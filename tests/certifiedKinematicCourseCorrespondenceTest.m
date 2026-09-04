@@ -1,0 +1,136 @@
+classdef certifiedKinematicCourseCorrespondenceTest < ...
+        matlab.unittest.TestCase
+    % certifiedKinematicCourseCorrespondenceTest Verify course correction.
+
+    methods (TestClassSetup)
+        function addEstimatorPath(testCase)
+            repoRoot = fileparts(fileparts(mfilename("fullpath")));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture( ...
+                fullfile(repoRoot, "estimator")));
+        end
+    end
+
+    methods (Test)
+        function exactSingleTrackDataRecoversBodyYaw(testCase)
+            yaw = 0.4;
+            sideslip = 0.06;
+            speed = 12.0;
+            rearAxleDistance = 1.45;
+            courseDirection = yaw+sideslip;
+            gnssVelocity = speed ...
+                * [cos(courseDirection); sin(courseDirection)];
+            yawRate = speed*sin(sideslip)/rearAxleDistance;
+
+            course = certifiedKinematicCourseCorrespondence( ...
+                gnssVelocity, yawRate, rearAxleDistance, ...
+                0.0, 0.0, 0.0, 0.15);
+
+            testCase.verifyTrue(course.correspondence.informative);
+            testCase.verifyTrue(course.inversionValid);
+            testCase.verifyTrue(course.boundsConsistent);
+            testCase.verifyEqual(course.estimatedSideslip, sideslip, ...
+                AbsTol=1.0e-14);
+            testCase.verifyEqual(course.sideslipErrorMaximum, 0.0, ...
+                AbsTol=1.0e-14);
+            testCase.verifyEqual(course.correspondence.heading, yaw, ...
+                AbsTol=1.0e-14);
+            testCase.verifyEqual(course.correspondence.radius, 0.0, ...
+                AbsTol=1.0e-14);
+        end
+
+        function simultaneousBoundedErrorsRemainCertified(testCase)
+            yaw = -0.35;
+            sideslip = 0.055;
+            speed = 11.0;
+            rearAxleDistance = 1.45;
+            modelMismatch = 0.018;
+            gyroError = -0.002;
+            velocityErrorMaximum = 0.05;
+            velocityError = velocityErrorMaximum/sqrt(2.0)*[1.0; -1.0];
+            trueVelocity = speed ...
+                * [cos(yaw+sideslip); sin(yaw+sideslip)];
+            trueYawRate = speed*sin(sideslip)/rearAxleDistance ...
+                + modelMismatch;
+            measuredYawRate = trueYawRate+gyroError;
+            measuredVelocity = trueVelocity+velocityError;
+
+            course = certifiedKinematicCourseCorrespondence( ...
+                measuredVelocity, measuredYawRate, rearAxleDistance, ...
+                velocityErrorMaximum, abs(gyroError), ...
+                abs(modelMismatch), 0.15);
+            expectedSineBound = rearAxleDistance ...
+                / (norm(measuredVelocity)-velocityErrorMaximum) ...
+                * (abs(gyroError)+abs(modelMismatch) ...
+                    + abs(measuredYawRate)*velocityErrorMaximum ...
+                        / norm(measuredVelocity));
+            actualYawError = abs(localWrapToPi( ...
+                course.correspondence.heading-yaw));
+
+            testCase.verifyTrue(course.correspondence.informative);
+            testCase.verifyEqual(course.sineErrorMaximum, ...
+                expectedSineBound, RelTol=1.0e-14);
+            testCase.verifyGreaterThanOrEqual( ...
+                sideslip, course.trueSideslipInterval(1));
+            testCase.verifyLessThanOrEqual( ...
+                sideslip, course.trueSideslipInterval(2));
+            testCase.verifyLessThanOrEqual( ...
+                actualYawError, course.correspondence.radius+1.0e-14);
+            testCase.verifyEqual(course.correspondence.radius, ...
+                asin(velocityErrorMaximum/norm(measuredVelocity)) ...
+                    + course.sideslipErrorMaximum, ...
+                RelTol=1.0e-14);
+        end
+
+        function declaredModelMismatchWidensOnlyModelRadius(testCase)
+            sideslip = 0.04;
+            speed = 10.0;
+            rearAxleDistance = 1.45;
+            velocity = speed*[cos(sideslip); sin(sideslip)];
+            yawRate = speed*sin(sideslip)/rearAxleDistance;
+
+            exact = certifiedKinematicCourseCorrespondence( ...
+                velocity, yawRate, rearAxleDistance, ...
+                0.02, 0.002, 0.0, 0.12);
+            uncertain = certifiedKinematicCourseCorrespondence( ...
+                velocity, yawRate, rearAxleDistance, ...
+                0.02, 0.002, 0.05, 0.12);
+
+            testCase.verifyEqual( ...
+                uncertain.correspondence.inertialDirectionRadius, ...
+                exact.correspondence.inertialDirectionRadius, ...
+                AbsTol=0.0);
+            testCase.verifyGreaterThan( ...
+                uncertain.sideslipErrorMaximum, ...
+                exact.sideslipErrorMaximum);
+            testCase.verifyGreaterThan( ...
+                uncertain.correspondence.radius, ...
+                exact.correspondence.radius);
+        end
+
+        function lowSpeedClaimsNoCourseYaw(testCase)
+            course = certifiedKinematicCourseCorrespondence( ...
+                [0.03; 0.0], 0.01, 1.45, ...
+                0.05, 0.002, 0.02, 0.12);
+
+            testCase.verifyFalse(course.speedCertificateValid);
+            testCase.verifyFalse(course.boundsConsistent);
+            testCase.verifyFalse(course.correspondence.informative);
+            testCase.verifyEqual(course.correspondence.radius, Inf);
+        end
+
+        function infeasibleArcsineArgumentClaimsNoCourseYaw(testCase)
+            course = certifiedKinematicCourseCorrespondence( ...
+                [1.0; 0.0], 1.0, 1.45, ...
+                0.01, 0.002, 0.02, 0.12);
+
+            testCase.verifyFalse(course.inversionValid);
+            testCase.verifyFalse(course.correspondence.informative);
+            testCase.verifyTrue(isnan(course.estimatedSideslip));
+            testCase.verifyEqual(course.correspondence.radius, Inf);
+        end
+    end
+end
+
+function value = localWrapToPi(value)
+    value = mod(value+pi, 2.0*pi)-pi;
+end
