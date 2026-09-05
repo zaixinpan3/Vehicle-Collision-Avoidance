@@ -15,7 +15,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         function resetController(testCase)
             clear collisionAvoidanceController collisionAvoidanceControllerConfig
             clear formulateTwoStageQp targetPredictionFutureSupport
-            clear solveHardCbfClf certifySweptRectangleIntervals
+            clear solveHardCbfClf
             collisionAvoidanceController("resetNominalTrajectory");
             localJointSolveHook("reset", struct());
             testCase.addTeardown(@() collisionAvoidanceController( ...
@@ -241,8 +241,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "routeCoordinateValid"));
             testCase.verifyFalse(isfield(problem.metadata, ...
                 "nodeClearanceMargin"));
-            testCase.verifyFalse(isfield(problem.metadata, ...
-                "sweptCollisionCertificate"));
+            testCase.verifyEqual(problem.metadata.collisionDiscretization, ...
+                "predictionNodesOnly");
         end
 
         function certifiedMultiStartUsesNoElasticRefinement(testCase)
@@ -456,30 +456,52 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:optimizationFailure");
         end
 
-        function sweptCheckRejectsBetweenNodeCrossing(testCase)
-            egoPose = [-2.0, 2.0; 0.0, 0.0; 0.0, 0.0];
-            targetPose = zeros(3, 2);
+        function nodeSafeFallbackAcceptsBetweenNodeCrossing(testCase)
+            % Synthetic fast crossing isolates the discrete-node convention:
+            % the target crosses the ego between two separated nodes.
+            cfg = localSmallConfiguration();
+            cfg.solver.jointFunction = @localJointSolveHook;
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
+                [0.0; 0.0]);
+            target = localTarget("crossing", [1.125; 30.0], [0.0; -400.0]);
+            [command, firstPlan, first] = collisionAvoidanceController( ...
+                ego, target, localLane(), cfg);
+            nextEgo = localNextEgo(first, command.actuatorInput);
+            nextTarget = localTarget( ...
+                "crossing", [1.125; 10.0], [0.0; -400.0]);
 
-            certificate = certifySweptRectangleIntervals( ...
-                egoPose, targetPose, [0.4; 0.2; 0.4; 0.2], 0.0, ...
-                struct("maxDepth", 10));
+            [nextCommand, ~, next] = collisionAvoidanceController( ...
+                nextEgo, nextTarget, localLane(), cfg);
 
-            testCase.verifyFalse(certificate.certified);
-            testCase.verifyEqual(certificate.failureReason, ...
-                "sampledCollision");
-            testCase.verifyLessThan(certificate.minimumMargin, 0.0);
+            midpointEgo = 0.5*(next.prediction.egoStateOffset(1:3, 1) ...
+                + next.prediction.stageMatrixA(1:3, :, 1) ...
+                    * next.prediction.egoStateOffset(:, 1) ...
+                + next.prediction.stageMatrixB(1:3, :, 1) ...
+                    * nextCommand.actuatorInput ...
+                + next.prediction.stageAffine(1:3, 1));
+            midpointDistance = rectangleConfigurationDistance( ...
+                midpointEgo(1:2), midpointEgo(3), ...
+                [1.125; 0.0], -pi/2.0, [2.4; 0.95; 2.4; 0.95]);
+            testCase.verifyLessThan(midpointDistance, 0.0);
+            testCase.verifyTrue(next.metadata.fallbackUsed);
+            testCase.verifyTrue(next.metadata.planCertified);
+            testCase.verifyTrue(next.metadata.postSolveCertificationPerformed);
+            testCase.verifyGreaterThan(next.metadata.nodeClearanceMargin, 0.0);
+            testCase.verifyEqual(nextCommand.actuatorInput, firstPlan(:, 2), ...
+                AbsTol=0.0);
+            testCase.verifyEqual(next.metadata.collisionDiscretization, ...
+                "predictionNodesOnly");
         end
 
-        function sweptCheckCertifiesSeparatedMotion(testCase)
-            egoPose = [-2.0, 2.0; 2.0, 2.0; 0.0, 0.0];
-            targetPose = zeros(3, 2);
+        function collisionAtTheNextNodeStillRejectsThePlan(testCase)
+            cfg = localSmallConfiguration();
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
+                [0.0; 0.0]);
+            target = localTarget("crossing", [0.75; 20.0], [0.0; -400.0]);
 
-            certificate = certifySweptRectangleIntervals( ...
-                egoPose, targetPose, [0.4; 0.2; 0.4; 0.2], 0.1, ...
-                struct("maxDepth", 10));
-
-            testCase.verifyTrue(certificate.certified);
-            testCase.verifyGreaterThan(certificate.minimumMargin, 0.0);
+            testCase.verifyError(@() collisionAvoidanceController( ...
+                ego, target, localLane(), cfg), ...
+                "collisionAvoidanceController:noSolution");
         end
     end
 end

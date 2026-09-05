@@ -24,6 +24,15 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function certificationHasNoBetweenNodeCollisionSettings(testCase)
+            cfg = collisionAvoidanceControllerConfig();
+
+            testCase.verifyFalse(isfield(cfg.certification, ...
+                "interSampleMaxDepth"));
+            testCase.verifyFalse(isfield(cfg.certification, ...
+                "interSampleDistanceTolerance"));
+        end
+
         function accelerationBoundsMustBeFiniteRealScalars( ...
                 testCase, boundField, invalidBound)
             override = struct("actuation", struct(boundField, invalidBound));
