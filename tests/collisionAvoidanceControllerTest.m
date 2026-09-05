@@ -14,7 +14,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
         function resetController(testCase)
             clear collisionAvoidanceController collisionAvoidanceControllerConfig
-            clear formulateTwoStageQp targetPredictionFutureSupport
+            clear formulateAvoidanceProblem targetPredictionFutureSupport
             clear solveHardCbfClf
             collisionAvoidanceController("resetNominalTrajectory");
             localJointSolveHook("reset", struct());
@@ -59,6 +59,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(second, third);
             testCase.verifyEqual(secondPlan, thirdPlan, AbsTol=0.0);
             testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(problem.metadata.candidateCount, 1);
+            testCase.verifyEqual(problem.metadata.solverCallCount, 1);
         end
 
         function solvedPlanRespectsConfiguredInputBounds(testCase)
@@ -93,53 +95,6 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 + problem.prediction.egoStateOffset;
             testCase.verifyEqual(problem.qp.nominalState, predicted, ...
                 AbsTol=1.0e-11);
-        end
-
-        function legacyQpStillReturnsAHardPlan(testCase)
-            cfg = localSmallConfiguration();
-            cfg.certification = struct("enabled", false);
-            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
-                [0.0; 0.0]);
-            target = localTarget("lead", [100.0; 0.0], [5.0; 0.0]);
-
-            [command, inputPlan, problem] = collisionAvoidanceController( ...
-                ego, target, localLane(), cfg);
-
-            testCase.verifyEqual(problem.qp.obstacleMode, "hard");
-            testCase.verifyFalse(problem.metadata.planCertified);
-            testCase.verifyEqual(command.actuatorInput, inputPlan(:, 1), ...
-                AbsTol=0.0);
-            testCase.verifyLessThanOrEqual(max( ...
-                problem.qp.inequalityMatrix*problem.decision ...
-                    - problem.qp.inequalityBound), 1.0e-6);
-        end
-
-        function legacyDisjunctiveSearchStillReturnsAHardPlan(testCase)
-            cfg = localSmallConfiguration();
-            cfg.certification = struct("enabled", false);
-            cfg.disjunctive.nodeBudget = 4;
-            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
-                [0.0; 0.0]);
-            target = localTarget("lead", [100.0; 0.0], [5.0; 0.0]);
-
-            [~, ~, problem] = collisionAvoidanceController( ...
-                ego, target, localLane(), cfg);
-
-            testCase.verifyEqual(problem.metadata.selectedCandidate, ...
-                "disjunctive");
-            testCase.verifyFalse(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(problem.metadata.disjunctiveExplored, 0);
-            testCase.verifyLessThanOrEqual(max( ...
-                problem.qp.inequalityMatrix*problem.decision ...
-                    - problem.qp.inequalityBound), 1.0e-6);
-        end
-
-        function certifiedModeRejectsFactRelaxationBudget(testCase)
-            override = struct("collision", struct("disturbanceBound", 0.01));
-
-            testCase.verifyError( ...
-                @() collisionAvoidanceControllerConfig(override), ...
-                "collisionAvoidanceController:invalidConfiguration");
         end
 
         function configurationOmitsActuatorRateLimits(testCase)
@@ -196,10 +151,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem] = collisionAvoidanceController( ...
                 ego, target, localLane(), cfg);
 
-            testCase.verifyEqual(problem.qp.obstacleMode, "certified");
-            testCase.verifyEqual(problem.layout.slackCount, 0);
-            testCase.verifyEmpty(problem.layout.slackIndex);
-            testCase.verifyEmpty(problem.metadata.safetySlackProfile);
+            testCase.verifyEqual(problem.layout.relaxationCount, 1);
+            testCase.verifyEqual(problem.layout.decisionCount, ...
+                problem.layout.planCount+1);
             testCase.verifyTrue(problem.metadata.cbfConstraintsHard);
             testCase.verifyTrue(problem.metadata.hardCbfSatisfied);
             testCase.verifyLessThanOrEqual( ...
@@ -216,10 +170,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 problem.metadata.inputDeviationCost ...
                     + problem.metadata.clfRelaxationCost, ...
                 AbsTol=1.0e-8);
-            testCase.verifyEqual(problem.metadata.solverCallCount, 1);
+            testCase.verifyEqual(problem.metadata.solverCallCount, 2);
             testCase.verifyTrue(problem.metadata.terminalInvariantCertified);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(problem.metadata.factRelaxedNodes, 0);
         end
 
         function freshHardSolutionSkipsDuplicateCertificate(testCase)
@@ -245,11 +198,10 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "predictionNodesOnly");
         end
 
-        function certifiedMultiStartUsesNoElasticRefinement(testCase)
+        function targetConstraintsUseBothPrescribedStarts(testCase)
             cfg = struct();
             cfg.controller = struct("sampleTime", 0.05, ...
                 "horizonSteps", 4);
-            cfg.disjunctive = struct("nodeBudget", 0);
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
                 [0.0; 0.0]);
             target = localTarget("lead", [100.0; 0.0], [5.0; 0.0]);
@@ -258,10 +210,10 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 ego, target, localLane(), cfg);
 
             testCase.verifyEqual(problem.metadata.candidateCount, 2);
-            testCase.verifyEqual( ...
-                problem.metadata.candidateRefinementRungs, [0.0, 0.0]);
+            testCase.verifyEqual(problem.metadata.candidateLabels, ...
+                ["shiftedPlan", "cruiseProbe"]);
             testCase.verifyEqual(problem.metadata.solverCallCount, 2);
-            testCase.verifyEqual(problem.layout.slackCount, 0);
+            testCase.verifyEqual(problem.layout.relaxationCount, 1);
             testCase.verifyTrue(problem.metadata.hardCbfSatisfied);
         end
 
@@ -509,8 +461,6 @@ end
 function cfg = localSmallConfiguration()
     cfg = struct();
     cfg.controller = struct("sampleTime", 0.05, "horizonSteps", 4);
-    cfg.disjunctive = struct("nodeBudget", 0);
-    cfg.sequentialConvex = struct("penaltySchedule", []);
 end
 
 function lane = localLane()

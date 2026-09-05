@@ -1,4 +1,4 @@
-function [signedDistance, normal, supportValue, outside, facetNormal] = ...
+function [signedDistance, normal, supportValue, outside] = ...
         rectangleConfigurationDistance( ...
         egoPosition, egoYaw, targetPosition, targetYaw, halfDimensions)
 % rectangleConfigurationDistance The configuration obstacle of two rectangles.
@@ -25,41 +25,16 @@ function [signedDistance, normal, supportValue, outside, facetNormal] = ...
 % obstacle, with equality at the closest point), and whether the
 % position was outside.
 %
-% Called in PATH COORDINATES by stage 1 (formulateTwoStageQp), with the
+% Called in PATH COORDINATES by stage 1 (formulateAvoidanceProblem), with the
 % heading errors as the yaws and the target centre as the origin, and
 % in Cartesian coordinates by the harness for the physical clearance
 % readout.
 %
-% The fifth output is the polygon's own FACET NORMALS, deduplicated by
-% direction (2-by-M, M <= 8; the four generator directions collapse to
-% two pairs when the rectangles are parallel). Those are the disjuncts
-% of the exact collision-free condition: the ego centre is outside the
-% obstacle if and only if it is outside at least one facet, and by the
-% separating-axis theorem for two convex polygons no other direction is
-% needed. They are what the disjunctive program branches on.
-
     [vertices, faceNormal, faceBound] = localConfigurationObstacle( ...
         egoYaw, targetPosition, targetYaw, halfDimensions);
     [signedDistance, normal, outside] = localPointPolygonSignedDistance( ...
         egoPosition, vertices, faceNormal, faceBound);
     supportValue = max(normal.' * vertices);
-    if nargout >= 5
-        facetNormal = localUniqueDirections(faceNormal.');
-    end
-end
-
-function directions = localUniqueDirections(candidate)
-% The distinct facet directions of the polygon, in the order they
-% appear. Parallel rectangles give collinear generators and so repeated
-% edge normals; a repeated disjunct is a redundant branch, not an
-% error, but dropping it halves the tree in the common aligned case.
-    directions = candidate(:, 1);
-    for columnIdx = 2:size(candidate, 2)
-        direction = candidate(:, columnIdx);
-        if all(abs(directions.' * direction - 1.0) > 1.0e-9)
-            directions(:, end + 1) = direction; %#ok<AGROW>
-        end
-    end
 end
 
 function [vertices, faceNormal, faceBound] = ...

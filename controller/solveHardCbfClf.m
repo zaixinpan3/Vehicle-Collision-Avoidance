@@ -1,16 +1,16 @@
 function result = solveHardCbfClf(problem, cfg)
 % solveHardCbfClf Solve hard CBF constraints with a joint CLF/input cost.
 %
-% The certified decision assembled by formulateTwoStageQp is
+% The certified decision assembled by formulateAvoidanceProblem is
 %
 %   z = [plan; delta],
 %
 % where every collision, road, physical, backup-tail, and terminal row is
-% hard. delta(1) is the only active relaxation and belongs exclusively to
+% hard. delta is the only active relaxation and belongs exclusively to
 % the exact first-step discrete CLF inequality. This routine performs one
 % conic solve of
 %
-%   min  J_input(plan) + w delta(1)
+%   min  J_input(plan) + w delta
 %
 % subject to those hard rows and the exact quadratic CLF condition. The
 % input quadratic is represented by its exact squared-norm epigraph. The
@@ -20,25 +20,15 @@ function result = solveHardCbfClf(problem, cfg)
     result = localEmptyResult();
     if problem.certifiedInfeasible
         result.exitFlag = -2;
-        result.infeasible = true;
-        result.unresolved = false;
         result.message = "hard CBF, terminal, or physical constraints " ...
             + "are infeasible";
         return;
     end
-    if layout.slackCount ~= 0 || ~isempty(layout.slackIndex)
-        error("collisionAvoidanceController:invalidCertifiedProblem", ...
-            "A certified hard-CBF problem must contain no safety slack.");
-    end
-
     program = localJointProgram(problem);
     jointSolve = localRunJointProgram(program, cfg);
     result.solverCalls = 1;
-    result.stageExitFlags = jointSolve.exitFlag;
     if ~jointSolve.feasible
         result.exitFlag = jointSolve.exitFlag;
-        result.infeasible = jointSolve.infeasible;
-        result.unresolved = jointSolve.unresolved;
         result.message = "joint CLF/input solve failed: " ...
             + jointSolve.message;
         return;
@@ -49,8 +39,6 @@ function result = solveHardCbfClf(problem, cfg)
     result.decision = decision;
     result.exitFlag = jointSolve.exitFlag;
     result.feasible = true;
-    result.infeasible = false;
-    result.unresolved = false;
     result.iterations = localIterationCount(jointSolve.output);
     result.algorithm = "coneprog hard-CBF joint CLF/input";
     result.message = "hard CBF feasible; joint CLF/input optimum solved";
@@ -68,7 +56,7 @@ function program = localJointProgram(problem)
     planLinear = problem.linear(planIndex);
     [factor, factorFlag] = chol(planHessian);
     if factorFlag ~= 0
-        error("collisionAvoidanceController:invalidCertifiedProblem", ...
+        error("collisionAvoidanceController:invalidProblem", ...
             "The plan/input Hessian must be positive definite.");
     end
     centre = -planHessian\planLinear;
@@ -102,9 +90,7 @@ function program = localJointProgram(problem)
     program.beq = zeros(0, 1);
     program.lb = [problem.lowerBound; 0.0];
     program.ub = [problem.upperBound; inf];
-    if numel(layout.relaxationIndex) > 1
-        program.ub(layout.relaxationIndex(2:end)) = 0.0;
-    end
+
 end
 
 function cone = localExactClfCone(problem)
@@ -154,10 +140,10 @@ function solve = localDefaultSolve(program, cfg)
         "ConstraintTolerance", cfg.solver.constraintTolerance, ...
         "OptimalityTolerance", cfg.solver.optimalityTolerance, ...
         "MaxIterations", cfg.solver.maxIterations);
-    [decision, objective, exitFlag, output] = coneprog( ...
+    [decision, ~, exitFlag, output] = coneprog( ...
         program.f, program.cones, program.A, program.b, ...
         program.Aeq, program.beq, program.lb, program.ub, options);
-    solve = struct("decision", decision, "objective", objective, ...
+    solve = struct("decision", decision, ...
         "exitFlag", exitFlag, "output", output);
     solve = localNormalizeSolve(solve, numel(program.f));
 end
@@ -170,15 +156,12 @@ function solve = localNormalizeSolve(solve, decisionCount)
     end
     if ~isfield(solve, "decision"), solve.decision = zeros(0, 1); end
     if ~isfield(solve, "exitFlag"), solve.exitFlag = -999; end
-    if ~isfield(solve, "objective"), solve.objective = inf; end
     if ~isfield(solve, "output"), solve.output = struct(); end
     solve.exitFlag = double(solve.exitFlag);
     solve.feasible = solve.exitFlag > 0 ...
         && isnumeric(solve.decision) && isreal(solve.decision) ...
         && numel(solve.decision) == decisionCount ...
         && all(isfinite(solve.decision));
-    solve.infeasible = solve.exitFlag == -2;
-    solve.unresolved = ~solve.feasible && ~solve.infeasible;
     solve.message = "solver exit flag "+string(solve.exitFlag);
     if isstruct(solve.output) && isfield(solve.output, "message")
         solve.message = solve.message+": "+string(solve.output.message);
@@ -199,9 +182,9 @@ function iterations = localIterationCount(output)
 end
 
 function solve = localEmptySolve()
-    solve = struct("decision", zeros(0, 1), "objective", inf, ...
+    solve = struct("decision", zeros(0, 1), ...
         "exitFlag", -999, "output", struct(), "feasible", false, ...
-        "infeasible", false, "unresolved", true, "message", "");
+        "message", "");
 end
 
 function result = localEmptyResult()
@@ -209,14 +192,10 @@ function result = localEmptyResult()
         "decision", zeros(0, 1), ...
         "exitFlag", -999, ...
         "feasible", false, ...
-        "infeasible", false, ...
-        "unresolved", true, ...
         "iterations", 0, ...
         "solverCalls", 0, ...
-        "retried", false, ...
         "algorithm", "coneprog hard-CBF joint CLF/input", ...
         "message", "", ...
         "objectiveValue", inf, ...
-        "clfValue", inf, ...
-        "stageExitFlags", -999);
+        "clfValue", inf);
 end

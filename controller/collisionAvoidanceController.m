@@ -1,222 +1,20 @@
 function [command, predictedInput, planningProblem] = ...
         collisionAvoidanceController( ...
         egoState, targetEstimate, laneCenterline, cfg)
-% collisionAvoidanceController Recursive hard-CBF, soft-CLF controller.
+% collisionAvoidanceController Recursive hard-CBF, soft-CLF MPC.
 %
-% The default certified mode imposes every collision and road CBF row as a
-% hard constraint, together with actuator, tire, model-domain, backup-tail,
-% and augmented terminal rows. There is no CBF or safety slack. If the
-% first-frame hard problem is infeasible, the controller raises noSolution
-% and issues no command. Inside the hard-safe feasible set, one conic solve
-% jointly minimizes the exact first-step discrete CLF relaxation and nominal
-% input intervention using their configured weights.
+% Every covered collision and road row is hard at every prediction node,
+% including the measured state and braking tail. One joint conic solve per
+% start minimizes input deviation and exact first-step CLF relaxation.
+% The starts are the shifted plan and, when target constraints are present,
+% the obstacle-free cruise reference. The least-cost feasible plan is used.
+% A solver failure may use a compatible stored plan only after rechecking
+% its shifted hard rows, node clearance, model assumptions and terminal set.
+% See PCBF_CLF_ARCHITECTURE.md for the algorithm and certificate assumptions.
 %
-% Collision freedom is defined at the discrete prediction nodes, including
-% the braking-tail nodes. A plan whose node separation constraints hold is
-% collision-free under this convention. Motion between adjacent nodes is
-% not evaluated when accepting either a new solution or a stored fallback.
-%
-% A feasible result of the certified hard-constrained optimization is
-% accepted and stored directly; it is not passed through a duplicate check
-% of prediction assumptions, route coordinates, hard CBF rows, terminal
-% invariance, or exact node clearance. On the next call, measured ego state,
-% held actuation when available, and the fresh target prediction must equal
-% the stored one-step shift. The LTV schedule is
-% shifted rather than regenerated. If a new solve fails, the shifted stored
-% plan is the exceptional fallback path and is rechecked before execution.
-% An old plan is never silently applied to a changed episode.
-%
-% The braking tail ends at rest in a hard target-conditioned terminal
-% half-space. Its threshold is the support of the controller's COMPLETE
-% predicted target continuation in a fixed inertial direction, enlarged by
-% footprint circumradii and the certified lateral-tail envelope. The
-% support interface admits every trajectory produced by the predictor;
-% stationary, straight, monotone, or curvature predicates are never
-% terminal admissibility conditions. Exact prediction and shift
-% consistency are visible in the returned certification metadata.
-%
-% The shared two-stage geometry and the optional noncertified legacy path
-% are detailed below. Statements about fact-row relaxation, elastic
-% refinement, predictive tangent CLF rows, or a monitored one-step rest
-% contract apply only when cfg.certification.enabled is false. Certified
-% mode may evaluate multiple starts, but every resulting problem is hard.
-%
-% The legacy path uses one convex quadratic program per sample: the
-% two-stage approximate convex optimization of Li, Zhang, Guo, Lenzo
-% and Guo (2023) - TWO_STAGE_QP.md - on the scheduled Frenet LTV
-% dynamic-bicycle model. Its ingredients, and nothing else:
-%
-%   SAFETY is the collision-free condition dist(ego_k, target_k) >= d_min
-%   at every node of the prediction horizon, made convex in two
-%   stages and imposed HARD. STAGE 1 solves, at every node, the DUAL
-%   of the distance problem between a LINEARIZATION TRAJECTORY's ego
-%   rectangle and the target rectangle in path coordinates (paper
-%   Eq. 12): the exact projection of the ego centre onto the TRUE
-%   configuration obstacle, the Minkowski sum of the two ORIENTED
-%   rectangles (rectangleConfigurationDistance) - a convex polygon of
-%   at most eight vertices, with no bounding box taken of either
-%   rectangle. Its optimizer is the separating direction n_k. STAGE 2
-%   freezes n_k and imposes the affine row (paper Eq. 13 without its
-%   slack), written through the two rectangles' SUPPORT FUNCTIONS,
-%   with the decision's yaw charged by the exact Lipschitz bound of
-%   the ego's support over the heading interval the program admits
-%   (TWO_STAGE_SAFETY.md, Lemmas 1'-4). Weak duality makes the row
-%   SUFFICIENT for the true rectangle separation at every plan, and
-%   strong duality makes it EXACT at the linearization trajectory: the
-%   row is the supporting half-plane of the true obstacle facing that
-%   trajectory - an edge of one of the rectangles where it faces an
-%   edge, the vertex direction where it faces a corner. There is no
-%   slack, no priced violation, no face assignment, no barrier chain: a
-%   plan that cannot honour every imposed row is "no solution".
-%
-%   THE TERMINAL SET closes the horizon (TWO_STAGE_SAFETY.md, "The
-%   terminal set"). Every program ends in a KINEMATIC BRAKING TAIL of
-%   N_b further stages whose accelerations are decision variables, on
-%   which the same separation and road rows are imposed, and which
-%   must end at REST. A plan is admitted only if the vehicle can come
-%   to rest from its terminal state without violating a row on the
-%   way - the backup-set construction of the control-barrier-function
-%   literature, with the optimizer supplying the witness. Rest is
-%   invariant under zero input, so under the declared model and target
-%   prediction the previous plan shifted by one stage, with a zero
-%   tail input appended, is a feasible point of the next sample's
-%   program (Proposition 8): the feasible set is control invariant,
-%   and the hard rows are a control barrier function. The tail is
-%   never executed. Its lateral band and the terminal handoff rows on
-%   the heading error, the lateral velocity and the yaw-rate error are
-%   certified in closed form (terminalLateralCertificate), and the
-%   tail's length is derived from the actuator (kinematicBrakingTail).
-%
-%   A hard row is a constraint only where the input has authority over
-%   it. Under the forward-Euler stage map the pose one step ahead is a
-%   fact of the measured state and the input's authority over a node's
-%   margin grows like the fourth power of the node index; one sample of
-%   plant mismatch moves a margin by up to the declared
-%   cfg.collision.disturbanceBound, and at a node the input cannot move
-%   by that much a hard row is either true or infeasible. The rows are
-%   imposed wherever some plan in the input reach box
-%   satisfies them; a row every plan in the box misses, at a node of
-%   the near window, by at most the mismatch it can have accumulated
-%   since it was last a hard row, is a fact, and where a candidate is
-%   nevertheless infeasible the near-window rows no admissible plan
-%   satisfies jointly (the friction polygon, which the reach box does
-%   not see) are named by one least-relaxation LP and, within the same
-%   allowance, become facts as well (localFactRelaxation). Facts are
-%   reported (collisionFactViolation), never imposed; a row missed by
-%   more, or beyond the window, makes the candidate infeasible
-%   (TWO_STAGE_SAFETY.md, Proposition 2).
-%
-%   THE LINEARIZATION TRAJECTORY DECIDES THE HOMOTOPY CLASS, and that
-%   is the design's one real difficulty. The frozen dual is one of the
-%   four supporting half-planes of the target box, chosen by the
-%   trajectory alone: a trajectory behind the target yields "stay
-%   behind the rear face", a row whose coefficient on the lateral
-%   coordinate is zero. Such a program can neither see nor reach a
-%   passing plan, and its solution is another behind trajectory - a
-%   FIXED POINT that survives any number of re-linearizations at the
-%   solution, and that persists after braking has stopped being an
-%   answer. No convex relaxation escapes it: the supporting
-%   half-planes of the obstacle union to its complement, whose convex
-%   hull is the whole plane, so every single convex program is blind to
-%   every class but its own.
-%
-%   THE ANSWER IS NOT A CASE ANALYSIS BUT A SECOND START. This file
-%   contains no test on the driving situation - not whether the target
-%   is ahead or beside, not whether the plan is following or passing,
-%   not which way to go. The controller solves the same trajectory
-%   optimization from two STARTS: the shifted previous solution (the
-%   receding horizon's warm start) and the cruise probe (the
-%   obstacle-free reference, a cold start, which runs THROUGH the
-%   obstacle so that stage 1 answers it with the outward normal of the
-%   least-penetrated edge - lateral, for an obstacle longer than it is
-%   wide entered from behind - and those are rows that credit
-%   steering). Each start is refined by the same sequential convex loop
-%   (localRefineStart): while its own stage-1 margins show a shortfall,
-%   re-solve an ELASTIC program at it - one priced slack per imposed
-%   target node, everything else hard - and take the solution as the
-%   next linearization, stage 1 recomputed there so the normals rotate
-%   with the iterate. A start already separated exits before solving
-%   anything, which the shifted plan normally does, so the receding
-%   horizon pays nothing for the machinery. Each refined start is then
-%   solved as the same hard program and the feasible one with the least
-%   EXACT objective is committed (localSolve). Braking, following,
-%   passing left and passing right are outcomes of that comparison;
-%   none is a case in the code, and no side is ever named - which side
-%   a start ends up on is the sign of its own offset from the target's
-%   centre line. No rung is ever committed.
-%
-%   TRACKING is the soft control Lyapunov condition
-%   V(e_{k+1}) - V(e_k) <= -f W(e_k) + delta_k on every transition,
-%   with V the discrete Riccati certificate of the path-frame cruise
-%   error about the cruise EQUILIBRIUM of the declared model, and
-%   delta_k >= 0 priced in the objective. Cruising at the reference
-%   speed along the nominal path is what the CLF asks for; it is never
-%   a tracking cost. The rows are the tangent of V at the nominal
-%   error, and a tangent of a convex quadratic credits an unbounded
-%   decrease along its downhill direction, so the plan's error is held
-%   within a TRUST REGION of the nominal's (cfg.clf.trustRegionScale
-%   error scales per channel and sample): the receding-horizon loop is
-%   a damped SQP iteration of the exact rows, not an unbounded one.
-%
-%   THE OBJECTIVE is minimum intervention: the deviation of the whole
-%   input plan from the cruise equilibrium input, plus the price of the
-%   CLF relaxations. There is no tracking cost, no collision cost, no
-%   terminal cost; the tail accelerations are priced only for positive
-%   definiteness.
-%
-% The closed-loop behaviour follows from those alone. In free cruise
-% the separation rows are inactive, the relaxations are zero, and the
-% plan holds the equilibrium input. When the target's box enters the
-% horizon the rows at the far nodes become active, the incumbent
-% brakes while its duals face the rear of the obstacle; the second
-% start, refined from the obstacle-free reference, offers whatever
-% class it converges to; and the objective commits whichever costs
-% less inside the rows, the model domain, the friction circles and the
-% input box. After the target passes the rows go inactive again
-% and the relaxed CLF rows pull the vehicle back to cruise.
-%
-% In certified mode the returned planCertified flag means that the hard
-% constrained solver returned a feasible plan, or that an exceptional stored
-% fallback passed its separate recheck. Under the exact shift assumptions,
-% the shifted stored candidate supplies the recursive-feasibility induction.
-% In legacy mode the weaker per-sample/fact-row claims in
-% TWO_STAGE_SAFETY.md apply; they must not be read as this certificate.
-%
-% The certified memory is the complete plan together with its predicted
-% state, target continuation, shifted LTV schedule, terminal lateral
-% reference, and applied first input. The first backup-tail acceleration
-% enters the head together with the analytic terminal steering law. The
-% resetNominalTrajectory action deliberately invalidates all of it. In
-% legacy mode no plan is retained between calls; each call starts from the
-% current schedule reference.
-%
-% Inputs: egoState (explicit controller-state fields or the
-% estimator's egoState vector form, optionally heldActuatorInput and
-% longitudinalAccelerationBias), targetEstimate (at most one target),
-% laneCenterline (an N-by-2 centerline or a road-geometry structure
-% with centerline, finite local-quadratic boundaries and a route), and
-% the configuration override merged over
-% config/collisionAvoidanceControllerConfig. The command is
-% [frontWheelSteeringAngle; longitudinalAcceleration] with the
-% axle-force readout; predictedInput is the whole plan; the third
-% output carries the program, the decision, and the diagnostics
-% (metadata: collisionMargin, collisionPlanMargin, collisionFactViolation,
-% collisionImposedFrom, candidateLabels, selectedCandidate,
-% candidateObjectives, candidateRefinementRungs, dualRegionProfile,
-% dualNormalProfile, clfRelaxation, ...).
-%
-% Modules: readPlanningInputs (input contract), ltvBicyclePrediction
-% (schedule and condensation of the Frenet model over
-% ltvBicycleStageMatrices), formulateTwoStageQp
-% (stage 1 duals, stage 2 rows, the cruise probe, CLF data, objective,
-% with cruiseEquilibrium local to it), solveHardCbfClf (the certified
-% joint conic kernel), solveTwoStageQp (the legacy QP kernel),
-% frictionCirclePolygonRows with axleFrictionParameters (the actuator/tire
-% layer, using acceleration bounds validated by the configuration entry),
-% laneProjection and laneCurvatureAtStation (the path frame),
-% rectangleConfigurationDistance (the configuration obstacle: stage 1
-% in path coordinates, and the physical clearance readout in Cartesian
-% coordinates).
+% Inputs are ego state, target estimate, route and configuration overrides.
+% Outputs are the steering/acceleration command, input plan and diagnostics.
+% collisionAvoidanceController("resetNominalTrajectory") clears stored state.
 
     persistent previousCertificate
     if nargin >= 1 && (ischar(egoState) ...
@@ -276,30 +74,22 @@ function [command, predictedInput, planningProblem] = ...
         [inputPlan, problem, plan] = localSolve( ...
             model, prediction, nominalInput);
     catch exception
-        if ~certificateCompatible || ~previousCertificate.certified
+        if ~certificateCompatible
             previousCertificate = [];
             rethrow(exception);
         end
         [inputPlan, problem, plan] = localStoredFallback( ...
-            nominalInput, prediction, previousCertificate, exception, model);
+            nominalInput, prediction, exception, model);
         fallbackUsed = true;
     end
     if ~fallbackUsed
-        problem.metadata.planCertified = cfg.certification.enabled;
+        problem.metadata.planCertified = true;
         problem.metadata.certificateSource = ...
             "hardConstrainedOptimization";
         problem.metadata.postSolveCertificationPerformed = false;
-        if cfg.certification.enabled
-            previousCertificate = localStoredCertificate( ...
-                plan, prediction, model, problem.metadata);
-        else
-            previousCertificate = [];
-        end
     end
-    if fallbackUsed
-        previousCertificate = localStoredCertificate( ...
-            plan, prediction, model, problem.metadata);
-    end
+    previousCertificate = localStoredCertificate( ...
+        plan, prediction, model);
     command = localCommand(inputPlan, model);
     predictedInput = inputPlan;
     planningProblem = [];
@@ -324,20 +114,12 @@ function identity = localEpisodeIdentity(model)
 end
 
 function compatible = localCertificateCompatible(certificate, identity, model)
-    compatible = isstruct(certificate) && isscalar(certificate) ...
-        && isfield(certificate, "certified") && certificate.certified ...
-        && isfield(certificate, "episodeIdentity") ...
-        && isequaln(certificate.episodeIdentity, identity) ...
-        && isfield(certificate, "plan") ...
-        && isfield(certificate, "schedule") ...
-        && isfield(certificate, "targetHorizon") ...
-        && isfield(certificate, "predictedState") ...
-        && isfield(certificate, "appliedInput") ...
-        && isfield(certificate, "terminalLateralReference");
+    compatible = ~isempty(certificate) ...
+        && isequaln(certificate.episodeIdentity, identity);
     if ~compatible
         return;
     end
-    tolerance = model.cfg.certification.shiftConsistencyTolerance;
+    tolerance = model.cfg.controller.shiftConsistencyTolerance;
     compatible = size(certificate.predictedState, 2) >= 2 ...
         && localNumericallyEqual(certificate.predictedState(:, 2), ...
             model.initialEgoState, tolerance) ...
@@ -483,11 +265,9 @@ function schedule = localShiftSchedule(previous, model)
         "tailAcceleration", tailAcceleration);
 end
 
-function stored = localStoredCertificate( ...
-        plan, prediction, model, metadata)
+function stored = localStoredCertificate(plan, prediction, model)
     predictedState = localPredictedState(prediction, plan);
     stored = struct( ...
-        "certified", true, ...
         "plan", plan, ...
         "schedule", prediction.scheduleForStore, ...
         "targetHorizon", model.targetHorizon, ...
@@ -495,16 +275,14 @@ function stored = localStoredCertificate( ...
         "predictedState", predictedState, ...
         "appliedInput", plan(1:model.inputDimension), ...
         "terminalLateralReference", ...
-            predictedState(2, prediction.headNodeCount), ...
-        "metadata", metadata);
+            predictedState(2, prediction.headNodeCount));
 end
 
 function [inputPlan, problem, plan] = localStoredFallback( ...
-        shiftedPlan, prediction, storedCertificate, exception, model)
+        shiftedPlan, prediction, exception, model)
     plan = shiftedPlan;
-    options = struct("label", "verifiedStoredPlan", ...
-        "obstacleMode", "certified", "trustRegionScale", inf);
-    qp = formulateTwoStageQp(model, prediction, plan, options);
+    qp = formulateAvoidanceProblem( ...
+        model, prediction, plan, "verifiedStoredPlan");
     layout = qp.layout;
     decision = zeros(layout.decisionCount, 1);
     decision(layout.planIndex) = plan;
@@ -523,10 +301,8 @@ function [inputPlan, problem, plan] = localStoredFallback( ...
     end
     inputPlan = reshape(plan(1:prediction.inputCount), ...
         model.inputDimension, []);
-    jointObjective = 0.5*decision.'*qp.Hessian*decision ...
-        + qp.linear.'*decision+qp.constant;
-    result = struct("objectiveValue", jointObjective, "exitFlag", 1, ...
-        "iterations", 0, "retried", false, ...
+    result = struct("exitFlag", 1, ...
+        "iterations", 0, ...
         "algorithm", "verified stored incumbent", ...
         "message", "No optimization used; all shifted rows were checked.");
     metadata = localPlanDiagnostics( ...
@@ -548,7 +324,7 @@ function [inputPlan, problem, plan] = localStoredFallback( ...
         "metadata", metadata);
     [verified, planCertificate] = localFallbackCertificate( ...
         problem, plan, model, prediction);
-    if ~verified || ~storedCertificate.certified
+    if ~verified
         error("collisionAvoidanceController:invalidStoredCertificate", ...
             "The shifted stored plan failed its exact commit certificate " ...
             + "(%s) after %s.", ...
@@ -662,11 +438,10 @@ end
 function [nominalInput, source] = localNominalInput( ...
         previousPlan, prediction, model, certificate)
 % The linearization nominal, a PLAN vector (head inputs then tail
-% accelerations): the previous plan shifted by one stage - the head
-% advanced, its new last input the repeated steering with the tail's
-% first acceleration, the tail advanced with a zero input appended -
+% accelerations): advance the head, append terminal steering with the
+% tail's first acceleration, and advance the tail with zero appended -
 % or the schedule reference with its braking tail. The shift is the
-% candidate of Proposition 8: under the declared model it is a feasible
+% backup candidate: under the declared model it is a feasible
 % point of this sample's program.
     if isnumeric(previousPlan) && isreal(previousPlan) ...
             && numel(previousPlan) == prediction.planCount ...
@@ -683,13 +458,9 @@ function [nominalInput, source] = localNominalInput( ...
                     * shiftedInput(:, stageIdx) ...
                 + prediction.stageAffine(:, stageIdx);
         end
-        if isstruct(certificate) ...
-                && isfield(certificate, "terminalLateralReference")
-            shiftedInput(1, end) = localTerminalBackupSteering( ...
-                state, certificate.terminalLateralReference, ...
-                prediction.scheduleCurvature(model.horizonSteps), ...
-                model.cfg);
-        end
+        shiftedInput(1, end) = localTerminalBackupSteering( ...
+            state, certificate.terminalLateralReference, ...
+            prediction.scheduleCurvature(model.horizonSteps), model.cfg);
         shiftedTail = [tail(2:end); 0.0];
         nominalInput = [shiftedInput(:); shiftedTail(:)];
         source = "shiftedPreviousPlan";
@@ -734,72 +505,13 @@ end
 
 function [inputPlan, problem, plan] = localSolve( ...
         model, prediction, nominalInput)
-% The sample's programs, and the only place a behaviour is chosen.
-%
-% THE CONTROLLER CONTAINS NO TEST ON THE DRIVING SITUATION. It does not
-% ask whether the target is ahead or beside, whether the plan is
-% following or passing, whether a manoeuvre is called for, or which way
-% to go. It solves the same trajectory optimization from a fixed set of
-% STARTS, refines each by the same sequential convex loop, solves each
-% as the same hard program, and commits the feasible one with the least
-% EXACT objective. Braking, following, passing left and passing right
-% are outcomes of that comparison, never cases in this file.
-%
-% THE STARTS are the two the problem itself supplies:
-%
-%   the SHIFTED PLAN   - the previous solution advanced one stage, the
-%                        receding horizon's own warm start;
-%   the CRUISE PROBE   - the trajectory the vehicle would follow if the
-%                        target were not there (formulateTwoStageQp>
-%                        localCruiseProbeInput), the obstacle-free
-%                        reference, which is a cold start.
-%
-% Both are functions of the route, the measured state and the declared
-% model; neither names a manoeuvre. The second is formed whenever the
-% obstacle CONSTRAINS the program - that is, whenever the target family
-% imposes a row - because that is exactly when the linearization can
-% decide the answer; it is a statement about the program, not about the
-% scene.
-%
-% WHY MORE THAN ONE START. The frozen dual is one supporting half-plane
-% of the configuration obstacle, chosen by the trajectory stage 1 is
-% evaluated on, so that trajectory fixes the homotopy class: a braking
-% linearization yields rows with no lateral coefficient whose feasible
-% set contains no passing plan, and re-solving at the solution
-% reproduces it (TWO_STAGE_SAFETY.md, Proposition 5). One start can
-% therefore only ever return its own class. Two starts return two, and
-% the objective - not the author - decides between them.
-%
-% CERTIFIED MODE solves the hard program directly at each start. It has no
-% collision slack and no elastic refinement; if neither hard candidate is
-% feasible on the first frame, controller failure is declared. The optional
-% legacy mode may refine each start through localRefineStart before its hard
-% solve.
-%
-% Certified candidates each use the joint solver's configured budget.
-% In legacy mode the first candidate gets the full budget and retry ladder,
-% and the others cfg.solver.candidateMaxIterations without retries. Stalled
-% candidates are retried only when nothing resolved.
+% Solve the same hard-CBF/soft-CLF problem at each prescribed start.
     cfg = model.cfg;
-    if cfg.disjunctive.nodeBudget > 0
-        [inputPlan, problem, plan] = localSolveDisjunctive(model, ...
-            prediction, nominalInput);
-        return;
-    end
-    firstOptions = struct();
-    if cfg.certification.enabled
-        firstOptions = struct("label", "shiftedPlan", ...
-            "obstacleMode", "certified", "trustRegionScale", inf);
-    end
-    [firstQp, common] = formulateTwoStageQp( ...
-        model, prediction, nominalInput, firstOptions);
+    [firstQp, common] = formulateAvoidanceProblem( ...
+        model, prediction, nominalInput, "shiftedPlan");
     startInput = {nominalInput};
     labels = "shiftedPlan";
-    % The obstacle-free reference is a second start exactly when the
-    % obstacle constrains this program.
-    if ~isempty(cfg.sequentialConvex.penaltySchedule) ...
-            && ~isempty(firstQp.collision.nodes) ...
-            && any([firstQp.collision.nodes.imposed])
+    if any([firstQp.collision.nodes.imposed])
         startInput{end+1} = common.probeInput;
         labels(end+1) = "cruiseProbe";
     end
@@ -807,85 +519,39 @@ function [inputPlan, problem, plan] = localSolve( ...
     candidateCount = numel(startInput);
     qps = cell(1, candidateCount);
     results = cell(1, candidateCount);
-    trustDroppedFlags = false(1, candidateCount);
-    factRelaxedCounts = zeros(1, candidateCount);
-    rungCounts = zeros(1, candidateCount);
     startViolations = zeros(1, candidateCount);
-    refinementCalls = 0;
+    solverCalls = 0;
     for candidateIdx = 1:candidateCount
-        if cfg.certification.enabled
-            % Each hard problem supplies both start diagnostics and the
-            % solve. The first problem already exists from start selection.
-            if candidateIdx == 1
-                qps{candidateIdx} = firstQp;
-            else
-                options = firstOptions;
-                options.label = labels(candidateIdx);
-                qps{candidateIdx} = formulateTwoStageQp( ...
-                    model, prediction, startInput{candidateIdx}, ...
-                    options, common);
-            end
-            startViolations(candidateIdx) = ...
-                localStartViolation(qps{candidateIdx});
-            results{candidateIdx} = solveHardCbfClf(qps{candidateIdx}, cfg);
+        if candidateIdx == 1
+            qps{candidateIdx} = firstQp;
         else
-            policy = struct();
-            if candidateIdx > 1
-                policy = struct( ...
-                    "maxIterations", cfg.solver.candidateMaxIterations, ...
-                    "retry", false);
-            end
-            [refined, rungCounts(candidateIdx), ...
-                startViolations(candidateIdx), refinementSolves] = ...
-                localRefineStart(model, prediction, common, cfg, ...
-                    startInput{candidateIdx});
-            refinementCalls = refinementCalls+refinementSolves;
-            [qps{candidateIdx}, results{candidateIdx}, ...
-                trustDroppedFlags(candidateIdx), ...
-                factRelaxedCounts(candidateIdx)] = localLegacyCandidate( ...
-                    model, prediction, refined, common, cfg, ...
-                    labels(candidateIdx), policy);
+            qps{candidateIdx} = formulateAvoidanceProblem( ...
+                model, prediction, startInput{candidateIdx}, ...
+                labels(candidateIdx), common);
         end
-    end
-    % Nothing resolved: give the stalled candidates the retry ladder.
-    if ~any(cellfun(@(candidate) candidate.feasible, results))
-        for candidateIdx = 1:candidateCount
-            if results{candidateIdx}.unresolved
-                results{candidateIdx} = localSolveCandidate( ...
-                    qps{candidateIdx}, cfg, struct());
-            end
-        end
+        startViolations(candidateIdx) = ...
+            localStartViolation(qps{candidateIdx});
+        results{candidateIdx} = solveHardCbfClf(qps{candidateIdx}, cfg);
+        solverCalls = solverCalls+results{candidateIdx}.solverCalls;
     end
 
     exitFlags = zeros(1, candidateCount);
-    linearObjectives = inf(1, candidateCount);
-    exactObjectives = inf(1, candidateCount);
-    clfObjectives = inf(1, candidateCount);
-    certified = false(1, candidateCount);
+    objectives = inf(1, candidateCount);
+    clfValues = inf(1, candidateCount);
+    certifiedInfeasible = false(1, candidateCount);
     messages = strings(1, candidateCount);
-    solverCalls = refinementCalls;
     bestIdx = 0;
     for candidateIdx = 1:candidateCount
-        candidateQp = qps{candidateIdx};
-        candidateResult = results{candidateIdx};
-        exitFlags(candidateIdx) = candidateResult.exitFlag;
-        certified(candidateIdx) = candidateQp.certifiedInfeasible;
-        messages(candidateIdx) = candidateResult.message;
-        solverCalls = solverCalls+candidateResult.solverCalls;
-        if candidateResult.feasible
-            linearObjectives(candidateIdx) = candidateResult.objectiveValue;
-            if cfg.certification.enabled
-                clfObjectives(candidateIdx) = candidateResult.clfValue;
-                exactObjectives(candidateIdx) = ...
-                    candidateResult.objectiveValue;
-            else
-                clfObjectives(candidateIdx) = 0.0;
-                exactObjectives(candidateIdx) = localExactObjective( ...
-                    candidateQp, candidateResult.decision, cfg);
-            end
+        candidate = results{candidateIdx};
+        exitFlags(candidateIdx) = candidate.exitFlag;
+        certifiedInfeasible(candidateIdx) = ...
+            qps{candidateIdx}.certifiedInfeasible;
+        messages(candidateIdx) = candidate.message;
+        if candidate.feasible
+            clfValues(candidateIdx) = candidate.clfValue;
+            objectives(candidateIdx) = candidate.objectiveValue;
             if bestIdx == 0 || localObjectiveBetter( ...
-                    exactObjectives(candidateIdx), ...
-                    exactObjectives(bestIdx), cfg)
+                    objectives(candidateIdx), objectives(bestIdx), cfg)
                 bestIdx = candidateIdx;
             end
         end
@@ -893,16 +559,11 @@ function [inputPlan, problem, plan] = localSolve( ...
     if bestIdx == 0
         if all(exitFlags == -2)
             error("collisionAvoidanceController:noSolution", ...
-                "No solution: the two-stage convex program is " ...
-                + "infeasible from every start (%s). No admissible " ...
-                + "input plan satisfies the hard separation rows " ...
-                + "imposed from node %d, the model domain, the " ...
-                + "friction rows and input bounds over the horizon; " ...
-                + "nothing is issued.", strjoin(labels, ", "), ...
-                localFirstImposedNode(qps{1}.collision));
+                "The hard-CBF/soft-CLF problem is infeasible from every " ...
+                + "start (%s). No command is issued.", strjoin(labels, ", "));
         end
         error("collisionAvoidanceController:optimizationFailure", ...
-            "The convex solver returned no plan (%s).", ...
+            "The conic solver returned no plan (%s).", ...
             strjoin(labels+": "+messages, "; "));
     end
 
@@ -912,38 +573,21 @@ function [inputPlan, problem, plan] = localSolve( ...
     layout = qp.layout;
     plan = localCommittedPlan(decision, qp);
     inputPlan = localHeadInputPlan(plan, layout);
-
-    problem = struct();
-    problem.problemClass = qp.problemClass;
-    problem.qp = qp;
-    problem.layout = layout;
-    problem.prediction = prediction;
-    problem.nominalInput = nominalInput;
-    problem.decision = decision;
-    problem.inputPlan = inputPlan;
-    problem.plan = plan;
-    problem.tailPlan = plan(layout.tailIndex);
-    problem.metadata = localPlanDiagnostics( ...
-        qp, result, decision, model, prediction);
+    problem = struct( ...
+        "problemClass", qp.problemClass, "qp", qp, "layout", layout, ...
+        "prediction", prediction, "nominalInput", nominalInput, ...
+        "decision", decision, "inputPlan", inputPlan, "plan", plan, ...
+        "tailPlan", plan(layout.tailIndex), ...
+        "metadata", localPlanDiagnostics(qp, result, decision, model, prediction));
     problem.metadata.candidateCount = candidateCount;
     problem.metadata.candidateLabels = labels;
     problem.metadata.candidateExitFlags = exitFlags;
-    problem.metadata.candidateObjectives = exactObjectives;
-    problem.metadata.candidateClfValues = clfObjectives;
-    problem.metadata.candidateLinearObjectives = linearObjectives;
-    problem.metadata.candidateCertifiedInfeasible = certified;
-    problem.metadata.candidateFactRelaxed = factRelaxedCounts;
-    problem.metadata.candidateRefinementRungs = rungCounts;
+    problem.metadata.candidateObjectives = objectives;
+    problem.metadata.candidateClfValues = clfValues;
+    problem.metadata.candidateCertifiedInfeasible = certifiedInfeasible;
     problem.metadata.candidateStartViolation = startViolations;
-    problem.metadata.candidatesSolved = sum(~certified);
+    problem.metadata.candidatesSolved = sum(~certifiedInfeasible);
     problem.metadata.selectedCandidate = labels(bestIdx);
-    problem.metadata.objectiveExact = exactObjectives(bestIdx);
-    if cfg.certification.enabled
-        problem.metadata.jointObjectiveValue = exactObjectives(bestIdx);
-    end
-    problem.metadata.trustRegionDropped = trustDroppedFlags(bestIdx);
-    problem.metadata.factRelaxedNodes = factRelaxedCounts(bestIdx);
-    problem.metadata.refinementRungs = rungCounts(bestIdx);
     problem.metadata.solverCallCount = solverCalls;
 end
 
@@ -951,246 +595,6 @@ function better = localObjectiveBetter(candidate, incumbent, cfg)
     tolerance = cfg.solver.optimalityTolerance;
     better = candidate ...
         < incumbent-tolerance*(1.0+abs(incumbent));
-end
-
-function [inputPlan, problem, plan] = localSolveDisjunctive( ...
-        model, prediction, nominalInput)
-% THE DISJUNCTIVE PATH: one linearization, and the homotopy class a
-% decision of the optimization rather than of a start.
-%
-% The exact collision-free condition is the OR over the configuration
-% obstacle's facets, and here that OR is in the model
-% (formulateTwoStageQp>localDisjunctionData). The program is solved by
-% branch and bound over the facet assignment (localDisjunctiveSearch),
-% so its answer is the best plan over EVERY class the model admits -
-% not the best plan among the classes some set of starts happened to
-% reach. Run to exhaustion it is the global optimum of the convexified
-% program at this linearization, and it says so (`disjunctiveProven`);
-% cut short by the node budget it is anytime, and reports the certified
-% gap to the best any class could achieve.
-%
-% There is no start set here, no refinement ladder and no probe: with
-% the disjunction explicit they have nothing left to do. The
-% linearization is the shifted previous solution, which fixes the CLF
-% tangents, the obstacle's facet directions (through the ego's yaw) and
-% the trust region - and the receding horizon is the sequential convex
-% iteration over it.
-    cfg = model.cfg;
-    [qp, result, info, trustDropped, factRelaxed] = ...
-        localDisjunctiveCandidate(model, prediction, nominalInput, ...
-            [], cfg);
-    if ~result.feasible
-        % The shifted plan is the feasible point Proposition 8 promises
-        % under its premises; when the sample fails, how far it itself
-        % is from the rows says which premise failed, and by how much.
-        shortfall = localIncumbentShortfall(qp);
-        if result.infeasible
-            error("collisionAvoidanceController:noSolution", ...
-                "No solution: the disjunctive program is infeasible. " ...
-                + "No admissible input plan lies outside the " ...
-                + "configuration obstacle at every node the input can " ...
-                + "reach (%d imposed), whatever facet it is held to, " ...
-                + "while satisfying the model domain, friction, tail " ...
-                + "and terminal rows and the input bounds; the search " ...
-                + "closed its whole tree (%d subproblems). %s Nothing " ...
-                + "is issued.", info.imposedNodes, info.explored, ...
-                shortfall);
-        end
-        error("collisionAvoidanceController:optimizationFailure", ...
-            "The convex solver returned no plan (%s; %d subproblems). %s", ...
-            result.message, info.explored, shortfall);
-    end
-    decision = result.decision;
-    layout = qp.layout;
-    plan = localCommittedPlan(decision, qp);
-    inputPlan = localHeadInputPlan(plan, layout);
-
-    problem = struct();
-    problem.problemClass = qp.problemClass;
-    problem.qp = qp;
-    problem.layout = layout;
-    problem.prediction = prediction;
-    problem.nominalInput = nominalInput;
-    problem.decision = decision;
-    problem.inputPlan = inputPlan;
-    problem.plan = plan;
-    problem.tailPlan = plan(layout.tailIndex);
-    problem.metadata = localPlanDiagnostics( ...
-        qp, result, decision, model, prediction);
-    problem.metadata.candidateCount = 1;
-    problem.metadata.candidateLabels = "disjunctive";
-    problem.metadata.candidateExitFlags = result.exitFlag;
-    problem.metadata.candidateObjectives = ...
-        localExactObjective(qp, decision, cfg);
-    problem.metadata.candidateLinearObjectives = result.objectiveValue;
-    problem.metadata.candidateCertifiedInfeasible = qp.certifiedInfeasible;
-    problem.metadata.candidateFactRelaxed = factRelaxed;
-    problem.metadata.candidateRefinementRungs = 0;
-    problem.metadata.candidateStartViolation = 0.0;
-    problem.metadata.candidatesSolved = 1;
-    problem.metadata.selectedCandidate = "disjunctive";
-    problem.metadata.objectiveExact = ...
-        problem.metadata.candidateObjectives;
-    problem.metadata.trustRegionDropped = trustDropped;
-    problem.metadata.factRelaxedNodes = factRelaxed;
-    problem.metadata.refinementRungs = 0;
-    problem.metadata.disjunctiveExplored = info.explored;
-    problem.metadata.disjunctiveProven = info.proven;
-    problem.metadata.disjunctiveGap = info.gap;
-    problem.metadata.disjunctiveBound = info.bestBound;
-    problem.metadata.disjunctiveAssigned = info.assignedNodes;
-    problem.metadata.disjunctiveImposed = info.imposedNodes;
-    problem.metadata.disjunctiveQueuePeak = info.queuePeak;
-    problem.metadata.disjunctiveFellBack = info.fellBack;
-    problem.metadata.disjunctiveUnresolved = info.unresolved;
-    problem.metadata.solverCallCount = info.solverCalls;
-end
-
-function [qp, result, info, trustDropped, factRelaxed] = ...
-        localDisjunctiveCandidate(model, prediction, ...
-        linearizationInput, common, cfg)
-% One disjunctive program, searched, with the same two repairs the
-% single-normal candidate gets: the trust region is a device for the
-% CLF linearization and no hard row may yield to it, and a program the
-% search proves infeasible gets the fact relaxation.
-    options = struct("label", "disjunctive", "obstacleMode", "hard", ...
-        "disjunctive", true, ...
-        "trustRegionScale", cfg.clf.trustRegionScale);
-    [baseQp, common] = formulateTwoStageQp( ...
-        model, prediction, linearizationInput, options, common);
-    [qp, result, info] = localDisjunctiveSearch(baseQp, cfg);
-    trustDropped = false;
-    if ~result.feasible && ~baseQp.certifiedInfeasible && baseQp.trustRegion
-        options.trustRegionScale = inf;
-        baseQp = formulateTwoStageQp( ...
-            model, prediction, linearizationInput, options, common);
-        [qp, result, info] = localDisjunctiveSearch(baseQp, cfg);
-        trustDropped = true;
-    end
-    factRelaxed = 0;
-    if result.infeasible && ~qp.certifiedInfeasible
-        [relaxedQp, droppedNodes] = localFactRelaxation(qp, cfg);
-        if droppedNodes > 0
-            qp = relaxedQp;
-            result = localSolveCandidate(qp, cfg, struct());
-            factRelaxed = droppedNodes;
-        end
-    end
-    if ~result.feasible && info.fellBack && ~info.proven
-        % A budget-exhausted search that found no incumbent, whose
-        % fallback - the linearization's own assignment - is infeasible
-        % even after the fact relaxation, has proved nothing about the
-        % other assignments: an optimization failure, never "no
-        % solution". (Measured: with the fallback's infeasibility
-        % converted to a stall before the fact relaxation, the reference
-        % scene lost one sample whose fallback the relaxation would have
-        % repaired.)
-        if result.infeasible
-            verdict = "is infeasible after the fact relaxation";
-        else
-            verdict = "was left unresolved by the kernel";
-        end
-        result.infeasible = false;
-        result.unresolved = true;
-        result.exitFlag = 0;
-        result.message = "disjunctive search spent its budget without " ...
-            + "an incumbent and the linearization's own assignment " ...
-            + verdict;
-    end
-end
-
-function [qp, result, trustDropped, factRelaxed] = ...
-        localLegacyCandidate(model, prediction, linearizationInput, ...
-        common, cfg, label, policy)
-% One candidate: the HARD program at `linearizationInput`, solved, with
-% the two repairs that are not relaxations of it. The trust region is a
-% device for the CLF linearization and a hard separation row must never
-% yield to it, so an infeasible trust-bounded program is re-solved
-% unbounded; and a program the kernel declares infeasible gets the fact
-% relaxation (localFactRelaxation), which removes only near-window rows
-% no admissible plan satisfies by more than one sample's mismatch.
-    options = struct("label", string(label), "obstacleMode", "hard", ...
-        "trustRegionScale", cfg.clf.trustRegionScale);
-    qp = formulateTwoStageQp( ...
-        model, prediction, linearizationInput, options, common);
-    result = localSolveCandidate(qp, cfg, policy);
-    trustDropped = false;
-    if ~result.feasible && ~qp.certifiedInfeasible && qp.trustRegion
-        options.trustRegionScale = inf;
-        qp = formulateTwoStageQp( ...
-            model, prediction, linearizationInput, options, common);
-        result = localSolveCandidate(qp, cfg, policy);
-        trustDropped = true;
-    end
-    factRelaxed = 0;
-    if result.infeasible && ~qp.certifiedInfeasible
-        [relaxedQp, droppedNodes] = localFactRelaxation(qp, cfg);
-        if droppedNodes > 0
-            qp = relaxedQp;
-            result = localSolveCandidate(qp, cfg, policy);
-            factRelaxed = droppedNodes;
-        end
-    end
-end
-
-function [refinedInput, rungs, violation, solverCalls] = ...
-        localRefineStart(model, prediction, common, cfg, startInput)
-% LEGACY SEQUENTIAL CONVEX REFINEMENT of one start. Certified mode never
-% calls this function because its CBF constraints have no slack.
-%
-% A start is only a place to evaluate stage 1; the hard program that
-% follows needs a linearization that is itself separated from the
-% obstacle, because then - its rows evaluating at it to the true signed
-% distances minus the budgets (Lemma 4) - that trajectory is a feasible
-% point of the hard program and the solve cannot fail for want of one.
-% So: while the start's own stage-1 margins show a shortfall, re-solve
-% an ELASTIC program at it (one priced slack per imposed target node,
-% everything else hard) and take the solution as the next
-% linearization, with the price rising along
-% cfg.sequentialConvex.penaltySchedule. Stage 1 is recomputed at every
-% rung, so the normals rotate with the iterate; that is what carries a
-% start into another homotopy class, and it is why a start that runs
-% through the obstacle - the cruise probe - comes out the other side of
-% it rather than being pushed back the way it came.
-%
-% The loop is uniform and its length is decided by the data: a start
-% already separated exits before solving anything, which is what the
-% shifted previous solution normally does, so the receding horizon pays
-% nothing for the machinery. A rung carries only the rows that decide
-% whether a class is REACHABLE - road, speed and heading domain, and
-% input box - and neither the friction polygons nor the
-% CLF rows and their trust region (formulateTwoStageQp, obstacleMode),
-% and is solved by the interior-point kernel: 0.06 s against 0.43 s for
-% the full row set, for the same result. No rung is ever committed.
-    refinedInput = startInput;
-    rungs = 0;
-    violation = 0.0;
-    solverCalls = 0;
-    schedule = cfg.sequentialConvex.penaltySchedule(:).';
-    if isempty(schedule)
-        return;
-    end
-    policy = struct("maxIterations", cfg.sequentialConvex.maxIterations, ...
-        "retry", false, "algorithm", "interior-point-convex");
-    for stepIdx = 1:numel(schedule)+1
-        options = struct("label", "refinement", ...
-            "obstacleMode", "elastic", ...
-            "violationPenalty", schedule(min(stepIdx, numel(schedule))));
-        qp = formulateTwoStageQp( ...
-            model, prediction, refinedInput, options, common);
-        violation = localStartViolation(qp);
-        if violation <= cfg.sequentialConvex.violationTolerance ...
-                || stepIdx > numel(schedule)
-            return;
-        end
-        result = solveTwoStageQp(qp, cfg, policy);
-        solverCalls = solverCalls+result.solverCalls;
-        if ~result.feasible
-            return;
-        end
-        refinedInput = result.decision(qp.layout.planIndex);
-        rungs = stepIdx;
-    end
 end
 
 function violation = localStartViolation(qp)
@@ -1206,530 +610,6 @@ function violation = localStartViolation(qp)
             violation = max(violation, -nodes(nodeIdx).nominalMargin);
         end
     end
-end
-
-function [qp, result, info] = localDisjunctiveSearch(baseQp, cfg)
-% THE DISJUNCTION, SOLVED GLOBALLY: branch and bound over which facet
-% of the configuration obstacle each node is outside of.
-%
-% The exact collision-free condition at a node is the OR over the
-% obstacle's facets (formulateTwoStageQp>localDisjunctionData). A
-% single convex program can hold only one disjunct, which is why
-% freezing one normal makes the linearization decide the homotopy
-% class. Here the choice is a decision of the optimization instead: the
-% search minimizes the same objective over ALL assignments of facets to
-% nodes, so its answer is the best plan in EVERY class the model
-% admits, not the best plan in the class a start happened to reach.
-%
-% The tree needs neither binaries nor a big-M. A node of the tree is a
-% partial assignment; its relaxation imposes the assigned nodes' rows
-% and NOTHING at the unassigned ones, which is a genuine relaxation of
-% the disjunctive program, so its optimum is a valid lower bound for
-% the whole subtree. The root - nothing assigned - is the program
-% without the target, whose optimum bounds the sample from below. If a
-% relaxed solution already satisfies the disjunction at every imposed
-% node then it is feasible for the disjunctive program and, being
-% optimal for a relaxation, optimal for its subtree: it becomes the
-% incumbent and the subtree closes. Otherwise the search branches on
-% the node whose best facet is most violated, one child per facet that
-% some admissible plan could satisfy at all (facetMaximum >= 0), each
-% child inheriting the parent's bound. Best-first, pruned against the
-% incumbent.
-%
-% Run to exhaustion the answer is the GLOBAL optimum of the convexified
-% disjunctive program at this linearization, and `proven` says so. Cut
-% A subproblem the kernel leaves unresolved - a stalled active set,
-% not a declared infeasibility - decides nothing, so its subtree is
-% abandoned rather than pruned and the tree no longer counts as
-% closed: `proven` is false whenever any subproblem stalled, and the
-% count is reported. Every child is handed its parent's solution as
-% the point the kernel works about, which is what keeps them from
-% stalling in the first place (measured: six of eight children hit the
-% iteration budget without it).
-%
-% Cut short by cfg.disjunctive.nodeBudget the search is anytime: the incumbent is a
-% feasible plan of some class and `gap` is the certified distance to
-% the best any class could achieve. The one thing it never does is
-% claim infeasibility it has not proved - a budget-exhausted search
-% with no incumbent falls back to the LINEARIZATION'S OWN ASSIGNMENT
-% (the facet each node's projection faces, which is exactly the
-% single-normal program this design used before the disjunction was
-% made explicit), and if that is infeasible too the sample is an
-% optimization failure rather than "no solution".
-%
-% Node selection is dive-then-best-first, the standard remedy for a
-% relaxation this weak: an unassigned node contributes no row at all,
-% so the root bound is the obstacle-free optimum and bounds improve
-% only as nodes are assigned. Until there is an incumbent the search
-% DIVES - always expanding the child whose facet the current solution
-% clears by the most - because a feasible plan is worth more than a
-% bound; afterwards it is best-first, which is what closes the tree.
-    disjunction = baseQp.disjunction;
-    nodeCount = numel(disjunction);
-    info = struct("explored", 0, "solverCalls", 0, "bestBound", -inf, ...
-        "gap", inf, "proven", false, "assignedNodes", 0, ...
-        "imposedNodes", 0, "queuePeak", 0, "fellBack", false, ...
-        "unresolved", 0);
-    empty = zeros(1, nodeCount);
-    if nodeCount == 0 || ~any([disjunction.imposed]) ...
-            || baseQp.certifiedInfeasible
-        qp = localApplyAssignment(baseQp, empty);
-        result = localSolveCandidate(qp, cfg, struct());
-        info.explored = 1;
-        info.solverCalls = result.solverCalls;
-        info.proven = true;
-        info.gap = 0.0;
-        info.bestBound = result.objectiveValue;
-        return;
-    end
-    imposed = find([disjunction.imposed]);
-    info.imposedNodes = numel(imposed);
-    budget = cfg.disjunctive.nodeBudget;
-    incumbentBudget = max(budget, cfg.disjunctive.incumbentBudget);
-    relativeGap = cfg.disjunctive.relativeGapTolerance;
-    satisfactionTolerance = 10.0*cfg.solver.constraintTolerance;
-
-    queue = struct("assignment", empty, "bound", -inf, ...
-        "priority", 0.0, "dive", false, ...
-        "warmStart", baseQp.initialDecision);
-    bestObjective = inf;
-    bestAssignment = empty;
-    bestResult = [];
-    % The node budget caps the subproblems spent on OPTIMALITY once an
-    % incumbent exists; while none does, the search may go on to the
-    % incumbent budget - a feasible plan is what the sample needs, and
-    % the alternative is a lost sample.
-    while ~isempty(queue) && (info.explored < budget ...
-            || (isempty(bestResult) && info.explored < incumbentBudget))
-        if isempty(bestResult)
-            % Dive: the most promising child first - a dive child
-            % before any single-node child - until something feasible
-            % exists to prune against.
-            [~, pick] = max([queue.priority]+1.0e12*[queue.dive]);
-        else
-            [~, pick] = min([queue.bound]);
-        end
-        entry = queue(pick);
-        queue(pick) = [];
-        if entry.bound >= bestObjective-localGapAllowance( ...
-                bestObjective, relativeGap)
-            continue;
-        end
-        nodeQp = localApplyAssignment(baseQp, entry.assignment);
-        % A child differs from its parent by one node's two rows, so
-        % the parent's solution is where its own optimum is looked for:
-        % the kernel works in deviation coordinates about this point.
-        % A dive child differs by many rows and its optimum is far from
-        % the parent's - the probe rungs' case - so it goes to the
-        % interior-point kernel; and while no incumbent exists a
-        % stalled child gets the retry ladder, since a feasible plan is
-        % worth the time and an abandoned subtree may be the only one.
-        nodeQp.initialDecision = entry.warmStart;
-        policy = struct("retry", isempty(bestResult));
-        if entry.dive
-            policy.algorithm = "interior-point-convex";
-        end
-        nodeResult = localSolveCandidate(nodeQp, cfg, policy);
-        info.explored = info.explored+1;
-        info.solverCalls = info.solverCalls+nodeResult.solverCalls;
-        if nodeResult.infeasible && ~nodeQp.certifiedInfeasible ...
-                && string(nodeResult.algorithm) ~= "interior-point-convex"
-            % A declared infeasibility closes a subtree for good, and on
-            % these degenerate children the active set has been measured
-            % to declare it wrongly: a tree closed with no incumbent
-            % while the linearization's own assignment - an extension
-            % of one of its root-to-leaf paths, hence of a relaxation
-            % it had called infeasible - then solved feasibly. One
-            % interior-point confirmation is asked for before the
-            % subtree is closed; a confirmation that stalls leaves the
-            % subproblem undecided, which the tree counts as not closed.
-            confirmation = localSolveCandidate(nodeQp, cfg, struct( ...
-                "retry", false, "algorithm", "interior-point-convex"));
-            info.solverCalls = info.solverCalls+confirmation.solverCalls;
-            if confirmation.feasible
-                nodeResult = confirmation;
-            elseif ~confirmation.infeasible
-                nodeResult.infeasible = false;
-                nodeResult.unresolved = true;
-            end
-        end
-        if ~nodeResult.feasible
-            % A kernel that stalls has decided nothing. Pruning here
-            % would be pruning a subtree that may hold the optimum, so
-            % the subtree is abandoned and the tree is no longer closed:
-            % whatever the search returns, it is not proved optimal.
-            info.unresolved = info.unresolved ...
-                + double(~nodeResult.infeasible);
-            continue;
-        end
-        bound = nodeResult.objectiveValue;
-        if bound >= bestObjective-localGapAllowance( ...
-                bestObjective, relativeGap)
-            continue;
-        end
-        [worstNode, facetMargin] = localDisjunctionResidual( ...
-            disjunction, imposed, nodeResult.decision, ...
-            baseQp.layout, satisfactionTolerance);
-        if worstNode == 0
-            bestObjective = bound;
-            bestResult = nodeResult;
-            bestAssignment = localCompleteAssignment( ...
-                disjunction, imposed, facetMargin);
-            continue;
-        end
-        candidateFacets = find(disjunction(worstNode).facetMaximum >= 0.0);
-        margins = facetMargin{worstNode};
-        for facetIdx = candidateFacets
-            child = entry.assignment;
-            child(worstNode) = facetIdx;
-            queue(end+1) = struct("assignment", child, ...
-                "bound", bound, ...
-                "priority", entry.priority+margins(facetIdx), ...
-                "dive", false, ...
-                "warmStart", nodeResult.decision); %#ok<AGROW>
-        end
-        % THE DIVE CHILD: every node the relaxed solution violates,
-        % assigned at once to the facet it clears by the most - one
-        % subproblem standing where a chain of single-node children
-        % would end. Its subtree lies inside one of the single-node
-        % children's, so its optimum is a valid bound for that subtree
-        % and the enumeration stays complete; it is expanded before any
-        % single-node child while no incumbent exists. With the
-        % terminal set's tail the disjunction holds over a hundred
-        % nodes, and a dive that assigns one node per subproblem cannot
-        % reach an incumbent within the budget (measured: samples lost
-        % to a budget-exhausted search whose fallback was infeasible).
-        [dive, divePriority, diveCount] = localDiveAssignment( ...
-            disjunction, imposed, entry.assignment, facetMargin, ...
-            entry.priority, satisfactionTolerance);
-        if diveCount > 1
-            queue(end+1) = struct("assignment", dive, ...
-                "bound", bound, ...
-                "priority", divePriority, ...
-                "dive", true, ...
-                "warmStart", nodeResult.decision); %#ok<AGROW>
-        end
-        info.queuePeak = max(info.queuePeak, numel(queue));
-    end
-    if isempty(queue) && info.unresolved == 0
-        info.proven = true;
-        info.bestBound = bestObjective;
-        info.gap = 0.0;
-    elseif isempty(queue)
-        info.bestBound = -inf;
-        info.gap = inf;
-    else
-        info.bestBound = min([queue.bound]);
-        info.gap = (bestObjective-info.bestBound) ...
-            / max(abs(bestObjective), 1.0e-9);
-    end
-    info.assignedNodes = sum(bestAssignment > 0);
-    qp = localApplyAssignment(baseQp, bestAssignment);
-    if isempty(bestResult)
-        % Nothing feasible was found. Fall back to the linearization's
-        % own assignment - the single-normal program - so the sample is
-        % never worse than it would have been without the search; and
-        % only an exhausted tree may call the sample infeasible.
-        info.fellBack = true;
-        qp = localApplyAssignment(baseQp, localProjectionAssignment( ...
-            baseQp, imposed));
-        result = localSolveCandidate(qp, cfg, struct());
-        info.solverCalls = info.solverCalls+result.solverCalls;
-        info.assignedNodes = numel(imposed);
-        % The fallback's verdict is returned as the kernel gave it: an
-        % infeasibility goes to the fact relaxation first
-        % (localDisjunctiveCandidate), and only what survives that is
-        % read against the tree - closed, "no solution"; not closed, an
-        % optimization failure, since an unclosed tree proves nothing.
-        return;
-    end
-    result = bestResult;
-end
-
-function [assignment, priority, count] = localDiveAssignment( ...
-        disjunction, imposed, assignment, facetMargin, priority, ...
-        tolerance)
-% The dive child's assignment: every unassigned imposed node whose best
-% admissible facet the relaxed solution still violates, assigned to
-% that facet. Returns how many nodes it assigned.
-    count = 0;
-    for nodeIdx = imposed
-        if assignment(nodeIdx) > 0
-            continue;
-        end
-        margins = facetMargin{nodeIdx};
-        if isempty(margins)
-            continue;
-        end
-        margins(disjunction(nodeIdx).facetMaximum < 0.0) = -inf;
-        [best, bestFacet] = max(margins);
-        if ~isfinite(best) || best >= -tolerance
-            continue;
-        end
-        assignment(nodeIdx) = bestFacet;
-        priority = priority+best;
-        count = count+1;
-    end
-end
-
-function text = localIncumbentShortfall(qp)
-% How far the linearization plan - the shifted previous plan, or the
-% schedule reference - is from being a feasible point of the program
-% it was linearized at: the largest violation of its own stage-1
-% margins over the imposed nodes (Lemma 4 makes these the true signed
-% distances less the budgets) and of the hard model, tail and terminal
-% rows, by family and node. Reported in the failure message so that a
-% lost sample names the premise that failed.
-    nodes = qp.collision.nodes;
-    worstNode = 0;
-    worstMargin = 0.0;
-    for nodeIdx = 1:numel(nodes)
-        if nodes(nodeIdx).imposed && nodes(nodeIdx).nominalMargin < worstMargin
-            worstMargin = nodes(nodeIdx).nominalMargin;
-            worstNode = nodeIdx-1;
-        end
-    end
-    residual = qp.inequalityMatrix*qp.initialDecision-qp.inequalityBound;
-    hardRow = qp.rowFamily ~= "clf" & qp.rowFamily ~= "collision";
-    worstRow = 0.0;
-    worstFamily = "";
-    worstRowNode = 0;
-    if any(hardRow)
-        [worstRow, rowIdx] = max(residual.*hardRow);
-        worstFamily = qp.rowFamily(rowIdx);
-        worstRowNode = qp.rowNode(rowIdx);
-    end
-    text = sprintf("The linearization plan's own shortfall: " ...
-        + "separation %.4f m at node %d, hard rows %.3g " ...
-        + "(%s, node %d).", -worstMargin, worstNode, ...
-        max(worstRow, 0.0), worstFamily, worstRowNode);
-end
-
-function assignment = localProjectionAssignment(qp, imposed)
-% The assignment the linearization itself points to: at each node the
-% facet whose normal is nearest the direction stage 1's projection
-% returned. It reproduces the single-normal program - the one the
-% design solved before the disjunction was explicit - and is the
-% search's fallback, so the disjunctive path can only improve on it.
-    disjunction = qp.disjunction;
-    assignment = zeros(1, numel(disjunction));
-    for nodeIdx = imposed
-        entry = disjunction(nodeIdx);
-        [~, assignment(nodeIdx)] = max(entry.facetNormal.' ...
-            * qp.collision.nodes(nodeIdx).normal);
-    end
-end
-
-function allowance = localGapAllowance(bestObjective, relativeGap)
-    if ~isfinite(bestObjective)
-        allowance = 0.0;
-        return;
-    end
-    allowance = max(relativeGap*abs(bestObjective), 1.0e-9);
-end
-
-function [worstNode, facetMargin] = localDisjunctionResidual( ...
-        disjunction, imposed, decision, layout, tolerance)
-% Which imposed node the plan is inside the obstacle at, and by how
-% much each facet misses there. Zero means the plan satisfies the
-% disjunction everywhere, i.e. it is collision-free for the model.
-    worstNode = 0;
-    worstValue = -tolerance;
-    facetMargin = cell(1, numel(disjunction));
-    planColumn = decision(layout.planIndex);
-    for nodeIdx = imposed
-        entry = disjunction(nodeIdx);
-        margins = zeros(1, entry.facetCount);
-        for facetIdx = 1:entry.facetCount
-            rows = 2*(facetIdx-1)+(1:2);
-            margins(facetIdx) = min(entry.facetMatrix(rows, :) ...
-                * planColumn+entry.facetOffset(rows));
-        end
-        facetMargin{nodeIdx} = margins;
-        best = max(margins);
-        if best < worstValue
-            worstValue = best;
-            worstNode = nodeIdx;
-        end
-    end
-end
-
-function assignment = localCompleteAssignment( ...
-        disjunction, imposed, facetMargin)
-% The facet each imposed node is outside of, for a plan that satisfies
-% the disjunction: the one it clears by the most. The program built on
-% that assignment has the plan as a feasible point and the same
-% objective, so it is the program the plan was optimal for.
-    assignment = zeros(1, numel(disjunction));
-    for nodeIdx = imposed
-        margins = facetMargin{nodeIdx};
-        if isempty(margins)
-            continue;
-        end
-        [~, assignment(nodeIdx)] = max(margins);
-    end
-end
-
-function qp = localApplyAssignment(qp, assignment)
-% Install one facet per assigned node as the program's target rows, and
-% write the choice into the readout so every diagnostic downstream sees
-% the plan against the facet it was actually held to. An unassigned
-% node contributes nothing - that is what makes a partial assignment a
-% relaxation.
-    disjunction = qp.disjunction;
-    assigned = find(assignment > 0);
-    rowCount = 2*numel(assigned);
-    matrix = zeros(rowCount, qp.layout.decisionCount);
-    bound = zeros(rowCount, 1);
-    rowNode = zeros(rowCount, 1);
-    rowWindow = false(rowCount, 1);
-    rowAllowance = zeros(rowCount, 1);
-    rowIdx = 0;
-    for nodeIdx = assigned
-        entry = disjunction(nodeIdx);
-        facetIdx = assignment(nodeIdx);
-        rows = 2*(facetIdx-1)+(1:2);
-        for signIdx = 1:2
-            rowIdx = rowIdx+1;
-            matrix(rowIdx, qp.layout.planIndex) = ...
-                -entry.facetMatrix(rows(signIdx), :);
-            bound(rowIdx) = entry.facetOffset(rows(signIdx));
-            rowNode(rowIdx) = nodeIdx;
-        end
-        qp.collision.nodes(nodeIdx).normal = entry.facetNormal(:, facetIdx);
-        qp.collision.nodes(nodeIdx).regionCode = entry.facetRegion(facetIdx);
-        qp.collision.nodes(nodeIdx).marginMatrix = entry.facetMatrix(rows, :);
-        qp.collision.nodes(nodeIdx).marginOffset = entry.facetOffset(rows);
-        qp.collision.nodes(nodeIdx).imposed = true;
-        rowWindow(rowIdx-1:rowIdx) = entry.window;
-        rowAllowance(rowIdx-1:rowIdx) = entry.allowance;
-    end
-    unassigned = setdiff(find([disjunction.imposed]), assigned);
-    for nodeIdx = unassigned
-        qp.collision.nodes(nodeIdx).imposed = false;
-    end
-    qp.inequalityMatrix = [matrix; qp.inequalityMatrix];
-    qp.inequalityBound = [bound; qp.inequalityBound];
-    qp.rowFamily = [repmat("collision", rowCount, 1); qp.rowFamily];
-    qp.rowNode = [rowNode; qp.rowNode];
-    qp.rowWindow = [rowWindow; qp.rowWindow];
-    qp.rowAllowance = [rowAllowance; qp.rowAllowance];
-end
-
-function result = localSolveCandidate(qp, cfg, policy)
-% One candidate through the kernel, or the certificate's verdict.
-    if qp.certifiedInfeasible
-        result = struct( ...
-            "decision", zeros(0, 1), ...
-            "exitFlag", -2, ...
-            "feasible", false, ...
-            "infeasible", true, ...
-            "unresolved", false, ...
-            "iterations", 0, ...
-            "solverCalls", 0, ...
-            "retried", false, ...
-            "algorithm", "reachBoxCertificate", ...
-            "message", "certified infeasible: an imposed separation " ...
-                + "row exceeds what any admissible plan reaches", ...
-            "objectiveValue", inf);
-        return;
-    end
-    if qp.obstacleMode == "certified"
-        result = solveHardCbfClf(qp, cfg);
-        return;
-    end
-    result = solveTwoStageQp(qp, cfg, policy);
-end
-
-function [qp, droppedNodes] = localFactRelaxation(qp, cfg)
-% Which near-window rows can no admissible plan satisfy jointly: the
-% least total relaxation of the window rows that makes the program
-% feasible, every other row held (one LP, only on an infeasible
-% candidate). The rows that need relaxation - each by at most its
-% node's allowance - are facts of the state and the previous plan:
-% the friction polygon, which the reach box does not see, took their
-% capacity away. They are dropped from the program and reported
-% (collisionFactViolation covers them). If the program is infeasible
-% even with the window relaxed, or a row needs more than one sample's
-% mismatch, the conflict is beyond the input's authority and the
-% candidate stays infeasible.
-    persistent options
-    if isempty(options)
-        options = optimoptions("linprog", "Display", "none");
-    end
-    droppedNodes = 0;
-    window = qp.rowWindow;
-    if ~any(window)
-        return;
-    end
-    rowCount = numel(qp.inequalityBound);
-    decisionCount = qp.layout.decisionCount;
-    windowCount = sum(window);
-    augmented = [sparse(qp.inequalityMatrix), sparse(rowCount, windowCount)];
-    augmented(window, decisionCount+(1:windowCount)) = -speye(windowCount);
-    cost = [zeros(decisionCount, 1); ones(windowCount, 1)];
-    lowerBound = [qp.lowerBound; zeros(windowCount, 1)];
-    upperBound = [qp.upperBound; inf(windowCount, 1)];
-    [solution, ~, exitFlag] = linprog(cost, augmented, ...
-        qp.inequalityBound, [], [], lowerBound, upperBound, options);
-    if exitFlag ~= 1
-        return;
-    end
-    relaxation = solution(decisionCount+1:end);
-    tolerance = max(cfg.solver.constraintTolerance, 1.0e-9);
-    % A fact is mismatch-sized: a row that needs more than its node's
-    % allowance - the mismatch it can have accumulated since it was
-    % last a hard row - is a conflict, not a fact, and the candidate
-    % stays infeasible.
-    if any(relaxation > qp.rowAllowance(window)+tolerance)
-        return;
-    end
-    droppedRows = false(rowCount, 1);
-    droppedRows(window) = relaxation > tolerance;
-    if ~any(droppedRows)
-        return;
-    end
-    droppedNodes = numel(unique(qp.rowNode(droppedRows)));
-    % The dropped rows' nodes become facts of their families.
-    families = [{"collision", 1}; ...
-        arrayfun(@(idx) {"road", idx}, 1:numel(qp.road), ...
-            "UniformOutput", false).'];
-    for familyIdx = 1:size(families, 1)
-        name = families{familyIdx, 1};
-        idx = families{familyIdx, 2};
-        nodeList = unique(qp.rowNode(droppedRows & qp.rowFamily == name));
-        for nodeIdx = nodeList(:).'
-            if name == "collision"
-                qp.collision.nodes(nodeIdx).imposed = false;
-                qp.collision.nodes(nodeIdx).factSource = "relaxation";
-            else
-                qp.road(idx).nodes(nodeIdx).imposed = false;
-                qp.road(idx).nodes(nodeIdx).factSource = "relaxation";
-            end
-        end
-    end
-    keep = ~droppedRows;
-    qp.inequalityMatrix = qp.inequalityMatrix(keep, :);
-    qp.inequalityBound = qp.inequalityBound(keep);
-    qp.rowFamily = qp.rowFamily(keep);
-    qp.rowNode = qp.rowNode(keep);
-    qp.rowWindow = qp.rowWindow(keep);
-    qp.rowAllowance = qp.rowAllowance(keep);
-end
-
-function value = localExactObjective(qp, decision, cfg)
-% The objective with the CLF relaxations replaced by the solution's
-% EXACT decrease residuals: what the linearized program approximates,
-% and the only value comparable across candidates linearized at the
-% same incumbent but solved in different homotopy classes.
-    layout = qp.layout;
-    inputColumn = decision(layout.inputIndex);
-    inputHessian = qp.Hessian(layout.inputIndex, layout.inputIndex);
-    inputCost = 0.5*inputColumn.'*inputHessian*inputColumn ...
-        + qp.linear(layout.inputIndex).'*inputColumn+qp.constant;
-    residual = max(localClfExactResiduals(qp.clf, ...
-        decision(layout.planIndex)), 0.0);
-    value = inputCost+cfg.clf.relaxationWeight*sum(residual);
 end
 
 function [residual, valueProfile, planError] = ...
@@ -1766,7 +646,7 @@ function metadata = localPlanDiagnostics( ...
         qp, result, decision, model, prediction)
 % What is reported about the committed plan: the stage-1 duals along
 % its linearization trajectory, the plan's linearized separation
-% margins, the repair capacities and the facts, the CLF relaxations,
+% margins, the exact CLF relaxation,
 % the objective split, and the kernel's verdict.
     layout = qp.layout;
     metadata = struct();
@@ -1774,13 +654,10 @@ function metadata = localPlanDiagnostics( ...
     metadata.collisionDiscretization = "predictionNodesOnly";
     metadata.horizonSteps = layout.horizonSteps;
     metadata.tailSteps = layout.tailSteps;
-    metadata.trustRegion = qp.trustRegion;
     planColumn = decision(layout.planIndex);
     headNodeCount = prediction.headNodeCount;
 
-    % The target family: node 1 is the measured state, the nodes below
-    % the authority threshold are facts, the rest carry the rows - over
-    % the head and the tail alike.
+    % Every covered target node carries hard separation rows.
     collision = localFamilyReadout(qp.collision, planColumn);
     nodes = qp.collision.nodes;
     metadata.collisionMarginProfile = collision.margin;
@@ -1806,28 +683,14 @@ function metadata = localPlanDiagnostics( ...
 
     % The terminal set: the committed tail, the terminal handoff state
     % against its rows, and the hard target-conditioned separation from
-    % the controller's complete predicted continuation. The legacy
-    % restContract fields below alias this imposed invariant condition.
+    % the controller's complete predicted continuation.
     metadata = localTerminalDiagnostics(metadata, qp, planColumn, ...
         model, prediction);
-    % The largest violation of a covered node the rows do NOT cover:
-    % the measured state and the nodes below the authority threshold.
-    factMargin = collision.margin;
-    factMargin(~collision.covered | collision.imposed) = inf;
-    metadata.collisionFactViolation = max([0.0, -factMargin]);
-    metadata.collisionCapacityProfile = [nodes.capacity];
-    metadata.collisionAuthorityProfile = [nodes.authority];
-    metadata.collisionBoxMaximumProfile = [nodes.boxMaximum];
-    metadata.collisionFactSourceProfile = [nodes.factSource];
     metadata.dualDistanceProfile = [nodes.dualDistance];
     metadata.dualRegionProfile = [nodes.regionCode];
     metadata.dualNormalProfile = [nodes.normal];
     metadata.nominalMarginProfile = [nodes.nominalMargin];
     if isempty(nodes)
-        metadata.collisionCapacityProfile = zeros(1, 0);
-        metadata.collisionAuthorityProfile = zeros(1, 0);
-        metadata.collisionBoxMaximumProfile = zeros(1, 0);
-        metadata.collisionFactSourceProfile = strings(1, 0);
         metadata.dualDistanceProfile = zeros(1, 0);
         metadata.dualRegionProfile = zeros(1, 0);
         metadata.dualNormalProfile = zeros(2, 0);
@@ -1858,11 +721,7 @@ function metadata = localPlanDiagnostics( ...
 
     % Row residuals of the committed decision.
     residual = qp.inequalityMatrix*decision-qp.inequalityBound;
-    hardRow = qp.rowFamily ~= "clf";
-    metadata.hardRowViolation = 0.0;
-    if any(hardRow)
-        metadata.hardRowViolation = max(0.0, max(residual(hardRow)));
-    end
+    metadata.hardRowViolation = max([0.0; residual]);
     metadata.rowCounts = struct( ...
         "collision", sum(qp.rowFamily == "collision"), ...
         "road", sum(qp.rowFamily == "road"), ...
@@ -1871,42 +730,18 @@ function metadata = localPlanDiagnostics( ...
         "friction", sum(qp.rowFamily == "friction"), ...
         "tail", sum(qp.rowFamily == "tail"), ...
         "terminal", sum(qp.rowFamily == "terminal"), ...
-        "clfTrust", sum(qp.rowFamily == "clfTrust"), ...
-        "clf", sum(qp.rowFamily == "clf"));
-    % Nodes at which the CLF trust region binds: where the plan wanted
-    % to move further from the nominal than the linearization allows.
-    trustRow = qp.rowFamily == "clfTrust";
-    metadata.clfTrustActiveNodes = 0;
-    if any(trustRow)
-        metadata.clfTrustActiveNodes = numel(unique( ...
-            qp.rowNode(trustRow & residual >= -1.0e-6)));
-    end
+        "terminalSegment", sum(qp.rowFamily == "terminalSegment"));
 
     % CLF relaxations and the exact decrease residual of the plan.
     relaxation = decision(layout.relaxationIndex);
-    if model.cfg.certification.enabled
-        relaxation = relaxation(1);
-    end
-    metadata.clfRelaxationProfile = relaxation(:).';
-    metadata.clfRelaxation = sum(relaxation);
-    metadata.clfRelaxationMax = max(relaxation);
+    metadata.clfRelaxation = relaxation;
     metadata.clfInitialValue = qp.clf.initialValue;
     [exactResidual, valueProfile, planError] = ...
         localClfExactResiduals(qp.clf, planColumn);
     metadata.clfValueProfile = valueProfile;
-    if model.cfg.certification.enabled
-        metadata.clfExactResidual = exactResidual(1)-relaxation(1);
-    else
-        metadata.clfExactResidual = max(exactResidual-relaxation(:).');
-    end
+    metadata.clfExactResidual = exactResidual(1)-relaxation;
     metadata.clfPlanError = planError;
-    metadata.safetySlackProfile = zeros(1, 0);
-    if ~model.cfg.certification.enabled && layout.slackCount > 0
-        metadata.safetySlackProfile = ...
-            decision(layout.slackIndex).';
-    end
-    metadata.cbfConstraintsHard = model.cfg.certification.enabled ...
-        && layout.slackCount == 0 && isempty(layout.slackIndex);
+    metadata.cbfConstraintsHard = true;
     metadata.cbfMinimumMargin = min( ...
         metadata.collisionPlanMargin, metadata.roadMargin);
     metadata.hardCbfSatisfied = metadata.cbfConstraintsHard ...
@@ -1920,12 +755,8 @@ function metadata = localPlanDiagnostics( ...
     metadata.inputDeviationCost = 0.5*planColumn.'*planHessian ...
         * planColumn+qp.linear(layout.planIndex).'*planColumn ...
         + qp.constant;
-    activeRelaxationIndex = layout.relaxationIndex(1:numel(relaxation));
-    relaxationHessian = qp.Hessian( ...
-        activeRelaxationIndex, activeRelaxationIndex);
     metadata.clfRelaxationCost = ...
-        0.5*relaxation(:).'*relaxationHessian*relaxation(:) ...
-        + qp.linear(activeRelaxationIndex).'*relaxation(:);
+        qp.linear(layout.relaxationIndex)*relaxation;
     metadata.jointObjectiveValue = metadata.inputDeviationCost ...
         + metadata.clfRelaxationCost;
     metadata.objectiveValue = metadata.jointObjectiveValue;
@@ -1933,7 +764,6 @@ function metadata = localPlanDiagnostics( ...
     % Kernel.
     metadata.solverExitFlag = result.exitFlag;
     metadata.solverIterations = result.iterations;
-    metadata.solverRetried = result.retried;
     metadata.solverAlgorithm = result.algorithm;
     metadata.solverMessage = result.message;
     metadata.scheduleSpeed = prediction.scheduleSpeed;
@@ -1998,10 +828,6 @@ function metadata = localTerminalDiagnostics(metadata, qp, planColumn, ...
     metadata.terminalFutureSupport = inf;
     metadata.terminalSupportDirection = zeros(2, 1);
     metadata.terminalSegmentIndex = 0;
-    % Backward-compatible aliases now report the hard invariant row, not a
-    % one-step monitor.
-    metadata.restContractHolds = true;
-    metadata.restContractMargin = inf;
     if ~model.hasTarget
         return;
     end
@@ -2015,8 +841,6 @@ function metadata = localTerminalDiagnostics(metadata, qp, planColumn, ...
     metadata.terminalFutureSupport = node.terminalFutureSupport;
     metadata.terminalSupportDirection = node.terminalSupportDirection;
     metadata.terminalSegmentIndex = node.terminalSegmentIndex;
-    metadata.restContractMargin = metadata.terminalInvariantMargin;
-    metadata.restContractHolds = metadata.terminalInvariantCertified;
 end
 
 % ====================================================================
@@ -2085,9 +909,8 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
             cfg.model.speedMinimum));
     model.lane = lane;
     model.road = road;
-    % AT MOST ONE TARGET: the reader admits a single record, so the
-    % passing-side candidates exhaust the disjunction. The fields hold
-    % neutral values - never read - when no target is present.
+    % The reader admits at most one target. Empty-target geometry uses
+    % neutral values; target constraints are then absent.
     model.hasTarget = ~isempty(targets);
     model.targetKey = "";
     model.targetPosition = zeros(2, 1);
@@ -2248,7 +1071,7 @@ function horizon = localTargetHorizon(model)
         return;
     end
     directionCount = ...
-        model.cfg.certification.terminalSupportDirectionCount;
+        model.cfg.terminal.supportDirectionCount;
     angle = (0:directionCount-1)*(2.0*pi/directionCount);
     horizon.terminalSupportDirection = [cos(angle); sin(angle)];
     horizon.terminalFuturePositionSupport = ...

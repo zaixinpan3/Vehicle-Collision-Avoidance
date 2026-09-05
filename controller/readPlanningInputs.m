@@ -148,8 +148,8 @@ function held = localOptionalHeldActuatorInput(data)
 % stays correct when a command is not achieved, when another
 % controller shares the loop, and across an episode restart.
 %
-% Absent, the anchor row is not built and the program is exactly the
-% one that treats the first input as free.
+% When published, it is compared with the stored plan's applied input
+% before certificate reuse. It does not constrain a newly optimized input.
 
     held = zeros(0, 1);
     if isfield(data, "heldActuatorInput") ...

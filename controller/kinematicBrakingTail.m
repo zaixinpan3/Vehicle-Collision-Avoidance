@@ -4,7 +4,7 @@ function out = kinematicBrakingTail(action, cfg, varargin)
 %   steps   = kinematicBrakingTail("steps", cfg)
 %   profile = kinematicBrakingTail("profile", cfg, steps, speed)
 %
-% The terminal set of the two-stage program (TWO_STAGE_SAFETY.md, "The
+% The terminal set of the two-stage program (PCBF_CLF_ARCHITECTURE.md, "The
 % terminal set") is the set of terminal states from which an admissible
 % KINEMATIC BRAKING TAIL reaches rest with every separation and road
 % row satisfied along the way. The tail's longitudinal model is exact

@@ -77,7 +77,7 @@ end
 function [residualRate, excludedCount] = ...
         localScenarioResidualRates(result)
     cfg = result.controllerConfiguration;
-    sampleTime = cfg.collision.pcbf.sampleTime;
+    sampleTime = cfg.controller.sampleTime;
     validitySpeed = cfg.model.scheduleSpeedFloor;
     state = result.controlState;
     stepCount = numel(result.command);

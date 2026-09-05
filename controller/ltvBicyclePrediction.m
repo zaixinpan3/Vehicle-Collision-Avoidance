@@ -10,7 +10,7 @@ function prediction = ltvBicyclePrediction(model, storedSchedule)
 % speed vBar = max(vx, scheduleSpeedFloor) and the stations
 % s_k = s_0 + k vBar Ts with the centerline curvature at each of them.
 % The TAIL (nodes N+1..N+N_b) is the kinematic braking tail of the
-% terminal set (kinematicBrakingTail, TWO_STAGE_SAFETY.md "The
+% terminal set (kinematicBrakingTail, PCBF_CLF_ARCHITECTURE.md "The
 % terminal set"): from the terminal state x_N the station and speed
 % advance under N_b further accelerations a_N..a_{N+N_b-1}, which are
 % decision variables,

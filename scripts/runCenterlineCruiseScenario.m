@@ -892,9 +892,7 @@ function cfg = localControllerConfigurationForPlant( ...
     cfg.vehicle.lf = parameters.frontAxleDistance;
     cfg.vehicle.lr = parameters.rearAxleDistance;
     cfg.vehicle.wheelbase = parameters.wheelbase;
-    cfg.vehicle.frontTrackWidth = parameters.trackWidth;
-    cfg.vehicle.rearTrackWidth = parameters.trackWidth;
-    cfg.vehicle.cgHeight = parameters.cgHeight;
+    cfg.vehicle.centerOfGravityHeight = parameters.cgHeight;
     cfg.vehicle.gravity = parameters.gravity;
     cfg.vehicle.width = max( ...
         cfg.vehicle.width, parameters.trackWidth + parameters.tireWidth);
