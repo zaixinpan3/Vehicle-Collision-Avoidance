@@ -1,407 +1,401 @@
-# Exact-flow finite-window ego–target estimation
+# Multistage high-gain NRMM observer: model, design, and stability
 
-The online estimator now separates three objects: yaw-independent body-velocity
-information, a nominal constant-acceleration/curvature trajectory fit, and a
-conservative outer enclosure of the physical target state. Absolute yaw is a
-union of circular arcs used for inertial reconstruction. There is no online
-third-order radar injection, yaw correction gain, or downstream acceleration
-filter. The retained continuous observer and gain-design functions remain
-independently testable research algorithms; their ISS constants do not certify
-this sampled estimator.
+The estimator retains the framework of Sharma, Alai, and Rajamani,
+*Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using
+a multistage high gain observer*, Transportation Research Part C 182 (2026),
+105411, [DOI](https://doi.org/10.1016/j.trc.2025.105411). The relevant parts are
+Section 2.3, Section 3.3, Eq. (65), and Theorem 1, Eqs. (30)--(33).
 
-## 1. Geometry and the retained model
+The online architecture is the ego yaw observer, the ego body-velocity observer,
+and the third-order target observer. Inertial position is a downstream output
+stage. The target state remains `[rho; q; s]`; its gains remain
+`[l1*w; l2*w^2; l3*w^3]`. The improvements are analytic global Lipschitz bounds,
+a structured Lyapunov inequality, and a noise-aware choice of bandwidth.
 
-Let \(J=[0,-1;1,0]\), \(R(\psi)=\exp(\psi J)\), and
-\(\nabla_\omega z=\dot z+\omega Jz\). The physical target coordinates are
-\(\rho=R_E^\top(p_C-p_E)\), \(q=R_E^\top v_C\), and
-\(s=R_E^\top a_C\). On the positive-speed, unsaturated operating domain,
+## 1. Retained model and covariant chain
 
-\[
-\nabla_{\omega_E}\rho=q-b,\qquad
-\nabla_{\omega_E}q=s,\qquad
-\nabla_{\omega_E}s=-\Omega^2q+3A\Omega Jq/V,
-\]
-
-where \(V=\|q\|\), \(A=q^\top s/V\), and
-\(\Omega=(Jq)^\top s/V^2\). Rotation terms cancel in scalar products.
-Differentiating gives
+Let `J = [0,-1;1,0]`, `R(psi)` denote a planar rotation, and
 
 \[
-\dot V=A,\quad \frac{d}{dt}(q^\top s)=A^2,\quad
-\dot A=0,\quad\dot\Omega=A\Omega/V,\quad
-\kappa=\Omega/V,\quad\dot\kappa=0.
+\nabla_u z=\dot z+uJz,\qquad
+\rho=R_E^T(p_C-p_E),\quad q=R_E^Tv_C,\quad s=R_E^Ta_C.
 \]
 
-Thus this particular NRMM nonlinearity is constant scalar acceleration and
-constant geometric curvature. With relative course \(\chi\), use
-\(x=(\rho_x,\rho_y,\chi,V,A,\kappa)\). Its physical reconstruction is
+The Sharma target model has constant scalar acceleration `A` and constant
+sideslip `betaC`, with positive speed. Equivalently its curvature
+`kappa = sin(betaC)/lrC` is constant. This observation is used to derive the
+vector field; `A` and `kappa` are not replacement online estimation states.
+The exact transformed equations are
 
 \[
-q=Ve(\chi),\qquad s=Ae(\chi)+\kappa V^2Je(\chi),\qquad
-\dot\chi=\kappa V-\omega_E.
+\nabla_{\omega_E}\rho=q-v_E,\qquad
+\nabla_{\omega_E}q=s,\qquad \nabla_{\omega_E}s=\Phi(q,s),
+\]
+\[
+V=\|q\|,\quad A=\frac{q^Ts}{V},\quad
+\Omega=\frac{(Jq)^Ts}{V^2},\qquad
+\Phi=-\Omega^2q+3A\Omega J\frac qV.
 \]
 
-These identities are a coordinate change of the retained model, **not** an
-identity for its globally saturated extension outside the domain.
-\(V>0\) must hold throughout the flow interval. Constant curvature does not
-mean constant yaw rate when speed changes. Under the constant-sideslip model,
-\(\beta_C=\arcsin(l_{r,C}\kappa)\) and relative body heading is
-\(\chi-\beta_C\). With varying geometric curvature, that reconstruction is
-only the nominal constant-sideslip interpretation; no additional body-heading
-dynamics are asserted.
+These are the same NRMM dynamics in physical, covariant companion coordinates.
+For example, `q = rhoDot + vE + omegaE*J*rho`. Using this chain avoids
+repeated differentiation of measured ego inputs. Ego jerk and angular
+acceleration need not vanish. The dynamics and their saturation extension in
+`nrmmTargetTrackerDerivative.m` have not been replaced by another motion model.
 
-The model class itself is established: Schubert, Richter, and Wanielik,
-*Comparison and evaluation of advanced motion models for vehicle tracking*
-(2008), [DOI 10.1109/ICIF.2008.4632283](https://doi.org/10.1109/ICIF.2008.4632283),
-discuss the constant-curvature-and-acceleration model. The reduction above is
-derived directly from this repository's equations.
-
-## 2. Exact nominal flow
-
-For duration \(h\), ego yaw increment \(\Delta\psi_E\), and ego translation
-\(d_E\) expressed in the **start** ego frame, put
+Truth must remain in the declared positive-speed operating domain:
+`a <= |q| <= b`, `|A| <= Amax`, `|Omega| <= Omax`, `|s| <= S`, and
+`|rho| <= rhoMax`, where
 
 \[
-L=Vh+\tfrac12Ah^2,\quad\delta=\kappa L,\quad
- d_C=L\operatorname{sinc}(\delta/2)e(\chi+\delta/2),
-\qquad\operatorname{sinc}(z)=\sin(z)/z.
+O_{\max}=b\sin(\beta_{\max})/l_r,\qquad
+S=\sqrt{A_{\max}^2+(bO_{\max})^2}.
 \]
 
-Then
+The physical heading reconstruction is not observable at zero target speed.
+Estimated states may peak outside this domain: the globally Lipschitz extension
+below keeps the observer defined. Estimated-domain flags report such exits;
+they are not substitutes for checking the assumptions on truth.
+
+## 2. Global Lipschitz bounds for the existing extension
+
+Write `r = |q|`, `d = max(r,a)`, `Q = projection_ball(b,q)`,
+`Svec = projection_ball(S,s)`, and `e = q/d`. The implemented extension is
 
 \[
-\rho^+=R(-\Delta\psi_E)(\rho+d_C-d_E),\quad
-\chi^+=\chi+\delta-\Delta\psi_E,\quad V^+=V+Ah,
-\quad A^+=A,\quad\kappa^+=\kappa.
+\alpha=\operatorname{clip}_{A_{\max}}(Q^TS_{\rm vec}/d),\quad
+\nu=\operatorname{clip}_{O_{\max}}((JQ)^TS_{\rm vec}/d^2),
+\qquad \Phi_e=-\nu^2Q+3\alpha\nu Je.
 \]
 
-`nrmmExactFlow` evaluates the removable zero-curvature singularity with a
-small-angle series and rejects intervals crossing zero speed. This is the
-exact nonlinear nominal target flow in real arithmetic. It does not make
-uncertain ego increments exact.
+It agrees with `Phi` on the true operating domain and is defined on all of
+`R^4`. Ball projections and scalar clips are nonexpansive. Their almost-everywhere
+Jacobians suffice because the maps are continuous and piecewise differentiable.
+Bounds are integrated along the whole line segment in the extended space;
+no convexity of the positive-speed annulus is presumed.
 
-## 3. Yaw-independent body information and circular yaw
+For fixed `s`, differentiation in the radial/tangential basis gives:
 
-The declared single-track residual gives
-\(b_y=l_{r,E}(\omega_E-d_{st})\). For measured gyro \(u_3\), define
-\(\epsilon_\perp=l_{r,E}(\bar d_\omega+\bar d_{st})\). The body set is
+| Radial region | Bound on `|Dq alpha|` | Bound on `|Dq nu|` | Bound on `|Q| |Dq nu|` |
+|---|---:|---:|---:|
+| `r <= a` | `S/a` | `S/a^2` | `S/a` |
+| `a <= r <= b` | `S/r` | `S/r^2` | `S/r` |
+| `r >= b` | `b*S/r^2` | `2*b*S/r^3` | `2*b^2*S/r^3` |
+
+Clipping only decreases these derivative bounds. Consequently, with
 
 \[
-\mathcal B_k=\{b:\ V_{E,\min}\le\|b\|\le\bar V_E,
-\ |\operatorname{atan2}(b_y,b_x)|\le\bar\beta_E<\pi/2,
-\ |\|b\|-\|v_m^I\||\le\bar n_v,
-\ |b_y-l_{r,E}u_3|\le\epsilon_\perp\}.
+c_A=S/a,\quad c_\Omega=S\max(a^{-2},2b^{-2}),\quad
+c_{Q\Omega}=S\max(a^{-1},2b^{-1}),
+\]
+\[
+L_q=O_{\max}^2+2O_{\max}c_{Q\Omega}
+ +3A_{\max}O_{\max}/a+3O_{\max}c_A+3A_{\max}c_\Omega.
 \]
 
-`nrmmBodyVelocitySet` intersects the speed annulus and lateral strip with the
-forward sideslip domain. It returns a feasible representative, an enclosing
-rectangle, and a covering radius. If the nominal inverse is inadmissible,
-the representative is selected from the feasible speed/lateral intersection;
-it is not obtained by clipping a negative radicand. Empty information stays
-explicitly empty. The runtime uses this sampled representative directly,
-without introducing another continuous smoothing gain.
-
-The GNSS direction cone and the enclosing sideslip interval give an outer
-yaw arc. This is a conservative projection of the joint GNSS/gyro/body
-information, not an exact nonlinear yaw-feasibility solver. Circular arcs are
-stored as unions of closed intervals on \([-\pi,\pi]\), preserving components
-and identifying the endpoints. The recursion is
+For fixed `q`, retain the acceleration Jacobian's directional structure.
+In the basis aligned with `q`, its entrywise absolute values before the
+nonexpansive acceleration projection are bounded by
 
 \[
-\Theta_k^+=\Theta_k^-\cap\mathcal Y_k,\qquad
-\Theta_{k+1}^-=\Theta_k^+\oplus\Delta\psi_m\oplus[-E_\Delta,E_\Delta].
+B_s=\begin{bmatrix}0&2O_{\max}\\3O_{\max}&3A_{\max}/a\end{bmatrix},
+\qquad L_s=\|B_s\|_2.
 \]
 
-No lifted-error decay theorem is used. Empty intersections remain empty until
-explicit initialization; they do not trigger a silent reset or reliability
-weight. `egoYawRadius` covers the entire reported arc union about the nominal
-yaw, even if it has multiple components. Neither nominal absolute yaw nor
-its set enters the internal relative target estimator.
-
-## 4. The sample and increment contract
-
-`step` consumes a synchronized frame at \(t\), assimilates its measurements,
-and returns a prediction at \(t+h\). `stateTime`, `inputSampleTime`, and
-`lastRadarTime` retain these distinct meanings. `output` is read-only.
-Radar slots require stable identifiers for multiple targets. `resetTarget`
-is an explicit acquisition/retirement operation that also clears that
-track's measurement history and prior enclosure.
-
-A frame can supply `egoMotion.duration`, `yawIncrement`, `translation`,
-`yawErrorMaximum`, and `translationErrorMaximum`. The bounds must enclose
-the complete interval, and translation must use the start ego frame.
-Otherwise, the nominal ego flow integrates held body acceleration and yaw
-rate. Its enclosure uses
+At `q=0` the same bound follows by continuity. Thus, globally,
 
 \[
-E_\Delta\le\min\{h(\bar\omega_E+|u_3|),
- h\bar d_\omega+\tfrac12h^2\bar\alpha_E\},
+\boxed{\|\Phi_e(q,s)-\Phi_e(\hat q,\hat s)\|
+ \le L_q\|q-\hat q\|+L_s\|s-\hat s\|.}
 \]
+
+`nrmmTargetLipschitzCertificate.m` evaluates these analytic expressions.
+A sampled Jacobian maximum is not used as the proof. The reconstructed
+`Omega(q,s)` is differentiated, rather than frozen as a constant in this bound.
+The legacy scalar `phi = hypot(Lq,Ls)` is only a diagnostic in numerical SI
+coordinates; the physical certificate below uses the separate channels.
+
+## 3. Observer equations and the yaw chart condition
+
+The continuous measurement model is
+`u3 = omegaE + dOmega`, `am = aE + na`,
+`vm = R(psiE)*vE + nv`, and `yR = rho + nR`, with the declared uniform norm
+bounds. The corrected GNSS-course correspondence supplies `yF` with a certified
+circular error radius `BF`. Its construction uses the declared single-track
+mismatch bound; it is not an additional zero-sideslip assumption.
+
+The retained ego observers are
 
 \[
-E_d\le\min\{h\bar V_E+\|\tilde d_E\|,
- hB_v+\tfrac12h^2(\bar a_E+\|a_m^E\|)\}.
+\dot{\hat\psi}=u_3+k_\psi\operatorname{wrap}(y_F-\hat\psi),
+\qquad \nabla_{u_3}\hat v=a_m+k_v(R(\hat\psi)^Tv_m-\hat v).
 \]
 
-Here \(\bar\alpha_E\) and \(\bar a_E\) are optional bounds valid throughout
-the interval. Defaults are `Inf`, preserving unrestricted intersample
-yaw acceleration and acceleration. Domain-only terms then remain valid but
-can be loose. A point gyro error bound is never multiplied by \(h\) and
-mistaken for a complete hold-error bound. Accelerometer sample noise does not
-by itself enclose intersample acceleration variation either.
-
-Ego poses are accumulated from relative increments in a frame anchored at
-the beginning of the current window. For pose error radii \(B_\psi,E_p\),
-composition encloses the additional translation rotation by
-\(2\|\tilde d\|\sin(\min(B_\psi,\pi)/2)\). Re-anchoring the finite window
-avoids accumulating uncertainty from the entire runtime history.
-
-## 5. Three-parameter nominal inference
-
-Transform each available radar position into the fixed window frame:
+Let `ePsi = psiE - psiHat` be a compatible lift and `dF = yF - psiE`.
+The linear comparison for yaw requires `|ePsi| + BF < pi`. A sufficient invariant
+condition is
 
 \[
-z_j=\tilde d_{E,j}+R(\Delta\tilde\psi_{E,j})y_{R,j},\qquad
-p_j=p_0+R(\theta_0)f_j(V_0,A,\kappa).
+B_\psi=\max\{|e_\psi(0)|,B_F+\bar d_\omega/k_\psi\},
+\qquad B_\psi+B_F<\pi.
 \]
 
-Here \(f_j=L_j\operatorname{sinc}(\kappa L_j/2)e(\kappa L_j/2)\) and
-\(L_j=V_0\tau_j+A\tau_j^2/2\). Centering both point sets eliminates
-translation; planar Procrustes alignment eliminates rotation:
+Inside this chart, `wrap(ePsi+dF)=ePsi+dF`, so the scalar comparison and a
+first-exit argument preserve the condition. A proper measurement arc alone is
+insufficient: `ePsi=3`, `dF=0.2`, `kPsi=1` yields a positive derivative of
+`|ePsi|`, contradicting an unrestricted linear-decay claim. The runtime's
+`yawInnovationChartCompatible` flag is only a pointwise diagnostic; it does not
+establish chart invariance or an initial true-error bound.
+
+The target observer is exactly the third-order high-gain chain
 
 \[
-\theta_0=\operatorname{atan2}\left(\sum_j\operatorname{cross}(\tilde f_j,\tilde z_j),
-\sum_j\tilde f_j^\top\tilde z_j\right),\quad
-p_0=\bar z-R(\theta_0)\bar f.
+\begin{aligned}
+\nabla_{u_3}\hat\rho&=\hat q-\hat v+l_1\omega(y_R-\hat\rho),\\
+\nabla_{u_3}\hat q&=\hat s+l_2\omega^2(y_R-\hat\rho),\\
+\nabla_{u_3}\hat s&=\Phi_e(\hat q,\hat s)+l_3\omega^3(y_R-\hat\rho).
+\end{aligned}
 \]
 
-`fitNrmmTrajectoryWindow` minimizes the remaining isotropic squared residual
-in the three scaled parameters \((V_0,A,\kappa)\) using `fmincon` (Optimization
-Toolbox). Analytic objective gradients use the envelope theorem. Bounds
-constrain acceleration, curvature, and speed at both endpoints, including
-the one-sample prediction endpoint; constant acceleration makes these speed
-constraints sufficient throughout the fitted interval. No robust weights or
-hidden filtering are applied.
+There is no extra filter between these estimates and the published acceleration.
 
-At straight positive-speed motion, the three-time Jacobian at \(0,T,2T\)
-has longitudinal and transverse determinants \(T^3\) and \(V^3T^3\).
-Nonzero curvature is unnecessary for local identification. This is not a
-global uniqueness claim. The returned dimensionless Jacobian condition number
-is a diagnostic, not an observability certificate.
+## 4. Structured target Lyapunov inequality
 
-Startup, short windows, coincident measurements, and optimizer failure use an
-explicit nominal prediction fallback. A fresh radar sample can anchor its
-position without differentiating it. Physical nominal boundary constraints
-are reported through the fit/domain diagnostics and do not prune the hard
-set. During radar dropout, the last estimated model coasts: an eroding window
-is not repeatedly refitted without new information.
+Let `Ac` be the three-state integrator-chain matrix, `C=e1^T`, and
+`Al=Ac-l*C`. The normalized Sharma-type observer LMI selects `l`. Its existing
+normalized pole region and bounded-real noise objective are retained. The
+identity `Al^T*P + P*Al = -I` fixes a positive definite, dimensionless metric.
 
-## 6. Independent deterministic outer enclosures
-
-A transformed radar radius is
+For true-minus-estimated errors use
 
 \[
-\epsilon_j=E_{d,j}+\bar n_R+
-2\bar\rho\sin(\min(B_{\psi,j},\pi)/2).
+\epsilon=\operatorname{diag}(\omega^2I_2,\omega I_2,I_2)e_T,
+\qquad W_T=\sqrt{\epsilon^T(P\otimes I_2)\epsilon}.
 \]
 
-The nominal fit residual is never substituted for this radius. The exact
-trajectory feasibility problem consists of the physical domain, a propagated
-prior, and all measurement-consistency inequalities. The implementation
-maintains a conservative **outer relaxation** of that problem in physical
-\((p,q,s)\) coordinates; it does not enumerate sampled trajectories or use
-a local optimizer to eliminate feasible states.
-
-The physical acceleration and fixed-frame jerk bounds are
+All components of `epsilon` have acceleration units. The common rotation
+`-u3*(I3 tensor J)` contributes exactly zero to the quadratic derivative.
+Split `DeltaPhi = DeltaPhiq + DeltaPhis` by changing `q` first and then `s`.
+The two global bounds become
 
 \[
-S_{\max}=\sqrt{\bar A^2+\bar\kappa^2\bar V^4},\qquad
-J_{\max}=\sqrt{(\bar j_A+\bar\kappa^2\bar V^3)^2+
- (3\bar A\bar\kappa\bar V+\bar j_\kappa\bar V^2)^2}.
+\|\Delta\Phi_q\|\le(L_q/\omega)\|\epsilon_2\|,\qquad
+\|\Delta\Phi_s\|\le L_s\|\epsilon_3\|.
 \]
 
-The default model has \(\bar j_A=\bar j_\kappa=0\). Nonzero values explicitly
-admit variation of geometric acceleration and curvature. The nominal window
-still fits constant values; its mismatch is then enclosed in the hard jerk
-bound. This does not assert that the changing target satisfies the original
-constant-sideslip retained model.
-
-For a query time after every sample, \(d_j=t-\tau_j\), Taylor's integral
-remainder gives, componentwise,
+Set `bP=P*e3`. For positive Young multipliers `tq,ts`, define
 
 \[
-p_j=p_t-d_jq_t+\tfrac12d_j^2s_t+r_j,\qquad
-|r_{j,i}|\le J_{\max}d_j^3/6.
+M=\omega I-t_q(L_q/\omega)^2e_2e_2^T-t_sL_s^2e_3e_3^T
+ -(t_q^{-1}+t_s^{-1})b_Pb_P^T.
 \]
 
-For three distinct observation times define rows
-\(M_j=[1,-d_j,d_j^2/2]\). With \(W=M^{-1}\), the center and radius for each
-coordinate of \((p_t,q_t,s_t)\) are
-\(Wz\) and \(|W|(\epsilon+J_{\max}d^3/6)\). Several nested triples are
-intersected, together with velocity secant bounds using \(S_{\max}\), every
-position reachability ball using \(\bar V\), and the physical component
-bounds. Ill-conditioned triples are skipped, which only weakens information.
+Twice applying `2 z^T d <= |z|^2/t + t |d|^2` gives
 
-Between frames, `nrmmTargetSet` propagates the previous box with the Taylor
-chain and radii \(J_{\max}(h^3/6,h^2/2,h)\). It encloses uncertain ego
-translation and rotation, then intersects the result with measurement/window
-information and the physical domain. Rotation error terms use the appropriate
-physical norm bounds \((\bar\rho,\bar V,S_{\max})\). Initialization uses the
-entire declared domain, never the unverified nominal initialization offset.
+\[
+\boxed{M\succeq 2\lambda_TP\quad\Longrightarrow\quad
+ \dot W_T\le-\lambda_TW_T\quad\text{without exogenous error inputs}.}
+\]
 
-**Containment statement (real arithmetic).** If the initial domain contains
-the truth, all sensor, model-rate, and intersample bounds hold throughout their
-stated intervals, and every numerical approximation is enclosed, prediction
-and every intersection above retain the truth. Taking the farthest corner of
-each two-coordinate output rectangle about the nominal estimate gives its
-reported Euclidean covering radius. This is conditional containment, not
-convergence or an accuracy forecast.
+This is a Lyapunov/Lipschitz high-gain proof. It preserves the absence of
+position from `Phi` and the `1/omega` scaling of its velocity sensitivity.
+`synthesizeTargetTrackerCertificate.m` numerically searches the two positive
+multipliers, recovers the generalized-eigenvalue decay rate, subtracts a small
+numerical margin, and checks the final dissipation matrix. Feasibility of that
+matrix is the certificate; optimizer termination does not prove global
+optimality. Ordinary floating-point checks are not a directed-rounding proof.
 
-`outerNonempty` means only that the retained relaxation is nonempty. It does
-not prove that an exact nonlinear feasible trajectory exists. `inconsistent`
-means an outer intersection was empty or the instantaneous body/gyro domain
-information was contradictory. Such outputs have infinite reported radii.
-Estimated domain audits do not establish that the true trajectory stayed in
-the physical domain.
+## 5. Disturbance directions and cascade ISS
 
-**Numerical boundary.** The MATLAB implementation uses explicit Taylor
-remainders and a configured floating-point guard (`numericalAllowance`,
-default \(10^{-9}\)). It does not implement directed-rounding interval
-arithmetic or verify the complete floating-point/libm error budget. Accordingly
-`machineVerified=false` is published with every enclosure. The analytic
-containment argument is not a machine-verified digital certificate; upgrading
-that claim requires validated arithmetic for rotations, alignment-independent
-bounds, linear solves, and constant evaluation. Passing sampled containment
-tests is not a substitute for that work.
+If the nominal constant-`A,kappa` model is relaxed, declare rate bounds. The
+additional physical jerk is `Adot*e + kappaDot*V^2*J*e`, so
 
-## 7. Continuous-comparator qualifications
+\[
+\bar\nu_\Phi=\sqrt{\bar{\dot A}^{\,2}+b^4\bar{\dot\kappa}^{\,2}}.
+\]
 
-For the continuous high-gain radar predictor, its residual obeys
-\(\dot r=-K_1r\) between resets. Its acceleration injection integrates to
-\((K_3/K_1)(1-e^{-K_1h})r(0)\), about \(311r(0)\ \mathrm{s}^{-2}\) for the
-previous default design at 50 Hz. This identifies a noise-amplification
-mechanism; it is not a full transfer-function analysis.
+Both rates default to zero. They enter as uncertainty in the last chain
+equation and do not change the nominal observer dynamics.
 
-The previous wrapped yaw correction does **not** support unrestricted lifted
-linear-error decay. For \(e=3\), measurement error \(d_F=0.2\), and unit gain,
-\(-\operatorname{wrap}(e+d_F)=3.083185\), while \(-|e|+|d_F|=-2.8\).
-Its ISS yaw row requires a compatible chart, such as \(|e|+B_F<\pi\), and an
-invariance argument. A proper measurement arc alone is insufficient. The
-independently retained gain and vector-field algorithms must be read with that
-local qualification. Their innovation-displacement minimax is an engineering
-design objective, not an optimum uniquely forced by the continuous ISS bound.
+Define `h = [omega^2*rhoMax, omega*b, S]^T`. Cauchy--Schwarz in the actual metric
+gives the directional coefficients
 
-Schiller et al., *A Lyapunov function for robust stability of moving horizon
-estimation*, [arXiv:2202.12744](https://arxiv.org/abs/2202.12744), provide an
-exponential detectability/Lyapunov route to robust MHE stability with appropriate
-objectives and horizon conditions. Those conditions have not been established
-for this estimator. Barrau and Bonnabel, *The invariant extended Kalman filter
-as a stable observer*, [arXiv:1410.1465](https://arxiv.org/abs/1410.1465), analyze
-a characterized class of invariant systems under stability conditions; mere
-rotation equivariance of NRMM does not establish membership in that class.
-These references identify possible further theory, not inherited guarantees.
+\[
+g_{Tv}=\omega^2\sqrt{P_{11}},\quad
+g_R=\omega^3\sqrt{l^TPl},\quad
+g_\omega=\sqrt{h^T|P|h},\quad g_\Phi=\sqrt{P_{33}}.
+\]
 
-## 8. Integration and reproduction
+Here `|P|` is entrywise absolute value. The target comparison is
 
-`nrmmEstimatorControllerAdapter` publishes the unfiltered window estimates,
-including physical acceleration. It no longer overwrites them with a
-constant-velocity alpha-beta filter and zero acceleration. Existing controller
-tightening values remain separately labeled `configured-engineering-assumption`;
-the relative enclosure is not silently promoted to an inertial-frame controller
-certificate. Certified closed-loop tightening needs the corresponding ego
-position/yaw uncertainty and controller analysis.
+\[
+D^+W_T\le-\lambda_TW_T+g_{Tv}\|e_v\|
+ +g_\omega\bar d_\omega+g_R\bar n_R+g_\Phi\bar\nu_\Phi.
+\]
 
-Run the geometry/runtime tests and the scenario from the repository root:
+Under the yaw chart condition, the full retained cascade satisfies
+
+\[
+D^+\begin{bmatrix}|e_\psi|\\\|e_v\|\\W_T\end{bmatrix}
+\le H\begin{bmatrix}|e_\psi|\\\|e_v\|\\W_T\end{bmatrix}+d,
+\quad H=\begin{bmatrix}
+-k_\psi&0&0\\k_v\bar V_E&-k_v&0\\0&g_{Tv}&-\lambda_T
+\end{bmatrix},
+\]
+\[
+d=\begin{bmatrix}
+\bar d_\omega+k_\psi B_F\\
+\bar n_a+\bar V_E\bar d_\omega+k_v\bar n_v\\
+g_\omega\bar d_\omega+g_R\bar n_R+g_\Phi\bar\nu_\Phi
+\end{bmatrix}.
+\]
+
+`H` is Hurwitz and Metzler. The positive vector `c=-H^{-T}*ones(3,1)` gives
+`c^T H=-ones(1,3)`. Therefore `Vc=c^T[|ePsi|,|ev|,WT]^T` is a copositive
+cascade Lyapunov function with an explicit ISS comparison. This is implemented
+in `nrmmObserverCertificate.m`. The ultimate comparison vector is `-H^{-1}d`.
+
+Component extraction uses the tight ellipsoid factors
+
+\[
+\|e_{T,i}\|\le c_iW_T,\qquad
+(c_1,c_2,c_3)^T=\operatorname{diag}(\omega^{-2},\omega^{-1},1)
+ \sqrt{\operatorname{diag}(P^{-1})}.
+\]
+
+The square root is componentwise. This avoids using the worst eigenvalue for
+every component and the worst metric direction for every disturbance.
+Inertial position remains downstream:
+`|ep|_infinity <= np + (|ev|_infinity + VEmax*|ePsi|_infinity)/kp`.
+The ego-frame acceleration-difference error is bounded by the target
+acceleration error plus accelerometer error, with no velocity term added to
+an acceleration quantity.
+
+## 6. Explicit gain-selection preference
+
+The normalized gain shape is unchanged. The physical bandwidth minimizes the
+largest ultimate error bound divided by its corresponding declared physical
+scale, subject to `lambdaT >= 1/Tdomain` and `omega > 1/s`, where
+`Tdomain=rhoMax/(VEmax+VCmax)`. This is an engineering preference for disturbance
+rejection with a minimum decay rate. The ISS theorem does not force this
+objective or the transit-time convention. Numerical minimization is not claimed
+to be globally optimal. The conservative transient formula
+`WT(t) <= exp(-lambdaT*t)*WT(0) + WT_infinity` remains available; a full-domain
+initial-error bound is not mixed into the persistent-noise objective.
+
+The yaw, velocity, and position gains retain their scalar objective
+`max(a/k, Ts*b*k)` on `[1/Tdomain,1/Ts]`. This objective balances process-error
+leakage and innovation displacement. It is likewise a stated design preference,
+not an optimum implied by the continuous ultimate bound `b+a/k`.
+
+## 7. Sampling, radar prediction, and scope of the theorem
+
+`onlineNrmmTrackingRuntime.m` receives a synchronized frame at `t`, resets its
+output predictors, and advances the continuous observers to `t+Ts` with RK4.
+The GNSS position predictor follows estimated inertial velocity. The radar
+predictor uses its own moving-frame dynamics,
+
+\[
+\dot y_P=\hat q-\hat v-u_3Jy_P.
+\]
+
+While radar is available its innovation obeys exactly
+
+\[
+\dot r=-(K_1I+u_3J)r,\qquad r=y_P-\hat\rho.
+\]
+
+Using `-u3*J*rhoHat` in both predictor and observer would omit the rotation of
+this residual. The corrected equation is tested against its matrix exponential.
+For zero ego rotation, the acceleration injection integrated over one interval
+is `(K3/K1)*(1-exp(-K1*Ts))*r(0)`. This explains why excessive bandwidth can
+strongly amplify fresh radar noise even with a motion predictor.
+
+The continuous theorem assumes bounded-error measurements throughout time.
+A noise bound at one sample instant does not bound the error of a held signal
+over an interval without additional intersample assumptions. Predictor resets,
+intersample errors, dropouts, and RK4 remainders require a separate digital
+stability proof. During radar dropout the correction is removed and the
+nominal model coasts; the positive continuous correction decay cannot be claimed
+for that interval. Both design and runtime explicitly publish
+`sampledImplementationCertified=false`.
+
+Scenario controller margins are separately labeled engineering assumptions.
+They are not derived from this continuous observer certificate, and neither the
+benchmark nor this document proves closed-loop collision avoidance.
+
+## 8. Executable verification and reproduction
+
+The behavior tests check the NRMM coordinate correspondence, exact equality of
+`Phi_e` and `Phi` on the operating domain, global bounds across saturation
+regions, the nonlinear Lyapunov derivative, component ellipsoid factors,
+wrapped-yaw limitations, radar residual rotation, and track reset isolation.
+A noisy seed outside the benchmark seed range checks acceleration performance.
+
+From the repository root:
 
 ```matlab
-results = runtests({'tests/nrmmWindowEstimatorTest.m', ...
+addpath('estimator','config','scripts');
+results = runtests({'tests/nrmmStructuredHighGainTest.m', ...
+    'tests/observerGainSynthesisTest.m','tests/nrmmCascadeCertificateTest.m', ...
+    'tests/nrmmModelFormulationTest.m','tests/nrmmObserverVectorFieldTest.m', ...
+    'tests/certifiedKinematicCourseCorrespondenceTest.m', ...
     'tests/onlineNrmmTrackingRuntimeTest.m'});
 assertSuccess(results);
 runOnlineNrmmComplexManeuverScenario('Plot',false,'NoiseModel','boundedUniform');
-benchmark = runOnlineNrmmTrackingErrorBenchmark('MonteCarloRuns',5);
+benchmark = runOnlineNrmmTrackingErrorBenchmark();
 ```
 
-The benchmark uses 12 s trials, 2 s burn-in, seeds 7--11, 0.4/0.8/1.2 s
-windows, 50 Hz and 25 Hz sampling, a one-second radar dropout, and a smooth
-change of acceleration and curvature. Its explicit scenario increment bounds
-are \(\bar a_E=3\ \mathrm{m/s^2}\) and
-\(\bar\alpha_E=0.05\ \mathrm{rad/s^2}\), enclosing the analytic ego profiles.
-For varying motion it declares \(\bar j_A=1.5\ \mathrm{m/s^3}\) and
-\(\bar j_\kappa=0.0175\ \mathrm{m^{-1}s^{-1}}\). These tighter bounds change
-the reported enclosures and yaw set, not the nominal relative input history.
+A paired historical comparison accepts `BaselineRuntime` and `BaselineDesign`
+function handles to independently versioned source exports. Trials share truth,
+noise draws, initialization, and sample timing. Continuous ultimate bounds,
+empirical RMSE, initial peaks, curvature lag, domain exits, and computation time
+are reported separately. Generated results and source exports belong outside
+the estimator directory.
 
-`RuntimeFunction` and `DesignFunction` on the scenario, and `BaselineRuntime`
-and `BaselineDesign` on the benchmark, allow paired replay of an independently
-versioned comparator. The 2026-09-05 comparison uses an external source export
-of the original runtime at `ac20bc4317c373e388b846bcf0f42fc8eb077d61`, with only
-its function name and path setup changed for side-by-side invocation. The
-standard paired truth and noise draws are unchanged. The retained scenario
-positions use the same trapezoidal truth quadrature as the original benchmark;
-exact-flow equivalence is separately tested against tight-tolerance ODE
-integration. Changing-motion truth uses `ode113` at relative tolerance
-\(10^{-11}\) and absolute tolerance \(10^{-12}\).
+## 9. Paired synthetic benchmark
 
-Curvature lag is the minimum-MSE shift on a 20 ms grid over a declared
-transition neighborhood (40 ms at 25 Hz), searching -1 to +2 seconds. Timing
-measures estimator steps on this host and does not establish a real-time
-worst-case execution bound. Detailed trial outputs and test evidence are
-stored in the external research archive, not under `estimator/`.
+The reference is the previous repository high-gain implementation at commit
+`ac20bc4317c373e388b846bcf0f42fc8eb077d61`, not a reproduction of the paper's
+full-scale vehicle experiments. Both variants retain the NRMM high-gain cascade.
+There are 42 trials: 21 per variant, 12 s duration, 2 s burn-in, bounded-uniform
+noise seeds 7--11, one noise-free trial, 50/25 Hz sensing, a changing-motion case,
+and a radar dropout from 4 to 5 s. Initial states and sensor draws are identical
+within each pair. Noise-free trials retain the same designed gains.
 
-## 9. Measured comparison, 2026-09-05
+Five-seed mean results:
 
-The completed paired study contains 84 final trials: 21 sampled high-gain
-baseline trials and 21 trials for each window. Values below average the five
-seeds after the 2 s burn-in. Velocity RMSE uses inertial reconstruction;
-position/acceleration RMSE and all physical-state enclosure checks use the
-ego-frame coordinates. The smooth changing-motion trajectory reaches
-50.7588 m separation; its explicit domain is therefore 55 m. An initial run
-incorrectly retained the 50 m domain. Its outputs are preserved as diagnostic
-evidence, and all 20 changing-motion comparisons were rerun with the corrected
-domain. The final benchmark checks the truth domain/model-rate assumptions
-before accepting a trial.
+| Case | Design | Position RMSE (m) | Velocity RMSE (m/s) | Acceleration RMSE (m/s^2) |
+|---|---|---:|---:|---:|
+| Retained model, 50 Hz | Previous high gain | 0.093528 | 2.7231 | 29.5604 |
+| Retained model, 50 Hz | Structured high gain | 0.046948 | 0.48023 | 1.8236 |
+| Retained model, 25 Hz | Previous high gain | 0.17934 | 4.8262 | 48.511 |
+| Retained model, 25 Hz | Structured high gain | 0.071183 | 0.71372 | 2.6685 |
+| Changing motion | Previous high gain | 0.094063 | 2.7576 | 30.1445 |
+| Changing motion | Structured high gain | 0.045581 | 0.44295 | 1.6020 |
+| One-second dropout | Previous high gain | 2.8549 | 39.6818 | 404.986 |
+| One-second dropout | Structured high gain | 0.24014 | 1.4605 | 5.1457 |
 
-| Case / estimator | Position RMSE (m) | Velocity RMSE (m/s) | Acceleration RMSE (m/s²) | Curvature lag (s) |
-|---|---:|---:|---:|---:|
-| retained / sampled high gain | 0.093528 | 2.7231 | 29.560 | — |
-| retained / 0.4 s | 0.042472 | 0.40039 | 1.7368 | — |
-| retained / 0.8 s | 0.032623 | 0.17856 | 0.41250 | — |
-| retained / 1.2 s | 0.026362 | 0.098852 | 0.15462 | — |
-| changing / 0.4 s | 0.043013 | 0.41077 | 1.7941 | 0.244 |
-| changing / 0.8 s | 0.032794 | 0.18239 | 0.45724 | 0.424 |
-| changing / 1.2 s | 0.027411 | 0.11875 | 0.30154 | 0.612 |
-| dropout / sampled high gain | 2.8549 | 39.682 | 404.99 | — |
-| dropout / 0.8 s | 0.059115 | 0.21100 | 0.57007 | — |
-| 25 Hz / sampled high gain | 0.17934 | 4.8262 | 48.511 | — |
-| 25 Hz / 0.8 s | 0.049724 | 0.26304 | 0.58069 | — |
+Position and acceleration errors use the ego frame; velocity RMSE uses inertial
+reconstruction. The default bandwidth changes from 19.011 to 6.4431 /s and the
+three gains from approximately `[86.99,2856,32846]` to `[29.48,328.0,1278.7]`.
+The sufficient continuous target decay changes from 1.5594 to 0.8000 /s, while
+the continuous position ultimate bound decreases from 312.03 to 6.2185 m.
+This is a smaller sufficient bound, not a tight error radius for the sampled run.
 
-All evaluated samples of the final 63 window-estimator trials satisfied the
-estimated physical domain and lay within the reported analytic radii. This
-is empirical support, with the mathematical and numerical qualifications in
-Section 6. The baseline's noisy physical acceleration frequently left its
-unsaturated domain; the comparison does not claim that its continuous ISS
-certificate applied throughout those realizations. No sampled radius or
-coverage percentage is assigned to that baseline.
+The mean peak acceleration error during the first 2 s falls from 346.06 to
+34.37 m/s^2. Startup peaking remains. Post-burn-in estimates satisfy the full
+physical reconstruction domain at about 62.4% of samples in the noisy retained
+case; the global extension handles the remaining samples, and the proof does
+not require the estimated state to stay inside that physical domain. Noise-free
+post-burn-in domain membership is 100%. Mean step time is approximately 2.44 ms
+on this host, without a worst-case execution claim.
 
-For retained noisy motion with the explicit intersample bounds, the 0.8 s
-window's mean relative-position radius was 0.26238 m and mean step time was
-3.81 ms. Under the unrestricted default intersample model, the separate paired
-seed-7 probe gave the same nominal relative-position/acceleration errors but
-much looser mean physical radii: approximately (2.42 m, 39.22 m/s, 6.66 m/s²).
-The tight-enclosure seed-7 probe gave approximately (0.263 m, 3.33 m/s,
-6.65 m/s²). Acceleration bounds remain substantially more conservative than
-measured acceleration error; no smallest feasible-set radius is claimed.
-
-The default remains 0.8 s as an explicit response/noise compromise. A 1.2 s
-window reduces stationary-model acceleration error further while increasing
-measured curvature lag. These open-loop results and adapter interface checks
-do not establish certified collision avoidance in closed loop.
-
-Validation included the estimator/geometry and adapter contract tests, the
-84-trial final benchmark, and the repository-wide test suite. The first full
-run exposed a new case-normalization bug in `resetTarget`; this was corrected
-and covered by an explicit reset regression. The final combined test record
-has 211 passes and 12 remaining controller/scenario failures out of 223 tests.
-All 12 remaining failures were independently reproduced in an exported checkout
-of the unchanged baseline commit. They include 0.05 s versus 0.1 s sample-time
-contracts, a removed `frontTrackWidth` field, and terminal-row feasibility
-expectations. They are not represented as passing closed-loop validation.
+The changing-motion case declares `|Adot|<=1.5 m/s^3` and
+`|kappaDot|<=0.0175 /(m*s)`, with a 55 m range domain. Its best-shift curvature
+lag estimate is 0.272 s for the revised observer and 0.644 s for the previous
+one; this noisy-signal metric is not an exact phase-delay measurement. The
+previous certificate does not include the additional model-jerk forcing.
+`DeclaredModelJerkCovered`, `HasRadarDropout`, and `DigitalCertified` in the
+trial table make these qualifications explicit. Dropout results are empirical;
+the continuous correction theorem is not applied to missing-measurement intervals.

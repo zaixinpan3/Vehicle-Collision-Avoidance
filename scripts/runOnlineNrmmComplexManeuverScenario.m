@@ -5,9 +5,9 @@ function result = runOnlineNrmmComplexManeuverScenario(varargin)
 % and TargetMotion ('retained' or 'varying'). Initial estimates use documented
 % offsets; metrics discard the first 2 s. The retained truth and random draws
 % are unchanged from the paired high-gain baseline. The varying case declares
-% changing geometric A and curvature and measures the resulting window lag.
-% Radius coverage is empirical validation of conditional analytic bounds;
-% it is not a proof of containment or moving-horizon convergence.
+% changing geometric A and curvature and measures response lag.
+% Lyapunov ultimate bounds are reported separately for the continuous model;
+% they are not asserted as certified sample-by-sample digital error radii.
 
     options = localOptions(varargin{:});
     localAddProjectPaths();
@@ -25,6 +25,20 @@ function result = runOnlineNrmmComplexManeuverScenario(varargin)
     estimate = localRunObserver(time, measurements, initial, cfg, design, options);
     metrics = localMetrics(truth, estimate, time, transientDuration, cfg, options);
     metrics.curvatureLagSeconds = localCurvatureLag(truth,estimate,options);
+    metrics.continuousUltimateBounds = [design.ultimateBounds.relativePosition, ...
+        design.ultimateBounds.targetVelocity,design.ultimateBounds.targetAcceleration];
+    metrics.continuousTargetDecayRate = design.target.lambda;
+    metrics.targetBandwidth = design.target.bandwidth;
+    requiredModelJerk = hypot(cfg.target.model.scalarAccelerationRateMaximum, ...
+        cfg.target.domain.speedMaximum^2*cfg.target.model.curvatureRateMaximum);
+    coveredModelJerk = 0;
+    if isfield(design.target,"modelJerkMaximum")
+        coveredModelJerk = design.target.modelJerkMaximum;
+    end
+    metrics.declaredModelJerkCovered = coveredModelJerk+1e-12 >= requiredModelJerk;
+    metrics.hasRadarDropout = ~isempty(options.dropoutIntervals);
+
+
 
     result = struct();
     result.options = options;
@@ -232,7 +246,7 @@ function initial = localInitialEstimate(truth)
 % localInitialEstimate Truth plus the documented initialization offsets.
 %
 % The target q offset is below 1 m/s. The same offsets are used for the
-% window estimator and the independently versioned high-gain comparator.
+% improved high-gain observer and an independently versioned comparator.
 
     initial = struct( ...
         "egoPosition", truth.egoPosition(1, :).'+[1.0; -0.8], ...
@@ -265,9 +279,6 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design, o
     targetHeadingInertial = NaN(sampleCount, 1);
     targetSpeed = NaN(sampleCount, 1);
     targetYawRate = NaN(sampleCount, 1);
-    errorRadius = NaN(sampleCount, 3);
-    outerNonempty = false(sampleCount, 1);
-    fitConsistent = false(sampleCount, 1);
     stepSeconds = NaN(sampleCount, 1);
 
     % Sample 1 carries the initial estimate mapped through the same output
@@ -320,12 +331,6 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design, o
             "step", runtime, frame);
         stepSeconds(sampleIdx+1) = toc(timer);
         targetOutput = output.targetEstimates(1);
-        if isfield(targetOutput,"errorBound") && isfield(targetOutput.errorBound,"outerNonempty")
-            errorRadius(sampleIdx+1,:) = [targetOutput.errorBound.relativePosition, ...
-                targetOutput.errorBound.targetVelocity, targetOutput.errorBound.targetAcceleration];
-            outerNonempty(sampleIdx+1) = targetOutput.errorBound.outerNonempty;
-            fitConsistent(sampleIdx+1) = targetOutput.windowFit.measurementConsistent;
-        end
         egoState(sampleIdx+1, :) = output.egoState.';
         egoYaw(sampleIdx+1) = output.egoYaw;
         egoYawRate(sampleIdx+1) = output.egoYawRate;
@@ -347,8 +352,7 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design, o
         "targetHeadingInertial", targetHeadingInertial, ...
         "targetSpeed", targetSpeed, ...
         "targetYawRate", targetYawRate, ...
-        "errorRadius", errorRadius, "outerNonempty", outerNonempty, ...
-        "fitConsistent", fitConsistent, "stepSeconds", stepSeconds, ...
+        "stepSeconds", stepSeconds, ...
         "finalOutput", output, ...
         "runtime", runtime);
 end
@@ -401,19 +405,14 @@ function metrics = localMetrics(truth, estimate, time, transientDuration, cfg, o
     physicalError = [vecnorm(estimate.targetState(:,1:2)-truth.targetTransformedState(:,1:2),2,2), ...
         vecnorm(estimate.targetState(:,3:4)-truth.targetTransformedState(:,3:4),2,2), ...
         vecnorm(estimate.targetState(:,5:6)-truth.targetTransformedState(:,5:6),2,2)];
-    metrics.radiusCoverageFraction = mean(all(physicalError(evaluation,:) <= estimate.errorRadius(evaluation,:),2) ...
-        & estimate.outerNonempty(evaluation));
-    metrics.meanErrorRadius = mean(estimate.errorRadius(evaluation,:),1);
-    metrics.maximumErrorRadius = max(estimate.errorRadius(evaluation,:),[],1);
-    metrics.outerNonemptyFraction = mean(estimate.outerNonempty(evaluation));
-    metrics.nominalMeasurementConsistentFraction = mean(estimate.fitConsistent(evaluation));
+    metrics.peakInitialPositionError = max(physicalError(time <= transientDuration,1));
+    metrics.peakInitialVelocityError = max(physicalError(time <= transientDuration,2));
+    metrics.peakInitialAccelerationError = max(physicalError(time <= transientDuration,3));
+    metrics.maximumPositionError = max(physicalError(evaluation,1));
+    metrics.maximumAccelerationError = max(physicalError(evaluation,3));
     metrics.meanStepMilliseconds = 1000*mean(estimate.stepSeconds(2:end));
     metrics.maximumStepMilliseconds = 1000*max(estimate.stepSeconds(2:end));
-    if all(isnan(estimate.errorRadius),"all")
-        metrics.radiusCoverageFraction = NaN;
-        metrics.outerNonemptyFraction = NaN;
-        metrics.nominalMeasurementConsistentFraction = NaN;
-    end
+    metrics.digitalErrorBoundCertified = false;
     metrics.estimatedDomainValidFraction = mean(localPhysicalDomain(estimate.targetState(evaluation,:),cfg));
     metrics.truthOperatingDomainValid = all(localPhysicalDomain(truth.targetTransformedState,cfg));
     if options.targetMotion == "varying"
@@ -463,17 +462,19 @@ function value = localVectorRmse(error, evaluation)
     value = sqrt(mean(magnitude(evaluation).^2));
 end
 
-function localReport(metrics, design)
-    fprintf("\nExact-flow finite-window NRMM estimator\n");
-    fprintf("  sample period / window: %.3g / %.3g s\n", ...
-        design.samplePeriod, design.configuration.window.duration);
-    fprintf("  relative position / velocity / acceleration RMSE: %.6g / %.6g / %.6g\n", ...
-        metrics.relativePositionRmse, metrics.targetVelocityRmse, metrics.targetAccelerationRmse);
-    fprintf("  mean p/q/s enclosure radii: %s\n", mat2str(metrics.meanErrorRadius, 5));
-    fprintf("  observed radius coverage / outer nonempty: %.4f / %.4f\n", ...
-        metrics.radiusCoverageFraction, metrics.outerNonemptyFraction);
-    fprintf("  mean / maximum step: %.3f / %.3f ms\n", ...
-        metrics.meanStepMilliseconds, metrics.maximumStepMilliseconds);
+function localReport(metrics,design)
+    fprintf("\nMultistage high-gain NRMM observer\n");
+    fprintf("  sample period: %.3g s; target bandwidth: %.4g /s\n", ...
+        design.samplePeriod,design.target.bandwidth);
+    fprintf("  position / velocity / acceleration RMSE: %.6g m / %.6g m/s / %.6g m/s^2\n", ...
+        metrics.relativePositionRmse,metrics.targetVelocityRmse,metrics.targetAccelerationRmse);
+    fprintf("  continuous target decay: %.4g /s; position ultimate bound: %.4g m\n", ...
+        design.target.lambda,design.ultimateBounds.relativePosition);
+    fprintf("  These continuous-flow bounds are not digital samplewise certificates.\n");
+    fprintf("  mean / maximum step time: %.4g / %.4g ms\n", ...
+        metrics.meanStepMilliseconds,metrics.maximumStepMilliseconds);
+    fprintf("  truth domain valid: %d; estimated domain fraction: %.4f\n", ...
+        metrics.truthOperatingDomainValid,metrics.estimatedDomainValidFraction);
 end
 
 function localPlot(result)
@@ -539,7 +540,7 @@ function options = localOptions(varargin)
         @(x) isnumeric(x) && size(x,2) == 2 && all(isfinite(x), "all") && all(x(:,2) >= x(:,1)));
     addParameter(parser,"TargetMotion","retained",@(x) any(string(x) == ["retained","varying"]));
     addParameter(parser,"RuntimeFunction",@onlineNrmmTrackingRuntime,@(x) isa(x,"function_handle"));
-    addParameter(parser,"DesignFunction",@nrmmWindowEstimatorDesign,@(x) isa(x,"function_handle"));
+    addParameter(parser,"DesignFunction",@synthesizeNrmmObserverGains,@(x) isa(x,"function_handle"));
     parse(parser, varargin{:});
     options = struct( ...
         "runtimeFunction", parser.Results.RuntimeFunction, "designFunction", parser.Results.DesignFunction, ...

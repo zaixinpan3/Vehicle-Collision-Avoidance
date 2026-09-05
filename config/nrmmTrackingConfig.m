@@ -1,27 +1,16 @@
 function cfg = nrmmTrackingConfig()
 % nrmmTrackingConfig Physical bounds and sampled NRMM estimator settings.
 %
-% Online estimation separates yaw information from body-relative tracking.
-% The target nominal estimate comes from an exact constant-A/curvature window
-% fit. Independent analytic outer enclosures use the physical domain, bounded
-% sensor errors, and explicit model/intersample variation bounds. Sensor biases
-% are compensated upstream. See estimator/OBSERVER_ISS_THEORY.md.
+% The observer retains the Sharma NRMM ego-to-target cascade and covariant
+% third-order high-gain chain. Gains follow a normalized observer LMI and a
+% structured Lyapunov/Lipschitz ISS design. Sensor biases are compensated
+% upstream. See estimator/OBSERVER_ISS_THEORY.md.
 
     cfg.runtime.samplePeriod = 0.02;                 % s
-    cfg.runtime.integrationStepMaximum = 0.005;      % s, continuous-comparator only
-    % The online estimator fits a constant-acceleration/curvature segment.
-    % These are explicit information-versus-response choices, not ISS gains.
-    cfg.window.duration = 0.8;                       % s
-    cfg.window.minimumFitSpan = 0.12;                % s
-    cfg.window.maximumIterations = 40;
-    cfg.window.numericalAllowance = 1.0e-9;
-    % Optional bounds valid THROUGHOUT each sample interval. Inf preserves
-    % the original unrestricted intersample model; then domain-only motion
-    % enclosures are used. A point sensor bound alone never bounds a hold.
-    cfg.ego.intersample.accelerationMaximum = Inf;   % m/s^2
-    cfg.ego.intersample.yawAccelerationMaximum = Inf; % rad/s^2
-    % Zero retains the exact model. Nonzero rates enlarge the hard jerk
-    % enclosure; the nominal fit still uses constant A and curvature.
+    cfg.runtime.integrationStepMaximum = 0.005;      % s, RK4 step limit
+    % Zero retains constant scalar acceleration and constant curvature.
+    % Nonzero rates enter the final chain equation as bounded model jerk;
+    % the observer model itself remains the nominal Sharma NRMM.
     cfg.target.model.scalarAccelerationRateMaximum = 0.0; % m/s^3
     cfg.target.model.curvatureRateMaximum = 0.0;      % 1/(m s)
 
@@ -33,7 +22,7 @@ function cfg = nrmmTrackingConfig()
     cfg.ego.domain.speedMaximum = 20.0;              % m/s   Vbar_E
     cfg.ego.domain.yawRateMaximum = 0.30;            % rad/s omegabar_E
 
-    %% Joint body-velocity and circular yaw measurement information
+    %% Certified kinematic course measurement for the yaw stage
     % The course channel estimates side slip pointwise from the measured
     % yaw rate and GNSS speed using the kinematic single-track relation.
     % sideslipDomainMaximum only selects the invertible principal branch;

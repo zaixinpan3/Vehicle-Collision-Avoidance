@@ -20,7 +20,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function configuredSensorsProduceFiniteWindowDesign(testCase)
+        function configuredSensorsProduceCascadedHighGainDesign(testCase)
             cfg = estimatorControllerIntegrationConfig();
             initialEgo = struct( ...
                 "position", [0.0; 0.0], ...
@@ -55,9 +55,9 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             testCase.verifyEqual( ...
                 cfg.initialization.targetSpeedPrior, 15.0, ...
                 AbsTol=0.0);
-            testCase.verifyEqual(design.method,"exact-flow-finite-window");
-            testCase.verifyGreaterThan(design.target.domain.jerkNormBound,0.0);
-            testCase.verifyGreaterThan(design.configuration.window.duration,0.0);
+            testCase.verifyEqual(design.coreIss.stateOrder,["yaw";"bodyVelocity";"target"]);
+            testCase.verifyGreaterThan(design.target.lipschitzCertificate.phiAcceleration,0.0);
+            testCase.verifyGreaterThan(design.target.lambda,0.0);
             testCase.verifyEqual( ...
                 context.observerSamplesSinceLastControllerTime, 0);
             testCase.verifyEqual( ...

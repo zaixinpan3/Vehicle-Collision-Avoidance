@@ -90,16 +90,16 @@ function cfg = estimatorControllerIntegrationConfig()
     % state and plans as if estimation were exact.
     %
     % These controller tightening values remain explicit engineering
-    % assumptions from the scenario configuration. The redesigned runtime
-    % separately publishes conditional relative-state enclosures and a yaw
-    % set. They are not interchangeable with inertial-frame controller bounds.
+    % assumptions from the scenario configuration. The observer design
+    % separately provides continuous-time Lyapunov bounds, which are not
+    % certified sampled inertial-frame controller error bounds.
     % A certified closed-loop integration requires propagating ego position,
     % yaw, and target correlations into that controller's uncertainty model.
     cfg.publishedErrorBound.egoPosition = 0.08;       % m
     cfg.publishedErrorBound.egoVelocity = 0.30;       % m/s
     cfg.publishedErrorBound.egoYaw = 0.03;            % rad
     cfg.publishedErrorBound.egoYawRate = 0.05;        % rad/s
-    % Retained nominal planner margins, not certificates of the new window
+    % Retained nominal planner margins, not certificates of the sampled high-gain
     % estimator. The adapter labels their source explicitly and publishes the
     % unfiltered NRMM position, velocity, and acceleration alongside them.
     cfg.publishedErrorBound.targetPosition = 0.15;    % m
