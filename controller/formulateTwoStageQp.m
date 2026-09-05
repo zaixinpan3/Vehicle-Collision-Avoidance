@@ -537,13 +537,17 @@ end
 
 function nominalState = localNominalState(prediction, model, plan)
 % The linearization trajectory at every node: the head by the stage
-% rollout, the tail by its condensed map from the terminal state.
+% rollout in O(N), the tail by its condensed map from the terminal state.
     inputPlan = reshape(plan(1:prediction.inputCount), ...
         model.inputDimension, model.horizonSteps);
     nominalState = zeros(6, prediction.nodeCount);
-    nominalState(:, 1:prediction.headNodeCount) = ltvBicycleRollout( ...
-        prediction.stageMatrixA, prediction.stageMatrixB, ...
-        prediction.stageAffine, model.initialEgoState, inputPlan);
+    nominalState(:, 1) = model.initialEgoState(:);
+    for stageIdx = 1:model.horizonSteps
+        nominalState(:, stageIdx+1) = ...
+            prediction.stageMatrixA(:, :, stageIdx)*nominalState(:, stageIdx) ...
+            + prediction.stageMatrixB(:, :, stageIdx)*inputPlan(:, stageIdx) ...
+            + prediction.stageAffine(:, stageIdx);
+    end
     for nodeIdx = prediction.tailNodeIndex
         nominalState(:, nodeIdx) = prediction.egoStateMatrix(:, :, nodeIdx) ...
             * plan+prediction.egoStateOffset(:, nodeIdx);
@@ -690,8 +694,8 @@ function [centre, halfWidth] = localReachBox(model, layout)
 % largest margin any admissible plan reaches - the cheap side of the
 % gate and a sound certificate.
     cfg = model.cfg;
-    [accelerationMinimum, accelerationMaximum] = ...
-        longitudinalAccelerationBounds(cfg);
+    accelerationMinimum = cfg.actuation.longitudinalAccelerationMinimum;
+    accelerationMaximum = cfg.actuation.longitudinalAccelerationMaximum;
     lower = [-cfg.model.frontWheelSteeringAngleMaximum; accelerationMinimum];
     upper = [cfg.model.frontWheelSteeringAngleMaximum; accelerationMaximum];
     centre = repmat((lower+upper)/2.0, layout.horizonSteps, 1);
@@ -728,8 +732,8 @@ function inputPlan = localCruiseProbeInput(model, prediction, common)
     cfg = model.cfg;
     horizonSteps = model.horizonSteps;
     gain = common.certificate.feedbackGain;
-    [accelerationMinimum, accelerationMaximum] = ...
-        longitudinalAccelerationBounds(cfg);
+    accelerationMinimum = cfg.actuation.longitudinalAccelerationMinimum;
+    accelerationMaximum = cfg.actuation.longitudinalAccelerationMaximum;
     lower = [-cfg.model.frontWheelSteeringAngleMaximum; accelerationMinimum];
     upper = [cfg.model.frontWheelSteeringAngleMaximum; accelerationMaximum];
     inputPlan = zeros(model.inputDimension, horizonSteps);
@@ -1852,8 +1856,8 @@ function certificate = localClfCertificate(model)
 % demanded contraction is not achievable.
     persistent memoKey memoCertificate
     cfg = model.cfg;
-    [minimumAcceleration, maximumAcceleration] = ...
-        longitudinalAccelerationBounds(cfg);
+    minimumAcceleration = cfg.actuation.longitudinalAccelerationMinimum;
+    maximumAcceleration = cfg.actuation.longitudinalAccelerationMaximum;
     accelerationScale = max( ...
         abs(minimumAcceleration), abs(maximumAcceleration));
     key = struct( ...
@@ -1997,8 +2001,8 @@ function [hessian, linear, constant] = localObjective( ...
 end
 
 function [inputWeight, inputScale] = localInputWeightAndScale(cfg)
-    [minimumAcceleration, maximumAcceleration] = ...
-        longitudinalAccelerationBounds(cfg);
+    minimumAcceleration = cfg.actuation.longitudinalAccelerationMinimum;
+    maximumAcceleration = cfg.actuation.longitudinalAccelerationMaximum;
     accelerationScale = max( ...
         abs(minimumAcceleration), abs(maximumAcceleration));
     inputScale = [ ...
@@ -2011,8 +2015,8 @@ end
 function [lowerBound, upperBound] = localInputBox(model)
 % Physical input box of [deltaF; a] over the horizon.
     cfg = model.cfg;
-    [accelerationMinimum, accelerationMaximum] = ...
-        longitudinalAccelerationBounds(cfg);
+    accelerationMinimum = cfg.actuation.longitudinalAccelerationMinimum;
+    accelerationMaximum = cfg.actuation.longitudinalAccelerationMaximum;
     steeringLimit = cfg.model.frontWheelSteeringAngleMaximum;
     lowerBound = repmat([-steeringLimit; accelerationMinimum], ...
         model.horizonSteps, 1);
@@ -2038,7 +2042,7 @@ function interval = localPlannedSpeedInterval(prediction, model)
     horizonSteps = model.horizonSteps;
     speedFloor = model.plannedSpeedFloor;
     speedMaximum = cfg.model.speedMaximum;
-    [~, accelerationMaximum] = longitudinalAccelerationBounds(cfg);
+    accelerationMaximum = cfg.actuation.longitudinalAccelerationMaximum;
     release = repmat(accelerationMaximum, 1, horizonSteps);
     releaseSteering = prediction.referenceInput(1, :);
     releaseInput = [releaseSteering; release];

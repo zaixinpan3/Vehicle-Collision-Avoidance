@@ -6,14 +6,28 @@ classdef fitPerceivedRoadBoundariesTest < matlab.unittest.TestCase
             repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
             testCase.applyFixture( ...
                 matlab.unittest.fixtures.PathFixture( ...
-                    fullfile(repositoryRoot, "controller")));
-            testCase.applyFixture( ...
-                matlab.unittest.fixtures.PathFixture( ...
                     fullfile(repositoryRoot, "scripts")));
         end
     end
 
     methods (Test)
+        function offlineEvaluationMeasuresClearanceAlongTheTrace(testCase)
+            centerline = [-100.0, 0.0; 100.0, 0.0];
+            perception = fitPerceivedRoadBoundaries( ...
+                centerline, [0.0; 0.0; 0.0]);
+            trace = struct("time", [0.0; 0.05], ...
+                "positionX", [0.0; 0.5], "positionY", [0.0; 0.0], ...
+                "yaw", [0.0; 0.0]);
+
+            safety = evaluatePerceivedRoadBoundarySafety( ...
+                trace, {perception}, 0.05, [5.0; 2.0]);
+
+            testCase.verifyTrue(safety.noBoundaryCrossing);
+            testCase.verifyTrue(safety.allRectanglesCoveredByPerceivedSegments);
+            testCase.verifyEqual(safety.minimumBoundaryFunctionMargin, ...
+                7.6, AbsTol=1.0e-10);
+        end
+
         function straightRoadUsesDeclaredOffsetsAndRange(testCase)
             positionX = (-100.0:0.1:100.0).';
             centerline = [positionX, zeros(size(positionX))];

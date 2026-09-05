@@ -182,7 +182,8 @@ function [command, predictedInput, planningProblem] = ...
 % reference, and applied first input. The first backup-tail acceleration
 % enters the head together with the analytic terminal steering law. The
 % resetNominalTrajectory action deliberately invalidates all of it. In
-% legacy mode only the shifted linearization plan is retained.
+% legacy mode no plan is retained between calls; each call starts from the
+% current schedule reference.
 %
 % Inputs: egoState (explicit controller-state fields or the
 % estimator's egoState vector form, optionally heldActuatorInput and
@@ -201,12 +202,12 @@ function [command, predictedInput, planningProblem] = ...
 %
 % Modules: readPlanningInputs (input contract), ltvBicyclePrediction
 % (schedule and condensation of the Frenet model over
-% ltvBicycleStageMatrices and ltvBicycleRollout), formulateTwoStageQp
+% ltvBicycleStageMatrices), formulateTwoStageQp
 % (stage 1 duals, stage 2 rows, the cruise probe, CLF data, objective,
 % with cruiseEquilibrium local to it), solveHardCbfClf (the certified
 % joint conic kernel), solveTwoStageQp (the legacy QP kernel),
-% frictionCirclePolygonRows with axleFrictionParameters and
-% longitudinalAccelerationBounds (the actuator/tire layer),
+% frictionCirclePolygonRows with axleFrictionParameters (the actuator/tire
+% layer, using acceleration bounds validated by the configuration entry),
 % laneProjection and laneCurvatureAtStation (the path frame),
 % rectangleConfigurationDistance (the configuration obstacle: stage 1
 % in path coordinates, and the physical clearance readout in Cartesian
@@ -268,7 +269,7 @@ function [command, predictedInput, planningProblem] = ...
     fallbackUsed = false;
     try
         [inputPlan, problem, plan] = localSolve( ...
-            model, prediction, nominalInput, true);
+            model, prediction, nominalInput);
     catch exception
         if ~certificateCompatible || ~previousCertificate.certified
             previousCertificate = [];
@@ -744,7 +745,7 @@ function inputPlan = localHeadInputPlan(plan, layout)
 end
 
 function [inputPlan, problem, plan] = localSolve( ...
-        model, prediction, nominalInput, buildPlanningProblem)
+        model, prediction, nominalInput)
 % The sample's programs, and the only place a behaviour is chosen.
 %
 % THE CONTROLLER CONTAINS NO TEST ON THE DRIVING SITUATION. It does not
@@ -787,13 +788,14 @@ function [inputPlan, problem, plan] = localSolve( ...
 % legacy mode may refine each start through localRefineStart before its hard
 % solve.
 %
-% Kernel budget: the first candidate gets the full budget and the retry
-% ladder, the others cfg.solver.candidateMaxIterations and no retry;
-% the stalled ones are retried only when nothing resolved.
+% Certified candidates each use the joint solver's configured budget.
+% In legacy mode the first candidate gets the full budget and retry ladder,
+% and the others cfg.solver.candidateMaxIterations without retries. Stalled
+% candidates are retried only when nothing resolved.
     cfg = model.cfg;
     if cfg.disjunctive.nodeBudget > 0
         [inputPlan, problem, plan] = localSolveDisjunctive(model, ...
-            prediction, nominalInput, buildPlanningProblem);
+            prediction, nominalInput);
         return;
     end
     firstOptions = struct();
@@ -823,32 +825,39 @@ function [inputPlan, problem, plan] = localSolve( ...
     startViolations = zeros(1, candidateCount);
     refinementCalls = 0;
     for candidateIdx = 1:candidateCount
-        policy = struct();
-        if candidateIdx > 1
-            policy = struct( ...
-                "maxIterations", cfg.solver.candidateMaxIterations, ...
-                "retry", false);
-        end
         if cfg.certification.enabled
-            refined = startInput{candidateIdx};
-            refinementSolves = 0;
-            probeOptions = struct("label", labels(candidateIdx), ...
-                "obstacleMode", "certified", "trustRegionScale", inf);
-            probeQp = formulateTwoStageQp(model, prediction, refined, ...
-                probeOptions, common);
-            startViolations(candidateIdx) = localStartViolation(probeQp);
+            % Each hard problem supplies both start diagnostics and the
+            % solve. The first problem already exists from start selection.
+            if candidateIdx == 1
+                qps{candidateIdx} = firstQp;
+            else
+                options = firstOptions;
+                options.label = labels(candidateIdx);
+                qps{candidateIdx} = formulateTwoStageQp( ...
+                    model, prediction, startInput{candidateIdx}, ...
+                    options, common);
+            end
+            startViolations(candidateIdx) = ...
+                localStartViolation(qps{candidateIdx});
+            results{candidateIdx} = solveHardCbfClf(qps{candidateIdx}, cfg);
         else
+            policy = struct();
+            if candidateIdx > 1
+                policy = struct( ...
+                    "maxIterations", cfg.solver.candidateMaxIterations, ...
+                    "retry", false);
+            end
             [refined, rungCounts(candidateIdx), ...
                 startViolations(candidateIdx), refinementSolves] = ...
                 localRefineStart(model, prediction, common, cfg, ...
                     startInput{candidateIdx});
+            refinementCalls = refinementCalls+refinementSolves;
+            [qps{candidateIdx}, results{candidateIdx}, ...
+                trustDroppedFlags(candidateIdx), ...
+                factRelaxedCounts(candidateIdx)] = localLegacyCandidate( ...
+                    model, prediction, refined, common, cfg, ...
+                    labels(candidateIdx), policy);
         end
-        refinementCalls = refinementCalls+refinementSolves;
-        [qps{candidateIdx}, results{candidateIdx}, ...
-            trustDroppedFlags(candidateIdx), ...
-            factRelaxedCounts(candidateIdx)] = localHardCandidate( ...
-                model, prediction, refined, common, cfg, ...
-                labels(candidateIdx), policy);
     end
     % Nothing resolved: give the stalled candidates the retry ladder.
     if ~any(cellfun(@(candidate) candidate.feasible, results))
@@ -917,9 +926,6 @@ function [inputPlan, problem, plan] = localSolve( ...
     inputPlan = localHeadInputPlan(plan, layout);
 
     problem = struct();
-    if ~buildPlanningProblem
-        return;
-    end
     problem.problemClass = qp.problemClass;
     problem.qp = qp;
     problem.layout = layout;
@@ -960,7 +966,7 @@ function better = localObjectiveBetter(candidate, incumbent, cfg)
 end
 
 function [inputPlan, problem, plan] = localSolveDisjunctive( ...
-        model, prediction, nominalInput, buildPlanningProblem)
+        model, prediction, nominalInput)
 % THE DISJUNCTIVE PATH: one linearization, and the homotopy class a
 % decision of the optimization rather than of a start.
 %
@@ -1012,9 +1018,6 @@ function [inputPlan, problem, plan] = localSolveDisjunctive( ...
     inputPlan = localHeadInputPlan(plan, layout);
 
     problem = struct();
-    if ~buildPlanningProblem
-        return;
-    end
     problem.problemClass = qp.problemClass;
     problem.qp = qp;
     problem.layout = layout;
@@ -1109,7 +1112,7 @@ function [qp, result, info, trustDropped, factRelaxed] = ...
 end
 
 function [qp, result, trustDropped, factRelaxed] = ...
-        localHardCandidate(model, prediction, linearizationInput, ...
+        localLegacyCandidate(model, prediction, linearizationInput, ...
         common, cfg, label, policy)
 % One candidate: the HARD program at `linearizationInput`, solved, with
 % the two repairs that are not relaxations of it. The trust region is a
@@ -1118,17 +1121,6 @@ function [qp, result, trustDropped, factRelaxed] = ...
 % unbounded; and a program the kernel declares infeasible gets the fact
 % relaxation (localFactRelaxation), which removes only near-window rows
 % no admissible plan satisfies by more than one sample's mismatch.
-    if cfg.certification.enabled
-        options = struct("label", string(label), ...
-            "obstacleMode", "certified", ...
-            "trustRegionScale", inf);
-        qp = formulateTwoStageQp( ...
-            model, prediction, linearizationInput, options, common);
-        result = solveHardCbfClf(qp, cfg);
-        trustDropped = false;
-        factRelaxed = 0;
-        return;
-    end
     options = struct("label", string(label), "obstacleMode", "hard", ...
         "trustRegionScale", cfg.clf.trustRegionScale);
     qp = formulateTwoStageQp( ...

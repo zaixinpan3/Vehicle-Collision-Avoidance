@@ -12,6 +12,8 @@ function parameters = axleFrictionParameters(cfg)
 % polygon families remain linear inequalities.  The braking allocation is
 % supplied explicitly as actuation.brakingForceDistribution =
 % [rho_fb; rho_rb].
+% cfg uses the acceleration bounds validated and normalized by
+% collisionAvoidanceControllerConfig.
 
     if ~isstruct(cfg) || ~isscalar(cfg) ...
             || ~all(isfield(cfg, ["vehicle", "tire", "model", ...
@@ -51,8 +53,8 @@ function parameters = axleFrictionParameters(cfg)
 
     staticNormalLoad = mass * gravity / wheelbase * [lr; lf];
     normalLoadAccelerationSlope = mass * cgHeight / wheelbase * [-1; 1];
-    [minimumAcceleration, maximumAcceleration] = ...
-        longitudinalAccelerationBounds(cfg);
+    minimumAcceleration = cfg.actuation.longitudinalAccelerationMinimum;
+    maximumAcceleration = cfg.actuation.longitudinalAccelerationMaximum;
     minimumNormalLoad = staticNormalLoad + [ ...
         normalLoadAccelerationSlope(1) * maximumAcceleration; ...
         normalLoadAccelerationSlope(2) * minimumAcceleration];

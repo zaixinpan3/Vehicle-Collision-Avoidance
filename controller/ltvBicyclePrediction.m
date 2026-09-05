@@ -26,9 +26,9 @@ function prediction = ltvBicyclePrediction(model, storedSchedule)
 % tail's lane-keeping law holds the terminal lateral offset within the
 % band terminalLateralCertificate certifies, and the rows charge that
 % band, so no lateral dynamics are predicted there. The schedule
-% depends only on the measured state and the route; it is regenerated
-% from scratch at every sample and no previous solution enters the
-% model.
+% is anchored to the measured state and route at the start of an episode.
+% A compatible stored certificate supplies its shifted schedule on later
+% samples; otherwise the schedule is regenerated from the current state.
 %
 % The condensed affine map at every node is over the PLAN columns -
 % the N head inputs stacked column-wise, then the N_b tail

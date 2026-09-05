@@ -7,6 +7,8 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
 % the controller reads is defined here; a missing field is a
 % configuration error at the consuming module rather than a silent
 % default there.
+% Longitudinal-acceleration limits are validated here and normalized to
+% double scalars in m/s^2 before model and tire modules consume them.
 %
 % The defaults describe a mid-size passenger car with the Ge et al.
 % (2022) input [deltaF; a] and the forward-Euler Frenet LTV bicycle
@@ -23,6 +25,7 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
         end
         cfg = localMergeStructure(cfg, userCfg);
     end
+    cfg.actuation = localNormalizeActuation(cfg.actuation);
     localValidate(cfg);
 end
 
@@ -353,6 +356,32 @@ function base = localMergeStructure(base, overrides)
         else
             base.(name) = value;
         end
+    end
+end
+
+function actuation = localNormalizeActuation(actuation)
+% Keep the acceleration-input contract at the configuration boundary.
+    if ~isstruct(actuation) || ~isscalar(actuation)
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "cfg must contain a scalar actuation structure.");
+    end
+    names = ["longitudinalAccelerationMinimum", ...
+        "longitudinalAccelerationMaximum"];
+    for name = names
+        value = actuation.(name);
+        if ~isnumeric(value) || ~isreal(value) || ~isscalar(value) ...
+                || ~isfinite(value)
+            error("collisionAvoidanceController:invalidConfiguration", ...
+                "actuation.%s must be a finite real scalar.", name);
+        end
+        actuation.(name) = double(value);
+    end
+    minimum = actuation.longitudinalAccelerationMinimum;
+    maximum = actuation.longitudinalAccelerationMaximum;
+    if minimum >= maximum || minimum > 0.0 || maximum < 0.0
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "Longitudinal-acceleration limits must satisfy " ...
+            + "aMinimum <= 0 <= aMaximum and aMinimum < aMaximum.");
     end
 end
 

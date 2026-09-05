@@ -14,8 +14,8 @@ function [minimumSafeSideValue, witness] = ...
 %
 %   safeSideSign * (l - polyval(coefficients, s))
 %
-% over the complete oriented ego rectangle. It is intended for nonlinear
-% theory checks and unit tests. The online controller uses a conservative
+% over the complete oriented ego rectangle. This offline utility supports
+% road-boundary evaluation and unit tests. The online controller uses a conservative
 % affine tangent row and does not perform nonlinear rollout validation.
 
     egoPose = localFiniteVector(egoPose, 3, "egoPose");
