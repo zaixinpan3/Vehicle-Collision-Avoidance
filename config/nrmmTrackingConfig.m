@@ -21,6 +21,12 @@ function cfg = nrmmTrackingConfig()
     cfg.ego.domain.speedMinimum = 5.0;               % m/s   V_{E,min}
     cfg.ego.domain.speedMaximum = 20.0;              % m/s   Vbar_E
     cfg.ego.domain.yawRateMaximum = 0.30;            % rad/s omegabar_E
+    % Optional true-trajectory envelopes for online error bounds only.
+    % Inf means unspecified: a held sample is never treated as exact between
+    % arrivals. The bound then uses the existing speed/yaw-rate domains.
+    cfg.ego.domain.accelerationNormMaximum = Inf;   % m/s^2
+    cfg.ego.domain.bodyAccelerationRateMaximum = Inf; % m/s^3
+    cfg.ego.domain.yawAccelerationMaximum = Inf;    % rad/s^2
 
     %% Certified kinematic course measurement for the yaw stage
     % The course channel estimates side slip pointwise from the measured

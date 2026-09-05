@@ -3,7 +3,8 @@ function cfg = estimatorControllerIntegrationConfig()
 %
 % The synthetic sensor contract contains ego GNSS position and velocity,
 % ego center-of-mass body acceleration, ego gyroscope yaw rate, and radar
-% relative position. Noise is bounded uniform with the declared maxima.
+% relative position. Vector noise maxima are Euclidean norm bounds; the
+% gyroscope maximum is an absolute scalar bound.
 
     cfg.randomSeed = 20260728;
     cfg.noiseModel = "boundedUniform";

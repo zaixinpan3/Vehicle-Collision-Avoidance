@@ -315,14 +315,17 @@ The continuous theorem assumes bounded-error measurements throughout time.
 A noise bound at one sample instant does not bound the error of a held signal
 over an interval without additional intersample assumptions. Predictor resets,
 intersample errors, dropouts, and RK4 remainders require a separate digital
-stability proof. During radar dropout the correction is removed and the
+argument. Section 10 supplies a finite-time position enclosure for this runtime,
+including these effects. During radar dropout the correction is removed and the
 nominal model coasts; the positive continuous correction decay cannot be claimed
 for that interval. Both design and runtime explicitly publish
 `sampledImplementationCertified=false`.
 
 Scenario controller margins are separately labeled engineering assumptions.
 They are not derived from this continuous observer certificate, and neither the
-benchmark nor this document proves closed-loop collision avoidance.
+benchmark nor this document proves closed-loop collision avoidance. The online
+position enclosure below is published separately from the configured controller
+margins and from a sampled exponential-stability claim.
 
 ## 8. Executable verification and reproduction
 
@@ -399,3 +402,343 @@ previous certificate does not include the additional model-jerk forcing.
 `DeclaredModelJerkCovered`, `HasRadarDropout`, and `DigitalCertified` in the
 trial table make these qualifications explicit. Dropout results are empirical;
 the continuous correction theorem is not applied to missing-measurement intervals.
+
+## 10. Recursively updated deterministic position enclosure
+
+`nrmmPositionErrorBound.m` augments the existing observer with uncertainty state;
+it does not change the point estimates, gains, NRMM model, or cascade. At the
+published state timestamp it supplies
+
+\[
+\boxed{\|\rho(t)-\hat\rho(t)\|\le B_\rho(t).}
+\]
+
+This is a conditional deterministic norm enclosure, not a covariance, confidence
+interval, or empirical RMSE multiplier. Its containment theorem below is in real
+arithmetic and includes input holds, predictor resets, radar dropout, and the
+defect of the accepted numerical trajectory. The MATLAB implementation uses
+ordinary matrix exponentials and explicit roundoff guards; it is not an
+interval-arithmetic verification of floating-point operations or the gain LMI.
+`floatingPointVerified=false` states this distinction. Nor does finite-time
+containment prove uniform exponential stability of the hybrid observer.
+
+The intersample predictor approach has an established sampled-observer context:
+Karafyllis and Kravaris study continuous observers coupled to output predictors
+and conditions on sampling for inherited robustness
+([author preprint](https://arxiv.org/abs/0801.4824)). The specific enclosure here
+follows from the inequalities below; their stability theorem is not assumed to
+apply automatically to this implementation.
+
+### 10.1 Continuous comparison recursion and initialization
+
+For the continuous measurement model of Section 5, initialize a nonnegative
+vector `z(0) >= [|ePsi(0)|, |ev(0)|, WT(0)]^T`. On an interval of length `h`
+with constant disturbance upper bound `d`, positivity gives
+
+\[
+z^+=e^{Hh}z+\left(\int_0^h e^{H\tau}\,d\tau\right)d,
+\qquad B_\rho=c_1z_3,
+\quad c_1=\omega^{-2}\sqrt{(P^{-1})_{11}}.
+\]
+
+The integral must be retained: the steady-state number `-H^{-1}d` by itself
+does not cover an arbitrary initialization. An augmented matrix exponential
+evaluates this affine update without inverting `H`, including zero-decay modes.
+
+The runtime defaults to the declared physical prior, not to zero error:
+
+\[
+b_\psi=\pi,\quad b_v=\bar V_E+\|\hat v\|,\quad
+b_T=\begin{bmatrix}R_0+\|\hat\rho\|\\b+\|\hat q\|\\S+\|\hat s\|\end{bmatrix},
+\qquad W_T\le\sqrt{(Db_T)^T|P|(Db_T)},
+\quad D=\operatorname{diag}(\omega^2,\omega,1).
+\]
+
+Here `R0` is the declared initial relative-position maximum. A caller may supply
+smaller *known initial error bounds* through `options.initialErrorBounds`, with
+fields `yaw`, `bodyVelocity`, and `targetComponents` (3-by-target-count). That is
+an additional initial-set premise, not a deduction from an estimated state.
+
+An independent true-range enclosure evolves as
+`R^+ = R + (VEmax+VCmax)*h`, since the rotation term vanishes from the derivative
+of `|rho|`. At detection it can be intersected with `|yR|+nR`. Thus the online
+argument does not keep imposing the initial 50 m range on a coasting target.
+Positive target speed, target speed/acceleration/curvature bounds, the declared
+model-jerk envelope, ego speed/yaw-rate bounds, sensor calibration and noise
+bounds remain premises on truth. Estimated-domain exits do not invalidate this
+global-extension argument.
+
+### 10.2 The additional predictor-error state
+
+The continuous theorem cannot use `nR` as the error of the evolving radar
+predictor. Introduce `bP >= |rho-yP|`. With a numerical predictor defect `etaP`,
+
+\[
+D^+\|\rho-y_P\|\le\|e_q\|+\|e_v\|+R\epsilon_\omega+\eta_P.
+\]
+
+During a detection interval use `zA=[bPsi,bv,WT,bP]^T`. On each integration
+substep, choose uniform input-error and numerical-defect bounds. In a compatible
+yaw chart the augmented comparison matrix and forcing are
+
+\[
+G_A=\begin{bmatrix}
+-k_\psi&0&0&0\\
+k_v\bar V_E&-k_v&0&0\\
+0&g_{Tv}&-\lambda_T&g_R\\
+0&1&c_2&0
+\end{bmatrix},
+\qquad
+d_A=\begin{bmatrix}
+\epsilon_\omega+k_\psi B_F^h+\eta_\psi\\
+\epsilon_a+\bar V_E\epsilon_\omega+k_v\epsilon_V+\eta_v\\
+g_\omega(R)\epsilon_\omega+g_\Phi\bar\nu_\Phi+\eta_T\\
+R\epsilon_\omega+\eta_P
+\end{bmatrix},
+\]
+
+where `c2` is the velocity component factor from Section 5,
+`etaT=sqrt((D*etaTarget)^T*abs(P)*(D*etaTarget))`, and `gOmega(R)` uses the
+propagated range upper bound rather than a fixed range. All off-diagonal entries
+are nonnegative. Therefore the actual implemented comparison update is
+
+\[
+\boxed{\begin{bmatrix}z_A^+\\1\end{bmatrix}
+=\exp\!\left(h\begin{bmatrix}G_A&d_A\\0&0\end{bmatrix}\right)
+\begin{bmatrix}z_A\\1\end{bmatrix}.}
+\]
+
+The predictor feedback loop means `GA` is not assumed Hurwitz. Its fourth state
+is reset at detections. Establishing a uniform contraction of the resulting
+reset/flow products would be a further sampled-stability result.
+
+### 10.3 Held measurements and yaw charts
+
+Let `a` now denote measurement age (only in this subsection). Optional physical
+envelopes are `Ea=accelerationNormMaximum`,
+`Ja=bodyAccelerationRateMaximum`, and `Jomega=yawAccelerationMaximum` under
+`cfg.ego.domain`. The acceleration rate is the derivative of the *body-frame
+acceleration vector*. All three default to `Inf`, meaning unspecified.
+
+At a substep's maximum age, valid hold-error envelopes are
+
+\[
+\begin{aligned}
+\epsilon_\omega&=\min\{\bar\omega_E+|u_k|,\bar n_g+J_\omega a\},\\
+E_a^h&=\min\{E_a,\|a_{m,k}\|+\bar n_a+J_a a\},\\
+\epsilon_a&=\min\{E_a+\|a_{m,k}\|,\bar n_a+J_a a\},\\
+\epsilon_V&=\min\{\bar V_E+\|v_{m,k}\|,\bar n_v+E_a^h a\},\\
+B_F^h&=\min\{\pi,B_{F,k}+\bar\omega_E a\}.
+\end{aligned}
+\]
+
+An unspecified rate removes its candidate from the minimum. If no finite
+acceleration envelope is available, the implementation does not integrate an
+infinite velocity forcing or assume a held accelerometer is exact. It replaces
+the second comparison state over that substep by the uniform bound
+`VEmax + max(norm(vHatBefore),norm(vHatAfter))`; its comparison row is zero.
+This remains finite using the existing ego speed premise alone.
+
+For the line segment joining accepted yaw states, a uniform circular-error
+bound is `bPsi + omegaEmax*h + abs(deltaPsiHat)`. If this plus `BFh` is below
+`pi`, the stable yaw row above is valid throughout the substep. Otherwise use
+the first comparison row zero and forcing
+`omegaEmax + abs(deltaPsiHat)/h`, and cap its endpoint radius at `pi`. This
+fallback uses circular distance and does not assert an invalid linear-decay law
+near the antipodal chart boundary.
+
+With a finite acceleration envelope, a tighter uniform velocity bound is
+
+\[
+\bar b_v^h=\min\left\{\bar V_E+\max(\|\hat v_0\|,\|\hat v_1\|),\,
+\max\left(b_v,\bar V_E\min(\pi,b_\psi^h)+(d_A)_2/k_v\right)\right\}.
+\]
+
+Together with `bqPath = VCmax + max(norm(qHatBefore),norm(qHatAfter))`, it gives
+an independent predictor endpoint cap
+`bP + h*(bqPath+bvPath+R*epsilonOmega+etaP)`. Taking the smaller of two proven
+upper bounds remains valid. No estimator gain is changed by these envelopes.
+
+### 10.4 Numerical trajectory defects
+
+For an accepted numerical step from `x0` to `x1`, define its continuous
+reconstruction `xHat(t)=x0+theta*(x1-x0)`, `theta in [0,1]`. It joins the
+actual values returned by RK4. Define
+
+\[
+\delta_{\rm num}(\theta)=(x_1-x_0)/h-F(x_0+\theta(x_1-x_0),u_k).
+\]
+
+The bound update encloses this defect over the *entire* line, rather than
+estimating integration error from the difference of two numerical runs.
+For an affine row with endpoint field increment `DeltaF`, its norm is bounded by
+
+\[
+\eta=\|(x_1-x_0)/h-F(x_0)-\tfrac12\Delta F\|+\tfrac12\|\Delta F\|.
+\]
+
+This applies to target position, velocity and radar prediction. For the final
+target row use the same expression for its linear part and add
+`Lq*norm(deltaQ)+Ls*norm(deltaS)`. The existing global extension bounds justify
+that remainder even when the line crosses saturation boundaries. For body
+velocity, use its initial residual plus
+`(|u|+kv)*norm(deltaV)+kv*norm(vm)*min(2,abs(deltaPsi))`.
+For yaw use its initial residual plus `kPsi*abs(deltaPsi)` if the innovation
+does not cross a branch boundary, or `2*pi*kPsi` otherwise.
+
+These are derivative-defect bounds. Their effects are integrated through the
+comparison system as `etaPsi`, `etav`, `etaTarget`, and `etaP`. Thus no
+unprovided fifth-derivative bound, assumed RK4 remainder constant, or convergence
+test is required. A finer reconstruction can reduce conservatism in later work.
+Ordinary floating-point evaluation is padded by a scale-dependent `256*eps`
+guard. This guard is explicitly an engineering allowance, not a proof of every
+rounding error in `expm`, trigonometric functions or gain synthesis.
+
+### 10.5 Measurement reset, component extraction, and dropout
+
+At a detection, `yP^+=yR` gives `bP^+=nR`. The unchanged position estimate also
+admits `bRho^+=min(bRho^-,norm(yR-rhoHat)+nR)`. The circular yaw radius is
+intersected with `abs(wrap(yF-psiHat))+BF`. The GNSS sample gives
+
+\[
+b_v^+\le\min\{b_v^-,\|\hat R^Tv_m-\hat v\|+\bar n_v
+ +2\bar V_E\sin(\min(b_\psi^+,\pi)/2)\}.
+\]
+
+Individual target component bounds can additionally be intersected with
+`[R+norm(rhoHat), VCmax+norm(qHat), S+norm(sHat)]^T`. After a component update,
+`sqrt((D*bT)^T*abs(P)*(D*bT))` is a valid new upper bound on `WT`. It may be
+intersected with the prior Lyapunov upper bound; no sign assumption on the
+off-diagonal entries of `P` is made.
+
+At a radar-active accepted endpoint, let `Wcomp` denote the Lyapunov bound
+returned by the comparison flow, before recertification from component caps.
+The reported position radius is
+
+\[
+\boxed{B_\rho=\min\{c_1W_{\rm comp},\ b_P+\|y_P-\hat\rho\|,\ R+\|\hat\rho\|\}.}
+\]
+
+The capped components then recertify `WT` for the next substep; the algorithm
+does not iterate this tightening to a fixed point. During dropout, replace the
+first candidate with the directly propagated position component bound.
+Specifically use `zC=[bPsi,bv,bRho,bq,bs,bP]^T`, with the same applicable ego rows
+and the target/predictor inequalities
+
+\[
+\begin{aligned}
+\dot b_\rho&=b_q+b_v+R\epsilon_\omega+\eta_\rho,\\
+\dot b_q&=b_s+b\epsilon_\omega+\eta_q,\\
+\dot b_s&=L_qb_q+L_sb_s+S\epsilon_\omega+\bar\nu_\Phi+\eta_s,\\
+\dot b_P&=b_q+b_v+R\epsilon_\omega+\eta_P.
+\end{aligned}
+\]
+
+Its affine Metzler flow is integrated by the same augmented exponential. There
+is no negative target-decay row during dropout. Reconstructing `WT` from its
+component bounds on return to detection preserves containment.
+
+**Containment proposition.** Suppose the initial norm/range bounds contain
+truth, all declared model and sensor/hold envelopes hold on the interval, and
+the chosen defect bounds enclose the numerical reconstruction. On each substep,
+the derived error inequalities and Metzler comparison imply componentwise
+domination by the corresponding comparison solution. The independent domain
+and measurement caps also contain truth, so their minima preserve domination.
+Predictor resets are enclosed by the sample noise ball. Induction over substeps,
+detections and dropouts proves the claimed position containment. This proves
+finite-time containment, with no assertion that the radius necessarily shrinks
+or reaches a useful size for every permitted measurement sequence.
+
+Necessary measurement/prior consistency failures mark the affected bound
+unavailable and publish `Inf`, rather than an invented finite radius. A radar
+inconsistency affects its track; an ego inconsistency affects all tracks and
+requires runtime reinitialization. Resetting a target cannot repair an invalid
+ego bound. A fresh target reset reinitializes only that target's uncertainty.
+These are necessary checks, not an online verification of all premises on truth.
+
+### 10.6 Interface for subsequent collision-avoidance control
+
+`output.targetEstimates(i).relativePositionErrorBound` is a scalar Euclidean
+radius in the ego body frame at `stateTime`. The accompanying `positionErrorBound`
+structure carries `time`, `frame`, `available`, `reason`, and scope flags.
+The runtime's `step` consumes the sample at `t` and publishes the radius for the
+predicted state at `t+Ts`; it must not be relabeled as a bound at the sample time.
+The read-only `output` action may tighten a bound with the supplied current
+sample without modifying the stored runtime. Stale bound/measurement times are
+rejected. The adapter passes these fields through with the raw target estimate.
+
+```matlab
+[runtime, output] = onlineNrmmTrackingRuntime('step', runtime, frame);
+track = output.targetEstimates(1);
+radiusM = track.relativePositionErrorBound;
+boundTime = track.positionErrorBound.time; % equals track.stateTime
+usableUnderDeclaredAssumptions = track.positionErrorBound.available;
+```
+
+For an inertial *relative vector*, use the separately published bound
+
+\[
+B_{\Delta p}^I=B_\rho+2R\sin(\min(b_\psi,\pi)/2),
+\quad \|p_C-p_E-\hat R\hat\rho\|\le B_{\Delta p}^I.
+\]
+
+An absolute target-position bound additionally needs an ego-position bound.
+For center-distance constraints, `norm(rhoHat)-Brho` is a lower bound on actual
+center distance without any absolute-yaw reconstruction. Rectangle footprint,
+orientation, road, ego tracking, and future target-prediction uncertainty remain
+separate controller obligations. In particular, today's `Brho` cannot be copied
+unchanged across the controller prediction horizon. The runtime states
+`futurePredictionIncluded=false`, and the existing configured controller margins
+are not relabeled as this certificate.
+
+The synthetic adapter's two-dimensional noise was corrected to use the same
+inscribed-square construction as the research scenario: each independent
+uniform component is scaled by `1/sqrt(2)`. Thus its declared vector maxima are
+actually Euclidean radii. Its interpolated ego-state/sampled-acceleration harness
+is not a validation against a continuous high-fidelity physical sensor stream.
+
+### 10.7 Containment experiment
+
+`scripts/runNrmmPositionBoundBenchmark.m` executes 32 trials: three seeds
+(71--73), five noisy cases and two envelope choices, plus one noise-free
+realization for each choice. Duration is 12 s; the mean and maximum radii below
+exclude the first 2 s, while containment is checked at **every** recorded state,
+including initialization. The paired truth, sensor arrays, ego estimates and
+target estimates are verified bit-identical across envelope choices.
+
+The default domain-only variant leaves all optional rates unspecified. The
+experiment's finite variant declares ego acceleration norm at most 5 m/s^2,
+body-acceleration rate at most 5 m/s^3, and yaw acceleration at most 0.1 rad/s^2.
+These are synthetic trajectory premises, not calibrated vehicle limits. For the
+analytic ego maneuver, `V>=10.8`, `|Vdot|<=0.3`, `|Vddot|<=0.075`,
+`|omega|<=0.12`, `|omegaDot|<=0.042`, and `|omegaDdot|<=0.0147` give conservative
+all-time acceleration and body-acceleration-rate envelopes below 2 and 1.3,
+respectively. The script also checks the sampled analytic acceleration, inertial
+jerk transformed to body-acceleration rate, yaw acceleration, and target domain.
+
+| Case | Mean radius: domain only (m) | Mean radius: finite ego envelopes (m) | Mean of maximum radii: finite envelopes (m) |
+|---|---:|---:|---:|
+| Retained NRMM, 50 Hz | 1.6942 | 0.8323 | 0.8951 |
+| Changing A and curvature | 1.7461 | 0.8549 | 0.9566 |
+| Radar dropout, 4--5 s | 5.9299 | 2.5283 | 34.172 |
+| One 0.02 s RK4 step per sample | 1.7016 | 0.8411 | 0.9104 |
+| Retained NRMM, 25 Hz | 3.2148 | 1.4892 | 1.5553 |
+| Noise-free realization, declared noise bounds retained | 1.6493 | 0.7875 | 0.7962 |
+
+Every tested timestamp had an available bound and satisfied containment in all
+32 trials. This experiment is validation evidence for the implementation; the
+deterministic claim derives from the stated premises and comparison argument.
+The 50 Hz noisy point-estimate RMSE is 0.04785 m, far smaller than the radius.
+The domain-only dropout maximum averages 87.69 m; even the finite-envelope
+dropout bound is too large for many road geometries. These losses of usefulness
+must be visible to the controller. Noise-free measurements do not justify
+removing the declared sensor uncertainty from the bound. MATLAB timing is
+observational, without a worst-case real-time claim.
+
+The final focused validation contains 50 passing unique MATLAB tests: 15 for
+the new bound, 23 existing runtime tests, eight structured high-gain tests and
+four existing adapter contracts. Coverage includes large initial errors with
+high-gain peaking, the yaw chart boundary, stale timestamps, isolated track
+invalidation/reset, the entire numerical reconstruction, and vector-noise norms.
+All eight changed MATLAB files have zero Code Analyzer issues under factory
+settings. No whole-repository or closed-loop safety pass is claimed.

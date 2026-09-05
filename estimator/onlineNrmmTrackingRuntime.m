@@ -46,7 +46,13 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % measurements held over the interval.
 % The Lyapunov/Lipschitz theorem covers the continuous vector field. Holds,
 % output-predictor resets, dropouts and RK4 are explicitly outside that
-% theorem; the runtime reports this limitation rather than a digital radius.
+% exponential-stability theorem. A separate comparison recursion in
+% nrmmPositionErrorBound encloses their effects at each accepted state time.
+% targetEstimates(i).relativePositionErrorBound is the conditional Euclidean
+% position radius in the ego body frame; invalid bounds publish Inf. The
+% accompanying metadata states its time, assumptions and numerical scope.
+% See OBSERVER_ISS_THEORY.md Section 10; floating-point verification and future
+% controller prediction-horizon bounds are not included.
 
     action = lower(string(action));
     if ~isscalar(action)
@@ -77,6 +83,8 @@ function runtime = localResetTarget(runtime,index,physicalState)
     runtime.targetState(:,index) = physicalState;
     runtime.targetOutputPredictor(:,index) = physicalState(1:2);
     runtime.lastRadarTime(index) = NaN;
+    runtime.positionErrorBound = nrmmPositionErrorBound("reset", ...
+        runtime.positionErrorBound,index,localBoundState(localPackState(runtime),runtime.targetCount));
     audit = localOperatingDomainAudit(localPackState(runtime),runtime,"track-reset");
     runtime.lastIntervalDomainAudit = audit;
     runtime.estimatedDomainAudit = localMergeDomainAudits( ...
@@ -154,6 +162,12 @@ function runtime = localInitialize(cfg, options, observerDesign)
     runtime.minimumReconstructedTargetSpeed = initialAudit.minimumTargetSpeed;
     runtime.lastIntervalTargetCertifiedSpeedDomainValid = ...
         initialAudit.speedValid;
+    prior = struct();
+    if isfield(options,"initialErrorBounds")
+        prior = options.initialErrorBounds;
+    end
+    runtime.positionErrorBound = nrmmPositionErrorBound("initialize", ...
+        observerDesign,cfg,localBoundState(localPackState(runtime),targetCount),initialTime,prior);
 end
 
 function [runtime, output] = localStep(runtime, frame)
@@ -170,7 +184,10 @@ function [runtime, output] = localStep(runtime, frame)
         :, observerInput.radarDetectionAvailable) = ...
         observerInput.radarRelativePosition( ...
             observerInput.radarDetectionAvailable, :).';
-    [state, intervalAudit] = localRungeKuttaInterval( ...
+    runtime.positionErrorBound = nrmmPositionErrorBound("measure", ...
+        runtime.positionErrorBound,observerInput, ...
+        localBoundState(localPackState(runtime),runtime.targetCount));
+    [state, intervalAudit, runtime.positionErrorBound] = localRungeKuttaInterval( ...
         localPackState(runtime), observerInput, runtime);
     [runtime.yawEstimate, ...
         runtime.bodyVelocityEstimate, ...
@@ -190,6 +207,7 @@ function [runtime, output] = localStep(runtime, frame)
         runtime.estimatedDomainAudit, intervalAudit);
     runtime.lastIntervalDomainAudit = intervalAudit;
     runtime.currentTime = observerInput.time+runtime.samplePeriod;
+    runtime.positionErrorBound.time = runtime.currentTime;
     runtime = localRecordMeasurementTimes(runtime, observerInput);
     output = localOutput(runtime, observerInput);
 end
@@ -204,15 +222,21 @@ function output = localCurrentOutput(runtime, frame)
     end
     outputRuntime = localRecordMeasurementTimes(runtime, observerInput);
     outputRuntime.currentTime = runtime.currentTime;
+    boundState = localBoundState(localPackState(runtime),runtime.targetCount);
+    boundState.radarPredictor(:,observerInput.radarDetectionAvailable) = ...
+        observerInput.radarRelativePosition(observerInput.radarDetectionAvailable,:).';
+    outputRuntime.positionErrorBound = nrmmPositionErrorBound("measure", ...
+        runtime.positionErrorBound,observerInput,boundState);
     output = localOutput(outputRuntime, observerInput);
 end
 
-function [nextState, intervalAudit] = localRungeKuttaInterval( ...
+function [nextState, intervalAudit, positionErrorBound] = localRungeKuttaInterval( ...
         state, observerInput, runtime)
     nextState = state;
     intervalAudit = localOperatingDomainAudit( ...
         nextState, runtime, "interval-start", observerInput);
     step = runtime.integrationStep;
+    positionErrorBound = runtime.positionErrorBound;
     for substepIdx = 1:runtime.integrationSubstepCount
         first = localObserverDerivative( ...
             nextState, observerInput, runtime);
@@ -222,12 +246,17 @@ function [nextState, intervalAudit] = localRungeKuttaInterval( ...
             nextState+0.5*step*second, observerInput, runtime);
         fourth = localObserverDerivative( ...
             nextState+step*third, observerInput, runtime);
+        previousState = nextState;
         nextState = nextState+(step/6.0)*(first+2.0*second ...
             + 2.0*third+fourth);
         if any(~isfinite(nextState))
             error("onlineNrmmTrackingRuntime:nonfiniteObserverState", ...
                 "The cascaded observer produced a nonfinite state.");
         end
+        positionErrorBound = nrmmPositionErrorBound("advance",positionErrorBound, ...
+            observerInput,localBoundState(previousState,runtime.targetCount), ...
+            localBoundState(nextState,runtime.targetCount), ...
+            localBoundState(first,runtime.targetCount),step);
         substepAudit = localOperatingDomainAudit( ...
             nextState, runtime, ...
             "substep-" + string(substepIdx) + "-accepted", ...
@@ -575,6 +604,12 @@ function output = localOutput(runtime, observerInput)
             runtime.lastIntervalDomainAudit, ...
         "targetStates", runtime.targetState.', ...
         "targetEstimates", localTargetEstimates(runtime, observerInput));
+    output.relativePositionErrorBound = runtime.positionErrorBound.targetComponents(1,:).';
+    output.relativePositionErrorBound(~runtime.positionErrorBound.valid) = Inf;
+    output.positionErrorBoundAvailable = runtime.positionErrorBound.valid(:) ...
+        & isfinite(output.relativePositionErrorBound);
+    output.egoYawErrorBound = runtime.positionErrorBound.yaw;
+    output.egoBodyVelocityErrorBound = runtime.positionErrorBound.bodyVelocity;
 end
 
 function estimates = localTargetEstimates(runtime, observerInput)
@@ -616,6 +651,21 @@ function estimates = localTargetEstimates(runtime, observerInput)
         estimate.stateTime = runtime.currentTime;
         estimate.estimateTime = runtime.currentTime;
         estimate.lastRadarTime = runtime.lastRadarTime(targetIdx);
+        radius = runtime.positionErrorBound.targetComponents(1,targetIdx);
+        available = runtime.positionErrorBound.valid(targetIdx) && isfinite(radius);
+        if ~available
+            radius = Inf;
+        end
+        estimate.relativePositionErrorBound = radius;
+        estimate.inertialRelativePositionErrorBound = radius ...
+            +2*runtime.positionErrorBound.trueRangeMaximum(targetIdx) ...
+            *sin(min(runtime.positionErrorBound.yaw,pi)/2);
+        estimate.positionErrorBound = struct("time",runtime.currentTime, ...
+            "radius",radius,"frame","ego-body-at-state-time", ...
+            "available",available,"reason",runtime.positionErrorBound.reason(targetIdx), ...
+            "integrationErrorIncluded",true,"floatingPointVerified",false, ...
+            "scope",runtime.positionErrorBound.scope, ...
+            "futurePredictionIncluded",false);
         % Retained as a compatibility alias with corrected semantics.
         estimate.measurementTime = estimate.lastRadarTime;
         if runtime.targetIdentifiersStable
@@ -755,6 +805,12 @@ function [yawEstimate, bodyVelocity, ...
     targetState = reshape(state(8:targetStateEnd), 6, targetCount);
     targetOutputPredictor = reshape( ...
         state((targetStateEnd+1):end), 2, targetCount);
+end
+
+function state = localBoundState(packed,targetCount)
+    [yaw,velocity,~,~,target,predictor] = localUnpackState(packed,targetCount);
+    state = struct("yaw",yaw,"bodyVelocity",velocity, ...
+        "targetState",target,"radarPredictor",predictor);
 end
 
 function targetState = localInitialTargets(options, targetCount)

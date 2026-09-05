@@ -706,6 +706,9 @@ end
 function [frame, audit] = localSensorFrame( ...
         cfg, stream, time, egoTruth, bodyAcceleration, targetTruth)
     unitNoise = localUnitNoise(stream, 9, cfg.noiseModel);
+    % Vector sensor maxima are Euclidean radii, matching the observer proof.
+    % Independent component draws occupy the inscribed square of each ball.
+    unitNoise([1:4,6:9]) = unitNoise([1:4,6:9])/sqrt(2);
     position = localEgoPosition(egoTruth);
     yaw = localEgoYaw(egoTruth);
     yawRate = localEgoYawRate(egoTruth);

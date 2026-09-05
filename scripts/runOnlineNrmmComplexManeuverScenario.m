@@ -280,6 +280,12 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design, o
     targetSpeed = NaN(sampleCount, 1);
     targetYawRate = NaN(sampleCount, 1);
     stepSeconds = NaN(sampleCount, 1);
+    relativePositionErrorBound = NaN(sampleCount,1);
+    positionErrorBoundAvailable = false(sampleCount,1);
+    if isfield(runtime,"positionErrorBound")
+        relativePositionErrorBound(1) = runtime.positionErrorBound.targetComponents(1);
+        positionErrorBoundAvailable(1) = runtime.positionErrorBound.valid(1);
+    end
 
     % Sample 1 carries the initial estimate mapped through the same output
     % transformations the runtime applies.
@@ -330,6 +336,10 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design, o
         [runtime, output] = options.runtimeFunction( ...
             "step", runtime, frame);
         stepSeconds(sampleIdx+1) = toc(timer);
+        if isfield(output,"relativePositionErrorBound")
+            relativePositionErrorBound(sampleIdx+1) = output.relativePositionErrorBound;
+            positionErrorBoundAvailable(sampleIdx+1) = output.positionErrorBoundAvailable;
+        end
         targetOutput = output.targetEstimates(1);
         egoState(sampleIdx+1, :) = output.egoState.';
         egoYaw(sampleIdx+1) = output.egoYaw;
@@ -353,6 +363,8 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design, o
         "targetSpeed", targetSpeed, ...
         "targetYawRate", targetYawRate, ...
         "stepSeconds", stepSeconds, ...
+        "relativePositionErrorBound",relativePositionErrorBound, ...
+        "positionErrorBoundAvailable",positionErrorBoundAvailable, ...
         "finalOutput", output, ...
         "runtime", runtime);
 end
@@ -413,6 +425,12 @@ function metrics = localMetrics(truth, estimate, time, transientDuration, cfg, o
     metrics.meanStepMilliseconds = 1000*mean(estimate.stepSeconds(2:end));
     metrics.maximumStepMilliseconds = 1000*max(estimate.stepSeconds(2:end));
     metrics.digitalErrorBoundCertified = false;
+    metrics.positionBoundAvailableFraction = mean(estimate.positionErrorBoundAvailable);
+    metrics.positionBoundContainmentFraction = mean(estimate.positionErrorBoundAvailable ...
+        & physicalError(:,1) <= estimate.relativePositionErrorBound+1e-10);
+    metrics.minimumPositionBoundSlack = min(estimate.relativePositionErrorBound-physicalError(:,1));
+    metrics.meanPositionErrorBound = mean(estimate.relativePositionErrorBound(evaluation));
+    metrics.maximumPositionErrorBound = max(estimate.relativePositionErrorBound(evaluation));
     metrics.estimatedDomainValidFraction = mean(localPhysicalDomain(estimate.targetState(evaluation,:),cfg));
     metrics.truthOperatingDomainValid = all(localPhysicalDomain(truth.targetTransformedState,cfg));
     if options.targetMotion == "varying"
