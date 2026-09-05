@@ -10,6 +10,47 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function commandedAccelerationUsesTheDeclaredInputGain(testCase)
+            cfg = collisionAvoidanceControllerConfig(struct( ...
+                "model", struct("longitudinalInputGain", 0.8)));
+            [stateMatrix, inputMatrix, affine] = ltvBicycleStageMatrices( ...
+                0.0, 10.0, 0.05, cfg);
+            next = stateMatrix*[0.0; 0.0; 0.0; 10.0; 0.0; 0.0] ...
+                + inputMatrix*[0.0; -4.0]+affine;
+            testCase.verifyEqual(next(4), 9.84, AbsTol=1.0e-13);
+            testCase.verifyEqual(next(1), 0.496, AbsTol=1.0e-13);
+        end
+
+        function stiffLateralDynamicsRemainStableUnderHeldInputIntegration(testCase)
+            cfg = collisionAvoidanceControllerConfig(struct( ...
+                "model", struct("scheduleSpeedFloor", 0.5)));
+            stateMatrix = ltvBicycleStageMatrices(0.0, 0.5, 0.05, cfg);
+            testCase.verifyTrue(all(isfinite(stateMatrix), "all"));
+            testCase.verifyLessThan(max(abs(eig(stateMatrix(5:6, 5:6)))), 1.0);
+        end
+
+        function heldInputPredictionIsInvariantToIntegrationSubdivision(testCase)
+            model = localModel();
+            [fullA, fullB, fullC] = ltvBicycleStageMatrices( ...
+                0.0025, 15.0, model.sampleTime, model.cfg);
+            [halfA, halfB, halfC] = ltvBicycleStageMatrices( ...
+                0.0025, 15.0, 0.5*model.sampleTime, model.cfg);
+            testCase.verifyEqual(fullA, halfA*halfA, AbsTol=1.0e-13);
+            testCase.verifyEqual(fullB, halfA*halfB+halfB, AbsTol=1.0e-13);
+            testCase.verifyEqual(fullC, halfA*halfC+halfC, AbsTol=1.0e-13);
+        end
+
+        function aHeldAccelerationBiasAlsoChangesPosition(testCase)
+            model = localModel();
+            model.cfg.model.longitudinalInputGain = 0.8;
+            model.longitudinalAccelerationBias = 0.7;
+            prediction = ltvBicyclePrediction(model);
+            state = prediction.egoStateOffset(:, 2);
+            testCase.verifyEqual(state(4), 4.0+0.7*model.sampleTime, AbsTol=1.0e-13);
+            testCase.verifyEqual(state(1), 4.0*model.sampleTime ...
+                + 0.5*0.7*model.sampleTime^2, AbsTol=1.0e-13);
+        end
+
         function errorBoundsContinuePropagatingBeyondTheFirstStep(testCase)
             model = localModel();
             model.measuredEgoStateErrorBound = [0.01; 0.02; 0.003; 0.04; 0.02; 0.005];
@@ -28,7 +69,7 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
                 prediction.egoStateErrorBound(2, 3));
         end
 
-        function brakingContinuationUsesTheExecutableEulerStationUpdate(testCase)
+        function brakingContinuationUsesTheSameHeldInputFlowAsTheHead(testCase)
             model = localModel();
             prediction = ltvBicyclePrediction(model);
             state = squeeze(pagemtimes(prediction.egoStateMatrix, prediction.referencePlan)) ...
@@ -37,9 +78,12 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
 
             increment = state(1, node+1)-state(1, node);
 
-            testCase.verifyEqual(increment, model.sampleTime*state(4, node), AbsTol=1.0e-13);
+            acceleration = prediction.referencePlan(2*node);
+            expected = model.sampleTime*state(4, node) ...
+                + 0.5*model.sampleTime^2*acceleration;
+            testCase.verifyEqual(increment, expected, AbsTol=1.0e-13);
             testCase.verifyLessThan(state(4, node+1), state(4, node));
-            testCase.verifyEqual(prediction.stageMatrixB(1, :, node), [0.0, 0.0], AbsTol=0.0);
+            testCase.verifyEqual(prediction.stageMatrixB(1, :, node), [0.0, 0.5*model.sampleTime^2], AbsTol=1.0e-15);
         end
     end
 end

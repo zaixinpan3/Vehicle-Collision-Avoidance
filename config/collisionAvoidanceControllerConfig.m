@@ -10,7 +10,7 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
 % double scalars in m/s^2 before model and tire modules consume them.
 %
 % The defaults describe a mid-size passenger car with the Ge et al.
-% (2022) input [deltaF; a] and the forward-Euler Frenet LTV bicycle
+% (2022) input [deltaF; a] and the held-input Frenet LTV bicycle
 % stage model of LTV_BICYCLE_MODEL.md.
 
     if nargin < 1
@@ -33,6 +33,9 @@ function cfg = localDefaults()
 
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
+    % Prefer passing behind traffic predicted to cross and clear the path.
+    % This time gap modifies performance only; hard safety is unchanged.
+    cfg.performance = struct("crossingTimeGap", 0.25);
 
     % Closed-loop period and prediction horizon. Every prediction
     % stage is one sample, so the plan advances one node per sample.
@@ -68,6 +71,7 @@ function cfg = localDefaults()
     % denominator alone uses scheduleSpeedFloor. Geometry is certified on
     % finite station intervals and the declared lateral/heading domains.
     cfg.model = struct( ...
+        "longitudinalInputGain", 1.0, ...
         "speedMinimum", 0.0, ...
         "speedMaximum", 18.0, ...
         "lateralDomainRadius", 12.0, ...
@@ -105,7 +109,7 @@ function cfg = localDefaults()
         "relaxationWeight", 100.0);
 
     % One joint conic solve per sample. The optional solver hook receives
-    % (phase, problem); problem.defaultSolver runs the built-in coneprog.
+    % (phase, problem); problem.defaultSolver runs the single SeDuMi SOCP.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
@@ -164,6 +168,8 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    localValidateNonnegativeScalar(cfg.performance.crossingTimeGap, ...
+        "performance.crossingTimeGap");
     if cfg.model.speedMinimum ~= 0.0 || cfg.model.speedMaximum <= 0.0
         error("collisionAvoidanceController:invalidConfiguration", ...
             "The rest certificate requires speedMinimum = 0 and speedMaximum > 0.");
@@ -175,6 +181,13 @@ function localValidate(cfg)
     end
     localValidateNonnegativeScalar(cfg.controller.stationTrustRadius, ...
         "controller.stationTrustRadius");
+    localValidateNonnegativeScalar(cfg.model.longitudinalInputGain, ...
+        "model.longitudinalInputGain");
+    if cfg.model.longitudinalInputGain <= 0.0 ...
+            || cfg.model.longitudinalInputGain > 1.0
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "model.longitudinalInputGain must lie in (0, 1].");
+    end
     localValidateNonnegativeScalar(cfg.model.lateralDomainRadius, ...
         "model.lateralDomainRadius");
     if cfg.controller.stationTrustRadius == 0.0 || cfg.model.lateralDomainRadius == 0.0
@@ -224,25 +237,18 @@ function localValidate(cfg)
         error("collisionAvoidanceController:invalidConfiguration", ...
             "solver.jointFunction must be empty or a function handle.");
     end
-    % Forward-Euler stability of the declared stage model: the lateral
-    % and yaw stiffness rates scale as 1/vBar, so the sample time and
-    % the schedule speed floor carry the obligation together
-    % (LTV_BICYCLE_MODEL.md).
-    corneringStiffness = double(cfg.tire.corneringStiffness(:));
-    if isscalar(corneringStiffness)
-        corneringStiffness = repmat(corneringStiffness, 2, 1);
+    for name = ["constraintTolerance", "optimalityTolerance"]
+        localValidateNonnegativeScalar(cfg.solver.(name), "solver."+name);
+        if cfg.solver.(name) == 0.0
+            error("collisionAvoidanceController:invalidConfiguration", ...
+                "solver.%s must be positive.", name);
+        end
     end
-    lateralRate = sum(corneringStiffness) ...
-        / (cfg.vehicle.m*cfg.model.scheduleSpeedFloor);
-    yawRate = (cfg.vehicle.lf^2*corneringStiffness(1) ...
-            + cfg.vehicle.lr^2*corneringStiffness(2)) ...
-        / (cfg.vehicle.Iz*cfg.model.scheduleSpeedFloor);
-    stiffestRate = max(lateralRate, yawRate);
-    if cfg.controller.sampleTime*stiffestRate >= 2.0
+    localValidateNonnegativeScalar(cfg.solver.maxIterations, "solver.maxIterations");
+    if cfg.solver.maxIterations < 1 ...
+            || cfg.solver.maxIterations ~= fix(cfg.solver.maxIterations)
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "The forward-Euler stage step is unstable at the declared " ...
-            + "schedule speed floor: sampleTime * %.3f 1/s must stay " ...
-            + "below 2.", stiffestRate);
+            "solver.maxIterations must be a positive integer.");
     end
     localValidateTerminal(cfg);
 end

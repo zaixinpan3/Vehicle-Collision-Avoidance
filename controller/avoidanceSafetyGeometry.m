@@ -1,7 +1,7 @@
 function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
 %avoidanceSafetyGeometry Supporting halfspaces in certified Cartesian frames.
-% Each node has an affine Frenet-to-Cartesian map on one polyline segment,
-% enforced by hard station bounds. A new supporting certificate replaces a
+% Each node has an affine chart with certified position/heading error over
+% a station interval spanning polyline segments. A supporting certificate replaces a
 % carried one only when it admits the carried state. This is geometric
 % evaluation, with no trajectory optimization or alternative solver start.
 
@@ -22,6 +22,13 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
     for nodeIdx = 1:count
         nominal = state(:, nodeIdx);
         frame = localFrame(model, nominal(1));
+        if nodeIdx == count-1 && prediction.scheduleSpeedProfile(end-1) == 0.0
+            % The final zero-input step and terminal velocity equalities
+            % require both endpoint poses to coincide. Use one route chart
+            % even if an inadmissible readmission anchor drifts backwards
+            % across a polyline vertex at that step.
+            frame = localFrame(model, state(1, end));
+        end
         targetNode = localTargetNode(model, prediction, nominal, frame, nodeIdx);
         roadNodes = repmat(empty, numel(road), 1);
         admitted = nominal(1) >= frame.stationLower ...
@@ -61,25 +68,8 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
 end
 
 function frame = localFrame(model, station)
-    lane = model.lane;
-    segment = find(lane.segmentStation <= station, 1, "last");
-    if isempty(segment)
-        segment = 1;
-    end
-    segment = min(segment, numel(lane.segmentLength));
-    lower = lane.segmentStation(segment);
-    upper = lower+lane.segmentLength(segment);
-    if segment < numel(lane.segmentLength)
-        upper = upper-min(1.0e-6, 0.01*lane.segmentLength(segment));
-    end
-    tangent = lane.tangent(segment, :).';
-    lateral = [-tangent(2); tangent(1)];
-    radius = model.cfg.controller.stationTrustRadius;
-    frame = struct("origin", lane.segmentStart(segment, :).'-tangent*lower, ...
-        "tangent", tangent, "lateral", lateral, ...
-        "heading", atan2(tangent(2), tangent(1)), "segmentIndex", segment, ...
-        "stationLower", max(lower, station-radius), ...
-        "stationUpper", min(upper, station+radius));
+    frame = laneFrameCertificate(model.lane, station, ...
+        model.cfg.controller.stationTrustRadius, model.cfg.model.lateralDomainRadius);
 end
 
 function node = localTargetNode(model, prediction, state, frame, nodeIdx)
@@ -124,7 +114,7 @@ function node = localTargetNode(model, prediction, state, frame, nodeIdx)
         nodeIdx, normal, targetSupport, model.cfg.collision.clearanceMargin);
     node.dualDistance = distance;
     node.terminalSegmentIndex = frame.segmentIndex;
-    node.terminalSegmentEnforced = terminal;
+    node.terminalSegmentEnforced = false;
     node.terminalStationLower = frame.stationLower;
     node.terminalStationUpper = frame.stationUpper;
 end
@@ -140,7 +130,8 @@ function node = localRoadNode(model, prediction, state, frame, nodeIdx, boundary
     origin = longitudinal.'*(frame.origin-boundary.origin);
     stationRange = coefficients(1)*[frame.stationLower, frame.stationUpper];
     extent = abs(coefficients(2))*cfg.model.lateralDomainRadius ...
-        + hypot(model.egoHalfLength, model.egoHalfWidth);
+        + hypot(model.egoHalfLength, model.egoHalfWidth) ...
+        + abs(longitudinal).'*frame.positionErrorBound;
     range = [min(stationRange)-extent, max(stationRange)+extent]+origin;
     tolerance = cfg.road.parameterRangeTolerance;
     outside = range(2) < boundary.parameterRange(1)-tolerance ...
@@ -173,7 +164,7 @@ end
 function node = localSupportNode(node, model, prediction, state, frame, ...
         nodeIdx, inertialNormal, obstacleSupport, clearance)
     heading = state(3)+frame.heading;
-    radius = prediction.egoStateErrorBound(3, nodeIdx);
+    radius = prediction.egoStateErrorBound(3, nodeIdx)+frame.headingErrorBound;
     normal = [frame.tangent, frame.lateral].'*inertialNormal;
     egoSupport = localRectangleSupport(model.egoHalfLength, ...
         model.egoHalfWidth, inertialNormal, heading, radius);
@@ -189,7 +180,8 @@ function node = localSupportNode(node, model, prediction, state, frame, ...
     node.headingCoefficient = slope;
     node.nominalHeading = state(3);
     node.tightening = clearance ...
-        + abs(normal).'*prediction.egoStateErrorBound(1:2, nodeIdx);
+        + abs(normal).'*prediction.egoStateErrorBound(1:2, nodeIdx) ...
+        + abs(inertialNormal).'*frame.positionErrorBound;
     node.nominalMargin = normal.'*state(1:2)-node.supportValue-node.tightening;
     node.outside = node.nominalMargin >= 0.0;
     if abs(normal(2)) <= 0.087

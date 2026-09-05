@@ -1,6 +1,6 @@
 function [stateMatrix, inputMatrix, affineVector] = ...
         ltvBicycleStageMatrices(kappa, vBar, sampleTime, cfg)
-% ltvBicycleStageMatrices Forward-Euler Frenet bicycle matrices at a schedule point.
+% ltvBicycleStageMatrices Exact held-input flow of a scheduled affine bicycle.
 %
 % Closed-form linearization of the dynamic bicycle with linear
 % cornering regularized at a positive tire-speed floor, in path coordinates
@@ -8,29 +8,27 @@ function [stateMatrix, inputMatrix, affineVector] = ...
 % state [s; d; ePsi; vx; vy; r] with s the station, d the left-positive
 % lateral offset and ePsi the heading error to the path tangent - about
 % the schedule point (d = 0, ePsi = 0, vy = 0, vx = vBar, r = kappa*vBar)
-% at the local curvature kappa, discretized by ONE FORWARD-EULER step:
-%
-%   A_d = I + Ts*A,   B_d = Ts*B,   c_d = Ts*c,   c = f(xhat) - A*xhat.
+% at the local curvature kappa. One block matrix exponential integrates
+% the affine model with constant input over the sample. This is exact for
+% that scheduled linearization, not for the nonlinear bicycle or plant.
 %
 % Continuous model:
 %   sdot    = (vx cos ePsi - vy sin ePsi)/(1 - kappa d)
 %   ddot    = vx sin ePsi + vy cos ePsi
 %   ePsidot = r - kappa sdot
-%   vxdot   = a + vy r
+%   vxdot   = gamma*a + vy r, gamma = cfg.model.longitudinalInputGain
 %   vydot   = (Fyf + Fyr)/m - vx r
 %   rdot    = (lf Fyf - lr Fyr)/Iz
 %   Fyf = Cf (deltaF - (vy + lf r)/vTire), Fyr = -Cr (vy - lr r)/vTire
 %   vTire = max(vBar, cfg.model.scheduleSpeedFloor)
 %
-% Input [deltaF; a] (Ge et al. 2022). The curvature is treated as
+% Input [deltaF; a] uses commanded acceleration, with a fixed declared
+% longitudinal effectiveness gain. The default gain is one. The curvature is treated as
 % locally constant at the schedule station of the stage (its variation
-% along the horizon is carried node by node by the schedule). The Euler
-% map IS the declared discrete model (design decision 2026-08-23); it is
-% conditionally stable - sampleTime times (Cf+Cr)/(m*vTire) and
-% (lf^2*Cf + lr^2*Cr)/(Iz*vTire) must stay below 2, an obligation the
-% sample time and the schedule speed floor carry together. This is the
-% single model source for the prediction and for the CLF Riccati
-% synthesis (at kappa = 0).
+% along the horizon is carried node by node by the schedule). Prediction,
+% continuation and CLF Riccati synthesis use this same held-input flow.
+% Position and heading can therefore depend on the new first input. The
+% discretization does not impose a forward-Euler stiffness restriction.
 
     mass = cfg.vehicle.m;
     yawInertia = cfg.vehicle.Iz;
@@ -66,9 +64,9 @@ function [stateMatrix, inputMatrix, affineVector] = ...
     continuousA(3, 6) = 1.0;
     continuousA(3, 4) = -kappa;
     continuousA(3, 2) = -kappa^2*vBar;
-    % vxdot = a + vy*r, bilinear term frozen at (vy = 0, r = rBar).
+    % vxdot = gamma*a + vy*r, frozen at (vy = 0, r = rBar).
     continuousA(4, 5) = rBar;
-    continuousB(4, 2) = 1.0;
+    continuousB(4, 2) = cfg.model.longitudinalInputGain;
     % Lateral channel at the frozen speed.
     yawStiffness = (lf*corneringFront-lr*corneringRear)/tireSpeed;
     lateralStiffness = (corneringFront+corneringRear)/tireSpeed;
@@ -82,7 +80,9 @@ function [stateMatrix, inputMatrix, affineVector] = ...
         + lr^2*corneringRear)/(tireSpeed*yawInertia);
     continuousB(6, 1) = lf*corneringFront/yawInertia;
 
-    stateMatrix = eye(6)+sampleTime*continuousA;
-    inputMatrix = sampleTime*continuousB;
-    affineVector = sampleTime*continuousC;
+    heldTransition = expm(sampleTime*[continuousA, continuousB, continuousC; ...
+        zeros(3, 9)]);
+    stateMatrix = heldTransition(1:6, 1:6);
+    inputMatrix = heldTransition(1:6, 7:8);
+    affineVector = heldTransition(1:6, 9);
 end

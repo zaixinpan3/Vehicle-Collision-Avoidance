@@ -15,6 +15,7 @@ function prediction = ltvBicyclePrediction(model, storedSchedule)
     nodeCount = stageCount+1;
     planCount = model.inputDimension*stageCount;
     sampleTime = model.sampleTime;
+    inputGain = cfg.model.longitudinalInputGain;
     scheduleShifted = ~isempty(storedSchedule);
     if scheduleShifted
         schedule = storedSchedule;
@@ -48,8 +49,8 @@ function prediction = ltvBicyclePrediction(model, storedSchedule)
             affine(:, stageIdx)] = ltvBicycleStageMatrices( ...
                 schedule.curvature(stageIdx), schedule.speedProfile(stageIdx), ...
                 sampleTime, cfg);
-        affine(4, stageIdx) = affine(4, stageIdx) ...
-            + sampleTime*model.longitudinalAccelerationBias;
+        affine(:, stageIdx) = affine(:, stageIdx) ...
+            + inputMatrix(:, 2, stageIdx)*(model.longitudinalAccelerationBias/inputGain);
         inputRange = 2*stageIdx-1:2*stageIdx;
         stateMap(:, :, stageIdx+1) = ...
             stateMatrix(:, :, stageIdx)*stateMap(:, :, stageIdx);
@@ -63,9 +64,9 @@ function prediction = ltvBicyclePrediction(model, storedSchedule)
 
     reference = zeros(2, stageCount);
     reference(1, :) = atan(cfg.vehicle.wheelbase*schedule.curvature(1:end-1));
-    reference(2, :) = diff(schedule.speedProfile)/sampleTime ...
-        - model.longitudinalAccelerationBias;
-    reference(:, end) = [0.0; -model.longitudinalAccelerationBias];
+    reference(2, :) = (diff(schedule.speedProfile)/sampleTime ...
+        - model.longitudinalAccelerationBias)/inputGain;
+    reference(:, end) = [0.0; -model.longitudinalAccelerationBias/inputGain];
     prediction = struct( ...
         "scheduleSpeed", max(schedule.speedProfile(1), cfg.model.scheduleSpeedFloor), ...
         "scheduleShifted", scheduleShifted, ...
@@ -93,7 +94,8 @@ function schedule = localInitialSchedule(model, nodeCount)
         max(0.0, speed+model.sampleTime*cumsum(braking));
     speedProfile(end-1:end) = 0.0;
     station = model.initialEgoState(1) ...
-        + model.sampleTime*[0.0, cumsum(speedProfile(1:end-1))];
+        + 0.5*model.sampleTime*[0.0, ...
+            cumsum(speedProfile(1:end-1)+speedProfile(2:end))];
     curvature = zeros(1, nodeCount);
     for nodeIdx = 1:nodeCount
         curvature(nodeIdx) = laneCurvatureAtStation(station(nodeIdx), model.lane);

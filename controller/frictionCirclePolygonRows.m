@@ -25,7 +25,9 @@ function [matrix, offset] = frictionCirclePolygonRows(prediction, model)
 %
 % Static Fzi follows the axle geometry.  When the configuration supplies
 % centerOfGravityHeight/cgHeight, Fzi(a) includes affine longitudinal load
-% transfer, which preserves linearity of every row.  Four additional rows
+% transfer at the model acceleration gamma*a, where gamma is the declared
+% longitudinal input gain. Full requested Fxi remains in the polygon, so
+% a gain below one does not relax the force-request envelope. Every row is linear.  Four additional rows
 % per stage enforce the configured linear-tire validity limits on alphaF
 % and alphaR.  All rows are nondimensional and HARD.
 
@@ -89,7 +91,8 @@ function [matrix, offset] = frictionCirclePolygonRows(prediction, model)
             staticCapacity = ...
                 parameters.staticFrictionForceMaximum(axleIdx);
             normalLoadSlope = ...
-                parameters.normalLoadAccelerationSlope(axleIdx);
+                parameters.normalLoadAccelerationSlope(axleIdx) ...
+                * cfg.model.longitudinalInputGain;
             mu = parameters.frictionCoefficient(axleIdx);
             for edgeIdx = 1:edgeCount
                 normal = parameters.edgeNormal(edgeIdx, :);

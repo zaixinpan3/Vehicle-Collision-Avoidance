@@ -20,18 +20,18 @@ classdef oncomingVehicleAvoidanceScenarioTest < matlab.unittest.TestCase
                 Plot=false, Report=false);
 
             testCase.verifyEqual(result.scenario.sampleTime, ...
-                0.1, AbsTol=0.0);
+                0.05, AbsTol=0.0);
             testCase.verifyEqual(result.scenario.targetSampleTime, ...
-                0.1, AbsTol=0.0);
+                0.05, AbsTol=0.0);
             testCase.verifyEqual(result.scenario.targetCount, 0);
             testCase.verifyEqual( ...
-                result.metrics.requestedControlSteps, 1);
+                result.metrics.requestedControlSteps, 2);
             testCase.verifyEqual( ...
-                result.metrics.completedControlSteps, 1);
+                result.metrics.completedControlSteps, 2);
             testCase.verifyEqual( ...
-                result.controlTime, [0.0; 0.1], AbsTol=0.0);
-            testCase.verifyNumElements(result.command, 1);
-            testCase.verifyNumElements(result.targetEstimate, 1);
+                result.controlTime, [0.0; 0.05; 0.1], AbsTol=0.0);
+            testCase.verifyNumElements(result.command, 2);
+            testCase.verifyNumElements(result.targetEstimate, 2);
 
             testCase.verifyEqual( ...
                 result.avoidance.targetLateralOffset, ...
@@ -87,13 +87,13 @@ classdef oncomingVehicleAvoidanceScenarioTest < matlab.unittest.TestCase
                 Plot=false, Report=false);
 
             testCase.verifyEqual( ...
-                result.metrics.requestedControlSteps, 3);
+                result.metrics.requestedControlSteps, 6);
             testCase.verifyEqual( ...
-                result.metrics.completedControlSteps, 3);
+                result.metrics.completedControlSteps, 6);
             testCase.verifyEqual( ...
-                result.controlTime, (0.0:0.1:0.3).', ...
+                result.controlTime, (0.0:0.05:0.3).', ...
                 AbsTol=1.0e-15);
-            testCase.verifyNumElements(result.command, 3);
+            testCase.verifyNumElements(result.command, 6);
             testCase.verifyEqual(result.scenario.targetCount, 0);
             testCase.verifyFalse(any( ...
                 result.perception.targetDetectionAvailable));

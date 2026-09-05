@@ -23,6 +23,8 @@ configuration/environment identity, committed actuator vector, and acceptance
 residuals. The four-input interface stores the same state persistently for
 existing scenario drivers. `resetNominalTrajectory` clears that convenience
 interface and does not change an explicitly supplied certificate.
+Certificates use version 4 for the route-interval geometry, held-input
+flow and commanded-input model contract. Earlier certificates must undergo initial admission again.
 
 Initial admission constructs one domain from the schedule reference and
 attempts one SOCP. This reference is not certified in advance. The augmented
@@ -46,12 +48,36 @@ and `M = N + Nb`. All `M` stages use the same scheduled Frenet bicycle:
  x=[s,d,e_\psi,v_x,v_y,r]^\top,\quad u=[\delta_f,a]^\top.
 \]
 
+Each stage integrates its scheduled affine model exactly under a held input,
+using one block matrix exponential. The same flow supplies the CLF's cruise
+Riccati design. Acceleration bias propagates through the entire acceleration
+input column. The first predicted pose therefore includes the input's
+within-sample effect. This replaces Euler integration consistently in both
+head and continuation; it does not make the nonlinear plant model exact.
+
 Every stage has both steering and acceleration decision variables. There is
 no dynamic-to-kinematic handoff. `brakingSchedule` only supplies an initial
 speed schedule and derives `Nb` from maximum speed and the configured
 braking rate, with two rest stages. The optimizer can steer and accelerate
 throughout the continuation subject to the same physical limits as the head.
 The configured braking rate does not replace those physical rows.
+
+`model.longitudinalInputGain` is a fixed declared gain `gamma` in `(0, 1]`:
+`vxDot = gamma*a + rBar*vy + b`. The input `a` remains the requested
+longitudinal acceleration used by the actuator adapter. The default is 1;
+the Blockset experiment uses 0.80 after observing a step-average braking
+response of 0.841 times its command. This is a fixed modeling choice motivated
+by the recorded response, not a certified lower bound on every nonlinear-plant response. Gain uncertainty
+and actuator dynamics have not been enclosed by a feedback tube.
+
+The gain enters all head/continuation matrices, cruise equilibrium, CLF
+Riccati cache, bias propagation and resting input. Axle polygons still check
+the full requested longitudinal force `rho*m*a`, while their affine load
+transfer uses the model's effective acceleration `gamma*a`. For the declared
+gain no larger than one, the model's realized longitudinal force has no larger
+magnitude than that request. The same hard force/request envelope applies
+at every stage. The unsuccessful future-capacity-reserve variant is not
+part of the implemented controller.
 
 The condensed map is `x_j = F_j plan + f_j`. The decision is
 `z = [plan; delta]`, with one nonnegative scalar relaxation:
@@ -67,7 +93,7 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
  \end{aligned}
 \]
 
-The input cost measures deviation from the cruise equilibrium over the head.
+The input cost measures deviation from the performance-reference equilibrium over the head.
 A small positive input quadratic in the continuation removes degeneracy.
 There is no safety slack. The first-step CLF is represented exactly as
 
@@ -81,22 +107,56 @@ horizon-wide difference of two decision-dependent quadratic CLF values is
 constrained. The reported later CLF values are diagnostics. A soft CLF and
 finite penalty do not establish convergence or a recovery deadline.
 
+Before the solve, fixed terminal inputs and the three terminal velocity
+equalities are eliminated with an affine parameterization `z = Z*y + z0`.
+Rank-revealing QR selects independent late controls, preserving the sparse
+dependence of the first-step CLF on the first input. A distributed particular
+solution avoids representing a full stop as one artificial, very large
+acceleration in the cone offsets. All original inequalities, bounds and cones
+are transformed exactly; this is linear algebra, not another optimization.
+Reconstructed terminal equalities hold to floating-point roundoff.
+
+## Crossing-traffic performance reference
+
+`crossingCruiseReference` makes the longitudinal preference explicit. It
+projects the target forecast onto the nominal path, includes the two rectangle
+supports and clearance margin, and identifies the last occupied path node.
+When the target leaves this corridor within the forecast and the stopping
+station is ahead, the reference speed is the smaller of requested cruise and
+distance to that station divided by clearance time plus
+`performance.crossingTimeGap` (default 0.25 s). Clearance time is the node
+following the last occupied node. Otherwise, the requested cruise speed is
+retained. Both the input objective and exact first-step CLF use this reference.
+
+This is a deterministic preference to yield before a crossing, not a safety
+certificate or another trajectory solve. It uses nominal target motion; the
+SOCP still enforces the complete hard continuation constraints. Its time gap
+is not a plant-error bound. Targets without a forecast lateral exit, including
+the oncoming steering regression, retain the original cruise preference.
+Reference changes do not invalidate an otherwise applicable certificate:
+the carried plan remains admissible with the sole CLF relaxation. The
+controller reports the reference speed, yielding state and clearance time.
+
 ## Sound node geometry
 
 `avoidanceSafetyGeometry` constructs physical Cartesian halfspaces. A node's
-Frenet-to-Cartesian map is affine on its selected polyline segment:
+affine chart approximates the physical polyline map over a station interval:
 
 \[
- p=o+T s+N d,\qquad \psi=\theta+e_\psi.
+ p=o+T s+N d+r_p,\qquad \psi=\theta+e_\psi+r_\psi,
+ \qquad |r_p|\le b_p,\quad |r_\psi|\le b_\psi.
 \]
 
-Hard station bounds keep the solution on that segment and within
-`controller.stationTrustRadius` of its geometry anchor. Hard lateral and
-heading bounds apply at all nodes, including measured, first-future and
-continuation nodes. The segment guard prevents a solution from crossing into
-another frame at an interior upper endpoint. This domain can be narrow on a
-finely segmented curved route; its restrictions are part of the controller,
-not an exact representation of all road-following motion.
+Hard station bounds keep the solution within `controller.stationTrustRadius`
+of its geometry anchor and the finite route extent. The interval may cross
+polyline vertices; it is not limited by the centerline sampling distance.
+`laneFrameCertificate` computes componentwise position-error bounds at both
+ends of each intersecting segment and both extremes of the admitted lateral
+offset. The error is affine on each such rectangle, so these corners cover
+the full interval. The maximum wrapped segment-heading difference gives the
+yaw bound. Both sides of a vertex are included. Hard lateral and heading
+bounds apply at every node. This is a bounded inner approximation, not an
+unrestricted route-domain reformulation.
 
 For a fixed unit inertial normal `n`, rectangle support at the anchor is
 maximized over the published yaw interval. An exact interval Lipschitz bound
@@ -107,10 +167,12 @@ maximized over the published yaw interval. An exact interval Lipschitz bound
  -\sigma_{T,j}-\bar\sigma_{E,j}-L|e_{\psi,j}-\bar e_{\psi,j}|-\epsilon_j.
 \]
 
-Both signs of the absolute value become hard affine rows. Position and yaw
-uncertainty are charged in their physical support directions. This replaces
-the previous unproved conversion of two Cartesian rectangles into Frenet
-rectangles plus a curvature sagitta allowance.
+Both signs of the absolute value become hard affine rows. The position charge
+includes `abs(n)'*b_p`; the yaw-support interval includes `b_psi` in addition
+to the published yaw uncertainty. Thus widening a station interval also
+tightens its geometric inequalities by a computed allowance. The independent
+acceptance check evaluates the actual polyline pose with `lanePoseFromFrenet`,
+rather than checking clearance only in the affine chart.
 
 For each supplied quadratic road graph, the implementation computes its
 maximum signed height over the whole admitted rectangle-parameter interval.
@@ -131,11 +193,11 @@ regularization floor. At zero schedule speed,
 
 \[
  x_R=[s_R,d_R,e_{\psi,R},0,0,0]^\top,
- \qquad \pi_R=[0,-b]^\top
+ \qquad \pi_R=[0,-b/\gamma]^\top
 \]
 
 is a fixed point of the same scheduled bicycle; `b` is the declared constant
-longitudinal bias. The last input is fixed to this policy and checked against
+longitudinal bias and `gamma` the configured input gain. The last input is fixed to this policy and checked against
 actuator and axle constraints. The policy, zero-speed schedule and resting
 frame can be appended indefinitely. Rest remains valid at nonzero lateral
 offset and heading error within the admitted geometry domain.
@@ -170,8 +232,14 @@ overlap, complete target support, route and model assumptions must agree with
 the carried certificate before its shift can be treated as applicable.
 A changed observation or environment requires admission again. When the
 track, route and controller configuration still identify the same operation,
-the old shifted inputs and schedule supply the single admission proposal;
-all geometric rows are rebuilt from the new environment. They can supply a
+the old shifted inputs supply the single admission proposal. Its model uses
+the same deterministic measured-speed cruise/brake template as initial
+admission. This prevents an aging braking schedule during repeated cruise
+readmission and avoids feeding unexecuted optimized speeds back into the
+entire model. The template is a declared local model choice; it does not
+certify approximation error for the nonlinear plant. Exact certificate reuse
+still shifts the original model verbatim. All geometric rows are rebuilt
+from the new environment. A proposal can supply a
 fallback only after passing the complete current certificate checks. An
 unrelated track does not inherit that proposal. This preserves maneuver
 memory without claiming that an expired certificate still applies. Successful
@@ -187,8 +255,22 @@ motion bounds or a sampled-data certificate.
 
 ## Acceptance and fallback
 
-`solveHardCbfClf` calls `coneprog` once. `certifyAvoidancePlan` checks the exact
-returned vector for dimensions, finite real values, actuator bounds, all hard
+`solveHardCbfClf` calls SeDuMi once. The reduced physical decision is its dual
+variable, with affine inequality slacks in the nonnegative cone and the exact
+CLF/objective epigraphs in Lorentz cones. This is an exact conic representation
+of the selected convex problem. SeDuMi is loaded from `solver/sedumi` when it
+is not already on the MATLAB path; that external dependency is not vendored
+by the controller change. Optimization Toolbox supplies `secondordercone`.
+The requested SeDuMi relative precision is the minimum of 1e-9 and the two
+configured solver tolerances; physical acceptance remains a separate absolute
+check. There is no retry with another solver or another geometric start.
+
+For its returned input plan, the sole
+performance slack is reconstructed as `max(0, V(e1)-V(e0)+W(e0))`, its analytic
+minimum at that fixed plan. This prevents a numerical epigraph residual from
+rejecting an otherwise safe input and reports the actual performance loss.
+It changes no actuator or hard-safety variable. `certifyAvoidancePlan` checks
+the reconstructed vector for dimensions, finite real values, actuator bounds, all hard
 rows, rest equalities, the exact first-step CLF and Cartesian rectangle
 clearance at every node. The checked vector is stored and committed without
 clipping. The same checks apply to the carried witness.
@@ -243,7 +325,34 @@ fixed problem is not a recursive-control theorem. Leeman et al.'s
 illustrates that disturbance handling needs a feedback/error-containment
 construction. Those references do not independently certify this implementation.
 
-## Validation recorded on 2026-09-05
+## Experiment-driven validation
+
+The repaired implementation passes 119 focused tests and has zero Code
+Analyzer findings across its 24 changed MATLAB files. A frozen full-suite run
+on the current estimator base produced 284 passes, six failures and two
+additional skips among 292 tests. The six failures are estimator-integrated
+scenarios supplying nonzero ego/model uncertainty outside this controller's
+declared certificate domain. Two historical curb-data tests skip because
+their recorded dataset is absent. The full suite is therefore not green.
+
+Both complete 10 s PassVeh14DOF crossing trials and their nominal
+counterfactuals meet the functional experiment requirements. Their minimum
+sampled SAT gaps are 1.4500 m (straight) and 1.7902 m (400 m arc). Both recover
+the specified cruise tolerances throughout the final second. Every successful
+sample uses one SOCP with no fallback. Maximum measured controller times are
+0.95233 s and 0.982513 s, so neither meets the 0.05 s deadline. These are offline
+plant experiments, not real-time or continuous-motion safety demonstrations.
+See [the experiment record](../scripts/CONTROLLER_DESIGN_EXPERIMENTS.md) for
+the failed candidates, unchanged acceptance criteria and complete metrics.
+
+The separate declared-model oncoming test with input gain 0.80 solves once,
+then forces solver outages through rest. Its minimum rectangle clearance is
+0.250000291 m for a 0.25 m requirement, and its final velocity residual is
+2.77e-14; the rotated case also passes (2.82e-14). This retains steering-based
+continuation coverage alongside the crossing trials' longitudinal yielding.
+It does not extend the certificate theorem to the nonlinear plant.
+
+## Initial redesign validation (commit 85f9e34)
 
 MATLAB R2026a Update 3, with Control System Toolbox and Optimization Toolbox:
 

@@ -34,9 +34,25 @@ function plotControllerDesignExperiment(result, experiment, options)
     xlabel("Time [s]"); ylabel("Rectangle SAT margin [m]");
     legend("Nominal", "Avoidance", Location="best", Box="off");
     nexttile;
-    plot(nominal.controlTime, nominal.controlState(:,4), "--", ...
+    speedLines = plot(nominal.controlTime, nominal.controlState(:,4), "--", ...
         avoidance.controlTime, avoidance.controlState(:,4), LineWidth=1.5);
-    yline(experiment.referenceSpeed, ":"); grid on;
+    speedLines(1).DisplayName = "Nominal";
+    speedLines(2).DisplayName = "Avoidance";
+    hold on;
+    reference = nan(size(avoidance.attempts.time));
+    for idx = 1:numel(reference)
+        metadata = avoidance.attempts.metadata{idx};
+        if isstruct(metadata) && isfield(metadata, "performanceReferenceSpeed")
+            reference(idx) = metadata.performanceReferenceSpeed;
+        end
+    end
+    if any(isfinite(reference))
+        stairs(avoidance.attempts.time, reference, "-.", ...
+            Color=[0.35, 0.35, 0.35], LineWidth=1.0, ...
+            DisplayName="Performance reference");
+    end
+    yline(experiment.referenceSpeed, ":", DisplayName="Cruise request");
+    legend(Location="best", Box="off"); grid on;
     xlabel("Time [s]"); ylabel("Longitudinal speed [m/s]");
     nexttile;
     plot(avoidance.controlTime, avoidance.controlTracking.lateralError, LineWidth=1.5);

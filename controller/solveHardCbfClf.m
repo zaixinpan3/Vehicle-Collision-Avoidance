@@ -35,12 +35,26 @@ function result = solveHardCbfClf(problem, cfg)
     end
 
     decision = jointSolve.decision(1:layout.decisionCount);
+    % The sole slack has an analytic minimizer once the input plan is fixed.
+    % Reconstruct it exactly instead of rejecting a safe input because the
+    % cone solver's epigraph variable differs by its stopping tolerance.
+    % No actuator or hard-safety variable is changed by this operation.
+    clf = problem.clf;
+    plan = decision(layout.planIndex);
+    initialError = clf.errorOffset(:, 1);
+    nextError = clf.errorMatrix(:, :, 2)*plan+clf.errorOffset(:, 2);
+    decision(layout.relaxationIndex) = max(0.0, ...
+        nextError.'*clf.lyapunovMatrix*nextError ...
+        - initialError.'*(clf.lyapunovMatrix-clf.decreaseMatrix)*initialError);
     jointValue = localJointValue(problem, decision);
     result.decision = decision;
     result.exitFlag = jointSolve.exitFlag;
     result.feasible = true;
     result.iterations = localIterationCount(jointSolve.output);
-    result.algorithm = "coneprog hard-CBF joint CLF/input";
+    result.algorithm = "joint predictive SOCP";
+    if isfield(jointSolve.output, "algorithm")
+        result.algorithm = string(jointSolve.output.algorithm);
+    end
     result.message = "candidate returned for independent acceptance: " ...
         + jointSolve.message;
     result.objectiveValue = jointValue;
@@ -122,32 +136,134 @@ end
 
 function solve = localRunJointProgram(program, cfg)
     hook = cfg.solver.jointFunction;
-    if isempty(hook)
-        solve = localDefaultSolve(program, cfg);
-        return;
-    end
     program.defaultSolver = @() localDefaultSolve(program, cfg);
     try
-        solve = hook("joint", program);
+        if isempty(hook)
+            solve = localDefaultSolve(program, cfg);
+        else
+            solve = hook("joint", program);
+        end
     catch exception
         solve = localEmptySolve();
         solve.exitFlag = -999;
-        solve.message = string(exception.message);
+        solve.output = struct("message", string(exception.message));
     end
     solve = localNormalizeSolve(solve, numel(program.f));
 end
 
 function solve = localDefaultSolve(program, cfg)
-    options = optimoptions("coneprog", "Display", "none", ...
-        "ConstraintTolerance", cfg.solver.constraintTolerance, ...
-        "OptimalityTolerance", cfg.solver.optimalityTolerance, ...
-        "MaxIterations", cfg.solver.maxIterations);
-    [decision, ~, exitFlag, output] = coneprog( ...
-        program.f, program.cones, program.A, program.b, ...
-        program.Aeq, program.beq, program.lb, program.ub, options);
+    if isempty(which("sedumi"))
+        solverRoot = fullfile(fileparts(fileparts(mfilename("fullpath"))), ...
+            "solver", "sedumi");
+        if ~isfolder(solverRoot)
+            error("collisionAvoidanceController:missingSocpSolver", ...
+                "The predictive SOCP requires SeDuMi in %s.", solverRoot);
+        end
+        addpath(genpath(solverRoot));
+    end
+    % Eliminate fixed inputs and terminal rest before the single conic call.
+    % The physical decision is the dual variable y in SeDuMi's convention:
+    % max -f'*y subject to c-A'*y in a product of nonnegative/SOC cones.
+    % This conversion preserves the objective and every feasible input.
+    [reduced, map, offset] = localEliminateEqualities(program);
+    identity = speye(numel(reduced.f));
+    upper = find(isfinite(reduced.ub));
+    lower = find(isfinite(reduced.lb));
+    blocks = cell(numel(reduced.cones)+1, 1);
+    constants = cell(size(blocks));
+    blocks{1} = [sparse(reduced.A); identity(upper, :); -identity(lower, :)];
+    constants{1} = [reduced.b; reduced.ub(upper); -reduced.lb(lower)];
+    cones = struct("l", size(blocks{1}, 1), ...
+        "q", zeros(1, numel(reduced.cones)));
+    for coneIdx = 1:numel(reduced.cones)
+        cone = reduced.cones{coneIdx};
+        blocks{coneIdx+1} = [-sparse(cone.d.'); -sparse(cone.A)];
+        constants{coneIdx+1} = [-cone.gamma; -cone.b];
+        cones.q(coneIdx) = size(cone.A, 1)+1;
+    end
+    % SeDuMi uses relative residuals. Request high internal precision and
+    % retain the independent absolute acceptance checks in physical units.
+    options = struct("fid", 0, "eps", min([1.0e-9, ...
+        cfg.solver.constraintTolerance, cfg.solver.optimalityTolerance]), ...
+        "maxiter", cfg.solver.maxIterations);
+    [~, reducedDecision, information] = sedumi( ...
+        vertcat(blocks{:}).', -reduced.f, vertcat(constants{:}), cones, options);
+    exitFlag = 1;
+    if information.dinf
+        exitFlag = -2;
+    elseif information.pinf
+        exitFlag = -3;
+    elseif information.numerr
+        exitFlag = -7;
+    end
+    decision = zeros(0, 1);
+    if numel(reducedDecision) == numel(reduced.f)
+        decision = map*reducedDecision+offset;
+    end
+    output = struct("iterations", information.iter, ...
+        "algorithm", "SeDuMi joint predictive SOCP", ...
+        "message", "SeDuMi numerr="+string(information.numerr) ...
+            +", pinf="+string(information.pinf)+", dinf="+string(information.dinf));
     solve = struct("decision", decision, ...
         "exitFlag", exitFlag, "output", output);
     solve = localNormalizeSolve(solve, numel(program.f));
+end
+
+function [reduced, map, offset] = localEliminateEqualities(program)
+    count = numel(program.f);
+    fixed = find(program.lb == program.ub);
+    free = setdiff((1:count).', fixed);
+    offset = zeros(count, 1);
+    offset(fixed) = program.lb(fixed);
+    equality = program.Aeq(:, free);
+    bound = program.beq-program.Aeq*offset;
+    rowCount = size(equality, 1);
+    % Prefer late controls: eliminating the first acceleration would couple
+    % the first-step CLF to the sum of every future acceleration. Keep that
+    % short performance cone sparse, and use rank-revealing QR on a small
+    % suffix of the controls that influence the endpoint.
+    active = find(any(equality ~= 0.0, 1));
+    selected = active(max(1, end-2*rowCount+1):end);
+    if rank(equality(:, selected)) < rowCount
+        selected = active;
+    end
+    [~, triangular, permutation] = qr(equality(:, selected), "vector");
+    if rank(triangular) ~= rowCount
+        error("collisionAvoidanceController:invalidProblem", ...
+            "The terminal velocity equalities must have full row rank.");
+    end
+    pivot = free(selected(permutation(1:rowCount)));
+    independent = setdiff(free, pivot);
+    map = sparse(independent, 1:numel(independent), 1.0, ...
+        count, numel(independent));
+    pivotMatrix = program.Aeq(:, pivot);
+    map(pivot, :) = -pivotMatrix\program.Aeq(:, independent);
+    % A distributed particular solution avoids encoding a full stop as an
+    % artificial hundreds-of-m/s^2 pivot input in the cone offsets.
+    offset(free) = equality.'*((equality*equality.')\bound);
+    offset(pivot) = offset(pivot) ...
+        + pivotMatrix\(program.beq-program.Aeq*offset);
+    reduced = struct("f", map.'*program.f, ...
+        "A", program.A*map, "b", program.b-program.A*offset, ...
+        "lb", program.lb(independent)-offset(independent), ...
+        "ub", program.ub(independent)-offset(independent));
+    for variable = pivot(:).'
+        if isfinite(program.ub(variable))
+            reduced.A(end+1, :) = map(variable, :);
+            reduced.b(end+1) = program.ub(variable)-offset(variable);
+        end
+        if isfinite(program.lb(variable))
+            reduced.A(end+1, :) = -map(variable, :);
+            reduced.b(end+1) = offset(variable)-program.lb(variable);
+        end
+    end
+    reduced.cones = cell(size(program.cones));
+    for coneIdx = 1:numel(program.cones)
+        cone = program.cones{coneIdx};
+        reduced.cones{coneIdx} = secondordercone( ...
+            cone.A*map, cone.b-cone.A*offset, ...
+            map.'*cone.d, cone.gamma-cone.d.'*offset);
+    end
 end
 
 function solve = localNormalizeSolve(solve, decisionCount)
@@ -203,7 +319,7 @@ function result = localEmptyResult()
         "feasible", false, ...
         "iterations", 0, ...
         "solverCalls", 0, ...
-        "algorithm", "coneprog hard-CBF joint CLF/input", ...
+        "algorithm", "joint predictive SOCP", ...
         "message", "", ...
         "objectiveValue", inf, ...
         "clfValue", inf);

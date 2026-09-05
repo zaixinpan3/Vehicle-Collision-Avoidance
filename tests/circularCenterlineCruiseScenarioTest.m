@@ -12,14 +12,14 @@ classdef circularCenterlineCruiseScenarioTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function oneControlIntervalBeginsLeftArcTracking(testCase)
+        function twoControlIntervalsBeginLeftArcTracking(testCase)
             result = runCircularCenterlineCruiseScenario( ...
                 Duration=0.1, Radius=100.0, ...
                 Plot=false, Report=false);
 
             testCase.verifyEqual(result.scenario.targetCount, 0);
             testCase.verifyEqual(result.scenario.sampleTime, ...
-                0.1, AbsTol=0.0);
+                0.05, AbsTol=0.0);
             testCase.verifyEqual(result.scenario.geometry.type, ...
                 "circularArc");
             testCase.verifyEqual(result.scenario.geometry.direction, ...

@@ -5,7 +5,7 @@ function result = runOncomingVehicleAvoidanceScenario(varargin)
 % opposite speeds. The target has a small lateral offset that breaks the
 % left/right symmetry but is insufficient to prevent an uncontrolled
 % rectangle overlap. Perception, optimization, and actuation are updated at
-% the controller's 0.1 s sample time.
+% the configured controller sample time.
 
     options = localOptions(varargin{:});
     centerline = [ ...
@@ -161,9 +161,10 @@ end
 function result = localAvoidanceEvaluation(result, options)
     sampleTimeTolerance = 100.0 * eps(max( ...
         1.0, result.scenario.sampleTime));
-    if abs(result.scenario.sampleTime - 0.1) > sampleTimeTolerance
+    if abs(result.scenario.targetSampleTime ...
+            - result.scenario.sampleTime) > sampleTimeTolerance
         error("runOncomingVehicleAvoidanceScenario:invalidSampleTime", ...
-            "The perception and control sample time must be 0.1 s.");
+            "The target observation and control sample times must agree.");
     end
 
     traceTime = result.plantTrace.time;

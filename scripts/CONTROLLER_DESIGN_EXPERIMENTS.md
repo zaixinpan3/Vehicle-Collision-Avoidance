@@ -2,7 +2,7 @@
 
 `runControllerDesignExperiments` compares nominal cruise with range-triggered
 avoidance on a straight path and a circular arc. Both trials use the same
-hard-CBF/soft-CLF controller and the actual Vehicle Dynamics Blockset
+certificate-preserving predictive SOCP and the actual Vehicle Dynamics Blockset
 `PassVeh14DOF` plant. `controllerDesignExperimentConfig` owns the experiment
 parameters; it does not add a controller mode or a different control algorithm.
 
@@ -318,3 +318,244 @@ consistent route domains when a readmission anchor violates the model's speed
 domain. Retest full cruise before drawing conclusions about obstacle avoidance
 or recovery. The controller algorithm, solver tolerances, node collision
 criterion and physical constraints were not changed during this retest.
+
+## Repairs driven by the recorded plant failures
+
+The follow-up investigation replayed the saved failing calls before running
+the complete paired experiments again. It identified three separate issues:
+
+1. Terminal velocity equalities could miss the absolute acceptance threshold
+   despite a successful conic solver status. They are now eliminated by an
+   exact affine parameterization before the same single SOCP, along with
+   fixed terminal inputs. Reconstructed terminal velocities satisfy the
+   equalities to roundoff. The sole CLF slack is set to its analytic minimum
+   for the returned input vector; actuator and safety variables are unchanged.
+2. Restricting a prediction node to its anchor's 0.1 m polyline segment
+   obstructed station corrections and could give the stationary endpoint
+   disjoint domains. A chart now spans the configured station trust radius.
+   Explicit position and heading error bounds cover every intersecting
+   segment and tighten collision/road support. The last two resting nodes
+   share a chart. Independent clearance checks use the physical polyline pose.
+3. Repeated readmission on the Blockset plant shifted the initial braking
+   schedule toward zero even while the optimized vehicle kept cruising.
+   The first repair supplied shifted optimized states for a refreshed
+   schedule, starting at measured speed. The later schedule experiment below
+   replaces that refresh with the deterministic measured-speed template.
+   An exactly applicable certificate still shifts its original model
+   unchanged. The proposed continuation must pass all current checks before
+   it can authorize fallback.
+
+With these repairs alone, both nominal trials completed all 200 intervals.
+Both crossing trials passed initial cruise and target acquisition but stopped
+with `noSolution`: straight at 4.80 s after 96 intervals, arc at 4.85 s after
+97 intervals. Their smallest observed SAT gaps were respectively 14.738 m and
+14.298 m. These are incomplete avoidance runs, not successful avoidance.
+
+A straight-path replay isolated the later conflict to collision and axle
+friction constraints. Removing either family restored LP feasibility; removing
+road, route, lateral, heading or speed rows separately did not. The previous
+plan postponed braking until future acceleration reached approximately
+-7.552 m/s^2 at the axle limit. After one plant step, the refreshed prediction
+differed from the old shifted prediction by up to 0.0048 m/s in longitudinal
+speed and 0.0282 m in lateral position over the continuation. Its carried
+plan violated a collision row by 0.0060 m and a
+nondimensional friction row by 0.00138. The relevant old and new collision
+normals were both rear-facing, so changing that normal was not the cause.
+This diagnoses an absence of correction capacity at a boundary plan; it does
+not establish physical unavoidability or nonlinear-plant recursive safety.
+
+Adding integrated head-horizon state tracking to the objective was tested in
+an isolated candidate. It passed the controller unit tests but the actual
+straight crossing trial still stopped at 4.80 s. That objective change was
+not retained. The simulation and acceptance requirements were not weakened.
+
+A second candidate reserved 10% of each axle's load-dependent friction
+polygon at future stages, retaining the full physical polygon for the current
+input. With Euler integration it still failed: straight stopped at 4.75 s
+and arc at 4.85 s, with observed SAT gaps of 15.501 m and 14.352 m. Thus this
+reserve alone did not repair the high-fidelity closed loop.
+
+The straight reserve-only failure followed a command of -0.0366 rad steering
+and -4.1555 m/s^2 acceleration at 4.70 s. Its next measured lateral velocity
+and yaw rate were -0.05906 m/s and -0.07614 rad/s. Euler predicted -0.12850
+m/s and -0.11249 rad/s. Integrating that same scheduled affine model exactly
+under the held input predicted -0.07434 m/s and -0.08385 rad/s: the respective
+absolute errors decreased from 0.06944 to 0.01528 m/s and from 0.03635 to
+0.00771 rad/s. This is a local model comparison, not an exact nonlinear-plant
+model or a disturbance certificate.
+
+The implemented correction uses this block-exponential discretization at
+every head and continuation stage, including acceleration-bias propagation
+and the CLF Riccati design. Initial station schedules use the corresponding
+constant-acceleration integration. Fixed terminal controls and velocity
+equalities retain their common-model interpretation. Exact-model certificates
+shift the complete scheduled flow unchanged. A recorded-state replay through
+the reserve-only failure at 4.75 s then returned an accepted command of
+approximately 0.0019 rad and -6.7573 m/s^2. This replay is distinct from a
+completed closed-loop plant experiment.
+
+The complete held-input trials with a 10% future-force reserve nevertheless
+stopped at 4.80 s (straight) and 4.85 s (arc). Increasing the reserve to 30%
+moved those stops to 4.55 s and 4.70 s. Both variants completed nominal cruise,
+but neither completed avoidance. A reserve available to the current optimizer
+was consumed by its nominal performance choice; it did not correct the
+assumed commanded-to-motion relationship. The 30% variant also rejected the
+tight 30 m oncoming continuation regression. An LP sweep of that fixed
+initial convex domain was infeasible at fractions 0.50 through 0.75 and
+feasible at 0.80 through 1.00, in increments of 0.05. This is a domain
+diagnostic, not a proof of physical impossibility at smaller fractions.
+The future-force-reserve parameter was removed from the implementation.
+
+At the held-input straight failure, the command was -7.23115 m/s^2 while the
+next interval's measured body-speed change averaged -6.08489 m/s^2. The
+speed discrepancy was 0.05731 m/s and the shifted continuation's collision
+row violation was 0.09372 m. Across six recorded braking intervals from the
+failed variants, step-average response/command ratios ranged from 0.84148
+to 0.94068. These ratios include the complete plant response, not only an
+isolated brake actuator.
+
+The current experiment therefore sets `model.longitudinalInputGain = 0.80`.
+The controller's exact-model default is 1.0. The declared affine dynamics use
+`vxDot = gain*a + rBar*vy + bias`; the same gain enters the entire prediction,
+the cruise reference, CLF synthesis/cache and terminal bias cancellation.
+Actuator bounds and the full requested longitudinal-force envelope remain
+hard at every stage. Load transfer uses the effective model acceleration.
+This fixed modeling choice is motivated by the recorded response; it is not
+a proven lower bound on the nonlinear plant or a robust tube certificate.
+
+With gain 0.80 and the optimized-state schedule refresh, both nominal runs
+again completed 200 intervals. Avoidance still stopped at 4.80 s and 4.85 s,
+with minimum observed SAT gaps of 14.735 m and 14.309 m. At the straight
+failure, measured speed was only 0.0104 m/s below the previous prediction;
+the last requested acceleration was -0.1003 m/s^2. In contrast, refreshing
+the entire speed schedule from the optimized trajectory changed it by up to
+1.4399 m/s. The carried plan then violated collision and friction rows by
+0.02707 m and 0.01757 respectively. Both retaining the shifted schedule and
+using a new measured-speed cruise/brake template restored linear feasibility
+at that same measured state. Thus reducing the longitudinal-model discrepancy
+alone did not resolve the schedule-induced loss of the convex domain.
+
+The older oncoming and circular-target wrappers also contained a separate
+0.1 s guard, incompatible with the controller's current 0.05 s default.
+Their checks now require equality of observation and control sample periods.
+Their existing tests count the actual 0.05 s intervals. Collision, road,
+recovery and command acceptance thresholds are unchanged.
+
+The implemented readmission rule uses the same measured-speed cruise/brake
+template as initial admission. The shifted optimized inputs remain the one
+geometric proposal, but their unexecuted future speeds do not set the new
+model schedule. Exact certificate reuse continues to shift the stored model.
+Replaying the recorded gain-0.80 straight failure with this rule produces an
+accepted plan in one SOCP, with first input -0.014665 rad and -0.396463 m/s^2
+and maximum hard-row violation 2.87e-6 at the unchanged 1e-6 solver tolerance
+(the existing acceptance allowance is ten times that tolerance). A separate
+two-history regression verifies that differing old optimized futures do not
+change the readmission model for identical current observations. These checks
+establish the implementation behavior; full plant completion remains a
+separate experiment.
+
+### Numerical acceptance and the crossing preference
+
+The deterministic schedule repaired the captured linear infeasibility but
+did not yet complete the plant trials. With `coneprog` at the original
+1e-6 tolerances, avoidance still stopped at 4.80 s and 4.85 s (candidate V7).
+At the straight failure, the linear constraints were feasible and the solver
+reported success, but its returned vector violated a hard row by 2.0584e-5
+and independent node clearance by 2.0291e-5. Both exceed the unchanged 1e-5
+acceptance allowance. A tighter replay reduced these residuals; repeating the
+whole plant run with both `coneprog` tolerances at 1e-8 nevertheless failed
+at 4.80 s (straight) and 5.00 s (arc), with much longer solve times (V9).
+
+`crossingCruiseReference` now gives the controller an explicit preference to
+arrive after a target clears the nominal path corridor. The rule accounts
+for rectangle supports and the configured clearance, chooses the first node
+after the last forecast occupancy, and adds a 0.25 s performance time gap.
+It reduces the cruise reference only when the target exits within the
+forecast and the stopping station remains ahead. It performs no optimization
+and changes no hard constraint. Oncoming targets without a lateral exit keep
+the original cruise reference, leaving evasive steering available. This
+behavioral choice makes yielding explicit instead of expecting a local
+cruise objective to choose a useful crossing maneuver on a saturated boundary.
+
+The yielding reference alone, with the original `coneprog` backend, produced
+numerically rejected candidates at initial acquisition: 3.10 s and 3.15 s
+(V8). An exact conversion of the same reduced SOCP to SeDuMi's dual form
+improved numerical residuals and execution time. On the captured critical
+problem, SeDuMi took 0.5592 s and returned a maximum hard-row violation of
+2.23e-9. SeDuMi alone, without the yielding reference, still failed the full
+straight trial at 4.80 s and the arc at 5.15 s (V10). These comparisons
+support retaining both the explicit performance preference and the backend
+change. They do not establish that no other formulation could work.
+
+The selected candidate V11 combines the yielding reference with one SeDuMi
+call. Its relative internal precision is 1e-9; the experiment's public
+constraint and optimality tolerances remain 1e-6, and independent physical
+acceptance remains ten times the constraint tolerance. Fixed-input and
+terminal-equality elimination is algebraic. No alternate geometry, second
+solve or actuator clipping was added. A final sparse-assembly cleanup returned
+exactly the same decision on the recorded critical SOCP (infinity-norm
+difference zero).
+
+### Completed paired plant experiments
+
+All four V11 trials ran for 10 s and 200 control intervals using the physical
+setup and independent evaluator above. Each avoidance result is paired with
+its own target-free nominal run from the same frozen implementation. Both
+nominal counterfactuals first overlap the target rectangle at 5.80 s.
+No contact forces are simulated in those counterfactuals.
+
+| Measured result | Straight | 400 m left arc |
+| --- | ---: | ---: |
+| First target acquisition [s] | 3.10 | 3.15 |
+| Center range at acquisition [m] | 49.3417 | 49.5434 |
+| Minimum avoidance SAT gap [m] | 1.450004 | 1.790249 |
+| Minimum analytic outer-road margin [m] | 7.649988 | 7.542667 |
+| Maximum hard-row violation | 5.72e-9 | 9.98e-9 |
+| Maximum terminal velocity residual | 4.26e-14 | 2.49e-14 |
+| Final-second maximum speed error [m/s] | 0.015644 | 0.016217 |
+| Final-second maximum lateral error [m] | 0.00001123 | 0.013080 |
+| Final-second maximum heading error [rad] | 0.0000005635 | 0.001830 |
+| Maximum SOCP calls per sample | 1 | 1 |
+| Fallback commands | 0 | 0 |
+| Median controller time [s] | 0.207499 | 0.231205 |
+| Maximum controller time [s] | 0.952330 | 0.982513 |
+| All functional requirements | Pass | Pass |
+| Every call within 0.05 s | Fail | Fail |
+
+Both vehicles yield longitudinally, allow the target to cross, and recover
+cruise before the final assessment window. Recorded figures include the
+actual performance-speed reference alongside requested cruise and measured
+speed. All command/friction checks pass within the declared numerical
+tolerance. The maximum measured commanded friction utilizations are
+1.0000000059 and 1.0000000100; these are model-based command checks, not
+measured tire-force certificates.
+
+The experiments ran in MATLAB R2026a Update 3 on a Ryzen 7 7800X3D host, with
+concurrent offline processes. They are not isolated real-time benchmarks.
+The deadline requirement remains unmet, and the plant harness applies no
+latency penalty for controller computation. No collision, road, recovery,
+range, duration or actuator requirement was relaxed. The gain 0.80 remains
+an empirical model choice, not a nonlinear-plant error enclosure.
+
+### Final regression scope
+
+The final implementation passed 119/119 focused tests, including controller
+state/readmission, exact held-input flow, route-chart bounds, crossing
+reference behavior, configuration validation, geometry, road fitting and
+experiment evaluation. Static analysis reported zero findings across all
+24 changed MATLAB files. Declared-model solver-outage continuations also
+passed in the original and rotated frames with gain 0.80: minimum rectangle
+clearance 0.250000291 m against 0.25 m, and terminal velocity residuals
+2.77e-14 and 2.82e-14. These retain a tight oncoming steering case in addition
+to the plant crossing examples.
+
+A frozen full-suite run, based on estimator commit
+`d6741d2ab6b5fb7cd0d755dc61a34490cf1a836a` plus the controller repairs,
+reported 284 passes, six failures and two additional skips among 292 tests.
+All six failures are in `estimatedStateAvoidanceScenarioTest`, whose nonzero
+ego/model uncertainty is rejected by the declared exact-model certificate.
+A feedback tube and robust terminal contract remain necessary for that
+integration. The two skipped curb tests require an absent historical recorded
+dataset. Their assumptions were not bypassed. The final full suite is not
+green; the paired truth-sensing plant experiments and the focused controller
+checks have the narrower successful scope stated here.
