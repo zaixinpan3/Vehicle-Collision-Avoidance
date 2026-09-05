@@ -35,6 +35,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     if nargin < 4, cfg = []; end
     if nargin < 3, laneCenterline = []; end
     if nargin < 2, targetEstimate = []; end
+    runtimeClock = tic;
     cfg = localControllerConfiguration(cfg);
     [ego, lane, road, targets] = readPlanningInputs( ...
         egoState, targetEstimate, laneCenterline, cfg);
@@ -51,6 +52,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     model.episodeIdentity = localEpisodeIdentity(model);
     compatible = localCertificateCompatible(controllerState, model.episodeIdentity, model);
     related = localCertificateRelated(controllerState, model);
+    runtimePreparation = toc(runtimeClock);
     schedule = [];
     geometry = [];
     if related
@@ -67,6 +69,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     end
     prediction = ltvBicyclePrediction(model, schedule);
     prediction.scheduleShifted = compatible;
+    runtimePrediction = toc(runtimeClock);
     if related
         inputs = reshape(controllerState.plan, 2, []);
         inputs = [inputs(:, 2:end), [0.0; -model.longitudinalAccelerationBias/cfg.model.longitudinalInputGain]];
@@ -93,7 +96,9 @@ function [command, predictedInput, planningProblem, certificate] = ...
         end
     end
 
+    runtimeFormulation = toc(runtimeClock);
     result = solveHardCbfClf(qp, cfg);
+    runtimeSolve = toc(runtimeClock);
     check = certifyAvoidancePlan(qp, prediction, model, result.decision);
     fallback = ~result.feasible || ~check.accepted;
     if fallback
@@ -130,6 +135,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     if ~explicitState
         previousCertificate = certificate;
     end
+    runtimeAcceptance = toc(runtimeClock);
     metadata = localPlanDiagnostics(qp, result, decision, model, prediction);
     metadata.planCertified = check.accepted;
     metadata.certificateSource = certificateSource;
@@ -152,6 +158,12 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.solverCallCount = result.solverCalls;
     metadata.nominalSource = source;
     metadata.acceptance = check;
+    metadata.runtime = struct("inputPreparationSeconds", runtimePreparation, ...
+        "predictionSeconds", runtimePrediction-runtimePreparation, ...
+        "formulationAndWitnessSeconds", runtimeFormulation-runtimePrediction, ...
+        "solveSeconds", runtimeSolve-runtimeFormulation, ...
+        "acceptanceAndCommitSeconds", runtimeAcceptance-runtimeSolve, ...
+        "diagnosticsSeconds", toc(runtimeClock)-runtimeAcceptance);
     planningProblem = struct("problemClass", qp.problemClass, "qp", qp, ...
         "layout", qp.layout, "prediction", prediction, "nominalInput", anchorPlan, ...
         "nominalSource", source, "decision", decision, "inputPlan", predictedInput, ...

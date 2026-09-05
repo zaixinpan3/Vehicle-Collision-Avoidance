@@ -559,3 +559,33 @@ integration. The two skipped curb tests require an absent historical recorded
 dataset. Their assumptions were not bypassed. The final full suite is not
 green; the paired truth-sensing plant experiments and the focused controller
 checks have the narrower successful scope stated here.
+
+## Sparse native solver and runtime optimization (2026-09-05)
+
+The subsequent runtime change keeps the selected physical controller and
+experiment contract. It introduces explicit future-state variables, sparse
+dynamic equalities and a native quadratic-conic solve, using the same local
+constraint coefficients for the native problem and independent condensed
+acceptance. It also batches geometry and friction assembly and caches native
+function handles. It does not shorten the horizon, add another solve, loosen
+hard constraints or substitute a prescribed braking-only backup.
+
+Both final 10 s avoidance runs and their nominal counterfactuals complete and
+pass the unchanged functional evaluator. Minimum sampled SAT gaps are
+1.450020 m (straight) and 1.790228 m (arc). Avoidance medians are
+37.336/38.693 ms, 95th percentiles 42.203/42.874 ms, and maxima
+119.561/75.958 ms. Five of 200 straight calls and one of 200 arc calls miss
+50 ms. First target acquisition is the largest avoidance call in each scene.
+The fresh process's initial nominal call takes 585.82 ms. No latency is
+introduced into the simulated plant by the harness, so the results still
+do not demonstrate real-time operation.
+
+Every call uses one SOCP and zero fallbacks. Almost-solved or numerical
+termination occurs in 187/200 straight and 194/200 arc avoidance calls; all
+returned input plans pass independent acceptance. Maximum hard-row and
+terminal residuals are 4.25e-11 and 5.57e-11. Exact optimality is not claimed.
+The combined broad regression results are 298 passes and six existing
+estimated-state uncertainty-domain failures among 304 tests. Full methods,
+negative condensed-solver findings, controlled recorded-input comparisons,
+native build instructions and limitations are documented in
+[CONTROLLER_RUNTIME.md](../controller/CONTROLLER_RUNTIME.md).

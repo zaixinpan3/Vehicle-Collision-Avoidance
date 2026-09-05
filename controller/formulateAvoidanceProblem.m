@@ -20,58 +20,86 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
         + prediction.egoStateOffset;
     geometry = avoidanceSafetyGeometry(model, prediction, nominalState, geometry);
     families = [geometry.collision; geometry.road];
-    matrix = zeros(0, count+1);
-    bound = zeros(0, 1);
-    rowFamily = strings(0, 1);
-    rowNode = zeros(0, 1);
+    [frictionMatrix, frictionOffset, frictionRows, frictionConstant] = ...
+        frictionCirclePolygonRows(prediction, model);
+    covered = arrayfun(@(family) nnz([family.nodes.covered]), families);
+    rowCount = 2*sum(covered)+8*prediction.nodeCount+numel(frictionOffset);
+    matrix = zeros(rowCount, count+1);
+    bound = zeros(rowCount, 1);
+    rowFamily = strings(rowCount, 1);
+    rowNode = zeros(rowCount, 1);
+    localRows = zeros(rowCount, 8);
+    localBound = zeros(rowCount, 1);
+    stateNode = zeros(rowCount, 1);
+    inputStage = zeros(rowCount, 1);
+    cursor = 0;
     for familyIdx = 1:numel(families)
-        for nodeIdx = 1:prediction.nodeCount
-            node = families(familyIdx).nodes(nodeIdx);
-            if ~node.covered
-                continue;
-            end
-            stateMap = prediction.egoStateMatrix(:, :, nodeIdx);
-            offset = prediction.egoStateOffset(:, nodeIdx);
-            signs = [1.0; -1.0];
-            node.marginMatrix = repmat(node.normal.'*stateMap(1:2, :), 2, 1) ...
-                - signs*node.headingCoefficient*stateMap(3, :);
-            node.marginOffset = repmat(node.normal.'*offset(1:2) ...
-                - node.supportValue-node.tightening, 2, 1) ...
-                - signs*node.headingCoefficient*(offset(3)-node.nominalHeading);
-            node.imposed = true;
-            families(familyIdx).nodes(nodeIdx) = node;
-            matrix = [matrix; -node.marginMatrix, zeros(2, 1)]; %#ok<AGROW>
-            bound = [bound; node.marginOffset]; %#ok<AGROW>
-            rowFamily = [rowFamily; repmat(families(familyIdx).name, 2, 1)]; %#ok<AGROW>
-            rowNode = [rowNode; repmat(nodeIdx, 2, 1)]; %#ok<AGROW>
-        end
+        nodes = families(familyIdx).nodes;
+        selected = find([nodes.covered]);
+        if isempty(selected), continue; end
+        normals = reshape([nodes(selected).normal], 2, []);
+        slope = [nodes(selected).headingCoefficient];
+        support = [nodes(selected).supportValue]+[nodes(selected).tightening];
+        heading = [nodes(selected).nominalHeading];
+        signs = [1.0; -1.0];
+        stateMap = prediction.egoStateMatrix(:, :, selected);
+        positionMap = pagemtimes(reshape(normals, 1, 2, []), stateMap(1:2, :, :));
+        headingMap = reshape(slope, 1, 1, []).*stateMap(3, :, :);
+        margins = [positionMap-headingMap; positionMap+headingMap];
+        offset = prediction.egoStateOffset(:, selected);
+        marginOffset = sum(normals.*offset(1:2, :), 1)-support ...
+            - signs.*slope.*(offset(3, :)-heading);
+        values = reshape(num2cell(margins, [1, 2]), 1, []);
+        [nodes(selected).marginMatrix] = values{:};
+        values = num2cell(marginOffset, 1);
+        [nodes(selected).marginOffset] = values{:};
+        [nodes(selected).imposed] = deal(true);
+        families(familyIdx).nodes = nodes;
+        range = cursor+(1:2*numel(selected));
+        matrix(range, 1:count) = -reshape(permute(margins, [1, 3, 2]), [], count);
+        bound(range) = marginOffset(:);
+        rowFamily(range) = families(familyIdx).name;
+        rowNode(range) = repelem(selected(:), 2);
+        localRows(range, 1:2) = repelem(-normals.', 2, 1);
+        localRows(range, 3) = reshape(signs.*slope, [], 1);
+        localBound(range) = reshape(-support+signs.*slope.*heading, [], 1);
+        stateNode(range) = repelem(selected(:)-1, 2);
+        cursor = cursor+numel(range);
     end
     geometry.collision = families(1);
     geometry.road = families(2:end);
-    for nodeIdx = 1:prediction.nodeCount
-        frame = geometry.frames(nodeIdx);
-        stateMap = prediction.egoStateMatrix(:, :, nodeIdx);
-        offset = prediction.egoStateOffset(:, nodeIdx);
-        radii = prediction.egoStateErrorBound(:, nodeIdx);
-        lower = [frame.stationLower; -cfg.model.lateralDomainRadius; ...
-            -cfg.model.headingDomainRadius; 0.0]+radii(1:4);
-        upper = [frame.stationUpper; cfg.model.lateralDomainRadius; ...
-            cfg.model.headingDomainRadius; cfg.model.speedMaximum]-radii(1:4);
-        scale = [1.0; cfg.model.lateralDomainRadius; ...
-            cfg.model.headingDomainRadius; cfg.model.speedMaximum];
-        rows = stateMap(1:4, :)./scale;
-        matrix = [matrix; rows, zeros(4, 1); -rows, zeros(4, 1)]; %#ok<AGROW>
-        bound = [bound; (upper-offset(1:4))./scale; ...
-            (offset(1:4)-lower)./scale]; %#ok<AGROW>
-        rowFamily = [rowFamily; repmat(["routeDomain"; "lateralDomain"; ...
-            "headingDomain"; "speedDomain"], 2, 1)]; %#ok<AGROW>
-        rowNode = [rowNode; repmat(nodeIdx, 8, 1)]; %#ok<AGROW>
-    end
-    [frictionMatrix, frictionOffset] = frictionCirclePolygonRows(prediction, model);
-    matrix = [matrix; frictionMatrix, zeros(size(frictionMatrix, 1), 1)];
-    bound = [bound; -frictionOffset];
-    rowFamily = [rowFamily; repmat("friction", numel(frictionOffset), 1)];
-    rowNode = [rowNode; zeros(numel(frictionOffset), 1)];
+    scale = [1.0; cfg.model.lateralDomainRadius; ...
+        cfg.model.headingDomainRadius; cfg.model.speedMaximum];
+    nodeCount = prediction.nodeCount;
+    lower = [[geometry.frames.stationLower]; ...
+        repmat([-cfg.model.lateralDomainRadius; -cfg.model.headingDomainRadius; 0.0], 1, nodeCount)] ...
+        + prediction.egoStateErrorBound(1:4, :);
+    upper = [[geometry.frames.stationUpper]; ...
+        repmat([cfg.model.lateralDomainRadius; cfg.model.headingDomainRadius; cfg.model.speedMaximum], 1, nodeCount)] ...
+        - prediction.egoStateErrorBound(1:4, :);
+    maps = prediction.egoStateMatrix(1:4, :, :)./scale;
+    maps = [maps; -maps];
+    offset = prediction.egoStateOffset(1:4, :);
+    limits = [(upper-offset)./scale; (offset-lower)./scale];
+    range = cursor+(1:8*nodeCount);
+    matrix(range, 1:count) = reshape(permute(maps, [1, 3, 2]), [], count);
+    bound(range) = limits(:);
+    rowFamily(range) = repmat(["routeDomain"; "lateralDomain"; ...
+        "headingDomain"; "speedDomain"], 2*nodeCount, 1);
+    rowNode(range) = repelem((1:nodeCount).', 8);
+    localRows(range, 1:4) = repmat([diag(1.0./scale); -diag(1.0./scale)], nodeCount, 1);
+    limits = [upper./scale; -lower./scale];
+    localBound(range) = limits(:);
+    stateNode(range) = repelem((0:nodeCount-1).', 8);
+    cursor = cursor+numel(range);
+    range = cursor+1:rowCount;
+    matrix(range, 1:count) = frictionMatrix;
+    bound(range) = -frictionOffset;
+    rowFamily(range) = "friction";
+    localRows(range, :) = reshape(permute(frictionRows, [1, 3, 2]), [], 8);
+    localBound(range) = -frictionConstant(:);
+    stateNode(range) = repelem((0:prediction.stageCount-1).', size(frictionRows, 1));
+    inputStage(range) = stateNode(range)+1;
 
     % Exact rest in the three velocity states. The terminal policy cancels
     % the declared constant longitudinal bias; its steering is zero.
@@ -105,6 +133,8 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
         "terminalInput", terminalInput, "certifiedInfeasible", ...
             any(~isfinite(bound)) || any(lowerBound > upperBound) ...
             || any(terminalInput < lowerInput) || any(terminalInput > upperInput));
+    qp.stageProgram = avoidanceStageSocp(qp, prediction, ...
+        localRows, localBound, stateNode, inputStage);
 end
 
 function equilibrium = localCruiseEquilibriumProfile(model, prediction)

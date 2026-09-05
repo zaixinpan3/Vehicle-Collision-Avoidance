@@ -5,6 +5,30 @@ function frame = laneFrameCertificate(lane, station, radius, lateralRadius)
 % over the admitted rectangle occur at its four corners. Heading variation
 % is constant per segment. These bounds include both sides of every vertex.
 
+    persistent nativeFrames
+    if isempty(nativeFrames) && exist("laneFrameBoundsMex", "file") == 3
+        nativeFrames = @laneFrameBoundsMex;
+    end
+    if ~isempty(nativeFrames)
+        values = nativeFrames(station, radius, lateralRadius, lane.segmentStart, ...
+            lane.segmentLength, lane.segmentStation, lane.tangent);
+        frame = struct("origin", num2cell(values(1:2, :), 1), ...
+            "tangent", num2cell(values(3:4, :), 1), ...
+            "lateral", num2cell([-values(4, :); values(3, :)], 1), ...
+            "heading", num2cell(values(5, :)), "segmentIndex", num2cell(values(6, :)), ...
+            "stationLower", num2cell(values(7, :)), "stationUpper", num2cell(values(8, :)), ...
+            "positionErrorBound", num2cell(values(9:10, :), 1), ...
+            "headingErrorBound", num2cell(values(11, :)));
+        frame = frame(:);
+    else
+        frame = repmat(localFrame(lane, station(1), radius, lateralRadius), numel(station), 1);
+        for nodeIdx = 2:numel(station)
+            frame(nodeIdx) = localFrame(lane, station(nodeIdx), radius, lateralRadius);
+        end
+    end
+end
+
+function frame = localFrame(lane, station, radius, lateralRadius)
     segment = find(lane.segmentStation <= station, 1, "last");
     if isempty(segment)
         segment = 1;
@@ -17,22 +41,19 @@ function frame = laneFrameCertificate(lane, station, radius, lateralRadius)
     heading = atan2(tangent(2), tangent(1));
     active = find(lane.segmentStation <= upper ...
         & lane.segmentStation+lane.segmentLength >= lower);
-    positionError = zeros(2, 1);
-    headingError = 0.0;
-    for idx = active(:).'
-        localTangent = lane.tangent(idx, :).';
-        localLateral = [-localTangent(2); localTangent(1)];
-        endpoints = [max(lower, lane.segmentStation(idx)), ...
-            min(upper, lane.segmentStation(idx)+lane.segmentLength(idx))];
-        centreError = lane.segmentStart(idx, :).'-origin ...
-            + localTangent*(endpoints-lane.segmentStation(idx)) ...
-            - tangent*endpoints;
-        lateralError = (localLateral-lateral)*lateralRadius;
-        positionError = max(positionError, ...
-            max(abs([centreError+lateralError, centreError-lateralError]), [], 2));
-        difference = atan2(localTangent(2), localTangent(1))-heading;
-        headingError = max(headingError, abs(atan2(sin(difference), cos(difference))));
-    end
+    localTangent = lane.tangent(active, :).';
+    localLateral = [-localTangent(2, :); localTangent(1, :)];
+    starts = lane.segmentStation(active).';
+    low = max(lower, starts);
+    high = min(upper, starts+lane.segmentLength(active).');
+    originError = lane.segmentStart(active, :).'-origin;
+    lowError = originError+localTangent.*(low-starts)-tangent*low;
+    highError = originError+localTangent.*(high-starts)-tangent*high;
+    lateralError = (localLateral-lateral)*lateralRadius;
+    positionError = max(abs([lowError+lateralError, lowError-lateralError, ...
+        highError+lateralError, highError-lateralError, zeros(2, 1)]), [], 2);
+    difference = atan2(localTangent(2, :), localTangent(1, :))-heading;
+    headingError = max([0.0, abs(atan2(sin(difference), cos(difference)))]);
     frame = struct("origin", origin, "tangent", tangent, "lateral", lateral, ...
         "heading", heading, "segmentIndex", segment, ...
         "stationLower", lower, "stationUpper", upper, ...

@@ -1,4 +1,4 @@
-function [matrix, offset] = frictionCirclePolygonRows(prediction, model)
+function [matrix, offset, stageRows, stageOffset] = frictionCirclePolygonRows(prediction, model)
 % frictionCirclePolygonRows Ge-2022 front/rear friction-circle maps.
 %
 % At every MPC stage this function adds TWO independent inscribed-polygon
@@ -45,98 +45,52 @@ function [matrix, offset] = frictionCirclePolygonRows(prediction, model)
     parameters = axleFrictionParameters(cfg);
     edgeCount = parameters.edgeCount;
     rowsPerStage = 2 * edgeCount + 4;
-    matrix = zeros(rowsPerStage * horizonSteps, controlCount);
-    offset = zeros(rowsPerStage * horizonSteps, 1);
-
-    mass = parameters.mass;
-    lf = cfg.vehicle.lf;
-    lr = cfg.vehicle.lr;
-    corneringFront = parameters.corneringStiffness(1);
-    corneringRear = parameters.corneringStiffness(2);
-    vBar = prediction.scheduleSpeed;
-    if ~isnumeric(vBar) || ~isreal(vBar) || ~isscalar(vBar) ...
-            || ~isfinite(vBar) || vBar <= 0.0
-        error("collisionAvoidanceController:invalidFormulation", ...
-            "prediction.scheduleSpeed must be a positive scalar.");
-    end
-
-    for stageIdx = 1:horizonSteps
-        vBar = max(prediction.scheduleSpeedProfile(stageIdx), ...
-            cfg.model.scheduleSpeedFloor);
-        steeringRow = zeros(1, controlCount);
-        steeringRow(inputDimension * (stageIdx - 1) + 1) = 1.0;
-        accelerationRow = zeros(1, controlCount);
-        accelerationRow(inputDimension * (stageIdx - 1) + 2) = 1.0;
-        stateMatrix = prediction.egoStateMatrix(:, :, stageIdx);
-        stateOffset = prediction.egoStateOffset(:, stageIdx);
-
-        % Paper Eq. (8): tire sideslip (not lateral-force sign convention).
-        alphaFrontRow = (stateMatrix(5, :) ...
-            + lf * stateMatrix(6, :)) / vBar - steeringRow;
-        alphaFrontOffset = ...
-            (stateOffset(5) + lf * stateOffset(6)) / vBar;
-        alphaRearRow = (stateMatrix(5, :) ...
-            - lr * stateMatrix(6, :)) / vBar;
-        alphaRearOffset = ...
-            (stateOffset(5) - lr * stateOffset(6)) / vBar;
-        lateralForceRow = [ ...
-            -corneringFront * alphaFrontRow; ...
-            -corneringRear * alphaRearRow];
-        lateralForceOffset = [ ...
-            -corneringFront * alphaFrontOffset; ...
-            -corneringRear * alphaRearOffset];
-
-        rowIdx = rowsPerStage * (stageIdx - 1);
-        for axleIdx = 1:2
-            staticCapacity = ...
-                parameters.staticFrictionForceMaximum(axleIdx);
-            normalLoadSlope = ...
-                parameters.normalLoadAccelerationSlope(axleIdx) ...
-                * cfg.model.longitudinalInputGain;
-            mu = parameters.frictionCoefficient(axleIdx);
-            for edgeIdx = 1:edgeCount
-                normal = parameters.edgeNormal(edgeIdx, :);
-                if normal(1) >= 0.0
-                    distribution = ...
-                        parameters.driveDistribution(axleIdx);
-                else
-                    distribution = ...
-                        parameters.brakeDistribution(axleIdx);
-                end
-                longitudinalForceRow = ...
-                    distribution * mass * accelerationRow;
-                % Move the load-dependent polygon radius to the left:
-                % n'F - tau*mu*(Fz0 + dFz/da*a) <= 0.
-                rowIdx = rowIdx + 1;
-                matrix(rowIdx, :) = ( ...
-                    normal(1) * longitudinalForceRow ...
-                    + normal(2) * lateralForceRow(axleIdx, :) ...
-                    - parameters.inscribedFraction * mu ...
-                        * normalLoadSlope * accelerationRow) ...
-                    / staticCapacity;
-                offset(rowIdx) = ( ...
-                    normal(2) * lateralForceOffset(axleIdx) ...
-                    - parameters.inscribedFraction * staticCapacity) ...
-                    / staticCapacity;
-            end
+    % Local coefficients use [s,d,ePsi,vx,vy,r,deltaF,a]. The same
+    % coefficients form the condensed acceptance rows and the sparse SOCP,
+    % avoiding a separate physical-constraint implementation in the solver.
+    stageRows = zeros(rowsPerStage, 8, horizonSteps);
+    stageOffset = zeros(rowsPerStage, horizonSteps);
+    speed = max(prediction.scheduleSpeedProfile(1:horizonSteps), ...
+        cfg.model.scheduleSpeedFloor);
+    inverseSpeed = reshape(1.0./speed, 1, 1, []);
+    normal = parameters.edgeNormal;
+    for axleIdx = 1:2
+        capacity = parameters.staticFrictionForceMaximum(axleIdx);
+        cornering = parameters.corneringStiffness(axleIdx);
+        lever = cfg.vehicle.lf;
+        steering = 1.0;
+        if axleIdx == 2
+            lever = -cfg.vehicle.lr;
+            steering = 0.0;
         end
-
-        slipLimit = parameters.validitySlipAngleMaximum;
-        rowIdx = rowIdx + 1;
-        matrix(rowIdx, :) = alphaFrontRow / slipLimit(1);
-        offset(rowIdx) = ...
-            (alphaFrontOffset - slipLimit(1)) / slipLimit(1);
-        rowIdx = rowIdx + 1;
-        matrix(rowIdx, :) = -alphaFrontRow / slipLimit(1);
-        offset(rowIdx) = ...
-            (-alphaFrontOffset - slipLimit(1)) / slipLimit(1);
-        rowIdx = rowIdx + 1;
-        matrix(rowIdx, :) = alphaRearRow / slipLimit(2);
-        offset(rowIdx) = ...
-            (alphaRearOffset - slipLimit(2)) / slipLimit(2);
-        rowIdx = rowIdx + 1;
-        matrix(rowIdx, :) = -alphaRearRow / slipLimit(2);
-        offset(rowIdx) = ...
-            (-alphaRearOffset - slipLimit(2)) / slipLimit(2);
+        distribution = parameters.brakeDistribution(axleIdx)*ones(edgeCount, 1);
+        distribution(normal(:, 1) >= 0.0) = parameters.driveDistribution(axleIdx);
+        range = (axleIdx-1)*edgeCount+(1:edgeCount);
+        lateral = -normal(:, 2)*cornering/capacity;
+        stageRows(range, 5, :) = lateral.*inverseSpeed;
+        stageRows(range, 6, :) = lateral*lever.*inverseSpeed;
+        stageRows(range, 7, :) = -lateral*steering.*ones(1, 1, horizonSteps);
+        stageRows(range, 8, :) = ((normal(:, 1).*distribution*parameters.mass ...
+            - parameters.inscribedFraction*parameters.frictionCoefficient(axleIdx) ...
+                * parameters.normalLoadAccelerationSlope(axleIdx) ...
+                * cfg.model.longitudinalInputGain)/capacity).*ones(1, 1, horizonSteps);
+        stageOffset(range, :) = -parameters.inscribedFraction;
+        range = 2*edgeCount+2*(axleIdx-1)+(1:2);
+        signs = [1.0; -1.0]/parameters.validitySlipAngleMaximum(axleIdx);
+        stageRows(range, 5, :) = signs.*inverseSpeed;
+        stageRows(range, 6, :) = signs*lever.*inverseSpeed;
+        stageRows(range, 7, :) = -signs*steering.*ones(1, 1, horizonSteps);
+        stageOffset(range, :) = -1.0;
     end
+    mapped = pagemtimes(stageRows(:, 1:6, :), ...
+        prediction.egoStateMatrix(:, :, 1:horizonSteps));
+    for stageIdx = 1:horizonSteps
+        inputRange = inputDimension*(stageIdx-1)+(1:inputDimension);
+        mapped(:, inputRange, stageIdx) = mapped(:, inputRange, stageIdx) ...
+            + stageRows(:, 7:8, stageIdx);
+    end
+    matrix = reshape(permute(mapped, [1, 3, 2]), [], controlCount);
+    mappedOffset = pagemtimes(stageRows(:, 1:6, :), ...
+        reshape(prediction.egoStateOffset(:, 1:horizonSteps), 6, 1, []));
+    offset = reshape(reshape(mappedOffset, rowsPerStage, [])+stageOffset, [], 1);
 end

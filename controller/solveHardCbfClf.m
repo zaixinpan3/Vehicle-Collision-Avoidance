@@ -13,8 +13,9 @@ function result = solveHardCbfClf(problem, cfg)
 %   min  J_input(plan) + w delta
 %
 % subject to those hard rows and the exact quadratic CLF condition. The
-% input quadratic is represented by its exact squared-norm epigraph. The
-% CLF relaxation has only the configured linear penalty.
+% native backend retains the quadratic input cost directly and uses explicit
+% stage states with sparse dynamics. The public fault-injection hook retains
+% its equivalent condensed epigraph interface. The slack penalty is linear.
 
     layout = problem.layout;
     result = localEmptyResult();
@@ -24,8 +25,7 @@ function result = solveHardCbfClf(problem, cfg)
             + "are infeasible";
         return;
     end
-    program = localJointProgram(problem);
-    jointSolve = localRunJointProgram(program, cfg);
+    jointSolve = localRunJointProgram(problem, cfg);
     result.solverCalls = 1;
     if ~jointSolve.feasible
         result.exitFlag = jointSolve.exitFlag;
@@ -134,13 +134,17 @@ function cone = localExactClfCone(problem)
     cone = secondordercone(matrix, centre, bound, gamma);
 end
 
-function solve = localRunJointProgram(program, cfg)
+function solve = localRunJointProgram(problem, cfg)
     hook = cfg.solver.jointFunction;
-    program.defaultSolver = @() localDefaultSolve(program, cfg);
     try
         if isempty(hook)
-            solve = localDefaultSolve(program, cfg);
+            solve = localDefaultSolve(problem, cfg);
         else
+            % Retain the public solver-hook format for fault injection and
+            % independent backend comparisons. The online path does not
+            % construct this condensed objective epigraph.
+            program = localJointProgram(problem);
+            program.defaultSolver = @() localDefaultSolve(problem, cfg);
             solve = hook("joint", program);
         end
     catch exception
@@ -148,122 +152,52 @@ function solve = localRunJointProgram(program, cfg)
         solve.exitFlag = -999;
         solve.output = struct("message", string(exception.message));
     end
-    solve = localNormalizeSolve(solve, numel(program.f));
+    solve = localNormalizeSolve(solve, problem.layout.decisionCount+1);
 end
 
-function solve = localDefaultSolve(program, cfg)
-    if isempty(which("sedumi"))
-        solverRoot = fullfile(fileparts(fileparts(mfilename("fullpath"))), ...
-            "solver", "sedumi");
-        if ~isfolder(solverRoot)
-            error("collisionAvoidanceController:missingSocpSolver", ...
-                "The predictive SOCP requires SeDuMi in %s.", solverRoot);
+function solve = localDefaultSolve(problem, cfg)
+    persistent nativeSolver
+    if isempty(nativeSolver)
+        if exist("solveAvoidanceSocpMex", "file") ~= 3
+            solverPath = fullfile(fileparts(fileparts(mfilename("fullpath"))), ...
+                "solver", "clarabel", "matlab");
+            if isfolder(solverPath)
+                addpath(solverPath);
+            end
+            if exist("solveAvoidanceSocpMex", "file") ~= 3
+                error("collisionAvoidanceController:missingSocpSolver", ...
+                    "Build the native solver once using scripts/buildAvoidanceSocpSolver.m.");
+            end
         end
-        addpath(genpath(solverRoot));
+        nativeSolver = @solveAvoidanceSocpMex;
     end
-    % Eliminate fixed inputs and terminal rest before the single conic call.
-    % The physical decision is the dual variable y in SeDuMi's convention:
-    % max -f'*y subject to c-A'*y in a product of nonnegative/SOC cones.
-    % This conversion preserves the objective and every feasible input.
-    [reduced, map, offset] = localEliminateEqualities(program);
-    identity = speye(numel(reduced.f));
-    upper = find(isfinite(reduced.ub));
-    lower = find(isfinite(reduced.lb));
-    blocks = cell(numel(reduced.cones)+1, 1);
-    constants = cell(size(blocks));
-    blocks{1} = [sparse(reduced.A); identity(upper, :); -identity(lower, :)];
-    constants{1} = [reduced.b; reduced.ub(upper); -reduced.lb(lower)];
-    cones = struct("l", size(blocks{1}, 1), ...
-        "q", zeros(1, numel(reduced.cones)));
-    for coneIdx = 1:numel(reduced.cones)
-        cone = reduced.cones{coneIdx};
-        blocks{coneIdx+1} = [-sparse(cone.d.'); -sparse(cone.A)];
-        constants{coneIdx+1} = [-cone.gamma; -cone.b];
-        cones.q(coneIdx) = size(cone.A, 1)+1;
+    program = problem.stageProgram;
+    [stageDecision, output] = nativeSolver( ...
+        program.P, program.q, program.A, program.b, program.cones, ...
+        [min(1.0e-9, cfg.solver.constraintTolerance), ...
+            min(1.0e-9, cfg.solver.optimalityTolerance), cfg.solver.maxIterations]);
+    flag = -7;
+    switch output.status
+        case 1
+            flag = 1;
+        case 4
+            flag = 2;
+        case {2, 5}
+            flag = -2;
+        case {3, 6}
+            flag = -3;
+        case {7, 8}
+            flag = 0;
     end
-    % SeDuMi uses relative residuals. Request high internal precision and
-    % retain the independent absolute acceptance checks in physical units.
-    options = struct("fid", 0, "eps", min([1.0e-9, ...
-        cfg.solver.constraintTolerance, cfg.solver.optimalityTolerance]), ...
-        "maxiter", cfg.solver.maxIterations);
-    [~, reducedDecision, information] = sedumi( ...
-        vertcat(blocks{:}).', -reduced.f, vertcat(constants{:}), cones, options);
-    exitFlag = 1;
-    if information.dinf
-        exitFlag = -2;
-    elseif information.pinf
-        exitFlag = -3;
-    elseif information.numerr
-        exitFlag = -7;
-    end
-    decision = zeros(0, 1);
-    if numel(reducedDecision) == numel(reduced.f)
-        decision = map*reducedDecision+offset;
-    end
-    output = struct("iterations", information.iter, ...
-        "algorithm", "SeDuMi joint predictive SOCP", ...
-        "message", "SeDuMi numerr="+string(information.numerr) ...
-            +", pinf="+string(information.pinf)+", dinf="+string(information.dinf));
-    solve = struct("decision", decision, ...
-        "exitFlag", exitFlag, "output", output);
-    solve = localNormalizeSolve(solve, numel(program.f));
-end
-
-function [reduced, map, offset] = localEliminateEqualities(program)
-    count = numel(program.f);
-    fixed = find(program.lb == program.ub);
-    free = setdiff((1:count).', fixed);
-    offset = zeros(count, 1);
-    offset(fixed) = program.lb(fixed);
-    equality = program.Aeq(:, free);
-    bound = program.beq-program.Aeq*offset;
-    rowCount = size(equality, 1);
-    % Prefer late controls: eliminating the first acceleration would couple
-    % the first-step CLF to the sum of every future acceleration. Keep that
-    % short performance cone sparse, and use rank-revealing QR on a small
-    % suffix of the controls that influence the endpoint.
-    active = find(any(equality ~= 0.0, 1));
-    selected = active(max(1, end-2*rowCount+1):end);
-    if rank(equality(:, selected)) < rowCount
-        selected = active;
-    end
-    [~, triangular, permutation] = qr(equality(:, selected), "vector");
-    if rank(triangular) ~= rowCount
-        error("collisionAvoidanceController:invalidProblem", ...
-            "The terminal velocity equalities must have full row rank.");
-    end
-    pivot = free(selected(permutation(1:rowCount)));
-    independent = setdiff(free, pivot);
-    map = sparse(independent, 1:numel(independent), 1.0, ...
-        count, numel(independent));
-    pivotMatrix = program.Aeq(:, pivot);
-    map(pivot, :) = -pivotMatrix\program.Aeq(:, independent);
-    % A distributed particular solution avoids encoding a full stop as an
-    % artificial hundreds-of-m/s^2 pivot input in the cone offsets.
-    offset(free) = equality.'*((equality*equality.')\bound);
-    offset(pivot) = offset(pivot) ...
-        + pivotMatrix\(program.beq-program.Aeq*offset);
-    reduced = struct("f", map.'*program.f, ...
-        "A", program.A*map, "b", program.b-program.A*offset, ...
-        "lb", program.lb(independent)-offset(independent), ...
-        "ub", program.ub(independent)-offset(independent));
-    for variable = pivot(:).'
-        if isfinite(program.ub(variable))
-            reduced.A(end+1, :) = map(variable, :);
-            reduced.b(end+1) = program.ub(variable)-offset(variable);
-        end
-        if isfinite(program.lb(variable))
-            reduced.A(end+1, :) = -map(variable, :);
-            reduced.b(end+1) = offset(variable)-program.lb(variable);
-        end
-    end
-    reduced.cones = cell(size(program.cones));
-    for coneIdx = 1:numel(program.cones)
-        cone = program.cones{coneIdx};
-        reduced.cones{coneIdx} = secondordercone( ...
-            cone.A*map, cone.b-cone.A*offset, ...
-            map.'*cone.d, cone.gamma-cone.d.'*offset);
-    end
+    physical = stageDecision(1:program.physicalDecisionCount);
+    plan = physical(problem.layout.planIndex);
+    inputValue = max(0.0, 0.5*plan.'*problem.Hessian( ...
+        problem.layout.planIndex, problem.layout.planIndex)*plan ...
+        + problem.linear(problem.layout.planIndex).'*plan+problem.constant);
+    output.algorithm = "Clarabel sparse predictive SOCP";
+    output.message = "Clarabel status "+string(output.status);
+    solve = struct("decision", [physical; inputValue], ...
+        "exitFlag", flag, "output", output);
 end
 
 function solve = localNormalizeSolve(solve, decisionCount)

@@ -17,19 +17,18 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
         "nodes", repmat(empty, count, 1));
     road = repmat(struct("name", "road", "id", "", ...
         "nodes", repmat(empty, count, 1)), numel(model.road.boundaries), 1);
-    frames = repmat(localFrame(model, state(1, 1)), count, 1);
+    candidates = laneFrameCertificate(model.lane, state(1, :), ...
+        model.cfg.controller.stationTrustRadius, model.cfg.model.lateralDomainRadius);
+    if prediction.scheduleSpeedProfile(end-1) == 0.0
+        % The final rest step has a single pose and must use one chart.
+        candidates(count-1) = candidates(count);
+    end
+    frames = candidates;
     replaced = 0;
     for nodeIdx = 1:count
         nominal = state(:, nodeIdx);
-        frame = localFrame(model, nominal(1));
-        if nodeIdx == count-1 && prediction.scheduleSpeedProfile(end-1) == 0.0
-            % The final zero-input step and terminal velocity equalities
-            % require both endpoint poses to coincide. Use one route chart
-            % even if an inadmissible readmission anchor drifts backwards
-            % across a polyline vertex at that step.
-            frame = localFrame(model, state(1, end));
-        end
-        targetNode = localTargetNode(model, prediction, nominal, frame, nodeIdx);
+        frame = candidates(nodeIdx);
+        targetNode = localTargetNode(empty, model, prediction, nominal, frame, nodeIdx);
         roadNodes = repmat(empty, numel(road), 1);
         admitted = nominal(1) >= frame.stationLower ...
             && nominal(1) <= frame.stationUpper;
@@ -40,7 +39,7 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
             boundary = model.road.boundaries(boundaryIdx);
             road(boundaryIdx).id = boundary.boundaryId;
             roadNodes(boundaryIdx) = localRoadNode( ...
-                model, prediction, nominal, frame, nodeIdx, boundary);
+                empty, model, prediction, nominal, frame, nodeIdx, boundary);
             admitted = admitted && (~roadNodes(boundaryIdx).covered ...
                 || roadNodes(boundaryIdx).nominalMargin >= 0.0);
             if ~isempty(carried) && carried.road(boundaryIdx).nodes(nodeIdx).covered
@@ -67,13 +66,7 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
         "road", road, "reanchoredCount", replaced);
 end
 
-function frame = localFrame(model, station)
-    frame = laneFrameCertificate(model.lane, station, ...
-        model.cfg.controller.stationTrustRadius, model.cfg.model.lateralDomainRadius);
-end
-
-function node = localTargetNode(model, prediction, state, frame, nodeIdx)
-    node = localEmptyNode(prediction.planCount);
+function node = localTargetNode(node, model, prediction, state, frame, nodeIdx)
     if ~model.hasTarget
         return;
     end
@@ -119,11 +112,10 @@ function node = localTargetNode(model, prediction, state, frame, nodeIdx)
     node.terminalStationUpper = frame.stationUpper;
 end
 
-function node = localRoadNode(model, prediction, state, frame, nodeIdx, boundary)
+function node = localRoadNode(node, model, prediction, state, frame, nodeIdx, boundary)
 % Bound the complete quadratic graph over the rectangle's admitted range.
 % Its maximum is attained at an endpoint or the quadratic stationary point.
 % This replaces sampled/interpolated road offsets with a sound halfspace.
-    node = localEmptyNode(prediction.planCount);
     cfg = model.cfg;
     longitudinal = boundary.longitudinalDirection;
     coefficients = longitudinal.'*[frame.tangent, frame.lateral];
@@ -152,9 +144,9 @@ function node = localRoadNode(model, prediction, state, frame, nodeIdx, boundary
         stationary = -polynomial(2)/(2.0*polynomial(1));
         samples = [samples, min(max(stationary, range(1)), range(2))];
     end
-    graphSupport = max(polyval(polynomial, samples));
+    graphSupport = max((polynomial(1)*samples+polynomial(2)).*samples+polynomial(3));
     normal = boundary.safeSideSign*boundary.lateralDirection;
-    maxSlope = max(abs(polyval(polyder(boundary.coefficients), range)));
+    maxSlope = max(abs(2.0*boundary.coefficients(1)*range+boundary.coefficients(2)));
     tightening = (cfg.collision.clearanceMargin ...
         + boundary.normalDistanceErrorBound)*hypot(1.0, maxSlope);
     node = localSupportNode(node, model, prediction, state, frame, ...

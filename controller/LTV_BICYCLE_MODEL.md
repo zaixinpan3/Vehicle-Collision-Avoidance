@@ -46,8 +46,12 @@ profile, consistent with constant acceleration within a sample. Curvature is
 sampled from the supplied route.
 
 All `M=N+Nb` stages have two control variables. `ltvBicyclePrediction`
-condenses them into `x_j = F_j*plan + f_j`, including all lateral dynamics
-through rest. Reference and resting commands divide their required model
+provides the stage matrices and the condensed map `x_j = F_j*plan + f_j`,
+including all lateral dynamics through rest. The native SOCP uses explicit
+states with sparse dynamic equalities; acceptance independently reconstructs
+states from the condensed map. Identical adjacent scheduling parameters reuse
+exactly the same stage matrices; no speed or curvature quantization is used.
+Reference and resting commands divide their required model
 acceleration by `gamma`; the gain also enters the cruise Riccati design. A compatible certificate shifts the complete speed, station
 and curvature schedules verbatim and appends zero speed. Thus an old
 continuation stage and the executable stage it becomes have identical

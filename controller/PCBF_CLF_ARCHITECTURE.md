@@ -102,19 +102,24 @@ There is no safety slack. The first-step CLF is represented exactly as
  \qquad q=V(e_0)-W(e_0)+\delta,\quad R^\top R=P.
 \]
 
-The quadratic objective also has an exact squared-norm epigraph. No
+The native solver retains the quadratic input objective directly. No
 horizon-wide difference of two decision-dependent quadratic CLF values is
 constrained. The reported later CLF values are diagnostics. A soft CLF and
 finite penalty do not establish convergence or a recovery deadline.
 
-Before the solve, fixed terminal inputs and the three terminal velocity
-equalities are eliminated with an affine parameterization `z = Z*y + z0`.
-Rank-revealing QR selects independent late controls, preserving the sparse
-dependence of the first-step CLF on the first input. A distributed particular
-solution avoids representing a full stop as one artificial, very large
-acceleration in the cone offsets. All original inequalities, bounds and cones
-are transformed exactly; this is linear algebra, not another optimization.
-Reconstructed terminal equalities hold to floating-point roundoff.
+The numerical decision also includes `x_1,...,x_M`. Sparse equality rows
+impose `x_(j+1) = A_j*x_j+B_j*u_j+c_j`, terminal rest and the fixed final
+input. Each geometric, physical and model-domain row touches only its own
+state and input. Eliminating those states gives exactly the condensed
+problem above; introducing them does not change its admissible trajectories.
+`avoidanceStageSocp` constructs this sparse lift. The condensed maps remain
+available for an independent acceptance calculation from the input vector.
+The returned solver states are never trusted instead of that reconstruction.
+
+The default solve has one seven-dimensional Lorentz cone for the five-state
+first-step CLF. It avoids both state condensation inside the conic solver and
+the large input-cost epigraph cone. The existing fault-injection hook retains
+its equivalent condensed two-cone interface. No second optimization is used.
 
 ## Crossing-traffic performance reference
 
@@ -255,15 +260,22 @@ motion bounds or a sampled-data certificate.
 
 ## Acceptance and fallback
 
-`solveHardCbfClf` calls SeDuMi once. The reduced physical decision is its dual
-variable, with affine inequality slacks in the nonnegative cone and the exact
-CLF/objective epigraphs in Lorentz cones. This is an exact conic representation
-of the selected convex problem. SeDuMi is loaded from `solver/sedumi` when it
-is not already on the MATLAB path; that external dependency is not vendored
-by the controller change. Optimization Toolbox supplies `secondordercone`.
-The requested SeDuMi relative precision is the minimum of 1e-9 and the two
-configured solver tolerances; physical acceptance remains a separate absolute
-check. There is no retry with another solver or another geometric start.
+`solveHardCbfClf` calls the native Clarabel backend once. Its primal decision
+contains inputs, CLF slack and explicit future states; equality slacks lie in
+a zero cone, inequality slacks in a nonnegative cone, and the exact first-step
+CLF in one Lorentz cone. This is an equivalent convex quadratic conic problem.
+The feasibility and optimality targets are each the minimum of 1e-9 and their
+respective configured tolerance. Physical acceptance remains a separate
+absolute check. There is no retry with another solver or geometric start.
+
+Run `addpath('scripts'); buildAvoidanceSocpSolver()` once before experiments.
+The validated Linux recipe builds the pinned Apache-2.0 Clarabel C API and
+three small MEX bridges under `solver/clarabel/matlab`, using the committed
+Cargo lockfile. No download, compilation or additional optimization occurs
+within a sample. QDLDL uses one solver thread. MATLAB path projection and
+frame-bound implementations remain available when their optional MEX files
+are absent. The SOCP backend itself is required. See
+[CONTROLLER_RUNTIME.md](CONTROLLER_RUNTIME.md) for build and timing details.
 
 For its returned input plan, the sole
 performance slack is reconstructed as `max(0, V(e1)-V(e0)+W(e0))`, its analytic
@@ -325,7 +337,22 @@ fixed problem is not a recursive-control theorem. Leeman et al.'s
 illustrates that disturbance handling needs a feedback/error-containment
 construction. Those references do not independently certify this implementation.
 
-## Experiment-driven validation
+## Runtime optimization validation
+
+The sparse native implementation completes both 10 s crossing experiments
+and their own nominal counterfactuals with all functional criteria passing.
+Avoidance median times are 37.336/38.693 ms, with 95th percentiles
+42.203/42.874 ms. Five straight and one arc call exceed 50 ms, with maxima
+119.561/75.958 ms. The strict real-time requirement is still unmet. The
+maximum hard-row violation is 4.25e-11, with one SOCP and no fallback at each
+sample. Most native terminations are almost-solved or numerical; their
+accepted plans do not establish exact optimality. The broad regression and
+affected-estimator rerun yield 298 passes and six existing uncertainty-domain
+failures among 304 tests. See [CONTROLLER_RUNTIME.md](CONTROLLER_RUNTIME.md)
+for the equivalent transcription, benchmark method, build recipe, residual
+comparisons, startup/acquisition limits and complete numerical status scope.
+
+## Experiment-driven validation before runtime optimization (commit 856be7c)
 
 The repaired implementation passes 119 focused tests and has zero Code
 Analyzer findings across its 24 changed MATLAB files. A frozen full-suite run
