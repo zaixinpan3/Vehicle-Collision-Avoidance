@@ -30,7 +30,7 @@ function [matrix, offset] = frictionCirclePolygonRows(prediction, model)
 % and alphaR.  All rows are nondimensional and HARD.
 
     cfg = model.cfg;
-    horizonSteps = model.horizonSteps;
+    horizonSteps = prediction.stageCount;
     inputDimension = model.inputDimension;
     if inputDimension ~= 2
         error("collisionAvoidanceController:invalidFormulation", ...
@@ -59,6 +59,8 @@ function [matrix, offset] = frictionCirclePolygonRows(prediction, model)
     end
 
     for stageIdx = 1:horizonSteps
+        vBar = max(prediction.scheduleSpeedProfile(stageIdx), ...
+            cfg.model.scheduleSpeedFloor);
         steeringRow = zeros(1, controlCount);
         steeringRow(inputDimension * (stageIdx - 1) + 1) = 1.0;
         accelerationRow = zeros(1, controlCount);

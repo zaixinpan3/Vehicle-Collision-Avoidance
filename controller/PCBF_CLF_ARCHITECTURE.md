@@ -1,279 +1,286 @@
-# Recursively executable hard-CBF--soft-CLF controller
+# Certificate-preserving predictive SOCP
 
-**Implemented:** 2026-09-04
+This is the implemented controller contract as of 2026-09-05. The online
+controller uses one performance objective, a maintained safe continuation,
+and at most one SOCP call per sample. It does not optimize over alternative
+geometric starts. It is a conservative predictive controller on a selected
+convex domain, not an exact convex reformulation of unrestricted trajectory
+optimization or a pointwise CBF theorem.
 
-This document is the executable contract for the single algorithm in
-`collisionAvoidanceController`. The controller does not optimize a safety
-violation value. Collision and road control-barrier constraints are hard;
-only the control-Lyapunov condition may be relaxed.
+## Controller state and admission
 
-**Collision convention (2026-09-04):** collision freedom is defined at the
-discrete prediction steps. A plan whose rectangle-separation constraints hold
-at all head and braking-tail nodes is collision-free under this convention.
-Both newly optimized plans and stored fallbacks use this same node criterion.
+Use the explicit state interface for independent controller instances:
 
-## 1. Hard predictive safety problem
-
-For the augmented ego--target state, let the free head contain `N` stages
-and the braking backup contain `N_b` stages. At every covered head and tail
-node, the sufficient oriented-rectangle separation margins and road margins
-must satisfy
-
-```text
-g_collision,i(u) >= 0,
-g_road,i(u)      >= 0.
+```matlab
+certificate = [];
+[command, headInputs, problem, certificate] = ...
+    collisionAvoidanceController(ego, target, road, cfg, certificate);
 ```
 
-Input-magnitude, tire, model-domain, braking-tail, and terminal constraints
-are hard as well. The decision is `z = [plan; delta]`, with exactly one
-scalar CLF relaxation. Collision and road constraints have no slack.
+The certificate contains the complete input sequence, predicted states,
+scheduled model, node frames and supporting geometry, target continuation,
+configuration/environment identity, committed actuator vector, and acceptance
+residuals. The four-input interface stores the same state persistently for
+existing scenario drivers. `resetNominalTrajectory` clears that convenience
+interface and does not change an explicitly supplied certificate.
 
-Here “strict safety” means that the non-relaxed inequalities include the
-configured positive clearance. A numerical program cannot impose the open
-condition `g > 0`; it imposes the closed condition `g >= 0` after clearance
-tightening.
+Initial admission constructs one domain from the schedule reference and
+attempts one SOCP. This reference is not certified in advance. The augmented
+state enters the certified domain only after a feasible plan passes acceptance.
+An infeasible initial problem issues no command. Admission is not a complete
+maneuver planner, and a safe state can lie outside the selected domain.
 
-The predictive hard-safe set is
+An applicable certificate supplies its shifted schedule and inputs, followed
+by the terminal policy. The formulation checks this witness before solving.
+Geometry may change only when the replacement admits that witness; otherwise
+the carried geometry is retained. A failed preservation check is an explicit
+`invalidStoredCertificate` error, not permission to execute an unchecked plan.
 
-```text
-C_H = { z : a hard-feasible head, backup tail, and terminal witness exist }.
+## One model and one optimization
+
+Let `N` be the performance horizon, `Nb` the additional continuation length,
+and `M = N + Nb`. All `M` stages use the same scheduled Frenet bicycle:
+
+\[
+ x_{j+1}=A_jx_j+B_ju_j+c_j,\qquad
+ x=[s,d,e_\psi,v_x,v_y,r]^\top,\quad u=[\delta_f,a]^\top.
+\]
+
+Every stage has both steering and acceleration decision variables. There is
+no dynamic-to-kinematic handoff. `brakingSchedule` only supplies an initial
+speed schedule and derives `Nb` from maximum speed and the configured
+braking rate, with two rest stages. The optimizer can steer and accelerate
+throughout the continuation subject to the same physical limits as the head.
+The configured braking rate does not replace those physical rows.
+
+The condensed map is `x_j = F_j plan + f_j`. The decision is
+`z = [plan; delta]`, with one nonnegative scalar relaxation:
+
+\[
+ \begin{aligned}
+ \min_{\mathrm{plan},\delta\ge0}\quad&
+ J_{\mathrm{input}}(\mathrm{plan})+\rho\delta,\\
+ \text{s.t.}\quad& \text{hard actuator, axle-friction, slip and domain rows},\\
+ &\underline g_{\ell j}(\mathrm{plan};c_t)\ge0,\\
+ &(v_x,v_y,r)_{M}=(0,0,0),\\
+ &V(e_1)-V(e_0)+W(e_0)\le\delta.
+ \end{aligned}
+\]
+
+The input cost measures deviation from the cruise equilibrium over the head.
+A small positive input quadratic in the continuation removes degeneracy.
+There is no safety slack. The first-step CLF is represented exactly as
+
+\[
+ \left\|\begin{bmatrix}2Re_1\\q-1\end{bmatrix}\right\|_2\le q+1,
+ \qquad q=V(e_0)-W(e_0)+\delta,\quad R^\top R=P.
+\]
+
+The quadratic objective also has an exact squared-norm epigraph. No
+horizon-wide difference of two decision-dependent quadratic CLF values is
+constrained. The reported later CLF values are diagnostics. A soft CLF and
+finite penalty do not establish convergence or a recovery deadline.
+
+## Sound node geometry
+
+`avoidanceSafetyGeometry` constructs physical Cartesian halfspaces. A node's
+Frenet-to-Cartesian map is affine on its selected polyline segment:
+
+\[
+ p=o+T s+N d,\qquad \psi=\theta+e_\psi.
+\]
+
+Hard station bounds keep the solution on that segment and within
+`controller.stationTrustRadius` of its geometry anchor. Hard lateral and
+heading bounds apply at all nodes, including measured, first-future and
+continuation nodes. The segment guard prevents a solution from crossing into
+another frame at an interior upper endpoint. This domain can be narrow on a
+finely segmented curved route; its restrictions are part of the controller,
+not an exact representation of all road-following motion.
+
+For a fixed unit inertial normal `n`, rectangle support at the anchor is
+maximized over the published yaw interval. An exact interval Lipschitz bound
+`L` gives
+
+\[
+ \underline g_j=n^\top(p_{E,j}-p_{T,j})
+ -\sigma_{T,j}-\bar\sigma_{E,j}-L|e_{\psi,j}-\bar e_{\psi,j}|-\epsilon_j.
+\]
+
+Both signs of the absolute value become hard affine rows. Position and yaw
+uncertainty are charged in their physical support directions. This replaces
+the previous unproved conversion of two Cartesian rectangles into Frenet
+rectangles plus a curvature sagitta allowance.
+
+For each supplied quadratic road graph, the implementation computes its
+maximum signed height over the whole admitted rectangle-parameter interval.
+The only extrema needed are interval endpoints and a quadratic stationary
+point. A supporting halfspace with ego rectangle support and fit/clearance
+charges is therefore sufficient for every point of the footprint. It does
+not interpolate a finite grid of boundary samples to assert safety.
+
+`perceptionLimited` boundaries may omit nodes whose entire admitted rectangle
+range is not covered. Diagnostics report which nodes carry rows. Consequently,
+road guarantees concern the represented, covered boundaries only; unknown
+road geometry is not certified. Strict partial coverage raises an error.
+
+## Rest and complete target continuation
+
+The schedule reaches zero speed, while tire denominators use the positive
+regularization floor. At zero schedule speed,
+
+\[
+ x_R=[s_R,d_R,e_{\psi,R},0,0,0]^\top,
+ \qquad \pi_R=[0,-b]^\top
+\]
+
+is a fixed point of the same scheduled bicycle; `b` is the declared constant
+longitudinal bias. The last input is fixed to this policy and checked against
+actuator and axle constraints. The policy, zero-speed schedule and resting
+frame can be appended indefinitely. Rest remains valid at nonzero lateral
+offset and heading error within the admitted geometry domain.
+
+For targets, the last node has a hard halfspace separating the resting ego
+from the target's complete future center-trajectory support. A target
+circumradius covers every future yaw; the resting ego retains its directional
+rectangle support. `targetPredictionFutureSupport` supplies the nominal
+complete-future support. Constant position uncertainty is added directionally.
+A direction with persistent velocity or acceleration uncertainty is treated
+conservatively as having infinite future support and cannot certify rest.
+This can reject cases where nominal motion would dominate the uncertainty.
+A finite error radius at the rest time is never substituted for future support.
+
+The halfspace is sufficient, not necessary. A safe resting point inside the
+convex hull of a target's complete orbit can remain outside this certificate
+class. More optimization starts would not repair that restriction.
+
+## Uncertainty and sampling contract
+
+The implemented persistent certificate is an exact-model trajectory
+certificate. Nonzero ego estimation radii or model/disturbance rate bounds
+raise `unsupportedCertificateUncertainty`. A robust feedback tube with a
+robust terminal invariant set has not been implemented. The predictor itself
+now propagates all boxes through `r(j+1) = abs(A(j))*r(j) + Ts*w`; the former
+first-future-node-only update has been removed. Propagation alone does not
+supply terminal robustness, so it is not used to label such inputs certified.
+
+Static target uncertainty is admitted when the directional rows and complete
+future support remain feasible. State, actuator execution, target finite-node
+overlap, complete target support, route and model assumptions must agree with
+the carried certificate before its shift can be treated as applicable.
+A changed observation or environment requires admission again. When the
+track, route and controller configuration still identify the same operation,
+the old shifted inputs and schedule supply the single admission proposal;
+all geometric rows are rebuilt from the new environment. They can supply a
+fallback only after passing the complete current certificate checks. An
+unrelated track does not inherit that proposal. This preserves maneuver
+memory without claiming that an expired certificate still applies. Successful
+re-admission does not retroactively establish recursive feasibility across
+the change. The higher-fidelity plant is outside the exact-model proof.
+
+The public safety scope is `declaredModelPredictionNodes`; collision
+diagnostics state `predictionNodesOnly`. There is no intersample collision
+claim. The regression suite deliberately includes a fast between-node
+crossing that is admitted under this convention, and a collision at the next
+node that is rejected. Continuous-motion protection needs additional proven
+motion bounds or a sampled-data certificate.
+
+## Acceptance and fallback
+
+`solveHardCbfClf` calls `coneprog` once. `certifyAvoidancePlan` checks the exact
+returned vector for dimensions, finite real values, actuator bounds, all hard
+rows, rest equalities, the exact first-step CLF and Cartesian rectangle
+clearance at every node. The checked vector is stored and committed without
+clipping. The same checks apply to the carried witness.
+
+A finite iterate from iteration-limit or numerical termination may be used
+if it passes acceptance. Its solver exit flag remains visible; no optimum is
+claimed for that status. A positive exit flag alone cannot authorize an input.
+If no returned candidate passes, the already checked carried witness supplies
+the command without another optimization. If no such witness exists, the
+controller reports failure and issues no command.
+
+Acceptance uses the declared numerical tolerance (ten times solver constraint
+tolerance, with a roundoff floor for the CLF). Residuals are reported. These
+are numerical checks, not interval-arithmetic proofs of exact equalities or
+infinite-time invariance. In particular, a small nonzero terminal velocity
+residual must not be interpreted as an exact physical resting state.
+
+## Conditional recursive-feasibility argument
+
+In exact arithmetic, assume initial admission, sound represented geometry,
+exact execution of the declared scheduled model, unchanged applicable road
+coverage, shift-consistent target prediction with contained complete future
+support, and an admissible rest policy. Then:
+
+1. The current stored plan is a feasible witness. A geometric replacement is
+   adopted only if it admits the witness.
+2. Any accepted feasible plan satisfies the declared node constraints.
+3. After applying its first input, all overlapping state transitions use the
+   identical shifted matrices, affine terms and two-input sequence. No speed,
+   tire or heading constraint becomes stricter at a head/continuation boundary.
+4. Appending the resting model/policy preserves the endpoint and terminal
+   separation. The unbounded nonnegative CLF slack admits this continuation.
+5. The next convex problem therefore has a feasible witness. Solver failure
+   does not require another optimization to preserve the certificate.
+
+This is an induction on augmented controller state. It establishes neither
+optimality, maneuver completeness, global navigation, nonlinear-plant safety,
+nor continuous-time safety. A maintained local domain may brake or wait while
+another safe passing maneuver exists. An application requiring a particular
+passing side, liveness or recovery deadline must supply and validate that
+behavioral requirement; there is no hidden global planner in this controller.
+
+## Relation to literature
+
+Zhang, Liniger and Borrelli's [Optimization-Based Collision Avoidance](https://arxiv.org/abs/1711.03449)
+uses duality to obtain smooth nonlinear collision constraints. It does not
+make unrestricted trajectory optimization convex. Liu, Lin and Tomizuka's
+[Convex Feasible Set algorithm](https://arxiv.org/abs/1709.00627) motivates
+feasible inner approximations; convergence for repeated optimization of a
+fixed problem is not a recursive-control theorem. Leeman et al.'s
+[Predictive safety filter using system level synthesis](https://proceedings.mlr.press/v211/leeman23a.html)
+illustrates that disturbance handling needs a feedback/error-containment
+construction. Those references do not independently certify this implementation.
+
+## Validation recorded on 2026-09-05
+
+MATLAB R2026a Update 3, with Control System Toolbox and Optimization Toolbox:
+
+```matlab
+results = runtests({'tests/collisionAvoidanceControllerTest.m', ...
+    'tests/ltvBicyclePredictionTest.m', ...
+    'tests/collisionAvoidanceControllerConfigTest.m'});
+assertSuccess(results)
+addpath('scripts', 'controller', 'config');
+trial = runCertificateContinuationScenario();
 ```
 
-If no hard-feasible plan exists on the first call, the controller raises
-`collisionAvoidanceController:noSolution` and issues no command. No
-least-violation recovery plan is returned or stored.
+All 65 focused tests passed. They cover explicit state, exact-model shift
+through rest, re-admission after target changes, unsafe successful solver
+outputs, full-horizon error propagation, zero-speed curved-route equilibrium,
+node/inter-node distinction, and evasive steering with road constraints.
+Static Code Analyzer checks reported zero issues in the changed MATLAB files.
 
-`formulateAvoidanceProblem` builds this problem. Every sample uses the
-shifted-plan start (the schedule reference on the first call). Whenever the
-target imposes constraints, the obstacle-free cruise reference supplies a
-second start. Both solve the same hard-CBF/soft-CLF problem, and the candidate
-with the lowest joint objective is selected. Each start gets one solver call;
-a numerical failure proceeds to the stored-plan protocol below. There is no
-configuration switch that selects a different control algorithm.
+The deterministic continuation scenario uses `Ts = 0.05 s`, `N = 12`,
+`Nb = 74`, ego speed 15 m/s, an oncoming target at 30 m longitudinal and 1.5 m
+lateral offset moving at 5 m/s, 4.8-by-1.9 m rectangles, and road boundaries
+at lateral offsets +/-6 m. It solves once, then injects an empty solver
+result at every later attempt through three samples beyond terminal rest.
+Over 90 sampled states, minimum physical rectangle clearance was
+0.317602565 m for a 0.25 m requirement, minimum certified road margin was
+3.944734069 m, maximum lateral displacement was 0.7602 m, maximum shifted
+state discrepancy was 9.95e-14, and final velocity-state residual was
+9.40e-13. The rotated-frame regression also passed. These results demonstrate
+steering continuation on the declared discrete model, not continuous-motion
+or high-fidelity plant safety and not a runtime/deadline result.
 
-## 2. Joint CLF-relaxation and input objective
-
-The exact executed-step CLF condition is
-
-```text
-V(e_1) - V(e_0) + W(e_0) <= delta,    delta >= 0.
-```
-
-It is represented exactly as a rotated second-order cone. `solveHardCbfClf`
-performs one conic solve with the joint objective
-
-```text
-min  J_input(plan)
-     + relaxationWeight * delta.
-```
-
-Thus CLF relaxation and input intervention trade according to their declared
-weights, but neither can trade against collision or road safety because the
-CBF rows have no slack. The quadratic input cost is represented by an exact
-squared-norm epigraph; the CLF relaxation has no quadratic penalty.
-
-## 3. Terminal closure
-
-The head ends in the analytically certified lateral handoff set. The
-longitudinal backup tail must reach zero speed and zero final acceleration,
-and collision and road rows cover every tail node.
-
-At the resting node, the target predictor supplies the support of its
-complete future centre trajectory,
-
-```text
-sigma_H(n) = sup_{t >= H Ts} n' p_T(t|k).
-```
-
-For each direction on a fixed inertial grid, the terminal row separates the
-resting ego centre from `sigma_H(n)` by the two footprint circumradii,
-clearance, prediction budget, and lateral-tail envelope. The direction with
-the largest incumbent margin is imposed. The grid affects the size of the
-certified terminal set, not which target motions are permitted.
-
-`targetPredictionFutureSupport` evaluates this interface exactly for the
-current predictor. Stopped, finite-turning, unbounded-straight, and
-indefinitely turning continuations are analytic evaluation cases rather than
-target-motion assumptions. A replacement predictor must supply the same
-exact support operation for its own complete continuation.
-
-Two hard terminal rows keep the resting station on the lane-polyline segment
-whose affine Frenet-to-Cartesian map defines the inertial support row.
-
-The only target-motion premise is that the target follows the controller's
-complete, exact, shift-consistent prediction. A prediction for which the
-implemented resting policy has no separating witness makes the hard problem
-infeasible; that is a feasibility result, not a target-motion restriction.
-
-## 4. Shift and incumbent protocol
-
-A stored certificate contains the complete plan, predicted state sequence,
-target continuation, shifted LTV schedule, applied first input, and terminal
-lateral reference. Before reuse, the next measured ego state, held actuator
-when published, and fresh target prediction must match the stored one-step
-shift within `controller.shiftConsistencyTolerance`. Target identity,
-geometry, route branch, lane, and configuration must also remain unchanged.
-
-A newly solved hard-feasible plan is accepted directly from the certified
-optimization. It is not passed through a second gate for exact-prediction
-flags, route coordinates, hard CBF rows, terminal invariance, or exact rectangle
-distance at the nodes.
-
-If a later improvement solve fails numerically, the shifted incumbent is not
-accepted on faith. The controller rebuilds its hard CBF rows at that
-trajectory, supplies the exact CLF relaxation required by the fixed plan,
-and verifies every bound and hard row. It then repeats exact rectangle checks
-at the prediction nodes. A shift satisfying these node checks and the existing
-prediction, route, and terminal conditions may provide the fallback action.
-
-## 5. Geometry and discrete collision criterion
-
-Each affine collision row is the sufficient support-function inner
-approximation generated at its linearization trajectory and is exact there.
-Consequently, a separate exact rectangle-distance calculation is not used to
-accept a newly optimized solution.
-
-For prediction node indices `k = 0, ..., N + N_b`, the collision criterion is
-
-```text
-dist(ego_rectangle_k, target_rectangle_k) >= required_clearance_k.
-```
-
-The required clearance includes the existing geometric and prediction
-tightenings and, on tail nodes, the terminal lateral envelope. The controller
-does not interpolate between nodes or evaluate midpoint or swept-volume
-collisions. A between-node crossing does not reject a plan whose node
-constraints hold. This applies to both ordinary optimization and the stored
-fallback recheck. The terminal continuation support remains the conservative
-admissibility condition described in Section 3.
-
-## 6. Guarantee and boundary
-
-Suppose the hard problem is feasible on the first call and the committed plan
-has `planCertified=true`. Assume the declared ego model and actuation are
-exact, target prediction is exact and shift-consistent, constraints shift
-with the horizon, and the terminal continuation support is exact. Then every
-subsequent call has the shifted certified plan as a feasible candidate. The
-controller either commits a new certified hard-feasible plan or executes the
-independently re-certified shift. Therefore the terminally closed feasible
-set is control invariant and collision separation is preserved at the
-enforced prediction nodes. No separate between-node claim is made.
-
-The CLF is a performance condition inside this hard-safe set. When zero
-relaxation is jointly optimal, the exact first transition achieves the
-declared Lyapunov decrease. During avoidance, positive CLF relaxation is
-permitted and jointly balanced against input intervention.
-
-Principal diagnostics are `cbfConstraintsHard`, `cbfMinimumMargin`,
-`hardCbfSatisfied`, `clfRelaxation`, `clfRelaxationCost`,
-`inputDeviationCost`, `jointObjectiveValue`, `clfExactResidual`,
-`terminalInvariantCertified`, `terminalContinuationAxis`,
-`terminalFutureSupport`, `terminalSupportDirection`,
-`terminalSegmentIndex`, `certificateSource`,
-`postSolveCertificationPerformed`, `scheduleShifted`,
-`targetContinuationShifted`, `fallbackUsed`, and `planCertified`.
-`collisionDiscretization` is `"predictionNodesOnly"`. The exact-node
-`nodeClearanceMargin` diagnostic is present on the exceptional stored fallback
-recheck. There is no swept-clearance diagnostic or subdivision configuration.
-
-## 7. Rectangle support and affine safety rows
-
-For unit direction `n = [cos(alpha); sin(alpha)]`, a rectangle with
-half-length `l`, half-width `w` and heading `psi` has support
-
-```text
-h(n, psi) = l |cos(alpha - psi)| + w |sin(alpha - psi)|.
-```
-
-The configuration obstacle of the ego centre is the Minkowski sum of the
-target rectangle and the centrally symmetric ego rectangle. Its support is
-the sum of the two footprint supports plus the projected target centre.
-`rectangleConfigurationDistance` forms the exact polygon, with at most eight
-vertices, and returns its signed distance and a supporting unit normal.
-For an outside point the normal faces the closest boundary point; for an
-inside point it is the outward normal of the least-penetrated edge.
-
-At each head node, maximize the footprint supports over their declared yaw
-uncertainty intervals. Let `b_k` bound the absolute derivative of ego support
-on the entire admitted heading interval. Then
-
-```text
-h_E(n_k, psi_k) <= h_E(n_k, nominalPsi_k)
-                  + b_k |psi_k - nominalPsi_k|.
-```
-
-The maximum support and derivative bounds are evaluated analytically at
-interval endpoints, trigonometric extrema and kinks. For both signs
-`sigma = +/-1`, impose
-
-```text
-g_k^sigma(plan) = n_k' p_k(plan)
-                 - sigma b_k (psi_k(plan) - nominalPsi_k)
-                 - n_k' p_T,k - h_T,k - h_E,k - tightening_k >= 0.
-```
-
-These rows lower-bound the true rectangle separation in the chosen
-coordinates over the declared heading domain. The uncertainty and geometric
-budgets enter `tightening_k`. At the nominal heading the extra Lipschitz term
-vanishes. Different starts supply different supporting directions; selecting
-between their feasible solutions preserves every hard constraint. This
-finite set of starts does not establish a global optimum of the original
-nonconvex collision-avoidance problem.
-
-Road boundaries use the corresponding inward normal and a bound on the
-boundary's lateral variation over reachable stations. Every covered road
-node remains hard. An initially violated constant row makes the candidate
-infeasible even when the current input cannot change that row.
-
-## 8. Braking witness and lateral handoff
-
-The free head contains `N` steering/acceleration pairs. Its tail has `N_b`
-independent accelerations and the affine longitudinal maps
-
-```text
-v_(k+1) = v_k + Ts a_k,
-s_(k+1) = s_k + Ts v_k + 0.5 Ts^2 a_k + Ts kappa_k vHat_k d_N.
-```
-
-Tail acceleration lies in `[-backupDeceleration, 0]`, speed stays nonnegative,
-and the last node has zero speed and zero final acceleration. `N_b` is derived
-from the maximum admitted speed, braking bound and sample time. A small tail
-quadratic regularization selects a witness while keeping the plan Hessian
-positive definite. The terminal steering law is used when a shifted plan
-extends its head into the backup; the dynamic-head/kinematic-tail handoff
-remains a declared modeling premise.
-
-In traveled arclength `s`, the lateral backup law has the linear dynamics
-
-```text
-DeltaD' = ePsi,
-ePsi'   = -omega^2 DeltaD - 2 omega ePsi.
-```
-
-From `[DeltaD(0); ePsi(0)] = [0; e0]`, its response is
-`DeltaD(s) = e0 s exp(-omega s)` and
-`ePsi(s) = e0 (1 - omega s) exp(-omega s)`. The shift-consistent lateral
-radius is `|e0|/(2 omega)`: the envelope about a later point of the response
-is contained in the original envelope. `terminalLateralCertificate` combines
-this bound with steering and lateral-acceleration limits. Handoff rows also
-bound lateral velocity and yaw-rate error; their course contributions and
-state uncertainty reduce the admitted heading error.
-
-Tail footprint support is maximized over the certified heading band, and
-the band's lateral drift is included in the separation budget. The resting
-node additionally carries the complete-future target support condition from
-Section 3. `terminal.supportDirectionCount` controls its fixed direction grid.
-These terminal rows are part of every candidate and every stored fallback.
-
-## 9. Module and configuration ownership
-
-`collisionAvoidanceController` owns the stateful shift, candidate comparison,
-commands and diagnostics. `formulateAvoidanceProblem` owns the hard affine
-rows, cruise objective and exact CLF data. `solveHardCbfClf` translates the
-quadratics into cones and invokes `coneprog`. Geometry, prediction and
-terminal-support calculations remain shared single-purpose modules.
-
-`collisionAvoidanceControllerConfig` defines and validates the numerical
-parameters. Its recursive merge rejects unknown fields. The solver hook
-`solver.jointFunction` permits controlled numerical-failure tests of the same
-conic problem; it does not select a different optimization formulation.
+A broader `runtests('tests')` working-tree snapshot produced 237 passes and
+10 failures among 247 tests (nine failures were also incomplete). The
+failures were scenario checks requiring 0.1 s while the existing default is
+0.05 s. The unchanged scenario guards and baseline configuration were
+compared with commit `d14bb9519967093d8dd8ed5510b5a421fc7bfa46` to identify that
+pre-existing mismatch. The snapshot preceded the final focused additions and
+concurrent estimator edits; it is not a full-suite result for those unrelated
+edits. Estimated-state integration also remains outside the exact-ego
+certificate domain, even if its scenario timing guards are repaired.

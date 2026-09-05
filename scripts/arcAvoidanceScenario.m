@@ -85,8 +85,8 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
     % node, and `closestRegion` identifies
     % which part of the target box the separating direction faces at
     % the plan's closest node (1 behind, 2 ahead, 3 left, 4 right, 5-8
-    % corners), `selectedCandidate` which linearization trajectory the
-    % committed plan came from.
+    % corners). The certificate source identifies optimization or
+    % execution of the carried continuation.
     results.collisionMargin = inf(stepCount, 1);
     results.collisionPlanMargin = inf(stepCount, 1);
     results.collisionActive = false(stepCount, 1);
@@ -95,11 +95,8 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
     results.closestNode = zeros(stepCount, 1);
     results.marginPredictedNext = inf(stepCount, 1);
     results.dualRegion = zeros(stepCount, 2);
-    results.candidateCount = zeros(stepCount, 1);
-    results.candidatesSolved = zeros(stepCount, 1);
-    results.selectedCandidate = strings(stepCount, 1);
-    % Prescribed starts and the selected hard-constrained plan.
-    results.probeCommitted = false(stepCount, 1);
+    results.certificateSource = strings(stepCount, 1);
+    results.carriedWitnessFeasible = false(stepCount, 1);
     % The terminal set (PCBF_CLF_ARCHITECTURE.md, "The terminal set"): the
     % least separation margin over the committed plan's braking tail,
     % the terminal heading error against its certified bound, the
@@ -213,11 +210,8 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
                     results.dualRegion(stepIdx, :) = ...
                         md.dualRegionProfile(1:2);
                 end
-                results.candidateCount(stepIdx) = md.candidateCount;
-                results.candidatesSolved(stepIdx) = md.candidatesSolved;
-                results.selectedCandidate(stepIdx) = md.selectedCandidate;
-                results.probeCommitted(stepIdx) = ...
-                    md.selectedCandidate == "cruiseProbe";
+                results.certificateSource(stepIdx) = md.certificateSource;
+                results.carriedWitnessFeasible(stepIdx) = md.carriedWitnessFeasible;
                 results.collisionTailMargin(stepIdx) = ...
                     md.collisionTailMargin;
                 results.terminalHeadingError(stepIdx) = ...
@@ -352,11 +346,9 @@ function localReport(results, sampleTime, cfg)
                 time(find(active, 1, 'last')));
         end
         fprintf('\n');
-        fprintf(['starts: two on %d samples; committed shifted plan %d / ' ...
-            'cruise probe %d\n'], ...
-            sum(results.candidateCount(visible) > 1), ...
-            sum(results.selectedCandidate(visible) == "shiftedPlan"), ...
-            sum(results.probeCommitted & visible));
+        fprintf('certificate: checked optimization %d / carried continuation %d\n', ...
+            sum(results.certificateSource(visible) == "checkedOptimization"), ...
+            sum(results.certificateSource(visible) == "shiftedStoredPlan"));
         % Which way the stage-1 separating direction faces at the
         % plan's closest node: the homotopy class the plan is in.
         % Reporting only - nothing in the controller branches on it.

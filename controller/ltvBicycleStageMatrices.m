@@ -3,7 +3,8 @@ function [stateMatrix, inputMatrix, affineVector] = ...
 % ltvBicycleStageMatrices Forward-Euler Frenet bicycle matrices at a schedule point.
 %
 % Closed-form linearization of the dynamic bicycle with linear
-% cornering, written in PATH COORDINATES along the lane centerline -
+% cornering regularized at a positive tire-speed floor, in path coordinates
+% along the lane centerline -
 % state [s; d; ePsi; vx; vy; r] with s the station, d the left-positive
 % lateral offset and ePsi the heading error to the path tangent - about
 % the schedule point (d = 0, ePsi = 0, vy = 0, vx = vBar, r = kappa*vBar)
@@ -18,14 +19,15 @@ function [stateMatrix, inputMatrix, affineVector] = ...
 %   vxdot   = a + vy r
 %   vydot   = (Fyf + Fyr)/m - vx r
 %   rdot    = (lf Fyf - lr Fyr)/Iz
-%   Fyf = Cf (deltaF - (vy + lf r)/vBar),   Fyr = -Cr (vy - lr r)/vBar
+%   Fyf = Cf (deltaF - (vy + lf r)/vTire), Fyr = -Cr (vy - lr r)/vTire
+%   vTire = max(vBar, cfg.model.scheduleSpeedFloor)
 %
 % Input [deltaF; a] (Ge et al. 2022). The curvature is treated as
 % locally constant at the schedule station of the stage (its variation
 % along the horizon is carried node by node by the schedule). The Euler
 % map IS the declared discrete model (design decision 2026-08-23); it is
-% conditionally stable - sampleTime times (Cf+Cr)/(m*vBar) and
-% (lf^2*Cf + lr^2*Cr)/(Iz*vBar) must stay below 2, an obligation the
+% conditionally stable - sampleTime times (Cf+Cr)/(m*vTire) and
+% (lf^2*Cf + lr^2*Cr)/(Iz*vTire) must stay below 2, an obligation the
 % sample time and the schedule speed floor carry together. This is the
 % single model source for the prediction and for the CLF Riccati
 % synthesis (at kappa = 0).
@@ -47,6 +49,9 @@ function [stateMatrix, inputMatrix, affineVector] = ...
     end
     corneringFront = corneringStiffness(1);
     corneringRear = corneringStiffness(2);
+    % At zero schedule speed the rest state is invariant. Only the tire
+    % denominator is regularized; kinematic transport uses vBar itself.
+    tireSpeed = max(vBar, cfg.model.scheduleSpeedFloor);
     rBar = kappa*vBar;
 
     continuousA = zeros(6, 6);
@@ -65,8 +70,8 @@ function [stateMatrix, inputMatrix, affineVector] = ...
     continuousA(4, 5) = rBar;
     continuousB(4, 2) = 1.0;
     % Lateral channel at the frozen speed.
-    yawStiffness = (lf*corneringFront-lr*corneringRear)/vBar;
-    lateralStiffness = (corneringFront+corneringRear)/vBar;
+    yawStiffness = (lf*corneringFront-lr*corneringRear)/tireSpeed;
+    lateralStiffness = (corneringFront+corneringRear)/tireSpeed;
     continuousA(5, 4) = -rBar;
     continuousA(5, 5) = -lateralStiffness/mass;
     continuousA(5, 6) = -(yawStiffness/mass+vBar);
@@ -74,7 +79,7 @@ function [stateMatrix, inputMatrix, affineVector] = ...
     continuousC(5) = rBar*vBar;
     continuousA(6, 5) = -yawStiffness/yawInertia;
     continuousA(6, 6) = -(lf^2*corneringFront ...
-        + lr^2*corneringRear)/(vBar*yawInertia);
+        + lr^2*corneringRear)/(tireSpeed*yawInertia);
     continuousB(6, 1) = lf*corneringFront/yawInertia;
 
     stateMatrix = eye(6)+sampleTime*continuousA;

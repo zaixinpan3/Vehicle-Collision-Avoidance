@@ -41,7 +41,8 @@ function result = solveHardCbfClf(problem, cfg)
     result.feasible = true;
     result.iterations = localIterationCount(jointSolve.output);
     result.algorithm = "coneprog hard-CBF joint CLF/input";
-    result.message = "hard CBF feasible; joint CLF/input optimum solved";
+    result.message = "candidate returned for independent acceptance: " ...
+        + jointSolve.message;
     result.objectiveValue = jointValue;
     result.clfValue = max( ...
         decision(layout.relaxationIndex(1)), 0.0);
@@ -86,8 +87,9 @@ function program = localJointProgram(problem)
     program.A = [problem.inequalityMatrix, ...
         zeros(size(problem.inequalityMatrix, 1), 1)];
     program.b = problem.inequalityBound;
-    program.Aeq = zeros(0, augmentedCount);
-    program.beq = zeros(0, 1);
+    program.Aeq = [problem.equalityMatrix, ...
+        zeros(size(problem.equalityMatrix, 1), 1)];
+    program.beq = problem.equalityBound;
     program.lb = [problem.lowerBound; 0.0];
     program.ub = [problem.upperBound; inf];
 
@@ -157,11 +159,18 @@ function solve = localNormalizeSolve(solve, decisionCount)
     if ~isfield(solve, "decision"), solve.decision = zeros(0, 1); end
     if ~isfield(solve, "exitFlag"), solve.exitFlag = -999; end
     if ~isfield(solve, "output"), solve.output = struct(); end
+    if ~isnumeric(solve.exitFlag) || ~isreal(solve.exitFlag) ...
+            || ~isscalar(solve.exitFlag) || ~isfinite(solve.exitFlag)
+        solve.exitFlag = -999;
+    end
     solve.exitFlag = double(solve.exitFlag);
-    solve.feasible = solve.exitFlag > 0 ...
+    % A feasible iterate can preserve safety after an iteration limit or
+    % numerical termination. The caller verifies the complete decision.
+    solve.feasible = any(solve.exitFlag == [1, 2, 0, -7]) ...
         && isnumeric(solve.decision) && isreal(solve.decision) ...
         && numel(solve.decision) == decisionCount ...
-        && all(isfinite(solve.decision));
+        && all(isfinite(solve.decision), "all");
+    solve.decision = solve.decision(:);
     solve.message = "solver exit flag "+string(solve.exitFlag);
     if isstruct(solve.output) && isfield(solve.output, "message")
         solve.message = solve.message+": "+string(solve.output.message);

@@ -1,25 +1,21 @@
-function [command, predictedInput, planningProblem] = ...
+function [command, predictedInput, planningProblem, certificate] = ...
         collisionAvoidanceController( ...
-        egoState, targetEstimate, laneCenterline, cfg)
-% collisionAvoidanceController Recursive hard-CBF, soft-CLF MPC.
+        egoState, targetEstimate, laneCenterline, cfg, controllerState)
+%collisionAvoidanceController Certificate-preserving predictive SOCP.
+% One SOCP minimizes cruise-input deviation and exact first-step CLF slack.
+% A complete steering/acceleration continuation and its geometric certificate
+% are controller state. Solver results are checked before use; failure uses
+% only a checked carried continuation. Safety covers declared prediction nodes.
 %
-% Every covered collision and road row is hard at every prediction node,
-% including the measured state and braking tail. One joint conic solve per
-% start minimizes input deviation and exact first-step CLF relaxation.
-% The starts are the shifted plan and, when target constraints are present,
-% the obstacle-free cruise reference. The least-cost feasible plan is used.
-% A solver failure may use a compatible stored plan only after rechecking
-% its shifted hard rows, node clearance, model assumptions and terminal set.
-% See PCBF_CLF_ARCHITECTURE.md for the algorithm and certificate assumptions.
-%
-% Inputs are ego state, target estimate, route and configuration overrides.
-% Outputs are the steering/acceleration command, input plan and diagnostics.
-% collisionAvoidanceController("resetNominalTrajectory") clears stored state.
+% Pass the fifth argument and retain the fourth output for explicit state:
+%   [command, plan, diagnostics, cNext] = ...
+%       collisionAvoidanceController(ego, target, road, cfg, c);
+% An empty c starts admission. With four inputs, a persistent compatibility
+% interface retains c; resetNominalTrajectory clears that interface.
 
     persistent previousCertificate
-    if nargin >= 1 && (ischar(egoState) ...
-            || (isstring(egoState) && isscalar(egoState)))
-        if nargin ~= 1 ...
+    if nargin == 1 && (ischar(egoState) || isstring(egoState))
+        if ~isscalar(string(egoState)) ...
                 || string(egoState) ~= "resetNominalTrajectory"
             error("collisionAvoidanceController:invalidAction", ...
                 "The only controller action is resetNominalTrajectory.");
@@ -28,79 +24,174 @@ function [command, predictedInput, planningProblem] = ...
         command = [];
         predictedInput = [];
         planningProblem = [];
+        certificate = [];
         return;
     end
-
-    if nargin < 4
-        cfg = [];
+    explicitState = nargin >= 5;
+    if ~explicitState
+        controllerState = previousCertificate;
+        previousCertificate = [];
     end
-    if nargin < 3
-        laneCenterline = [];
-    end
-    if nargin < 2
-        targetEstimate = [];
-    end
-
+    if nargin < 4, cfg = []; end
+    if nargin < 3, laneCenterline = []; end
+    if nargin < 2, targetEstimate = []; end
     cfg = localControllerConfiguration(cfg);
     [ego, lane, road, targets] = readPlanningInputs( ...
         egoState, targetEstimate, laneCenterline, cfg);
     model = localPredictionModel(ego, targets, lane, road, cfg);
+    if any(model.measuredEgoStateErrorBound ~= 0.0) ...
+            || any(cfg.model.ltvModelErrorRateBound ~= 0.0) ...
+            || any(cfg.model.plantModelResidualRateBound ~= 0.0)
+        error("collisionAvoidanceController:unsupportedCertificateUncertainty", ...
+            "This trajectory certificate requires exact ego/model prediction. " ...
+            + "Nonzero ego or disturbance bounds require a feedback-tube terminal certificate.");
+    end
     model.episodeIdentity = localEpisodeIdentity(model);
-    certificateCompatible = localCertificateCompatible( ...
-        previousCertificate, model.episodeIdentity, model);
-    storedSchedule = [];
-    previousPlan = [];
-    if certificateCompatible
-        model.targetHorizon = localShiftTargetHorizon( ...
-            previousCertificate.targetHorizon, model.targetHorizon);
-        model.targetPath = localTargetPath(model);
-        storedSchedule = localShiftSchedule( ...
-            previousCertificate.schedule, model);
-        if isempty(storedSchedule)
-            certificateCompatible = false;
-            previousCertificate = [];
-        else
-            previousPlan = previousCertificate.plan;
+    compatible = localCertificateCompatible(controllerState, model.episodeIdentity, model);
+    related = localCertificateRelated(controllerState, model);
+    schedule = [];
+    geometry = [];
+    if related
+        schedule = localShiftSchedule(controllerState.schedule);
+    end
+    if compatible
+        geometry = localShiftGeometry(controllerState.geometry);
+    end
+    prediction = ltvBicyclePrediction(model, schedule);
+    if related
+        inputs = reshape(controllerState.plan, 2, []);
+        inputs = [inputs(:, 2:end), [0.0; -model.longitudinalAccelerationBias]];
+        anchorPlan = inputs(:);
+        source = "shiftedCertifiedContinuation";
+        if ~compatible
+            source = "continuationReadmission";
         end
-    elseif ~isempty(previousCertificate)
-        previousCertificate = [];
+    else
+        anchorPlan = prediction.referencePlan;
+        source = "initialAdmission";
     end
-    prediction = ltvBicyclePrediction(model, storedSchedule);
-    [nominalInput, nominalSource] = localNominalInput( ...
-        previousPlan, prediction, model, previousCertificate);
-    buildPlanningProblem = nargout >= 3;
-    fallbackUsed = false;
-    try
-        [inputPlan, problem, plan] = localSolve( ...
-            model, prediction, nominalInput);
-    catch exception
-        if ~certificateCompatible
-            previousCertificate = [];
-            rethrow(exception);
+    qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry);
+    witnessValid = false;
+    witnessDecision = [];
+    if related
+        witnessDecision = localWitnessDecision(qp, anchorPlan);
+        witnessCheck = certifyAvoidancePlan(qp, prediction, model, witnessDecision);
+        witnessValid = witnessCheck.accepted;
+        if compatible && ~witnessValid
+            error("collisionAvoidanceController:invalidStoredCertificate", ...
+                "The carried continuation failed certificate preservation: %s.", ...
+                strjoin(witnessCheck.failedConditions, ", "));
         end
-        [inputPlan, problem, plan] = localStoredFallback( ...
-            nominalInput, prediction, exception, model);
-        fallbackUsed = true;
     end
-    if ~fallbackUsed
-        problem.metadata.planCertified = true;
-        problem.metadata.certificateSource = ...
-            "hardConstrainedOptimization";
-        problem.metadata.postSolveCertificationPerformed = false;
+
+    result = solveHardCbfClf(qp, cfg);
+    check = certifyAvoidancePlan(qp, prediction, model, result.decision);
+    fallback = ~result.feasible || ~check.accepted;
+    if fallback
+        if ~witnessValid
+            if result.exitFlag == -2 || qp.certifiedInfeasible
+                error("collisionAvoidanceController:noSolution", ...
+                    "Initial admission has no feasible certificate in the selected convex domain.");
+            end
+            error("collisionAvoidanceController:optimizationFailure", ...
+                "No accepted plan or applicable continuation: %s (%s).", ...
+                result.message, strjoin(check.failedConditions, ", "));
+        end
+        decision = witnessDecision;
+        check = witnessCheck;
+        certificateSource = "shiftedStoredPlan";
+        if ~compatible
+            certificateSource = "revalidatedContinuation";
+        end
+    else
+        decision = result.decision;
+        certificateSource = "checkedOptimization";
     end
-    previousCertificate = localStoredCertificate( ...
-        plan, prediction, model);
-    command = localCommand(inputPlan, model);
-    predictedInput = inputPlan;
-    planningProblem = [];
-    if buildPlanningProblem
-        problem.nominalSource = nominalSource;
-        problem.metadata.nominalSource = nominalSource;
-        problem.metadata.fallbackUsed = fallbackUsed;
-        problem.metadata.scheduleShifted = prediction.scheduleShifted;
-        problem.metadata.targetContinuationShifted = certificateCompatible;
-        planningProblem = problem;
+    % The vector checked above is the vector stored and sent. No clipping.
+    plan = decision(qp.layout.planIndex);
+    predictedInput = reshape(plan(qp.layout.inputIndex), 2, []);
+    command = localCommand(predictedInput, model, prediction);
+    predictedState = squeeze(pagemtimes(prediction.egoStateMatrix, plan)) ...
+        + prediction.egoStateOffset;
+    certificate = struct("version", 1, "plan", plan, ...
+        "schedule", prediction.scheduleForStore, "geometry", qp.geometry, ...
+        "targetHorizon", model.targetHorizon, "episodeIdentity", model.episodeIdentity, ...
+        "predictedState", predictedState, "appliedInput", command.actuatorInput, ...
+        "safetyScope", "declaredModelPredictionNodes", "acceptance", check);
+    if ~explicitState
+        previousCertificate = certificate;
     end
+    metadata = localPlanDiagnostics(qp, result, decision, model, prediction);
+    metadata.planCertified = check.accepted;
+    metadata.certificateSource = certificateSource;
+    metadata.postSolveCertificationPerformed = true;
+    metadata.exactPredictionAssumptionsHold = true;
+    metadata.nodeClearanceMargin = check.nodeClearanceMargin;
+    metadata.routeCoordinateValid = check.routeCoordinateValid;
+    metadata.certificateCompatible = compatible;
+    metadata.continuationReadmission = related && ~compatible;
+    metadata.carriedWitnessFeasible = witnessValid;
+    metadata.fallbackUsed = fallback;
+    metadata.scheduleShifted = prediction.scheduleShifted;
+    metadata.targetContinuationShifted = compatible;
+    metadata.geometryReanchoredCount = qp.geometry.reanchoredCount;
+    metadata.solverCallCount = result.solverCalls;
+    metadata.nominalSource = source;
+    metadata.acceptance = check;
+    planningProblem = struct("problemClass", qp.problemClass, "qp", qp, ...
+        "layout", qp.layout, "prediction", prediction, "nominalInput", anchorPlan, ...
+        "nominalSource", source, "decision", decision, "inputPlan", predictedInput, ...
+        "plan", plan, "tailPlan", reshape(plan(qp.layout.tailIndex), 2, []), ...
+        "metadata", metadata);
+end
+
+function related = localCertificateRelated(certificate, model)
+% Retain maneuver memory when an observation changes. The old plan is only
+% a proposal in this case: all geometry and acceptance checks are rebuilt
+% from the new environment. It supplies no unverified fallback authority.
+    related = isstruct(certificate) && isscalar(certificate) ...
+        && all(isfield(certificate, ["version", "episodeIdentity", ...
+            "plan", "schedule"])) && isequal(certificate.version, 1);
+    if ~related
+        return;
+    end
+    identity = certificate.episodeIdentity;
+    related = isstruct(identity) && isscalar(identity) ...
+        && all(isfield(identity, ["targetKey", "targetGeometry", ...
+            "lane", "configuration"])) ...
+        && isequaln(identity.targetKey, model.targetKey) ...
+        && isequaln(identity.targetGeometry, ...
+            [model.targetHalfLength; model.targetHalfWidth]) ...
+        && isequaln(identity.lane, model.lane) ...
+        && isequaln(identity.configuration, model.cfg) ...
+        && isnumeric(certificate.plan) && isreal(certificate.plan) ...
+        && numel(certificate.plan) == 2*(model.horizonSteps+model.tailSteps) ...
+        && all(isfinite(certificate.plan), "all");
+end
+
+function schedule = localShiftSchedule(previous)
+    schedule = previous;
+    schedule.station = [previous.station(2:end), previous.station(end)];
+    schedule.speedProfile = [previous.speedProfile(2:end), 0.0];
+    schedule.curvature = [previous.curvature(2:end), previous.curvature(end)];
+end
+
+function geometry = localShiftGeometry(previous)
+    geometry = previous;
+    geometry.frames = previous.frames([2:end, end]);
+    geometry.collision.nodes = previous.collision.nodes([2:end, end]);
+    for boundaryIdx = 1:numel(previous.road)
+        geometry.road(boundaryIdx).nodes = previous.road(boundaryIdx).nodes([2:end, end]);
+    end
+end
+
+function decision = localWitnessDecision(qp, plan)
+    clf = qp.clf;
+    errorNow = clf.errorOffset(:, 1);
+    errorNext = clf.errorMatrix(:, :, 2)*plan+clf.errorOffset(:, 2);
+    slack = errorNext.'*clf.lyapunovMatrix*errorNext ...
+        - errorNow.'*(clf.lyapunovMatrix-clf.decreaseMatrix)*errorNow;
+    decision = [plan; max(slack, 0.0)];
 end
 
 function identity = localEpisodeIdentity(model)
@@ -109,12 +200,16 @@ function identity = localEpisodeIdentity(model)
         "targetGeometry", [model.targetHalfLength; ...
             model.targetHalfWidth], ...
         "routeBranchId", string(model.road.routeBranchId), ...
-        "lane", model.lane, ...
+        "lane", model.lane, "road", model.road, ...
+        "accelerationBias", model.longitudinalAccelerationBias, ...
         "configuration", model.cfg);
 end
 
 function compatible = localCertificateCompatible(certificate, identity, model)
-    compatible = ~isempty(certificate) ...
+    compatible = isstruct(certificate) && isscalar(certificate) ...
+        && all(isfield(certificate, ["version", "episodeIdentity", "plan", ...
+            "predictedState", "targetHorizon", "schedule", "geometry", "appliedInput"])) ...
+        && isequal(certificate.version, 1) ...
         && isequaln(certificate.episodeIdentity, identity);
     if ~compatible
         return;
@@ -217,401 +312,6 @@ function equal = localNumericallyEqual(first, second, tolerance)
     equal = all(abs(first-second) <= tolerance*scale, "all");
 end
 
-function horizon = localShiftTargetHorizon(previous, fresh)
-    horizon = fresh;
-    names = ["targetPosition", "targetYaw", ...
-        "targetPositionErrorBound", "targetYawErrorBound"];
-    for name = names
-        if ~isfield(previous, name) || ~isfield(fresh, name) ...
-                || size(previous.(name), 2) ~= size(fresh.(name), 2)
-            return;
-        end
-    end
-    horizon.targetPosition = [previous.targetPosition(:, 2:end), ...
-        fresh.targetPosition(:, end)];
-    horizon.targetYaw = [previous.targetYaw(2:end), fresh.targetYaw(end)];
-    horizon.targetPositionErrorBound = [ ...
-        previous.targetPositionErrorBound(:, 2:end), ...
-        fresh.targetPositionErrorBound(:, end)];
-    horizon.targetYawErrorBound = [previous.targetYawErrorBound(2:end), ...
-        fresh.targetYawErrorBound(end)];
-end
-
-function schedule = localShiftSchedule(previous, model)
-    schedule = [];
-    nodeCount = model.horizonSteps+model.tailSteps+1;
-    required = ["speed", "station", "speedProfile", "curvature", ...
-        "tailAcceleration"];
-    if ~isstruct(previous) || ~isscalar(previous) ...
-            || ~all(isfield(previous, required)) ...
-            || numel(previous.station) ~= nodeCount ...
-            || numel(previous.speedProfile) ~= nodeCount ...
-            || numel(previous.curvature) ~= nodeCount
-        return;
-    end
-    station = [previous.station(2:end), previous.station(end)];
-    speedProfile = [previous.speedProfile(2:end), 0.0];
-    curvature = [previous.curvature(2:end), ...
-        laneCurvatureAtStation(station(end), model.lane)];
-    tailAcceleration = previous.tailAcceleration;
-    if ~isempty(tailAcceleration)
-        tailAcceleration = [tailAcceleration(2:end), 0.0];
-    end
-    schedule = struct( ...
-        "speed", previous.speed, ...
-        "station", station, ...
-        "speedProfile", speedProfile, ...
-        "curvature", curvature, ...
-        "tailAcceleration", tailAcceleration);
-end
-
-function stored = localStoredCertificate(plan, prediction, model)
-    predictedState = localPredictedState(prediction, plan);
-    stored = struct( ...
-        "plan", plan, ...
-        "schedule", prediction.scheduleForStore, ...
-        "targetHorizon", model.targetHorizon, ...
-        "episodeIdentity", model.episodeIdentity, ...
-        "predictedState", predictedState, ...
-        "appliedInput", plan(1:model.inputDimension), ...
-        "terminalLateralReference", ...
-            predictedState(2, prediction.headNodeCount));
-end
-
-function [inputPlan, problem, plan] = localStoredFallback( ...
-        shiftedPlan, prediction, exception, model)
-    plan = shiftedPlan;
-    qp = formulateAvoidanceProblem( ...
-        model, prediction, plan, "verifiedStoredPlan");
-    layout = qp.layout;
-    decision = zeros(layout.decisionCount, 1);
-    decision(layout.planIndex) = plan;
-    exactResidual = localClfExactResiduals(qp.clf, plan);
-    decision(layout.relaxationIndex(1)) = max(exactResidual(1), 0.0);
-    tolerance = model.cfg.solver.constraintTolerance;
-    boundViolation = max([0.0; qp.lowerBound-decision; ...
-        decision-qp.upperBound]);
-    rowViolation = max([0.0; ...
-        qp.inequalityMatrix*decision-qp.inequalityBound]);
-    if boundViolation > 10.0*tolerance || rowViolation > 10.0*tolerance
-        error("collisionAvoidanceController:invalidStoredCertificate", ...
-            "The shifted stored plan failed re-certification (bound " ...
-            + "violation %.3g, row violation %.3g) after %s.", ...
-            boundViolation, rowViolation, exception.identifier);
-    end
-    inputPlan = reshape(plan(1:prediction.inputCount), ...
-        model.inputDimension, []);
-    result = struct("exitFlag", 1, ...
-        "iterations", 0, ...
-        "algorithm", "verified stored incumbent", ...
-        "message", "No optimization used; all shifted rows were checked.");
-    metadata = localPlanDiagnostics( ...
-        qp, result, decision, model, prediction);
-    metadata.fallbackUsed = true;
-    metadata.fallbackReasonIdentifier = string(exception.identifier);
-    metadata.fallbackReason = string(exception.message);
-    metadata.certificateSource = "shiftedStoredPlan";
-    problem = struct( ...
-        "problemClass", "verifiedStoredCertifiedBackupPlan", ...
-        "qp", qp, ...
-        "layout", layout, ...
-        "prediction", prediction, ...
-        "nominalInput", shiftedPlan, ...
-        "decision", decision, ...
-        "inputPlan", inputPlan, ...
-        "plan", plan, ...
-        "tailPlan", plan(prediction.tailIndex), ...
-        "metadata", metadata);
-    [verified, planCertificate] = localFallbackCertificate( ...
-        problem, plan, model, prediction);
-    if ~verified
-        error("collisionAvoidanceController:invalidStoredCertificate", ...
-            "The shifted stored plan failed its exact commit certificate " ...
-            + "(%s) after %s.", ...
-            strjoin(planCertificate.failedConditions, ", "), ...
-            exception.identifier);
-    end
-    problem.metadata.planCertified = true;
-    problem.metadata.exactPredictionAssumptionsHold = ...
-        planCertificate.exactPredictionAssumptionsHold;
-    problem.metadata.nodeClearanceMargin = ...
-        planCertificate.nodeClearanceMargin;
-    problem.metadata.routeCoordinateValid = ...
-        planCertificate.routeCoordinateValid;
-    problem.metadata.postSolveCertificationPerformed = true;
-end
-
-function [certified, certificate] = localFallbackCertificate( ...
-        problem, plan, model, prediction)
-    tolerance = model.cfg.solver.constraintTolerance;
-    certificate = struct();
-    certificate.exactPredictionAssumptionsHold = ...
-        localExactPredictionAssumptionsHold(model);
-    certificate.nodeClearanceMargin = inf;
-    state = localPredictedState(prediction, plan);
-    routeEnd = model.lane.segmentStation(end) ...
-        + model.lane.segmentLength(end);
-    certificate.routeCoordinateValid = all(state(1, :) >= -tolerance) ...
-        && all(state(1, :) <= routeEnd+tolerance);
-    if model.hasTarget
-        egoPose = localFrenetTrajectoryToCartesian( ...
-            state(1:3, :), model.lane);
-        targetPose = [model.targetHorizon.targetPosition( ...
-                :, 1:prediction.nodeCount); ...
-            model.targetHorizon.targetYaw(1:prediction.nodeCount)];
-        halfDimensions = [model.egoHalfLength; model.egoHalfWidth; ...
-            model.targetHalfLength; model.targetHalfWidth];
-        egoRadius = hypot(model.egoHalfLength, model.egoHalfWidth);
-        terminal = problem.qp.terminal;
-        tailEnvelope = terminal.lateralDrift ...
-            + 2.0*egoRadius*terminal.headingRadius;
-        nodeClearance = repmat( ...
-            model.cfg.collision.clearanceMargin, 1, prediction.nodeCount);
-        nodeClearance(prediction.tailNodeIndex) = ...
-            nodeClearance(prediction.tailNodeIndex)+tailEnvelope;
-        nodeMargin = inf(1, prediction.nodeCount);
-        for nodeIdx = 1:prediction.nodeCount
-            nodeMargin(nodeIdx) = rectangleConfigurationDistance( ...
-                egoPose(1:2, nodeIdx), egoPose(3, nodeIdx), ...
-                targetPose(1:2, nodeIdx), targetPose(3, nodeIdx), ...
-                halfDimensions)-nodeClearance(nodeIdx);
-        end
-        certificate.nodeClearanceMargin = min(nodeMargin);
-    end
-    conditionName = [ ...
-        "exactPrediction", "routeCoordinate", "hardCbf", ...
-        "terminalInvariant", "nodeClearance"];
-    conditionHolds = [ ...
-        certificate.exactPredictionAssumptionsHold, ...
-        certificate.routeCoordinateValid, ...
-        problem.metadata.hardCbfSatisfied, ...
-        problem.metadata.terminalInvariantCertified, ...
-        certificate.nodeClearanceMargin >= -10.0*tolerance];
-    certificate.failedConditions = conditionName(~conditionHolds);
-    certified = all(conditionHolds);
-end
-
-function holds = localExactPredictionAssumptionsHold(model)
-    holds = all(model.measuredEgoStateErrorBound == 0.0) ...
-        && all(model.cfg.model.ltvModelErrorRateBound == 0.0) ...
-        && all(model.cfg.model.plantModelResidualRateBound == 0.0);
-    if ~model.hasTarget
-        return;
-    end
-    holds = holds ...
-        && all(model.targetPositionErrorBound == 0.0) ...
-        && all(model.targetVelocityErrorBound == 0.0) ...
-        && all(model.targetPredictionAccelerationErrorBound == 0.0) ...
-        && model.targetYawErrorBound == 0.0 ...
-        && model.targetYawRateErrorBound == 0.0 ...
-        && model.targetPredictionYawAccelerationErrorBound == 0.0;
-end
-
-function pose = localFrenetTrajectoryToCartesian(frenetPose, lane)
-    nodeCount = size(frenetPose, 2);
-    pose = zeros(3, nodeCount);
-    for nodeIdx = 1:nodeCount
-        station = frenetPose(1, nodeIdx);
-        segmentIdx = find(lane.segmentStation <= station, 1, "last");
-        if isempty(segmentIdx)
-            segmentIdx = 1;
-        end
-        segmentIdx = min(segmentIdx, numel(lane.segmentLength));
-        fraction = (station-lane.segmentStation(segmentIdx)) ...
-            / lane.segmentLength(segmentIdx);
-        fraction = min(max(fraction, 0.0), 1.0);
-        tangent = lane.tangent(segmentIdx, :).';
-        normal = [-tangent(2); tangent(1)];
-        centre = lane.segmentStart(segmentIdx, :).' ...
-            + fraction*lane.segment(segmentIdx, :).' ...
-            + normal*frenetPose(2, nodeIdx);
-        pose(1:2, nodeIdx) = centre;
-        pose(3, nodeIdx) = atan2(tangent(2), tangent(1)) ...
-            + frenetPose(3, nodeIdx);
-    end
-end
-
-% ====================================================================
-% Nominal and the solve
-% ====================================================================
-
-function [nominalInput, source] = localNominalInput( ...
-        previousPlan, prediction, model, certificate)
-% The linearization nominal, a PLAN vector (head inputs then tail
-% accelerations): advance the head, append terminal steering with the
-% tail's first acceleration, and advance the tail with zero appended -
-% or the schedule reference with its braking tail. The shift is the
-% backup candidate: under the declared model it is a feasible
-% point of this sample's program.
-    if isnumeric(previousPlan) && isreal(previousPlan) ...
-            && numel(previousPlan) == prediction.planCount ...
-            && all(isfinite(previousPlan), "all")
-        inputPlan = reshape(previousPlan(1:prediction.inputCount), ...
-            model.inputDimension, model.horizonSteps);
-        tail = previousPlan(prediction.tailIndex);
-        shiftedInput = [inputPlan(:, 2:end), ...
-            [inputPlan(1, end); tail(1)]];
-        state = model.initialEgoState;
-        for stageIdx = 1:model.horizonSteps-1
-            state = prediction.stageMatrixA(:, :, stageIdx)*state ...
-                + prediction.stageMatrixB(:, :, stageIdx) ...
-                    * shiftedInput(:, stageIdx) ...
-                + prediction.stageAffine(:, stageIdx);
-        end
-        shiftedInput(1, end) = localTerminalBackupSteering( ...
-            state, certificate.terminalLateralReference, ...
-            prediction.scheduleCurvature(model.horizonSteps), model.cfg);
-        shiftedTail = [tail(2:end); 0.0];
-        nominalInput = [shiftedInput(:); shiftedTail(:)];
-        source = "shiftedPreviousPlan";
-    else
-        nominalInput = prediction.referencePlan;
-        source = "scheduleReference";
-    end
-end
-
-function steering = localTerminalBackupSteering( ...
-        state, lateralReference, curvature, cfg)
-% The feedback law certified by terminalLateralCertificate, evaluated
-% when the first stage of the proof-side tail enters the executable head.
-    omega = cfg.terminal.lateralBandwidth;
-    lateralError = state(2)-lateralReference;
-    steering = cfg.vehicle.wheelbase*(curvature ...
-        - omega^2*lateralError-2.0*omega*state(3));
-    limit = cfg.model.frontWheelSteeringAngleMaximum;
-    steering = min(max(steering, -limit), limit);
-end
-
-function state = localPredictedState(prediction, plan)
-    state = zeros(6, prediction.nodeCount);
-    for nodeIdx = 1:prediction.nodeCount
-        state(:, nodeIdx) = prediction.egoStateMatrix(:, :, nodeIdx)*plan ...
-            + prediction.egoStateOffset(:, nodeIdx);
-    end
-end
-
-function plan = localCommittedPlan(decision, qp)
-% The committed plan: the returned decision's plan columns clipped into
-% their bounds (the kernel satisfies bounds to its tolerance).
-    planIndex = qp.layout.planIndex;
-    plan = min(max(decision(planIndex), qp.lowerBound(planIndex)), ...
-        qp.upperBound(planIndex));
-end
-
-function inputPlan = localHeadInputPlan(plan, layout)
-    inputPlan = reshape(plan(layout.inputIndex), ...
-        layout.inputDimension, layout.horizonSteps);
-end
-
-function [inputPlan, problem, plan] = localSolve( ...
-        model, prediction, nominalInput)
-% Solve the same hard-CBF/soft-CLF problem at each prescribed start.
-    cfg = model.cfg;
-    [firstQp, common] = formulateAvoidanceProblem( ...
-        model, prediction, nominalInput, "shiftedPlan");
-    startInput = {nominalInput};
-    labels = "shiftedPlan";
-    if any([firstQp.collision.nodes.imposed])
-        startInput{end+1} = common.probeInput;
-        labels(end+1) = "cruiseProbe";
-    end
-
-    candidateCount = numel(startInput);
-    qps = cell(1, candidateCount);
-    results = cell(1, candidateCount);
-    startViolations = zeros(1, candidateCount);
-    solverCalls = 0;
-    for candidateIdx = 1:candidateCount
-        if candidateIdx == 1
-            qps{candidateIdx} = firstQp;
-        else
-            qps{candidateIdx} = formulateAvoidanceProblem( ...
-                model, prediction, startInput{candidateIdx}, ...
-                labels(candidateIdx), common);
-        end
-        startViolations(candidateIdx) = ...
-            localStartViolation(qps{candidateIdx});
-        results{candidateIdx} = solveHardCbfClf(qps{candidateIdx}, cfg);
-        solverCalls = solverCalls+results{candidateIdx}.solverCalls;
-    end
-
-    exitFlags = zeros(1, candidateCount);
-    objectives = inf(1, candidateCount);
-    clfValues = inf(1, candidateCount);
-    certifiedInfeasible = false(1, candidateCount);
-    messages = strings(1, candidateCount);
-    bestIdx = 0;
-    for candidateIdx = 1:candidateCount
-        candidate = results{candidateIdx};
-        exitFlags(candidateIdx) = candidate.exitFlag;
-        certifiedInfeasible(candidateIdx) = ...
-            qps{candidateIdx}.certifiedInfeasible;
-        messages(candidateIdx) = candidate.message;
-        if candidate.feasible
-            clfValues(candidateIdx) = candidate.clfValue;
-            objectives(candidateIdx) = candidate.objectiveValue;
-            if bestIdx == 0 || localObjectiveBetter( ...
-                    objectives(candidateIdx), objectives(bestIdx), cfg)
-                bestIdx = candidateIdx;
-            end
-        end
-    end
-    if bestIdx == 0
-        if all(exitFlags == -2)
-            error("collisionAvoidanceController:noSolution", ...
-                "The hard-CBF/soft-CLF problem is infeasible from every " ...
-                + "start (%s). No command is issued.", strjoin(labels, ", "));
-        end
-        error("collisionAvoidanceController:optimizationFailure", ...
-            "The conic solver returned no plan (%s).", ...
-            strjoin(labels+": "+messages, "; "));
-    end
-
-    qp = qps{bestIdx};
-    result = results{bestIdx};
-    decision = result.decision;
-    layout = qp.layout;
-    plan = localCommittedPlan(decision, qp);
-    inputPlan = localHeadInputPlan(plan, layout);
-    problem = struct( ...
-        "problemClass", qp.problemClass, "qp", qp, "layout", layout, ...
-        "prediction", prediction, "nominalInput", nominalInput, ...
-        "decision", decision, "inputPlan", inputPlan, "plan", plan, ...
-        "tailPlan", plan(layout.tailIndex), ...
-        "metadata", localPlanDiagnostics(qp, result, decision, model, prediction));
-    problem.metadata.candidateCount = candidateCount;
-    problem.metadata.candidateLabels = labels;
-    problem.metadata.candidateExitFlags = exitFlags;
-    problem.metadata.candidateObjectives = objectives;
-    problem.metadata.candidateClfValues = clfValues;
-    problem.metadata.candidateCertifiedInfeasible = certifiedInfeasible;
-    problem.metadata.candidateStartViolation = startViolations;
-    problem.metadata.candidatesSolved = sum(~certifiedInfeasible);
-    problem.metadata.selectedCandidate = labels(bestIdx);
-    problem.metadata.solverCallCount = solverCalls;
-end
-
-function better = localObjectiveBetter(candidate, incumbent, cfg)
-    tolerance = cfg.solver.optimalityTolerance;
-    better = candidate ...
-        < incumbent-tolerance*(1.0+abs(incumbent));
-end
-
-function violation = localStartViolation(qp)
-% How far the linearization itself is from separation: the largest
-% shortfall of its own stage-1 margins over the nodes that carry rows.
-% Zero means the trajectory is separated from the obstacle by the
-% declared budgets, and is therefore a feasible point of the hard
-% program built at it.
-    violation = 0.0;
-    nodes = qp.collision.nodes;
-    for nodeIdx = 1:numel(nodes)
-        if nodes(nodeIdx).imposed
-            violation = max(violation, -nodes(nodeIdx).nominalMargin);
-        end
-    end
-end
-
 function [residual, valueProfile, planError] = ...
         localClfExactResiduals(clf, planColumn)
 % The exact (unlinearized) CLF rows of a plan,
@@ -681,9 +381,7 @@ function metadata = localPlanDiagnostics( ...
             min(imposedMargin(headNodeCount+1:end));
     end
 
-    % The terminal set: the committed tail, the terminal handoff state
-    % against its rows, and the hard target-conditioned separation from
-    % the controller's complete predicted continuation.
+    % The complete bicycle continuation and its resting endpoint.
     metadata = localTerminalDiagnostics(metadata, qp, planColumn, ...
         model, prediction);
     metadata.dualDistanceProfile = [nodes.dualDistance];
@@ -728,9 +426,9 @@ function metadata = localPlanDiagnostics( ...
         "speedDomain", sum(qp.rowFamily == "speedDomain"), ...
         "headingDomain", sum(qp.rowFamily == "headingDomain"), ...
         "friction", sum(qp.rowFamily == "friction"), ...
-        "tail", sum(qp.rowFamily == "tail"), ...
-        "terminal", sum(qp.rowFamily == "terminal"), ...
-        "terminalSegment", sum(qp.rowFamily == "terminalSegment"));
+        "lateralDomain", sum(qp.rowFamily == "lateralDomain"), ...
+        "routeDomain", sum(qp.rowFamily == "routeDomain"), ...
+        "terminalRest", size(qp.equalityMatrix, 1));
 
     % CLF relaxations and the exact decrease residual of the plan.
     relaxation = decision(layout.relaxationIndex);
@@ -792,60 +490,39 @@ function readout = localFamilyReadout(family, planColumn)
     end
 end
 
-function metadata = localTerminalDiagnostics(metadata, qp, planColumn, ...
-        model, prediction)
-% The terminal set's readout: the committed tail's speed and station
-% profiles, the terminal handoff state against its rows, and the hard
-% augmented target-continuation row at the resting node.
-    layout = qp.layout;
-    terminal = qp.terminal;
-    terminalNode = prediction.headNodeCount;
-    restNode = prediction.nodeCount;
-    planState = zeros(6, prediction.nodeCount);
-    for nodeIdx = 1:prediction.nodeCount
-        planState(:, nodeIdx) = prediction.egoStateMatrix(:, :, nodeIdx) ...
-            * planColumn+prediction.egoStateOffset(:, nodeIdx);
-    end
-    terminalState = planState(:, terminalNode);
-    curvature = prediction.scheduleCurvature(terminalNode);
-    metadata.tailAccelerationPlan = planColumn(layout.tailIndex).';
-    metadata.tailSpeedProfile = planState(4, prediction.tailNodeIndex);
-    metadata.tailStationProfile = planState(1, prediction.tailNodeIndex);
-    metadata.restStation = planState(1, restNode);
-    metadata.terminalSpeed = terminalState(4);
-    metadata.terminalHeadingError = terminalState(3);
-    metadata.terminalHeadingBound = terminal.headingRow;
-    metadata.terminalLateralVelocity = terminalState(5);
-    metadata.terminalLateralVelocityBound = terminal.lateralVelocityRow;
-    metadata.terminalYawRateError = terminalState(6) ...
-        - curvature*terminalState(4);
-    metadata.terminalYawRateErrorBound = terminal.yawRateRow;
-    metadata.terminalHeadingRadius = terminal.headingRadius;
-    metadata.terminalLateralDrift = terminal.lateralDrift;
-    metadata.terminalInvariantCertified = true;
+function metadata = localTerminalDiagnostics(metadata, qp, plan, model, prediction)
+    state = squeeze(pagemtimes(prediction.egoStateMatrix, plan)) ...
+        + prediction.egoStateOffset;
+    tail = reshape(plan(qp.layout.tailIndex), 2, []);
+    metadata.tailAccelerationPlan = tail(2, :);
+    metadata.tailSteeringPlan = tail(1, :);
+    metadata.tailSpeedProfile = state(4, prediction.tailNodeIndex);
+    metadata.tailStationProfile = state(1, prediction.tailNodeIndex);
+    metadata.restStation = state(1, end);
+    metadata.terminalSpeed = state(4, end);
+    metadata.terminalHeadingError = state(3, end);
+    metadata.terminalHeadingBound = model.cfg.model.headingDomainRadius;
+    metadata.terminalLateralVelocity = state(5, end);
+    metadata.terminalYawRateError = state(6, end);
+    metadata.terminalRestResidual = norm(state(4:6, end), inf);
+    metadata.terminalInvariantCertified = metadata.terminalRestResidual ...
+        <= 10.0*model.cfg.solver.constraintTolerance;
     metadata.terminalInvariantMargin = inf;
     metadata.terminalContinuationAxis = "none";
     metadata.terminalFutureSupport = inf;
     metadata.terminalSupportDirection = zeros(2, 1);
-    metadata.terminalSegmentIndex = 0;
-    if ~model.hasTarget
-        return;
+    metadata.terminalSegmentIndex = qp.geometry.frames(end).segmentIndex;
+    if model.hasTarget
+        node = qp.collision.nodes(end);
+        metadata.terminalInvariantMargin = min(node.marginMatrix*plan+node.marginOffset);
+        metadata.terminalInvariantCertified = metadata.terminalInvariantCertified ...
+            && node.terminalInvariant && metadata.terminalInvariantMargin ...
+                >= -10.0*model.cfg.solver.constraintTolerance;
+        metadata.terminalContinuationAxis = node.terminalContinuationAxis;
+        metadata.terminalFutureSupport = node.terminalFutureSupport;
+        metadata.terminalSupportDirection = node.terminalSupportDirection;
     end
-    node = qp.collision.nodes(restNode);
-    metadata.terminalInvariantMargin = min( ...
-        node.marginMatrix*planColumn+node.marginOffset);
-    metadata.terminalInvariantCertified = node.terminalInvariant ...
-        && metadata.terminalInvariantMargin ...
-            >= -model.cfg.solver.constraintTolerance;
-    metadata.terminalContinuationAxis = node.terminalContinuationAxis;
-    metadata.terminalFutureSupport = node.terminalFutureSupport;
-    metadata.terminalSupportDirection = node.terminalSupportDirection;
-    metadata.terminalSegmentIndex = node.terminalSegmentIndex;
 end
-
-% ====================================================================
-% Configuration and the prediction model
-% ====================================================================
 
 function cfg = localControllerConfiguration(userCfg)
     persistent cachedUserConfiguration cachedConfiguration cacheValid
@@ -902,11 +579,7 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
     if isfield(ego, "heldActuatorInput")
         model.heldActuatorInput = ego.heldActuatorInput(:);
     end
-    % The planned speed floor: the declared planned minimum, lowered
-    % to the worst-case measured speed so a slow start is solvable.
-    model.plannedSpeedFloor = min(cfg.model.plannedSpeedMinimum, ...
-        max(ego.modelState(4)-ego.stateErrorBound(4), ...
-            cfg.model.speedMinimum));
+    model.plannedSpeedFloor = 0.0;
     model.lane = lane;
     model.road = road;
     % The reader admits at most one target. Empty-target geometry uses
@@ -991,41 +664,6 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
             "stopTime", model.targetStopTime);
     end
     model.targetHorizon = localTargetHorizon(model);
-    model.targetPath = localTargetPath(model);
-end
-
-function path = localTargetPath(model)
-% The target's predicted box in path coordinates at every node of the
-% head and the tail, and one node beyond for the next shift check: the
-% projected station and lateral offset of its centre, its heading
-% error to the path, and the half-extents of the axis-aligned bound of
-% its rotated rectangle in the path frame.
-    nodeCount = model.horizonSteps+model.tailSteps+2;
-    path = struct("station", zeros(1, nodeCount), ...
-        "lateral", zeros(1, nodeCount), ...
-        "headingError", zeros(1, nodeCount), ...
-        "halfLength", zeros(1, nodeCount), ...
-        "halfWidth", zeros(1, nodeCount));
-    if ~model.hasTarget
-        return;
-    end
-    horizon = model.targetHorizon;
-    for nodeIdx = 1:nodeCount
-        projection = laneProjection( ...
-            horizon.targetPosition(:, nodeIdx), model.lane);
-        headingError = atan2( ...
-            sin(horizon.targetYaw(nodeIdx)-projection.heading), ...
-            cos(horizon.targetYaw(nodeIdx)-projection.heading));
-        path.station(nodeIdx) = projection.station;
-        path.lateral(nodeIdx) = projection.lateralPosition;
-        path.headingError(nodeIdx) = headingError;
-        path.halfLength(nodeIdx) = ...
-            model.targetHalfLength*abs(cos(headingError)) ...
-            + model.targetHalfWidth*abs(sin(headingError));
-        path.halfWidth(nodeIdx) = ...
-            model.targetHalfLength*abs(sin(headingError)) ...
-            + model.targetHalfWidth*abs(cos(headingError));
-    end
 end
 
 function model = localStaticPredictionModel(cfg)
@@ -1041,8 +679,8 @@ function model = localStaticPredictionModel(cfg)
     model.sampleTime = cfg.controller.sampleTime;
     model.horizonSteps = cfg.controller.horizonSteps;
     % The braking tail's length: derived from the actuator and the
-    % speed domain, never declared (kinematicBrakingTail).
-    model.tailSteps = kinematicBrakingTail("steps", cfg);
+    % speed domain, never declared (brakingSchedule).
+    model.tailSteps = brakingSchedule("steps", cfg);
     model.referenceSpeed = cfg.referenceSpeed;
     model.cfg = cfg;
     cachedConfiguration = cfg;
@@ -1073,11 +711,23 @@ function horizon = localTargetHorizon(model)
     directionCount = ...
         model.cfg.terminal.supportDirectionCount;
     angle = (0:directionCount-1)*(2.0*pi/directionCount);
-    horizon.terminalSupportDirection = [cos(angle); sin(angle)];
+    direction = [cos(angle); sin(angle)];
+    direction(abs(direction) < 100.0*eps) = 0.0;
+    direction = direction./vecnorm(direction);
+    horizon.terminalSupportDirection = direction;
     horizon.terminalFuturePositionSupport = ...
         targetPredictionFutureSupport( ...
             horizon.terminalSupportDirection, ...
             horizon.terminalSupportStartTime, model.targetPrediction);
+    % Independent velocity/acceleration error boxes grow without bound.
+    % Admit a terminal direction only when its complete future support is
+    % finite; a rest-node error radius alone cannot certify future safety.
+    horizon.terminalFuturePositionSupport = ...
+        horizon.terminalFuturePositionSupport ...
+        + model.targetPositionErrorBound.'*abs(direction);
+    growth = (model.targetVelocityErrorBound ...
+        + model.targetPredictionAccelerationErrorBound).'*abs(direction);
+    horizon.terminalFuturePositionSupport(growth > 0.0) = inf;
 end
 
 function [positionErrorBound, yawErrorBound] = ...
@@ -1144,11 +794,12 @@ end
 % The command
 % ====================================================================
 
-function command = localCommand(inputPlan, model)
+function command = localCommand(inputPlan, model, prediction)
     firstInput = inputPlan(:, 1);
     cfg = model.cfg;
     state = model.initialEgoState;
-    forceScheduleSpeed = max(state(4), cfg.model.scheduleSpeedFloor);
+    forceScheduleSpeed = max(prediction.scheduleSpeedProfile(1), ...
+        cfg.model.scheduleSpeedFloor);
     friction = axleFrictionParameters(cfg);
     steeringAngle = firstInput(1);
     longitudinalAcceleration = firstInput(2);

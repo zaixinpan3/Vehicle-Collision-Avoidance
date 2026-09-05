@@ -1,7 +1,7 @@
 function cfg = collisionAvoidanceControllerConfig(userCfg)
 % collisionAvoidanceControllerConfig Defaults and merge for the controller.
 %
-% Returns the hard-CBF/soft-CLF controller configuration, with supplied
+% Returns the predictive-certificate controller configuration, with supplied
 % overrides merged recursively over the declared defaults. Every field
 % the controller reads is defined here; a missing field is a
 % configuration error at the consuming module rather than a silent
@@ -39,7 +39,8 @@ function cfg = localDefaults()
     cfg.controller = struct( ...
         "sampleTime", 0.05, ...
         "horizonSteps", 48, ...
-        "shiftConsistencyTolerance", 1.0e-8);
+        "shiftConsistencyTolerance", 1.0e-8, ...
+        "stationTrustRadius", 2.0);
 
     % Geometric clearance in metres, imposed at every prediction node.
     cfg.collision = struct("clearanceMargin", 0.25);
@@ -63,18 +64,13 @@ function cfg = localDefaults()
         "longitudinalAccelerationMinimum", -8.0, ...
         "longitudinalAccelerationMaximum", 4.0);
 
-    % Declared model domain. speedMinimum is bounded away from zero
-    % because the linear-cornering rows carry 1/vx; scheduleSpeedFloor
-    % clamps the frozen schedule speed (forward-Euler stability);
-    % plannedSpeedMinimum is the hard floor of the planned speed - the
-    % frozen-speed linearization is only trusted near the schedule
-    % speed - lowered per sample to the measured speed when the
-    % vehicle is slower. headingDomainRadius bounds the plan's heading
-    % error to the path (validity of the Frenet linearization).
+    % Zero speed is admitted by the regularized scheduled model. The tire
+    % denominator alone uses scheduleSpeedFloor. Geometry is certified on
+    % finite station intervals and the declared lateral/heading domains.
     cfg.model = struct( ...
-        "speedMinimum", 1.0, ...
+        "speedMinimum", 0.0, ...
         "speedMaximum", 18.0, ...
-        "plannedSpeedMinimum", 12.0, ...
+        "lateralDomainRadius", 12.0, ...
         "scheduleSpeedFloor", 12.0, ...
         "frontWheelSteeringAngleMaximum", deg2rad(40.0), ...
         "frictionPolygonEdgeCount", 8, ...
@@ -83,42 +79,10 @@ function cfg = localDefaults()
         "ltvModelErrorRateBound", zeros(6, 1), ...
         "plantModelResidualRateBound", zeros(6, 1));
 
-    % THE TERMINAL SET (PCBF_CLF_ARCHITECTURE.md, "The terminal set"). Every
-    % program ends in a KINEMATIC BRAKING TAIL: N_b extra stages, with
-    % the tail accelerations as decision variables, on which the same
-    % separation and road rows are imposed, ending at REST. A plan is
-    % admitted only if the vehicle can come to rest from its terminal
-    % state without ever violating a row - the backup-set construction
-    % of the CBF literature, with the optimizer supplying the witness.
-    % Rest is invariant under zero input, so the feasible set of the
-    % program is control invariant under the declared model and target
-    % prediction (Proposition 8), which is what turns the rows into a
-    % control barrier function. The knobs:
-    %
-    % backupDeceleration is the tail's braking rate a_b (m/s^2,
-    % positive): each tail acceleration may independently lie in
-    % [-a_b, 0]. Together with lateralAccelerationMaximum it must fit
-    % inside every axle's
-    % friction polygon under the braking shares and the affine load
-    % transfer, which is validated here.
-    %
-    % lateralAccelerationMaximum is what the tail's lane-keeping law may
-    % use while braking; lateralBandwidth (1/m) is the law's bandwidth
-    % in arclength. The two fix the heading bound of the terminal node
-    % in closed form (terminalLateralCertificate): a faster law holds a
-    % narrower lateral band but demands more steering, so it admits a
-    % smaller terminal heading error. lateralVelocityMaximum (m/s) and
-    % yawRateErrorMaximum (rad/s) are the terminal rows on the dynamic
-    % states the kinematic tail does not carry; their course
-    % contributions are charged against the heading bound. The tail
-    % length N_b is derived (kinematicBrakingTail), not declared.
-    cfg.terminal = struct( ...
-        "backupDeceleration", 5.0, ...
-        "lateralAccelerationMaximum", 4.0, ...
-        "lateralBandwidth", 0.08, ...
-        "lateralVelocityMaximum", 0.15, ...
-        "yawRateErrorMaximum", 0.05, ...
-        ... % Inertial directions for the resting-ego support certificate.
+    % The complete bicycle continuation reaches rest. backupDeceleration
+    % determines only the initial braking schedule and continuation length;
+    % full physical actuator/tire constraints apply at every stage.
+    cfg.terminal = struct("backupDeceleration", 5.0, ...
         "supportDirectionCount", 64);
 
     % Road-geometry implementation allowances.
@@ -140,7 +104,7 @@ function cfg = localDefaults()
         "certificateSpeedFloor", 5.0, ...
         "relaxationWeight", 100.0);
 
-    % One joint conic solve per candidate. The optional solver hook receives
+    % One joint conic solve per sample. The optional solver hook receives
     % (phase, problem); problem.defaultSolver runs the built-in coneprog.
     cfg.solver = struct( ...
         "jointFunction", [], ...
@@ -200,26 +164,22 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
-    if cfg.model.speedMinimum <= 0.0
+    if cfg.model.speedMinimum ~= 0.0 || cfg.model.speedMaximum <= 0.0
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "model.speedMinimum must be positive: the linear-cornering " ...
-            + "rows carry 1/vx.");
+            "The rest certificate requires speedMinimum = 0 and speedMaximum > 0.");
     end
-    if cfg.model.speedMaximum <= cfg.model.speedMinimum
-        error("collisionAvoidanceController:invalidConfiguration", ...
-            "model.speedMaximum must exceed model.speedMinimum.");
-    end
-    if cfg.model.scheduleSpeedFloor < cfg.model.speedMinimum ...
+    if cfg.model.scheduleSpeedFloor <= 0.0 ...
             || cfg.model.scheduleSpeedFloor > cfg.model.speedMaximum
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "model.scheduleSpeedFloor must lie inside the model " ...
-            + "speed domain.");
+            "scheduleSpeedFloor must be positive and no greater than speedMaximum.");
     end
-    if cfg.model.plannedSpeedMinimum < cfg.model.speedMinimum ...
-            || cfg.model.plannedSpeedMinimum > cfg.model.speedMaximum
+    localValidateNonnegativeScalar(cfg.controller.stationTrustRadius, ...
+        "controller.stationTrustRadius");
+    localValidateNonnegativeScalar(cfg.model.lateralDomainRadius, ...
+        "model.lateralDomainRadius");
+    if cfg.controller.stationTrustRadius == 0.0 || cfg.model.lateralDomainRadius == 0.0
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "model.plannedSpeedMinimum must lie inside the model " ...
-            + "speed domain.");
+            "Station and lateral domain radii must be positive.");
     end
     if cfg.controller.horizonSteps < 2 ...
             || cfg.controller.horizonSteps ~= round(cfg.controller.horizonSteps)
@@ -304,72 +264,11 @@ function localValidateNonnegativeScalar(value, name)
 end
 
 function localValidateTerminal(cfg)
-% The terminal set's tail: positive knobs, a backup deceleration inside
-% the actuator box, and the braking and lateral budgets inside every
-% axle's friction polygon together - the braking shares longitudinally,
-% the steady-cornering shares laterally, the affine load transfer under
-% the backup deceleration - at the same inscribed fraction the stage
-% rows use. The heading budget itself is route-dependent (the curvature
-% enters) and is checked where the program is built.
-    if ~isfield(cfg, "terminal") || ~isstruct(cfg.terminal) ...
-            || ~isscalar(cfg.terminal)
+    localValidateNonnegativeScalar(cfg.terminal.backupDeceleration, ...
+        "terminal.backupDeceleration");
+    if cfg.terminal.backupDeceleration <= 0.0 ...
+            || cfg.terminal.backupDeceleration > -cfg.actuation.longitudinalAccelerationMinimum
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "cfg.terminal must be a scalar structure.");
-    end
-    names = ["backupDeceleration", "lateralAccelerationMaximum", ...
-        "lateralBandwidth", "lateralVelocityMaximum", ...
-        "yawRateErrorMaximum"];
-    strictlyPositive = [true, true, true, false, false];
-    for nameIdx = 1:numel(names)
-        name = names(nameIdx);
-        if ~isfield(cfg.terminal, name)
-            error("collisionAvoidanceController:invalidConfiguration", ...
-                "terminal.%s must be declared.", name);
-        end
-        value = cfg.terminal.(name);
-        if ~isnumeric(value) || ~isreal(value) || ~isscalar(value) ...
-                || ~isfinite(value) || value < 0.0 ...
-                || (strictlyPositive(nameIdx) && value <= 0.0)
-            error("collisionAvoidanceController:invalidConfiguration", ...
-                "terminal.%s must be a finite nonnegative scalar%s.", ...
-                name, localPositiveSuffix(strictlyPositive(nameIdx)));
-        end
-    end
-    deceleration = cfg.terminal.backupDeceleration;
-    lateralAcceleration = cfg.terminal.lateralAccelerationMaximum;
-    if deceleration > -cfg.actuation.longitudinalAccelerationMinimum
-        error("collisionAvoidanceController:invalidConfiguration", ...
-            "terminal.backupDeceleration exceeds the actuator's " ...
-            + "braking limit -actuation.longitudinalAccelerationMinimum.");
-    end
-    parameters = axleFrictionParameters(cfg);
-    wheelbase = cfg.vehicle.lf+cfg.vehicle.lr;
-    lateralShare = [cfg.vehicle.lr; cfg.vehicle.lf]/wheelbase;
-    for axleIdx = 1:2
-        longitudinalForce = parameters.brakeDistribution(axleIdx) ...
-            * parameters.mass*deceleration;
-        lateralForce = lateralShare(axleIdx)*parameters.mass ...
-            * lateralAcceleration;
-        normalLoad = parameters.staticNormalLoad(axleIdx) ...
-            + parameters.normalLoadAccelerationSlope(axleIdx) ...
-                * (-deceleration);
-        capacity = parameters.inscribedFraction ...
-            * parameters.frictionCoefficient(axleIdx)*normalLoad;
-        if hypot(longitudinalForce, lateralForce) > capacity
-            error("collisionAvoidanceController:invalidConfiguration", ...
-                "terminal.backupDeceleration %.2f m/s^2 with " ...
-                + "terminal.lateralAccelerationMaximum %.2f m/s^2 " ...
-                + "exceeds axle %d's friction polygon (%.0f N of " ...
-                + "%.0f N).", deceleration, lateralAcceleration, ...
-                axleIdx, hypot(longitudinalForce, lateralForce), capacity);
-        end
-    end
-end
-
-function suffix = localPositiveSuffix(strictlyPositive)
-    if strictlyPositive
-        suffix = ", strictly positive";
-    else
-        suffix = "";
+            "backupDeceleration must be positive and within the braking limit.");
     end
 end

@@ -8,6 +8,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 fullfile(repositoryRoot, "config")));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture( ...
                 fullfile(repositoryRoot, "controller")));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture( ...
+                fullfile(repositoryRoot, "scripts")));
         end
     end
 
@@ -59,7 +61,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(second, third);
             testCase.verifyEqual(secondPlan, thirdPlan, AbsTol=0.0);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(problem.metadata.candidateCount, 1);
+            testCase.verifyFalse(isfield(problem.metadata, "candidateCount"));
             testCase.verifyEqual(problem.metadata.solverCallCount, 1);
         end
 
@@ -125,9 +127,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
 
         function brakingTailUsesAccelerationBoundsWithoutJerk(testCase)
             cfg = collisionAvoidanceControllerConfig();
-            steps = kinematicBrakingTail("steps", cfg);
+            steps = brakingSchedule("steps", cfg);
 
-            profile = kinematicBrakingTail( ...
+            profile = brakingSchedule( ...
                 "profile", cfg, steps, 1.0);
             speed = 1.0+cfg.controller.sampleTime*cumsum(profile);
 
@@ -170,12 +172,12 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 problem.metadata.inputDeviationCost ...
                     + problem.metadata.clfRelaxationCost, ...
                 AbsTol=1.0e-8);
-            testCase.verifyEqual(problem.metadata.solverCallCount, 2);
+            testCase.verifyEqual(problem.metadata.solverCallCount, 1);
             testCase.verifyTrue(problem.metadata.terminalInvariantCertified);
             testCase.verifyTrue(problem.metadata.planCertified);
         end
 
-        function freshHardSolutionSkipsDuplicateCertificate(testCase)
+        function freshSolutionIsCheckedBeforeCommit(testCase)
             cfg = localSmallConfiguration();
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
                 [0.0; 0.0]);
@@ -184,21 +186,18 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem] = collisionAvoidanceController( ...
                 ego, target, localLane(), cfg);
 
-            testCase.verifyFalse( ...
+            testCase.verifyTrue( ...
                 problem.metadata.postSolveCertificationPerformed);
             testCase.verifyEqual(problem.metadata.certificateSource, ...
-                "hardConstrainedOptimization");
-            testCase.verifyFalse(isfield(problem.metadata, ...
-                "exactPredictionAssumptionsHold"));
-            testCase.verifyFalse(isfield(problem.metadata, ...
-                "routeCoordinateValid"));
-            testCase.verifyFalse(isfield(problem.metadata, ...
-                "nodeClearanceMargin"));
+                "checkedOptimization");
+            testCase.verifyTrue(problem.metadata.exactPredictionAssumptionsHold);
+            testCase.verifyTrue(problem.metadata.routeCoordinateValid);
+            testCase.verifyGreaterThan(problem.metadata.nodeClearanceMargin, 0.0);
             testCase.verifyEqual(problem.metadata.collisionDiscretization, ...
                 "predictionNodesOnly");
         end
 
-        function targetConstraintsUseBothPrescribedStarts(testCase)
+        function targetConstraintsUseOneCertificatePreservingSolve(testCase)
             cfg = struct();
             cfg.controller = struct("sampleTime", 0.05, ...
                 "horizonSteps", 4);
@@ -209,10 +208,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem] = collisionAvoidanceController( ...
                 ego, target, localLane(), cfg);
 
-            testCase.verifyEqual(problem.metadata.candidateCount, 2);
-            testCase.verifyEqual(problem.metadata.candidateLabels, ...
-                ["shiftedPlan", "cruiseProbe"]);
-            testCase.verifyEqual(problem.metadata.solverCallCount, 2);
+            testCase.verifyFalse(isfield(problem.metadata, "candidateLabels"));
+            testCase.verifyEqual(problem.metadata.solverCallCount, 1);
             testCase.verifyEqual(problem.layout.relaxationCount, 1);
             testCase.verifyTrue(problem.metadata.hardCbfSatisfied);
         end
@@ -228,16 +225,21 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:noSolution");
         end
 
-        function predictedFutureIntersectionFailsHardTerminalEnvelope( ...
-                testCase)
+        function fullBicycleContinuationCanSteerClearOfFutureOncomingPath(testCase)
             cfg = localSmallConfiguration();
-            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
-                [0.0; 0.0]);
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
             target = localTarget("oncoming", [100.0; 0.0], [-5.0; 0.0]);
 
-            testCase.verifyError(@() collisionAvoidanceController( ...
-                ego, target, localLane(), cfg), ...
-                "collisionAvoidanceController:noSolution");
+            [~, ~, problem, certificate] = collisionAvoidanceController( ...
+                ego, target, localLane(), cfg, []);
+
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyGreaterThan(abs(certificate.predictedState(2, end)), 3.5);
+            testCase.verifyLessThan(problem.metadata.terminalRestResidual, 1.0e-6);
+            testCase.verifyGreaterThanOrEqual( ...
+                problem.metadata.terminalInvariantMargin, -1.0e-6);
+            testCase.verifyEqual(problem.metadata.solverCallCount, 1);
+            testCase.verifyGreaterThan(max(abs(problem.tailPlan(1, :))), 0.001);
         end
 
         function curvedPredictionIsNotRejectedByMotionClass(testCase)
@@ -391,7 +393,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:optimizationFailure");
         end
 
-        function targetShiftMismatchCannotReuseStoredPlan(testCase)
+        function changedTargetPredictionRequiresFreshCertification(testCase)
             cfg = localSmallConfiguration();
             cfg.solver.jointFunction = @localJointSolveHook;
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
@@ -403,9 +405,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             inconsistent = localTarget( ...
                 "lead", [101.0; 0.0], [5.0; 0.0]);
 
-            testCase.verifyError(@() collisionAvoidanceController( ...
-                nextEgo, inconsistent, localLane(), cfg), ...
-                "collisionAvoidanceController:optimizationFailure");
+            [~, ~, second] = collisionAvoidanceController( ...
+                nextEgo, inconsistent, localLane(), cfg);
+
+            testCase.verifyFalse(second.metadata.certificateCompatible);
+            testCase.verifyTrue(second.metadata.continuationReadmission);
+            testCase.verifyTrue(second.metadata.planCertified);
+            testCase.verifyEqual(second.metadata.certificateSource, ...
+                "revalidatedContinuation");
         end
 
         function nodeSafeFallbackAcceptsBetweenNodeCrossing(testCase)
@@ -443,6 +450,113 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 AbsTol=0.0);
             testCase.verifyEqual(next.metadata.collisionDiscretization, ...
                 "predictionNodesOnly");
+        end
+
+        function explicitCertificateSurvivesResetOfConvenienceState(testCase)
+            cfg = localSmallConfiguration();
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
+            [command, ~, first, certificate] = collisionAvoidanceController( ...
+                ego, [], localLane(), cfg, []);
+            next = localNextEgo(first, command.actuatorInput);
+            collisionAvoidanceController("resetNominalTrajectory");
+
+            [~, ~, second] = collisionAvoidanceController( ...
+                next, [], localLane(), cfg, certificate);
+
+            testCase.verifyTrue(second.metadata.carriedWitnessFeasible);
+            testCase.verifyTrue(second.metadata.certificateCompatible);
+        end
+
+        function repeatedFallbackReachesRestThroughTheFormerHandoff(testCase)
+            trace = localFallbackToRest();
+
+            testCase.verifyLessThan(trace.maximumStateError, 2.0e-6);
+            testCase.verifyLessThan(norm(trace.finalState(4:6), inf), 2.0e-6);
+            testCase.verifyTrue(all(trace.fallbackUsed(2:end)));
+            testCase.verifyEqual(trace.solverCalls, ones(size(trace.solverCalls)));
+            testCase.verifyGreaterThan(trace.sampleCount, trace.headSteps+trace.tailSteps);
+        end
+
+        function carriedSteeringAvoidsAnOncomingTargetWithinRoadBounds(testCase)
+            result = runCertificateContinuationScenario();
+
+            testCase.verifyGreaterThanOrEqual(result.minimumRectangleClearance, ...
+                result.clearanceRequirement-1.0e-6);
+            testCase.verifyGreaterThanOrEqual(result.minimumRoadMargin, -1.0e-6);
+            testCase.verifyGreaterThan(result.maximumLateralDisplacement, 0.65);
+            testCase.verifyLessThan(result.terminalRestResidual, 1.0e-6);
+            testCase.verifyLessThan(result.maximumShiftError, 2.0e-6);
+            testCase.verifyTrue(all(result.fallbackUsed(2:end)));
+            testCase.verifyEqual(result.actualOptimizationCount, 1);
+        end
+
+        function rotatedInertialFramesRetainTheRectangleCertificate(testCase)
+            result = runCertificateContinuationScenario(pi);
+
+            testCase.verifyGreaterThanOrEqual(result.minimumRectangleClearance, ...
+                result.clearanceRequirement-1.0e-6);
+            testCase.verifyGreaterThanOrEqual(result.minimumRoadMargin, -1.0e-6);
+            testCase.verifyLessThan(result.maximumShiftError, 2.0e-6);
+            testCase.verifyTrue(all(result.fallbackUsed(2:end)));
+        end
+
+        function positiveSolverStatusCannotBypassCommitChecks(testCase)
+            cfg = localSmallConfiguration();
+            cfg.solver.jointFunction = @localUnsafeSuccess;
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
+
+            testCase.verifyError(@() collisionAvoidanceController( ...
+                ego, [], localLane(), cfg, []), ...
+                "collisionAvoidanceController:optimizationFailure");
+        end
+
+        function unsafeSuccessfulImprovementUsesTheCarriedInput(testCase)
+            cfg = localSmallConfiguration();
+            cfg.solver.jointFunction = @localUnsafeAfterFirst;
+            localUnsafeAfterFirst("reset", struct());
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
+            [command, plan, first, certificate] = collisionAvoidanceController( ...
+                ego, [], localLane(), cfg, []);
+
+            [next, ~, problem] = collisionAvoidanceController( ...
+                localNextEgo(first, command.actuatorInput), [], ...
+                localLane(), cfg, certificate);
+
+            testCase.verifyTrue(problem.metadata.fallbackUsed);
+            testCase.verifyEqual(next.actuatorInput, plan(:, 2), AbsTol=0.0);
+            testCase.verifyEqual(problem.metadata.solverCallCount, 1);
+        end
+
+        function growingTargetUncertaintyCannotUseARestNodeOnlyBound(testCase)
+            cfg = localSmallConfiguration();
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
+            target = localTarget("uncertain", [100.0; 0.0], [5.0; 0.0]);
+            target.targetVelocityInertialErrorBound = [0.1; 0.1];
+
+            testCase.verifyError(@() collisionAvoidanceController( ...
+                ego, target, localLane(), cfg, []), ...
+                "collisionAvoidanceController:noSolution");
+        end
+
+        function nonzeroEgoBoundsRequireAFeedbackTubeCertificate(testCase)
+            cfg = localSmallConfiguration();
+            ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
+            ego.controllerStateErrorBound = [0.1; 0.1; 0.01; 0.1; 0.1; 0.01];
+
+            testCase.verifyError(@() collisionAvoidanceController( ...
+                ego, [], localLane(), cfg, []), ...
+                "collisionAvoidanceController:unsupportedCertificateUncertainty");
+        end
+
+        function zeroSpeedSchedulePreservesOffsetRestOnACurve(testCase)
+            cfg = collisionAvoidanceControllerConfig();
+            state = [20.0; -4.0; 0.1; 0.0; 0.0; 0.0];
+            [stateMatrix, inputMatrix, affine] = ltvBicycleStageMatrices( ...
+                0.02, 0.0, cfg.controller.sampleTime, cfg);
+
+            next = stateMatrix*state+inputMatrix*[0.0; 0.0]+affine;
+
+            testCase.verifyEqual(next, state, AbsTol=1.0e-14);
         end
 
         function collisionAtTheNextNodeStillRejectsThePlan(testCase)
@@ -562,4 +676,53 @@ function solve = localJointSolveHook(phase, problem)
         "objective", inf, ...
         "exitFlag", 0, ...
         "output", struct("message", "deliberate test failure"));
+end
+
+function trace = localFallbackToRest()
+    cfg = localSmallConfiguration();
+    cfg.solver.jointFunction = @localJointSolveHook;
+    localJointSolveHook("reset", struct());
+    ego = localEgoState([0.0; 0.1; 0.002; 15.0; 0.01; 0.0], [0.0; 0.0]);
+    [command, ~, first, certificate] = collisionAvoidanceController( ...
+        ego, [], localLane(), cfg, []);
+    expected = certificate.predictedState;
+    sampleCount = first.prediction.stageCount+3;
+    trace = struct("sampleCount", sampleCount, "headSteps", cfg.controller.horizonSteps, ...
+        "tailSteps", first.prediction.tailSteps, "maximumStateError", 0.0, ...
+        "fallbackUsed", false(1, sampleCount), "solverCalls", ones(1, sampleCount), ...
+        "finalState", zeros(6, 1));
+    problem = first;
+    for sampleIdx = 2:sampleCount
+        ego = localNextEgo(problem, command.actuatorInput);
+        [command, ~, problem, certificate] = collisionAvoidanceController( ...
+            ego, [], localLane(), cfg, certificate);
+        trace.maximumStateError = max(trace.maximumStateError, ...
+            norm(certificate.predictedState(:, 1) ...
+                - expected(:, min(sampleIdx, size(expected, 2))), inf));
+        trace.fallbackUsed(sampleIdx) = problem.metadata.fallbackUsed;
+        trace.solverCalls(sampleIdx) = problem.metadata.solverCallCount;
+    end
+    trace.finalState = certificate.predictedState(:, 1);
+end
+
+function result = localUnsafeSuccess(~, program)
+    result = program.defaultSolver();
+    result.exitFlag = 1;
+    result.decision(1) = program.ub(1)+0.5;
+end
+
+function result = localUnsafeAfterFirst(phase, program)
+    persistent calls
+    if phase == "reset"
+        calls = 0;
+        result = struct();
+        return;
+    end
+    calls = calls+1;
+    if calls == 1
+        result = program.defaultSolver();
+    else
+        result = struct("decision", zeros(numel(program.f), 1), ...
+            "exitFlag", 1, "output", struct("message", "invalid successful iterate"));
+    end
 end
