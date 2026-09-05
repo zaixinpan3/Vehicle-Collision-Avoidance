@@ -202,3 +202,119 @@ This does not represent a passing whole-repository test run. Four trial MAT
 checkpoints preserve the simulation output even if a tool call times out;
 the final long MATLAB MCP call timed out at the transport layer, and a
 subsequent call verified its completed study and saved results.
+
+## Retest of the certificate-preserving controller: September 5, 2026
+
+The four trials were repeated with controller commit
+`85f9e340e5a883a00e92cdf209ba248415ea2fc0` using an isolated Git source export.
+The same experiment configuration was retained: 15 m/s ego cruise, 8 m/s
+crossing target, 50 m perception, straight/400 m circular paths, 0.05 s sample
+time, 24 head stages, and 1e-6 SOCP tolerances. The experiment's 24-stage
+override remains explicit; this is not a test of the global 48-stage default.
+The revised controller uses full steering/acceleration decisions and the same
+dynamic model throughout its continuation. There are 98 stages and 99 nodes.
+The actual PassVeh14DOF plant and independent control-node evaluator were
+unchanged. Uncommitted estimator changes were excluded; sensing remained ideal.
+
+All four trial calls returned and saved checkpoints. Both scenes stopped
+before target acquisition, during ordinary cruise:
+
+| Result | Straight | Arc |
+| --- | ---: | ---: |
+| Requested duration [s] | 10.00 | 10.00 |
+| Nominal and target-aware stop time [s] | 1.00 | 0.50 |
+| Completed intervals / requested | 20 / 200 | 10 / 200 |
+| Failed control attempt | 21 | 11 |
+| Target observations received | 0 | 0 |
+| Target center range at stop [m] | 85.0119 | 97.2916 |
+| Maximum observed speed error [m/s] | 0.01824 | 0.0185 |
+| Maximum observed lateral error [m] | 2.08e-8 | 0.0051 |
+| Minimum observed target SAT gap [m] | 71.6635 | 87.1463 |
+| Minimum observed road margin [m] | 7.6500 | 7.6425 |
+| Maximum target-aware controller call [s] | 2.476907 | 5.220744 |
+| Complete functional acceptance | No | No |
+
+Within each scene, nominal and target-aware control-state arrays are exactly
+equal, as expected before the first observation. Physical tracking errors
+remain small through the recorded interval. The acceptance flags are false
+because the runs stop before the required cruise/acquisition/encounter/recovery
+sequence, not because the measured tracking errors exceed their tolerances.
+No contact is observed at the sampled nodes. These short traces establish
+neither completed avoidance nor post-avoidance cruise recovery. Every attempted
+controller call exceeded 50 ms. These are observed offline wall times, not a
+hardware-isolated performance benchmark, and they were not injected as
+actuation delays into the plant.
+
+### Straight: successful solver status rejected by terminal acceptance
+
+The failed call reports `collisionAvoidanceController:optimizationFailure`:
+the solver returned exit flag 1, but independent acceptance rejected
+`terminalRest`. Replaying the recorded states reproduced the result. Its
+terminal equality residual is `1.09689129e-5`, slightly above the absolute
+acceptance limit `10 * constraintTolerance = 1e-5`. The inequality residual
+is `1.0076e-6`, the CLF residual is `1.1421e-6`, and the input bounds pass.
+An independent LP including all inequalities, terminal equalities and bounds
+is feasible. Thus this failure is a disagreement between the solver's
+successful numerical termination and the controller's absolute endpoint
+acceptance, rather than established emptiness of the hard feasible set.
+
+A fresh initial-admission solve at the identical measured failure state
+passes, with terminal equality residual `8.0734e-8` and inequality residual
+`4.4852e-9`. This was a diagnostic snapshot; it was not substituted into the
+plant run and does not justify silently loosening the acceptance threshold.
+
+### Arc: a one-micrometre gap between terminal route intervals
+
+The arc call reports `collisionAvoidanceController:noSolution`, with solver
+exit flag -2. A separate LP at 1e-9 feasibility/optimality tolerances confirms
+infeasibility. Removing only the `routeDomain` rows restores feasibility;
+removing road, lateral-domain, heading-domain, speed-domain, friction, or
+terminal-rest rows separately does not.
+
+The last two node frames select opposite sides of one polyline boundary:
+
+```text
+node 98: s >= 240.599999373430649 m
+node 99: s <= 240.599998373430651 m
+```
+
+The final acceleration is fixed to zero, the longitudinal bias is zero, and
+terminal speed is zero. The final dynamic step therefore requires
+`vx_98 = vx_99 = 0` and `s_98 = s_99`. The displayed station inequalities
+cannot both hold: their gap is approximately `1e-6 m`.
+`avoidanceSafetyGeometry/localFrame` subtracts this guard from a segment's
+upper bound. The readmission anchor, rolled out from a slightly different
+measured state, has negative terminal speed and crosses that segment boundary
+backwards: its last three station values are approximately 240.601094,
+240.600531 and 240.599969 m. Selecting a separate segment from each of these
+anchor nodes creates the contradictory terminal intervals.
+
+An auxiliary LP that uniformly expands only route intervals needs just
+`4.99999994e-7 m` on each side to recover feasibility. This is diagnostic
+evidence of the boundary gap; no route bounds were relaxed in an executed
+controller. Fresh initial admission at the identical failure state passes
+with terminal residual `1.8646e-7` and inequality residual `1.0359e-8`.
+
+### Validation and interpretation
+
+The new code does retain related continuation proposals: 19 straight and
+9 arc successful calls use continuation readmission, with no fallback command
+in either original trial. At both failure points the old plan is related,
+the exact certificate is incompatible with the plant state, and its carried
+witness is invalid. The two failures are therefore distinct from the earlier
+3.80 s target-collision-plane conflict.
+
+The selected regression suites passed **51/51**, with zero failed or incomplete
+cases: `collisionAvoidanceControllerTest` (31), `ltvBicyclePredictionTest` (2),
+`controllerDesignExperimentTest` (16), and
+`straightCenterlineCruiseScenarioTest` (2). Recorded-state failure replays,
+LP feasibility probes, fresh-admission checks, identical pre-detection traces,
+zero observation counts, and the terminal route-gap calculation also passed
+their diagnostic assertions. This is not a passing whole-repository suite or
+a successful high-fidelity avoidance/recovery demonstration.
+
+The next corrections should address terminal equality scaling/acceptance and
+consistent route domains when a readmission anchor violates the model's speed
+domain. Retest full cruise before drawing conclusions about obstacle avoidance
+or recovery. The controller algorithm, solver tolerances, node collision
+criterion and physical constraints were not changed during this retest.
