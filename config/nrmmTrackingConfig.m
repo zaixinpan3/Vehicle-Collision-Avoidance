@@ -1,32 +1,29 @@
 function cfg = nrmmTrackingConfig()
-% nrmmTrackingConfig Parameters for the cascaded measured-input NRMM observer.
+% nrmmTrackingConfig Physical bounds and sampled NRMM estimator settings.
 %
-% The observer is the cascade
-%
-%   GNSS/IMU/gyro -> ego observer -> NRMM target observer,
-%
-% consisting of a first-order GNSS acceleration filter, certified
-% set-membership fusion of two yaw pseudo-headings, a single-bandwidth yaw
-% observer driven by the measured yaw rate, a body-velocity observer, a
-% GNSS position observer, and a high-gain target observer in the
-% transformed NRMM coordinates [rho; q; s]. Inertial-sensor biases are
-% neglected, so no observer carries a bias state and the cascade is
-% strictly feedforward. The configuration declares only physical operating
-% domains, deterministic sensor bounds, and realization timing.
-% synthesizeNrmmObserverGains solves every filter/observer gain and returns
-% the corresponding optimization and stability certificates.
+% Online estimation separates yaw information from body-relative tracking.
+% The target nominal estimate comes from an exact constant-A/curvature window
+% fit. Independent analytic outer enclosures use the physical domain, bounded
+% sensor errors, and explicit model/intersample variation bounds. Sensor biases
+% are compensated upstream. See estimator/OBSERVER_ISS_THEORY.md.
 
-    % Implementation-layer settings. The synthesized gains and certificates
-    % are continuous-time and do not depend on these; the settings exist to
-    % realize the designed observer faithfully. Measured on the noise-free
-    % constant-velocity probe, the predictor-reset realization reproduces
-    % the continuous-time design to below a micrometre at
-    % omega_T*samplePeriod <= 0.75, degrades to centimetres near 0.9,
-    % reaches metres at 1.05 and diverges above about 1.2. The synthesized
-    % bandwidth is therefore reported with this product so the realization
-    % can be checked independently of the continuous-time design.
     cfg.runtime.samplePeriod = 0.02;                 % s
-    cfg.runtime.integrationStepMaximum = 0.005;      % s
+    cfg.runtime.integrationStepMaximum = 0.005;      % s, continuous-comparator only
+    % The online estimator fits a constant-acceleration/curvature segment.
+    % These are explicit information-versus-response choices, not ISS gains.
+    cfg.window.duration = 0.8;                       % s
+    cfg.window.minimumFitSpan = 0.12;                % s
+    cfg.window.maximumIterations = 40;
+    cfg.window.numericalAllowance = 1.0e-9;
+    % Optional bounds valid THROUGHOUT each sample interval. Inf preserves
+    % the original unrestricted intersample model; then domain-only motion
+    % enclosures are used. A point sensor bound alone never bounds a hold.
+    cfg.ego.intersample.accelerationMaximum = Inf;   % m/s^2
+    cfg.ego.intersample.yawAccelerationMaximum = Inf; % rad/s^2
+    % Zero retains the exact model. Nonzero rates enlarge the hard jerk
+    % enclosure; the nominal fit still uses constant A and curvature.
+    cfg.target.model.scalarAccelerationRateMaximum = 0.0; % m/s^3
+    cfg.target.model.curvatureRateMaximum = 0.0;      % 1/(m s)
 
     %% Ego operating domain (Assumption 1)
     % The positive lower speed makes the corrected GNSS-course channel
@@ -36,7 +33,7 @@ function cfg = nrmmTrackingConfig()
     cfg.ego.domain.speedMaximum = 20.0;              % m/s   Vbar_E
     cfg.ego.domain.yawRateMaximum = 0.30;            % rad/s omegabar_E
 
-    %% Certified yaw measurement (Secs. 7-8)
+    %% Joint body-velocity and circular yaw measurement information
     % The course channel estimates side slip pointwise from the measured
     % yaw rate and GNSS speed using the kinematic single-track relation.
     % sideslipDomainMaximum only selects the invertible principal branch;
@@ -49,14 +46,14 @@ function cfg = nrmmTrackingConfig()
     % The direction certificate uses the measured GNSS speed directly; no
     % reliability score or fixed validity threshold is configured.
 
-    %% Target operating domain (Assumption 2; Secs. 12-17)
+    %% Target operating domain
     cfg.target.domain.speedMinimum = 10.0;           % m/s V_{C,min}
     cfg.target.domain.speedMaximum = 20.0;           % m/s Vbar_C
     cfg.target.domain.scalarAccelerationMaximum = 2.0; % m/s^2 Abar_C
     cfg.target.domain.sideslipMaximum = 0.015;       % rad beta_max
     cfg.target.domain.rearAxleDistance = 1.6;        % m l_r
     cfg.target.domain.relativePositionMaximum = 50.0; % m rhobar
-    %% Deterministic sensor error bounds (Sec. 4)
+    %% Deterministic sensor error bounds
     % Input contract: GNSS position/velocity are inertial-frame,
     % center-of-mass, lever-arm-compensated samples; IMU acceleration is
     % ego-body-frame at the center of mass, gravity- and lever-arm-

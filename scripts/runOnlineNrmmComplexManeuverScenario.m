@@ -1,54 +1,33 @@
 function result = runOnlineNrmmComplexManeuverScenario(varargin)
-% runOnlineNrmmComplexManeuverScenario Exercise the cascaded NRMM observer.
-%
-% Open-loop research scenario for the cascaded measured-input observer in
-% the transformed target coordinates [rho; q; s]. The ego truth is a
-% jerk-rich maneuver with visibly nonzero jerk and yaw acceleration; the
-% observer requires neither to vanish, which is the point of the cascade.
-% The target truth satisfies the Sharma NRMM assumptions exactly (constant
-% scalar acceleration, constant sideslip, kinematic single track with rear
-% axle distance design.target.domain.rearAxleDistance). Synchronized GNSS
-% position+velocity, IMU body-acceleration, gyroscope, and radar frames
-% are generated at cfg.runtime.samplePeriod and fed through
-% onlineNrmmTrackingRuntime.
-%
-% result = runOnlineNrmmComplexManeuverScenario(Name, Value) accepts:
-%   Plot       - logical, default true; plotting is skipped automatically
-%                in -batch sessions.
-%   Report     - logical, default true.
-%   Duration   - scenario length in seconds, default 12.0.
-%   Seed       - noise seed, default 7 (used only with bounded noise).
-%   NoiseModel - "none" (default) or "boundedUniform" within the
-%                configured measurement bounds.
-% All observer gains are solved from the declared domains, deterministic
-% sensor bounds, and sample period; the scenario exposes no gain option.
-%
-% The observer is initialized from truth plus a documented offset (ego
-% position +[1.0; -0.8] m, yaw +0.03 rad, body velocity +[0.5; -0.3] m/s,
-% target [rho; q; s] +[1.0; -0.5; 0.5; 0.5; 0.2; -0.2]). The rho offset
-% excites the deliberate high-gain peaking transient, so result.metrics
-% reports RMSE values only after discarding the first
-% metrics.transientDuration seconds. The cumulative certified
-% speed-domain flag may be false because of that peaking while the
-% final-interval flag recovers; both are reported honestly.
+% runOnlineNrmmComplexManeuverScenario Reproducible open-loop estimator scenario.
+% Options: Plot, Report, Duration (12 s), Seed (7), NoiseModel ('none' or
+% 'boundedUniform'), Config (nrmmTrackingConfig), DropoutIntervals (N-by-2 s),
+% and TargetMotion ('retained' or 'varying'). Initial estimates use documented
+% offsets; metrics discard the first 2 s. The retained truth and random draws
+% are unchanged from the paired high-gain baseline. The varying case declares
+% changing geometric A and curvature and measures the resulting window lag.
+% Radius coverage is empirical validation of conditional analytic bounds;
+% it is not a proof of containment or moving-horizon convergence.
 
     options = localOptions(varargin{:});
     localAddProjectPaths();
     % Declared initial transient discarded before every RMSE evaluation.
     transientDuration = 2.0;                          % s
 
-    cfg = nrmmTrackingConfig();
-    design = synthesizeNrmmObserverGains(cfg);
+    cfg = options.configuration;
+    design = options.designFunction(cfg);
     time = (0.0:cfg.runtime.samplePeriod:options.duration).';
     truth = localTruth(time, ...
         design.yaw.courseModel.rearAxleDistance, ...
-        design.target.domain.rearAxleDistance);
+        design.target.domain.rearAxleDistance, options);
     measurements = localMeasurements(truth, cfg, options);
     initial = localInitialEstimate(truth);
-    estimate = localRunObserver(time, measurements, initial, cfg, design);
-    metrics = localMetrics(truth, estimate, time, transientDuration);
+    estimate = localRunObserver(time, measurements, initial, cfg, design, options);
+    metrics = localMetrics(truth, estimate, time, transientDuration, cfg, options);
+    metrics.curvatureLagSeconds = localCurvatureLag(truth,estimate,options);
 
     result = struct();
+    result.options = options;
     result.config = cfg;
     result.design = design;
     result.truth = truth;
@@ -66,7 +45,7 @@ function result = runOnlineNrmmComplexManeuverScenario(varargin)
 end
 
 function truth = localTruth(time, ...
-        egoRearAxleDistance, targetRearAxleDistance)
+        egoRearAxleDistance, targetRearAxleDistance, options)
 % localTruth Single-track ego maneuver and an exact Sharma-model target.
 %
 % Ego: sinusoidal speed and yaw-rate profiles, with betaE recovered from
@@ -142,6 +121,28 @@ function truth = localTruth(time, ...
         + (targetSpeed.*targetYawRate) ...
         .*[-sin(targetCourse), cos(targetCourse)];
 
+    targetCurvature = repmat(sin(targetSideslip)/targetRearAxleDistance,numel(time),1);
+    scalarAccelerationTruth = repmat(targetScalarAcceleration,numel(time),1);
+    if options.targetMotion == "varying"
+        centre = options.duration/2;
+        initialCourse = targetInitialHeading+targetSideslip;
+        [~,trajectory] = ode113(@(t,x) localVaryingDerivative(t,x,centre,targetCurvature(1)), ...
+            time,[targetInitialPosition.';initialCourse;targetInitialSpeed], ...
+            odeset("RelTol",1.0e-11,"AbsTol",1.0e-12));
+        transition = 0.5*(1+tanh((time-centre)/0.2));
+        scalarAccelerationTruth = 0.08+0.6*transition;
+        targetCurvature = targetCurvature-0.007*transition;
+        targetPosition = trajectory(:,1:2);
+        targetCourse = trajectory(:,3);
+        targetSpeed = trajectory(:,4);
+        targetYawRate = targetSpeed.*targetCurvature;
+        targetVelocity = targetSpeed.*[cos(targetCourse),sin(targetCourse)];
+        targetAcceleration = scalarAccelerationTruth.*[cos(targetCourse),sin(targetCourse)] ...
+            +(targetSpeed.^2.*targetCurvature).*[-sin(targetCourse),cos(targetCourse)];
+        % This heading is the instantaneous constant-sideslip reconstruction;
+        % no changing-sideslip body-yaw model is asserted in this stress case.
+        targetHeading = targetCourse-asin(targetRearAxleDistance*targetCurvature);
+    end
     sampleCount = numel(time);
     targetTransformedState = zeros(sampleCount, 6);
     for sampleIdx = 1:sampleCount
@@ -174,7 +175,15 @@ function truth = localTruth(time, ...
         "targetHeading", targetHeading, ...
         "targetCourse", targetCourse, ...
         "targetYawRate", targetYawRate, ...
+        "targetScalarAcceleration", scalarAccelerationTruth, "targetCurvature", targetCurvature, ...
         "targetTransformedState", targetTransformedState);
+end
+
+function derivative = localVaryingDerivative(time,state,centre,curvature)
+    transition = 0.5*(1+tanh((time-centre)/0.2));
+    acceleration = 0.08+0.6*transition;
+    curvature = curvature-0.007*transition;
+    derivative = [state(4)*cos(state(3));state(4)*sin(state(3));curvature*state(4);acceleration];
 end
 
 function measurements = localMeasurements(truth, cfg, options)
@@ -222,8 +231,8 @@ end
 function initial = localInitialEstimate(truth)
 % localInitialEstimate Truth plus the documented initialization offsets.
 %
-% The target q offset norm is kept moderate (<= 1 m/s) so the high-gain
-% peaking transient stays representative of a plausible track handover.
+% The target q offset is below 1 m/s. The same offsets are used for the
+% window estimator and the independently versioned high-gain comparator.
 
     initial = struct( ...
         "egoPosition", truth.egoPosition(1, :).'+[1.0; -0.8], ...
@@ -233,7 +242,7 @@ function initial = localInitialEstimate(truth)
         + [1.0; -0.5; 0.5; 0.5; 0.2; -0.2]);
 end
 
-function estimate = localRunObserver(time, measurements, initial, cfg, design)
+function estimate = localRunObserver(time, measurements, initial, cfg, design, options)
 % localRunObserver Step the runtime over the synchronized frame sequence.
 
     runtimeOptions = struct( ...
@@ -244,7 +253,7 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design)
         "egoInitialYaw", initial.egoYaw, ...
         "egoInitialBodyVelocity", initial.egoBodyVelocity, ...
         "targetInitialState", initial.targetState);
-    runtime = onlineNrmmTrackingRuntime( ...
+    runtime = options.runtimeFunction( ...
         "initialize", cfg, runtimeOptions, design);
 
     sampleCount = numel(time);
@@ -256,6 +265,10 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design)
     targetHeadingInertial = NaN(sampleCount, 1);
     targetSpeed = NaN(sampleCount, 1);
     targetYawRate = NaN(sampleCount, 1);
+    errorRadius = NaN(sampleCount, 3);
+    outerNonempty = false(sampleCount, 1);
+    fitConsistent = false(sampleCount, 1);
+    stepSeconds = NaN(sampleCount, 1);
 
     % Sample 1 carries the initial estimate mapped through the same output
     % transformations the runtime applies.
@@ -298,9 +311,21 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design)
             "radarRelativePosition", ...
                 measurements.radarRelativePosition(sampleIdx, :), ...
             "radarDetectionAvailable", true);
-        [runtime, output] = onlineNrmmTrackingRuntime( ...
+        if any(frame.time >= options.dropoutIntervals(:,1) & frame.time < options.dropoutIntervals(:,2))
+            frame.radarRelativePosition(:) = NaN;
+            frame.radarDetectionAvailable = false;
+        end
+        timer = tic;
+        [runtime, output] = options.runtimeFunction( ...
             "step", runtime, frame);
+        stepSeconds(sampleIdx+1) = toc(timer);
         targetOutput = output.targetEstimates(1);
+        if isfield(targetOutput,"errorBound") && isfield(targetOutput.errorBound,"outerNonempty")
+            errorRadius(sampleIdx+1,:) = [targetOutput.errorBound.relativePosition, ...
+                targetOutput.errorBound.targetVelocity, targetOutput.errorBound.targetAcceleration];
+            outerNonempty(sampleIdx+1) = targetOutput.errorBound.outerNonempty;
+            fitConsistent(sampleIdx+1) = targetOutput.windowFit.measurementConsistent;
+        end
         egoState(sampleIdx+1, :) = output.egoState.';
         egoYaw(sampleIdx+1) = output.egoYaw;
         egoYawRate(sampleIdx+1) = output.egoYawRate;
@@ -322,11 +347,13 @@ function estimate = localRunObserver(time, measurements, initial, cfg, design)
         "targetHeadingInertial", targetHeadingInertial, ...
         "targetSpeed", targetSpeed, ...
         "targetYawRate", targetYawRate, ...
+        "errorRadius", errorRadius, "outerNonempty", outerNonempty, ...
+        "fitConsistent", fitConsistent, "stepSeconds", stepSeconds, ...
         "finalOutput", output, ...
         "runtime", runtime);
 end
 
-function metrics = localMetrics(truth, estimate, time, transientDuration)
+function metrics = localMetrics(truth, estimate, time, transientDuration, cfg, options)
 % localMetrics RMSE against truth after the declared transient window.
 
     evaluation = time >= transientDuration;
@@ -371,9 +398,64 @@ function metrics = localMetrics(truth, estimate, time, transientDuration)
         finalOutput.minimumReconstructedTargetSpeed;
     metrics.maximumAuditedRelativePosition = ...
         finalOutput.estimatedOperatingDomainAudit.maximumRelativePosition;
+    physicalError = [vecnorm(estimate.targetState(:,1:2)-truth.targetTransformedState(:,1:2),2,2), ...
+        vecnorm(estimate.targetState(:,3:4)-truth.targetTransformedState(:,3:4),2,2), ...
+        vecnorm(estimate.targetState(:,5:6)-truth.targetTransformedState(:,5:6),2,2)];
+    metrics.radiusCoverageFraction = mean(all(physicalError(evaluation,:) <= estimate.errorRadius(evaluation,:),2) ...
+        & estimate.outerNonempty(evaluation));
+    metrics.meanErrorRadius = mean(estimate.errorRadius(evaluation,:),1);
+    metrics.maximumErrorRadius = max(estimate.errorRadius(evaluation,:),[],1);
+    metrics.outerNonemptyFraction = mean(estimate.outerNonempty(evaluation));
+    metrics.nominalMeasurementConsistentFraction = mean(estimate.fitConsistent(evaluation));
+    metrics.meanStepMilliseconds = 1000*mean(estimate.stepSeconds(2:end));
+    metrics.maximumStepMilliseconds = 1000*max(estimate.stepSeconds(2:end));
+    if all(isnan(estimate.errorRadius),"all")
+        metrics.radiusCoverageFraction = NaN;
+        metrics.outerNonemptyFraction = NaN;
+        metrics.nominalMeasurementConsistentFraction = NaN;
+    end
+    metrics.estimatedDomainValidFraction = mean(localPhysicalDomain(estimate.targetState(evaluation,:),cfg));
+    metrics.truthOperatingDomainValid = all(localPhysicalDomain(truth.targetTransformedState,cfg));
+    if options.targetMotion == "varying"
+        metrics.truthOperatingDomainValid = metrics.truthOperatingDomainValid ...
+            && cfg.target.model.scalarAccelerationRateMaximum >= 1.5 ...
+            && cfg.target.model.curvatureRateMaximum >= 0.0175;
+    end
     metrics.domainViolationQuantities = unique( ...
         finalOutput.estimatedOperatingDomainAudit.violationQuantities, ...
         "stable");
+end
+
+function valid = localPhysicalDomain(state,cfg)
+    speed = vecnorm(state(:,3:4),2,2);
+    acceleration = sum(state(:,3:4).*state(:,5:6),2)./max(speed,realmin);
+    curvature = sum([-state(:,4),state(:,3)].*state(:,5:6),2)./max(speed,1.0e-100).^3;
+    domain = cfg.target.domain;
+    valid = speed >= domain.speedMinimum-1.0e-7 & speed <= domain.speedMaximum+1.0e-7 ...
+        & abs(acceleration) <= domain.scalarAccelerationMaximum+1.0e-7 ...
+        & abs(curvature) <= sin(domain.sideslipMaximum)/domain.rearAxleDistance+1.0e-7 ...
+        & vecnorm(state(:,1:2),2,2) <= domain.relativePositionMaximum+1.0e-7;
+end
+
+function lag = localCurvatureLag(truth,estimate,options)
+    lag = NaN;
+    if options.targetMotion ~= "varying"
+        return
+    end
+    q = estimate.targetState(:,3:4);
+    s = estimate.targetState(:,5:6);
+    curvature = sum([-q(:,2),q(:,1)].*s,2)./vecnorm(q,2,2).^3;
+    centre = options.duration/2;
+    selected = truth.time >= centre-0.5 & truth.time <= centre+1.5;
+    candidates = (-1:options.configuration.runtime.samplePeriod:2).';
+    error = Inf(size(candidates));
+    for index = 1:numel(candidates)
+        delayedTruth = interp1(truth.time,truth.targetCurvature, ...
+            truth.time(selected)-candidates(index),"linear",NaN);
+        error(index) = mean((curvature(selected)-delayedTruth).^2,"omitnan");
+    end
+    [~,index] = min(error);
+    lag = candidates(index);
 end
 
 function value = localVectorRmse(error, evaluation)
@@ -382,61 +464,16 @@ function value = localVectorRmse(error, evaluation)
 end
 
 function localReport(metrics, design)
-% localReport Print the synthesized design surface and the run metrics.
-
-    fprintf("\nCascaded measured-input NRMM observer scenario\n");
-    fprintf("  sample period: %.6g s\n", design.samplePeriod);
-    fprintf("  solved yaw correction bandwidth kt: %.6g 1/s\n", ...
-        design.yaw.correctionBandwidth);
-    fprintf("  body-velocity gain kv and certified lambda_v: " ...
-        + "%.6g 1/s, %.6g 1/s\n", ...
-        design.velocity.gain, design.velocity.lambda);
-    fprintf("  position gain kp: %.6g 1/s\n", design.position.gain);
-    fprintf("  target shape / solved bandwidth / stability threshold: " ...
-        + "%s / %.6g / %.6g 1/s\n", char(design.target.shape), ...
-        design.target.bandwidth, ...
-        design.target.lipschitzCertificate.minimumStabilityBandwidth);
-    fprintf("  core comparison eigenvalues: %s 1/s\n", ...
-        mat2str(real(eig(design.coreIss.matrix)).', 4));
-    fprintf("  ultimate bounds: yaw %.4g rad, position %.4g m, " ...
-        + "body velocity %.4g m/s\n", design.ultimateBounds.yaw, ...
-        design.ultimateBounds.position, ...
-        design.ultimateBounds.bodyVelocity);
-    fprintf("  ultimate bounds: relative position %.4g m, target " ...
-        + "velocity %.4g m/s, target acceleration %.4g m/s^2\n", ...
-        design.ultimateBounds.relativePosition, ...
-        design.ultimateBounds.targetVelocity, ...
-        design.ultimateBounds.targetAcceleration);
-    fprintf("  transient discarded before RMSE: %.3g s\n", ...
-        metrics.transientDuration);
-    fprintf("  ego position / velocity / acceleration RMSE: " ...
-        + "%.4g m / %.4g m/s / %.4g m/s^2\n", metrics.egoPositionRmse, ...
-        metrics.egoVelocityRmse, metrics.egoAccelerationRmse);
-    fprintf("  ego yaw RMSE: %.4g rad\n", metrics.egoYawRmse);
-    fprintf("  relative-position RMSE: %.4g m\n", ...
-        metrics.relativePositionRmse);
-    fprintf("  target velocity / acceleration RMSE: " ...
-        + "%.4g m/s / %.4g m/s^2\n", metrics.targetVelocityRmse, ...
-        metrics.targetAccelerationRmse);
-    fprintf("  target heading RMSE: %.4g rad\n", ...
-        metrics.targetHeadingRmse);
-    fprintf("  all samples finite: %d\n", metrics.allSamplesFinite);
-    fprintf("  certified speed domain valid (cumulative / final " ...
-        + "interval): %d / %d\n", ...
-        metrics.targetSpeedDomainValidCumulative, ...
-        metrics.targetSpeedDomainValidFinalInterval);
-    fprintf("  estimated operating domain valid (cumulative / final " ...
-        + "interval): %d / %d\n", ...
-        metrics.operatingDomainValidCumulative, ...
-        metrics.operatingDomainValidFinalInterval);
-    fprintf("  minimum reconstructed target speed: %.6g m/s\n", ...
-        metrics.minimumReconstructedTargetSpeed);
-    fprintf("  maximum audited relative position: %.6g m\n", ...
-        metrics.maximumAuditedRelativePosition);
-    if ~isempty(metrics.domainViolationQuantities)
-        fprintf("  audited domain violations: %s\n", ...
-            strjoin(metrics.domainViolationQuantities, ", "));
-    end
+    fprintf("\nExact-flow finite-window NRMM estimator\n");
+    fprintf("  sample period / window: %.3g / %.3g s\n", ...
+        design.samplePeriod, design.configuration.window.duration);
+    fprintf("  relative position / velocity / acceleration RMSE: %.6g / %.6g / %.6g\n", ...
+        metrics.relativePositionRmse, metrics.targetVelocityRmse, metrics.targetAccelerationRmse);
+    fprintf("  mean p/q/s enclosure radii: %s\n", mat2str(metrics.meanErrorRadius, 5));
+    fprintf("  observed radius coverage / outer nonempty: %.4f / %.4f\n", ...
+        metrics.radiusCoverageFraction, metrics.outerNonemptyFraction);
+    fprintf("  mean / maximum step: %.3f / %.3f ms\n", ...
+        metrics.meanStepMilliseconds, metrics.maximumStepMilliseconds);
 end
 
 function localPlot(result)
@@ -484,6 +521,7 @@ function value = localWrapToPi(value)
 end
 
 function options = localOptions(varargin)
+    localAddProjectPaths();
     parser = inputParser;
     parser.FunctionName = mfilename;
     addParameter(parser, "Plot", true, ...
@@ -496,8 +534,16 @@ function options = localOptions(varargin)
         @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0.0);
     addParameter(parser, "NoiseModel", "none", ...
         @(x) isstring(x) || ischar(x));
+    addParameter(parser, "Config", nrmmTrackingConfig(), @(x) isstruct(x) && isscalar(x));
+    addParameter(parser, "DropoutIntervals", zeros(0,2), ...
+        @(x) isnumeric(x) && size(x,2) == 2 && all(isfinite(x), "all") && all(x(:,2) >= x(:,1)));
+    addParameter(parser,"TargetMotion","retained",@(x) any(string(x) == ["retained","varying"]));
+    addParameter(parser,"RuntimeFunction",@onlineNrmmTrackingRuntime,@(x) isa(x,"function_handle"));
+    addParameter(parser,"DesignFunction",@nrmmWindowEstimatorDesign,@(x) isa(x,"function_handle"));
     parse(parser, varargin{:});
     options = struct( ...
+        "runtimeFunction", parser.Results.RuntimeFunction, "designFunction", parser.Results.DesignFunction, ...
+        "targetMotion", string(parser.Results.TargetMotion), "configuration", parser.Results.Config, "dropoutIntervals", parser.Results.DropoutIntervals, ...
         "plot", parser.Results.Plot, ...
         "report", parser.Results.Report, ...
         "seed", double(parser.Results.Seed), ...

@@ -89,33 +89,19 @@ function cfg = estimatorControllerIntegrationConfig()
     % the controller receives six numbers indistinguishable from a truth
     % state and plans as if estimation were exact.
     %
-    % The cascaded observer carries ISS certificates
-    % (synthesizeNrmmObserverGains), but their worst-case disturbance
-    % chains remain far too conservative to tighten controller rows
-    % with. These radii therefore remain engineering
-    % values measured on the straight oncoming avoidance run, not
-    % certified bounds.
-    %
-    % Position and velocity come from maxima measured over the straight
-    % oncoming avoidance run (0.0477 m and 0.1892 m/s) with a factor of
-    % roughly 1.6 on top; the ego velocity radius is consistent with the
-    % directly sensed GNSS velocity contract (0.05 m/s noise plus the
-    % yaw-rotation coupling of the estimated frame).
-    %
-    % Yaw follows the course-direction observability of the sensor
-    % contract with a factor of roughly 2.5; it should be re-measured
-    % over a completing avoidance run as soon as one exists.
+    % These controller tightening values remain explicit engineering
+    % assumptions from the scenario configuration. The redesigned runtime
+    % separately publishes conditional relative-state enclosures and a yaw
+    % set. They are not interchangeable with inertial-frame controller bounds.
+    % A certified closed-loop integration requires propagating ego position,
+    % yaw, and target correlations into that controller's uncertainty model.
     cfg.publishedErrorBound.egoPosition = 0.08;       % m
     cfg.publishedErrorBound.egoVelocity = 0.30;       % m/s
     cfg.publishedErrorBound.egoYaw = 0.03;            % rad
     cfg.publishedErrorBound.egoYawRate = 0.05;        % rad/s
-    % The target radii are derived rather than measured. Position is the
-    % radar noise added to the ego position radius. Target velocity is
-    % not sensed at all: a single radar return cannot observe it, and for
-    % a position sensor of bounded noise eps observed over a window T no
-    % causal estimator can beat 2 eps / T. At eps = 0.04 m this is
-    % 0.32 m/s over a 0.25 s window and 0.16 m/s over 0.50 s.
-    % See controller/LTV_BICYCLE_QP.md section 2.
+    % Retained nominal planner margins, not certificates of the new window
+    % estimator. The adapter labels their source explicitly and publishes the
+    % unfiltered NRMM position, velocity, and acceleration alongside them.
     cfg.publishedErrorBound.targetPosition = 0.15;    % m
     cfg.publishedErrorBound.targetVelocity = 0.32;    % m/s
     cfg.publishedErrorBound.targetYaw = 0.10;         % rad

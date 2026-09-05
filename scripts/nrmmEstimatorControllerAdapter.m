@@ -54,7 +54,7 @@ function [context, initialization] = localInitialize( ...
             egoTruth{sampleIdx}, bodyAcceleration, targetTruth);
     end
 
-    observerDesign = synthesizeNrmmObserverGains(cfg.observer);
+    observerDesign = nrmmWindowEstimatorDesign(cfg.observer);
     egoInitial = localInitialEgoEstimate(frame, observerDesign);
     [targetInitialState, targetAcquired, targetAcquisition] = ...
         localInitialTargetEstimate( ...
@@ -94,7 +94,6 @@ function [context, initialization] = localInitialize( ...
         "initialFramePending", true, ...
         "initialFrame", currentFrame, ...
         "initialAudit", audit{end}, ...
-        "targetOutputFilter", localEmptyOutputFilter(), ...
         "previousControllerTime", 0.0, ...
         "previousControllerEgoTruth", initialEgoTruth, ...
         "previousObserverEgoTruth", initialEgoTruth, ...
@@ -162,9 +161,7 @@ function [context, egoEstimate, targetEstimate, frame, audit] = ...
         if publicationPolicy ...
                 == "currentRadarVisibilityRequiredInternalTrackMayCoast" ...
                 && frame.radarDetectionAvailable
-            [context, targetEstimate] = localApplyOutputFilter( ...
-                context, rawTargetEstimate, ...
-                time - context.previousControllerTime);
+            targetEstimate = rawTargetEstimate;
         else
             targetEstimate = struct([]);
         end
@@ -308,66 +305,6 @@ function estimate = localCurrentEgoEstimate(output, ~, ~)
     estimate = output;
 end
 
-function filterState = localEmptyOutputFilter()
-    filterState = struct( ...
-        "valid", false, ...
-        "position", zeros(2, 1), ...
-        "velocity", zeros(2, 1));
-end
-
-function [context, published] = localApplyOutputFilter( ...
-        context, rawEstimate, elapsed)
-% Pole-placed constant-velocity output filter on the published target.
-%
-% The runtime's reconstruction is transiently violent while the ego
-% itself manoeuvres: mid-pass its target velocity swings by metres per
-% second and its acceleration by whole g-fractions, and the controller
-% extrapolates whatever it is handed over a 4.8-second horizon, which
-% poisons every collision row for a handful of frames. The published
-% stream is therefore a critically damped alpha-beta filter on a
-% constant-velocity model: it tracks honest motion within a few
-% samples, absorbs the transient, and publishes zero acceleration in
-% keeping with its own model. This restores the adapter's documented
-% output stage, which the flattening refactor had dropped.
-
-    published = rawEstimate;
-    if isempty(rawEstimate)
-        context.targetOutputFilter = localEmptyOutputFilter();
-        return;
-    end
-    filterState = context.targetOutputFilter;
-    rawPosition = rawEstimate(1).targetPositionInertial(:);
-    rawVelocity = rawEstimate(1).targetVelocityInertial(:);
-    if ~filterState.valid
-        filterState = struct("valid", true, ...
-            "position", rawPosition, "velocity", rawVelocity);
-    else
-        elapsed = max(elapsed, 1.0e-3);
-        % Critically damped alpha-beta gains for a double pole at z.
-        z = 0.6;
-        alpha = 1.0 - z^2;
-        beta = (1.0 - z)^2;
-        predictedPosition = filterState.position ...
-            + elapsed * filterState.velocity;
-        innovation = rawPosition - predictedPosition;
-        filterState.position = predictedPosition + alpha * innovation;
-        filterState.velocity = filterState.velocity ...
-            + (beta / elapsed) * innovation;
-    end
-    context.targetOutputFilter = filterState;
-    published(1).targetPositionInertial = filterState.position;
-    published(1).targetVelocityInertial = filterState.velocity;
-    published(1).targetAccelerationInertial = zeros(2, 1);
-    speed = norm(filterState.velocity);
-    if speed > 0.5
-        published(1).targetYawInertial = ...
-            atan2(filterState.velocity(2), filterState.velocity(1));
-    end
-    published(1).targetYawRate = 0.0;
-    published(1).outputFilter = ...
-        "polePlacedConstantVelocityAlphaBeta";
-end
-
 function [egoEstimate, targetEstimate] = localAttachErrorBounds( ...
         egoEstimate, targetEstimate, cfg)
 % Publish the estimation error radii alongside the estimates.
@@ -382,12 +319,14 @@ function [egoEstimate, targetEstimate] = localAttachErrorBounds( ...
         return;
     end
     bound = cfg.publishedErrorBound;
+    egoEstimate.controllerErrorBoundSource = "configured-engineering-assumption";
     % Controller state order is
     % [x; y; yaw; longitudinalVelocity; lateralVelocity; yawRate].
     egoEstimate.controllerStateErrorBound = [ ...
         bound.egoPosition; bound.egoPosition; bound.egoYaw; ...
         bound.egoVelocity; bound.egoVelocity; bound.egoYawRate];
     for targetIdx = 1:numel(targetEstimate)
+        targetEstimate(targetIdx).controllerErrorBoundSource = "configured-engineering-assumption";
         targetEstimate(targetIdx).targetPositionInertialErrorBound = ...
             bound.targetPosition * ones(2, 1);
         targetEstimate(targetIdx).targetVelocityInertialErrorBound = ...
@@ -404,12 +343,12 @@ function estimate = localLabelTargetEstimate(estimate, acquisition)
         estimate(targetIdx).velocityInitializationMethod = ...
             acquisition.velocityInitializationMethod;
         estimate(targetIdx).source = ...
-            "NRMM continuous-gain output predictor";
+            "NRMM exact-flow finite-window estimator";
     end
 end
 
 function egoInitial = localInitialEgoEstimate(frame, observerDesign)
-% localInitialEgoEstimate Seed the ego cascade from the latest GNSS sample.
+% localInitialEgoEstimate Seed body velocity and yaw from joint sensor information.
 %
 % GNSS velocity is directly sensed, so the seed needs no history secant:
 % position and velocity come from the newest frame. Initial yaw applies the
@@ -419,24 +358,16 @@ function egoInitial = localInitialEgoEstimate(frame, observerDesign)
     latestFrame = frame{end};
     position = [latestFrame.xGps; latestFrame.yGps];
     inertialVelocity = [latestFrame.vxGps; latestFrame.vyGps];
-    course = certifiedKinematicCourseCorrespondence( ...
-        inertialVelocity, latestFrame.yawRateMeasured, ...
-        observerDesign.yaw.courseModel.rearAxleDistance, ...
-        observerDesign.sensors.velocityNoiseMaximum, ...
-        observerDesign.sensors.gyroscopeNoiseMaximum, ...
-        observerDesign.yaw.courseModel ...
-            .singleTrackYawRateMismatchMaximum, ...
-        observerDesign.yaw.courseModel.sideslipDomainMaximum);
-    if ~course.correspondence.informative
+    information = nrmmBodyVelocitySet(inertialVelocity, latestFrame.yawRateMeasured, ...
+        observerDesign.configuration);
+    if ~information.nonempty
         error("nrmmEstimatorControllerAdapter:unobservableInitialCourse", ...
-            "GNSS velocity and yaw rate did not certify an initial yaw.");
+            "GNSS velocity and yaw rate have an empty body-velocity information set.");
     end
-    yaw = course.correspondence.heading;
-    egoInitial = struct( ...
-        "position", position, ...
-        "yaw", yaw, ...
-        "bodyVelocity", localRotation(yaw).'*inertialVelocity, ...
-        "inertialVelocity", inertialVelocity);
+    yaw = atan2(inertialVelocity(2), inertialVelocity(1)) ...
+        -atan2(information.representative(2), information.representative(1));
+    egoInitial = struct("position", position, "yaw", yaw, ...
+        "bodyVelocity", information.representative, "inertialVelocity", inertialVelocity);
 end
 
 function [targetState, acquired, acquisition] = ...
@@ -573,8 +504,7 @@ function [context, justAcquired] = ...
         localTargetVelocityInitializationMethod( ...
             numel(selectedIdx));
     context.targetAcquisition = acquisition;
-    context.runtime.targetState = targetState;
-    context.runtime.targetOutputPredictor = targetState(1:2);
+    context.runtime = onlineNrmmTrackingRuntime("resetTarget", context.runtime, 1, targetState);
     context.runtime.targetCertifiedSpeedDomainValid = true;
     context.runtime.minimumReconstructedTargetSpeed = targetSpeed;
     context.runtime.lastIntervalTargetCertifiedSpeedDomainValid = true;
@@ -621,8 +551,7 @@ end
 
 function context = localAnchorDormantTarget(context, ~)
     targetState = localDormantTargetState(context.configuration);
-    context.runtime.targetState = targetState;
-    context.runtime.targetOutputPredictor = targetState(1:2);
+    context.runtime = onlineNrmmTrackingRuntime("resetTarget", context.runtime, 1, targetState);
     context.runtime.lastIntervalTargetCertifiedSpeedDomainValid = true;
     context.runtime.minimumReconstructedTargetSpeed = min( ...
         context.runtime.minimumReconstructedTargetSpeed, ...
