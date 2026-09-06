@@ -2,8 +2,8 @@ function program = avoidanceStageQp(qp, prediction, rows, bound, stateNode, inpu
 %avoidanceStageQp Keep dynamics and constraints local in the CBF-CLF-QP.
 % The additional variables are x_1,...,x_M. Eliminating their affine
 % dynamics recovers the condensed program used by independent acceptance.
-% The quadratic input objective is retained directly. The continuous-time
-% CLF is one affine row in the current input and its nonnegative slack.
+% Only the CLF slack is penalized; explicit states add no objective terms.
+% The continuous-time CLF is one affine row in the current input and slack.
 
     stages = prediction.stageCount;
     controls = qp.layout.planCount;

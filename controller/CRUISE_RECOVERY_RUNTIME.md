@@ -1,5 +1,11 @@
 # Cruise recovery and controller execution time
 
+Historical experiment record for commit `dc58ef1`. The subsequent
+[CLF relaxation-only experiment](CLF_RELAXATION_ONLY.md) removes the sampled
+LQR input preference and all head/continuation input costs at the user's
+request. The results below describe the earlier implementation; they do not
+validate the current objective. Its geometry and execution improvements remain.
+
 ## Scope and reproduced failures
 
 The September 6, 2026 baseline used the actual Vehicle Dynamics Blockset

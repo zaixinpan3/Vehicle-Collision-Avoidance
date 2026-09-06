@@ -1,5 +1,9 @@
 classdef cruiseRecoveryTest < matlab.unittest.TestCase
-    %cruiseRecoveryTest Sampled cruise feedback under the unchanged safety QP.
+    %cruiseRecoveryTest Slack-only cruise optimization and initialization.
+
+    properties (TestParameter)
+        speed = struct("moderateError", 14.4, "actuatorLimitedError", 8.0);
+    end
 
     methods (TestClassSetup)
         function addControllerPaths(testCase)
@@ -28,28 +32,40 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             testCase.verifyNotEmpty(command);
         end
 
-        function moderateSpeedErrorRequestsRecoveryBeyondTheMinimumClfDecay(testCase)
+        function everyInputPlanHasTheSameCostAtFixedRelaxation(testCase)
             cfg = localConfiguration();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.4);
-            [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
-            minimumClfInput = -problem.qp.clf.decayRate*(-0.6) ...
-                /(2*cfg.model.longitudinalInputGain);
-            testCase.verifyGreaterThan(command.actuatorInput(2), 2*minimumClfInput);
-            testCase.verifyLessThanOrEqual(command.actuatorInput(2), ...
-                cfg.actuation.longitudinalAccelerationMaximum+1.0e-5);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThanOrEqual(problem.metadata.hardRowViolation, 1.0e-5);
+            [~, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
+            decision = problem.decision;
+            decision(end) = 0.7;
+            alternative = decision;
+            alternative(1:end-1) = sin((1:problem.layout.planCount).');
+            expectedCost = cfg.clf.relaxationWeight*0.7;
+
+            testCase.verifyEqual(localObjective(problem.qp, decision), expectedCost, AbsTol=1.0e-12);
+            testCase.verifyEqual(localObjective(problem.qp, alternative), expectedCost, AbsTol=1.0e-12);
+            testCase.verifyEqual(nnz(problem.qp.Hessian), 0);
+            testCase.verifyEqual(nnz(problem.qp.stageProgram.P), 0);
+            testCase.verifyEqual(nnz(problem.qp.stageProgram.q), 1);
+            testCase.verifyFalse(isfield(problem.qp, "preferredInput"));
+            testCase.verifyFalse(isfield(problem.qp.clf.certificate, "sampledFeedbackGain"));
         end
 
-        function theUnconstrainedSampledFeedbackHasStablePoles(testCase)
+        function relaxationMatchesAnIndependentLinearProgram(testCase, speed)
             cfg = localConfiguration();
-            ego = struct("position", [0; 0], "yaw", 0, "speed", 15);
-            [~, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
-            certificate = problem.qp.clf.certificate;
-            [a, b] = ltvBicycleModel.stageMatrices(0, cfg.referenceSpeed, cfg.controller.sampleTime, cfg);
-            poles = eig(a(2:6, 2:6)-b(2:6, :)*certificate.sampledFeedbackGain);
-            testCase.verifyLessThan(max(abs(poles)), 1.0);
-            testCase.verifyEqual(problem.qp.preferredInput, [0; 0], AbsTol=1.0e-12);
+            ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
+            road = [0, 0; 2000, 0];
+            [~, ~, native] = collisionAvoidanceController(ego, [], road, cfg, []);
+            cfg.solver.jointFunction = @localLinprog;
+            [~, ~, independent] = collisionAvoidanceController(ego, [], road, cfg, []);
+
+            testCase.verifyTrue(native.metadata.planCertified);
+            testCase.verifyTrue(independent.metadata.planCertified);
+            testCase.verifyEqual(native.metadata.clfRelaxation, ...
+                independent.metadata.clfRelaxation, AbsTol=1.0e-5);
+            testCase.verifyEqual(native.metadata.jointObjectiveValue, ...
+                cfg.clf.relaxationWeight*native.metadata.clfRelaxation, AbsTol=1.0e-10);
+            testCase.verifyLessThanOrEqual(native.metadata.hardRowViolation, 1.0e-5);
         end
 
         function preparationDoesNotConsumeOrReplaceTheLiveCertificate(testCase)
@@ -92,4 +108,16 @@ end
 function cfg = localConfiguration()
     cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4), ...
         "model", struct("longitudinalInputGain", 0.8)));
+end
+
+function value = localObjective(qp, decision)
+    value = 0.5*decision.'*qp.Hessian*decision+qp.linear.'*decision+qp.constant;
+end
+
+function result = localLinprog(~, program)
+    options = optimoptions("linprog", "Display", "none", ...
+        "ConstraintTolerance", 1.0e-9, "OptimalityTolerance", 1.0e-9);
+    [decision, ~, exitFlag, output] = linprog(program.f, ...
+        program.A, program.b, program.Aeq, program.beq, program.lb, program.ub, options);
+    result = struct("decision", decision, "exitFlag", exitFlag, "output", output);
 end

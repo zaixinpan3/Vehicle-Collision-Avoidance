@@ -85,7 +85,7 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
 \[
  \begin{aligned}
  \min_{\mathrm{plan},\delta\ge0}\quad&
- J_{\mathrm{input}}(\mathrm{plan})+\rho\delta,\\
+ \rho\delta,\\
  \text{s.t.}\quad& \text{hard actuator, axle-friction, slip and domain rows},\\
  &\underline g_{\ell j}(\mathrm{plan};c_t)\ge0,\\
  &(v_x,v_y,r)_{M}=(0,0,0),\\
@@ -93,13 +93,15 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
  \end{aligned}
 \]
 
-The current-input cost is centered at the performance-reference equilibrium
-minus sampled LQR feedback on the current cruise error. The discrete gain
-uses the exact held-input model and configured sample period; future head
-inputs retain their equilibrium centres. A small positive input quadratic
-in the continuation removes degeneracy. See
-[CRUISE_RECOVERY_RUNTIME.md](CRUISE_RECOVERY_RUNTIME.md) for the recovery
-diagnosis, input preference and explicit runtime initialization.
+Only the nonnegative CLF relaxation is minimized. There is no input cost,
+input reference, sampled LQR feedback target, or continuation regularization
+in the objective. Inputs remain decision variables in the dynamics and hard
+constraints. Multiple feasible plans may attain the same minimum relaxation;
+the objective specifies no preference among them. The continuous Riccati
+input weights still define the CLF certificate, not an online input penalty.
+See [CLF_RELAXATION_ONLY.md](CLF_RELAXATION_ONLY.md) for the experiment and
+[CRUISE_RECOVERY_RUNTIME.md](CRUISE_RECOVERY_RUNTIME.md) for historical recovery
+diagnosis and the retained explicit runtime initialization.
 There is no safety slack. Define the local cruise error by
 
 \[
@@ -145,13 +147,14 @@ independent of the sample period. This uses the continuous-matrix syntax of
 The affine performance inequality follows the CLF-QP construction in
 [Ames, Xu, Grizzle and Tabuada (2017)](https://arxiv.org/abs/1609.06408).
 
-The native solver retains the quadratic input objective and the existing
-linear slack penalty directly. Slack now has units of `V` per second. The
-numerical penalty coefficient remains unchanged; its previous discrete-time
-tuning and closed-loop performance results do not transfer automatically.
+The native solver receives a zero Hessian and the existing positive linear
+slack penalty. Slack has units of `V` per second. Since it is the sole cost,
+its positive weight scales the objective without changing the mathematical
+minimizer set. Solver tolerances can still affect numerical solutions.
 All hard rows, their tolerances, the continuation, and the rest constraints
-are unchanged. The resulting optimization is a convex QP with affine
-constraints, while its safety certificate retains its predictive node scope.
+retain their definitions. The resulting optimization is a linear program
+through the existing QP interface. Its safety certificate retains its
+predictive node scope.
 
 The numerical decision also includes `x_1,...,x_M`. Sparse equality rows
 impose `x_(j+1) = A_j*x_j+B_j*u_j+c_j`, terminal rest and the fixed final
@@ -185,7 +188,8 @@ station is ahead, the reference speed is the smaller of requested cruise and
 distance to that station divided by clearance time plus
 `performance.crossingTimeGap` (default 0.25 s). Clearance time is the node
 following the last occupied node. Otherwise, the requested cruise speed is
-retained. Both the input objective and continuous-time CLF use this reference.
+retained. The continuous-time CLF uses this state reference; there is no
+input-reference objective.
 
 This is a deterministic preference to yield before a crossing, not a safety
 certificate or another trajectory solve. It uses nominal target motion; the
@@ -403,7 +407,8 @@ construction. Those references do not independently certify this implementation.
 
 These checks describe the earlier CLF conversion. The subsequent input-cost
 and execution changes are documented in
-[CRUISE_RECOVERY_RUNTIME.md](CRUISE_RECOVERY_RUNTIME.md).
+[CRUISE_RECOVERY_RUNTIME.md](CRUISE_RECOVERY_RUNTIME.md), followed by the
+[relaxation-only objective experiment](CLF_RELAXATION_ONLY.md).
 
 The isolated commit tree passes all 120 tests in `continuousTimeClfTest`,
 `sparseAvoidanceQpTest`, `collisionAvoidanceControllerTest`,

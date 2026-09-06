@@ -1,5 +1,5 @@
 function result = solveHardCbfClf(problem, cfg)
-% solveHardCbfClf Solve hard CBF constraints with a joint CLF/input cost.
+% solveHardCbfClf Minimize CLF relaxation under hard predictive constraints.
 %
 % The certified decision assembled by formulateAvoidanceProblem is
 %
@@ -7,7 +7,8 @@ function result = solveHardCbfClf(problem, cfg)
 %
 % where every collision, road, physical, backup-tail, and terminal row is
 % hard. delta relaxes only LfV + LgV*u_0 <= -alpha*V + delta.
-% One QP minimizes J_input(plan) + w*delta with affine constraints.
+% One linear program minimizes w*delta with affine constraints and no input
+% cost. The QP interface is retained with an identically zero Hessian.
 % The native backend uses explicit stage states with sparse dynamics;
 % the optional solver hook receives the equivalent condensed QP.
 
@@ -23,7 +24,7 @@ function result = solveHardCbfClf(problem, cfg)
     result.solverCalls = 1;
     if ~jointSolve.feasible
         result.exitFlag = jointSolve.exitFlag;
-        result.message = "joint CLF/input solve failed: " ...
+        result.message = "CLF relaxation solve failed: " ...
             + jointSolve.message;
         return;
     end

@@ -1,8 +1,17 @@
 # Controller runtime and sparse QP implementation
 
-## Continuous-time CLF-QP update (2026-09-06)
+## CLF relaxation-only update (2026-09-06)
 
-The online controller now uses `avoidanceStageQp` with the unchanged sparse
+The latest formulation removes every input cost and the sampled LQR input
+preference. It minimizes only the nonnegative CLF slack with a zero Hessian
+through the existing sparse QP interface. The geometry, native solver and
+explicit pre-sampling initialization remain. See
+[CLF_RELAXATION_ONLY.md](CLF_RELAXATION_ONLY.md) for current measurements.
+The earlier timings below do not validate this objective.
+
+## Historical continuous-time CLF-QP update (2026-09-06)
+
+The CLF-QP conversion used `avoidanceStageQp` with the unchanged sparse
 hard-safety and dynamic rows, the same quadratic input objective, and one
 affine continuous-time CLF constraint. The native Clarabel bridge receives
 only the zero and nonnegative cone dimensions. It requires no Lorentz cone,
