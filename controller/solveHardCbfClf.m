@@ -1,5 +1,5 @@
 function result = solveHardCbfClf(problem, cfg)
-% solveHardCbfClf Minimize CLF relaxation under hard predictive constraints.
+% solveHardCbfClf Minimize input effort and squared CLF relaxation.
 %
 % The certified decision assembled by formulateAvoidanceProblem is
 %
@@ -7,8 +7,8 @@ function result = solveHardCbfClf(problem, cfg)
 %
 % where every collision, road, physical, backup-tail, and terminal row is
 % hard. delta relaxes only LfV + LgV*u_0 <= -alpha*V + delta.
-% One linear program minimizes w*delta with affine constraints and no input
-% cost. The QP interface is retained with an identically zero Hessian.
+% One quadratic program minimizes normalized head input effort plus w*delta^2
+% under affine hard constraints, without a desired input or a tail input cost.
 % The native backend uses explicit stage states with sparse dynamics;
 % the optional solver hook receives the equivalent condensed QP.
 

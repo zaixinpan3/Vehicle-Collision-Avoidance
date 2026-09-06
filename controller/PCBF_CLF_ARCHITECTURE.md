@@ -85,7 +85,7 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
 \[
  \begin{aligned}
  \min_{\mathrm{plan},\delta\ge0}\quad&
- \rho\delta,\\
+ h\sum_{j=0}^{N-1}u_j^{\mathsf T}R_u u_j+\rho\delta^2,\\
  \text{s.t.}\quad& \text{hard actuator, axle-friction, slip and domain rows},\\
  &\underline g_{\ell j}(\mathrm{plan};c_t)\ge0,\\
  &(v_x,v_y,r)_{M}=(0,0,0),\\
@@ -93,15 +93,17 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
  \end{aligned}
 \]
 
-Only the nonnegative CLF relaxation is minimized. There is no input cost,
-input reference, sampled LQR feedback target, or continuation regularization
-in the objective. Inputs remain decision variables in the dynamics and hard
-constraints. Multiple feasible plans may attain the same minimum relaxation;
-the objective specifies no preference among them. The continuous Riccati
-input weights still define the CLF certificate, not an online input penalty.
-See [CLF_RELAXATION_ONLY.md](CLF_RELAXATION_ONLY.md) for the experiment and
-[CRUISE_RECOVERY_RUNTIME.md](CRUISE_RECOVERY_RUNTIME.md) for historical recovery
-diagnosis and the retained explicit runtime initialization.
+The objective penalizes normalized input effort over the performance head
+and the square of the nonnegative CLF relaxation. There is no desired
+acceleration, steering reference, sampled LQR input target, input-rate cost,
+or continuation input cost. The backup tail is a safety witness. The positive
+weights on head controls and slack distinguish these variables between
+feasible plans, although the unpenalized tail can remain nonunique.
+The same configured input weights also define the continuous Riccati
+certificate. See [QUADRATIC_CLF_INPUT_OBJECTIVE.md](QUADRATIC_CLF_INPUT_OBJECTIVE.md)
+for the current objective and validation. The earlier relaxation-only results
+in [CLF_RELAXATION_ONLY.md](CLF_RELAXATION_ONLY.md) describe the preceding
+controller and remain historical measurements.
 There is no safety slack. Define the local cruise error by
 
 \[
@@ -147,14 +149,18 @@ independent of the sample period. This uses the continuous-matrix syntax of
 The affine performance inequality follows the CLF-QP construction in
 [Ames, Xu, Grizzle and Tabuada (2017)](https://arxiv.org/abs/1609.06408).
 
-The native solver receives a zero Hessian and the existing positive linear
-slack penalty. Slack has units of `V` per second. Since it is the sole cost,
-its positive weight scales the objective without changing the mathematical
-minimizer set. Solver tolerances can still affect numerical solutions.
-All hard rows, their tolerances, the continuation, and the rest constraints
-retain their definitions. The resulting optimization is a linear program
-through the existing QP interface. Its safety certificate retains its
-predictive node scope.
+The native solver receives a diagonal positive-semidefinite Hessian and a
+zero linear objective. Let `s = [steeringMaximum; maximumAbsoluteAcceleration]`
+and `w` contain the two configured input weights. Then
+`R_u = diag(w./s.^2)`, head Hessian blocks are `2*h*R_u`, and the slack
+coefficient is `2*rho`; tail and explicit-state coefficients are zero.
+Slack has units of `V` per second, so its squared penalty has a different
+scale from the former linear penalty. Its weight now trades input effort
+against CLF violation and changes the minimizer. A finite squared penalty
+need not attain zero slack even when zero slack is feasible.
+All hard rows, tolerances, continuation and rest constraints are unchanged.
+This remains a standard convex QP with affine constraints. Its safety
+certificate retains its predictive node scope.
 
 The numerical decision also includes `x_1,...,x_M`. Sparse equality rows
 impose `x_(j+1) = A_j*x_j+B_j*u_j+c_j`, terminal rest and the fixed final

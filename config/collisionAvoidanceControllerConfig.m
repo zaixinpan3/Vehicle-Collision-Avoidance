@@ -94,9 +94,10 @@ function cfg = localDefaults()
         "orthonormalTolerance", 1.0e-9, ...
         "parameterRangeTolerance", 1.0e-3);
 
-    % Continuous Riccati error scales and input weights. decreaseRateFraction
-    % scales the certified decay rate (1/s); slack has units of V per second.
-    % Its cost remains linear, with the configured positive relaxationWeight.
+    % Continuous Riccati error scales and normalized input effort weights.
+    % Input weights also penalize the head controls in the online QP.
+    % decreaseRateFraction scales the certified decay rate (1/s); slack has
+    % units of V per second and a squared cost weighted by relaxationWeight.
     cfg.clf = struct( ...
         "lateralPositionErrorScale", 0.5, ...
         "headingErrorScale", 0.1, ...

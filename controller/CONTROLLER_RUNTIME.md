@@ -1,13 +1,15 @@
 # Controller runtime and sparse QP implementation
 
-## CLF relaxation-only update (2026-09-06)
+## Quadratic input and relaxation objective (2026-09-06)
 
-The latest formulation removes every input cost and the sampled LQR input
-preference. It minimizes only the nonnegative CLF slack with a zero Hessian
-through the existing sparse QP interface. The geometry, native solver and
-explicit pre-sampling initialization remain. See
-[CLF_RELAXATION_ONLY.md](CLF_RELAXATION_ONLY.md) for current measurements.
-The earlier timings below do not validate this objective.
+The current formulation minimizes normalized head input effort and squared
+continuous-time CLF relaxation. It introduces no desired acceleration or
+steering target. The sparse lift, native solver, hard constraints and explicit
+pre-sampling initialization remain. See
+[QUADRATIC_CLF_INPUT_OBJECTIVE.md](QUADRATIC_CLF_INPUT_OBJECTIVE.md) for the
+current validation. The earlier relaxation-only measurements in
+[CLF_RELAXATION_ONLY.md](CLF_RELAXATION_ONLY.md) and timings below describe
+preceding objectives and do not validate the current controller.
 
 ## Historical continuous-time CLF-QP update (2026-09-06)
 

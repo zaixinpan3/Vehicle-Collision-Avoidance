@@ -1,8 +1,9 @@
 classdef cruiseRecoveryTest < matlab.unittest.TestCase
-    %cruiseRecoveryTest Slack-only cruise optimization and initialization.
+    %cruiseRecoveryTest Quadratic input effort, CLF relaxation and initialization.
 
     properties (TestParameter)
         speed = struct("moderateError", 14.4, "actuatorLimitedError", 8.0);
+        nearCruiseSpeed = struct("underspeed", 14.95, "overspeed", 15.05);
     end
 
     methods (TestClassSetup)
@@ -32,39 +33,72 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             testCase.verifyNotEmpty(command);
         end
 
-        function everyInputPlanHasTheSameCostAtFixedRelaxation(testCase)
+        function quadraticCostPenalizesHeadInputsAndRelaxation(testCase)
             cfg = localConfiguration();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.4);
             [~, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
-            decision = problem.decision;
+            decision = zeros(problem.layout.decisionCount, 1);
+            decision(1:2) = [0.02; 0.3];
             decision(end) = 0.7;
+            scale = [cfg.model.frontWheelSteeringAngleMaximum; ...
+                max(abs([cfg.actuation.longitudinalAccelerationMinimum; ...
+                    cfg.actuation.longitudinalAccelerationMaximum]))];
+            weights = [cfg.clf.frontWheelSteeringAngleWeight; ...
+                cfg.clf.longitudinalAccelerationWeight];
+            inputCost = cfg.controller.sampleTime*sum(weights.*(decision(1:2)./scale).^2);
+            expectedCost = inputCost+cfg.clf.relaxationWeight*0.7^2;
             alternative = decision;
-            alternative(1:end-1) = sin((1:problem.layout.planCount).');
-            expectedCost = cfg.clf.relaxationWeight*0.7;
+            alternative(problem.layout.tailIndex) = 0.1;
 
             testCase.verifyEqual(localObjective(problem.qp, decision), expectedCost, AbsTol=1.0e-12);
+            testCase.verifyEqual(localObjective(problem.qp, 2*decision), 4*expectedCost, AbsTol=1.0e-12);
             testCase.verifyEqual(localObjective(problem.qp, alternative), expectedCost, AbsTol=1.0e-12);
-            testCase.verifyEqual(nnz(problem.qp.Hessian), 0);
-            testCase.verifyEqual(nnz(problem.qp.stageProgram.P), 0);
-            testCase.verifyEqual(nnz(problem.qp.stageProgram.q), 1);
             testCase.verifyFalse(isfield(problem.qp, "preferredInput"));
             testCase.verifyFalse(isfield(problem.qp.clf.certificate, "sampledFeedbackGain"));
         end
 
-        function relaxationMatchesAnIndependentLinearProgram(testCase, speed)
+        function nominalCruiseDoesNotCommandDeparture(testCase)
+            cfg = localConfiguration();
+            ego = struct("position", [0; 0], "yawAngle", 0, "speed", cfg.referenceSpeed);
+            [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
+
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyLessThan(norm(command.actuatorInput, inf), 1.0e-3);
+            testCase.verifyLessThan(problem.metadata.clfValueProfile(2), 1.0e-8);
+            testCase.verifyEqual(problem.metadata.clfRelaxation, 0.0, AbsTol=0.0);
+        end
+
+        function nearCruiseCorrectionDoesNotOvershoot(testCase, nearCruiseSpeed)
+            cfg = localConfiguration();
+            ego = struct("position", [0; 0], "yawAngle", 0, "speed", nearCruiseSpeed);
+            [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
+            initialError = nearCruiseSpeed-cfg.referenceSpeed;
+            nextError = initialError+cfg.controller.sampleTime ...
+                *cfg.model.longitudinalInputGain*command.actuatorInput(2);
+
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyLessThan(initialError*command.actuatorInput(2), 0.0);
+            testCase.verifyLessThan(abs(nextError), abs(initialError));
+            testCase.verifyLessThan(problem.metadata.clfValueProfile(2), problem.metadata.clfInitialValue);
+        end
+
+        function quadraticObjectiveMatchesAnIndependentSolver(testCase, speed)
             cfg = localConfiguration();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
             road = [0, 0; 2000, 0];
             [~, ~, native] = collisionAvoidanceController(ego, [], road, cfg, []);
-            cfg.solver.jointFunction = @localLinprog;
+            cfg.solver.jointFunction = @localQuadprog;
             [~, ~, independent] = collisionAvoidanceController(ego, [], road, cfg, []);
 
             testCase.verifyTrue(native.metadata.planCertified);
             testCase.verifyTrue(independent.metadata.planCertified);
-            testCase.verifyEqual(native.metadata.clfRelaxation, ...
-                independent.metadata.clfRelaxation, AbsTol=1.0e-5);
             testCase.verifyEqual(native.metadata.jointObjectiveValue, ...
-                cfg.clf.relaxationWeight*native.metadata.clfRelaxation, AbsTol=1.0e-10);
+                independent.metadata.jointObjectiveValue, AbsTol=1.0e-5, RelTol=1.0e-6);
+            testCase.verifyEqual(native.metadata.clfRelaxationCost, ...
+                cfg.clf.relaxationWeight*native.metadata.clfRelaxation^2, AbsTol=1.0e-10);
+            testCase.verifyEqual(native.metadata.jointObjectiveValue, ...
+                localObjective(native.qp, native.decision), AbsTol=1.0e-10);
+            testCase.verifyEqual(native.metadata.inputEffortCost, native.metadata.inputDeviationCost);
             testCase.verifyLessThanOrEqual(native.metadata.hardRowViolation, 1.0e-5);
         end
 
@@ -114,10 +148,10 @@ function value = localObjective(qp, decision)
     value = 0.5*decision.'*qp.Hessian*decision+qp.linear.'*decision+qp.constant;
 end
 
-function result = localLinprog(~, program)
-    options = optimoptions("linprog", "Display", "none", ...
+function result = localQuadprog(~, program)
+    options = optimoptions("quadprog", "Display", "off", ...
         "ConstraintTolerance", 1.0e-9, "OptimalityTolerance", 1.0e-9);
-    [decision, ~, exitFlag, output] = linprog(program.f, ...
-        program.A, program.b, program.Aeq, program.beq, program.lb, program.ub, options);
+    [decision, ~, exitFlag, output] = quadprog(program.H, program.f, ...
+        program.A, program.b, program.Aeq, program.beq, program.lb, program.ub, [], options);
     result = struct("decision", decision, "exitFlag", exitFlag, "output", output);
 end

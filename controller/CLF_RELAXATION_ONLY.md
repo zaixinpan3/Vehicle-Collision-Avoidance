@@ -1,5 +1,9 @@
 # CLF relaxation-only objective
 
+This is the historical relaxation-only experiment. The current controller
+uses [quadratic input effort and squared relaxation](QUADRATIC_CLF_INPUT_OBJECTIVE.md).
+The measurements and interpretation below refer to the preceding objective.
+
 ## Implemented change
 
 At the user's request, the sampled LQR input preference introduced by

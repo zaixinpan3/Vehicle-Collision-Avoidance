@@ -123,7 +123,7 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
             testCase.verifyTrue(hooked.metadata.planCertified);
             testCase.verifyEqual(hooked.metadata.solverCallCount, 1);
             testCase.verifyEqual(hooked.metadata.jointObjectiveValue, ...
-                native.metadata.jointObjectiveValue, AbsTol=1.0e-4);
+                native.metadata.jointObjectiveValue, AbsTol=1.0e-5, RelTol=1.0e-8);
             testCase.verifySize(hooked.decision, [hooked.layout.planCount+1, 1]);
         end
     end

@@ -71,12 +71,12 @@ inequality certifies its decay against analytic global Lipschitz constants.
 All stage couplings being feedforward, a lower-triangular Metzler
 comparison system yields a linear copositive ISS certificate, closed-form
 ultimate radii without a small-gain condition, and the online error
-enclosure the controller consumes. The controller solves one linear
+enclosure the controller consumes. The controller solves one quadratic
 program per sample on a scheduled Frenet bicycle integrated exactly under
 held inputs: rectangle separation, quadratic road boundaries, actuator,
 friction-polygon and domain rows are hard at every node of a horizon
-terminating in a certified rest set, and the only objective is a
-nonnegative relaxation of a continuous-time control Lyapunov condition
+terminating in a certified rest set. The objective combines input effort
+with squared relaxation of a continuous-time control Lyapunov condition
 obtained from the cruise Riccati equation. A shifted candidate gives
 recursive feasibility without a second optimization. The estimation
 theorem is continuous-time; the control certificate covers prediction
@@ -199,8 +199,8 @@ uncertainty is considered.
 
 Rather than construct another predictive CBF, we carry the safe
 continuation itself as controller state. Lane keeping enters only as a
-relaxed continuous-time CLF condition whose relaxation is the whole
-objective, every geometric and physical requirement is hard at each
+relaxed continuous-time CLF condition whose squared relaxation is penalized
+alongside input effort, every geometric and physical requirement is hard at each
 prediction node, and the horizon terminates in a rest set separated from
 the obstacle's complete future occupancy. The shifted stored plan is then
 a feasible witness for the next sample, which gives recursive feasibility
@@ -1037,8 +1037,8 @@ own obligation, treated in Section~\ref{subsec:uncertainty}.
 One convex program is solved per sample. Its decision is a complete input
 sequence reaching a certified rest configuration, plus one nonnegative
 scalar relaxing a continuous-time CLF condition. Collision, road,
-actuator, tire and domain requirements are hard; the relaxation is the
-entire objective.
+actuator, tire and domain requirements are hard; the objective combines
+input effort over the performance horizon with squared CLF relaxation.
 
 \subsection{Prediction Model}
 \label{subsec:frenetModel}
@@ -1255,7 +1255,7 @@ and the performance row, in the form of \cite{AmesXuGrizzleTabuada2017}, is
 Collecting \eqref{eq:friction_polygon}--\eqref{eq:clf_row},
 \begin{equation}
     \begin{aligned}
-    \min_{\bm U,\;\delta\geq0}\quad&\delta\\
+    \min_{\bm U,\;\delta\geq0}\quad&T_s\sum_{j=0}^{N-1}\bm u_j^{\trans}R_u\bm u_j+\rho\delta^2\\
     \text{s.t.}\quad
     &\bm x_{j+1}=A_j\bm x_j+B_j\bm u_j+\bm c_j,\\
     &G_j\bm x_j+H_j\bm u_j\leq h_j, && j<M,\\
@@ -1265,14 +1265,18 @@ Collecting \eqref{eq:friction_polygon}--\eqref{eq:clf_row},
     \end{aligned}
     \label{eq:controller_program}
 \end{equation}
-The objective is \(\delta\) alone: there is no input cost, input reference,
-continuation regularization, or safety slack, so \eqref{eq:controller_program}
-is a linear program with a zero Hessian. Safety is therefore
-lexicographically above performance, since no weight relates a row of
-\(\underline g\) to \(\delta\). The price is that whenever \(\delta=0\) is
-feasible the objective ranks no admissible plan above another, so the
-regularity argument of \cite{AmesXuGrizzleTabuada2017}, which assumes a
-positive definite Hessian, is unavailable.
+Here \(N\) is the performance horizon, \(R_u\succ0\) is a diagonal
+input-effort weight and \(\rho>0\). No input reference, continuation
+regularization or safety slack is introduced. The stages \(N,\dots,M-1\)
+provide the safe continuation without a performance penalty. The resulting
+program is a convex QP with positive quadratic weights on the head inputs
+and relaxation. A finite \(\rho\) trades input effort against CLF violation;
+it need not select zero relaxation whenever zero relaxation is feasible.
+The applied head inputs and relaxation are unique on a fixed convex feasible
+domain, although the unpenalized continuation can remain nonunique. Thus
+positive definiteness of the complete Hessian, assumed by the regularity
+argument in \cite{AmesXuGrizzleTabuada2017}, is not asserted. All geometric
+and physical rows remain hard independently of these performance weights.
 
 \subsection{Recursive Feasibility}
 \label{subsec:feasibility}
@@ -1481,6 +1485,12 @@ seconds falls from \(346\) to \(34.4\)\,m/s\(^2\).
 \subsection{Closed Loop}
 \label{subsec:controlResults}
 
+The recorded trials and fixed-state diagnostics preceding the quadratic
+comparison below use the preceding
+relaxation-only objective, without input cost. They motivate the quadratic
+objective in \eqref{eq:controller_program}; they are not measurements of that
+updated objective.
+
 Four deterministic 10\,s trials were run against a 14-degree-of-freedom
 passenger-vehicle plant: a crossing-target avoidance and its target-free
 counterfactual, on a straight road and a 400\,m arc. Parameters were
@@ -1520,8 +1530,8 @@ criteria fail, although both final poses lie inside the tolerances.
 Extending the same two trials to 30\,s on an unchanged controller, the
 window \([25,30]\)\,s does meet all three tolerances, with maxima
 \(0.2599\)\,m/s, \(0.0300\)\,m, \(0.00768\)\,rad on the straight road and
-\(0.2630\)\,m/s, \(0.1639\)\,m, \(0.01453\)\,rad on the arc. The deficiency
-is therefore the settling time, not the equilibrium. Replaying the trials
+\(0.2630\)\,m/s, \(0.1639\)\,m, \(0.01453\)\,rad on the arc. Passing these finite windows does not establish nominal invariance or
+asymptotic convergence. Replaying the trials
 and probing alternative plans at fixed measured states isolates three
 mechanisms, all in the performance layer.
 
@@ -1569,6 +1579,33 @@ Proposition~\ref{prop:terminalBox}, the maximum excess of a true state
 beyond \eqref{eq:box_propagation} over 81 samples is
 \(6.94\times10^{-17}\).
 
+
+\subsubsection{Joint quadratic objective}
+The objective in \eqref{eq:controller_program} was then evaluated in two
+30\,s avoidance trials with the same physical configurations and an
+extended road. All 1200 commands completed without fallback or sampled
+contact. Minimum sampled SAT margins were 1.0883\,m and 1.5109\,m.
+In the complete 9--10\,s window, maximum speed errors were 0.65785 and
+0.72103\,m/s, exceeding 0.5\,m/s; lateral/heading errors were
+0.000705\,m/0.000194\,rad and 0.11377\,m/0.006580\,rad, satisfying
+both pose limits. All three limits hold from 9.40\,s through 30\,s.
+
+In 25--30\,s, acceleration-step RMS decreases from 8.4179 to
+0.000199\,m/s$^2$ (straight) and from 8.7075 to 0.30146\,m/s$^2$ (arc).
+Straight lateral/heading errors approach numerical zero, but the speed
+retains a mean error of $-0.1774$\,m/s. Arc lateral/heading RMS falls
+from 0.089892\,m/0.006616\,rad to 0.042872\,m/0.001600\,rad, while
+steering-step RMS increases from 0.012272 to 0.015457\,rad. The objective
+therefore reduces large acceleration swings without eliminating all
+oscillation or proving exact nominal recovery.
+
+Each trial has one call above the 50\,ms period: 109.440 and 73.950\,ms,
+at the first target-visible sample. Formulation/witness construction takes
+67.684 and 47.461\,ms; QP solution takes 11.655 and 12.058\,ms.
+The all-call deadline criterion fails. These trials bypass the estimator,
+reuse earlier nominal trials only as historical scenario counterfactuals,
+and establish neither intersample safety nor asymptotic convergence.
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -1589,15 +1626,16 @@ not merely narrow by implementation but bounded by the terminal condition
 itself, so a feedback tube and a hold mode, not a larger margin, are what
 would extend it.
 
-The performance layer is where the measured behavior is weakest, and
-\eqref{eq:clf_split}--\eqref{eq:quadratic_increment} localize why:
-a single quadratic form permits a longitudinal--lateral trade, and an
-instantaneous condition does not imply a sampled decrease. Splitting the
-certificate into longitudinal and lateral sampled conditions with separate
-relaxations is the obvious next step; the feasibility probes rule out an
-unrelaxed split, and exact sampled conditions are quadratically
-constrained \cite{TaylorDorobantuYueTabuadaAmes2021} rather than affine, so
-the program would leave the linear class.
+The historical performance diagnosis in
+\eqref{eq:clf_split}--\eqref{eq:quadratic_increment} identifies a
+longitudinal--lateral trade and the gap between instantaneous and sampled
+decrease. The joint quadratic objective removes the flat head-input cost
+and improves measured pose recovery, but speed bias, arc input switching
+and first-detection runtime peaks remain. Separate relaxed sampled
+conditions are a possible further design: prior feasibility probes rule
+out an unrelaxed split, and exact sampled conditions are quadratically
+constrained \cite{TaylorDorobantuYueTabuadaAmes2021}. Their feasibility
+and closed-loop benefit require separate validation.
 
 \section{Conclusion}
 \label{sec:conclusion}
@@ -1621,7 +1659,7 @@ The controller solves \eqref{eq:controller_program} once per sample:
 oriented-rectangle separation, quadratic road boundaries, actuator, tire
 and domain rows are hard at every node of a horizon terminating in the rest
 set of Lemma~\ref{lem:rest}, separated from the target's complete future
-occupancy, and the sole objective is the CLF relaxation. The shifted
+occupancy. Input effort and squared CLF relaxation form the objective. The shifted
 candidate \eqref{eq:shifted_candidate} makes Proposition~\ref{prop:recursive}
 hold without a second optimization or a fallback command, and
 Proposition~\ref{prop:terminalBox} delimits the admissible state

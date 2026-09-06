@@ -154,11 +154,20 @@ function equilibrium = localCruiseEquilibriumProfile(model, prediction)
 end
 
 function [hessian, linear, constant] = localObjective(model, layout)
-% Minimize only the CLF relaxation, with no head or continuation input cost.
-% The resulting linear program retains the public QP data interface.
-    hessian = zeros(layout.decisionCount);
+% Penalize head input effort and squared CLF relaxation without an input target.
+% The rest continuation certifies safety and carries no performance cost.
+    cfg = model.cfg;
+    scale = [cfg.model.frontWheelSteeringAngleMaximum; ...
+        max(abs([cfg.actuation.longitudinalAccelerationMinimum, ...
+            cfg.actuation.longitudinalAccelerationMaximum]))];
+    weight = [cfg.clf.frontWheelSteeringAngleWeight; ...
+        cfg.clf.longitudinalAccelerationWeight]./scale.^2;
+    diagonal = zeros(layout.decisionCount, 1);
+    diagonal(layout.inputIndex) = model.sampleTime ...
+        * repmat(weight, layout.horizonSteps, 1);
+    diagonal(layout.relaxationIndex) = cfg.clf.relaxationWeight;
+    hessian = diag(2.0*diagonal);
     linear = zeros(layout.decisionCount, 1);
-    linear(layout.relaxationIndex) = model.cfg.clf.relaxationWeight;
     constant = 0.0;
 end
 
