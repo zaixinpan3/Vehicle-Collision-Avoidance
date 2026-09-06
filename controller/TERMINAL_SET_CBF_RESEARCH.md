@@ -29,7 +29,7 @@ vertices using certified chart-error bounds; a resting endpoint is no longer
 pinned to one 0.1 m route segment or separated from its predecessor by an
 artificial endpoint guard.
 
-`brakingSchedule` derives a finite continuation length and constructs an
+`ltvBicycleModel.brakingSchedule` derives a finite continuation length and constructs an
 initial reference; it is not a backup controller or a safety proof. The
 optimizer may use steering throughout this continuation, which avoids the
 operating-domain restriction of a prescribed braking-only backup policy.

@@ -68,7 +68,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     if compatible
         geometry = localShiftGeometry(controllerState.geometry);
     end
-    prediction = ltvBicyclePrediction(model, schedule);
+    prediction = ltvBicycleModel.predict(model, schedule);
     prediction.scheduleShifted = compatible;
     runtimePrediction = toc(runtimeClock);
     if related
@@ -587,7 +587,7 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
     % the projection of the measured position onto the lane and the
     % heading error to the path tangent; the Cartesian state is kept
     % for the physical clearance readout.
-    projection = laneProjection(ego.position, lane);
+    projection = laneGeometry.project(ego.position, lane);
     headingError = atan2(sin(ego.yaw-projection.heading), ...
         cos(ego.yaw-projection.heading));
     model.initialCartesianState = ego.modelState;
@@ -713,8 +713,8 @@ function model = localStaticPredictionModel(cfg)
     model.sampleTime = cfg.controller.sampleTime;
     model.horizonSteps = cfg.controller.horizonSteps;
     % The braking tail's length: derived from the actuator and the
-    % speed domain, never declared (brakingSchedule).
-    model.tailSteps = brakingSchedule("steps", cfg);
+    % speed domain, never declared (ltvBicycleModel.brakingSchedule).
+    model.tailSteps = ltvBicycleModel.brakingSchedule("steps", cfg);
     model.referenceSpeed = cfg.referenceSpeed;
     model.cfg = cfg;
     cachedConfiguration = cfg;
@@ -729,7 +729,7 @@ function horizon = localTargetHorizon(model)
     nodeTime = (0:model.horizonSteps+model.tailSteps+1)*model.sampleTime;
     [position, yaw] = localTargetMotionAtTimes(nodeTime, model);
     [positionErrorBound, yawErrorBound] = ...
-        targetPredictionErrorEnvelope(nodeTime, model);
+        targetPrediction.errorEnvelope(nodeTime, model);
     horizon = struct();
     horizon.targetPosition = position;
     horizon.targetYaw = yaw;
@@ -761,7 +761,7 @@ function horizon = localTargetHorizon(model)
         return;
     end
     horizon.terminalFuturePositionSupport = ...
-        targetPredictionFutureSupport( ...
+        targetPrediction.futureSupport( ...
             horizon.terminalSupportDirection, ...
             horizon.terminalSupportStartTime, model.targetPrediction);
     % Independent velocity/acceleration error boxes grow without bound.
@@ -828,7 +828,7 @@ function command = localCommand(inputPlan, model, prediction)
     state = model.initialEgoState;
     forceScheduleSpeed = max(prediction.scheduleSpeedProfile(1), ...
         cfg.model.scheduleSpeedFloor);
-    friction = axleFrictionParameters(cfg);
+    friction = axleFriction.parameters(cfg);
     steeringAngle = firstInput(1);
     longitudinalAcceleration = firstInput(2);
     % Paper Eq. (8) sideslip convention; lateral force is -C_alpha*alpha.

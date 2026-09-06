@@ -263,7 +263,7 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
         results.solveTime(stepIdx) = toc(solveStart);
         results.failure(stepIdx) = failed;
 
-        projection = laneProjection(readout.position, lane);
+        projection = laneGeometry.project(readout.position, lane);
         results.time(stepIdx) = time;
         results.position(stepIdx, :) = readout.position.';
         results.speed(stepIdx) = readout.longitudinalVelocity;

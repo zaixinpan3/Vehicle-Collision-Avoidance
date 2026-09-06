@@ -13,7 +13,7 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
         function commandedAccelerationUsesTheDeclaredInputGain(testCase)
             cfg = collisionAvoidanceControllerConfig(struct( ...
                 "model", struct("longitudinalInputGain", 0.8)));
-            [stateMatrix, inputMatrix, affine] = ltvBicycleStageMatrices( ...
+            [stateMatrix, inputMatrix, affine] = ltvBicycleModel.stageMatrices( ...
                 0.0, 10.0, 0.05, cfg);
             next = stateMatrix*[0.0; 0.0; 0.0; 10.0; 0.0; 0.0] ...
                 + inputMatrix*[0.0; -4.0]+affine;
@@ -24,16 +24,16 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
         function stiffLateralDynamicsRemainStableUnderHeldInputIntegration(testCase)
             cfg = collisionAvoidanceControllerConfig(struct( ...
                 "model", struct("scheduleSpeedFloor", 0.5)));
-            stateMatrix = ltvBicycleStageMatrices(0.0, 0.5, 0.05, cfg);
+            stateMatrix = ltvBicycleModel.stageMatrices(0.0, 0.5, 0.05, cfg);
             testCase.verifyTrue(all(isfinite(stateMatrix), "all"));
             testCase.verifyLessThan(max(abs(eig(stateMatrix(5:6, 5:6)))), 1.0);
         end
 
         function heldInputPredictionIsInvariantToIntegrationSubdivision(testCase)
             model = localModel();
-            [fullA, fullB, fullC] = ltvBicycleStageMatrices( ...
+            [fullA, fullB, fullC] = ltvBicycleModel.stageMatrices( ...
                 0.0025, 15.0, model.sampleTime, model.cfg);
-            [halfA, halfB, halfC] = ltvBicycleStageMatrices( ...
+            [halfA, halfB, halfC] = ltvBicycleModel.stageMatrices( ...
                 0.0025, 15.0, 0.5*model.sampleTime, model.cfg);
             testCase.verifyEqual(fullA, halfA*halfA, AbsTol=1.0e-13);
             testCase.verifyEqual(fullB, halfA*halfB+halfB, AbsTol=1.0e-13);
@@ -44,7 +44,7 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
             model = localModel();
             model.cfg.model.longitudinalInputGain = 0.8;
             model.longitudinalAccelerationBias = 0.7;
-            prediction = ltvBicyclePrediction(model);
+            prediction = ltvBicycleModel.predict(model);
             state = prediction.egoStateOffset(:, 2);
             testCase.verifyEqual(state(4), 4.0+0.7*model.sampleTime, AbsTol=1.0e-13);
             testCase.verifyEqual(state(1), 4.0*model.sampleTime ...
@@ -56,7 +56,7 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
             model.measuredEgoStateErrorBound = [0.01; 0.02; 0.003; 0.04; 0.02; 0.005];
             model.cfg.model.ltvModelErrorRateBound = 0.001*ones(6, 1);
 
-            prediction = ltvBicyclePrediction(model);
+            prediction = ltvBicycleModel.predict(model);
 
             expectedThird = abs(prediction.stageMatrixA(:, :, 2)) ...
                 * prediction.egoStateErrorBound(:, 2) ...
@@ -71,7 +71,7 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
 
         function brakingContinuationUsesTheSameHeldInputFlowAsTheHead(testCase)
             model = localModel();
-            prediction = ltvBicyclePrediction(model);
+            prediction = ltvBicycleModel.predict(model);
             state = squeeze(pagemtimes(prediction.egoStateMatrix, prediction.referencePlan)) ...
                 + prediction.egoStateOffset;
             node = prediction.headNodeCount;
@@ -93,7 +93,7 @@ function model = localModel()
     ego = struct("positionX", 0.0, "positionY", 0.0, "yawAngle", 0.0, ...
         "longitudinalVelocity", 4.0, "lateralVelocity", 0.0, "yawRate", 0.0);
     [~, lane] = readPlanningInputs(ego, [], [0.0, 0.0; 2000.0, 0.0], cfg);
-    model = struct("cfg", cfg, "horizonSteps", 2, "tailSteps", brakingSchedule("steps", cfg), ...
+    model = struct("cfg", cfg, "horizonSteps", 2, "tailSteps", ltvBicycleModel.brakingSchedule("steps", cfg), ...
         "inputDimension", 2, "sampleTime", cfg.controller.sampleTime, ...
         "initialEgoState", [0.0; 0.0; 0.0; 4.0; 0.0; 0.0], ...
         "measuredEgoStateErrorBound", zeros(6, 1), ...

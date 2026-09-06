@@ -40,7 +40,7 @@ function certificate = certifyAvoidancePlan(qp, prediction, model, decision)
         certificate.failedConditions = "finitePrediction";
         return;
     end
-    [position, heading] = lanePoseFromFrenet(state, model.lane);
+    [position, heading] = laneGeometry.fromFrenet(state, model.lane);
     certificate.nodeClearanceMargin = inf;
     certificate.routeCoordinateValid = true;
     dimensions = [model.egoHalfLength; model.egoHalfWidth; ...

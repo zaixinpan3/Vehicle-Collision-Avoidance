@@ -14,7 +14,7 @@ classdef laneNativeGeometryTest < matlab.unittest.TestCase
         function batchedProjectionRetainsEndpointAndFirstTieSemantics(testCase)
             lane = localLane([0, 0; 1, 0; 1, 1]);
 
-            projection = laneProjection([-1, 1, 2, 0.5; 0, 0, 2, 0.5], lane);
+            projection = laneGeometry.project([-1, 1, 2, 0.5; 0, 0, 2, 0.5], lane);
 
             testCase.verifyEqual(projection.point, [0, 1, 1, 0.5; 0, 0, 1, 0], AbsTol=1e-14);
             testCase.verifyEqual(projection.heading, [0, 0, pi/2, 0], AbsTol=1e-14);
@@ -25,7 +25,7 @@ classdef laneNativeGeometryTest < matlab.unittest.TestCase
         function batchedFramesIncludeBothSidesOfAVertex(testCase)
             lane = localLane([0, 0; 1, 0; 1, 1]);
 
-            frames = laneFrameCertificate(lane, [0.5, 1.0], 0.5, 2.0);
+            frames = laneGeometry.frameBounds(lane, [0.5, 1.0], 0.5, 2.0);
 
             testCase.verifyEqual([frames.segmentIndex], [1, 2]);
             testCase.verifyEqual([frames.stationLower], [0, 0.5]);
@@ -38,8 +38,8 @@ classdef laneNativeGeometryTest < matlab.unittest.TestCase
             station = linspace(-20, 40, 501).';
             lane = localLane([sin(station/30), 1-cos(station/30)]*30);
             queries = [linspace(-24, 44, 101); 3*cos(linspace(0, 2*pi, 101))];
-            nativeProjection = laneProjection(queries, lane);
-            nativeFrames = laneFrameCertificate(lane, [0, 0.1, 5, 25, 59, 60], 2, 12);
+            nativeProjection = laneGeometry.project(queries, lane);
+            nativeFrames = laneGeometry.frameBounds(lane, [0, 0.1, 5, 25, 59, 60], 2, 12);
 
             [referenceProjection, referenceFrames] = localWithoutNative(queries, lane);
 
@@ -74,13 +74,13 @@ function [projection, frames] = localWithoutNative(queries, lane)
     directory = fileparts(which("projectLanePolylineMex"));
     restore = onCleanup(@() localRestore(directory));
     rmpath(directory);
-    clear laneProjection laneFrameCertificate
+    clear laneGeometry
     assert(exist("projectLanePolylineMex", "file") ~= 3);
-    projection = laneProjection(queries, lane);
-    frames = laneFrameCertificate(lane, [0, 0.1, 5, 25, 59, 60], 2, 12);
+    projection = laneGeometry.project(queries, lane);
+    frames = laneGeometry.frameBounds(lane, [0, 0.1, 5, 25, 59, 60], 2, 12);
 end
 
 function localRestore(directory)
     addpath(directory);
-    clear laneProjection laneFrameCertificate
+    clear laneGeometry
 end

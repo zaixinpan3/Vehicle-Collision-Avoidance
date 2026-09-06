@@ -13,7 +13,7 @@ function reference = crossingCruiseReference(model)
     end
     count = model.horizonSteps+model.tailSteps+1;
     clearance = model.cfg.collision.clearanceMargin;
-    projection = laneProjection(model.targetHorizon.targetPosition(:, 1:count), model.lane);
+    projection = laneGeometry.project(model.targetHorizon.targetPosition(:, 1:count), model.lane);
     relativeYaw = model.targetHorizon.targetYaw(1:count)-projection.heading;
     lateralSupport = model.targetHalfLength*abs(sin(relativeYaw)) ...
         + model.targetHalfWidth*abs(cos(relativeYaw));

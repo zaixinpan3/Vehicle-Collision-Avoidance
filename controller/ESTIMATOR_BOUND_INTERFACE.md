@@ -82,7 +82,7 @@ which has a different center when sideslip is nonzero.
 
 ## Future prediction
 
-`targetPredictionErrorEnvelope` encloses future true position about the
+`targetPrediction.errorEnvelope` encloses future true position about the
 controller's fixed nominal trajectory. It starts from the current certificate
 and takes the minimum of valid speed, acceleration and jerk envelopes. For
 example, the acceleration envelope is

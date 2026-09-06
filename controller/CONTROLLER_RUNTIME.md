@@ -64,7 +64,7 @@ Other implementation changes are:
   evaluation.
 - Retained native function handles after first load, avoiding repeated MEX
   file searches. The build script clears these handles before replacing a
-  binary. Clear `laneProjection`, `laneFrameCertificate` and `solveHardCbfClf`
+  binary. Clear `laneGeometry` and `solveHardCbfClf`
   when manually changing backend paths in an existing MATLAB session.
 - Phase wall times in `planningProblem.metadata.runtime`, separating input
   preparation, prediction, formulation/witness checking, solving, acceptance

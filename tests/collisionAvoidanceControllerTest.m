@@ -16,7 +16,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
         function resetController(testCase)
             clear collisionAvoidanceController collisionAvoidanceControllerConfig
-            clear formulateAvoidanceProblem targetPredictionFutureSupport
+            clear formulateAvoidanceProblem targetPrediction
             clear solveHardCbfClf
             collisionAvoidanceController("resetNominalTrajectory");
             localJointSolveHook("reset", struct());
@@ -127,9 +127,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
 
         function brakingTailUsesAccelerationBoundsWithoutJerk(testCase)
             cfg = collisionAvoidanceControllerConfig();
-            steps = brakingSchedule("steps", cfg);
+            steps = ltvBicycleModel.brakingSchedule("steps", cfg);
 
-            profile = brakingSchedule( ...
+            profile = ltvBicycleModel.brakingSchedule( ...
                 "profile", cfg, steps, 1.0);
             speed = 1.0+cfg.controller.sampleTime*cumsum(profile);
 
@@ -638,7 +638,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         function zeroSpeedSchedulePreservesOffsetRestOnACurve(testCase)
             cfg = collisionAvoidanceControllerConfig();
             state = [20.0; -4.0; 0.1; 0.0; 0.0; 0.0];
-            [stateMatrix, inputMatrix, affine] = ltvBicycleStageMatrices( ...
+            [stateMatrix, inputMatrix, affine] = ltvBicycleModel.stageMatrices( ...
                 0.02, 0.0, cfg.controller.sampleTime, cfg);
 
             next = stateMatrix*state+inputMatrix*[0.0; 0.0]+affine;

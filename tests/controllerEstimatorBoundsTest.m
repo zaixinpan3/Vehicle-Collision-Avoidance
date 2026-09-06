@@ -116,7 +116,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
 
         function velocityUncertaintyEnlargesTheFuturePositionBound(testCase)
             model = localPredictionModel();
-            [position, yaw] = targetPredictionErrorEnvelope([0, 1, 2], model);
+            [position, yaw] = targetPrediction.errorEnvelope([0, 1, 2], model);
             testCase.verifyEqual(position(:, 1), model.targetPositionErrorBound, AbsTol=0.0);
             testCase.verifyGreaterThan(position(:, 3), position(:, 2));
             testCase.verifyGreaterThanOrEqual(position(:, 2), ...
@@ -135,7 +135,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             model.targetPredictionMotionBounds.jerkNormMaximum = 0;
             model.targetPredictionMotionBounds.accelerationNormMaximum = 2;
             model.targetPredictionMotionBounds.speedMaximum = 10;
-            [position, ~] = targetPredictionErrorEnvelope([1, 2], model);
+            [position, ~] = targetPrediction.errorEnvelope([1, 2], model);
             testCase.verifyEqual(position(:, 1), zeros(2, 1), AbsTol=0.0);
             testCase.verifyGreaterThanOrEqual(position(:, 2), ones(2, 1));
         end

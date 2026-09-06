@@ -15,13 +15,13 @@ classdef avoidanceSafetyGeometryTest < matlab.unittest.TestCase
             ego = struct("position", [0.0; 0.0], "yaw", 0.0, "speed", 1.0);
             [~, lane] = readPlanningInputs(ego, [], ...
                 [0.0, 0.0; 5.0, 0.0; 6.0, 0.03; 7.0, 0.08; 20.0, 0.9], cfg);
-            frame = laneFrameCertificate(lane, 6.0, 2.0, 12.0);
+            frame = laneGeometry.frameBounds(lane, 6.0, 2.0, 12.0);
             stations = linspace(frame.stationLower, frame.stationUpper, 401);
             state = zeros(3, 3*numel(stations));
             state(1, :) = repmat(stations, 1, 3);
             state(2, :) = repelem([-12.0, 0.0, 12.0], numel(stations));
 
-            [position, heading] = lanePoseFromFrenet(state, lane);
+            [position, heading] = laneGeometry.fromFrenet(state, lane);
             affinePosition = frame.origin+[frame.tangent, frame.lateral]*state(1:2, :);
             error = max(abs(position-affinePosition), [], 2);
 

@@ -30,7 +30,7 @@ function information = buildAvoidanceSocpSolver()
     output = fullfile(dependency, "matlab");
     if ~isfolder(output), mkdir(output); end
     addpath(output);
-    clear solveHardCbfClf laneProjection laneFrameCertificate
+    clear solveHardCbfClf laneGeometry
     clear solveAvoidanceSocpMex projectLanePolylineMex laneFrameBoundsMex
     solverMessage = localBuild(fullfile(output, "solveAvoidanceSocpMex."+mexext), ...
         "-R2018a", "-I"+fullfile(dependency, "include"), ...

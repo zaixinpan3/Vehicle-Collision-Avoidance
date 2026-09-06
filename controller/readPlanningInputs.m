@@ -123,7 +123,7 @@ function ego = localReadNrmmEgoState(data, cfg)
 end
 
 function [bounds, certificate] = localEgoErrorBounds(data)
-    certificate = readEstimationErrorCertificate(data, "ego-state-v1");
+    certificate = stateUncertainty.readCertificate(data, "ego-state-v1");
     if isempty(certificate)
         bounds = localOptionalNonnegativeInputVector(data, "controllerStateErrorBound", 6);
     else
@@ -483,7 +483,7 @@ function localValidateRoadBoundarySafeSide(boundary, lane)
         + boundary.longitudinalDirection * sReference ...
         + boundary.lateralDirection ...
             * polyval(coefficients, sReference);
-    projection = laneProjection(curvePoint, lane);
+    projection = laneGeometry.project(curvePoint, lane);
     centerlineOffset = projection.point - boundary.origin;
     centerlineS = boundary.longitudinalDirection.' * centerlineOffset;
     centerlineL = boundary.lateralDirection.' * centerlineOffset;
@@ -695,7 +695,7 @@ function [target, active] = localReadTargetRecord(data, ego, cfg)
     target.width = widthValue;
     target.yaw = yaw;
     target.yawRate = yawRate;
-    target.errorCertificate = readEstimationErrorCertificate(data, "target-state-v1");
+    target.errorCertificate = stateUncertainty.readCertificate(data, "target-state-v1");
     if isempty(target.errorCertificate)
         target.positionErrorBound = ...
             localOptionalNonnegativeInputVector( ...

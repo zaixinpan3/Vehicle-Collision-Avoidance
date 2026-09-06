@@ -28,8 +28,8 @@ exhaustive systematic review or a novelty claim.
 
 The inspected interface is now committed in
 `d4da3ce23054fdb084345c138e572dbc71df36af`. In particular,
-`ESTIMATOR_BOUND_INTERFACE.md`, `readEstimationErrorCertificate.m`,
-`targetPredictionErrorEnvelope.m` and `nrmmControllerErrorBounds.m` are
+`ESTIMATOR_BOUND_INTERFACE.md`, `stateUncertainty.m`,
+`targetPrediction.m` and `nrmmControllerErrorBounds.m` are
 existing implementation inputs, not contributions of this study. Their
 snapshot hashes belong in the external research record. The numerical
 diagnostics use the existing model/configuration functions and do not invoke
@@ -81,7 +81,7 @@ the implementation below.
    validity and realized defects. Substituting the continuous ISS decay rate
    for a digital future transition would leave a proof gap.
 5. **Several dormant uncertainty paths need stronger mathematics.**
-   `ltvBicyclePrediction` currently maps position radii to Frenet coordinates
+   `ltvBicycleModel.predict` currently maps position radii to Frenet coordinates
    with sums and leaves the yaw radius unchanged. On a curved road the
    tangent also changes. Its `Ts*w` disturbance update requires an endpoint
    enclosure interpretation; continuous derivative-error bounds generally

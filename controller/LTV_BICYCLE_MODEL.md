@@ -1,6 +1,6 @@
 # Scheduled Frenet bicycle and continuation model
 
-The prediction and certificate use `ltvBicycleStageMatrices` at every stage.
+The prediction and certificate use `ltvBicycleModel.stageMatrices` at every stage.
 State is `x = [s; d; ePsi; vx; vy; r]`; input is front steering angle and
 requested longitudinal acceleration `u = [deltaF; a]`. Station and lateral offset use the
 selected lane polyline; heading error is relative to its tangent.
@@ -39,13 +39,13 @@ has no independently validated nonlinear-vehicle accuracy claim.
 ## Schedule and condensation
 
 The admission schedule cruises at measured speed for `N` stages and then
-brakes to zero. `brakingSchedule` derives `Nb` from maximum speed and the
+brakes to zero. `ltvBicycleModel.brakingSchedule` derives `Nb` from maximum speed and the
 configured nominal braking rate, with two additional rest stages. Initial
 scheduled station increments use trapezoidal integration of that speed
 profile, consistent with constant acceleration within a sample. Curvature is
 sampled from the supplied route.
 
-All `M=N+Nb` stages have two control variables. `ltvBicyclePrediction`
+All `M=N+Nb` stages have two control variables. `ltvBicycleModel.predict`
 provides the stage matrices and the condensed map `x_j = F_j*plan + f_j`,
 including all lateral dynamics through rest. The native SOCP uses explicit
 states with sparse dynamic equalities; acceptance independently reconstructs
@@ -60,7 +60,7 @@ a warm-start hint. A scheduled speed is an affine-model parameter, not a
 claim that the realized nonlinear vehicle equals that speed.
 
 A complete speed profile is exposed as `scheduleSpeedProfile`.
-`frictionCirclePolygonRows` uses each stage's `max(vBar, floor)` consistently
+`axleFriction.polygonRows` uses each stage's `max(vBar, floor)` consistently
 with its bicycle matrices. Command force diagnostics use that same first
 stage denominator. They do not silently recompute a different tire schedule
 from the measured speed after certification.

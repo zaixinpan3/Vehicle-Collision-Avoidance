@@ -21,7 +21,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
     geometry = avoidanceSafetyGeometry(model, prediction, nominalState, geometry);
     families = [geometry.collision; geometry.road];
     [frictionMatrix, frictionOffset, frictionRows, frictionConstant] = ...
-        frictionCirclePolygonRows(prediction, model);
+        axleFriction.polygonRows(prediction, model);
     covered = arrayfun(@(family) nnz([family.nodes.covered]), families);
     rowCount = 2*sum(covered)+8*prediction.nodeCount+numel(frictionOffset);
     matrix = zeros(rowCount, count+1);
@@ -242,7 +242,7 @@ function certificate = localClfCertificate(model)
         certificate = memoCertificate;
         return;
     end
-    [stageMatrixA, stageMatrixB] = ltvBicycleStageMatrices( ...
+    [stageMatrixA, stageMatrixB] = ltvBicycleModel.stageMatrices( ...
         0.0, key.referenceSpeed, key.sampleTime, cfg);
     errorIndex = 2:6;
     errorStateMatrix = stageMatrixA(errorIndex, errorIndex);

@@ -56,7 +56,7 @@ within-sample effect. This replaces Euler integration consistently in both
 head and continuation; it does not make the nonlinear plant model exact.
 
 Every stage has both steering and acceleration decision variables. There is
-no dynamic-to-kinematic handoff. `brakingSchedule` only supplies an initial
+no dynamic-to-kinematic handoff. `ltvBicycleModel.brakingSchedule` only supplies an initial
 speed schedule and derives `Nb` from maximum speed and the configured
 braking rate, with two rest stages. The optimizer can steer and accelerate
 throughout the continuation subject to the same physical limits as the head.
@@ -155,7 +155,7 @@ affine chart approximates the physical polyline map over a station interval:
 Hard station bounds keep the solution within `controller.stationTrustRadius`
 of its geometry anchor and the finite route extent. The interval may cross
 polyline vertices; it is not limited by the centerline sampling distance.
-`laneFrameCertificate` computes componentwise position-error bounds at both
+`laneGeometry.frameBounds` computes componentwise position-error bounds at both
 ends of each intersecting segment and both extremes of the admitted lateral
 offset. The error is affine on each such rectangle, so these corners cover
 the full interval. The maximum wrapped segment-heading difference gives the
@@ -176,7 +176,7 @@ Both signs of the absolute value become hard affine rows. The position charge
 includes `abs(n)'*b_p`; the yaw-support interval includes `b_psi` in addition
 to the published yaw uncertainty. Thus widening a station interval also
 tightens its geometric inequalities by a computed allowance. The independent
-acceptance check evaluates the actual polyline pose with `lanePoseFromFrenet`,
+acceptance check evaluates the actual polyline pose with `laneGeometry.fromFrenet`,
 rather than checking clearance only in the affine chart.
 
 For each supplied quadratic road graph, the implementation computes its
@@ -210,7 +210,7 @@ offset and heading error within the admitted geometry domain.
 For targets, the last node has a hard halfspace separating the resting ego
 from the target's complete future center-trajectory support. A target
 circumradius covers every future yaw; the resting ego retains its directional
-rectangle support. `targetPredictionFutureSupport` supplies the nominal
+rectangle support. `targetPrediction.futureSupport` supplies the nominal
 complete-future support. Constant position uncertainty is added directionally.
 A direction with persistent velocity or acceleration uncertainty is treated
 conservatively as having infinite future support and cannot certify rest.
