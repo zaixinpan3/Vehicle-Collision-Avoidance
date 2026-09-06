@@ -44,7 +44,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
             || any(cfg.model.ltvModelErrorRateBound ~= 0.0) ...
             || any(cfg.model.plantModelResidualRateBound ~= 0.0)
         error("collisionAvoidanceController:unsupportedCertificateUncertainty", ...
-            "This trajectory certificate requires exact ego/model prediction. " ...
+            "The current estimation bound was read, but this trajectory " ...
+            + "certificate requires exact ego/model prediction. " ...
             + "Nonzero ego or disturbance bounds require a feedback-tube terminal certificate.");
     end
     performanceReference = crossingCruiseReference(model);
@@ -593,6 +594,7 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
     model.initialEgoState = [projection.station; ...
         projection.lateralPosition; headingError; ego.modelState(4:6)];
     model.measuredEgoStateErrorBound = ego.stateErrorBound;
+    model.egoErrorCertificate = ego.errorCertificate;
     % Declared longitudinal model bias published by the estimator: the
     % offset-free disturbance term of Ge et al. (2022), entering the
     % prediction's vx row at every stage. An input, not controller
@@ -624,6 +626,9 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
     model.targetPositionErrorBound = zeros(2, 1);
     model.targetVelocityErrorBound = zeros(2, 1);
     model.targetPredictionAccelerationErrorBound = zeros(2, 1);
+    model.targetAccelerationErrorBound = zeros(2, 1);
+    model.targetPredictionMotionBounds = [];
+    model.targetErrorCertificate = [];
     model.targetYawErrorBound = 0.0;
     model.targetYawRateErrorBound = 0.0;
     model.targetPredictionYawAccelerationErrorBound = 0.0;
@@ -672,6 +677,9 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
         model.targetHalfWidth = 0.5*target.width;
         model.targetPositionErrorBound = target.positionErrorBound;
         model.targetVelocityErrorBound = target.velocityErrorBound;
+        model.targetAccelerationErrorBound = target.accelerationErrorBound;
+        model.targetPredictionMotionBounds = target.predictionMotionBounds;
+        model.targetErrorCertificate = target.errorCertificate;
         model.targetPredictionAccelerationErrorBound = ...
             target.predictionAccelerationErrorBound ...
             + abs(accelerationResidual);
@@ -721,12 +729,13 @@ function horizon = localTargetHorizon(model)
     nodeTime = (0:model.horizonSteps+model.tailSteps+1)*model.sampleTime;
     [position, yaw] = localTargetMotionAtTimes(nodeTime, model);
     [positionErrorBound, yawErrorBound] = ...
-        localTargetPredictionErrorAtTimes(nodeTime, model);
+        targetPredictionErrorEnvelope(nodeTime, model);
     horizon = struct();
     horizon.targetPosition = position;
     horizon.targetYaw = yaw;
     horizon.targetPositionErrorBound = positionErrorBound;
     horizon.targetYawErrorBound = yawErrorBound;
+    horizon.estimationErrorCertificate = model.targetErrorCertificate;
     horizon.terminalSupportDirection = zeros(2, 0);
     horizon.terminalFuturePositionSupport = zeros(1, 0);
     horizon.terminalSupportStartTime = ...
@@ -741,6 +750,16 @@ function horizon = localTargetHorizon(model)
     direction(abs(direction) < 100.0*eps) = 0.0;
     direction = direction./vecnorm(direction);
     horizon.terminalSupportDirection = direction;
+    if ~isempty(model.targetPredictionMotionBounds)
+        % Speed/acceleration domains alone do not restrict the target to a
+        % bounded future halfspace. A present B(t) is not such a restriction.
+        horizon.terminalFuturePositionSupport = inf(1, directionCount);
+        if model.targetPredictionMotionBounds.speedMaximum == 0.0
+            horizon.terminalFuturePositionSupport = model.targetPosition.'*direction ...
+                + model.targetPositionErrorBound.'*abs(direction);
+        end
+        return;
+    end
     horizon.terminalFuturePositionSupport = ...
         targetPredictionFutureSupport( ...
             horizon.terminalSupportDirection, ...
@@ -754,23 +773,6 @@ function horizon = localTargetHorizon(model)
     growth = (model.targetVelocityErrorBound ...
         + model.targetPredictionAccelerationErrorBound).'*abs(direction);
     horizon.terminalFuturePositionSupport(growth > 0.0) = inf;
-end
-
-function [positionErrorBound, yawErrorBound] = ...
-        localTargetPredictionErrorAtTimes(time, model)
-    time = max(0.0, double(time(:).'));
-    timeCount = numel(time);
-    positionErrorBound = zeros(2, timeCount);
-    yawErrorBound = zeros(1, timeCount);
-    if ~model.hasTarget
-        return;
-    end
-    positionErrorBound = model.targetPositionErrorBound ...
-        + model.targetVelocityErrorBound*time ...
-        + 0.5*model.targetPredictionAccelerationErrorBound*time.^2;
-    yawErrorBound = model.targetYawErrorBound ...
-        + model.targetYawRateErrorBound*time ...
-        + 0.5*model.targetPredictionYawAccelerationErrorBound*time.^2;
 end
 
 function [position, yaw] = localTargetMotionAtTimes(time, model)

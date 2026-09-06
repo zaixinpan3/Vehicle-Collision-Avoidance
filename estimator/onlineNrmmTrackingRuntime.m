@@ -611,6 +611,8 @@ function output = localOutput(runtime, observerInput)
         & isfinite(output.relativePositionErrorBound);
     output.egoYawErrorBound = runtime.positionErrorBound.yaw;
     output.egoBodyVelocityErrorBound = runtime.positionErrorBound.bodyVelocity;
+    output = nrmmControllerErrorBounds(output, runtime.positionErrorBound, ...
+        observerInput, design);
 end
 
 function estimates = localTargetEstimates(runtime, observerInput)

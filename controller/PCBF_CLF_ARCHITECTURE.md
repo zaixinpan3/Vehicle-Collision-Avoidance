@@ -231,6 +231,14 @@ now propagates all boxes through `r(j+1) = abs(A(j))*r(j) + Ts*w`; the former
 first-future-node-only update has been removed. Propagation alone does not
 supply terminal robustness, so it is not used to label such inputs certified.
 
+The estimator adapter now publishes its time-varying state-time enclosure
+instead of fixed configured state-error margins. The controller validates
+timestamps and availability, converts the relative target bound to absolute
+state bounds, and propagates future target uncertainty from declared motion
+limits. These interface changes do not remove the terminal restriction above.
+See [ESTIMATOR_BOUND_INTERFACE.md](ESTIMATOR_BOUND_INTERFACE.md) for the field
+contract, derivation and distinction between current estimation and prediction.
+
 Static target uncertainty is admitted when the directional rows and complete
 future support remain feasible. State, actuator execution, target finite-node
 overlap, complete target support, route and model assumptions must agree with

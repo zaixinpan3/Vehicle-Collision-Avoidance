@@ -612,17 +612,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function planningInputsConsumeSynchronizedEstimatorOutput(testCase)
-            runtime = localRuntime(1);
-            samplePeriod = runtime.samplePeriod;
-            frameTime = 0.0;
-            output = struct();
-            for frameIdx = 1:3
-                frame = localCruiseFrame(frameTime);
-                frame.yawRateMeasured = 0.05;
-                [runtime, output] = onlineNrmmTrackingRuntime( ...
-                    "step", runtime, frame);
-                frameTime = frameTime+samplePeriod;
-            end
+            output = localSynchronizedTurningOutput();
             controllerCfg = collisionAvoidanceControllerConfig();
             controllerCfg.referenceSpeed = 10.0;
             [ego, ~, ~, targets] = readPlanningInputs( ...
@@ -639,6 +629,20 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(targets(1).position, ...
                 output.targetEstimates(1).targetPositionInertial, ...
                 AbsTol=1.0e-12);
+            testCase.verifyEqual(ego.stateErrorBound, ...
+                output.controllerErrorBound.bounds, AbsTol=0.0);
+            testCase.verifyEqual(targets(1).yaw, ...
+                output.targetEstimates(1).targetHeadingInertial, AbsTol=1.0e-12);
+        end
+
+        function planningRejectsAnUnavailableOutOfDomainTargetBound(testCase)
+            runtime = localRuntime(1);
+            output = onlineNrmmTrackingRuntime("output", runtime, localCruiseFrame(0));
+            cfg = collisionAvoidanceControllerConfig();
+            testCase.verifyFalse(output.targetEstimates.controllerErrorBound.available);
+            testCase.verifyError(@() readPlanningInputs(output, [], ...
+                localControllerRoad(output.egoPositionInertial), cfg), ...
+                "collisionAvoidanceController:unavailableEstimatorBound");
         end
 
         function multipleTargetsUseOneSynchronizedFrame(testCase)
@@ -679,6 +683,35 @@ function options = localOptions(targetCount)
         "targetInitialState", targetState);
     options.targetIdentifiers = ...
         "test-target-" + string((1:targetCount).');
+end
+
+function output = localSynchronizedTurningOutput()
+% Physically synchronized turning ego and straight target inside the
+% declared 50 m range; no uncertainty radius is changed to admit this case.
+    cfg = nrmmTrackingConfig();
+    speed = 10;
+    yawRate = 0.05;
+    sideslip = asin(cfg.ego.yaw.rearAxleDistance*yawRate/speed);
+    velocity = speed*[cos(sideslip); sin(sideslip)];
+    options = localOptions(1);
+    options.egoInitialBodyVelocity = velocity;
+    options.targetInitialState = [30; 2; 8; 0; 0; 0];
+    runtime = onlineNrmmTrackingRuntime("initialize", cfg, options);
+    for index = 1:3
+        time = runtime.currentTime;
+        angle = yawRate*time;
+        position = [sin(angle), cos(angle)-1; 1-cos(angle), sin(angle)]*velocity/yawRate;
+        rotation = localRotation(angle);
+        inertialVelocity = rotation*velocity;
+        targetPosition = [30+8*time; 2];
+        frame = localFrame(time, position, (rotation.'*(targetPosition-position)).');
+        frame.vxGps = inertialVelocity(1);
+        frame.vyGps = inertialVelocity(2);
+        frame.longitudinalAcceleration = -yawRate*velocity(2);
+        frame.lateralAcceleration = yawRate*velocity(1);
+        frame.yawRateMeasured = yawRate;
+        [runtime, output] = onlineNrmmTrackingRuntime("step", runtime, frame);
+    end
 end
 
 function options = localHeadingOptions(initialYaw, speed)

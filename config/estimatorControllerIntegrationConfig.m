@@ -85,28 +85,10 @@ function cfg = estimatorControllerIntegrationConfig()
         cfg.sensor.radar.positionNoiseMaximum;
     cfg.observer = observer;
 
-    % Error radii published to the controller with every estimate, which
-    % is what lets its collision and road rows be tightened. Without them
-    % the controller receives six numbers indistinguishable from a truth
-    % state and plans as if estimation were exact.
-    %
-    % These controller tightening values remain explicit engineering
-    % assumptions from the scenario configuration. The observer design
-    % separately provides continuous-time Lyapunov bounds, which are not
-    % certified sampled inertial-frame controller error bounds.
-    % A certified closed-loop integration requires propagating ego position,
-    % yaw, and target correlations into that controller's uncertainty model.
-    cfg.publishedErrorBound.egoPosition = 0.08;       % m
-    cfg.publishedErrorBound.egoVelocity = 0.30;       % m/s
-    cfg.publishedErrorBound.egoYaw = 0.03;            % rad
-    cfg.publishedErrorBound.egoYawRate = 0.05;        % rad/s
-    % Retained nominal planner margins, not certificates of the sampled high-gain
-    % estimator. The adapter labels their source explicitly and publishes the
-    % unfiltered NRMM position, velocity, and acceleration alongside them.
-    cfg.publishedErrorBound.targetPosition = 0.15;    % m
-    cfg.publishedErrorBound.targetVelocity = 0.32;    % m/s
-    cfg.publishedErrorBound.targetYaw = 0.10;         % rad
-    cfg.publishedErrorBound.targetYawRate = 0.10;     % rad/s
+    % Controller errors come from the online timestamped observer enclosure.
+    % Sensor and true-motion bounds above are its premises; they are not
+    % substitutes for the evolving estimation errors. No fixed state-error
+    % override is applied by the adapter.
 
     % Controller vehicle parameters are copied from the loaded PassVeh14DOF
     % plant by the scenario drivers; this configuration deliberately holds

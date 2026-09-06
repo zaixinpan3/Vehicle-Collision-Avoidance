@@ -135,10 +135,43 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
         end
 
         function adapterRespectsVectorNoiseRadiiAndPublishesTheOnlineBound(testCase)
-            [noiseRatios,slack,available] = localAdapterChecks();
+            [noiseRatios,slack,available,stateSlack,publishedBounds] = localAdapterChecks();
             testCase.verifyLessThanOrEqual(max(noiseRatios,[],"all"),1+1e-10);
             testCase.verifyGreaterThanOrEqual(min(slack),-1e-10);
             testCase.verifyTrue(all(available));
+            testCase.verifyGreaterThanOrEqual(min(stateSlack, [], "all"), -1e-10);
+            testCase.verifyGreaterThan(max(publishedBounds(:, 1))-min(publishedBounds(:, 1)), 1e-4);
+            testCase.verifyGreaterThan(max(publishedBounds(:, 7))-min(publishedBounds(:, 7)), 1e-4);
+        end
+
+        function aFreshMeasurementTightensThePublishedEgoBound(testCase)
+            [runtime, frame] = localRuntime(testCase.Config, testCase.Design, 1, struct());
+            [changed, predicted] = onlineNrmmTrackingRuntime("step", runtime, frame);
+            frame.time = changed.currentTime;
+            frame.xGps = 15*frame.time;
+            fresh = onlineNrmmTrackingRuntime("output", changed, frame);
+            testCase.verifyLessThan(fresh.egoPositionErrorBound, predicted.egoPositionErrorBound);
+            testCase.verifyLessThan(fresh.egoYawRateErrorBound, predicted.egoYawRateErrorBound);
+            testCase.verifyEqual(fresh.controllerErrorBound.time, fresh.stateTime, AbsTol=0.0);
+            testCase.verifyEqual(fresh.controllerErrorBound.bounds, fresh.controllerStateErrorBound, AbsTol=0.0);
+        end
+
+        function invalidEgoCertificatesAreUnavailableForControl(testCase)
+            [runtime, frame] = localRuntime(testCase.Config, testCase.Design, 1, struct());
+            frame.vxGps = 40;
+            output = onlineNrmmTrackingRuntime("output", runtime, frame);
+            testCase.verifyFalse(output.controllerErrorBound.available);
+            testCase.verifyTrue(all(isinf(output.controllerStateErrorBound)));
+            testCase.verifyFalse(output.targetEstimates.controllerErrorBound.available);
+        end
+
+        function controllerBoundsRetainTheObserverStateTimestamp(testCase)
+            [runtime, frame] = localRuntime(testCase.Config, testCase.Design, 1, struct());
+            [~, output] = onlineNrmmTrackingRuntime("step", runtime, frame);
+            testCase.verifyEqual(output.controllerErrorBound.time, output.stateTime, AbsTol=0.0);
+            testCase.verifyEqual(output.targetEstimates.controllerErrorBound.time, output.stateTime, AbsTol=0.0);
+            testCase.verifyFalse(output.controllerErrorBound.futurePredictionIncluded);
+            testCase.verifyFalse(output.targetEstimates.controllerErrorBound.futurePredictionIncluded);
         end
     end
 end
@@ -179,7 +212,7 @@ function output = localExactCase(cfg)
     [~,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
 end
 
-function [ratios,slack,available] = localAdapterChecks()
+function [ratios,slack,available,stateSlack,publishedBounds] = localAdapterChecks()
     cfg = estimatorControllerIntegrationConfig();
     cfg.randomSeed = 83;
     ego = struct("position",[0;0],"yawAngle",0,"longitudinalVelocity",15, ...
@@ -190,6 +223,8 @@ function [ratios,slack,available] = localAdapterChecks()
     ratios = zeros(20,4);
     slack = zeros(20,1);
     available = false(20,1);
+    stateSlack = zeros(20,14);
+    publishedBounds = zeros(20,14);
     for index = 1:20
         time = (index-1)*0.1;
         ego.position = [15*time;0];
@@ -203,7 +238,17 @@ function [ratios,slack,available] = localAdapterChecks()
             norm(frame.radarRelativePosition.'-relative)/cfg.sensor.radar.positionNoiseMaximum];
         slack(index) = target.relativePositionErrorBound-norm(relative-target.relativePosition);
         available(index) = target.positionErrorBound.available ...
-            && target.positionErrorBound.time == estimate.stateTime;
+            && target.positionErrorBound.time == estimate.stateTime ...
+            && estimate.controllerErrorBound.available && target.controllerErrorBound.available;
+        egoError = [abs(ego.position-estimate.egoPositionInertial); ...
+            abs(atan2(sin(ego.yawAngle-estimate.egoYaw), cos(ego.yawAngle-estimate.egoYaw))); ...
+            abs([15;0]-estimate.egoBodyVelocity); abs(estimate.egoYawRate)];
+        targetError = [abs(truth.targetPositionInertial-target.targetPositionInertial); ...
+            abs([10;0]-target.targetVelocityInertial); abs(target.targetAccelerationInertial); ...
+            abs(atan2(sin(target.targetHeadingInertial), cos(target.targetHeadingInertial))); ...
+            abs(target.targetYawRate)];
+        publishedBounds(index,:) = [estimate.controllerErrorBound.bounds; target.controllerErrorBound.bounds].';
+        stateSlack(index,:) = publishedBounds(index,:)-[egoError;targetError].';
     end
 end
 

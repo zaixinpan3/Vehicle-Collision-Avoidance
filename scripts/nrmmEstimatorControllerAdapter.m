@@ -137,8 +137,7 @@ function [context, egoEstimate, targetEstimate, frame, audit] = ...
     end
 
     egoEstimate = localCurrentEgoEstimate( ...
-        context.currentOutput, frame, ...
-        context.configuration.observer.runtime.samplePeriod);
+        context.runtime, frame);
     [context, targetJustAcquired] = ...
         localUpdateTargetAcquisition( ...
             context, frame, egoEstimate);
@@ -148,8 +147,7 @@ function [context, egoEstimate, targetEstimate, frame, audit] = ...
         context.currentOutput = onlineNrmmTrackingRuntime( ...
             "output", context.runtime, frame);
         egoEstimate = localCurrentEgoEstimate( ...
-            context.currentOutput, frame, ...
-            context.configuration.observer.runtime.samplePeriod);
+            context.runtime, frame);
     end
     if context.targetAcquired
         rawTargetEstimate = egoEstimate.targetEstimates;
@@ -169,8 +167,6 @@ function [context, egoEstimate, targetEstimate, frame, audit] = ...
         rawTargetEstimate = struct([]);
         targetEstimate = struct([]);
     end
-    [egoEstimate, targetEstimate] = localAttachErrorBounds( ...
-        egoEstimate, targetEstimate, context.configuration);
     egoEstimate.rawNrmmTargetEstimates = rawTargetEstimate;
     egoEstimate.targetEstimates = targetEstimate;
     egoEstimate.targetTrackAcquired = context.targetAcquired;
@@ -253,7 +249,7 @@ function context = localAdvanceObserverToControllerTime( ...
             intermediateEgoTruth, bodyAcceleration, ...
             intermediateTargetTruth);
         intermediateEgoEstimate = localCurrentEgoEstimate( ...
-            context.currentOutput, frame, samplePeriod);
+            context.runtime, frame);
         [context, targetJustAcquired] = ...
             localUpdateTargetAcquisition( ...
                 context, frame, intermediateEgoEstimate);
@@ -301,41 +297,10 @@ function state = localInterpolateEgoState( ...
         "yawRate", yawRate);
 end
 
-function estimate = localCurrentEgoEstimate(output, ~, ~)
-    estimate = output;
-end
-
-function [egoEstimate, targetEstimate] = localAttachErrorBounds( ...
-        egoEstimate, targetEstimate, cfg)
-% Publish the estimation error radii alongside the estimates.
-%
-% Without these fields the controller receives six numbers that are
-% indistinguishable from a truth state, its optional error-bound inputs
-% default to zero, and every collision and road tightening it computes
-% is multiplied by zero. Declaring the radii is what makes the
-% controller's row tightenings nonempty.
-
-    if ~isfield(cfg, "publishedErrorBound")
-        return;
-    end
-    bound = cfg.publishedErrorBound;
-    egoEstimate.controllerErrorBoundSource = "configured-engineering-assumption";
-    % Controller state order is
-    % [x; y; yaw; longitudinalVelocity; lateralVelocity; yawRate].
-    egoEstimate.controllerStateErrorBound = [ ...
-        bound.egoPosition; bound.egoPosition; bound.egoYaw; ...
-        bound.egoVelocity; bound.egoVelocity; bound.egoYawRate];
-    for targetIdx = 1:numel(targetEstimate)
-        targetEstimate(targetIdx).controllerErrorBoundSource = "configured-engineering-assumption";
-        targetEstimate(targetIdx).targetPositionInertialErrorBound = ...
-            bound.targetPosition * ones(2, 1);
-        targetEstimate(targetIdx).targetVelocityInertialErrorBound = ...
-            bound.targetVelocity * ones(2, 1);
-        targetEstimate(targetIdx).targetYawErrorBound = ...
-            bound.targetYaw;
-        targetEstimate(targetIdx).targetYawRateErrorBound = ...
-            bound.targetYawRate;
-    end
+function estimate = localCurrentEgoEstimate(runtime, frame)
+% Tighten the timestamped enclosure with the current sensor frame. This
+% read-only output does not integrate the observer or advance its state.
+    estimate = onlineNrmmTrackingRuntime("output", runtime, frame);
 end
 
 function estimate = localLabelTargetEstimate(estimate, acquisition)
@@ -862,6 +827,10 @@ function localValidateConfiguration(cfg)
     if ~isstruct(cfg) || ~isscalar(cfg) || ~all(isfield(cfg, required))
         error("nrmmEstimatorControllerAdapter:invalidConfiguration", ...
             "cfg must come from estimatorControllerIntegrationConfig.");
+    end
+    if isfield(cfg, "publishedErrorBound")
+        error("nrmmEstimatorControllerAdapter:fixedErrorBoundOverride", ...
+            "Remove publishedErrorBound: controller bounds now come from the online estimator.");
     end
     publicationPolicyValid = ...
         isfield(cfg.sensor, "radar") ...
