@@ -14,6 +14,14 @@ classdef nrmmModelFormulationTest < matlab.unittest.TestCase
         PhiLipschitz
     end
 
+    properties (TestParameter)
+        derivativeState = struct( ...
+            "moving", [3; 1; 12; 1; 0.2; 0.4], ...
+            "zeroSpeed", [3; 1; 0; 0; 2; -1], ...
+            "highSpeed", [3; 1; 100; -40; 2; 1], ...
+            "highAcceleration", [3; 1; 12; 1; 30; -40]);
+    end
+
     methods (TestClassSetup)
         function addProjectPaths(testCase)
             repoRoot = fileparts(fileparts(mfilename("fullpath")));
@@ -34,6 +42,19 @@ classdef nrmmModelFormulationTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function requestingDiagnosticsPreservesTargetDynamics(testCase, derivativeState)
+            ego = struct("bodyVelocity", [10; 0.5], "yawRate", 0.12);
+
+            derivativeOnly = nrmmTargetTrackerDerivative( ...
+                derivativeState, ego, testCase.Domain);
+            [derivative, estimate] = nrmmTargetTrackerDerivative( ...
+                derivativeState, ego, testCase.Domain);
+
+            testCase.verifyEqual(derivativeOnly, derivative, AbsTol=0.0);
+            testCase.verifyEqual(estimate.relativeVelocity, derivative(1:2), AbsTol=0.0);
+            testCase.verifyTrue(all(isfinite(derivativeOnly)));
+        end
+
         function transformedTargetMapIsSo2Equivariant(testCase)
             angle = 0.63;
             rotation = [cos(angle), -sin(angle); ...

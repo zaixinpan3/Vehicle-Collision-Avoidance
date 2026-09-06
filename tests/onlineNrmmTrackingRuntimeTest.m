@@ -532,6 +532,77 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 abs(output.yawCourseInnovation), 0.02);
         end
 
+        function eachSampleRefreshesTheYawCorrectionAndAudit(testCase)
+            runtime = localRuntime(1);
+            [runtime, ~] = onlineNrmmTrackingRuntime( ...
+                "step", runtime, localCruiseFrame(0.0));
+            frame = localConstantHeadingFrame(runtime.currentTime, 0.3, 12.0);
+            frame.yawRateMeasured = 0.08;
+            design = runtime.observerDesign;
+            sideslip = asin(design.yaw.courseModel.rearAxleDistance ...
+                * frame.yawRateMeasured/12.0);
+            heading = 0.3-sideslip;
+            equilibrium = heading ...
+                + frame.yawRateMeasured/design.yaw.correctionBandwidth;
+            expectedYaw = equilibrium+(runtime.yawEstimate-equilibrium) ...
+                * exp(-design.yaw.correctionBandwidth*runtime.samplePeriod);
+
+            [~, output] = onlineNrmmTrackingRuntime("step", runtime, frame);
+
+            testCase.verifyEqual(output.yawCoursePseudoHeading, heading, AbsTol=1.0e-12);
+            testCase.verifyEqual(output.yawCourseEstimatedSideslip, sideslip, AbsTol=1.0e-12);
+            testCase.verifyEqual(output.egoYaw, expectedYaw, AbsTol=1.0e-9);
+            testCase.verifyEqual(output.lastIntervalOperatingDomainAudit ...
+                .minimumCourseDirectionMagnitude, 12.0, AbsTol=1.0e-12);
+            testCase.verifyEqual(output.lastIntervalOperatingDomainAudit ...
+                .maximumMeasuredYawRate, 0.08, AbsTol=1.0e-12);
+        end
+
+        function outputProbesUseTheirOwnCourseMeasurements(testCase)
+            runtime = localRuntime(1);
+            firstFrame = localConstantHeadingFrame(0.0, 0.25, 10.0);
+            secondFrame = localConstantHeadingFrame(0.0, -0.2, 12.0);
+
+            first = onlineNrmmTrackingRuntime("output", runtime, firstFrame);
+            second = onlineNrmmTrackingRuntime("output", runtime, secondFrame);
+            repeated = onlineNrmmTrackingRuntime("output", runtime, firstFrame);
+
+            testCase.verifyEqual(first.yawCoursePseudoHeading, 0.25, AbsTol=1.0e-12);
+            testCase.verifyEqual(second.yawCoursePseudoHeading, -0.2, AbsTol=1.0e-12);
+            testCase.verifyEqual(repeated, first);
+            testCase.verifyEqual(second.egoYaw, runtime.yawEstimate, AbsTol=0.0);
+        end
+
+        function uninformativeCourseIsRejectedAfterAnInformativeSample(testCase)
+            runtime = localRuntime(1);
+            [runtime, ~] = onlineNrmmTrackingRuntime( ...
+                "step", runtime, localCruiseFrame(0.0));
+            frame = localCruiseFrame(runtime.currentTime);
+            frame.vxGps = 0.0;
+            frame.vyGps = 0.0;
+
+            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
+                "step", runtime, frame), ...
+                "onlineNrmmTrackingRuntime:uninformativeCourseChannel");
+            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
+                "output", runtime, frame), ...
+                "onlineNrmmTrackingRuntime:uninformativeCourseChannel");
+        end
+
+        function offGridFramesAreRejectedBeforeTheirCourseIsUsed(testCase)
+            runtime = localRuntime(1);
+            frame = localCruiseFrame(runtime.samplePeriod);
+            frame.vxGps = 0.0;
+            frame.vyGps = 0.0;
+
+            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
+                "step", runtime, frame), ...
+                "onlineNrmmTrackingRuntime:offSampleGrid");
+            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
+                "output", runtime, frame), ...
+                "onlineNrmmTrackingRuntime:offSampleGrid");
+        end
+
         function courseChannelPublishesCertifiedGeometry(testCase)
             runtime = localRuntime(1);
 
