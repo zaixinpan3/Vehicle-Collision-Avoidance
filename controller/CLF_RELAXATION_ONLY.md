@@ -176,3 +176,72 @@ plant does not inject computation latency; collision separation is evaluated
 at control nodes. No hard worst-case time, intersample safety, general sampled
 convergence or estimator-robustness theorem is inferred. The full repository
 suite was not rerun; earlier unrelated full-suite failures are not claimed fixed.
+
+## Why lateral and heading recovery miss the window
+
+A subsequent analysis of the same saved trials separates three mechanisms.
+It introduces no controller change or new plant simulation.
+
+First, the reference-cruise Riccati matrix has a decoupled speed coordinate:
+`V = Vspeed + Vlateral`, where `Vspeed = 0.625*(vx-vRef)^2` and `Vlateral`
+contains lateral position, heading, lateral velocity and yaw-rate error,
+including their cross terms. The CLF constrains the derivative of their sum;
+it does not require either part, or either individual pose error, to decrease
+at every sample. On the straight road, at fixed 15 m/s reference:
+
+| Time (s) | Total V | Speed part | Lateral-state part |
+| ---: | ---: | ---: | ---: |
+| 7.0 | 4.55052 | 4.54349 | 0.00702 |
+| 7.2 | 2.99931 | 2.87116 | 0.12815 |
+| 7.5 | 1.61251 | 0.99715 | 0.61536 |
+| 8.0 | 0.82544 | 0.02994 | 0.79550 |
+
+At 7.2 s, the recorded modeled derivatives are approximately
+`VspeedDot = -8.48369`, `VlateralDot = +1.19184`, and
+`VDot = -7.29185`. The required bound is only `VDot <= -6.04889`.
+Thus the lateral-state part is actively increasing while the combined
+zero-slack CLF condition passes. This is direct evidence of the permitted
+trade between longitudinal and lateral recovery, not merely a hypothesis
+based on acceleration fluctuations. These derivative values use the
+straight, zero-bias model `vxDot = gamma*a`; no analogous isolated derivative
+claim is made for the curved-road data.
+
+Second, minimizing only slack stops distinguishing inputs once zero slack
+is feasible. In particular, later predicted CLF values and individual
+tracking errors are diagnostics, not costs or recovery constraints. The
+optimizer has no criterion requiring the lateral overshoot to be smaller or
+to finish before the 9 s acceptance-window boundary. On the recorded straight
+run, lateral error grows to 0.499381 m at 8.10 s after the acceleration phase,
+then decays; heading error peaks at 0.047574 rad at 7.45 s.
+
+Third, the current continuous-time derivative condition does not impose a
+sampled decrease condition. In the 20 straight-road recovery calls at
+9.00--9.95 s, every reconstructed slack is zero and every instantaneous CLF
+row passes, yet the model's own held-input prediction has `Vnext > Vcurrent`
+in six calls. The reference and P are identical at these straight-road
+nodes, so the discrepancy already exists within the predictor. The 19
+available consecutive recorded-current-state pairs also contain six increases.
+Those counts have different denominators and are not claimed to identify the
+same six intervals. The modeled and actual observations support a sampling
+limitation; they do not assign a causal fraction to plant/model mismatch.
+
+Both runs eventually enter the pose tolerances by 10 s. The actual failed
+samples within the complete 9--10 s window are:
+
+| Scene | Lateral violations (> 0.2 m) | Heading violations (> 0.02 rad) | Final lateral / heading error |
+| --- | --- | --- | --- |
+| Straight | 9.00, 9.05 s | 9.00, 9.05 s | 0.081592 m / -0.006545 rad |
+| Arc | 9.00, 9.05, 9.10, 9.15 s | 9.75, 9.80 s | 0.051974 m / -0.013886 rad |
+
+The straight run therefore settles just after the required window starts;
+the arc run also has a later heading excursion. A final-sample-only assessment
+would pass these two pose channels and conceal those failures. The correct
+conclusion is a missed window and insufficient sustained tracking precision,
+not a failure to approach cruise at all.
+
+The analysis is retained in `/tmp/controller-lateral-recovery-diagnosis-20260906`.
+It verifies that the speed/lateral partition reconstructs the saved total V
+within `1e-10` at the fixed 15 m/s reference. Curved-road predicted-V counts
+retain their locally changing curvature references and are explicitly not
+used as a frozen-reference sampling isolation. No model-only closed-loop
+ablation or independent state-decay-controller trial was performed.
