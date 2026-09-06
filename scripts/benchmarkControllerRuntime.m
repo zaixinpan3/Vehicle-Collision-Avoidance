@@ -4,7 +4,10 @@ function report = benchmarkControllerRuntime(trial, options)
 % Each pass resets certificate memory, then carries its own certified plan.
 % This measures the controller, not perception or the simulation plant, and
 % is not a closed-loop experiment. The first pass is reported separately;
-% every subsequent sample is retained, including deadline misses.
+% every subsequent sample is retained, including deadline misses. Explicit
+% preparation precedes all timed online samples, including sample one. The
+% requested thread limit is restored on return. Disable preparation and use
+% the original thread count when measuring cold-start behavior.
 %
 %   data = load("straight_avoidance.mat");
 %   report = benchmarkControllerRuntime(data.result, Repetitions=3);
@@ -13,13 +16,23 @@ function report = benchmarkControllerRuntime(trial, options)
         trial (1,1) struct
         options.Repetitions (1,1) double {mustBeInteger, mustBePositive} = 3
         options.OutputDirectory (1,1) string = ""
+        options.PrepareController (1,1) logical = true
+        options.ComputationalThreads (1,1) double {mustBeInteger, mustBePositive} = 1
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root, "controller"), fullfile(root, "config"));
+    previousThreads = maxNumCompThreads(options.ComputationalThreads);
+    threadCleanup = onCleanup(@() maxNumCompThreads(previousThreads));
     count = numel(trial.command);
     assert(count > 0, "benchmarkControllerRuntime:emptyTrial", "No controller inputs were recorded.");
     rows = zeros(count*options.Repetitions, 14);
     algorithms = strings(size(rows, 1), 1);
+    preparation = struct("performed", false, "elapsedSeconds", 0.0);
+    if options.PrepareController
+        preparation = prepareCollisionAvoidanceController( ...
+            trial.controllerEgoEstimate{1}, ...
+            trial.perception.roadBoundaryFit{1}.roadGeometry, trial.controllerConfiguration);
+    end
     for repetition = 1:options.Repetitions
         certificate = [];
         for sample = 1:count
@@ -73,6 +86,7 @@ function report = benchmarkControllerRuntime(trial, options)
     report = struct("samples", samples, "summary", summary, "matlabVersion", string(version), ...
         "computer", string(computer), "controllerPath", string(which("collisionAvoidanceController")), ...
         "sampleTime", trial.controllerConfiguration.controller.sampleTime, ...
+        "preparation", preparation, "computationalThreads", maxNumCompThreads, ...
         "scope", "Recorded-input replay; first pass separate; no hard real-time guarantee");
     if strlength(options.OutputDirectory) > 0
         if ~isfolder(options.OutputDirectory), mkdir(options.OutputDirectory); end

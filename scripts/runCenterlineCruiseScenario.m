@@ -16,6 +16,8 @@ function result = runCenterlineCruiseScenario(varargin)
 % controller configuration.
 
     options = localOptions(varargin{:});
+    previousThreads = maxNumCompThreads(options.computationalThreads);
+    threadCleanup = onCleanup(@() maxNumCompThreads(previousThreads));
     repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(repositoryRoot, "config"));
     addpath(fullfile(repositoryRoot, "controller"));
@@ -122,6 +124,7 @@ function result = runCenterlineCruiseScenario(varargin)
     completedStepCount = 0;
     terminalTaskCompleted = false;
     maximumTargetCount = 0;
+    controllerPreparation = struct("performed", false, "elapsedSeconds", 0.0);
 
     for stepIdx = 1:requestedStepCount
         attemptedStepCount = stepIdx;
@@ -178,6 +181,10 @@ function result = runCenterlineCruiseScenario(varargin)
         end
         maximumTargetCount = max( ...
             maximumTargetCount, numel(targetEstimate{stepIdx}));
+        if stepIdx == 1 && options.prepareController
+            controllerPreparation = prepareCollisionAvoidanceController( ...
+                controllerState, controllerRoadGeometry, cfg);
+        end
         solveTimer = tic;
         try
             [command{stepIdx}, ~, planningProblem] = ...
@@ -291,6 +298,8 @@ function result = runCenterlineCruiseScenario(varargin)
         "parameters", plantParameters, ...
         "initialization", initialization);
     result.controllerConfiguration = cfg;
+    result.controllerPreparation = controllerPreparation;
+    result.computationalThreads = options.computationalThreads;
     result.criteria = criteria;
     result.controlTime = controlTime;
     result.controlState = controlState;
@@ -399,6 +408,9 @@ function options = localOptions(varargin)
     addParameter(parser, "Plot", false, @localLogicalScalar);
     addParameter(parser, "Report", true, @localLogicalScalar);
     addParameter(parser, "Progress", false, @localLogicalScalar);
+    addParameter(parser, "PrepareController", true, @localLogicalScalar);
+    addParameter(parser, "ComputationalThreads", 1, ...
+        @(value) localPositiveScalar(value) && value == fix(value));
     parse(parser, varargin{:});
     if isempty(parser.Results.Centerline)
         error("runCenterlineCruiseScenario:missingCenterline", ...
@@ -423,6 +435,8 @@ function options = localOptions(varargin)
     options.estimatorConfiguration = ...
         parser.Results.EstimatorConfiguration;
     options.controllerConfiguration = parser.Results.ControllerConfiguration;
+    options.prepareController = parser.Results.PrepareController;
+    options.computationalThreads = parser.Results.ComputationalThreads;
     options.perceptionRange = ...
         double(parser.Results.PerceptionRange);
     options.roadBoundaryOffsets = ...

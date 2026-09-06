@@ -10,6 +10,42 @@ classdef avoidanceSafetyGeometryTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function batchedRoadSupportsBoundAllAdmittedRectangleHeadings(testCase)
+            cfg = collisionAvoidanceControllerConfig();
+            ego = struct("position", [0; 0], "yaw", 0, "speed", 1);
+            angles = linspace(-pi, pi, 25);
+            for angle = angles
+                tangent = [cos(angle); sin(angle)];
+                normal = [-sin(angle); cos(angle)];
+                boundary = struct("origin", [0; 0], "longitudinalDirection", tangent, ...
+                    "lateralDirection", normal, "coefficients", [-0.003, 0.1, -200], ...
+                    "parameterRange", [-1000, 1000], "safeSideSign", 1, ...
+                    "boundaryId", "rotated");
+                inputRoad = struct("centerline", [-100, 0; 100, 0], "boundaries", boundary);
+                [~, lane, road] = readPlanningInputs(ego, [], inputRoad, cfg);
+                model = struct("cfg", cfg, "lane", lane, "road", road, ...
+                    "hasTarget", false, "targetKey", "", ...
+                    "egoHalfLength", 2.4, "egoHalfWidth", 0.95);
+                prediction = struct("nodeCount", 5, "planCount", 8, ...
+                    "scheduleSpeedProfile", ones(1, 5), ...
+                    "egoStateErrorBound", repmat([0; 0; 0.07; 0; 0; 0], 1, 5));
+                state = zeros(6, 5);
+                state(1, :) = 90:2:98;
+                state(3, :) = linspace(-0.4, 0.4, 5);
+                geometry = avoidanceSafetyGeometry(model, prediction, state);
+                for index = 1:5
+                    node = geometry.road.nodes(index);
+                    yaw = linspace(-cfg.model.headingDomainRadius, cfg.model.headingDomainRadius, 201);
+                    uncertainYaw = yaw+[-0.07; 0.07];
+                    support = max(2.4*abs(cos(angle+pi/2-uncertainYaw)) ...
+                        + 0.95*abs(sin(angle+pi/2-uncertainYaw)), [], 1);
+                    bound = node.egoSupport+node.headingCoefficient*abs(yaw-state(3, index));
+                    testCase.verifyTrue(node.covered);
+                    testCase.verifyLessThanOrEqual(max(support-bound), 1.0e-12);
+                end
+            end
+        end
+
         function theChartBoundContainsPosesAcrossSegmentBoundaries(testCase)
             cfg = collisionAvoidanceControllerConfig();
             ego = struct("position", [0.0; 0.0], "yaw", 0.0, "speed", 1.0);

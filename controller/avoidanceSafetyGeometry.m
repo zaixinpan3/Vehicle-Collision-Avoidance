@@ -23,6 +23,13 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
         % The final rest step has a single pose and must use one chart.
         candidates(count-1) = candidates(count);
     end
+    roadCandidates = cell(numel(road), 1);
+    for boundaryIdx = 1:numel(road)
+        boundary = model.road.boundaries(boundaryIdx);
+        road(boundaryIdx).id = boundary.boundaryId;
+        roadCandidates{boundaryIdx} = localRoadNodes( ...
+            empty, model, prediction, state, candidates, boundary);
+    end
     frames = candidates;
     replaced = 0;
     for nodeIdx = 1:count
@@ -36,10 +43,7 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
             admitted = admitted && targetNode.nominalMargin >= 0.0;
         end
         for boundaryIdx = 1:numel(road)
-            boundary = model.road.boundaries(boundaryIdx);
-            road(boundaryIdx).id = boundary.boundaryId;
-            roadNodes(boundaryIdx) = localRoadNode( ...
-                empty, model, prediction, nominal, frame, nodeIdx, boundary);
+            roadNodes(boundaryIdx) = roadCandidates{boundaryIdx}(nodeIdx);
             admitted = admitted && (~roadNodes(boundaryIdx).covered ...
                 || roadNodes(boundaryIdx).nominalMargin >= 0.0);
             if ~isempty(carried) && carried.road(boundaryIdx).nodes(nodeIdx).covered
@@ -112,45 +116,96 @@ function node = localTargetNode(node, model, prediction, state, frame, nodeIdx)
     node.terminalStationUpper = frame.stationUpper;
 end
 
-function node = localRoadNode(node, model, prediction, state, frame, nodeIdx, boundary)
-% Bound the complete quadratic graph over the rectangle's admitted range.
-% Its maximum is attained at an endpoint or the quadratic stationary point.
-% This replaces sampled/interpolated road offsets with a sound halfspace.
+function nodes = localRoadNodes(empty, model, prediction, state, frames, boundary)
+% Bound every quadratic graph over the complete admitted rectangle range.
+% Batch node arithmetic; retain the same endpoint/stationary-point extrema.
     cfg = model.cfg;
+    count = numel(frames);
+    nodes = repmat(empty, count, 1);
     longitudinal = boundary.longitudinalDirection;
-    coefficients = longitudinal.'*[frame.tangent, frame.lateral];
-    origin = longitudinal.'*(frame.origin-boundary.origin);
-    stationRange = coefficients(1)*[frame.stationLower, frame.stationUpper];
-    extent = abs(coefficients(2))*cfg.model.lateralDomainRadius ...
+    tangent = reshape([frames.tangent], 2, []);
+    lateral = reshape([frames.lateral], 2, []);
+    origins = reshape([frames.origin], 2, []);
+    errors = reshape([frames.positionErrorBound], 2, []);
+    first = longitudinal.'*tangent;
+    second = longitudinal.'*lateral;
+    origin = longitudinal.'*(origins-boundary.origin);
+    stationRange = first.*[[frames.stationLower]; [frames.stationUpper]];
+    extent = abs(second)*cfg.model.lateralDomainRadius ...
         + hypot(model.egoHalfLength, model.egoHalfWidth) ...
-        + abs(longitudinal).'*frame.positionErrorBound;
-    range = [min(stationRange)-extent, max(stationRange)+extent]+origin;
+        + abs(longitudinal).'*errors;
+    range = [min(stationRange, [], 1)-extent; max(stationRange, [], 1)+extent]+origin;
     tolerance = cfg.road.parameterRangeTolerance;
-    outside = range(2) < boundary.parameterRange(1)-tolerance ...
-        || range(1) > boundary.parameterRange(2)+tolerance;
-    covered = range(1) >= boundary.parameterRange(1)-tolerance ...
-        && range(2) <= boundary.parameterRange(2)+tolerance;
-    if outside || (~covered && boundary.coveragePolicy == "perceptionLimited")
-        return;
-    end
-    if ~covered
+    outside = range(2, :) < boundary.parameterRange(1)-tolerance ...
+        | range(1, :) > boundary.parameterRange(2)+tolerance;
+    covered = range(1, :) >= boundary.parameterRange(1)-tolerance ...
+        & range(2, :) <= boundary.parameterRange(2)+tolerance;
+    if boundary.coveragePolicy ~= "perceptionLimited" && any(~outside & ~covered)
+        nodeIdx = find(~outside & ~covered, 1);
         error("collisionAvoidanceController:roadBoundaryCoverageGap", ...
             "Road boundary %s does not cover node %d's admitted rectangle range.", ...
             boundary.boundaryId, nodeIdx-1);
     end
+    selected = find(~outside & covered);
+    if isempty(selected), return; end
+    range = range(:, selected);
     polynomial = boundary.safeSideSign*boundary.coefficients;
     samples = range;
     if polynomial(1) < 0.0
         stationary = -polynomial(2)/(2.0*polynomial(1));
-        samples = [samples, min(max(stationary, range(1)), range(2))];
+        samples = [samples; min(max(stationary, range(1, :)), range(2, :))];
     end
-    graphSupport = max((polynomial(1)*samples+polynomial(2)).*samples+polynomial(3));
+    graphSupport = max((polynomial(1)*samples+polynomial(2)).*samples+polynomial(3), [], 1);
     normal = boundary.safeSideSign*boundary.lateralDirection;
-    maxSlope = max(abs(2.0*boundary.coefficients(1)*range+boundary.coefficients(2)));
+    maxSlope = max(abs(2.0*boundary.coefficients(1)*range+boundary.coefficients(2)), [], 1);
     tightening = (cfg.collision.clearanceMargin ...
         + boundary.normalDistanceErrorBound)*hypot(1.0, maxSlope);
-    node = localSupportNode(node, model, prediction, state, frame, ...
-        nodeIdx, normal, normal.'*boundary.origin+graphSupport, tightening);
+    nodes(selected) = localSupportNodes(empty, model, prediction, state(:, selected), ...
+        frames(selected), selected, repmat(normal, 1, numel(selected)), ...
+        normal.'*boundary.origin+graphSupport, tightening);
+end
+
+function nodes = localSupportNodes(empty, model, prediction, state, frames, ...
+        indices, inertialNormal, obstacleSupport, clearance)
+    frameHeading = [frames.heading];
+    heading = state(3, :)+frameHeading;
+    radius = prediction.egoStateErrorBound(3, indices)+[frames.headingErrorBound];
+    tangent = reshape([frames.tangent], 2, []);
+    lateral = reshape([frames.lateral], 2, []);
+    normal = [sum(tangent.*inertialNormal, 1); sum(lateral.*inertialNormal, 1)];
+    egoSupport = localRectangleSupport(model.egoHalfLength, ...
+        model.egoHalfWidth, inertialNormal, heading, radius);
+    headingDomain = model.cfg.model.headingDomainRadius+radius;
+    slope = localSupportSlopeBound(model.egoHalfLength, model.egoHalfWidth, ...
+        inertialNormal, frameHeading+min(-headingDomain, state(3, :)-radius), ...
+        frameHeading+max(headingDomain, state(3, :)+radius));
+    origins = reshape([frames.origin], 2, []);
+    errors = reshape([frames.positionErrorBound], 2, []);
+    supportValue = obstacleSupport+egoSupport-sum(inertialNormal.*origins, 1);
+    tightening = clearance ...
+        + sum(abs(normal).*prediction.egoStateErrorBound(1:2, indices), 1) ...
+        + sum(abs(inertialNormal).*errors, 1);
+    margin = sum(normal.*state(1:2, :), 1)-supportValue-tightening;
+    nodes = repmat(empty, numel(indices), 1);
+    for index = 1:numel(indices)
+        nodes(index).covered = true;
+        nodes(index).normal = normal(:, index);
+        nodes(index).egoSupport = egoSupport(index);
+        nodes(index).targetSupport = obstacleSupport(index);
+        nodes(index).supportValue = supportValue(index);
+        nodes(index).headingCoefficient = slope(index);
+        nodes(index).nominalHeading = state(3, index);
+        nodes(index).tightening = tightening(index);
+        nodes(index).nominalMargin = margin(index);
+        nodes(index).outside = margin(index) >= 0.0;
+        if abs(normal(2, index)) <= 0.087
+            nodes(index).regionCode = 1+double(normal(1, index) > 0.0);
+        elseif abs(normal(1, index)) <= 0.087
+            nodes(index).regionCode = 3+double(normal(2, index) < 0.0);
+        else
+            nodes(index).regionCode = 5+2*double(normal(1, index) > 0.0)+double(normal(2, index) < 0.0);
+        end
+    end
 end
 
 function node = localSupportNode(node, model, prediction, state, frame, ...
@@ -212,23 +267,15 @@ function value = localRectangleSupport(halfLength, halfWidth, normal, ...
 % over an interval is therefore the larger endpoint value, or R when a
 % maximizer falls inside. Exact, and the direction-wise treatment of a
 % yaw radius that an axis-aligned box can only approximate.
-    alpha = atan2(normal(2), normal(1));
+    alpha = atan2(normal(2, :), normal(1, :));
     low = alpha-yaw-yawRadius;
     high = alpha-yaw+yawRadius;
     value = max(localSupportAtAngle(halfLength, halfWidth, low), ...
         localSupportAtAngle(halfLength, halfWidth, high));
-    if yawRadius <= 0.0
-        return;
-    end
     phase = atan2(halfWidth, halfLength);
-    for phaseSign = [-1.0, 1.0]
-        maximizer = phaseSign*phase ...
-            + pi*ceil((low-phaseSign*phase)/pi);
-        if maximizer <= high
-            value = hypot(halfLength, halfWidth);
-            return;
-        end
-    end
+    reachesMaximum = phase+pi*ceil((low-phase)/pi) <= high ...
+        | -phase+pi*ceil((low+phase)/pi) <= high;
+    value(reachesMaximum) = hypot(halfLength, halfWidth);
 end
 
 function value = localSupportAtAngle(halfLength, halfWidth, angle)
@@ -245,54 +292,19 @@ function slope = localSupportSlopeBound(halfLength, halfWidth, normal, ...
 %   h(psi) <= h(psibar) + slope * |psi - psibar|,
 %
 % two affine rows (sigma = +-1) whose minimum is the bound. This
-% returns the exact Lipschitz constant of h over the interval the
-% program admits: max |dh/dpsi| there. With theta = alpha - psi,
-% dh/dtheta = -l sgn(cos) sin + w sgn(sin) cos is sinusoidal of
-% amplitude R = hypot(l, w) between the kinks at multiples of pi/2, so
-% its magnitude is maximized at an interval endpoint, at a kink (where
-% it is l or w) or at the sinusoid's own peak (where it is R) when that
-% falls inside. Exact, hence never worse than the retired box bound
-% (which charged w along the station axis and l along the lateral one,
-% and their sum for a diagonal normal); for a diagonal normal at the
-% declared heading domain it is measurably smaller.
-    alpha = atan2(normal(2), normal(1));
+% returns the exact Lipschitz constant over the admitted interval. Between
+% consecutive kinks, h'' = -h < 0, so h' is monotone and |h'| reaches its
+% maximum at an endpoint. Only the interval endpoints and the two families
+% of kinks are needed; no piece enumeration or sorting is required.
+    alpha = atan2(normal(2, :), normal(1, :));
     low = alpha-yawHigh;
     high = alpha-yawLow;
-    radius = hypot(halfLength, halfWidth);
-    if ~(high > low)
-        slope = radius;
-        return;
-    end
-    kinks = ceil(low/(pi/2))*(pi/2):(pi/2):high;
-    edges = unique([low, kinks, high]);
-    slope = 0.0;
-    for pieceIdx = 1:numel(edges)-1
-        pieceLow = edges(pieceIdx);
-        pieceHigh = edges(pieceIdx+1);
-        middle = 0.5*(pieceLow+pieceHigh);
-        cosineSign = localNonzeroSign(cos(middle));
-        sineSign = localNonzeroSign(sin(middle));
-        % dh/dtheta = cosineCoefficient cos(theta) + sineCoefficient sin(theta)
-        cosineCoefficient = halfWidth*sineSign;
-        sineCoefficient = -halfLength*cosineSign;
-        value = max( ...
-            abs(cosineCoefficient*cos(pieceLow) ...
-                + sineCoefficient*sin(pieceLow)), ...
-            abs(cosineCoefficient*cos(pieceHigh) ...
-                + sineCoefficient*sin(pieceHigh)));
-        peak = atan2(sineCoefficient, cosineCoefficient);
-        extremum = peak+pi*ceil((pieceLow-peak)/pi);
-        if extremum >= pieceLow && extremum <= pieceHigh
-            value = radius;
-        end
-        slope = max(slope, value);
-    end
-end
-
-function value = localNonzeroSign(value)
-    if value < 0.0
-        value = -1.0;
-    else
-        value = 1.0;
-    end
+    endpoints = [low; high];
+    slope = max(abs(halfLength*abs(sin(endpoints)) ...
+        - halfWidth*abs(cos(endpoints))), [], 1);
+    lengthKink = pi/2+pi*ceil((low-pi/2)/pi) <= high;
+    widthKink = pi*ceil(low/pi) <= high;
+    slope(lengthKink) = max(slope(lengthKink), halfLength);
+    slope(widthKink) = max(slope(widthKink), halfWidth);
+    slope(high <= low) = hypot(halfLength, halfWidth);
 end

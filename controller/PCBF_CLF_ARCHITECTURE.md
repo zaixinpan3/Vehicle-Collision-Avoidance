@@ -93,8 +93,13 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
  \end{aligned}
 \]
 
-The input cost measures deviation from the performance-reference equilibrium over the head.
-A small positive input quadratic in the continuation removes degeneracy.
+The current-input cost is centered at the performance-reference equilibrium
+minus sampled LQR feedback on the current cruise error. The discrete gain
+uses the exact held-input model and configured sample period; future head
+inputs retain their equilibrium centres. A small positive input quadratic
+in the continuation removes degeneracy. See
+[CRUISE_RECOVERY_RUNTIME.md](CRUISE_RECOVERY_RUNTIME.md) for the recovery
+diagnosis, input preference and explicit runtime initialization.
 There is no safety slack. Define the local cruise error by
 
 \[
@@ -321,8 +326,8 @@ motion bounds or a sampled-data certificate.
 contains inputs, CLF slack and explicit future states. Equality slacks lie in
 a zero cone; all inequality slacks, including the affine CLF row, lie in a
 nonnegative cone. The objective is quadratic, so this is a standard QP.
-The feasibility and optimality targets are each the minimum of 1e-9 and their
-respective configured tolerance. Physical acceptance remains a separate
+The feasibility and optimality targets use their respective configured
+tolerances. Physical acceptance remains a separate
 absolute check. There is no retry with another solver or geometric start.
 
 Run `addpath('scripts'); buildAvoidanceSocpSolver()` once before experiments.
@@ -395,6 +400,10 @@ illustrates that disturbance handling needs a feedback/error-containment
 construction. Those references do not independently certify this implementation.
 
 ## CLF-QP conversion validation (2026-09-06)
+
+These checks describe the earlier CLF conversion. The subsequent input-cost
+and execution changes are documented in
+[CRUISE_RECOVERY_RUNTIME.md](CRUISE_RECOVERY_RUNTIME.md).
 
 The isolated commit tree passes all 120 tests in `continuousTimeClfTest`,
 `sparseAvoidanceQpTest`, `collisionAvoidanceControllerTest`,
