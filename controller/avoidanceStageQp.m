@@ -1,9 +1,9 @@
-function program = avoidanceStageSocp(qp, prediction, rows, bound, stateNode, inputStage)
-%avoidanceStageSocp Keep dynamics and constraints local in the conic solve.
+function program = avoidanceStageQp(qp, prediction, rows, bound, stateNode, inputStage)
+%avoidanceStageQp Keep dynamics and constraints local in the CBF-CLF-QP.
 % The additional variables are x_1,...,x_M. Eliminating their affine
 % dynamics recovers the condensed program used by independent acceptance.
-% The quadratic input objective is retained directly; the sole SOC is the
-% exact first-step CLF. No horizon, constraint or objective is approximated.
+% The quadratic input objective is retained directly. The continuous-time
+% CLF is one affine row in the current input and its nonnegative slack.
 
     stages = prediction.stageCount;
     controls = qp.layout.planCount;
@@ -55,18 +55,11 @@ function program = avoidanceStageSocp(qp, prediction, rows, bound, stateNode, in
     inequality = [inequality; selectors];
     bound = [bound; qp.upperBound(upper); -qp.lowerBound(lower)];
 
-    clf = qp.clf;
-    factor = chol(clf.lyapunovMatrix);
-    error = clf.errorOffset(:, 1);
-    available = error.'*(clf.lyapunovMatrix-clf.decreaseMatrix)*error;
-    referenceOffset = clf.errorOffset(:, 2)-prediction.egoStateOffset(2:6, 2);
-    cone = sparse(7, count);
-    cone([1, 7], physicalCount) = -1.0;
-    cone(2:6, physicalCount+(2:6)) = -2.0*factor;
-    coneBound = [available+1.0; 2.0*factor*referenceOffset; available-1.0];
+    inequality = [inequality; sparse(qp.clf.inequalityMatrix), sparse(1, 6*stages)];
+    bound = [bound; qp.clf.inequalityBound];
     hessian = blkdiag(sparse(triu(qp.Hessian)), sparse(6*stages, 6*stages));
     program = struct("P", hessian, "q", [qp.linear; zeros(6*stages, 1)], ...
-        "A", [equality; inequality; cone], "b", [right; bound; coneBound], ...
-        "cones", [size(equality, 1); size(inequality, 1); 7], ...
+        "A", [equality; inequality], "b", [right; bound], ...
+        "cones", [size(equality, 1); size(inequality, 1)], ...
         "physicalDecisionCount", physicalCount, "stateIndex", physicalCount+(1:6*stages));
 end

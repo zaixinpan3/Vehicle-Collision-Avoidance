@@ -1,5 +1,5 @@
-classdef sparseAvoidanceSocpTest < matlab.unittest.TestCase
-%sparseAvoidanceSocpTest The sparse lift preserves the physical optimization.
+classdef sparseAvoidanceQpTest < matlab.unittest.TestCase
+%sparseAvoidanceQpTest The sparse lift preserves the physical optimization.
 
     methods (TestClassSetup)
         function addControllerPaths(testCase)
@@ -42,18 +42,18 @@ classdef sparseAvoidanceSocpTest < matlab.unittest.TestCase
             testCase.verifyEqual(residual, expected, AbsTol=1.0e-10);
         end
 
-        function theNativeConeRetainsTheExactFirstStepClf(testCase)
+        function theNativeQpRetainsTheAffineClfResidual(testCase)
             problem = localProblem();
             [decision, lifted] = localDecision(problem);
             native = problem.qp.stageProgram;
             clf = problem.qp.clf;
-            cone = native.b(end-6:end)-native.A(end-6:end, :)*lifted;
-            current = clf.errorOffset(:, 1);
-            next = clf.errorMatrix(:, :, 2)*decision(problem.layout.planIndex)+clf.errorOffset(:, 2);
-            margin = current.'*(clf.lyapunovMatrix-clf.decreaseMatrix)*current ...
-                + decision(end)-next.'*clf.lyapunovMatrix*next;
+            residual = native.A(end, :)*lifted-native.b(end);
+            derivative = clf.lieDerivativeDrift+clf.lieDerivativeInput*decision(1:2);
+            expected = derivative+clf.decayRate*clf.initialValue-decision(end);
 
-            testCase.verifyEqual(cone(1)^2-sum(cone(2:end).^2), 4.0*margin, AbsTol=1.0e-8);
+            testCase.verifyEqual(residual, expected, AbsTol=1.0e-10);
+            testCase.verifySize(native.cones, [2, 1]);
+            testCase.verifyEqual(sum(native.cones), size(native.A, 1));
         end
 
         function explicitStatesDoNotChangeThePerformanceObjective(testCase)

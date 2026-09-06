@@ -36,6 +36,13 @@ Using the positive tire floor in the kinematic rows would destroy this rest
 property. The low-speed continuation is a regularized research model and
 has no independently validated nonlinear-vehicle accuracy claim.
 
+The continuous-time CLF reads this same generator through
+`ltvBicycleModel.continuousMatrices`, before held-input integration. It
+computes `LfV + LgV*u` at the current scheduled state with a fixed local
+cruise reference. Its Lyapunov matrix is obtained from the continuous
+Riccati equation at straight reference cruise. This performance change
+leaves the discrete prediction and every hard safety constraint unchanged.
+
 ## Schedule and condensation
 
 The admission schedule cruises at measured speed for `N` stages and then
@@ -47,7 +54,7 @@ sampled from the supplied route.
 
 All `M=N+Nb` stages have two control variables. `ltvBicycleModel.predict`
 provides the stage matrices and the condensed map `x_j = F_j*plan + f_j`,
-including all lateral dynamics through rest. The native SOCP uses explicit
+including all lateral dynamics through rest. The native QP uses explicit
 states with sparse dynamic equalities; acceptance independently reconstructs
 states from the condensed map. Identical adjacent scheduling parameters reuse
 exactly the same stage matrices; no speed or curvature quantization is used.

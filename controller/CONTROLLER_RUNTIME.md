@@ -1,4 +1,32 @@
-# Controller runtime and sparse conic implementation
+# Controller runtime and sparse QP implementation
+
+## Continuous-time CLF-QP update (2026-09-06)
+
+The online controller now uses `avoidanceStageQp` with the unchanged sparse
+hard-safety and dynamic rows, the same quadratic input objective, and one
+affine continuous-time CLF constraint. The native Clarabel bridge receives
+only the zero and nonnegative cone dimensions. It requires no Lorentz cone,
+objective epigraph, solver rebuild, or additional solve.
+
+The optional joint solver hook now exposes a standard condensed QP
+(`H`, `f`, `A`, `b`, `Aeq`, `beq`, `lb`, `ub`) and returns `[plan; delta]`.
+A regression solves this interface with MATLAB `quadprog` and compares its
+objective with the native sparse result. `clfDerivativeResidual` replaces
+`clfExactResidual`; it measures `LfV + LgV*u0 + alpha*V0 - delta`.
+`clfDerivative` and `clfDecayRate` report the derivative and rate separately.
+The rate is in inverse seconds and the slack is in `V` per second.
+
+The existing `solveAvoidanceSocpMex` and `buildAvoidanceSocpSolver` names are
+retained for the general solver bridge and build entry. The online problem
+is a QP. See [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the
+formulation and its frozen-reference and sampled-control limitations.
+
+## Historical runtime study before the CLF-QP conversion
+
+The following measurements and equivalent-SOCP discussion describe the
+previous exact discrete-time CLF implementation. They are preserved as
+historical observations and do not establish the new QP's timing or
+closed-loop performance.
 
 The controller still solves one certificate-preserving convex problem per
 sample. The performance objective, 24-stage experiment head, 74-stage

@@ -1,8 +1,8 @@
 function [command, predictedInput, planningProblem, certificate] = ...
         collisionAvoidanceController( ...
         egoState, targetEstimate, laneCenterline, cfg, controllerState)
-%collisionAvoidanceController Certificate-preserving predictive SOCP.
-% One SOCP minimizes cruise-input deviation and exact first-step CLF slack.
+%collisionAvoidanceController Certificate-preserving predictive CBF-CLF-QP.
+% One QP minimizes cruise-input deviation and continuous-time CLF slack.
 % A complete steering/acceleration continuation and its geometric certificate
 % are controller state. Solver results are checked before use; failure uses
 % only a checked carried continuation. Safety covers declared prediction nodes.
@@ -214,10 +214,9 @@ end
 
 function decision = localWitnessDecision(qp, plan)
     clf = qp.clf;
-    errorNow = clf.errorOffset(:, 1);
-    errorNext = clf.errorMatrix(:, :, 2)*plan+clf.errorOffset(:, 2);
-    slack = errorNext.'*clf.lyapunovMatrix*errorNext ...
-        - errorNow.'*(clf.lyapunovMatrix-clf.decreaseMatrix)*errorNow;
+    slack = clf.lieDerivativeDrift ...
+        + clf.lieDerivativeInput*plan(1:qp.layout.inputDimension) ...
+        + clf.decayRate*clf.initialValue;
     decision = [plan; max(slack, 0.0)];
 end
 
@@ -339,11 +338,8 @@ function equal = localNumericallyEqual(first, second, tolerance)
     equal = all(abs(first-second) <= tolerance*scale, "all");
 end
 
-function [residual, valueProfile, planError] = ...
-        localClfExactResiduals(clf, planColumn)
-% The exact (unlinearized) CLF rows of a plan,
-% V(e_{k+1}) - V(e_k) + f W(e_k), k = 0..N-1, with the Lyapunov value
-% and the error at every node.
+function [valueProfile, planError] = localClfValueProfile(clf, planColumn)
+% Predicted quadratic values are diagnostics; only Vdot at x_0 is constrained.
     nodeCount = size(clf.errorOffset, 2);
     planError = zeros(size(clf.errorOffset));
     valueProfile = zeros(1, nodeCount);
@@ -352,12 +348,6 @@ function [residual, valueProfile, planError] = ...
             * planColumn+clf.errorOffset(:, nodeIdx);
         valueProfile(nodeIdx) = planError(:, nodeIdx).' ...
             * clf.lyapunovMatrix*planError(:, nodeIdx);
-    end
-    residual = zeros(1, nodeCount-1);
-    for rowIdx = 1:nodeCount-1
-        currentError = planError(:, rowIdx);
-        residual(rowIdx) = valueProfile(rowIdx+1)-valueProfile(rowIdx) ...
-            + currentError.'*clf.decreaseMatrix*currentError;
     end
 end
 
@@ -373,7 +363,7 @@ function metadata = localPlanDiagnostics( ...
         qp, result, decision, model, prediction)
 % What is reported about the committed plan: the stage-1 duals along
 % its linearization trajectory, the plan's linearized separation
-% margins, the exact CLF relaxation,
+% margins, the continuous-time CLF relaxation,
 % the objective split, and the kernel's verdict.
     layout = qp.layout;
     metadata = struct();
@@ -457,14 +447,17 @@ function metadata = localPlanDiagnostics( ...
         "routeDomain", sum(qp.rowFamily == "routeDomain"), ...
         "terminalRest", size(qp.equalityMatrix, 1));
 
-    % CLF relaxations and the exact decrease residual of the plan.
+    % Continuous-time CLF relaxation and derivative residual at the current state.
     relaxation = decision(layout.relaxationIndex);
     metadata.clfRelaxation = relaxation;
     metadata.clfInitialValue = qp.clf.initialValue;
-    [exactResidual, valueProfile, planError] = ...
-        localClfExactResiduals(qp.clf, planColumn);
+    [valueProfile, planError] = localClfValueProfile(qp.clf, planColumn);
     metadata.clfValueProfile = valueProfile;
-    metadata.clfExactResidual = exactResidual(1)-relaxation;
+    metadata.clfDerivative = qp.clf.lieDerivativeDrift ...
+        + qp.clf.lieDerivativeInput*planColumn(1:layout.inputDimension);
+    metadata.clfDecayRate = qp.clf.decayRate;
+    metadata.clfDerivativeResidual = metadata.clfDerivative ...
+        + qp.clf.decayRate*qp.clf.initialValue-relaxation;
     metadata.clfPlanError = planError;
     metadata.cbfConstraintsHard = true;
     metadata.cbfMinimumMargin = min( ...

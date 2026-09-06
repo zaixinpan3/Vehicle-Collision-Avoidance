@@ -1,8 +1,8 @@
-# Certificate-preserving predictive SOCP
+# Certificate-preserving predictive CBF-CLF-QP
 
-This is the implemented controller contract as of 2026-09-05. The online
+This is the implemented controller contract as of 2026-09-06. The online
 controller uses one performance objective, a maintained safe continuation,
-and at most one SOCP call per sample. It does not optimize over alternative
+and at most one QP call per sample. It does not optimize over alternative
 geometric starts. It is a conservative predictive controller on a selected
 convex domain, not an exact convex reformulation of unrestricted trajectory
 optimization or a pointwise CBF theorem.
@@ -27,7 +27,7 @@ Certificates use version 4 for the route-interval geometry, held-input
 flow and commanded-input model contract. Earlier certificates must undergo initial admission again.
 
 Initial admission constructs one domain from the schedule reference and
-attempts one SOCP. This reference is not certified in advance. The augmented
+attempts one QP. This reference is not certified in advance. The augmented
 state enters the certified domain only after a feasible plan passes acceptance.
 An infeasible initial problem issues no command. Admission is not a complete
 maneuver planner, and a safe state can lie outside the selected domain.
@@ -49,8 +49,8 @@ and `M = N + Nb`. All `M` stages use the same scheduled Frenet bicycle:
 \]
 
 Each stage integrates its scheduled affine model exactly under a held input,
-using one block matrix exponential. The same flow supplies the CLF's cruise
-Riccati design. Acceleration bias propagates through the entire acceleration
+using one block matrix exponential. The CLF uses the continuous generator
+of that same scheduled model and a continuous-time cruise Riccati design. Acceleration bias propagates through the entire acceleration
 input column. The first predicted pose therefore includes the input's
 within-sample effect. This replaces Euler integration consistently in both
 head and continuation; it does not make the nonlinear plant model exact.
@@ -89,37 +89,86 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
  \text{s.t.}\quad& \text{hard actuator, axle-friction, slip and domain rows},\\
  &\underline g_{\ell j}(\mathrm{plan};c_t)\ge0,\\
  &(v_x,v_y,r)_{M}=(0,0,0),\\
- &V(e_1)-V(e_0)+W(e_0)\le\delta.
+ &L_fV(x_0)+L_gV(x_0)u_0\le-\alpha V(x_0)+\delta.
  \end{aligned}
 \]
 
 The input cost measures deviation from the performance-reference equilibrium over the head.
 A small positive input quadratic in the continuation removes degeneracy.
-There is no safety slack. The first-step CLF is represented exactly as
+There is no safety slack. Define the local cruise error by
 
 \[
- \left\|\begin{bmatrix}2Re_1\\q-1\end{bmatrix}\right\|_2\le q+1,
- \qquad q=V(e_0)-W(e_0)+\delta,\quad R^\top R=P.
+ e=Sx-r_0,\qquad Sx=[d,e_\psi,v_x,v_y,r]^\top,\qquad V(x)=e^\top Pe.
 \]
 
-The native solver retains the quadratic input objective directly. No
-horizon-wide difference of two decision-dependent quadratic CLF values is
-constrained. The reported later CLF values are diagnostics. A soft CLF and
-finite penalty do not establish convergence or a recovery deadline.
+The current cruise reference `r0` includes reference speed and the existing
+curvature-dependent lateral velocity and yaw-rate targets. Both `r0` and
+`P` are fixed while evaluating the current derivative. The scheduled
+continuous dynamics are `xDot = Ac*x + Bc*u + cc`; the fourth entry of `cc`
+includes the declared acceleration bias. Therefore
+
+\[
+ L_fV=2e_0^\top PS(A_cx_0+c_c),\qquad
+ L_gV=2e_0^\top PSB_c.
+\]
+
+Only `u0` and the nonnegative slack appear in this CLF constraint. Its QP row is
+
+\[
+ [L_gV,\;0,\ldots,0,\;-1]\,z\le-L_fV-\alpha V(x_0).
+\]
+
+`ltvBicycleModel.continuousMatrices` provides the shared continuous generator;
+`stageMatrices` integrates it without changing the hard-safety prediction.
+The derivative uses the actual first scheduled speed and curvature, including
+a carried schedule. It is not a finite difference of future Lyapunov values
+or a Taylor approximation of the old quadratic constraint.
+
+At straight reference cruise, let `Ae = Ac(2:6,2:6)` and `Be = Bc(2:6,:)`.
+The existing state scales and input weights define `Q` and `R`. The continuous
+Riccati solution and feedback gain satisfy
+
+\[
+ (A_e-B_eK)^\top P+P(A_e-B_eK)=-(Q+K^\top RK)=-W.
+\]
+
+The rate is `alpha = clf.decreaseRateFraction * lambdaMin(W,P) > 0`, in
+inverse seconds. `decreaseRateFraction` retains its range `(0,1]`; there is
+no discrete-time cap of one on the resulting rate. `P` and the rate are
+independent of the sample period. This uses the continuous-matrix syntax of
+[MathWorks `lqr`](https://www.mathworks.com/help/control/ref/lti.lqr.html).
+The affine performance inequality follows the CLF-QP construction in
+[Ames, Xu, Grizzle and Tabuada (2017)](https://arxiv.org/abs/1609.06408).
+
+The native solver retains the quadratic input objective and the existing
+linear slack penalty directly. Slack now has units of `V` per second. The
+numerical penalty coefficient remains unchanged; its previous discrete-time
+tuning and closed-loop performance results do not transfer automatically.
+All hard rows, their tolerances, the continuation, and the rest constraints
+are unchanged. The resulting optimization is a convex QP with affine
+constraints, while its safety certificate retains its predictive node scope.
 
 The numerical decision also includes `x_1,...,x_M`. Sparse equality rows
 impose `x_(j+1) = A_j*x_j+B_j*u_j+c_j`, terminal rest and the fixed final
 input. Each geometric, physical and model-domain row touches only its own
-state and input. Eliminating those states gives exactly the condensed
-problem above; introducing them does not change its admissible trajectories.
-`avoidanceStageSocp` constructs this sparse lift. The condensed maps remain
-available for an independent acceptance calculation from the input vector.
-The returned solver states are never trusted instead of that reconstruction.
+state and input. `avoidanceStageQp` constructs this sparse lift. Eliminating
+those states gives the condensed problem above. Acceptance independently
+reconstructs states from the returned input plan.
 
-The default solve has one seven-dimensional Lorentz cone for the five-state
-first-step CLF. It avoids both state condensation inside the conic solver and
-the large input-cost epigraph cone. The existing fault-injection hook retains
-its equivalent condensed two-cone interface. No second optimization is used.
+The default solve has only zero and nonnegative cones in the general native
+solver interface; it has no Lorentz cone or quadratic constraint. The
+fault-injection hook receives a standard condensed QP with fields
+`H`, `f`, `A`, `b`, `Aeq`, `beq`, `lb`, `ub`, plus the objective `constant`
+and `defaultSolver`. It returns a decision of exactly `[plan; delta]`, with
+no objective epigraph variable. No second optimization is used.
+
+The reference and `P` may be updated at the next sample; their time variation
+is not included in this frozen-reference CLF. Curvature, saturation and
+scheduled-speed changes can require positive slack. A soft CLF evaluated at
+sample instants does not establish continuous-time convergence, sampled
+Lyapunov decrease, or a recovery deadline. Later predicted CLF values remain
+diagnostics only. The hard CBF certificate and its scope are independent of
+these performance claims.
 
 ## Crossing-traffic performance reference
 
@@ -131,11 +180,11 @@ station is ahead, the reference speed is the smaller of requested cruise and
 distance to that station divided by clearance time plus
 `performance.crossingTimeGap` (default 0.25 s). Clearance time is the node
 following the last occupied node. Otherwise, the requested cruise speed is
-retained. Both the input objective and exact first-step CLF use this reference.
+retained. Both the input objective and continuous-time CLF use this reference.
 
 This is a deterministic preference to yield before a crossing, not a safety
 certificate or another trajectory solve. It uses nominal target motion; the
-SOCP still enforces the complete hard continuation constraints. Its time gap
+QP still enforces the complete hard continuation constraints. Its time gap
 is not a plant-error bound. Targets without a forecast lateral exit, including
 the oncoming steering regression, retain the original cruise preference.
 Reference changes do not invalidate an otherwise applicable certificate:
@@ -269,9 +318,9 @@ motion bounds or a sampled-data certificate.
 ## Acceptance and fallback
 
 `solveHardCbfClf` calls the native Clarabel backend once. Its primal decision
-contains inputs, CLF slack and explicit future states; equality slacks lie in
-a zero cone, inequality slacks in a nonnegative cone, and the exact first-step
-CLF in one Lorentz cone. This is an equivalent convex quadratic conic problem.
+contains inputs, CLF slack and explicit future states. Equality slacks lie in
+a zero cone; all inequality slacks, including the affine CLF row, lie in a
+nonnegative cone. The objective is quadratic, so this is a standard QP.
 The feasibility and optimality targets are each the minimum of 1e-9 and their
 respective configured tolerance. Physical acceptance remains a separate
 absolute check. There is no retry with another solver or geometric start.
@@ -282,16 +331,16 @@ three small MEX bridges under `solver/clarabel/matlab`, using the committed
 Cargo lockfile. No download, compilation or additional optimization occurs
 within a sample. QDLDL uses one solver thread. MATLAB path projection and
 frame-bound implementations remain available when their optional MEX files
-are absent. The SOCP backend itself is required. See
+are absent. The native solver backend itself is required; its existing build and MEX names are retained. See
 [CONTROLLER_RUNTIME.md](CONTROLLER_RUNTIME.md) for build and timing details.
 
 For its returned input plan, the sole
-performance slack is reconstructed as `max(0, V(e1)-V(e0)+W(e0))`, its analytic
-minimum at that fixed plan. This prevents a numerical epigraph residual from
+performance slack is reconstructed as `max(0, LfV+LgV*u0+alpha*V0)`, its analytic
+minimum at that fixed plan. This prevents a numerical slack residual from
 rejecting an otherwise safe input and reports the actual performance loss.
 It changes no actuator or hard-safety variable. `certifyAvoidancePlan` checks
 the reconstructed vector for dimensions, finite real values, actuator bounds, all hard
-rows, rest equalities, the exact first-step CLF and Cartesian rectangle
+rows, rest equalities, the continuous-time CLF and Cartesian rectangle
 clearance at every node. The checked vector is stored and committed without
 clipping. The same checks apply to the carried witness.
 
@@ -345,7 +394,34 @@ fixed problem is not a recursive-control theorem. Leeman et al.'s
 illustrates that disturbance handling needs a feedback/error-containment
 construction. Those references do not independently certify this implementation.
 
-## Runtime optimization validation
+## CLF-QP conversion validation (2026-09-06)
+
+The isolated commit tree passes all 120 tests in `continuousTimeClfTest`,
+`sparseAvoidanceQpTest`, `collisionAvoidanceControllerTest`,
+`collisionAvoidanceControllerConfigTest`, `ltvBicyclePredictionTest`, and
+`controllerEstimatorBoundsTest`. Factory Code Analyzer reports zero findings
+in all 11 changed MATLAB files; the core controller remains at 18 sources.
+The new tests compare continuous Lie derivatives with symmetric held-flow
+finite differences on straight and curved schedules with nonzero acceleration
+bias, verify the Riccati rate, sample-period independence, zero-error behavior,
+slack rejection, and the equivalent public `quadprog` solve.
+
+A before/after fixture with target and road constraints gives bitwise-identical
+hard matrices, bounds, terminal equalities and input objective. Four held-flow
+cases, including zero speed and both curvature signs, also match bitwise.
+
+The full working-tree suite returns 362 passes and eight failures among
+370 tests. All eight failures reproduce on the pre-edit snapshot: six
+estimator-scenario tests and two pre-existing untracked stationary-pose
+uncertainty tests. Seven of those failures are also incomplete. The initial
+MCP call timed out after 300 seconds, but its saved result was recovered;
+the isolated commit checks completed separately in a fresh MATLAB process.
+These checks do not establish new closed-loop performance or runtime claims.
+
+The measurements below describe earlier SOCP revisions; they have not been
+reproduced for the continuous-time CLF-QP.
+
+## Historical SOCP runtime validation before the CLF-QP conversion
 
 The sparse native implementation completes both 10 s crossing experiments
 and their own nominal counterfactuals with all functional criteria passing.

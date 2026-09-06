@@ -16,7 +16,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `collisionAvoidanceController.m` | Controller entry, carried certificate, terminal admission and diagnostics |
 | `readPlanningInputs.m` | Input normalization and lane/target model construction |
 | `formulateAvoidanceProblem.m` | Objective, hard constraints and CLF construction |
-| `avoidanceStageSocp.m` | Sparse stage-state SOCP transcription |
+| `avoidanceStageQp.m` | Sparse stage-state QP transcription |
 | `solveHardCbfClf.m` | Numerical solve and independent constraint acceptance |
 | `certifyAvoidancePlan.m` | Independent geometric verification of a plan |
 | `avoidanceSafetyGeometry.m` | Robust lane and obstacle geometry rows |

@@ -123,10 +123,31 @@ classdef ltvBicycleModel
         % Input [deltaF; a] uses commanded acceleration, with a fixed declared
         % longitudinal effectiveness gain. The default gain is one. The curvature is treated as
         % locally constant at the schedule station of the stage (its variation
-        % along the horizon is carried node by node by the schedule). Prediction,
-        % continuation and CLF Riccati synthesis use this same held-input flow.
+        % along the horizon is carried node by node by the schedule). Prediction
+        % and continuation use this held-input flow; the CLF uses its continuous
+        % generator through continuousMatrices.
         % Position and heading can therefore depend on the new first input. The
         % discretization does not impose a forward-Euler stiffness restriction.
+
+            [continuousA, continuousB, continuousC] = ...
+                ltvBicycleModel.continuousMatrices(kappa, vBar, cfg);
+            heldTransition = expm(sampleTime*[continuousA, continuousB, continuousC; ...
+                zeros(3, 9)]);
+            stateMatrix = heldTransition(1:6, 1:6);
+            inputMatrix = heldTransition(1:6, 7:8);
+            affineVector = heldTransition(1:6, 9);
+        end
+
+        function [continuousA, continuousB, continuousC] = continuousMatrices(kappa, vBar, cfg)
+        %continuousMatrices Continuous generator of the scheduled Frenet bicycle.
+        % xDot = continuousA*x + continuousB*u + continuousC. The caller
+        % adds the declared longitudinal acceleration bias to xDot(4).
+
+            arguments
+                kappa (1,1) double {mustBeFinite}
+                vBar (1,1) double {mustBeFinite, mustBeNonnegative}
+                cfg (1,1) struct
+            end
 
             mass = cfg.vehicle.m;
             yawInertia = cfg.vehicle.Iz;
@@ -177,12 +198,6 @@ classdef ltvBicycleModel
             continuousA(6, 6) = -(lf^2*corneringFront ...
                 + lr^2*corneringRear)/(tireSpeed*yawInertia);
             continuousB(6, 1) = lf*corneringFront/yawInertia;
-
-            heldTransition = expm(sampleTime*[continuousA, continuousB, continuousC; ...
-                zeros(3, 9)]);
-            stateMatrix = heldTransition(1:6, 1:6);
-            inputMatrix = heldTransition(1:6, 7:8);
-            affineVector = heldTransition(1:6, 9);
         end
 
         function out = brakingSchedule(action, cfg, varargin)
