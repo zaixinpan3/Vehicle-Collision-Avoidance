@@ -37,7 +37,7 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             testCase.verifyEqual(design.gainSelection.method, ...
                 "structured-lipschitz-iss-minimax-synthesis");
             testCase.verifyEqual(design.gainSelection.scalarMethod, ...
-                "closed-form-disturbance-innovation-balance");
+                "minimum-bandwidth-continuous-decay");
         end
 
         function yawMeasurementContainsNoReliabilityTuning(testCase)
@@ -139,27 +139,16 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
                 testCase.Design.ultimateBounds.targetLyapunov);
         end
 
-        function scalarBandwidthsSolveClosedFormBalance(testCase)
-            samplePeriod = testCase.Design.samplePeriod;
-            programs = [testCase.Design.gainSelection.yawProgram; ...
-                testCase.Design.gainSelection.velocityProgram; ...
-                testCase.Design.gainSelection.positionProgram];
-            for program = programs.'
-                expectedGain = sqrt(program.processBound ...
-                    /(samplePeriod*program.measurementEquivalentBound));
-                testCase.verifyEqual(program.method, ...
-                    "closed-form-disturbance-innovation-balance");
-                testCase.verifyEqual(program.activeConstraint, ...
-                    "disturbance-innovation-balance");
-                testCase.verifyEqual(program.sampleProduct, ...
-                    expectedGain*samplePeriod, RelTol=1.0e-12);
-                testCase.verifyEqual(program.disturbanceContribution, ...
-                    program.innovationContribution, RelTol=1.0e-12);
-                testCase.verifyGreaterThan(program.sampleProduct, ...
-                    program.sampleProductBounds(1));
-                testCase.verifyLessThan(program.sampleProduct, ...
-                    program.sampleProductBounds(2));
-            end
+        function scalarBandwidthsMeetContinuousTransitDecay(testCase)
+            cfg = testCase.Cfg;
+            gains = [testCase.Design.yaw.correctionBandwidth; ...
+                testCase.Design.velocity.gain; testCase.Design.position.gain];
+            transitTime = cfg.target.domain.relativePositionMaximum ...
+                /(cfg.ego.domain.speedMaximum+cfg.target.domain.speedMaximum);
+
+            testCase.verifyEqual(exp(-gains*transitTime), ...
+                0.05*ones(3,1), AbsTol=1.0e-12);
+            testCase.verifyGreaterThan(gains, zeros(3,1));
         end
 
         function analyticLipschitzBoundsImproveTheCoarseProductBounds(testCase)
@@ -235,31 +224,39 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
                 RelTol=1.0e-12);
         end
 
-        function samplePeriodParticipatesInScalarGainSolve(testCase)
-            fastConfig = testCase.Cfg;
-            fastConfig.runtime.samplePeriod = 0.01;
-            slowConfig = testCase.Cfg;
-            slowConfig.runtime.samplePeriod = 0.05;
-            fast = synthesizeNrmmObserverGains(fastConfig);
-            slow = synthesizeNrmmObserverGains(slowConfig);
+        function runtimeTimingDoesNotChangeContinuousDesign(testCase)
+            cfg = testCase.Cfg;
+            cfg.runtime.samplePeriod = 2.0;
+            cfg.runtime.integrationStepMaximum = 0.001;
+            design = synthesizeNrmmObserverGains(cfg);
 
-            testCase.verifyEqual(fast.target.injectionVector, ...
-                slow.target.injectionVector, RelTol=1.0e-10);
-            testCase.verifyGreaterThan(fast.yaw.correctionBandwidth, ...
-                slow.yaw.correctionBandwidth);
-            testCase.verifyGreaterThan(fast.velocity.gain, ...
-                slow.velocity.gain);
-            testCase.verifyGreaterThan(fast.position.gain, ...
-                slow.position.gain);
-            testCase.verifyEqual( ...
-                fast.gainSelection.targetBandwidthSampleProduct, ...
-                fast.target.bandwidth*0.01, RelTol=1.0e-12);
-            testCase.verifyEqual( ...
-                slow.gainSelection.targetBandwidthSampleProduct, ...
-                slow.target.bandwidth*0.05, RelTol=1.0e-12);
+            testCase.verifyEqual(design, testCase.Design, AbsTol=1.0e-12);
         end
 
-        function solvedGainsRespondToDeclaredUncertainty(testCase)
+        function continuousDesignNeedsNoRuntimeConfiguration(testCase)
+            cfg = rmfield(testCase.Cfg, "runtime");
+            design = synthesizeNrmmObserverGains(cfg);
+
+            testCase.verifyEqual(design, testCase.Design, AbsTol=1.0e-12);
+        end
+
+        function physicalTransitTimeChangesContinuousDecay(testCase)
+            cfg = testCase.Cfg;
+            cfg.target.domain.relativePositionMaximum = ...
+                2.0*cfg.target.domain.relativePositionMaximum;
+            design = synthesizeNrmmObserverGains(cfg);
+
+            testCase.verifyEqual(design.yaw.correctionBandwidth, ...
+                0.5*testCase.Design.yaw.correctionBandwidth, AbsTol=1.0e-12);
+            testCase.verifyEqual(design.velocity.gain, ...
+                0.5*testCase.Design.velocity.gain, AbsTol=1.0e-12);
+            testCase.verifyEqual(design.position.gain, ...
+                0.5*testCase.Design.position.gain, AbsTol=1.0e-12);
+            testCase.verifyEqual(design.target.minimumDecayRate, ...
+                0.5*testCase.Design.target.minimumDecayRate, AbsTol=1.0e-12);
+        end
+
+        function declaredUncertaintyPropagatesIntoContinuousBounds(testCase)
             gyroConfig = testCase.Cfg;
             gyroConfig.measurement.gyroscope.noiseMaximum = 0.004;
             gyroDesign = synthesizeNrmmObserverGains(gyroConfig);
@@ -267,11 +264,12 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             positionConfig.measurement.gps.positionNoiseMaximum = 0.24;
             positionDesign = synthesizeNrmmObserverGains(positionConfig);
 
-            testCase.verifyGreaterThan( ...
-                gyroDesign.yaw.correctionBandwidth, ...
-                testCase.Design.yaw.correctionBandwidth);
-            testCase.verifyLessThan(positionDesign.position.gain, ...
-                testCase.Design.position.gain);
+            testCase.verifyGreaterThan(gyroDesign.ultimateBounds.yaw, ...
+                testCase.Design.ultimateBounds.yaw);
+            testCase.verifyGreaterThan(gyroDesign.ultimateBounds.bodyVelocity, ...
+                testCase.Design.ultimateBounds.bodyVelocity);
+            testCase.verifyGreaterThan(positionDesign.ultimateBounds.position, ...
+                testCase.Design.ultimateBounds.position);
         end
 
         function exactDataDegeneracyUsesPhysicalTieBreak(testCase)
@@ -283,7 +281,7 @@ classdef observerGainSynthesisTest < matlab.unittest.TestCase
             cfg.measurement.gyroscope.noiseMaximum = 0.0;
             cfg.measurement.radar.noiseMaximum = 0.0;
             design = synthesizeNrmmObserverGains(cfg);
-            minimumGain = 1.0/design.gainSelection.domainTransitTime;
+            minimumGain = log(20.0)/design.gainSelection.domainTransitTime;
 
             testCase.verifyEqual(design.yaw.correctionBandwidth, ...
                 minimumGain, RelTol=1.0e-12);

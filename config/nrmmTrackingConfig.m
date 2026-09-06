@@ -6,6 +6,7 @@ function cfg = nrmmTrackingConfig()
 % structured Lyapunov/Lipschitz ISS design. Sensor biases are compensated
 % upstream. See estimator/OBSERVER_ISS_THEORY.md.
 
+    % Realization settings are consumed only after continuous gain synthesis.
     cfg.runtime.samplePeriod = 0.02;                 % s
     cfg.runtime.integrationStepMaximum = 0.005;      % s, RK4 step limit
     % Zero retains constant scalar acceleration and constant curvature.

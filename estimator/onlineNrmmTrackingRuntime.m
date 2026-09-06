@@ -51,8 +51,8 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % targetEstimates(i).relativePositionErrorBound is the conditional Euclidean
 % position radius in the ego body frame; invalid bounds publish Inf. The
 % accompanying metadata states its time, assumptions and numerical scope.
-% See OBSERVER_ISS_THEORY.md Section 10; floating-point verification and future
-% controller prediction-horizon bounds are not included.
+% See scripts/NRMM_IMPLEMENTATION_NOTES.md Section 5 for the position enclosure
+% and its floating-point and future-prediction limitations.
 
     action = lower(string(action));
     if ~isscalar(action)
@@ -110,11 +110,12 @@ function runtime = localInitialize(cfg, options, observerDesign)
 
     samplePeriod = cfg.runtime.samplePeriod;
     integrationStepMaximum = cfg.runtime.integrationStepMaximum;
-    if abs(samplePeriod-observerDesign.samplePeriod) ...
-            > localTimeTolerance([samplePeriod; observerDesign.samplePeriod])
-        error("onlineNrmmTrackingRuntime:inconsistentSamplePeriod", ...
-            "The runtime and observer-design sample periods must agree.");
-    end
+    validateattributes(samplePeriod, {'double'}, ...
+        {'real', 'scalar', 'finite', 'positive'}, mfilename, ...
+        'cfg.runtime.samplePeriod');
+    validateattributes(integrationStepMaximum, {'double'}, ...
+        {'real', 'scalar', 'finite', 'positive'}, mfilename, ...
+        'cfg.runtime.integrationStepMaximum');
     integrationSubstepCount = max( ...
         1, ceil(samplePeriod/integrationStepMaximum));
     integrationStep = samplePeriod/integrationSubstepCount;

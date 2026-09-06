@@ -179,16 +179,52 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "onlineNrmmTrackingRuntime:invalidTargetIdentifiers");
         end
 
-        function initializationRejectsInconsistentSamplePeriod(testCase)
+        function continuousDesignIsReusableAtDifferentSamplePeriods(testCase)
             cfg = nrmmTrackingConfig();
-            design = synthesizeNrmmObserverGains(cfg);
-            mismatchedCfg = cfg;
-            mismatchedCfg.runtime.samplePeriod = ...
-                2.0*cfg.runtime.samplePeriod;
+            design = synthesizeNrmmObserverGains(rmfield(cfg, "runtime"));
+            cfg.runtime.samplePeriod = 2.0*cfg.runtime.samplePeriod;
+            runtime = onlineNrmmTrackingRuntime( ...
+                "initialize", cfg, localOptions(1), design);
+            [runtime, output] = onlineNrmmTrackingRuntime( ...
+                "step", runtime, localCruiseFrame(0.0));
+
+            testCase.verifyEqual(runtime.observerDesign, design, AbsTol=1.0e-12);
+            testCase.verifyEqual(output.time, cfg.runtime.samplePeriod, AbsTol=1.0e-12);
+            testCase.verifyLessThanOrEqual(runtime.integrationStep, ...
+                cfg.runtime.integrationStepMaximum);
+            testCase.verifyTrue(all(isfinite(runtime.targetState), "all"));
+        end
+
+        function integrationStepDoesNotChangeContinuousDesign(testCase)
+            cfg = nrmmTrackingConfig();
+            design = synthesizeNrmmObserverGains(rmfield(cfg, "runtime"));
+            cfg.runtime.integrationStepMaximum = 0.002;
+            runtime = onlineNrmmTrackingRuntime( ...
+                "initialize", cfg, localOptions(1), design);
+
+            testCase.verifyEqual(runtime.observerDesign, design, AbsTol=1.0e-12);
+            testCase.verifyEqual(runtime.integrationStep, 0.002, AbsTol=1.0e-14);
+            testCase.verifyEqual(runtime.integrationSubstepCount, 10);
+        end
+
+        function runtimeRejectsInvalidSamplePeriod(testCase)
+            cfg = nrmmTrackingConfig();
+            design = synthesizeNrmmObserverGains(rmfield(cfg, "runtime"));
+            cfg.runtime.samplePeriod = 0.0;
 
             testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "initialize", mismatchedCfg, localOptions(1), design), ...
-                "onlineNrmmTrackingRuntime:inconsistentSamplePeriod");
+                "initialize", cfg, localOptions(1), design), ...
+                "MATLAB:onlineNrmmTrackingRuntime:expectedPositive");
+        end
+
+        function runtimeRejectsInvalidIntegrationStep(testCase)
+            cfg = nrmmTrackingConfig();
+            design = synthesizeNrmmObserverGains(rmfield(cfg, "runtime"));
+            cfg.runtime.integrationStepMaximum = Inf;
+
+            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
+                "initialize", cfg, localOptions(1), design), ...
+                "MATLAB:onlineNrmmTrackingRuntime:expectedFinite");
         end
 
         function everyFrameRequiresSynchronizedRadar(testCase)

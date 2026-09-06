@@ -51,7 +51,7 @@ function result = runOnlineNrmmComplexManeuverScenario(varargin)
     result.metrics = metrics;
 
     if options.report
-        localReport(metrics, design);
+        localReport(metrics, design, cfg.runtime.samplePeriod);
     end
     if options.plot && ~batchStartupOptionUsed
         localPlot(result);
@@ -480,10 +480,10 @@ function value = localVectorRmse(error, evaluation)
     value = sqrt(mean(magnitude(evaluation).^2));
 end
 
-function localReport(metrics,design)
+function localReport(metrics,design,samplePeriod)
     fprintf("\nMultistage high-gain NRMM observer\n");
     fprintf("  sample period: %.3g s; target bandwidth: %.4g /s\n", ...
-        design.samplePeriod,design.target.bandwidth);
+        samplePeriod,design.target.bandwidth);
     fprintf("  position / velocity / acceleration RMSE: %.6g m / %.6g m/s / %.6g m/s^2\n", ...
         metrics.relativePositionRmse,metrics.targetVelocityRmse,metrics.targetAccelerationRmse);
     fprintf("  continuous target decay: %.4g /s; position ultimate bound: %.4g m\n", ...
