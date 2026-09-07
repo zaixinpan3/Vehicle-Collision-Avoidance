@@ -5,6 +5,13 @@ specification with a version-9 finite-witness implementation. The implemented
 nonreturning-halfspace exit guard is a sufficient special case; holding and
 arbitrary contract renewal are not implemented.
 
+Execution policy, clarified September 7, 2026: every command requires a
+verified solution from the current optimization call. No stored-tail or
+backup controller is executed when that call supplies no verified feasible
+candidate. The controller reports failure and the simulation ends at that
+sample. A retained witness remains mathematical and optimization context;
+it does not authorize operation through solver outages.
+
 The terminal requirement is **certified discharge of an encounter**. While an
 encounter is active, the controller must preserve a certified safe continuation
 at every time. Ordinary encounters do not require a permanently invariant
@@ -368,7 +375,7 @@ For continuous reference/metric choices, these estimates concatenate. If a
 switch has \(V^+\le V^-+j_i\), its certified jump bound must also enter the
 composed tracking estimate. Without such a bound, only each smooth interval's
 statement holds. A finite upper residual bound and no hard slack cap preserve
-the fallback candidate. Tracking penalties supplement this dissipation
+the retained feasible witness. Tracking penalties supplement this dissipation
 constraint; they do not replace it. Safety does not depend on the slack size.
 Yielding is allowed to incur slack against the common cruise reference.
 
@@ -459,12 +466,15 @@ This is an executable barrier inequality on a verified lower bound in the
 certificate-augmented state. It is not a claim that the optimizer computed
 the exact \(H_n\). If \(b_k=H_{n_k}(I_k)\), (22) also implies (15).
 
-On optimization failure or deadline miss, the incumbent witness is feasible
-with \(\mu=b_k\ge(1-\gamma)b_k\). Execute its next held input and retain its
-tail; carry or conservatively recompute the CLF slack. The representation must
+The conditioned incumbent witness can remain feasible with
+\(\mu=b_k\ge(1-\gamma)b_k\). This establishes existence of a continuation,
+but the runtime does not execute that witness after optimization failure.
+If no current candidate supplies a verified feasible solution, report control
+failure and terminate the simulation before the next held interval.
+The representation must
 be closed under conditioning and truncation. Re-linearization, re-anchoring,
 reference changes, solver initialization, and the number of optimization
-variables must not remove that feasible fallback. Solver latency and actuator
+variables must not invalidate the retained feasibility argument. Solver latency and actuator
 queues must be inside the execution contract; otherwise a stale first input
 has no certified execution interval.
 
@@ -479,11 +489,13 @@ For an accepted first action, (22) bounds every physical margin over the
 entire next held interval. For every admitted observation, conditioning selects
 futures already covered by that witness. Removing its executed prefix leaves
 a tail with margin at least \(\mu_k\), to the same certified endpoint. This
-proves (23)–(24) and supplies the fallback at the next sample. At any intermediate
-time, finish the remainder of the certified held input, then execute the tail.
-Continuation therefore exists between samples as well.
+proves (23)–(24) and supplies a feasible witness at the next sample. At any
+intermediate time, the remainder of the certified held input followed by the
+tail defines a feasible continuation. This is an existence statement, not
+permission to issue stored inputs after a failed optimization.
 
-Induction gives physical safety and continuation availability while the
+Conditional on a verified current solution at every executed sample,
+induction gives physical safety and continuation availability while the
 encounter remains active, and discharge only through a verified guard. With
 an unchanged finite clock, \(n=0\) forces the exit branch, so this particular
 construction also supplies finite exit. At no step is permanent joint
@@ -538,7 +550,7 @@ inferred from instantaneous velocity or from target disappearance.
 | CBF | Swept safety and verified margin carried with a shrinking absolute deadline |
 | CLF | One robust dissipation slack per held interval; a common metric and explicit affine-reference derivative |
 | Maneuver | Three constant-mode candidates with overlapping corridors, input smoothness and switch cost |
-| Failure | Algebraic truncation of the accepted controls, tubes, safety rows and CLF bounds |
+| Failure | Report control failure and stop simulation; never execute a stored input as backup |
 | Admission | Missing exit, expiry, inconsistent observations, incompatible replacement, and infeasible joint admission reject authority |
 | Unsupported transfer | No finite-prefix waiting shortcut, automatic deadline extension, or unverified holding contract |
 
@@ -623,20 +635,25 @@ execution timing, observation validity and route contracts remain premises.
 The behavior-focused tests cover absent exit contracts, footprint clearance,
 finite validity, visibility loss, stopped targets, zero-speed target uncertainty,
 between-node collision, common cell normals, nonzero residuals, set conditioning,
-contract/execution inconsistencies, repeated solver failure, a retained clock,
+contract/execution inconsistencies, termination on solver failure, a retained clock,
 CLF slack and reference derivatives, a concave interior dissipation peak,
 explicit maneuver comparison, joint admission, and rejection of unsafe solver
 iterates. A crossing that intersects the unmodified cruise path also tests
-strict acceptance near an active collision constraint and 15 consecutive
-stored-tail fallbacks through exit. Unsupported waiting, renewal and chart jumps are tested as rejection
+strict acceptance near an active collision constraint and refusal to execute
+its stored tail after solver failure. Fresh successful solves retain the active
+encounter deadline. Unsupported waiting, renewal and chart jumps are tested as rejection
 cases; they are not claimed as implemented capabilities.
 
 `runEncounterCertificateScenario` supplies a reproducible declared affine
 inclusion experiment. It uses deterministic nonzero residuals, independent
 matrix-exponential integration, target observation loss, and numerical failure
-after initial admission. Its dense rectangle, state-containment and CLF checks
+after initial admission. By default the first unsuccessful replan ends the
+experiment after one executed interval. `ForceSolverFailure=false` exercises
+fresh optimization through the crossing. Its dense rectangle, state-containment and CLF checks
 validate the implementation against that declared model. The interval guarantee
 comes from the tube/majorant construction, not from the density of those samples.
+Safety statements cover executed, certified intervals only; no continued
+physical operation after reported control failure is claimed.
 
 The existing nonlinear vehicle scenarios do not supply all the motion,
 residual, route, chart and perception-coverage contracts required by version 9.

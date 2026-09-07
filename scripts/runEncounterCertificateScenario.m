@@ -1,8 +1,12 @@
-function report = runEncounterCertificateScenario()
+function report = runEncounterCertificateScenario(options)
 %runEncounterCertificateScenario Finite crossing under a declared inclusion.
 % Tests the runtime certificate with nonzero process residuals, independent
 % matrix-exponential truth integration, lost target observations and solver
-% failure after admission. This is not a nonlinear physical-plant validation.
+% failure after admission. A failed control call ends the simulation before
+% another input is applied. This is not a nonlinear physical-plant validation.
+    arguments
+        options.ForceSolverFailure (1, 1) logical = true
+    end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root, "controller"), fullfile(root, "config"));
     rate = [1e-3;1e-4;1e-5;1e-3;1e-4;1e-5];
@@ -24,7 +28,8 @@ function report = runEncounterCertificateScenario()
     minimumDistance = inf;
     maximumClfResidual = -inf;
     maximumBoxViolation = -inf;
-    fallbackCount = 0;
+    failure = struct("occurred", false, "identifier", "", "message", "", "time", NaN);
+    executedIntervals = 0;
     issued = zeros(2, 15);
     sampleTime = cfg.controller.sampleTime;
     for stage = 1:15
@@ -56,18 +61,33 @@ function report = runEncounterCertificateScenario()
         ego = struct("position",position,"yaw",yaw,"speed",trueState(4), ...
             "lateralVelocity",trueState(5),"yawRate",trueState(6), ...
             "stateTime",stage*sampleTime,"heldActuatorInput",input);
-        cfg.solver.jointFunction = @localFailure;
-        [command,~,problem,certificate] = collisionAvoidanceController(ego,[],route,cfg,certificate);
-        fallbackCount = fallbackCount+double(problem.metadata.fallbackUsed);
-        assert(abs(certificate.deadline-deadline) < 1e-12);
+        executedIntervals = stage;
+        if options.ForceSolverFailure, cfg.solver.jointFunction = @localFailure; end
+        try
+            [command,~,problem,certificate] = collisionAvoidanceController(ego,[],route,cfg,certificate);
+        catch exception
+            if ~startsWith(string(exception.identifier), "collisionAvoidanceController:")
+                rethrow(exception);
+            end
+            failure = struct("occurred", true, "identifier", string(exception.identifier), ...
+                "message", string(exception.message), "time", ego.stateTime);
+            break;
+        end
+        if any(~[certificate.encounters.discharged])
+            assert(abs(certificate.deadline-deadline) < 1e-12);
+        end
     end
+    discharged = ~failure.occurred && all([certificate.encounters.discharged]);
+    exitTime = NaN;
+    if discharged, exitTime = certificate.stateTime; end
     report = struct("scope","declared affine inclusion; deterministic residual; no nonlinear-plant claim", ...
-        "executedIntervals",15,"fallbackCount",fallbackCount,"exitTime",certificate.stateTime, ...
-        "deadline",deadline,"discharged",all([certificate.encounters.discharged]), ...
+        "executedIntervals",executedIntervals,"fallbackCount",0,"exitTime",exitTime, ...
+        "deadline",deadline,"discharged",discharged,"failure",failure, ...
+        "simulatedDuration",executedIntervals*sampleTime, ...
         "minimumSampledRectangleDistance",minimumDistance,"requiredDistance",cfg.collision.clearanceMargin, ...
         "maximumSampledClfResidual",maximumClfResidual,"maximumEndpointBoxViolation",maximumBoxViolation, ...
-        "finalMargin",certificate.margin,"issuedInput",issued);
-    assert(report.discharged && minimumDistance >= cfg.collision.clearanceMargin ...
+        "finalMargin",certificate.margin,"issuedInput",issued(:,1:executedIntervals));
+    assert(minimumDistance >= cfg.collision.clearanceMargin ...
         && maximumClfResidual <= 1e-9 && maximumBoxViolation <= 1e-9);
 end
 

@@ -5,6 +5,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
 % input at the next sample. Targets require explicit finite motion/exit
 % contracts; missing observations retain their active obligations. Controls
 % are held for cfg.controller.sampleTime. No target forecast is appended.
+% Every issued command requires a verified solution from the current call.
+% If no candidate supplies one, report failure without applying stored inputs.
     persistent previousCertificate
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -156,6 +158,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
             check = certifyAvoidancePlan(qp, prediction, candidateModel, result.decision);
             if result.feasible && check.accepted && (isempty(best) || result.objectiveValue < best.result.objectiveValue)
                 best = struct("qp", qp, "result", result, "check", check, "maneuver", maneuver);
+            elseif ~result.feasible
+                failures(end+1, 1) = maneuver+": "+result.message; %#ok<AGROW>
             elseif ~check.accepted
                 failures(end+1, 1) = maneuver+": "+strjoin(check.failedConditions, ","); %#ok<AGROW>
             end
@@ -169,31 +173,18 @@ function [command, predictedInput, planningProblem, certificate] = ...
             end
         end
     end
-    fallback = isempty(best);
     phase = tic;
-    if fallback
-        if isempty(incumbent) || newAdmission
-            error("collisionAvoidanceController:noCertifiedContinuation", ...
-                "No jointly certified continuation: %s.", strjoin(failures, "; "));
-        end
-        prediction = incumbent.prediction;
-        qp = incumbent.qp;
-        decision = incumbent.decision;
-        check = certifyAvoidancePlan(qp, prediction, model, decision);
-        if ~check.accepted
-            error("collisionAvoidanceController:invalidStoredCertificate", "The truncated witness failed verification.");
-        end
-        maneuver = incumbent.maneuver;
-        source = "conditionedStoredContinuation";
-        margin = controllerState.margin;
-    else
-        qp = best.qp;
-        decision = best.result.decision;
-        check = best.check;
-        maneuver = best.maneuver;
-        source = "checkedOptimization";
-        margin = check.margin;
+    if isempty(best)
+        error("collisionAvoidanceController:noCertifiedContinuation", ...
+            "Control failed: no verified solution at the current sample. %s.", ...
+            strjoin(failures, "; "));
     end
+    qp = best.qp;
+    decision = best.result.decision;
+    check = best.check;
+    maneuver = best.maneuver;
+    source = "checkedOptimization";
+    margin = check.margin;
     predictedInput = reshape(decision(qp.layout.planIndex), 2, []);
     command = localCommand(predictedInput, model, prediction);
     predictedState = reshape(pagemtimes(prediction.egoStateMatrix, predictedInput(:)), 6, [])+prediction.egoStateOffset;
@@ -205,7 +196,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "stateErrorBound", prediction.egoStateErrorBound, ...
         "encounters", encounters, "acceptance", check, "safetyScope", "heldIntervalsUntilCertifiedEncounterExit");
     metadata = struct("planCertified", check.accepted, "certificateSource", source, ...
-        "fallbackUsed", fallback, "solverCallCount", solverCalls, "maneuver", maneuver, ...
+        "fallbackUsed", false, "solverCallCount", solverCalls, "maneuver", maneuver, ...
         "maneuverCandidates", maneuvers, "carriedMargin", margin, "requiredMargin", model.requiredMargin, ...
         "horizonSteps", prediction.stageCount, "tailSteps", 0, "deadline", certificate.deadline, ...
         "activeTargetKeys", string({encounters(~[encounters.discharged]).key}), ...
@@ -218,7 +209,6 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "solveSeconds", solveSeconds, "acceptanceAndCommitSeconds", verificationSeconds+toc(phase), ...
         "diagnosticsSeconds", 0);
     metadata.solverAlgorithm = "Clarabel predictive CBF-CLF SOCP";
-    if fallback, metadata.solverAlgorithm = "stored certified continuation"; end
     metadata.setMembershipUpdate = ~isempty(controllerState);
     metadata.certificateCompatible = ~isempty(incumbent);
     metadata.carriedWitnessFeasible = ~isempty(incumbent) && ~newAdmission;

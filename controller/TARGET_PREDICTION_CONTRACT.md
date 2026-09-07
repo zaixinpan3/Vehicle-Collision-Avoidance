@@ -81,7 +81,9 @@ the controller then retains the existing contract. A supplied replacement must
 match it. A valid observation intersects the carried reachable box, keeps its nominal
 center, and can shrink its radius. The update must not silently replace jerk,
 yaw-acceleration, extent, route, validity, or identity contracts. A contradictory
-observation reports an assumption failure and authorizes no inherited fallback.
+observation reports an assumption failure. Every issued command requires a
+verified current solution; a missing feasible solution terminates simulation
+without replaying stored controls.
 
 Each target exits on its own sample guard; joint optimization retains every
 active target until its guard is met. Discharged records retain the route

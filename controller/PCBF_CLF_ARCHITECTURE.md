@@ -4,8 +4,14 @@ The version-9 runtime implements a finite continuation witness for the
 [governing encounter specification](ENCOUNTER_SCOPED_CBF_CLF.md). Each admitted
 target must have a finite Cartesian motion inclusion and a supported exit
 contract. The controller certifies every held interval, carries its remaining
-witness through observations and solver failures, and discharges a target only
+witness through observations, and discharges a target only
 when its uncertain footprint satisfies the exit guard.
+
+Every issued command requires a newly verified solution from the current
+optimization call. If no maneuver candidate supplies one, the controller
+raises `collisionAvoidanceController:noCertifiedContinuation`. Simulation
+drivers record the failed sample and terminate before another plant interval.
+Stored inputs are never issued as a backup after an unsuccessful solve.
 
 ```matlab
 certificate = [];
@@ -125,13 +131,16 @@ physical safety check.
 After a valid sample, the first input and first slack are substituted into the
 stored affine maps and removed. The remaining dynamics, safety rows, and CLF
 bounds are truncated algebraically. There is no appended node. New optimization
-uses the retained schedule; its failure leaves the stored witness available.
+uses the retained schedule. The truncated witness supplies prediction and
+optimization context, not a backup execution policy. An unsuccessful call
+reports control failure even when that stored sequence remains feasible.
 New-target admission requires a newly checked joint witness and cannot use an
 incumbent that omits that target. With no active encounters, a fresh finite
 cruise plan is allowed; it does not claim perpetual road safety.
 
 Certificate outputs include `remainingSteps`, absolute `deadline`, verified
 `margin`, `maneuver`, target contracts/status, controls, reachable tubes, CLF
-slacks, and acceptance results. Diagnostics report solver calls, fallback use,
+slacks, and acceptance results. Diagnostics report solver calls,
 active/discharged target keys, interval safety scope, and actual wall timings.
+The compatibility field `fallbackUsed` is always false for returned commands.
 Runtime measurements are research observations, not a real-time guarantee.
