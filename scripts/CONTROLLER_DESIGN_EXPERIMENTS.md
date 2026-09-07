@@ -1,17 +1,56 @@
 # Controller design-requirement experiments
 
+## Recovery objective and rollback audit (2026-09-06 clarification)
+
+The required recovery behavior is eventual dissipation to nominal constant-speed
+cruise. The user specifies no settling deadline. The 9-10 s and 25-30 s windows,
+and their error bands, are observations rather than recovery acceptance criteria.
+Exceeding a band during one window does not disprove eventual convergence;
+remaining inside a band does not establish it. The recorded 30 s trajectories
+retain speed bias and arc oscillations, so exact convergence remains unestablished.
+
+The evaluator now reports `avoidancePass` independently of
+`finalWindowWithinCruiseBand`, and sets `convergenceStatus` to
+`notEstablishedByFiniteRun`. The driver reports `avoidanceRequirementsMet`
+instead of `functionalRequirementsMet`. Configuration uses
+`criteria.finalObservationWindow` instead of `criteria.recoveryWindow`.
+The controller equations, costs, weights, constraints and execution settings are
+unchanged by this evaluation correction. Archived raw trials remain unchanged.
+
+The historical rollback audit finds:
+
+| Change | Verified history and disposition |
+| --- | --- |
+| Discrete LQR preferred input to accelerate recovery | Added in `dc58ef1fd8724577c24b0ef3776abcfaddc9826b`, then explicitly removed in `2ab787947190dacaff26aeef9841acd9447293f7`. No preferred input or sampled feedback gain remains in the current optimization. No further rollback is needed for this change. |
+| Continuous Riccati synthesis of the CLF matrix | Already present before `dc58ef1`. It constructs the existing CLF certificate; it is not the removed discrete LQR input target. Retained. |
+| Geometry batching, configured solver tolerances and explicit preparation | Separate runtime work in `dc58ef1`; it does not impose a recovery deadline. Retained under the separate real-time objective. |
+| Raw input effort plus squared CLF slack | Restored at the user's request in `de10ae43e35c2d5deb851e94d942bdd53bdb7bdd`. Retained. |
+| Road load, modified Fiala tires and signed beta | Incorporated in `7d334ac48e117d80261c3ea3b885cafc39d493df` following the force-model and input revisions. Retained. |
+
+No remaining feedback term or constraint added solely to satisfy the mistaken
+9-10 s recovery deadline was found in these commits or the current controller.
+Historical recovery pass/fail language below and in the archived experiment
+reports describes the retired evaluator, not a user-specified settling deadline.
+
+Validation: all 22 evaluator cases and 8 existing cruise-objective/initialization
+cases pass. The four changed MATLAB files have zero factory Code Analyzer
+findings. Re-evaluating the two saved 30 s physical trials reports avoidance
+acceptance and final-band membership for both, with convergence still
+`notEstablishedByFiniteRun`. This is analysis of existing data, not a new plant
+simulation or a convergence proof.
+
 ## Current beta-input validation (2026-09-06)
 
 The signed-beta / modified-Fiala controller at `7d334ac48e117d80261c3ea3b885cafc39d493df` was evaluated with the current tracked working-tree stationary-pose admission changes. Controller equations and settings were held fixed. Two 30 s crossing-target trials and two 10 s nominal counterfactuals use the original scene parameters and road grid extended to station 1000 m. Exact-state control, 24 head steps at 0.05 s, 15 m/s reference, 50 m perception, and solver tolerances 1e-6 are retained.
 
-Each error triple is speed (m/s), lateral position (m), heading (rad); tolerances are 0.5, 0.2, 0.02.
+Each error triple is speed (m/s), lateral position (m), heading (rad); descriptive cruise bands are 0.5, 0.2, 0.02. These bands do not define asymptotic convergence.
 
 | Path | Completed avoidance | 9-10 s maximum errors | 25-30 s maximum errors | Final errors |
 | --- | ---: | --- | --- | --- |
 | straight | 30 s | 0.727707, 1.3491e-05, 7.04829e-07 | 0.0315122, 3.82211e-11, 4.10433e-11 | -0.0314215, -1.50792e-11, -2.46706e-11 |
 | arc | 30 s | 0.727975, 0.140574, 0.0012087 | 0.0802448, 0.0176978, 0.00231731 | -0.0789914, -0.0170936, -0.00162779 |
 
-Both paths fail the 9-10 s speed threshold, while lateral and heading recovery pass. All thresholds pass throughout 25-30 s. Entry into all tolerances is observed at 9.5 s (straight) and 9.4 s (arc), without a later violation through 30 s. Both avoidance trials complete 600 commands with no fallback or controller failure; minimum sampled rectangle SAT margins are 0.65006 m and 1.0613 m.
+Both paths exceed the descriptive speed band during part of 9-10 s, while lateral and heading errors remain inside their bands. All errors remain inside their bands throughout 25-30 s. Entry into all bands is observed at 9.5 s (straight) and 9.4 s (arc), without a later exit through 30 s; these times are observations, not deadlines. Both avoidance trials complete 600 commands with no fallback or controller failure; minimum sampled rectangle SAT margins are 0.65006 m and 1.0613 m.
 
 Nonzero speed deficits remain, and the arc retains persistent steering, beta and heading oscillations. No-target nominal final speed errors at 10 s are -0.037117 m/s (straight) and -0.0802322 m/s (arc), so the residual is not specific to avoidance.
 
@@ -131,7 +170,12 @@ trajectory on that plant run. The first rectangular overlap establishes the
 collision threat; the model does not simulate contact forces or post-impact
 dynamics. Subsequent nominal states are counterfactual continuation only.
 
-## Acceptance requirements
+## Historical acceptance criteria (recovery deadline withdrawn)
+
+The following list records the original evaluator. Item 6 was an inferred
+experimental criterion, not the user's requirement, and is withdrawn by the
+clarification above. Current evaluation separates avoidance acceptance from
+tracking observations and leaves asymptotic convergence unestablished.
 
 1. **Valid scenario:** nominal high-fidelity cruise completes and overlaps the
    target; the target initially lies outside 50 m, remains hidden until the
@@ -151,8 +195,9 @@ dynamics. Subsequent nominal states are counterfactual continuation only.
    acceleration and axle-friction limits, and all successful plans report
    satisfied hard rows and terminal admission. Commanded friction utilization
    is model-based and does not establish a plant tire-force bound.
-6. **Recovery:** the last complete 1 s of the 10 s trial satisfies the cruise
-   tolerances again after acquisition.
+6. **Retired recovery-window check:** the evaluator formerly required the last
+   complete 1 s of the 10 s trial to satisfy the cruise bands after acquisition.
+   This is retained only to interpret historical outputs, not as acceptance.
 7. **Computation:** every attempted controller call completes within 0.05 s.
    This is reported separately from functional acceptance; the simulation is
    offline, and computation does not insert a delay into plant actuation.

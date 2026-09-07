@@ -32,7 +32,7 @@ classdef controllerDesignExperimentTest < matlab.unittest.TestCase
             [nominal, avoidance, scene, experiment] = localEvaluationFixture(sceneIndex);
             result = evaluateControllerDesignExperiment(nominal, avoidance, scene, experiment);
             testCase.verifyTrue(result.summary.scenarioValid);
-            testCase.verifyTrue(result.summary.functionalPass);
+            testCase.verifyTrue(result.summary.avoidancePass);
             testCase.verifyLessThan(result.summary.nominalMinimumSatMargin, 0.0);
             testCase.verifyGreaterThan(result.summary.avoidanceMinimumSatMargin, 0.0);
             testCase.verifyGreaterThanOrEqual(result.summary.nominalContactTime, 5.7);
@@ -48,7 +48,7 @@ classdef controllerDesignExperimentTest < matlab.unittest.TestCase
             testCase.verifyTrue(result.visibilityPass);
             testCase.verifyFalse(result.summary.completed);
             testCase.verifyFalse(result.summary.collisionPass);
-            testCase.verifyFalse(result.summary.functionalPass);
+            testCase.verifyFalse(result.summary.avoidancePass);
             testCase.verifyEqual(result.summary.firstDetectionTime, ...
                 avoidance.attempts.time(end), AbsTol=0.0);
         end
@@ -62,12 +62,49 @@ classdef controllerDesignExperimentTest < matlab.unittest.TestCase
             testCase.verifyTrue(result.summary.collisionPass);
         end
 
-        function deadlineFailureIsReportedAlongsideFunctionalSuccess(testCase, sceneIndex)
+        function deadlineFailureIsReportedAlongsideAvoidanceSuccess(testCase, sceneIndex)
             [nominal, avoidance, scene, experiment] = localEvaluationFixture(sceneIndex);
             avoidance.attempts.solveTime(1) = 0.2;
             result = evaluateControllerDesignExperiment(nominal, avoidance, scene, experiment);
-            testCase.verifyTrue(result.summary.functionalPass);
+            testCase.verifyTrue(result.summary.avoidancePass);
             testCase.verifyFalse(result.summary.deadlinePass);
+        end
+
+        function slowRecoveryDoesNotInvalidateAvoidance(testCase, sceneIndex)
+            [nominal, avoidance, scene, experiment] = localEvaluationFixture(sceneIndex);
+            finalSamples = avoidance.controlTime >= 9.0;
+            avoidance.controlState(finalSamples,4) = 14.0;
+
+            result = evaluateControllerDesignExperiment(nominal, avoidance, scene, experiment);
+
+            testCase.verifyTrue(result.summary.avoidancePass);
+            testCase.verifyFalse(result.summary.finalWindowWithinCruiseBand);
+            testCase.verifyEqual(result.summary.convergenceStatus, "notEstablishedByFiniteRun");
+        end
+
+        function constantBiasInsideTheBandDoesNotEstablishConvergence(testCase, sceneIndex)
+            [nominal, avoidance, scene, experiment] = localEvaluationFixture(sceneIndex);
+            finalSamples = avoidance.controlTime >= 9.0;
+            avoidance.controlState(finalSamples,4) = 14.9;
+
+            result = evaluateControllerDesignExperiment(nominal, avoidance, scene, experiment);
+
+            testCase.verifyTrue(result.summary.avoidancePass);
+            testCase.verifyTrue(result.summary.finalWindowWithinCruiseBand);
+            testCase.verifyEqual(result.summary.convergenceStatus, "notEstablishedByFiniteRun");
+        end
+
+        function oscillationInsideTheBandDoesNotEstablishConvergence(testCase, sceneIndex)
+            [nominal, avoidance, scene, experiment] = localEvaluationFixture(sceneIndex);
+            finalSamples = avoidance.controlTime >= 9.0;
+            avoidance.controlTracking.headingError(finalSamples) = ...
+                0.01*cos(10.0*pi*avoidance.controlTime(finalSamples));
+
+            result = evaluateControllerDesignExperiment(nominal, avoidance, scene, experiment);
+
+            testCase.verifyTrue(result.summary.avoidancePass);
+            testCase.verifyTrue(result.summary.finalWindowWithinCruiseBand);
+            testCase.verifyEqual(result.summary.convergenceStatus, "notEstablishedByFiniteRun");
         end
 
         function contactAtAControlStepFailsAvoidance(testCase, sceneIndex)

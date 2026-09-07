@@ -3,6 +3,8 @@ function experiment = controllerDesignExperimentConfig()
 % SI units throughout. Both trials use the same controller and plant.
 % The nominal counterfactual omits target observations only; it introduces
 % no alternate controller algorithm. The target moves at constant velocity.
+% Duration and the final observation window bound data collection only.
+% The recovery objective is eventual nominal cruise, with no settling deadline.
 
     experiment = struct();
     experiment.duration = 10.0;
@@ -24,7 +26,7 @@ function experiment = controllerDesignExperimentConfig()
         "speedTolerance", 0.5, ...
         "lateralTolerance", 0.2, ...
         "headingTolerance", 0.02, ...
-        "recoveryWindow", 1.0, ...
+        "finalObservationWindow", 1.0, ...
         "contactTolerance", 1.0e-9);
     names = ["straight", "arc"];
     curvatures = [0.0, 1.0/400.0];

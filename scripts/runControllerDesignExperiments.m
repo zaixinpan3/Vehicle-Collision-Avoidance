@@ -3,6 +3,8 @@ function study = runControllerDesignExperiments(options)
 % Runs straight and circular paths with the actual PassVeh14DOF template.
 % Each path has a nominal counterfactual and a 50 m range-gated trial.
 % Results include stopped/failed trials; an incomplete run cannot pass.
+% Avoidance acceptance and final-window tracking observations are separate.
+% These finite trials do not establish eventual convergence to nominal cruise.
 %
 %   study = runControllerDesignExperiments(OutputDirectory="/tmp/designStudy");
 %
@@ -73,7 +75,8 @@ function study = runControllerDesignExperiments(options)
     end
     study.summary = vertcat(study.results.assessment);
     study.summary = vertcat(study.summary.summary);
-    study.functionalRequirementsMet = all(study.summary.functionalPass);
+    study.avoidanceRequirementsMet = all(study.summary.avoidancePass);
+    study.convergenceStatus = "notEstablishedByFiniteRun";
     study.realTimeRequirementMet = all(study.summary.deadlinePass);
     if strlength(options.OutputDirectory) > 0
         writetable(study.summary, fullfile(options.OutputDirectory, "summary.csv"));
