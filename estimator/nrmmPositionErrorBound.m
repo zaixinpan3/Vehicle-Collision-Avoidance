@@ -50,6 +50,11 @@ function bound = localInitialize(design,cfg,state,time,prior)
         "lastDefect",struct(),"lastComparison",struct([]), ...
         "integrationErrorIncluded",true,"floatingPointVerified",false, ...
         "scope","conditional deterministic containment; no sampled exponential stability claim");
+    duration = 2.0;
+    if isfield(cfg.runtime,"targetHistoryDuration"), duration = cfg.runtime.targetHistoryDuration; end
+    validateattributes(duration,{'double'},{'scalar','finite','positive'});
+    bound.targetHistory = repmat({nrmmTargetHistory("initialize", ...
+        design.target.domain,design.target.modelJerkMaximum,duration,holdBounds.yawAcceleration)},count,1);
     for index = 1:count
         bound = localReset(bound,index,state);
     end
@@ -91,6 +96,11 @@ function bound = localReset(bound,index,state)
         bound.reason(index) = "ego-bound-invalid-reinitialize-runtime";
     end
     bound.lastRadarTime(index) = NaN;
+    if isfield(bound,"targetHistory")
+        history = bound.targetHistory{index};
+        bound.targetHistory{index} = nrmmTargetHistory("initialize",domain, ...
+            bound.design.target.modelJerkMaximum,history.duration,history.yawAccelerationMaximum);
+    end
 end
 
 function bound = localMeasure(bound,input,state)
@@ -141,6 +151,10 @@ function bound = localMeasure(bound,input,state)
     for index = 1:size(state.targetState,2)
         if input.radarDetectionAvailable(index)
             position = input.radarRelativePosition(index,:).';
+            if isfield(input,"gnssPosition")
+                bound.targetHistory{index} = nrmmTargetHistory("sensor", ...
+                    bound.targetHistory{index},input,design,index);
+            end
             residual = norm(position-state.targetState(1:2,index));
             if residual > localGuard(bound.targetComponents(1,index)+sensors.radarNoiseMaximum) ...
                     || norm(position) > localGuard(bound.trueRangeMaximum(index)+sensors.radarNoiseMaximum)

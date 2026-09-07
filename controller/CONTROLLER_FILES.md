@@ -22,13 +22,13 @@ Do not move controller helpers into those directories to evade the limit.
 | `avoidanceSafetyGeometry.m` | Swept lane and obstacle geometry rows |
 | `rectangleConfigurationDistance.m` | Oriented rectangle configuration distance |
 | `terminalDissipation.m` | Separately validated optional rest-funnel construction |
-| `laneGeometry.m` | Projection, Frenet pose, curvature and affine chart bounds |
+| `laneGeometry.m` | Polyline and analytic-arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input stage matrices, full prediction and initial braking schedule |
 | `longitudinalRoadLoad.m` | Signed aerodynamic and equivalent rolling forces with their speed derivative |
-| `modifiedFialaTire.m` | Modified Fiala forces and scheduled local tire tangents |
+| `modifiedFialaTire.m` | Modified Fiala forces, local tire tangents and nominal combined-force rows |
 | `tireSlipRows.m` | Robust slip-angle model-domain rows |
 | `stateUncertainty.m` | Estimator certificate validation, Frenet boxes, disturbance propagation, intersection and terminal rest |
-| `targetPrediction.m` | Finite Cartesian target inclusion, conditioning and exit guard |
+| `targetPrediction.m` | Finite target inclusion, nominal motion, footprint support and encounter lifecycle |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |
 | `solveAvoidanceSocpMex.cpp` | Native conic solver bridge |
@@ -37,8 +37,8 @@ Do not move controller helpers into those directories to evade the limit.
 The five grouped MATLAB modules expose named static methods, such as
 `laneGeometry.project`, `ltvBicycleModel.finitePredict`, `modifiedFialaTire.evaluate`,
 `stateUncertainty.flowTube` and `targetPrediction.admit` / `targetPrediction.finiteFlow`.
-Their local helpers stay in the owning file. Version 9 retains the controller
-entry signature and introduces the encounter contract and conic solver-hook
+Their local helpers stay in the owning file. Version 10 retains the controller
+entry signature and supports finite-sensing and optional strong encounter contracts and conic solver-hook
 interface documented in `PCBF_CLF_ARCHITECTURE.md`. Callers of the former standalone helpers must use the
 corresponding module methods; repository scripts and tests use these interfaces.
 

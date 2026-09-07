@@ -6,15 +6,17 @@ classdef circularCenterlineCruiseScenarioTest < matlab.unittest.TestCase
             repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture( ...
                 fullfile(repositoryRoot, "scripts")));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(repositoryRoot,"config")));
             testCase.assumeFalse(isempty(which("PassVeh14DOF.sltx")), ...
                 "Vehicle Dynamics Blockset PassVeh14DOF is unavailable.");
         end
     end
 
     methods (Test)
-        function aPolylineReferenceJumpCannotClaimContinuousTrackingDecay(testCase)
+        function anAnalyticArcSupportsContinuousCruisePrediction(testCase)
             result = runCircularCenterlineCruiseScenario( ...
                 Duration=0.1, Radius=100.0, ...
+                ControllerConfiguration=finiteSensingValidationConfig(), ...
                 Plot=false, Report=false);
 
             testCase.verifyEqual(result.scenario.targetCount, 0);
@@ -28,8 +30,8 @@ classdef circularCenterlineCruiseScenarioTest < matlab.unittest.TestCase
                 100.0, AbsTol=0.0);
             testCase.verifyEqual(result.scenario.geometry.curvature, ...
                 0.01, RelTol=1.0e-14);
-            testCase.verifyEqual(result.controlState(1, 1:3), ...
-                zeros(1, 3), AbsTol=1.0e-12);
+            testCase.verifyEqual(result.controlState(1, 1:2), ...
+                zeros(1, 2), AbsTol=1.0e-12);
             testCase.verifyEqual(result.controlState(1, 4), ...
                 result.scenario.referenceSpeed, AbsTol=0.0);
             testCase.verifyEqual(result.controlState(1, 6), ...
@@ -43,10 +45,9 @@ classdef circularCenterlineCruiseScenarioTest < matlab.unittest.TestCase
                 result.controllerConfiguration.tire.corneringStiffness, ...
                 expectedCorneringStiffness, ...
                 RelTol=1.0e-12);
-            testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
-            testCase.verifyEmpty(result.command);
-            testCase.verifyFalse(result.metrics.controllerCompletedScenario);
+            testCase.verifyFalse(result.failure.occurred);
+            testCase.verifyNumElements(result.command,2);
+            testCase.verifyTrue(result.metrics.controllerCompletedScenario);
             testCase.verifyFalse(isfield(result, "diagnostics"));
         end
     end

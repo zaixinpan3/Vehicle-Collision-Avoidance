@@ -2,12 +2,13 @@ classdef stateUncertainty
     %stateUncertainty Estimator certificates and state-box propagation, intersection and rest.
 
     methods (Static)
-        function tube = flowTube(a, b, c, map, offset, radius, rate, duration, order, stateLimit, inputLimit)
+        function tube = flowTube(a, b, c, map, offset, radius, rate, duration, order, stateLimit, inputLimit, numericalRadius)
         %flowTube Taylor/Bernstein enclosure of a complete held-input cell.
         % The polynomial is affine in the state and held input. Its remainder
         % uses a scalar exponential-series majorant. The initial nominal
         % state and input must satisfy the supplied absolute domain bounds.
             sizeState = size(a, 1);
+            if nargin<12, numericalRadius = zeros(sizeState,1); end
             degree = order+1;
             gain = norm(a, inf)*duration;
             if gain >= 1
@@ -24,11 +25,14 @@ classdef stateUncertainty
             end
             radiusPolynomial = zeros(sizeState, degree+1);
             radiusPolynomial(:, 1) = radius;
+            numericalPolynomial = zeros(sizeState,degree+1);
+            numericalPolynomial(:,1) = numericalRadius;
             powerA = eye(sizeState);
             for powerIndex = 1:order
                 radiusPolynomial(:, powerIndex+1) = ...
                     abs(powerA*a)*radius/factorial(powerIndex) ...
                     + abs(powerA)*rate/factorial(powerIndex);
+                numericalPolynomial(:,powerIndex+1) = abs(powerA*a)*numericalRadius/factorial(powerIndex);
                 powerA = powerA*a;
             end
             driftBound = abs(a)*stateLimit+abs(b)*inputLimit+abs(c);
@@ -36,6 +40,7 @@ classdef stateUncertainty
             tailWeight = abs(a)^order*ones(sizeState, 1) ...
                 /factorial(degree)/(1-gain);
             radiusPolynomial(:, end) = tailWeight*(max(driftBound)+max(errorDrift));
+            numericalPolynomial(:,end) = tailWeight*(max(driftBound)+max(abs(a)*numericalRadius));
             % Arithmetic allowance, charged to the enclosures rather than to
             % a post-solve feasibility tolerance. At the copied initial point
             % no polynomial arithmetic has taken place.
@@ -45,6 +50,7 @@ classdef stateUncertainty
             arithmetic = 16*gamma*(1+abs(a)*coefficientMagnitude ...
                 +abs(b)*inputLimit+abs(c))/(1-gain);
             radiusPolynomial(:, 2) = radiusPolynomial(:, 2)+arithmetic;
+            numericalPolynomial(:,2) = numericalPolynomial(:,2)+arithmetic;
             transform = stateUncertainty.bernsteinTransform(degree, duration);
             controls = reshape(reshape(polynomial, [], degree+1)*transform.', ...
                 sizeState, columnCount, degree+1);
@@ -57,6 +63,10 @@ classdef stateUncertainty
             tube.offset = reshape(pagemtimes(controls(:, 1:sizeState, :), offset), sizeState, []) ...
                 + reshape(controls(:, end, :), sizeState, []);
             tube.radius = radiusPolynomial*transform.';
+            tube.numericalRadius = numericalPolynomial*transform.';
+            tube.localStateMap = controls(:,1:sizeState,:);
+            tube.localInputMap = controls(:,sizeState+(1:size(b,2)),:);
+            tube.localOffset = reshape(controls(:,end,:),sizeState,[]);
             transition = controls(:, 1:sizeState, end);
             tube.endMap = tube.map(:, :, end);
             tube.endOffset = tube.offset(:, end);
@@ -64,23 +74,35 @@ classdef stateUncertainty
             % uses absolute power bounds, while the next cell uses |Phi(h)|.
             process = radiusPolynomial;
             process(:, 1) = 0;
+            numericalProcess = numericalPolynomial;
+            numericalProcess(:,1) = 0;
             powerA = eye(sizeState);
             for powerIndex = 1:order
                 process(:, powerIndex+1) = process(:, powerIndex+1) ...
                     - abs(powerA*a)*radius/factorial(powerIndex);
+                numericalProcess(:,powerIndex+1) = numericalProcess(:,powerIndex+1) ...
+                    -abs(powerA*a)*numericalRadius/factorial(powerIndex);
                 powerA = powerA*a;
             end
             tube.endRadius = abs(transition)*radius+max(0, process*transform(end, :).');
+            tube.endNumericalRadius = abs(transition)*numericalRadius+max(0,numericalProcess*transform(end,:).');
         end
 
         function transform = bernsteinTransform(degree, duration)
         %bernsteinTransform Power coefficients to Bernstein control points.
-            transform = zeros(degree+1);
-            for row = 0:degree
-                for power = 0:row
-                    transform(row+1, power+1) = nchoosek(row, power)/nchoosek(degree, power)*duration^power;
+            persistent priorDegree normalized
+            if ~isequal(degree,priorDegree)
+                normalized = zeros(degree+1);
+                normalized(:,1) = 1;
+                for row = 1:degree
+                    for power = 1:row
+                        normalized(row+1,power+1) = normalized(row+1,power) ...
+                            *(row-power+1)/(degree-power+1);
+                    end
                 end
+                priorDegree = degree;
             end
+            transform = normalized.*duration.^(0:degree);
         end
 
         function certificate = readCertificate(data, kind)
@@ -142,6 +164,11 @@ classdef stateUncertainty
             validateattributes(cartesianRadius, {'double'}, ...
                 {'real', 'finite', 'nonnegative', 'numel', 6});
             cartesianRadius = cartesianRadius(:);
+            if isfield(lane, "referenceCurve")
+                [radius,chartValid] = laneGeometry.referenceUncertainty( ...
+                    cartesianState,cartesianRadius,lane.referenceCurve);
+                return;
+            end
             radius = cartesianRadius;
             position = cartesianState(1:2);
             centre = laneGeometry.project(position, lane);

@@ -31,10 +31,6 @@ function result = runCenterlineCruiseScenario(varargin)
     cfg = collisionAvoidanceControllerConfig(options.controllerConfiguration);
     cfg = localControllerConfigurationForPlant( ...
         cfg, plantParameters, options.referenceSpeed);
-    if ~isempty(options.egoCollisionSize)
-        cfg.vehicle.length = options.egoCollisionSize(1);
-        cfg.vehicle.width = options.egoCollisionSize(2);
-    end
     if ~isempty(options.targetCollisionSize)
         cfg.target.defaultLength = options.targetCollisionSize(1);
         cfg.target.defaultWidth = options.targetCollisionSize(2);
@@ -57,10 +53,34 @@ function result = runCenterlineCruiseScenario(varargin)
         initialVehicleParameters, sampleTime, cfg.referenceSpeed);
     plantAdapter.forceToTorqueRadius = ...
         initialization.effectiveRollingRadius;
-    plantParameters = localActiveRoadLoadParameters(plantParameters, plantAdapter.tireBlock);
+    plantParameters = localActiveTireParameters(plantParameters, plantAdapter.tireBlock);
+    cfg = localControllerConfigurationForPlant(cfg,plantParameters,options.referenceSpeed);
+    % The initialized tire refresh must preserve an explicit collision
+    % rectangle. Its dimensions are a scenario abstraction, distinct from
+    % the physical plant's track and tire width.
+    if ~isempty(options.egoCollisionSize)
+        cfg.vehicle.length = options.egoCollisionSize(1);
+        cfg.vehicle.width = options.egoCollisionSize(2);
+    end
     cfg.roadLoad = localRoadLoadForPlant(plantParameters, ...
         initialization.effectiveRollingRadius, cfg.roadLoad);
     cfg = collisionAvoidanceControllerConfig(cfg);
+
+    if options.initializeCruiseEquilibrium
+        if ~isfield(options.geometry,"referenceCurve")
+            error("runCenterlineCruiseScenario:missingReferenceCurve", ...
+                "Cruise initialization requires a declared analytic reference.");
+        end
+        equilibrium = ltvBicycleModel.cruiseEquilibrium(options.geometry.referenceCurve.curvature,cfg);
+        options.initialYaw = options.initialYaw+equilibrium(3);
+        options.initialLateralVelocity = equilibrium(5);
+        options.initialYawRate = equilibrium(6);
+        initialVehicleParameters = localInitialVehicleParameters( ...
+            plantContext.model,plantAdapter,cfg.referenceSpeed,options.initialPosition, ...
+            options.initialYaw,options.initialLateralVelocity,options.initialYawRate);
+        initialization.pathEquilibriumState = equilibrium;
+        initialization.pathEquilibriumScope = "frozenBicycleInitialCondition";
+    end
 
     centerline = options.centerline;
     operatingPoint = [];
@@ -81,6 +101,12 @@ function result = runCenterlineCruiseScenario(varargin)
         % used by the controller instead of retaining a nominal duplicate.
         estimatorConfiguration.observer.ego.yaw.rearAxleDistance = ...
             plantParameters.rearAxleDistance;
+        % Declared planar tire-force envelope: |Iz*rDot| <= lf*|FyF|+lr*|FyR|.
+        % This supplies a physical intersample premise, not a fitted noise
+        % reduction. The nonlinear plant remains an independent validation.
+        tireEnvelope = modifiedFialaTire.parameters(cfg);
+        estimatorConfiguration.observer.ego.domain.yawAccelerationMaximum = ...
+            dot([cfg.vehicle.lf;cfg.vehicle.lr],tireEnvelope.longitudinalForceScale)/cfg.vehicle.Iz;
         if isfinite(options.perceptionRange)
             estimatorConfiguration.sensor.radar.rangeMaximum = ...
                 options.perceptionRange;
@@ -146,7 +172,10 @@ function result = runCenterlineCruiseScenario(varargin)
             controllerState = egoEstimate{stepIdx};
         else
             controllerState = state;
-            egoEstimate{stepIdx} = state;
+            controllerState.stateTime = intervalStart;
+            controllerState.perception = struct("time",intervalStart,"range",options.perceptionRange,"completeWithinRange",true);
+            if stepIdx>1, controllerState.heldActuatorInput = command{stepIdx-1}.actuatorInput; end
+            egoEstimate{stepIdx} = controllerState;
             targetEstimate{stepIdx} = localRangeGateTargets( ...
                 targetTruthAtControlSample{stepIdx}, ...
                 state.position, options.perceptionRange);
@@ -183,6 +212,9 @@ function result = runCenterlineCruiseScenario(varargin)
         end
         maximumTargetCount = max( ...
             maximumTargetCount, numel(targetEstimate{stepIdx}));
+        if isfield(options.geometry, "referenceCurve")
+            controllerRoadGeometry.referenceCurve = options.geometry.referenceCurve;
+        end
         if stepIdx == 1 && options.prepareController
             controllerPreparation = prepareCollisionAvoidanceController( ...
                 controllerState, controllerRoadGeometry, cfg);
@@ -253,6 +285,8 @@ function result = runCenterlineCruiseScenario(varargin)
         "controllerEgoEstimate", {egoEstimate(1:attemptedStepCount)}, ...
         "targetEstimate", {targetEstimate(1:attemptedStepCount)}, ...
         "sensorFrame", {sensorFrame(1:attemptedStepCount)}, ...
+        "measurementAudit", {sensorAudit(1:attemptedStepCount)}, ...
+        "targetTruth", {targetTruthAtControlSample(1:attemptedStepCount)}, ...
         "roadPerception", {roadPerception(1:attemptedStepCount)});
     controlTime = controlTime(1:(completedStepCount + 1));
     controlState = controlState(1:(completedStepCount + 1), :);
@@ -365,6 +399,16 @@ function result = runCenterlineCruiseScenario(varargin)
         estimatorInitialization, sensorFrame, sensorAudit, ...
         egoEstimate, targetEstimate, targetTruthAtControlSample, ...
         controlState);
+    if options.useStateEstimator
+        audits = cellfun(@(value) value.truthEnclosure,attempts.measurementAudit);
+        result.estimator.truthAudit = audits;
+        result.estimator.metrics.sampledEgoPremisesSatisfied = all([audits.egoPremisesSatisfied]);
+        result.estimator.metrics.allPublishedBoundsContainTruth = ...
+            all([audits.egoContained]) && all([audits.checkedTargetComponentsContained]);
+        result.passed = result.passed ...
+            && result.estimator.metrics.sampledEgoPremisesSatisfied ...
+            && result.estimator.metrics.allPublishedBoundsContainTruth;
+    end
 
     if options.report
         localReport(result);
@@ -414,6 +458,7 @@ function options = localOptions(varargin)
     addParameter(parser, "Plot", false, @localLogicalScalar);
     addParameter(parser, "Report", true, @localLogicalScalar);
     addParameter(parser, "Progress", false, @localLogicalScalar);
+    addParameter(parser,"InitializeCruiseEquilibrium",false,@localLogicalScalar);
     addParameter(parser, "PrepareController", true, @localLogicalScalar);
     addParameter(parser, "ComputationalThreads", 1, ...
         @(value) localPositiveScalar(value) && value == fix(value));
@@ -459,6 +504,7 @@ function options = localOptions(varargin)
     options.plot = logical(parser.Results.Plot);
     options.report = logical(parser.Results.Report);
     options.progress = logical(parser.Results.Progress);
+    options.initializeCruiseEquilibrium = logical(parser.Results.InitializeCruiseEquilibrium);
 end
 
 function valid = localValidCenterline(value)
@@ -667,7 +713,8 @@ function estimator = localEstimatorResult( ...
 
         fields = sort(string(fieldnames(sensorFrame{sampleIdx})));
         sensorContractValid = sensorContractValid ...
-            && isequal(fields, expectedSensorFields);
+            && isequal(fields, expectedSensorFields) ...
+            && audit.sampledSensorNoiseWithinBounds;
         if audit.radarDetectionAvailable
             detectionOccurred = true;
             maximumDetectedRange = max( ...
@@ -952,7 +999,7 @@ function roadLoad = localRoadLoadForPlant(parameters, rollingRadius, roadLoad)
         /parameters.rollingNominalSpeed^4;
 end
 
-function parameters = localActiveRoadLoadParameters(parameters, tireBlock)
+function parameters = localActiveTireParameters(parameters, tireBlock)
 % The built-in tire preset overrides inactive values retained in the mask.
 % Read its initialized MF62 parameter vector, not the external-file settings.
 % This adapter is deliberately tied to the verified R2026a template layout.
@@ -965,7 +1012,7 @@ function parameters = localActiveRoadLoadParameters(parameters, tireBlock)
     end
     values = variables(index).Value(:);
     if numel(values) ~= 279 || values(12) ~= 62 || values(4) ~= 0 ...
-            || any(~isfinite(values([14, 24, 30, 38, 218:225]))) ...
+            || any(~isfinite(values([14, 24, 30, 38, 177:178,185:186,188,218:225]))) ...
             || any(values([14, 24, 30, 38]) <= 0)
         error("runCenterlineCruiseScenario:unsupportedRoadLoad", ...
             "The initialized built-in MF62 vector does not match the verified layout.");
@@ -977,6 +1024,23 @@ function parameters = localActiveRoadLoadParameters(parameters, tireBlock)
     parameters.rollingNominalPressure = values(30);
     parameters.rollingNominalLoad = values(38);
     parameters.rollingCoefficients = values(218:225);
+    % The built-in preset also overrides the inactive lateral-force mask
+    % coefficients. The R2026a MF62 zero-camber, zero-slip derivative uses
+    % PKY1, PKY2 and PKY4 from this same initialized vector. Its preset mode
+    % uses nominal pressure; this reduction is checked against the active
+    % MathWorks tire evaluator, not against the inactive dialog values.
+    parameters.lateralParameterSource = parameters.rollingParameterSource;
+    parameters.lateralInactiveCorneringStiffness = parameters.corneringStiffness;
+    parameters.lateralInactiveFrictionCoefficient = parameters.frictionCoefficient;
+    nominalLoad = values(38);
+    loadRatio = parameters.staticNormalLoad/nominalLoad;
+    parameters.corneringStiffness = abs(values(185)*nominalLoad ...
+        .*sin(values(188)*atan(loadRatio/values(186))));
+    parameters.frictionCoefficient = values(177)+values(178)*(loadRatio-1);
+    parameters.lateralPresetCoefficients = values([177,178,185,186,188]);
+    if any(parameters.corneringStiffness<=0) || any(parameters.frictionCoefficient<=0)
+        error("runCenterlineCruiseScenario:unsupportedTirePreset","The active lateral tire parameters are invalid.");
+    end
 end
 
 function cfg = localControllerConfigurationForPlant( ...
@@ -1001,15 +1065,8 @@ function cfg = localControllerConfigurationForPlant( ...
             parameters.staticNormalLoad(1:2)) / frontNormalLoad; ...
         dot(parameters.frictionCoefficient(3:4), ...
             parameters.staticNormalLoad(3:4)) / rearNormalLoad];
-    % NO plant-model residual set is installed, so these runs carry the
-    % DECLARED-MODEL descent guarantee only and claim nothing for the
-    % PassVeh14DOF plant. Re-measure against the LTV one-step map with
-    % measurePlantModelResidualRateBound before installing a value: the
-    % 2026-08-08 measurement was taken against the retired declared
-    % model, and the residual now enters only the first-step node's
-    % tightening, so the earlier objection to it (a persistent per-step
-    % box disturbance saturating a 48-step tube) no longer applies to
-    % the row structure that would consume it.
+    % Residual rates come only from the supplied controller configuration.
+    % Reading physical parameters does not certify that residual allowance.
 end
 
 function initialization = localPlantInitialization( ...

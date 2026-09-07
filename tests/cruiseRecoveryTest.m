@@ -145,16 +145,18 @@ function result = localIndependentConicSolve(~, program)
     hessian = program.P+triu(program.P,1).';
     options = optimoptions("fmincon", "Display", "off", "Algorithm", "sqp", ...
         "ConstraintTolerance", 1e-9, "OptimalityTolerance", 1e-8, "MaxIterations", 100);
-    rows = 1:program.cones(2);
+    equalities = 1:program.cones(1);
+    rows = program.cones(1)+(1:program.cones(2));
     [decision, ~, exitFlag, output] = fmincon(@(z) 0.5*z.'*hessian*z+program.q.'*z, ...
-        initial.decision, program.A(rows,:), program.b(rows), [], [], [], [], ...
+        initial.decision, program.A(rows,:), program.b(rows), ...
+        program.A(equalities,:),program.b(equalities),[],[], ...
         @(z) localCones(program,z), options);
     result = struct("decision",decision,"exitFlag",exitFlag,"output",output);
 end
 
 function [inequality,equality] = localCones(program,decision)
     slack = program.b-program.A*decision;
-    cells = reshape(slack(program.cones(2)+1:end),10,[]);
+    cells = reshape(slack(sum(program.cones(1:2))+1:end),10,[]);
     inequality = (sqrt(sum(cells(2:end,:).^2,1))-cells(1,:)).';
     equality = [];
 end

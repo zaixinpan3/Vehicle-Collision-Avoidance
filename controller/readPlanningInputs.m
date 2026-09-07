@@ -19,6 +19,24 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
     end
     ego = localReadEgoState(egoState, cfg);
     ego.stateTime = localOptionalStateScalar(egoState, "stateTime", NaN);
+    ego.completePerception = false;
+    ego.perceptionRange = NaN;
+    if isstruct(egoState) && isfield(egoState,"perception")
+        perception = egoState.perception;
+        if ~isstruct(perception) || ~isscalar(perception) ...
+                || ~all(isfield(perception,["time","range","completeWithinRange"])) ...
+                || ~isscalar(perception.completeWithinRange) ...
+                || ~islogical(perception.completeWithinRange)
+            error("collisionAvoidanceController:invalidPerception","Malformed current perception scope.");
+        end
+        validateattributes(perception.range,{'double'},{'scalar','positive'});
+        validateattributes(perception.time,{'double'},{'scalar','real','finite'});
+        if ~isfinite(ego.stateTime) || abs(perception.time-ego.stateTime)>128*eps(max(1,abs(ego.stateTime)))
+            error("collisionAvoidanceController:stalePerception","Perception and state timestamps must agree.");
+        end
+        ego.completePerception = perception.completeWithinRange;
+        ego.perceptionRange = perception.range;
+    end
     [lane, road] = localReadLane(laneCenterline, ego, cfg);
     targets = localReadTargets(targetEstimate, ego, cfg);
 end
@@ -244,6 +262,10 @@ function [lane, road] = localReadLane(rawGeometry, ego, cfg)
         end
     end
     lane = localReadCenterline(rawLane, ego);
+    if isstruct(rawGeometry) && isfield(rawGeometry, "referenceCurve") ...
+            && ~isempty(rawGeometry.referenceCurve)
+        lane.referenceCurve = laneGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
+    end
     road = localReadRoadGeometry(rawGeometry, lane, cfg);
 end
 
@@ -647,7 +669,7 @@ function target = localEmptyTarget()
         "yawErrorBound", 0.0, "yawRateErrorBound", 0.0, ...
         "predictionYawAccelerationErrorBound", 0.0, ...
         "accelerationErrorBound", zeros(2, 1), ...
-        "errorCertificate", [], "encounterContract", []);
+        "errorCertificate", [], "encounterContract", [], "predictionMotion", []);
 end
 
 function key = localTargetRecordKey(data, recordIdx)
@@ -703,6 +725,7 @@ function [target, active] = localReadTargetRecord(data, ego, cfg)
     if isfield(data, "encounterContract")
         target.encounterContract = data.encounterContract;
     end
+    if isfield(data,"predictionMotion"), target.predictionMotion = data.predictionMotion; end
     target.errorCertificate = stateUncertainty.readCertificate(data, "target-state-v1");
     if isempty(target.errorCertificate)
         target.positionErrorBound = ...

@@ -24,7 +24,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(plan(2, :), cfg.actuation.brakingRatioMaximum);
             testCase.verifyLessThanOrEqual(abs(plan(1, :)), cfg.model.frontWheelSteeringAngleMaximum);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(stored.safetyScope, "heldIntervalsUntilCertifiedEncounterExit");
+            testCase.verifyEqual(stored.safetyScope, "uncertainFiniteHorizon");
         end
 
         function aFiniteCollisionFreePrefixNeedsAnExitContract(testCase)
@@ -109,9 +109,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
 
         function anActiveCollisionConstraintDoesNotAuthorizeFallback(testCase)
             [ego, target, route, cfg] = encounterTestFixture.crossing();
-            target.targetPositionInertial(1) = 10;
+            target.targetPositionInertial(1) = 10.25;
             cruiseClearance = rectangleConfigurationDistance([7.2; 0], 0, ...
-                [10; 3.2], pi/2, [2.4; .95; 2.4; .95]);
+                [10.25; 3.2], pi/2, [2.4; .95; 2.4; .95]);
             testCase.verifyLessThan(cruiseClearance, 0);
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             testCase.verifyGreaterThan(stored.margin, 0);

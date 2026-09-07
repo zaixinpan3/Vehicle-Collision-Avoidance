@@ -1,9 +1,37 @@
 # Finite target motion and encounter-exit contracts
 
-Version 9 requires a current target enclosure, a finite motion contract, and an
-exit guard. Current estimator bounds do not establish future jerk limits,
-route nonreturn, or reliable detection. Those are separate caller assumptions.
-The governing requirement is [ENCOUNTER_SCOPED_CBF_CLF.md](ENCOUNTER_SCOPED_CBF_CLF.md).
+Version 10 supports renewing local finite predictions and the optional stronger
+nonreturning-exit contract. Current observer bounds do not establish future jerk
+limits or complete detection; these are separate caller assumptions. The default
+policy is described in [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md).
+
+## Local finite prediction
+
+```matlab
+target.predictionMotion = struct( ...
+    "kind", "finite-sensing-motion-v1", ...
+    "jerkBound", [jx; jy], ...             % componentwise m/s^3
+    "yawAccelerationBound", yawRateRate); % rad/s^2
+```
+
+The optional `scalarAccelerationMaximum` bounds the magnitude of tangential
+acceleration used in nominal lookahead. Every current observation renews the
+requested finite window after intersecting the old reachable set. Changed
+physical derivative bounds or dimensions are rejected. The observer's point
+estimate remains unchanged. A prior constant-curvature, constant-tangential-
+acceleration nominal trajectory is retained while it lies in the new enclosure;
+otherwise it is reinitialized. The robust executed interval uses the full set.
+
+A timestamped `ego.perception` with `completeWithinRange=true` and a sensor
+`range` permits retirement after absence, unless the whole reachable position
+set remains inside range. Missing observations without complete perception do
+not retire the target. New detections re-enter admission. There is no infinite
+forecast or prescribed target road corridor in this mode.
+
+## Optional strong exit contract
+
+The remainder of this document describes the stronger nonreturn mode. Its exit
+and nonrenewal requirements do not apply to `predictionMotion` encounters.
 
 A target is a scalar record; the controller accepts a structure array of such
 records. Existing inertial position, velocity, acceleration, body heading,
@@ -12,7 +40,7 @@ yaw-rate, extent, and current-error fields remain supported. `trackId`,
 `target-state-v1` estimator certificates override numeric current-bound aliases.
 Their timestamps must match `ego.stateTime`.
 
-Each target also requires:
+In this strong mode, each target also requires:
 
 ```matlab
 target.encounterContract = struct( ...

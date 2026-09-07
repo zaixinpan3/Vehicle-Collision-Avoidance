@@ -10,6 +10,59 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function discreteNominalSensitivitiesMatchIndependentOdePerturbations(testCase)
+            model = localModel();
+            model.initialEgoState = [10;0.2;0.03;10;0.2;0.1];
+            input = [0.04;0.05];
+            [~,a,b] = ltvBicycleModel.nominalRollout(model,input);
+            point = [model.initialEgoState;input];
+            reference = zeros(6,8);
+            step = 1e-5;
+            for column = 1:8
+                offset = zeros(8,1);offset(column) = step;
+                endpoints = zeros(6,2);
+                for side = 1:2
+                    changed = point+(3-2*side)*offset;
+                    [~,trajectory] = ode45(@(~,x) localNonlinearFlow(x,changed(7:8),0,model.cfg), ...
+                        [0,model.sampleTime],changed(1:6),odeset(RelTol=1e-10,AbsTol=1e-12));
+                    endpoints(:,side) = trajectory(end,:).';
+                end
+                reference(:,column) = diff(fliplr(endpoints),1,2)/(2*step);
+            end
+            testCase.verifyEqual([a,b],reference,AbsTol=2e-3,RelTol=1e-3);
+        end
+        function nonlinearPredictionAgreesWithIndependentHeldInputIntegration(testCase)
+            model = localModel();
+            model.initialEgoState = [20;-1;-0.2;9;-0.5;-0.35];
+            model.lane.segmentCurvature(:) = 0.01;
+            inputs = [-0.13,0.14,0.05;-0.35,-0.2,0.1];
+            predicted = ltvBicycleModel.nominalRollout(model,inputs);
+            actual = model.initialEgoState;
+            for stage = 1:size(inputs,2)
+                [~,states] = ode45(@(~,state) localNonlinearFlow( ...
+                    state,inputs(:,stage),0.01,model.cfg),[0,model.sampleTime],actual, ...
+                    odeset(RelTol=1e-11,AbsTol=1e-13));
+                actual = states(end,:).';
+                testCase.verifyEqual(predicted(:,stage+1),actual,AbsTol=1e-4);
+            end
+        end
+        function maneuverLinearizationMatchesAxleForceBalanceAndKinematicDerivatives(testCase)
+            cfg = collisionAvoidanceControllerConfig();
+            state = [20;-1;-0.2;9;-0.5;-0.35];
+            input = [-0.13;-0.35];curvature = 0.01;
+            point = struct("state",state,"input",input);
+            [a,b,c] = ltvBicycleModel.continuousMatrices(curvature,9,cfg,[],0,point);
+            expected = localNonlinearFlow(state,input,curvature,cfg);
+            testCase.verifyEqual(a*state+b*input+c,expected,AbsTol=1e-11);
+            combined = [state;input];jacobian = zeros(6,8);step = 1e-6;
+            for index = 1:8
+                plus = combined;minus = combined;
+                plus(index) = plus(index)+step;minus(index) = minus(index)-step;
+                jacobian(:,index) = (localNonlinearFlow(plus(1:6),plus(7:8),curvature,cfg) ...
+                    -localNonlinearFlow(minus(1:6),minus(7:8),curvature,cfg))/(2*step);
+            end
+            testCase.verifyEqual([a,b],jacobian,AbsTol=2e-7);
+        end
         function brakingRatioUsesThePaperLongitudinalForceScale(testCase)
             cfg = collisionAvoidanceControllerConfig(struct( ...
                 "roadLoad", struct("dragCoefficient", 0, "rollingCoefficient", 0)));
@@ -129,4 +182,19 @@ function model = localModel()
         "initialEgoState", [0.0; 0.0; 0.0; 4.0; 0.0; 0.0], ...
         "measuredEgoStateErrorBound", zeros(6, 1), ...
         "longitudinalAccelerationBias", 0.0, "lane", lane);
+end
+
+function derivative = localNonlinearFlow(state,input,curvature,cfg)
+    vx = state(4);vy = state(5);r = state(6);delta = input(1);
+    parameters = modifiedFialaTire.parameters(cfg);
+    slip = [atan2(vy+cfg.vehicle.lf*r,vx)-delta;atan2(vy-cfg.vehicle.lr*r,vx)];
+    fy = modifiedFialaTire.evaluate(slip,input(2),cfg);
+    fx = parameters.longitudinalForceScale*input(2);
+    frontX = fx(1)*cos(delta)-fy(1)*sin(delta);
+    frontY = fx(1)*sin(delta)+fy(1)*cos(delta);
+    stationRate = (vx*cos(state(3))-vy*sin(state(3)))/(1-curvature*state(2));
+    derivative = [stationRate;vx*sin(state(3))+vy*cos(state(3));r-curvature*stationRate; ...
+        (frontX+fx(2)-longitudinalRoadLoad(vx,cfg))/cfg.vehicle.m+vy*r; ...
+        (frontY+fy(2))/cfg.vehicle.m-vx*r; ...
+        (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2))/cfg.vehicle.Iz];
 end

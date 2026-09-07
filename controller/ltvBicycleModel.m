@@ -2,6 +2,56 @@ classdef ltvBicycleModel
     %ltvBicycleModel Held-input bicycle dynamics, horizon prediction and braking schedules.
 
     methods (Static)
+        function [states,stateJacobian,inputJacobian] = nominalRollout(model,inputs)
+        % Nonlinear nominal prediction only; the executed tube is separate.
+            count = size(inputs,2);states = zeros(6,count+1);
+            states(:,1) = model.initialEgoState;
+            linearize = nargout>1;
+            stateJacobian = zeros(6,6,count);inputJacobian = zeros(6,2,count);
+            cfg = model.cfg;parameters = modifiedFialaTire.parameters(cfg);
+            subdivisions = max(1,ceil(model.sampleTime/0.01));
+            h = model.sampleTime/subdivisions;
+            for stage = 1:count
+                x = states(:,stage);u = inputs(:,stage);
+                curvature = laneGeometry.curvature(x(1),model.lane);
+                if linearize
+                    point = [x;u];
+                    differenceStep = eps^(1/3)*(1+abs(point));
+                    differenceStep(8) = min(differenceStep(8),max(1e-10,(1-abs(u(2)))/4));
+                    batch = point+[zeros(8,1),diag(differenceStep),-diag(differenceStep)];
+                    x = batch(1:6,:);u = batch(7:8,:);
+                end
+                for substep = 1:subdivisions
+                    k1 = localNominalFlow(x,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
+                    k2 = localNominalFlow(x+h*k1/2,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
+                    k3 = localNominalFlow(x+h*k2/2,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
+                    k4 = localNominalFlow(x+h*k3,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
+                    x = x+h*(k1+2*k2+2*k3+k4)/6;
+                end
+                states(:,stage+1) = x(:,1);
+                if linearize
+                    jacobian = (x(:,2:9)-x(:,10:17))./(2*differenceStep.');
+                    jacobian(:,1) = [1;zeros(5,1)];
+                    stateJacobian(:,:,stage) = jacobian(:,1:6);
+                    inputJacobian(:,:,stage) = jacobian(:,7:8);
+                end
+            end
+        end
+        function [state, input] = cruiseEquilibrium(curvature, cfg, accelerationBias)
+        % Solve the frozen bicycle's constant-speed path equilibrium.
+        % Steering, lateral velocity, body heading and road-load force are
+        % compatible with one model; no desired acceleration is introduced.
+            if nargin < 3, accelerationBias = 0; end
+            speed = cfg.referenceSpeed;
+            [a,b,c] = ltvBicycleModel.continuousMatrices(curvature,speed,cfg,0,accelerationBias);
+            state = [0;0;0;speed;0;curvature*speed];
+            rows = 4:6;
+            solution = [a(rows,5),b(rows,:)]\(-a(rows,:)*state-c(rows));
+            state(5) = solution(1);
+            if speed > 0, state(3) = -state(5)/speed; end
+            input = solution(2:3);
+        end
+
         function prediction = finitePredict(model, schedule)
         %finitePredict A finite held-input witness, without an appended rest tail.
             cfg = model.cfg;
@@ -18,7 +68,32 @@ classdef ltvBicycleModel
                     "station", station, "curvature", curvature, ...
                     "brakingRatio", repmat(min(max(ratio, -1+sqrt(eps)), 1-sqrt(eps)), 1, count));
             end
-            reference = [atan(cfg.vehicle.wheelbase*schedule.curvature(1:count)); schedule.brakingRatio];
+            reference = zeros(2,count);
+            referenceStates = zeros(6,count);
+            for stage = 1:count
+                if stage>1 && schedule.speedProfile(stage)==schedule.speedProfile(stage-1) ...
+                        && schedule.curvature(stage)==schedule.curvature(stage-1)
+                    reference(:,stage) = reference(:,stage-1);
+                    referenceStates(:,stage) = referenceStates(:,stage-1);
+                    continue;
+                end
+                stageCfg = cfg;
+                stageCfg.referenceSpeed = schedule.speedProfile(stage);
+                [referenceStates(:,stage),reference(:,stage)] = ltvBicycleModel.cruiseEquilibrium( ...
+                    schedule.curvature(stage),stageCfg,model.longitudinalAccelerationBias);
+            end
+            nonlinearAnchor = [];
+            if string(cfg.model.linearizationPolicy)~="cruise"
+                anchorInputs = reference;
+                if isfield(model,"linearizationInputs") && ~isempty(model.linearizationInputs)
+                    retained = min(count,size(model.linearizationInputs,2));
+                    anchorInputs(:,1:retained) = model.linearizationInputs(:,1:retained);
+                end
+                [nonlinearAnchor,nominalStateJacobian,nominalInputJacobian] = ...
+                    ltvBicycleModel.nominalRollout(model,anchorInputs);
+                model.linearizationStates = nonlinearAnchor(:,1:end-1);
+                model.linearizationInputs = anchorInputs;
+            end
             prediction = struct("stageCount", count, "nodeCount", count+1, ...
                 "planCount", planCount, "referencePlan", reference(:), ...
                 "scheduleForStore", schedule, "scheduleSpeedProfile", schedule.speedProfile, ...
@@ -30,29 +105,98 @@ classdef ltvBicycleModel
             prediction.stageMatrixA = zeros(6, 6, count);
             prediction.stageMatrixB = zeros(6, 2, count);
             prediction.stageAffine = zeros(6, count);
+            prediction.executionReserve = zeros(6,count);
+            prediction.modelErrorRateBound = zeros(6,count);
             map = zeros(6, planCount);
             offset = model.initialEgoState;
             radius = model.initialFrenetErrorBound;
+            numericalRadius = zeros(6,1);
             prediction.egoStateOffset(:, 1) = offset;
             prediction.egoStateErrorBound(:, 1) = radius;
-            rate = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
+            baseRate = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
             stateLimit = [model.lane.segmentStation(end)+model.lane.segmentLength(end); ...
                 cfg.model.lateralDomainRadius; cfg.model.headingDomainRadius; ...
                 cfg.model.speedMaximum; cfg.model.lateralVelocityMaximum; cfg.model.yawRateMaximum];
             inputLimit = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
                 max(abs([cfg.actuation.brakingRatioMinimum, cfg.actuation.brakingRatioMaximum]))], count, 1);
             cells = cell(count, 1);
+            tireModels = cell(count,1);
+            priorOperatingPoint = [];
             for stage = 1:count
-                [a, b, c] = ltvBicycleModel.continuousMatrices(schedule.curvature(stage), ...
-                    schedule.speedProfile(stage), cfg, schedule.brakingRatio(stage), ...
-                    model.longitudinalAccelerationBias);
+                changed = stage==1 || schedule.curvature(stage)~=schedule.curvature(stage-1) ...
+                    || schedule.speedProfile(stage)~=schedule.speedProfile(stage-1) ...
+                    || schedule.brakingRatio(stage)~=schedule.brakingRatio(stage-1);
+                operatingPoint = [];
+                if any(string(cfg.model.linearizationPolicy)==["trajectory","currentState"])
+                    stateBar = referenceStates(:,stage);
+                    stateBar(1) = schedule.station(stage);
+                    inputBar = reference(:,stage);
+                    if isfield(model,"linearizationStates") && stage<=size(model.linearizationStates,2)
+                        stateBar = model.linearizationStates(:,stage);
+                        inputBar = model.linearizationInputs(:,min(stage,size(model.linearizationInputs,2)));
+                    end
+                    refine = isfield(model,"refineNominalLookahead") && model.refineNominalLookahead;
+                    if stage==1 || (string(cfg.model.linearizationPolicy)=="currentState" && ~refine)
+                        stateBar = model.initialEgoState;
+                        if isempty(nonlinearAnchor), inputBar = model.previousInput;end
+                    end
+                    operatingPoint = struct("state",stateBar,"input",inputBar);
+                    comparison = [stateBar(2:6);inputBar;schedule.curvature(stage)];
+                    changed = ~isequal(comparison,priorOperatingPoint);
+                    priorOperatingPoint = comparison;
+                    prediction.scheduleSpeedProfile(stage) = stateBar(4);
+                    prediction.scheduleBrakingRatio(stage) = inputBar(2);
+                end
+                if changed
+                    [a,b,c,tireModel] = ltvBicycleModel.continuousMatrices(schedule.curvature(stage), ...
+                        schedule.speedProfile(stage),cfg,schedule.brakingRatio(stage),model.longitudinalAccelerationBias,operatingPoint);
+                    rate = baseRate;
+                    if stage<=cfg.controller.certifiedSteps || isempty(nonlinearAnchor)
+                        exact = expm(h*[a,b,c;zeros(3,9)]);
+                    else
+                        exact = [nominalStateJacobian(:,:,stage),nominalInputJacobian(:,:,stage),zeros(6,1)];
+                    end
+                    executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound ...
+                        +h*expm(h*abs(a))*rate;
+                end
+                tireModels{stage} = tireModel;
+                prediction.modelErrorRateBound(:,stage) = rate;
+                prediction.executionReserve(:,stage) = executionReserve;
                 prediction.continuousA(:, :, stage) = a;
                 prediction.continuousB(:, :, stage) = b;
                 prediction.continuousC(:, stage) = c;
-                exact = expm(h*[a, b, c; zeros(3, 9)]);
                 prediction.stageMatrixA(:, :, stage) = exact(1:6, 1:6);
                 prediction.stageMatrixB(:, :, stage) = exact(1:6, 7:8);
                 prediction.stageAffine(:, stage) = exact(1:6, 9);
+                if stage>cfg.controller.certifiedSteps
+                    startMap = map;startOffset = offset;startRadius = numericalRadius;
+                    localState = exact(1:6,1:6);
+                    localInput = exact(1:6,7:8);
+                    localOffset = exact(1:6,9);
+                    if ~isempty(nonlinearAnchor)
+                        startAtAnchor = map*anchorInputs(:)+offset;
+                        localOffset = nonlinearAnchor(:,stage+1)-localState*startAtAnchor ...
+                            -localInput*anchorInputs(:,stage);
+                        prediction.stageAffine(:,stage) = localOffset;
+                    end
+                    map = localState*map;
+                    map(:,2*stage-1:2*stage) = map(:,2*stage-1:2*stage)+localInput;
+                    offset = localState*offset+localOffset;
+                    numericalRadius = abs(localState)*numericalRadius ...
+                        +128*eps*(1+abs(map)*inputLimit+abs(offset));
+                    radius = numericalRadius;
+                    tube = struct("map",cat(3,startMap,map),"offset",[startOffset,offset],"radius",[startRadius,radius], ...
+                        "numericalRadius",[startRadius,numericalRadius],"localStateMap",cat(3,eye(6),localState), ...
+                        "localInputMap",cat(3,zeros(6,2),localInput),"localOffset",[zeros(6,1),localOffset], ...
+                        "endMap",map,"endOffset",offset,"endRadius",radius, ...
+                        "endNumericalRadius",numericalRadius,"stage",stage, ...
+                        "start",(stage-1)*h,"duration",h,"time",[(stage-1)*h,stage*h]);
+                    cells{stage} = tube;
+                    prediction.egoStateMatrix(:,:,stage+1) = map;
+                    prediction.egoStateOffset(:,stage+1) = offset;
+                    prediction.egoStateErrorBound(:,stage+1) = radius;
+                    continue;
+                end
                 cellCount = max(cfg.encounter.minimumCells, ceil(2*norm(a, inf)*h));
                 dt = h/cellCount;
                 heldMap = zeros(6, planCount);
@@ -60,7 +204,8 @@ classdef ltvBicycleModel
                 stageCells = cell(cellCount, 1);
                 for cellIndex = 1:cellCount
                     tube = stateUncertainty.flowTube(a, heldMap, c, map, offset, radius, ...
-                        rate, dt, cfg.encounter.taylorOrder, stateLimit, inputLimit);
+                        rate, dt, cfg.encounter.taylorOrder, stateLimit, inputLimit,numericalRadius);
+                    tube.localInputMap = tube.localInputMap(:,2*stage-1:2*stage,:);
                     tube.stage = stage;
                     tube.start = (stage-1)*h+(cellIndex-1)*dt;
                     tube.duration = dt;
@@ -69,6 +214,7 @@ classdef ltvBicycleModel
                     map = tube.endMap;
                     offset = tube.endOffset;
                     radius = tube.endRadius;
+                    numericalRadius = tube.endNumericalRadius;
                 end
                 cells{stage} = vertcat(stageCells{:});
                 prediction.egoStateMatrix(:, :, stage+1) = map;
@@ -76,6 +222,7 @@ classdef ltvBicycleModel
                 prediction.egoStateErrorBound(:, stage+1) = radius;
             end
             prediction.cells = vertcat(cells{:});
+            prediction.tireModels = tireModels;
         end
 
         function prediction = predict(model, storedSchedule)
@@ -215,7 +362,7 @@ classdef ltvBicycleModel
             affineVector = heldTransition(1:6, 9);
         end
 
-        function [continuousA, continuousB, continuousC] = continuousMatrices(kappa, vBar, cfg, betaBar, accelerationBias)
+        function [continuousA, continuousB, continuousC, tireModel] = continuousMatrices(kappa, vBar, cfg, betaBar, accelerationBias,operatingPoint)
         %continuousMatrices Continuous generator of the scheduled Frenet bicycle.
         % xDot = continuousA*x + continuousB*u + continuousC, including the
         % independent declared longitudinal acceleration bias in continuousC.
@@ -226,6 +373,14 @@ classdef ltvBicycleModel
                 cfg (1,1) struct
                 betaBar = []
                 accelerationBias (1,1) double {mustBeReal, mustBeFinite} = 0.0
+                operatingPoint = []
+            end
+
+            tireModel = [];
+            if ~isempty(operatingPoint)
+                [continuousA,continuousB,continuousC,tireModel] = ...
+                    localOperatingPointMatrices(kappa,operatingPoint.state,operatingPoint.input,cfg,accelerationBias);
+                return;
             end
 
             mass = cfg.vehicle.m;
@@ -356,4 +511,67 @@ function profile = localProfile(cfg, steps, speed)
             "The braking tail cannot reach rest within %d stages " ...
             + "from %.3f m/s.", steps, speed);
     end
+end
+
+function [a,b,c,tire] = localOperatingPointMatrices(curvature,state,input,cfg,bias)
+% Jacobian of nonlinear Frenet kinematics and axle-force balance.
+    tire = modifiedFialaTire.affineModel(state,input,cfg);
+    input = tire.operatingInput;
+    parameters = modifiedFialaTire.parameters(cfg);
+    mass = cfg.vehicle.m;
+    vx = state(4);vy = state(5);yawRate = state(6);
+    heading = state(3);
+    denominator = 1-curvature*state(2);
+    if denominator<=0
+        error("collisionAvoidanceController:invalidReferenceCurve","The operating point is outside the regular Frenet chart.");
+    end
+    ct = cos(heading);st = sin(heading);
+    stationRate = (vx*ct-vy*st)/denominator;
+    a = zeros(6);b = zeros(6,2);flow = zeros(6,1);
+    a(1,2) = curvature*stationRate/denominator;
+    a(1,3:5) = [(-vx*st-vy*ct)/denominator,ct/denominator,-st/denominator];
+    a(2,3:5) = [vx*ct-vy*st,st,ct];
+    a(3,:) = -curvature*a(1,:);a(3,6) = 1;
+    flow(1:3) = [stationRate;vx*st+vy*ct;yawRate-curvature*stationRate];
+    delta = input(1);beta = input(2);
+    rotation = [cos(delta),-sin(delta);sin(delta),cos(delta)];
+    front = rotation*[parameters.longitudinalForceScale(1)*beta;tire.force(1)];
+    frontState = rotation*[zeros(1,6);tire.state(1,:)];
+    frontInput = rotation*[0,parameters.longitudinalForceScale(1);tire.input(1,:)];
+    frontInput(:,1) = frontInput(:,1)+[-front(2);front(1)];
+    rear = [parameters.longitudinalForceScale(2)*beta;tire.force(2)];
+    rearState = [zeros(1,6);tire.state(2,:)];
+    rearInput = [0,parameters.longitudinalForceScale(2);tire.input(2,:)];
+    [roadForce,roadSlope] = longitudinalRoadLoad(vx,cfg);
+    flow(4:6) = [(front(1)+rear(1)-roadForce)/mass+vy*yawRate+bias; ...
+        (front(2)+rear(2))/mass-vx*yawRate; ...
+        (cfg.vehicle.lf*front(2)-cfg.vehicle.lr*rear(2))/cfg.vehicle.Iz];
+    a(4:5,:) = (frontState+rearState)/mass;
+    b(4:5,:) = (frontInput+rearInput)/mass;
+    a(4,4) = a(4,4)-roadSlope/mass;
+    a(4,5:6) = a(4,5:6)+[yawRate,vy];
+    a(5,[4,6]) = a(5,[4,6])-[yawRate,vx];
+    a(6,:) = (cfg.vehicle.lf*frontState(2,:)-cfg.vehicle.lr*rearState(2,:))/cfg.vehicle.Iz;
+    b(6,:) = (cfg.vehicle.lf*frontInput(2,:)-cfg.vehicle.lr*rearInput(2,:))/cfg.vehicle.Iz;
+    c = flow-a*state-b*input;
+end
+
+function derivative = localNominalFlow(state,input,curvature,cfg,parameters,bias)
+    vx = state(4,:);vy = state(5,:);r = state(6,:);delta = input(1,:);beta = input(2,:);
+    speed = max(vx,cfg.model.scheduleSpeedFloor);
+    slip = [atan2(vy+cfg.vehicle.lf*r,speed)-delta;atan2(vy-cfg.vehicle.lr*r,speed)];
+    capacity = parameters.longitudinalForceScale*sqrt(max(0,1-beta.^2));
+    tangent = tan(slip);cornering = repmat(parameters.corneringStiffness,1,size(state,2));
+    fy = -capacity.*sign(slip);
+    adhesion = capacity>0 & abs(tangent)<3*capacity./cornering;
+    ratio = cornering(adhesion).*abs(tangent(adhesion))./(3*capacity(adhesion));
+    fy(adhesion) = -cornering(adhesion).*tangent(adhesion).*(1-ratio+ratio.^2/3);
+    fx = parameters.longitudinalForceScale*beta;
+    frontX = fx(1,:).*cos(delta)-fy(1,:).*sin(delta);
+    frontY = fx(1,:).*sin(delta)+fy(1,:).*cos(delta);
+    stationRate = (vx.*cos(state(3,:))-vy.*sin(state(3,:)))./(1-curvature*state(2,:));
+    derivative = [stationRate;vx.*sin(state(3,:))+vy.*cos(state(3,:));r-curvature*stationRate; ...
+        (frontX+fx(2,:)-longitudinalRoadLoad(vx,cfg))/cfg.vehicle.m+vy.*r+bias; ...
+        (frontY+fy(2,:))/cfg.vehicle.m-vx.*r; ...
+        (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2,:))/cfg.vehicle.Iz];
 end

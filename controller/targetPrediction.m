@@ -2,12 +2,70 @@ classdef targetPrediction
     %targetPrediction Finite-horizon target flow from uncertain initial states.
 
     methods (Static)
+        function [offset,slope] = rectangleSupportMajorant(normal,referenceHeading,halfLength,halfWidth,anchor,errorMaximum)
+        % Touching convex majorant of rectangle support over a yaw interval.
+        % Every vertex projection is concave wherever it is nonnegative.
+        % Tangents there cover every possible support-maximizing vertex.
+            rotation = [cos(referenceHeading),-sin(referenceHeading); ...
+                sin(referenceHeading),cos(referenceHeading)];
+            localNormal = rotation.'*normal;
+            vertices = [halfLength,halfLength,-halfLength,-halfLength; ...
+                halfWidth,-halfWidth,halfWidth,-halfWidth];
+            offset = zeros(0,1);slope = zeros(0,1);
+            for vertex = vertices
+                a = localNormal.'*vertex;
+                b = localNormal.'*[-vertex(2);vertex(1)];
+                phase = atan2(b,a);
+                for period = -1:1
+                    lower = max(-errorMaximum,phase-pi/2+2*pi*period);
+                    upper = min(errorMaximum,phase+pi/2+2*pi*period);
+                    if lower>upper,continue;end
+                    point = min(max(anchor,lower),upper);
+                    derivative = -a*sin(point)+b*cos(point);
+                    value = a*cos(point)+b*sin(point);
+                    offset(end+1,1) = value-derivative*point+64*eps*(1+abs(a)+abs(b)); %#ok<AGROW>
+                    slope(end+1,1) = derivative; %#ok<AGROW>
+                end
+            end
+        end
+        function finite = isFiniteSensing(encounter)
+            finite = string(encounter.contract.kind) == "finite-sensing-motion-v1";
+        end
+
         function encounter = admit(target, time, lane, cfg)
-        %admit Validate a finite Cartesian inclusion and a nonreturn route.
+        %admit Validate a finite motion descriptor or an optional exit contract.
         % The route assertion is an input assumption. The geometric check
         % proves that its downstream halfspace is disjoint from the complete
         % allowed ego route, including the footprint and lateral domain.
             contract = target.encounterContract;
+            if isfield(target,"predictionMotion") && ~isempty(target.predictionMotion)
+                motion = target.predictionMotion;
+                if ~isstruct(motion) || ~isscalar(motion) ...
+                        || ~all(isfield(motion,["kind","jerkBound","yawAccelerationBound"])) ...
+                        || string(motion.kind) ~= "finite-sensing-motion-v1"
+                    error("collisionAvoidanceController:invalidEncounterContract","Invalid finite motion bounds.");
+                end
+                contract = struct("kind","finite-sensing-motion-v1","id",target.key, ...
+                    "validFrom",time,"validUntil",time+cfg.controller.sampleTime*cfg.controller.horizonSteps, ...
+                    "jerkBound",motion.jerkBound,"yawAccelerationBound",motion.yawAccelerationBound, ...
+                    "predictionSampleTime",cfg.controller.sampleTime);
+                if isfield(motion,"scalarAccelerationMaximum")
+                    validateattributes(motion.scalarAccelerationMaximum,{'double'},{'scalar','finite','nonnegative'});
+                    contract.scalarAccelerationMaximum = motion.scalarAccelerationMaximum;
+                end
+                validateattributes(contract.jerkBound,{'double'},{'real','finite','nonnegative','numel',2});
+                validateattributes(contract.yawAccelerationBound,{'double'},{'real','finite','nonnegative','scalar'});
+                validateattributes(time,{'double'},{'real','finite','scalar'});
+                if target.predictionYawAccelerationErrorBound>contract.yawAccelerationBound
+                    error("collisionAvoidanceController:invalidEncounterContract","Yaw acceleration exceeds the motion bound.");
+                end
+                if startsWith(target.key,"anonymousTarget:")
+                    error("collisionAvoidanceController:invalidEncounterContract","Finite encounters need stable track identity.");
+                end
+                contract.jerkBound = contract.jerkBound(:);
+                encounter = localEncounter(target,time,contract);
+                return;
+            end
             required = ["kind", "id", "validFrom", "validUntil", "jerkBound", ...
                 "yawAccelerationBound", "exitNormal", "exitOffset", "postExitRoute"];
             if ~isstruct(contract) || ~isscalar(contract) || ~all(isfield(contract, required))
@@ -47,12 +105,7 @@ classdef targetPrediction
                 error("collisionAvoidanceController:invalidExitRoute", ...
                     "The exit halfspace must clear the entire allowed ego route and footprint.");
             end
-            encounter = struct("key", target.key, "contract", contract, ...
-                "center", [target.position; target.velocity; target.acceleration; target.yaw; target.yawRate], ...
-                "radius", [target.positionErrorBound; target.velocityErrorBound; ...
-                    target.accelerationErrorBound; target.yawErrorBound; target.yawRateErrorBound], ...
-                "time", time, "halfLength", target.length/2, "halfWidth", target.width/2, ...
-                "discharged", false, "exitMargin", -inf);
+            encounter = localEncounter(target,time,contract);
         end
 
         function [center, radius] = finiteFlow(encounter, duration)
@@ -72,10 +125,60 @@ classdef targetPrediction
                 r(3:4)+r(5:6)*duration+jerk*(duration.^2/2); ...
                 r(5:6)+jerk*duration; r(7)+r(8)*duration+yawAcceleration*(duration.^2/2); ...
                 r(8)+yawAcceleration*duration];
+            % Charge arithmetic in the prediction, rather than accepting an
+            % empty measurement intersection with a physical tolerance.
+            arithmetic = [abs(x(1:2))+abs(x(3:4))*duration+abs(x(5:6))*(duration.^2/2); ...
+                abs(x(3:4))+abs(x(5:6))*duration;repmat(abs(x(5:6)),1,numel(duration)); ...
+                abs(x(7))+abs(x(8))*duration;repmat(abs(x(8)),1,numel(duration))];
+            radius = radius+64*eps*(1+arithmetic+radius);
+        end
+
+        function [center, jerk, yawAcceleration] = nominalFlow(encounter, duration)
+        % Constant curvature and tangential acceleration, used for lookahead.
+        % This trajectory does not replace the uncertain executed-step tube.
+            x = encounter.center;
+            if isfield(encounter,"nominalCenter"), x = encounter.nominalCenter; end
+            speed = norm(x(3:4));
+            if speed<=sqrt(eps)
+                center = x;center(3:6) = 0;center(8) = 0;jerk = 0;yawAcceleration = 0;
+                return;
+            end
+            acceleration = dot(x(3:4),x(5:6))/speed;
+            if isfield(encounter.contract,"scalarAccelerationMaximum")
+                limit = encounter.contract.scalarAccelerationMaximum;
+                acceleration = min(max(acceleration,-limit),limit);
+            end
+            curvature = x(8)/speed;
+            stopped = acceleration<0 && duration>=speed/-acceleration;
+            if acceleration<0, duration = min(duration,speed/-acceleration); end
+            arc = speed*duration+acceleration*duration.^2/2;
+            initialCourse = atan2(x(4),x(3));
+            course = initialCourse+curvature*arc;
+            if abs(curvature)<sqrt(eps)
+                position = x(1:2)+[cos(initialCourse);sin(initialCourse)]*arc;
+            else
+                position = x(1:2)+[sin(course)-sin(initialCourse);cos(initialCourse)-cos(course)]/curvature;
+            end
+            speed = max(0,speed+acceleration*duration);
+            if stopped, acceleration = 0; end
+            direction = [cos(course);sin(course)];
+            center = [position;speed.*direction; ...
+                acceleration*direction+speed.^2*curvature.*[-direction(2,:);direction(1,:)]; ...
+                x(7)+curvature*arc;curvature*speed];
+            % Uniform nominal derivatives over a complete controller interval.
+            interval = 0;
+            if isfield(encounter.contract,"predictionSampleTime"), interval = encounter.contract.predictionSampleTime; end
+            maximumSpeed = speed+abs(acceleration)*interval;
+            jerk = hypot(maximumSpeed.^3*curvature^2,3*maximumSpeed*abs(acceleration*curvature));
+            yawAcceleration = abs(acceleration*curvature);
         end
 
         function margin = exitMargin(encounter, duration, cfg)
         %exitMargin Entire uncertain footprint beyond the declared exit plane.
+            if targetPrediction.isFiniteSensing(encounter)
+                margin = -inf(size(duration));
+                return;
+            end
             [center, radius] = targetPrediction.finiteFlow(encounter, duration);
             n = encounter.contract.exitNormal;
             support = targetPrediction.rectangleSupport(encounter.halfLength, ...
@@ -89,6 +192,30 @@ classdef targetPrediction
             next = encounter;
             [next.center, next.radius] = targetPrediction.finiteFlow(encounter, duration);
             next.time = encounter.time+duration;
+            if targetPrediction.isFiniteSensing(encounter) && ~isempty(observation)
+                measured = targetPrediction.admit(observation,next.time,lane,cfg);
+                if ~targetPrediction.isFiniteSensing(measured) ...
+                        || ~isequal(measured.contract.jerkBound,encounter.contract.jerkBound) ...
+                        || measured.contract.yawAccelerationBound ~= encounter.contract.yawAccelerationBound ...
+                        || measured.halfLength ~= encounter.halfLength || measured.halfWidth ~= encounter.halfWidth
+                    error("collisionAvoidanceController:changedEncounterContract","Physical target motion bounds changed.");
+                end
+                next.center(7) = measured.center(7)+atan2(sin(next.center(7)-measured.center(7)), ...
+                    cos(next.center(7)-measured.center(7)));
+                [measured.radius,consistent] = stateUncertainty.intersect( ...
+                    measured.center,measured.radius,next.center,next.radius);
+                if ~consistent
+                    error("collisionAvoidanceController:inconsistentObservation","Target measurements contradict the motion enclosure.");
+                end
+                nominal = targetPrediction.nominalFlow(encounter,duration);
+                difference = nominal-measured.center;
+                difference(7) = atan2(sin(difference(7)),cos(difference(7)));
+                if all(abs(difference)<=measured.radius)
+                    measured.nominalCenter = nominal;
+                end
+                next = measured;
+                return;
+            end
             if ~isempty(observation)
                 if isempty(observation.encounterContract)
                     observation.encounterContract = encounter.contract;
@@ -215,6 +342,16 @@ function radius = localDirectionRadius(magnitude, errorRadius)
             radius = asin(min(1.0, errorRadius/magnitude));
         end
     end
+end
+
+function encounter = localEncounter(target,time,contract)
+    encounter = struct("key",target.key,"contract",contract, ...
+        "center",[target.position;target.velocity;target.acceleration;target.yaw;target.yawRate], ...
+        "radius",[target.positionErrorBound;target.velocityErrorBound; ...
+            target.accelerationErrorBound;target.yawErrorBound;target.yawRateErrorBound], ...
+        "time",time,"halfLength",target.length/2,"halfWidth",target.width/2, ...
+        "discharged",false,"exitMargin",-inf);
+    encounter.nominalCenter = encounter.center;
 end
 
 function distance = localArc(time, speed, acceleration)

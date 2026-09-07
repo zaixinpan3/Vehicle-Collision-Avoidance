@@ -67,7 +67,30 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         yawRadius = min(pi, bound.yaw+courseRadius+sideslipRadius);
         values = [repmat(positionRadius, 2, 1); repmat(velocityRadius, 2, 1); ...
             repmat(accelerationRadius, 2, 1); yawRadius; yawRateRadius];
+        historyAvailable = true;
+        if isfield(bound,"targetHistory")
+            history = nrmmTargetHistory("enclose",bound.targetHistory{index},output.stateTime);
+            if history.samples > 0
+                historyAvailable = history.available;
+                center = [target.targetPositionInertial;target.targetVelocityInertial;target.targetAccelerationInertial];
+                historyRadius = max(abs([history.lower-center,history.upper-center]),[],2);
+                values(1:6) = min(values(1:6),historyRadius);
+                velocityBall = norm(values(3:4));
+                if velocityBall < norm(target.targetVelocityInertial)
+                    values(7) = min(values(7),asin(velocityBall/norm(target.targetVelocityInertial)) ...
+                        +domain.sideslipMaximum+abs(target.targetSideslip));
+                end
+                if history.heading.available
+                    difference = abs(atan2(sin(history.heading.center-target.targetHeadingInertial), ...
+                        cos(history.heading.center-target.targetHeadingInertial)));
+                    historyAvailable = historyAvailable && difference<=values(7)+history.heading.radius;
+                    values(7) = min(values(7),difference+history.heading.radius);
+                end
+                output.targetEstimates(index).measurementHistoryEnclosure = history;
+            end
+        end
         available = egoAvailable && bound.valid(index) && all(isfinite(values));
+        available = available && historyAvailable;
         if ~available
             values(:) = inf;
         end
@@ -79,6 +102,13 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         output.targetEstimates(index).targetAccelerationInertialErrorBound = values(5:6);
         output.targetEstimates(index).targetYawErrorBound = values(7);
         output.targetEstimates(index).targetYawRateErrorBound = values(8);
+        jerkMaximum = hypot(domain.speedMaximum*domain.yawRateMaximum^2, ...
+            3*domain.scalarAccelerationMaximum*domain.yawRateMaximum)+design.target.modelJerkMaximum;
+        output.targetEstimates(index).predictionMotion = struct( ...
+            "kind","finite-sensing-motion-v1","jerkBound",repmat(jerkMaximum,2,1), ...
+            "scalarAccelerationMaximum",domain.scalarAccelerationMaximum, ...
+            "yawAccelerationBound",domain.scalarAccelerationMaximum*domain.yawRateMaximum/domain.speedMinimum ...
+                +design.target.modelJerkMaximum/domain.speedMinimum);
     end
 end
 

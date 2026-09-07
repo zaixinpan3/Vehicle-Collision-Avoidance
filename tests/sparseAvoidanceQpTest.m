@@ -77,6 +77,9 @@ function problem = localProblem()
         "parameterRange", [-200,3000], "safeSideSign", -1, "boundaryId", "left");
     road = struct("centerline", centerline, "boundaries", boundary);
     [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
+    % Test the physical-decision transcription directly. The separate
+    % liftedAvoidanceSocpTest compares it with auxiliary-state programs.
+    problem.qp.stageProgram = avoidanceStageQp(problem.qp);
 end
 
 function [difference, margin] = localConeResiduals(problem)

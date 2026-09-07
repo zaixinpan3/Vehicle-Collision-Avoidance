@@ -153,6 +153,17 @@ function runtime = localInitialize(cfg, options, observerDesign)
     end
     runtime.positionErrorBound = nrmmPositionErrorBound("initialize", ...
         observerDesign,cfg,localBoundState(localPackState(runtime),targetCount),initialTime,prior);
+    if isfield(options,"targetMeasurementHistory")
+        for historyInput = options.targetMeasurementHistory(:).'
+            if historyInput.time > initialTime
+                error("onlineNrmmTrackingRuntime:futureHistory","Initialization cannot use future observations.");
+            end
+            for index = find(historyInput.radarDetectionAvailable(:)).'
+                runtime.positionErrorBound.targetHistory{index} = nrmmTargetHistory("sensor", ...
+                    runtime.positionErrorBound.targetHistory{index},historyInput,observerDesign,index);
+            end
+        end
+    end
 end
 
 function [runtime, output] = localStep(runtime, frame)

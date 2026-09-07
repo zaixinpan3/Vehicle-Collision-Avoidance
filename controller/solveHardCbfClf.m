@@ -1,12 +1,37 @@
-function result = solveHardCbfClf(problem, cfg)
+function [result,problem] = solveHardCbfClf(problem, cfg)
     result = localEmptyResult();
     if problem.certifiedInfeasible
         result.message = "A constant hard constraint is infeasible.";
         result.exitFlag = -2;
         return;
     end
-    solve = localRunJointProgram(problem, cfg);
-    result.solverCalls = 1;
+    solveCalls = 0;
+    solve = [];
+    if string(cfg.encounter.safetyMarginPolicy)=="maximize" ...
+            && any(startsWith(problem.geometry.label,"collision:"))
+        fullReserve = localApplyReserve(problem,max(0,problem.reserveFractionMaximum-10*cfg.encounter.numericalMargin));
+        solve = localRunJointProgram(fullReserve,cfg);
+        solveCalls = 1;
+        if solve.feasible
+            % A feasible full-reserve solve attains the allocation upper
+            % bound (up to its arithmetic guard). No separate LP is needed.
+            problem = fullReserve;
+        else
+            [problem,marginSolve] = localReserveMargin(problem,cfg);
+            solveCalls = solveCalls+1;
+            if ~marginSolve.feasible
+                result.solverCalls = solveCalls;result.exitFlag = marginSolve.exitFlag;
+                result.message = "margin optimization: "+marginSolve.message;
+                return;
+            end
+            solve = [];
+        end
+    end
+    if isempty(solve)
+        solve = localRunJointProgram(problem, cfg);
+        solveCalls = solveCalls+1;
+    end
+    result.solverCalls = solveCalls;
     result.exitFlag = solve.exitFlag;
     result.message = solve.message;
     if ~solve.feasible, return; end
@@ -31,6 +56,42 @@ function result = solveHardCbfClf(problem, cfg)
     result.clfValue = slacks;
 end
 
+function [problem,solve] = localReserveMargin(problem,cfg)
+% Maximize the achievable fraction of the additional lookahead reserve.
+% Physical safety rows remain hard even when the desired reserve cannot fit.
+% This phase supplies a margin target only; it never supplies an input for
+% execution. The second phase and the independent checker retain authority.
+    original = problem.stageProgram;
+    physical = problem.layout.decisionCount;
+    equalityCount = original.cones(1);
+    hardCount = numel(problem.inequalityBound);
+    selected = 1:equalityCount+hardCount;
+    marginColumn = [zeros(equalityCount,1);problem.anticipationReserve];
+    matrix = [original.A(selected,1:physical),sparse(marginColumn),original.A(selected,physical+1:end)];
+    total = size(matrix,2);
+    extra = sparse(2,total);extra(:,physical+1) = [1;-1];
+    linear = zeros(total,1);linear(physical+1) = -1;
+    program = struct("P",sparse(total,total),"q",linear,"A",[matrix;extra], ...
+        "b",[original.b(selected);problem.reserveFractionMaximum;0], ...
+        "cones",[equalityCount;hardCount+2],"physicalDecisionCount",physical+1);
+    auxiliary = struct("layout",struct("decisionCount",physical+1),"stageProgram",program);
+    solve = localRunJointProgram(auxiliary,cfg);
+    if ~solve.feasible,return;end
+    margins = problem.inequalityBound-problem.inequalityMatrix*solve.decision(1:physical);
+    selectedReserve = problem.anticipationReserve>0;
+    fraction = min([solve.decision(physical+1);margins(selectedReserve)./problem.anticipationReserve(selectedReserve);problem.reserveFractionMaximum]);
+    fraction = max(0,fraction-10*cfg.encounter.numericalMargin);
+    problem = localApplyReserve(problem,fraction);
+end
+
+function problem = localApplyReserve(problem,fraction)
+    reserve = fraction*problem.anticipationReserve;
+    problem.reserveFraction = fraction;
+    problem.inequalityBound = problem.inequalityBound-reserve;
+    rows = problem.stageProgram.cones(1)+(1:numel(problem.inequalityBound));
+    problem.stageProgram.b(rows) = problem.stageProgram.b(rows)-reserve;
+end
+
 
 function solve = localRunJointProgram(problem, cfg)
     hook = cfg.solver.jointFunction;
@@ -38,7 +99,8 @@ function solve = localRunJointProgram(problem, cfg)
         if isempty(hook)
             solve = localDefaultSolve(problem, cfg);
         else
-            % The hook can solve the conic program or inject a failure.
+            % The hook solves the full conic program, including auxiliary
+            % states. Only physical decisions survive independent checking.
             program = problem.stageProgram;
             program.defaultSolver = @() localDefaultSolve(problem, cfg);
             solve = hook("joint", program);
@@ -47,6 +109,11 @@ function solve = localRunJointProgram(problem, cfg)
         solve = localEmptySolve();
         solve.exitFlag = -999;
         solve.output = struct("message", string(exception.message));
+    end
+    if isstruct(solve) && isscalar(solve) && isfield(solve,"decision") ...
+            && numel(solve.decision)==numel(problem.stageProgram.q) ...
+            && all(isfinite(solve.decision),"all")
+        solve.decision = solve.decision(1:problem.layout.decisionCount);
     end
     solve = localNormalizeSolve(solve, problem.layout.decisionCount);
 end
@@ -85,10 +152,9 @@ function solve = localDefaultSolve(problem, cfg)
         case {7, 8}
             flag = 0;
     end
-    physical = stageDecision(1:program.physicalDecisionCount);
     output.algorithm = "Clarabel predictive CBF-CLF SOCP";
     output.message = "Clarabel status "+string(output.status);
-    solve = struct("decision", physical, ...
+    solve = struct("decision", stageDecision, ...
         "exitFlag", flag, "output", output);
 end
 

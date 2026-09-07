@@ -1,5 +1,12 @@
 # Controller runtime and sparse QP implementation
 
+Current runtime: version 10 uses a sparse SOCP, with bounded geometric
+relinearization and independently checked physical decisions. See
+[FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md) for current scope and
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the interface. The dated
+measurements and earlier formulations below are historical engineering records;
+they do not state the current controller's timing or certification guarantees.
+
 ## Quadratic input and relaxation objective (2026-09-06)
 
 The current formulation minimizes normalized head input effort and squared

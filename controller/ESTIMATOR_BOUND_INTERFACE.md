@@ -1,24 +1,19 @@
 # Time-varying estimator bounds in predictive control
 
-Version-9 implementation update (September 7, 2026): current estimator
-certificates are the initial enclosures of the
-[encounter-scoped controller](ENCOUNTER_SCOPED_CBF_CLF.md). Active targets persist
-independently of publication. Valid observations condition the carried future
-family; new targets need explicit finite motion and nonreturn route contracts
-as specified in [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md).
+Version-10 update (September 7, 2026): observer bounds initialize the executed
+interval enclosure described in [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md).
+The current NRMM point estimate is retained. Bounded-noise Cartesian measurement
+history tightens derivative enclosures; it does not manufacture velocity from
+one position. Shared gyro transport preserves common heading-error correlation.
 
-The adapter's current bounds remain current-state claims, with
-`futurePredictionIncluded=false`. They do not establish future jerk limits,
-physical plant residuals, detection completeness, or discharge. Known targets
-can publish subsequent measurements without repeating their retained contract.
-Replacing that contract requires independent admission and is not automatic.
+The adapter's state certificate remains a current-state claim with
+`futurePredictionIncluded=false`. A separate `predictionMotion` descriptor gives
+the finite derivative assumptions used for prediction. Detection completeness
+and physical plant residuals are separate premises. Neither is inferred from a
+finite observer error. Nominal future chords are identified explicitly in metadata.
 
-Bounded nonzero ego residuals and velocity radii are propagated over the finite
-certificate. They no longer require a stationary or dissipative terminal set.
-The optional rest construction described later in this research note is not
-the version-9 admission rule. Unsupported projection/reference jumps and
-uncovered road segments are rejected. The existing nonlinear scenarios still
-need validated physical/route contracts for successful robust admission.
+The rest/terminal constructions later in this research note are optional legacy
+analyses. They are not requirements of the default finite-perception policy.
 
 ## Current-state contract
 
@@ -109,8 +104,9 @@ operating-domain bounds remain premises of the current estimation enclosure;
 they are not independent adversarial future maneuvers. Legacy records carrying
 that extra field do not override the controller's finite prediction law.
 
-Every currently published target receives hard geometry rows at all head/tail
-nodes, including the last node. There is no infinite-future target support row.
+Every currently published target receives hard geometry rows over the finite
+lookahead. The executed interval retains full current uncertainty; later
+chords use the explicitly nominal forecast. There is no infinite-future row.
 A currently visible target is not removed early merely because its forecast
 leaves the sensor range. The adapter stops publication on actual current radar
 exit; the controller then removes that target's rows and re-admits the plan.
@@ -122,21 +118,26 @@ The ego predictor propagates its initial box through
 continuous forcing. Cartesian-to-Frenet bounds include possible tangent
 changes; uncertain admission requires an invertible interior initial chart.
 The compatible continuation intersects the new current estimator box with
-the previous reachable box at the retained nominal center.
-The dissipative terminal set handles nonzero initial velocity radii under
-the declared affine ego dynamics. Persistent forcing still requires a different
-certificate and remains rejected. This ego/road invariant construction does
-not establish permanent separation from a target beyond the finite forecast.
+the previous reachable box and encloses the intersection about the new
+observer estimate. Future nominal stages do not inherit a full-horizon
+robustness claim. Separate optional rest-set utilities are not used to assert
+permanent target separation or to substitute for a failed current solve.
 
-Changed target bounds trigger readmission. On a consistent shift, overlapping
-rows retain their validity, but the appended target node gets a fresh row and
-a new acceptance check. The old plan is used as fallback only if it passes
-that check. `terminalPredictionCertified` reports finite terminal admission;
-`terminalInvariantCertified` is false when a target is present. Solver failure
-and a rejected appended node can leave no admitted command: indefinite
-recursive feasibility against future targets is not claimed.
+Changed target bounds are consumed by a fresh solve. Old controls initialize
+that solve; they are never executed after its failure. A current solution
+must pass independent hard-row and CLF acceptance, as well as the nonlinear
+nominal lookahead check. Failure stops the simulation before plant advance.
+Indefinite recursive feasibility against future targets is not claimed.
 
 ## Verification
+
+The September 7 finite-sensing implementation also uses
+`auditNrmmTruthEnclosure` in scenario evaluation. It distinguishes finite
+estimates, declared-domain validity, actual sampled containment, and
+unavailable bounds. The failed control sample is included. Correct sensor
+fields or an infinite error radius alone cannot make the joint suite pass.
+See [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md) for the
+conditional measurement-history construction and the dynamic rear-slip gap.
 
 `controllerEstimatorBoundsTest` checks current-bound precedence and updates,
 timestamp/availability rejection, heading consistency, finite prediction propagation,

@@ -507,3 +507,26 @@ The positive target-speed condition for the retained NRMM extension remains.
 Estimated-domain audits are diagnostics, not proof that truth obeys the premises.
 Sampled containment, floating-point qualifications and future prediction remain
 separate from the continuous theorem and from closed-loop collision avoidance.
+
+## 11. Measurement-history postprocessing and physical validation
+
+The finite-sensing integration adds `nrmmTargetHistory` after the observer.
+Bounded-noise position secants and quadratic interpolation intersect the
+current velocity/acceleration enclosures. Gyro transport keeps the common
+absolute-heading error correlated across history samples; it does not assume
+independent deterministic sensor errors. Constant-curvature position chords
+also bound course direction by half the bounded angular sweep. The formulas
+and sampled transport allowance are documented in
+[FINITE_SENSING_CONTROLLER.md](../controller/FINITE_SENSING_CONTROLLER.md).
+All published bounds remain centered about the original NRMM point estimates.
+Neither the point-observer vector field nor its gain design changes.
+
+This postprocessing cannot repair a violated premise of the ego observer.
+In a dynamic bicycle, rear tire slip permits
+\(r-v_y/l_r\ne0\). A small configured mismatch is a true-motion assumption,
+not a consequence of the gyroscope or of estimated-domain consistency.
+The simulation-only `auditNrmmTruthEnclosure` checks the true mismatch,
+speed, yaw rate, sideslip and known state-component errors at logged times.
+It never feeds truth to the observer or controller. Passing sampled checks
+does not prove continuous-time validity; a violation invalidates application
+of the corresponding conditional certificate even if all states are finite.

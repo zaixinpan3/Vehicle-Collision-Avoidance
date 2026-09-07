@@ -1,9 +1,12 @@
 # Encounter-scoped predictive CBF, sampled-data CLF, and maneuver optimization
 
-Decision and implementation date: September 7, 2026. Status: governing
-specification with a version-9 finite-witness implementation. The implemented
-nonreturning-halfspace exit guard is a sufficient special case; holding and
-arbitrary contract renewal are not implemented.
+Strong-contract design note, September 7, 2026. The construction below concerns
+finite witnesses with certified nonreturning exits. Version 10's default finite
+perception policy is specified in [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md)
+and [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md). The stronger terminal
+premises below are not requirements imposed on ordinary sensor-range encounters.
+Claims below about nonrenewing forecasts apply to the explicit strong-contract
+mode, not the default renewing local prediction.
 
 Execution policy, clarified September 7, 2026: every command requires a
 verified solution from the current optimization call. No stored-tail or
@@ -18,8 +21,8 @@ at every time. Ordinary encounters do not require a permanently invariant
 joint ego–target terminal set. A finite safe prediction with an uncertified
 endpoint does not satisfy this requirement either.
 
-This specification supersedes the terminal, visibility, prediction-node, and
-current-state-only CLF requirements in earlier controller design notes.
+This stronger design superseded earlier terminal design notes; its nonreturn
+premises are now optional rather than governing the finite-sensing experiments.
 [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) documents the implemented
 finite-witness runtime and its supported contracts. The construction below is a project design
 derived from the stated requirement; the cited papers supply its background,

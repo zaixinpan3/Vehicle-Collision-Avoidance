@@ -13,16 +13,27 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         zeros(count, planCount), -eye(count)];
     physicalBound = [geometry.physicalBound; upperInput; -lowerInput; zeros(count, 1)];
     safetyRows = [geometry.safety; false(2*planCount+count, 1)];
+    rateLimit = model.sampleTime*repmat([cfg.model.frontWheelSteeringRateMaximum; ...
+        cfg.model.brakingRatioRateMaximum],count,1);
+    rateMap = eye(planCount)-diag(ones(planCount-2,1),-2);
+    ratePrior = [model.previousInput;zeros(planCount-2,1)];
+    selected = isfinite(rateLimit);
+    hardMatrix = [hardMatrix;rateMap(selected,:),zeros(nnz(selected),count); ...
+        -rateMap(selected,:),zeros(nnz(selected),count)];
+    physicalBound = [physicalBound;rateLimit(selected)+ratePrior(selected);rateLimit(selected)-ratePrior(selected)];
+    safetyRows = [safetyRows;false(2*nnz(selected),1)];
     % Leave room for strict independent acceptance at an active constraint.
     % Acceptance charges one reserve; solving with two does not spend that
     % same allowance on both solver termination and certificate arithmetic.
     reserve = 2*cfg.encounter.numericalMargin*double(any(hardMatrix ~= 0, 2));
-    reserve(end-count+1:end) = 0;
+    reserve(size(geometry.matrix,1)+2*planCount+(1:count)) = 0;
     bound = physicalBound-model.requiredMargin*double(safetyRows)-reserve;
     hessian = zeros(decisionCount);
     linear = zeros(decisionCount, 1);
     constant = cfg.encounter.maneuverSwitchWeight*double(model.maneuver ~= model.previousManeuver);
-    referenceStart = [0; 0; cfg.referenceSpeed; 0; 0]+cfg.clf.referenceOffset ...
+    equilibriumState = ltvBicycleModel.cruiseEquilibrium( ...
+        laneGeometry.curvature(model.initialEgoState(1),model.lane),cfg,model.longitudinalAccelerationBias);
+    referenceStart = equilibriumState(2:6)+cfg.clf.referenceOffset ...
         +cfg.clf.referenceRate*(model.stateTime-cfg.clf.referenceEpoch);
     clockScale = double(any(cfg.clf.referenceRate));
     scales = [cfg.clf.lateralPositionErrorScale; cfg.clf.headingErrorScale; cfg.clf.speedErrorScale; ...
@@ -55,12 +66,16 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     p = certificate.lyapunovMatrix;
     rate = cfg.clf.decreaseRateFraction*certificate.certifiedDecreaseRate;
     residual = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
+    if isfield(prediction,"modelErrorRateBound")
+        residual = max(prediction.modelErrorRateBound(:,1:min(count,cfg.controller.certifiedSteps)),[],2);
+    end
     disturbance = residual(2:6);
     youngRate = 0.1;
     disturbanceCost = disturbance.'*abs(p)*disturbance/youngRate;
-    cellConstraints = cell(numel(prediction.cells), 1);
-    for cellIndex = 1:numel(prediction.cells)
-        tube = prediction.cells(cellIndex);
+    certifiedCells = prediction.cells([prediction.cells.stage]<=cfg.controller.certifiedSteps);
+    cellConstraints = cell(numel(certifiedCells), 1);
+    for cellIndex = 1:numel(certifiedCells)
+        tube = certifiedCells(cellIndex);
         stage = tube.stage;
         a = prediction.continuousA(2:6, 2:6, stage);
         b = prediction.continuousB(2:6, :, stage);
@@ -104,7 +119,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
             root = sqrt(1+ratio)*factor;
             additive = curvature*(anchor.'*anchor)+disturbanceCost+expansion+abs(affine).'*error;
             constraints{point} = struct("map", map, "offset", offset, "root", root, ...
-                "linear", affine, "constant", additive, "stage", stage);
+                "linear", affine, "constant", additive, "stage", stage,"cellIndex",cellIndex,"pointIndex",point);
         end
         cellConstraints{cellIndex} = vertcat(constraints{:});
     end
@@ -129,10 +144,13 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         "inequalityMatrix", hardMatrix, "inequalityBound", bound, ...
         "physicalBound", physicalBound, "safetyRows", safetyRows, ...
         "requiredMargin", model.requiredMargin, "exitMargin", model.exitMargin, ...
+        "anticipationReserve",[geometry.anticipationReserve;zeros(numel(bound)-numel(geometry.anticipationReserve),1)], ...
+        "reserveFraction",0, ...
+        "reserveFractionMaximum",1, ...
         "equalityMatrix", zeros(0, decisionCount), "equalityBound", zeros(0, 1), ...
         "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
         "certifiedInfeasible", any(bound(~any(hardMatrix, 2)) < 0));
-    qp.stageProgram = avoidanceStageQp(qp);
+    qp.stageProgram = avoidanceStageQp(qp,prediction,model);
 end
 
 function certificate = localClfCertificate(model)

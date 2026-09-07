@@ -9,6 +9,7 @@ function cfg = nrmmTrackingConfig()
     % Realization settings are consumed only after continuous gain synthesis.
     cfg.runtime.samplePeriod = 0.02;                 % s
     cfg.runtime.integrationStepMaximum = 0.005;      % s, RK4 step limit
+    cfg.runtime.targetHistoryDuration = 2.0;         % s, bounded-noise derivative window
     % Zero retains constant scalar acceleration and constant curvature.
     % Nonzero rates enter the final chain equation as bounded model jerk;
     % the observer model itself remains the nominal Sharma NRMM.

@@ -15,6 +15,17 @@ classdef modifiedFialaTireTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function nonlinearCombinedForcesStayInsideThePhysicalCircle(testCase)
+            cfg = collisionAvoidanceControllerConfig();
+            tire = modifiedFialaTire.parameters(cfg);
+            for ratio = linspace(-1,1,21)
+                for angle = linspace(-0.6,0.6,41)
+                    force = modifiedFialaTire.evaluate([angle;-angle],ratio,cfg);
+                    utilization = ratio^2+(force./tire.longitudinalForceScale).^2;
+                    testCase.verifyLessThanOrEqual(utilization,ones(2,1)+1e-14);
+                end
+            end
+        end
         function zeroSlipRecoversTheCorneringStiffness(testCase)
             cfg = collisionAvoidanceControllerConfig();
             [force, slope, ~, intercept] = modifiedFialaTire.evaluate([0; 0], 0.0, cfg);

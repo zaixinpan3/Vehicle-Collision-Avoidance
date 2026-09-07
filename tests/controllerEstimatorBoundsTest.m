@@ -87,7 +87,8 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyLessThan(second.qp.geometry.physicalBound(secondRow), ...
                 first.qp.geometry.physicalBound(firstRow));
             testCase.verifyTrue(first.metadata.planCertified && second.metadata.planCertified);
-            testCase.verifyEqual(second.metadata.solverCallCount, 3);
+            testCase.verifyGreaterThanOrEqual(second.metadata.solverCallCount,1);
+            testCase.verifyFalse(second.metadata.fallbackUsed);
         end
 
         function changingBoundsRequireTheContinuationToBeRechecked(testCase)
@@ -110,7 +111,8 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyTrue(first.metadata.planCertified && next.metadata.planCertified);
             testCase.verifyTrue(next.metadata.certificateCompatible);
             testCase.verifyTrue(next.metadata.setMembershipUpdate);
-            testCase.verifyEqual(next.metadata.solverCallCount, 3);
+            testCase.verifyGreaterThanOrEqual(next.metadata.solverCallCount,1);
+            testCase.verifyFalse(next.metadata.fallbackUsed);
         end
 
         function uncertainEgoVelocityIsRetainedInTheFiniteTube(testCase)

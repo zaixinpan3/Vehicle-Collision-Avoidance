@@ -4,7 +4,64 @@ classdef modifiedFialaTire
     % derivatives enter the local affine model, without friction-limit rows.
 
     methods (Static)
+        function model = affineModel(state,input,cfg)
+        % Joint tire tangent at the current slip and signed braking ratio.
+            speed = max(state(4),cfg.model.scheduleSpeedFloor);
+            lever = [cfg.vehicle.lf;-cfg.vehicle.lr];
+            lateral = state(5)+lever*state(6);
+            slip = atan2(lateral,speed)-[input(1);0];
+            denominator = speed^2+lateral.^2;
+            slipState = zeros(2,6);
+            slipState(:,4) = -lateral./denominator*double(state(4)>cfg.model.scheduleSpeedFloor);
+            slipState(:,5) = speed./denominator;
+            slipState(:,6) = speed*lever./denominator;
+            slipInput = [-1,0;0,0];
+            ratio = min(max(input(2),-1+sqrt(eps)),1-sqrt(eps));
+            point = [input(1);ratio];
+            [force,slope,ratioSlope] = modifiedFialaTire.evaluate(slip,ratio,cfg);
+            forceState = slope.*slipState;
+            forceInput = slope.*slipInput+[zeros(2,1),ratioSlope];
+            model = struct("state",forceState,"input",forceInput, ...
+                "constant",force-forceState*state-forceInput*point, ...
+                "force",force,"operatingInput",point,"operatingState",state);
+        end
+        function rows = frictionCirclePolygonRows(curvature,speed,brakingRatio,cfg,linearization)
+        % Inner polygon of each axle's normalized combined-force circle.
+            persistent priorKey priorRows
+            key = {curvature,speed,brakingRatio,cfg.vehicle,cfg.tire, ...
+                cfg.model.scheduleSpeedFloor,cfg.model.frictionPolygonSides};
+            if nargin<5 && isequal(key,priorKey), rows = priorRows;return;end
+            sides = cfg.model.frictionPolygonSides;
+            angle = (0:sides-1).'*2*pi/sides;
+            if nargin<5
+                [slope,ratioSlope,intercept] = modifiedFialaTire.linearize(curvature,speed,brakingRatio,cfg);
+            end
+            tire = modifiedFialaTire.parameters(cfg);
+            tireSpeed = max(speed,cfg.model.scheduleSpeedFloor);
+            slipState = [0,0,0,0,1/tireSpeed,cfg.vehicle.lf/tireSpeed; ...
+                0,0,0,0,1/tireSpeed,-cfg.vehicle.lr/tireSpeed];
+            rows = struct("state",zeros(2*sides,6),"input",zeros(2*sides,2),"bound",zeros(2*sides,1));
+            for axle = 1:2
+                selected = (axle-1)*sides+(1:sides);
+                lateral = sin(angle)/tire.longitudinalForceScale(axle);
+                if nargin<5
+                    rows.state(selected,:) = lateral*slope(axle)*slipState(axle,:);
+                    rows.input(selected,:) = [-(axle==1)*lateral*slope(axle),cos(angle)+lateral*ratioSlope(axle)];
+                    rows.bound(selected) = cos(pi/sides)-lateral*intercept(axle);
+                else
+                    rows.state(selected,:) = lateral*linearization.state(axle,:);
+                    rows.input(selected,:) = [zeros(sides,1),cos(angle)]+lateral*linearization.input(axle,:);
+                    rows.bound(selected) = cos(pi/sides)-lateral*linearization.constant(axle);
+                end
+            end
+            if nargin<5, priorKey = key;priorRows = rows;end
+        end
+
         function parameters = parameters(cfg)
+            persistent priorKey priorParameters
+            key = [cfg.vehicle.m;cfg.vehicle.gravity;cfg.vehicle.lf;cfg.vehicle.lr; ...
+                cfg.tire.corneringStiffness(:);cfg.tire.frictionCoefficient(:)];
+            if isequal(key,priorKey),parameters = priorParameters;return;end
             mass = localPositiveScalar(cfg.vehicle.m, "vehicle.m");
             gravity = localPositiveScalar(cfg.vehicle.gravity, "vehicle.gravity");
             lf = localPositiveScalar(cfg.vehicle.lf, "vehicle.lf");
@@ -17,6 +74,7 @@ classdef modifiedFialaTire
                 "frictionCoefficient", friction, "staticNormalLoad", normalLoad, ...
                 "longitudinalForceScale", forceScale, ...
                 "brakingRatioAccelerationGain", sum(forceScale)/mass);
+            priorKey = key;priorParameters = parameters;
         end
 
         function gain = accelerationGain(cfg)

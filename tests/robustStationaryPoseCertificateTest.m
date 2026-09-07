@@ -13,13 +13,13 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyFalse(problem.metadata.exactPredictionAssumptionsHold);
-            testCase.verifyEqual(stored.safetyScope, "heldIntervalsUntilCertifiedEncounterExit");
+            testCase.verifyEqual(stored.safetyScope, "uncertainFiniteHorizon");
             testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
             testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, end), zeros(3, 1));
             testCase.verifyEqual(problem.metadata.solverCallCount, 1);
         end
 
-        function aNewEstimateCanTightenTheCarriedBoxWithoutRecentering(testCase)
+        function aNewEstimateCentersTheIntersectedCarriedBox(testCase)
             [ego, cfg, lane] = localInputs();
             [command, ~, ~, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
             fresh = localNextEgo(ego, stored, command);
@@ -29,11 +29,13 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(problem.metadata.certificateCompatible);
             testCase.verifyTrue(problem.metadata.setMembershipUpdate);
-            testCase.verifyTrue(problem.metadata.carriedWitnessFeasible);
-            testCase.verifyEqual(next.predictedState(:, 1), stored.predictedState(:, 2), AbsTol=0);
-            testCase.verifyEqual(next.stateErrorBound(1, 1), 0.05, AbsTol=1e-12);
-            testCase.verifyLessThanOrEqual(next.stateErrorBound(:, 1:end-1), ...
-                stored.stateErrorBound(:, 2:end)+1e-7);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(next.predictedState(1:2,1),fresh.position,AbsTol=1e-12);
+            testCase.verifyEqual(next.stateErrorBound(1,1),0.03,AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(next.predictedState(:,1)-next.stateErrorBound(:,1), ...
+                stored.predictedState(:,2)-stored.stateErrorBound(:,2)-1e-10);
+            testCase.verifyLessThanOrEqual(next.predictedState(:,1)+next.stateErrorBound(:,1), ...
+                stored.predictedState(:,2)+stored.stateErrorBound(:,2)+1e-10);
         end
 
         function aLargerObservationBoxDoesNotInvalidateAValidPrediction(testCase)
@@ -72,7 +74,7 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             [ego, lane] = localCurvedInputs(ego, 0);
             [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(stored.safetyScope, "heldIntervalsUntilCertifiedEncounterExit");
+            testCase.verifyEqual(stored.safetyScope, "uncertainFiniteHorizon");
             testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
         end
 
@@ -83,7 +85,7 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(abs(problem.prediction.scheduleCurvature(1)), 0.0);
             testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, :), ...
                 zeros(3, problem.prediction.nodeCount));
-            testCase.verifyEqual(stored.safetyScope, "heldIntervalsUntilCertifiedEncounterExit");
+            testCase.verifyEqual(stored.safetyScope, "uncertainFiniteHorizon");
         end
 
         function aNegativeForcingComponentIsRejectedBeforePropagation(testCase)
@@ -127,7 +129,7 @@ function [ego, lane] = localCurvedInputs(ego, speed)
 end
 
 function [ego, cfg, lane] = localInputs()
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
+    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4,"certifiedSteps",Inf)));
     lane = [0, 0; 1000, 0];
     ego = struct("position", [10; 0], "yawAngle", 0, ...
         "longitudinalVelocity", 5, "lateralVelocity", 0, "yawRate", 0, ...
