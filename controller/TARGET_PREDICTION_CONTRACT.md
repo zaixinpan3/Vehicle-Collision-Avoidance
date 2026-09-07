@@ -1,11 +1,24 @@
-# Finite encounter prediction and current target visibility
+# Finite target prediction in the version-8 runtime
 
-The September 7, 2026 modeling clarification is that target curvature and
-tangential acceleration are approximately constant during the short vehicle
+Requirement update (September 7, 2026):
+[ENCOUNTER_SCOPED_CBF_CLF.md](ENCOUNTER_SCOPED_CBF_CLF.md) is the governing
+encounter contract. A target forecast must cover its certified continuation
+to exit or valid transfer. Visibility loss and forecast expiry do not discharge
+an encounter. The controller must retain active obligations until a verified
+guard applies, with sensing/admission conditions that prevent an unprotected
+gap. Nonzero bounded residuals are admissible when that complete finite
+certificate passes. These requirements are not yet implemented.
+
+The earlier September 7, 2026 implementation assumes approximately constant
+target curvature and tangential acceleration during the short vehicle
 encounter. This is a finite prediction assumption, not a promise that the
 target never changes its maneuver. Targets need no specified road or corridor.
 Actual current radar visibility controls target publication: internal observer
 coasting does not keep a hidden target in the controller's constraint set.
+
+The visibility behavior below describes the current code and the preceding
+experiment. It is insufficient for the revised continuation requirement.
+Likewise, the finite endpoint rows below are not an exit certificate.
 
 ## Prediction law and uncertainty
 

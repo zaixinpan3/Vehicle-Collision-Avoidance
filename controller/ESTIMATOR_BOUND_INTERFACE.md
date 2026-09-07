@@ -1,5 +1,15 @@
 # Time-varying estimator bounds in predictive control
 
+Requirement update (September 7, 2026): the current-state field contract below
+is an input to the revised
+[encounter-scoped design](ENCOUNTER_SCOPED_CBF_CLF.md). The target-publication,
+node-only continuation, and rest-based admission behavior described here is
+the version-8 implementation. A conforming redesign must retain active
+encounters independently of publication, condition covered futures, enforce
+absolute validity limits, and verify swept safety to certified discharge or
+handoff. A current estimator certificate alone does not establish those future
+contracts.
+
 The controller reads the estimator's current error enclosure on every sample.
 The adapter no longer substitutes `cfg.publishedErrorBound` constants. Old
 configurations containing that field receive an explicit migration error.

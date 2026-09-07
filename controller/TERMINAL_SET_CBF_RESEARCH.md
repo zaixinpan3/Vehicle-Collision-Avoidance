@@ -1,54 +1,84 @@
-# Terminal continuation certificate
+# Terminal requirement: certified encounter discharge
 
-The implemented terminal condition is described in
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md). This note records the
-specific model-design decision and its limits.
+Decision date: September 7, 2026. The governing formulation is
+[ENCOUNTER_SCOPED_CBF_CLF.md](ENCOUNTER_SCOPED_CBF_CLF.md). Its invariant
+object is the availability of a valid certified continuation while an encounter
+is active. The endpoint is a verified event or handoff; it need not be a
+permanently invariant physical ego–target set.
 
-The former proof-side tail froze lateral states and used
-`sNext = s + Ts*v + 0.5*Ts^2*a`, while the executable head used a dynamic
-forward-Euler bicycle with `sNext = s + Ts*v` on a straight road. Shifting
-braking acceleration into the head moved the newly predicted station forward
-by `-0.5*Ts^2*a`. Bounds on heading, lateral speed and yaw rate did not prove
-that the kinematic lateral certificate contained the dynamic handoff.
+## Required endpoint
 
-The replacement uses steering and signed braking-ratio decisions, the same scheduled
-six-state bicycle with exact held-input affine integration, and physical
-input and slip-domain rows at every stage. The beta force scale and
-modified Fiala linearization are preserved across this boundary. The schedule's speed
-may reach zero; only tire-force denominators retain a positive floor. For a
-zero-speed schedule, arbitrary admitted station/lateral offset/heading and
-zero velocities form an equilibrium under zero steering and cancellation of
-the declared constant longitudinal bias: the resting command is
-`[0; -bias/brakingRatioAccelerationGain]`. Three exact terminal velocity
-equalities and a fixed last input close the continuation. The shifted tail
-therefore enters the head without changing its dynamics or constraints.
-The conic solver now parameterizes these equalities and fixed inputs
-algebraically, rather than relying on its scaled stopping test to enforce
-absolute terminal-rest acceptance. A station domain can cross polyline
-vertices using certified chart-error bounds; a resting endpoint is no longer
-pinned to one 0.1 m route segment or separated from its predecessor by an
-artificial endpoint guard.
+A complete continuation must reach one of the following:
 
-`ltvBicycleModel.brakingSchedule` derives a finite continuation length and constructs an
-initial reference; it is not a backup controller or a safety proof. The
-optimizer may use steering throughout this continuation, which avoids the
-operating-domain restriction of a prescribed braking-only backup policy.
+1. A certified encounter-exit guard that discharges every assigned obligation.
+2. A domain covered by another already certified continuation, with a verified
+   transition and no interval without safety coverage.
+3. A separately certified holding/handoff regime, including its validity and
+   transfer conditions.
 
-The terminal target halfspace uses support over the entire future target
-trajectory, not a finite horizon or only the final predicted target pose.
-The target circumradius covers future rotation. The resting ego's orientation
-is unchanged, so a directional rectangle support with a certified heading
-bound replaces its former circumradius. Persistent directional target motion
-uncertainty currently makes that direction inadmissible. Ego velocity uncertainty
-now has a dissipative-rest extension: terminal pose halfspaces reserve the
-complete remaining motion under the existing affine rest input, with a
-circumradius covering changing ego heading. Persistent disturbance remains
-unsupported. The extension and its limits are documented in
-[DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
+For a crossing, clearance of the entire uncertain target footprint from the
+shared conflict region requires an applicable route or monitoring contract
+before it can discharge that encounter. Current radar exit, target publication
+loss, forecast expiry, instantaneous separation, and stopping do not establish
+the guard. An unresolved encounter remains active.
 
-Halfspace separability is conservative: a target orbit can surround a safe
-resting ego without meeting any separating halfspace. This construction does
-not equate certificate infeasibility with physical inevitability of collision.
-The rest proof is for the declared discrete model in exact arithmetic.
-Numerical terminal residuals, model mismatch, changing observations and
-intersample motion are separate validation obligations.
+The target-motion contract covers the finite portion during which its
+obligation remains active. An endpoint before forecast expiry can close a
+certificate if its guard is verified. A safe prefix ending at forecast expiry
+without discharge or valid transfer cannot close it.
+
+## Predictive barrier and tracking roles
+
+The finite-to-exit construction carries a verified witness, nonnegative
+barrier margin \(b_k\), and remaining interval count \(n_k\). It certifies
+the entire held-input interval and every admitted successor continuation.
+An accepted replacement has verified margin
+\(\mu_k\ge(1-\gamma)b_k\), with \(0<\gamma\le1\). A valid observation conditions
+the covered futures; the controller retains the tail with
+\(b_{k+1}=\mu_k\) and \(n_{k+1}=n_k-1\).
+
+No terminal target node is appended. Solver failure uses the inherited
+certificate with \(\mu=b_k\). Keeping the deadline gives a finite-exit
+property; the safety requirement itself permits certified holding or renewal.
+Any deadline extension must be certified before replacing the incumbent.
+
+An explicit predictive CLF separately bounds tracking-error dissipation over
+every held interval, with nonnegative relaxation and complete reference/metric
+derivatives. Maneuver, control, input smoothness, and switching choices enter
+the optimization. Neither a tracking cost nor a selected separating normal
+replaces these CLF and maneuver requirements.
+
+## Existing rest construction and its limits
+
+The version-8 implementation remains described in
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md). Its head and tail use
+the same scheduled six-state bicycle, exact held-input affine integration,
+signed braking-ratio/Fiala force scale, and physical input/slip-domain rows.
+This removed the earlier dynamic-head/kinematic-tail mismatch. Exact affine
+flow is still an approximation of the physical plant unless a valid residual
+enclosure is supplied.
+
+At zero scheduled speed, arbitrary admitted station, lateral offset, and
+heading with zero velocities are an equilibrium under
+`[0; -bias/brakingRatioAccelerationGain]`. Exact-rest terminal equalities
+or the [dissipative extension](DISSIPATIVE_TERMINAL_CERTIFICATE.md) can certify
+ego behavior under their specific model premises. The braking schedule is an
+initial optimization template, not a safety proof.
+
+The current target row concerns the finite last predicted pose. It does not
+use infinite-future target support and does not certify encounter discharge.
+Ego rest or an ego dissipative funnel does not make the joint endpoint safe
+after that forecast. The runtime still checks prediction nodes and removes
+target rows when publication ceases; it therefore does not yet meet the
+revised contract.
+
+Rest/dissipation remains an optional construction for a separately certified
+holding regime. Its rejection of persistent forcing is not a universal rule
+for finite encounter certificates. Bounded nonzero residuals can be admitted
+when a sound finite tube and its discharge/transfer guard pass verification.
+No uncertainty may be zeroed merely to make that verification succeed.
+
+The revised specification lists the required interfaces, proof premises, and
+behavioral acceptance cases. It does not claim that a concrete exit guard,
+sampled-data physical safety theorem, or revised runtime has already been
+implemented.

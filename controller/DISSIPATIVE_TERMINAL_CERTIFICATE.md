@@ -1,5 +1,14 @@
 # A dissipative terminal certificate for uncertain velocity
 
+Requirement update (September 7, 2026): this is a model-specific terminal
+construction, not a universal admission requirement. The governing
+[encounter-scoped contract](ENCOUNTER_SCOPED_CBF_CLF.md) permits finite safe
+continuations to certified exit or valid handoff, including bounded nonzero
+residuals when their tubes pass. Ego rest/dissipation alone does not discharge
+an active target. This construction could support a separately verified
+holding regime only with the required target, physical-model, and handoff
+premises; its existing ego proof does not establish those premises.
+
 Implementation date: 2026-09-07. This extends the stationary-pose certificate
 to nonzero six-state estimation enclosures under the declared scheduled affine
 model. It does not establish robustness to an undeclared physical-model

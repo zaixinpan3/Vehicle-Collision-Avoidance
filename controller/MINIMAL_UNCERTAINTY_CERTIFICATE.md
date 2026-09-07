@@ -1,5 +1,12 @@
 # Minimal uncertainty extension of the maintained SOCP certificate
 
+Requirement update (September 7, 2026): the governing
+[encounter-scoped contract](ENCOUNTER_SCOPED_CBF_CLF.md) permits a complete
+finite continuation to certified exit or valid transfer. The stationary-pose
+and zero-residual restrictions studied below are limits of this particular
+construction, not universal admission rules. Existing runtime restrictions
+remain until their replacement is implemented and verified.
+
 Implementation update (2026-09-07):
 [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md)
 supersedes the velocity-uncertainty limitation below by replacing exact rest

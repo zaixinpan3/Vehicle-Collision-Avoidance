@@ -1,14 +1,21 @@
 # Closing the NRMM estimator and collision-avoidance control loop
 
-Current scope update (September 7, 2026): the user specifies approximately
-constant target curvature and tangential acceleration only during the short
-encounter, and stops considering a target after current radar exit. The
-infinite-future target occupancy/corridor proposals below are not requirements
-of the implemented experiment. The current implementation uses finite-node
-prediction and fresh appended-node acceptance; permanent target separation
-and indefinite traffic-dependent recursive feasibility are not claimed.
-See [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md). The remaining
-material records the earlier broader robustness investigation.
+Current requirement update (September 7, 2026):
+[ENCOUNTER_SCOPED_CBF_CLF.md](ENCOUNTER_SCOPED_CBF_CLF.md) supersedes this
+investigation's universal invariant-terminal requirement. Preserve certified
+safety and continuation while an encounter is active, then discharge it through
+a verified exit or valid handoff. Neither current radar exit nor forecast
+expiry suffices. Finite target contracts need cover only their assigned active
+obligations; holding/renewal regimes need separate certificates. Nonzero
+bounded residuals need not be rejected universally.
+
+The version-8 runtime still uses finite-node prediction, fresh appended-node
+acceptance, and current-publication target removal. It does not yet implement
+the revised requirement. See
+[TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md). The remaining
+material records the earlier robustness investigation: its perpetual joint
+terminal proposals are optional sufficient constructions, not the governing
+specification.
 
 
 Research date: 2026-09-05. Status: proposed architecture and proof obligations,
@@ -22,11 +29,12 @@ implementation retains open-loop inputs and set-membership intersections.
 The broader physical-model, curved-chart, target-motion and low-speed observer
 obligations below remain open; the proposals are not completed components.
 
-The recommended first implementation is a scheduled output-feedback tube
+The earlier recommended implementation was a scheduled output-feedback tube
 around the existing sparse SOCP, with a verified braking-to-hold backup and a
-set-valued target-motion contract. Keep the present uncertainty rejection
-until those ingredients pass acceptance together. Publishing a current error
-radius is necessary, but cannot establish recursive safety by itself.
+set-valued target-motion contract. Under the revised specification, replace the
+rest-based admission rule only when swept finite tubes and certified exit or
+handoff pass acceptance together. Publishing a current error radius is
+necessary, but cannot establish recursive safety by itself.
 
 The target claim is continuous-time collision and road-constraint satisfaction
 after initial admission, conditional on explicit bounded sensing, actuation,

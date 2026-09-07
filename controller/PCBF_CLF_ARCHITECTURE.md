@@ -1,11 +1,24 @@
 # Certificate-preserving predictive CBF-CLF-QP
 
-This is the implemented controller contract as of 2026-09-07. The online
-controller uses one performance objective, a maintained safe continuation,
-and at most one QP call per sample. It does not optimize over alternative
+This document describes the version-8 runtime as of 2026-09-07. The governing
+requirement is now
+[encounter-scoped predictive CBF, sampled-data CLF, and maneuver optimization](ENCOUNTER_SCOPED_CBF_CLF.md):
+preserve a certified safe continuation while an encounter is active, then
+discharge it through a certified exit or valid handoff. The version-8 runtime
+does not yet meet that requirement. Its finite target endpoint and current
+visibility rule do not establish a complete continuation certificate.
+
+The online controller uses one performance objective, a stored finite input
+plan, and at most one QP call per sample. It does not optimize over alternative
 geometric starts. It is a conservative predictive controller on a selected
 convex domain, not an exact convex reformulation of unrestricted trajectory
 optimization or a pointwise CBF theorem.
+
+The equations, interfaces, and results below describe that implementation.
+They do not replace the revised requirement with node-level safety or impose
+perpetual joint ego–target invariance. The new specification identifies the
+required exit guards, shrinking certificate clock, held-interval CBF/CLF
+bounds, maneuver optimization, and acceptance cases.
 
 ## Controller state and admission
 
