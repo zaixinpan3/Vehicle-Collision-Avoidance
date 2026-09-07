@@ -1,69 +1,23 @@
-function program = avoidanceStageQp(qp, prediction, rows, bound, stateNode, inputStage)
-%avoidanceStageQp Keep dynamics and constraints local in the CBF-CLF-QP.
-% The additional variables are x_1,...,x_M. Eliminating their affine
-% dynamics recovers the condensed program used by independent acceptance.
-% Head input effort and squared CLF slack are penalized; explicit states add no cost.
-% The continuous-time CLF is one affine row in the current input and slack.
-
-    stages = prediction.stageCount;
-    controls = qp.layout.planCount;
-    physicalCount = qp.layout.decisionCount;
-    count = physicalCount+6*stages;
-    rowCount = size(rows, 1);
-    initial = stateNode == 0;
-    bound(initial) = bound(initial)-rows(initial, 1:6)*prediction.egoStateOffset(:, 1);
-    [stateRow, component, value] = find(rows(:, 1:6));
-    keep = stateNode(stateRow) > 0;
-    stateRow = stateRow(keep);
-    component = component(keep);
-    value = value(keep);
-    stateColumn = physicalCount+6*(stateNode(stateRow)-1)+component;
-    [inputRow, component, inputValue] = find(rows(:, 7:8));
-    inputColumn = 2*(inputStage(inputRow)-1)+component;
-    inequality = sparse([stateRow; inputRow], [stateColumn; inputColumn], ...
-        [value; inputValue], rowCount, count);
-
-    % Triplet assembly avoids repeatedly reallocating a sparse matrix.
-    dynamicRows = (1:6*stages).';
-    nextColumns = physicalCount+dynamicRows;
-    [index, stage, stateValue] = find(reshape(-prediction.stageMatrixA, 36, []));
-    keep = stage > 1;
-    index = index(keep);
-    stage = stage(keep);
-    stateValue = stateValue(keep);
-    previousRows = 6*(stage-1)+mod(index-1, 6)+1;
-    previousColumns = physicalCount+6*(stage-2)+floor((index-1)/6)+1;
-    [index, stage, inputValue] = find(reshape(-prediction.stageMatrixB, 12, []));
-    inputRows = 6*(stage-1)+mod(index-1, 6)+1;
-    inputColumns = 2*(stage-1)+floor((index-1)/6)+1;
-    [terminalRow, component, terminalValue] = find(qp.terminalStateRows);
-    terminalCount = size(qp.terminalStateRows, 1);
-    terminalColumns = [physicalCount+6*(stages-1)+component; (controls-1:controls).'];
-    terminalRows = [terminalRow; terminalCount+(1:2).'];
-    equality = sparse([dynamicRows; previousRows; inputRows; 6*stages+terminalRows], ...
-        [nextColumns; previousColumns; inputColumns; terminalColumns], ...
-        [ones(6*stages, 1); stateValue; inputValue; terminalValue; ones(2, 1)], ...
-        6*stages+terminalCount+2, count);
-    right = prediction.stageAffine;
-    right(:, 1) = right(:, 1)+prediction.stageMatrixA(:, :, 1)*prediction.egoStateOffset(:, 1);
-    right = [right(:); zeros(terminalCount, 1); qp.terminalInput];
-
-    % Fixed final inputs are already equality rows. Avoid duplicating them
-    % as zero-interior inequality slacks in the native conic solver.
-    fixed = qp.lowerBound == qp.upperBound;
-    upper = find(isfinite(qp.upperBound) & ~fixed);
-    lower = find(isfinite(qp.lowerBound) & ~fixed);
-    selectors = sparse((1:numel(upper)+numel(lower)).', [upper; lower], ...
-        [ones(numel(upper), 1); -ones(numel(lower), 1)], ...
-        numel(upper)+numel(lower), count);
-    inequality = [inequality; selectors];
-    bound = [bound; qp.upperBound(upper); -qp.lowerBound(lower)];
-
-    inequality = [inequality; sparse(qp.clf.inequalityMatrix), sparse(1, 6*stages)];
-    bound = [bound; qp.clf.inequalityBound];
-    hessian = blkdiag(sparse(triu(qp.Hessian)), sparse(6*stages, 6*stages));
-    program = struct("P", hessian, "q", [qp.linear; zeros(6*stages, 1)], ...
-        "A", [equality; inequality], "b", [right; bound], ...
-        "cones", [size(equality, 1); size(inequality, 1)], ...
-        "physicalDecisionCount", physicalCount, "stateIndex", physicalCount+(1:6*stages));
+function program = avoidanceStageQp(qp)
+%avoidanceStageQp Convert the finite predictive QCQP to sparse Lorentz cones.
+% The native convention is A*z+s=b. The first cone is the (possibly empty)
+% equality cone, the second is the nonnegative cone, and each remaining
+% cone encodes a quadratic upper bound on one CLF control point.
+    constraints = qp.clf.constraints;
+    matrices = cell(numel(constraints), 1);
+    bounds = cell(numel(constraints), 1);
+    for index = 1:numel(constraints)
+        constraint = constraints(index);
+        tMap = -constraint.linear.'*constraint.map;
+        slackIndex = qp.layout.relaxationIndex(constraint.stage);
+        tMap(slackIndex) = tMap(slackIndex)+1;
+        tOffset = -constraint.linear.'*constraint.offset-constraint.constant;
+        matrices{index} = -[tMap; 2*constraint.root*constraint.map; tMap];
+        bounds{index} = [tOffset+1; 2*constraint.root*constraint.offset; tOffset-1];
+    end
+    program = struct("P", sparse(triu((qp.Hessian+qp.Hessian.')/2)), "q", qp.linear, ...
+        "A", sparse([qp.inequalityMatrix; vertcat(matrices{:})]), ...
+        "b", [qp.inequalityBound; vertcat(bounds{:})], ...
+        "cones", [0; numel(qp.inequalityBound); 10*ones(numel(constraints), 1)], ...
+        "physicalDecisionCount", qp.layout.decisionCount);
 end

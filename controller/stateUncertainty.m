@@ -2,6 +2,87 @@ classdef stateUncertainty
     %stateUncertainty Estimator certificates and state-box propagation, intersection and rest.
 
     methods (Static)
+        function tube = flowTube(a, b, c, map, offset, radius, rate, duration, order, stateLimit, inputLimit)
+        %flowTube Taylor/Bernstein enclosure of a complete held-input cell.
+        % The polynomial is affine in the state and held input. Its remainder
+        % uses a scalar exponential-series majorant. The initial nominal
+        % state and input must satisfy the supplied absolute domain bounds.
+            sizeState = size(a, 1);
+            degree = order+1;
+            gain = norm(a, inf)*duration;
+            if gain >= 1
+                error("collisionAvoidanceController:invalidCertificationCell", ...
+                    "Certification cells require norm(A,inf)*duration < 1.");
+            end
+            columnCount = sizeState+size(b, 2)+1;
+            polynomial = zeros(sizeState, columnCount, degree+1);
+            polynomial(:, :, 1) = [eye(sizeState), zeros(sizeState, size(b, 2)+1)];
+            power = [a, b, c];
+            for powerIndex = 1:order
+                polynomial(:, :, powerIndex+1) = power;
+                power = a*power/(powerIndex+1);
+            end
+            radiusPolynomial = zeros(sizeState, degree+1);
+            radiusPolynomial(:, 1) = radius;
+            powerA = eye(sizeState);
+            for powerIndex = 1:order
+                radiusPolynomial(:, powerIndex+1) = ...
+                    abs(powerA*a)*radius/factorial(powerIndex) ...
+                    + abs(powerA)*rate/factorial(powerIndex);
+                powerA = powerA*a;
+            end
+            driftBound = abs(a)*stateLimit+abs(b)*inputLimit+abs(c);
+            errorDrift = abs(a)*radius+rate;
+            tailWeight = abs(a)^order*ones(sizeState, 1) ...
+                /factorial(degree)/(1-gain);
+            radiusPolynomial(:, end) = tailWeight*(max(driftBound)+max(errorDrift));
+            % Arithmetic allowance, charged to the enclosures rather than to
+            % a post-solve feasibility tolerance. At the copied initial point
+            % no polynomial arithmetic has taken place.
+            operations = size(map, 2)+sizeState*order+degree^2;
+            gamma = operations*eps/(1-operations*eps);
+            coefficientMagnitude = abs(map)*inputLimit+abs(offset);
+            arithmetic = 16*gamma*(1+abs(a)*coefficientMagnitude ...
+                +abs(b)*inputLimit+abs(c))/(1-gain);
+            radiusPolynomial(:, 2) = radiusPolynomial(:, 2)+arithmetic;
+            transform = stateUncertainty.bernsteinTransform(degree, duration);
+            controls = reshape(reshape(polynomial, [], degree+1)*transform.', ...
+                sizeState, columnCount, degree+1);
+            tube.map = pagemtimes(controls(:, 1:sizeState, :), map);
+            for index = 1:degree+1
+                tube.map(:, :, index) = tube.map(:, :, index)+controls(:, sizeState+(1:size(b, 2)), index);
+            end
+            % b contains the condensed held-input columns, so controls already
+            % use the same decision coordinates as map.
+            tube.offset = reshape(pagemtimes(controls(:, 1:sizeState, :), offset), sizeState, []) ...
+                + reshape(controls(:, end, :), sizeState, []);
+            tube.radius = radiusPolynomial*transform.';
+            transition = controls(:, 1:sizeState, end);
+            tube.endMap = tube.map(:, :, end);
+            tube.endOffset = tube.offset(:, end);
+            % Retain cancellation in the endpoint transition; the swept tube
+            % uses absolute power bounds, while the next cell uses |Phi(h)|.
+            process = radiusPolynomial;
+            process(:, 1) = 0;
+            powerA = eye(sizeState);
+            for powerIndex = 1:order
+                process(:, powerIndex+1) = process(:, powerIndex+1) ...
+                    - abs(powerA*a)*radius/factorial(powerIndex);
+                powerA = powerA*a;
+            end
+            tube.endRadius = abs(transition)*radius+max(0, process*transform(end, :).');
+        end
+
+        function transform = bernsteinTransform(degree, duration)
+        %bernsteinTransform Power coefficients to Bernstein control points.
+            transform = zeros(degree+1);
+            for row = 0:degree
+                for power = 0:row
+                    transform(row+1, power+1) = nchoosek(row, power)/nchoosek(degree, power)*duration^power;
+                end
+            end
+        end
+
         function certificate = readCertificate(data, kind)
         %stateUncertainty.readCertificate Validate a current estimator enclosure.
         % A published certificate takes precedence over legacy numeric aliases.

@@ -11,6 +11,15 @@ classdef maneuverCouplingTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function failedAdmissionHasNoMeasuredManeuver(testCase)
+            result = localResult(5,0);
+            coupling = evaluateManeuverCoupling(result);
+            testCase.verifyFalse(coupling.available);
+            testCase.verifyFalse(coupling.significant);
+            testCase.verifyEqual(coupling.coupledDuration,0);
+            testCase.verifyTrue(isnan(coupling.maximumAbsoluteLongitudinalAcceleration));
+        end
+
         function uninterruptedThresholdCrossingIsSignificant(testCase)
             result = localResult( ...
                 [5.0; 4.8; 4.6; 4.4], ...

@@ -26,20 +26,17 @@ classdef terminalDissipationTest < matlab.unittest.TestCase
             [ego, cfg, lane] = localInputs();
             [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyTrue(problem.metadata.terminalInvariantCertified);
-            testCase.verifyEqual(stored.terminalUncertainty.kind, "dissipative-rest-funnel-v1");
+            testCase.verifyFalse(isfield(stored, "terminalUncertainty"));
             testCase.verifyGreaterThan(stored.stateErrorBound(4, end), 0);
-            testCase.verifyGreaterThanOrEqual(problem.metadata.terminalSpeed, ...
-                stored.stateErrorBound(4, end)-1e-8);
-            testCase.verifyEqual(problem.qp.linear, zeros(problem.layout.decisionCount, 1));
+            testCase.verifyGreaterThanOrEqual(stored.predictedState(4, end), stored.stateErrorBound(4, end));
         end
 
-        function theSparseLiftPreservesEveryDissipativeConstraint(testCase)
+        function finiteAdmissionDoesNotAppendADissipativeTerminalConstraint(testCase)
             [ego, cfg, lane] = localInputs();
             [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            [hard, dynamic] = localLiftResiduals(problem);
-            testCase.verifyLessThan(norm(hard, inf), 1e-9);
-            testCase.verifyLessThan(norm(dynamic, inf), 1e-9);
+            testCase.verifyEqual(problem.layout.tailSteps, 0);
+            testCase.verifyEqual(problem.prediction.nodeCount, cfg.controller.horizonSteps+1);
+            testCase.verifyEmpty(problem.qp.equalityBound);
         end
 
         function straightPolylineVerticesDoNotInvalidateAnInteriorChart(testCase)
@@ -58,11 +55,12 @@ classdef terminalDissipationTest < matlab.unittest.TestCase
             testCase.verifyFalse(certificate.accepted);
         end
 
-        function aPersistentForceDoesNotMasqueradeAsVelocityDissipation(testCase)
+        function persistentForcingCanBeEnclosedOverAFiniteCertificate(testCase)
             [ego, cfg, lane] = localInputs();
             cfg.model.plantModelResidualRateBound(4) = .001;
-            testCase.verifyError(@() collisionAvoidanceController(ego, [], lane, cfg, []), ...
-                "collisionAvoidanceController:unsupportedCertificateUncertainty");
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyGreaterThan(stored.stateErrorBound(4, end), 0);
         end
     end
 end
@@ -101,19 +99,4 @@ function [ego, cfg, lane] = localInputs()
     ego = struct("position", [10; 0], "yawAngle", 0, ...
         "longitudinalVelocity", 10, "lateralVelocity", 0, "yawRate", 0, ...
         "stateTime", 0, "controllerStateErrorBound", [.04; .04; .014; .388; .388; .0015]);
-end
-
-function [hard, dynamic] = localLiftResiduals(problem)
-    plan = .03*sin((1:problem.layout.planCount).');
-    decision = [plan; .7];
-    state = squeeze(pagemtimes(problem.prediction.egoStateMatrix, plan)) ...
-        +problem.prediction.egoStateOffset;
-    future = state(:, 2:end);
-    lifted = [decision; future(:)];
-    native = problem.qp.stageProgram;
-    indices = native.cones(1)+(1:size(problem.qp.inequalityMatrix, 1));
-    hard = native.A(indices, :)*lifted-native.b(indices) ...
-        -(problem.qp.inequalityMatrix*decision-problem.qp.inequalityBound);
-    indices = 1:native.cones(1)-2;
-    dynamic = native.A(indices, :)*lifted-native.b(indices);
 end

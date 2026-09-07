@@ -33,9 +33,6 @@ function cfg = localDefaults()
 
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
-    % Prefer passing behind traffic predicted to cross and clear the path.
-    % This time gap modifies performance only; hard safety is unchanged.
-    cfg.performance = struct("crossingTimeGap", 0.25);
 
     % Closed-loop period and prediction horizon. Every prediction
     % stage is one sample, so the plan advances one node per sample.
@@ -45,8 +42,17 @@ function cfg = localDefaults()
         "shiftConsistencyTolerance", 1.0e-8, ...
         "stationTrustRadius", 2.0);
 
-    % Geometric clearance in metres, imposed at every prediction node.
+    % Geometric clearance in metres, certified throughout every held interval.
     cfg.collision = struct("clearanceMargin", 0.25);
+
+    % Finite encounter certificates. A maneuver selects a corridor; support
+    % normals are separate certificate variables. All cells share the issued
+    % held input within a sample. Margins are measured in metres.
+    cfg.encounter = struct("barrierFraction", 1.0, ...
+        "minimumCells", 2, "taylorOrder", 6, ...
+        "numericalMargin", 1.0e-6, "maximumCarriedMargin", 1.0, ...
+        "corridorOverlap", 0.75, ...
+        "inputRateWeight", 0.02, "maneuverSwitchWeight", 0.1);
 
     % Vehicle geometry and inertia.
     cfg.vehicle = struct( ...
@@ -88,12 +94,13 @@ function cfg = localDefaults()
         "frontWheelSteeringAngleMaximum", deg2rad(40.0), ...
         "slipAngleMaximum", deg2rad([10.0; 10.0]), ...
         "headingDomainRadius", 0.40, ...
+        "lateralVelocityMaximum", 12.0, ...
+        "yawRateMaximum", 5.0, ...
         "ltvModelErrorRateBound", zeros(6, 1), ...
         "plantModelResidualRateBound", zeros(6, 1));
 
-    % The complete bicycle continuation reaches rest. backupDeceleration
-    % determines only the initial braking schedule and continuation length;
-    % actuator and slip-domain constraints apply at every stage.
+    % Parameter of the separate optional rest-schedule utility. Finite
+    % encounter admission neither appends this schedule nor requires rest.
     cfg.terminal = struct("backupDeceleration", 5.0);
 
     % Road-geometry implementation allowances.
@@ -102,7 +109,7 @@ function cfg = localDefaults()
         "parameterRangeTolerance", 1.0e-3);
 
     % Continuous Riccati error scales and normalized input effort weights.
-    % Input weights also penalize the head controls in the online QP.
+    % Input weights also penalize every predicted control in the online SOCP.
     % decreaseRateFraction scales the certified decay rate (1/s); slack has
     % units of V per second and a squared cost weighted by relaxationWeight.
     cfg.clf = struct( ...
@@ -115,11 +122,13 @@ function cfg = localDefaults()
         "brakingRatioWeight", 1.0, ...
         "decreaseRateFraction", 0.9, ...
         "certificateSpeedFloor", 5.0, ...
-        "relaxationWeight", 100.0);
+        "relaxationWeight", 100.0, ...
+        "referenceOffset", zeros(5, 1), ...
+        "referenceRate", zeros(5, 1), "referenceEpoch", 0.0);
 
-    % One QP per sample. The optional hook receives (phase, problem), with
-    % H/f/A/b/Aeq/beq/lb/ub fields and a [plan; delta] result decision.
-    % problem.defaultSolver runs the single native sparse QP.
+    % One SOCP per maneuver candidate. The optional hook receives (phase,
+    % problem), with P/q/A/b/cones fields and a [plan; delta] decision.
+    % problem.defaultSolver invokes the native sparse conic solver.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
@@ -179,6 +188,40 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
+        localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
+        if cfg.vehicle.(name) == 0
+            error("collisionAvoidanceController:invalidConfiguration", "vehicle.%s must be positive.", name);
+        end
+    end
+    for name = ["speedMinimum", "speedMaximum", "scheduleSpeedFloor", "headingDomainRadius", ...
+            "frontWheelSteeringAngleMaximum"]
+        localValidateNonnegativeScalar(cfg.model.(name), "model."+name);
+    end
+    localValidateNonnegativeScalar(cfg.referenceSpeed, "referenceSpeed");
+    localValidateNonnegativeScalar(cfg.controller.sampleTime, "controller.sampleTime");
+    localValidateNonnegativeScalar(cfg.controller.horizonSteps, "controller.horizonSteps");
+    validateattributes(cfg.encounter.barrierFraction, {'double'}, ...
+        {'scalar', 'finite', '>', 0, '<=', 1});
+    validateattributes(cfg.encounter.minimumCells, {'double'}, ...
+        {'scalar', 'integer', '>=', 1});
+    validateattributes(cfg.encounter.taylorOrder, {'double'}, ...
+        {'scalar', 'integer', '>=', 3, '<=', 10});
+    for name = ["numericalMargin", "maximumCarriedMargin", ...
+            "corridorOverlap", "inputRateWeight", "maneuverSwitchWeight"]
+        localValidateNonnegativeScalar(cfg.encounter.(name), "encounter."+name);
+    end
+    if cfg.encounter.numericalMargin <= 0
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "encounter.numericalMargin must be positive.");
+    end
+    validateattributes(cfg.clf.referenceRate, {'double'}, ...
+        {'real', 'finite', 'size', [5, 1]});
+    validateattributes(cfg.clf.referenceOffset, {'double'}, ...
+        {'real', 'finite', 'size', [5, 1]});
+    validateattributes(cfg.clf.referenceEpoch, {'double'}, {'real', 'finite', 'scalar'});
+    validateattributes(cfg.model.lateralVelocityMaximum, {'double'}, {'real', 'finite', 'scalar', 'positive'});
+    validateattributes(cfg.model.yawRateMaximum, {'double'}, {'real', 'finite', 'scalar', 'positive'});
     for name = string(fieldnames(cfg.roadLoad)).'
         localValidateNonnegativeScalar(cfg.roadLoad.(name), "roadLoad."+name);
     end
@@ -186,11 +229,9 @@ function localValidate(cfg)
         error("collisionAvoidanceController:invalidConfiguration", ...
             "roadLoad.rollingTransitionSpeed must be positive.");
     end
-    localValidateNonnegativeScalar(cfg.performance.crossingTimeGap, ...
-        "performance.crossingTimeGap");
-    if cfg.model.speedMinimum ~= 0.0 || cfg.model.speedMaximum <= 0.0
+    if cfg.model.speedMaximum <= cfg.model.speedMinimum
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "The rest certificate requires speedMinimum = 0 and speedMaximum > 0.");
+            "The finite speed domain must have a positive width.");
     end
     if cfg.model.scheduleSpeedFloor <= 0.0 ...
             || cfg.model.scheduleSpeedFloor > cfg.model.speedMaximum
@@ -214,10 +255,10 @@ function localValidate(cfg)
         error("collisionAvoidanceController:invalidConfiguration", ...
             "Station and lateral domain radii must be positive.");
     end
-    if cfg.controller.horizonSteps < 2 ...
+    if cfg.controller.horizonSteps < 1 ...
             || cfg.controller.horizonSteps ~= round(cfg.controller.horizonSteps)
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "controller.horizonSteps must be an integer of at least 2.");
+            "controller.horizonSteps must be a positive integer.");
     end
     if cfg.controller.sampleTime <= 0.0
         error("collisionAvoidanceController:invalidConfiguration", ...
@@ -286,8 +327,6 @@ function localValidateTerminal(cfg)
         error("collisionAvoidanceController:invalidConfiguration", ...
             "tire.frictionCoefficient must be positive scalar or front/rear values.");
     end
-    friction = double(friction(:));
-    if isscalar(friction), friction = [friction; friction]; end
     for name = ["gravity", "lf", "lr"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0.0
@@ -295,11 +334,8 @@ function localValidateTerminal(cfg)
                 "vehicle.%s must be positive.", name);
         end
     end
-    ratioGain = cfg.vehicle.gravity*(friction(1)*cfg.vehicle.lr ...
-        +friction(2)*cfg.vehicle.lf)/(cfg.vehicle.lf+cfg.vehicle.lr);
-    if cfg.terminal.backupDeceleration <= 0.0 ...
-            || cfg.terminal.backupDeceleration > -cfg.actuation.brakingRatioMinimum*ratioGain
+    if cfg.terminal.backupDeceleration <= 0.0
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "backupDeceleration must be positive and within the braking limit.");
+            "The optional rest-schedule backupDeceleration must be positive.");
     end
 end

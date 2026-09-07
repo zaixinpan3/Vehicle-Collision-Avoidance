@@ -9,13 +9,13 @@ expiry suffices. Finite target contracts need cover only their assigned active
 obligations; holding/renewal regimes need separate certificates. Nonzero
 bounded residuals need not be rejected universally.
 
-The version-8 runtime still uses finite-node prediction, fresh appended-node
-acceptance, and current-publication target removal. It does not yet implement
-the revised requirement. See
-[TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md). The remaining
-material records the earlier robustness investigation: its perpetual joint
-terminal proposals are optional sufficient constructions, not the governing
-specification.
+The version-9 runtime implements finite swept tubes, predictive CLF bounds,
+explicit maneuver comparison and a retained exit-terminated witness. It uses
+an explicit nonreturning-halfspace contract and rejects unsupported holding,
+renewal and chart jumps. See
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md). The remaining investigation
+is background analysis of optional perpetual-rest constructions and physical
+integration obligations; it is not the active controller's terminal rule.
 
 
 Research date: 2026-09-05. Status: proposed architecture and proof obligations,
@@ -24,8 +24,7 @@ with reproducible diagnostics; not an implemented robust vehicle controller.
 Implementation update (2026-09-07):
 [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md)
 extends the earlier stationary-pose implementation to uncertain terminal
-velocities using passive dissipation in the declared affine model. The current
-implementation retains open-loop inputs and set-membership intersections.
+velocities using passive dissipation in the declared affine model. The finite runtime retains open-loop witnesses and set-membership intersections.
 The broader physical-model, curved-chart, target-motion and low-speed observer
 obligations below remain open; the proposals are not completed components.
 

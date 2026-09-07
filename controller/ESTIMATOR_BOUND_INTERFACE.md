@@ -1,28 +1,24 @@
 # Time-varying estimator bounds in predictive control
 
-Requirement update (September 7, 2026): the current-state field contract below
-is an input to the revised
-[encounter-scoped design](ENCOUNTER_SCOPED_CBF_CLF.md). The target-publication,
-node-only continuation, and rest-based admission behavior described here is
-the version-8 implementation. A conforming redesign must retain active
-encounters independently of publication, condition covered futures, enforce
-absolute validity limits, and verify swept safety to certified discharge or
-handoff. A current estimator certificate alone does not establish those future
-contracts.
+Version-9 implementation update (September 7, 2026): current estimator
+certificates are the initial enclosures of the
+[encounter-scoped controller](ENCOUNTER_SCOPED_CBF_CLF.md). Active targets persist
+independently of publication. Valid observations condition the carried future
+family; new targets need explicit finite motion and nonreturn route contracts
+as specified in [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md).
 
-The controller reads the estimator's current error enclosure on every sample.
-The adapter no longer substitutes `cfg.publishedErrorBound` constants. Old
-configurations containing that field receive an explicit migration error.
-Sensor noise and true-motion limits remain premises of the enclosure, not
-fixed bounds on the estimated state error.
+The adapter's current bounds remain current-state claims, with
+`futurePredictionIncluded=false`. They do not establish future jerk limits,
+physical plant residuals, detection completeness, or discharge. Known targets
+can publish subsequent measurements without repeating their retained contract.
+Replacing that contract requires independent admission and is not automatic.
 
-This implements publication, validation, frame conversion and finite-horizon
-target prediction. Nonzero ego velocity radii now use a dissipative terminal
-certificate that reserves their complete remaining pose excursion under the
-declared affine model. This does **not** complete physical robust closed-loop
-admission: persistent forcing, generic noninvertible curved-polyline charts,
-remain open. Targets use finite encounter predictions, as specified below.
-See [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
+Bounded nonzero ego residuals and velocity radii are propagated over the finite
+certificate. They no longer require a stationary or dissipative terminal set.
+The optional rest construction described later in this research note is not
+the version-9 admission rule. Unsupported projection/reference jumps and
+uncovered road segments are rejected. The existing nonlinear scenarios still
+need validated physical/route contracts for successful robust admission.
 
 ## Current-state contract
 

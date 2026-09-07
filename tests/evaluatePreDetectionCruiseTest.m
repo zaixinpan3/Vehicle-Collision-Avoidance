@@ -11,6 +11,17 @@ classdef evaluatePreDetectionCruiseTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function failedAdmissionCannotPassWithoutExecutedSamples(testCase)
+            result = localResult(93);
+            result.perception.targetDetectionAvailable = false(0,1);
+            result.targetTruthAtControlSample = cell(0,1);
+            evaluation = evaluatePreDetectionCruise(result);
+            testCase.verifyFalse(evaluation.passed);
+            testCase.verifyEqual(evaluation.preDetectionSampleCount,0);
+            testCase.verifyTrue(isnan(evaluation.initialTargetRange));
+            testCase.verifyTrue(isnan(evaluation.preDetectionDuration));
+        end
+
         function targetEntersRangeAfterTwoSecondsOfCruise(testCase)
             result = localResult(93.0);
 

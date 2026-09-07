@@ -5,8 +5,8 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
 % Converts the ego state (explicit controller-state fields or the
 % cascaded estimator's egoState vector form), the lane centerline or
 % scalar road-geometry structure (finite local-quadratic boundaries
-% and route selection), and the target estimate record (at most one
-% target) into the canonical planning structures the controller
+% and route selection), and an array of target estimate records
+% into the canonical planning structures the controller
 % consumes. All validation of the
 % public input contract lives here; downstream modules assume these
 % structures are well formed. An empty targetEstimate falls back to a
@@ -536,23 +536,27 @@ function targets = localReadTargets(rawTargets, ego, cfg)
         error("collisionAvoidanceController:invalidInput", ...
             "targetEstimate must be a structure.");
     end
-    targets = repmat(localEmptyTarget(), 0, 1);
-    record = localTargetRecord(rawTargets);
-    if isempty(record)
-        return;
+    targets = repmat(localEmptyTarget(), numel(rawTargets), 1);
+    count = 0;
+    for index = 1:numel(rawTargets)
+        record = localTargetRecord(rawTargets(index));
+        if isempty(record), continue; end
+        [target, active] = localReadTargetRecord(record, ego, cfg);
+        if active
+            target.key = localTargetRecordKey(record, index);
+            count = count+1;
+            targets(count, 1) = target;
+        end
     end
-    [target, active] = localReadTargetRecord(record, ego, cfg);
-    if active
-        target.key = localTargetRecordKey(record, 1);
-        targets(end + 1, 1) = target;
+    targets = targets(1:count);
+    if numel(unique(string({targets.key}))) ~= numel(targets)
+        error("collisionAvoidanceController:invalidInput", "Target identities must be unique.");
     end
 end
 
 function record = localTargetRecord(rawTargets)
-% AT MOST ONE TARGET. This controller does not solve the multi-target
-% problem, so neither a structure array nor a vectorized record is
-% admitted: more than one target is a declared input error, never a
-% silently truncated list.
+% Normalize one member of the target structure array. Vectorized fields
+% inside a member are rejected so stable identities remain unambiguous.
 
     record = [];
     if isempty(rawTargets)
@@ -643,7 +647,7 @@ function target = localEmptyTarget()
         "yawErrorBound", 0.0, "yawRateErrorBound", 0.0, ...
         "predictionYawAccelerationErrorBound", 0.0, ...
         "accelerationErrorBound", zeros(2, 1), ...
-        "errorCertificate", []);
+        "errorCertificate", [], "encounterContract", []);
 end
 
 function key = localTargetRecordKey(data, recordIdx)
@@ -696,6 +700,9 @@ function [target, active] = localReadTargetRecord(data, ego, cfg)
     target.width = widthValue;
     target.yaw = yaw;
     target.yawRate = yawRate;
+    if isfield(data, "encounterContract")
+        target.encounterContract = data.encounterContract;
+    end
     target.errorCertificate = stateUncertainty.readCertificate(data, "target-state-v1");
     if isempty(target.errorCertificate)
         target.positionErrorBound = ...
@@ -719,11 +726,8 @@ function [target, active] = localReadTargetRecord(data, ego, cfg)
         target.predictionYawAccelerationErrorBound = ...
             localOptionalNonnegativeInputScalar( ...
                 data, "targetPredictionYawAccelerationErrorBound");
-        if target.predictionYawAccelerationErrorBound > 0.0
-            error("collisionAvoidanceController:unsupportedPredictionUncertainty", ...
-                "The fixed-curvature target model takes initial yaw-rate error, " ...
-                + "not an independent future yaw-acceleration disturbance.");
-        end
+        % Admission checks this future bound against the encounter contract.
+        % A known track can inherit that contract after parsing its observation.
     else
         values = target.errorCertificate.bounds;
         target.positionErrorBound = values(1:2);

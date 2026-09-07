@@ -4,6 +4,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             root = fileparts(fileparts(mfilename("fullpath")));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "controller")));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "config")));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "tests")));
         end
     end
     methods (Test)
@@ -81,10 +82,12 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             [~, ~, first] = collisionAvoidanceController(ego, target, lane, cfg, []);
             target.controllerErrorBound.bounds(1:2) = 0.4;
             [~, ~, second] = collisionAvoidanceController(ego, target, lane, cfg, []);
-            testCase.verifyGreaterThan(second.qp.collision.nodes(1).targetSupport, ...
-                first.qp.collision.nodes(1).targetSupport);
+            firstRow = find(startsWith(first.qp.geometry.label, "collision:"), 1);
+            secondRow = find(startsWith(second.qp.geometry.label, "collision:"), 1);
+            testCase.verifyLessThan(second.qp.geometry.physicalBound(secondRow), ...
+                first.qp.geometry.physicalBound(firstRow));
             testCase.verifyTrue(first.metadata.planCertified && second.metadata.planCertified);
-            testCase.verifyEqual(second.metadata.solverCallCount, 1);
+            testCase.verifyEqual(second.metadata.solverCallCount, 3);
         end
 
         function changingBoundsRequireTheContinuationToBeRechecked(testCase)
@@ -92,8 +95,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             ego = rmfield(ego, "controllerErrorBound");
             [command, ~, first, stored] = collisionAvoidanceController(ego, target, lane, cfg, []);
             state = stored.predictedState(:, 2);
-            ego.position = state(1:2);
-            ego.yawAngle = state(3);
+            [ego.position, ego.yawAngle] = laneGeometry.fromFrenet(state, first.model.lane);
             ego.longitudinalVelocity = state(4);
             ego.lateralVelocity = state(5);
             ego.yawRate = state(6);
@@ -102,20 +104,21 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             target.stateTime = cfg.controller.sampleTime;
             target.controllerErrorBound.time = cfg.controller.sampleTime;
             target.controllerErrorBound.bounds(1:2) = 0.25;
+            target.targetPositionInertial = target.targetPositionInertial ...
+                +cfg.controller.sampleTime*target.targetVelocityInertial;
             [~, ~, next] = collisionAvoidanceController(ego, target, lane, cfg, stored);
             testCase.verifyTrue(first.metadata.planCertified && next.metadata.planCertified);
-            testCase.verifyFalse(next.metadata.certificateCompatible);
-            testCase.verifyTrue(next.metadata.continuationReadmission);
-            testCase.verifyEqual(next.metadata.solverCallCount, 1);
+            testCase.verifyTrue(next.metadata.certificateCompatible);
+            testCase.verifyTrue(next.metadata.setMembershipUpdate);
+            testCase.verifyEqual(next.metadata.solverCallCount, 3);
         end
 
-        function uncertainEgoVelocityUsesTheDissipativeTerminalCertificate(testCase)
+        function uncertainEgoVelocityIsRetainedInTheFiniteTube(testCase)
             [ego, ~, cfg, lane] = localInputs();
             ego.position(1) = 10;
             [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(problem.metadata.uncertaintyCertificate.kind, ...
-                "dissipative-rest-funnel-v1");
+            testCase.verifyGreaterThan(problem.prediction.egoStateErrorBound(4, end), 0);
         end
 
 
@@ -123,16 +126,16 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
 end
 
 function [ego, target, cfg, lane] = localInputs()
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
-    lane = [0, 0; 1000, 0];
+    [~, crossing, lane, cfg] = encounterTestFixture.crossing();
     ego = struct("position", [0; 0], "yawAngle", 0, ...
         "longitudinalVelocity", 10, "lateralVelocity", 0, "yawRate", 0, ...
         "stateTime", 0, "controllerErrorBound", ...
         localCertificate("ego-state-v1", [0.1; 0.1; 0.01; 0.1; 0.1; 0.001]));
-    target = struct("trackId", "static-target", "targetPositionInertial", [60; 3], ...
-        "targetVelocityInertial", [0; 0], "targetAccelerationInertial", [0; 0], ...
-        "targetYawInertial", 0, "targetYawRate", 0, "stateTime", 0, ...
-        "controllerErrorBound", localCertificate("target-state-v1", [0.2; 0.2; zeros(6, 1)]));
+    target = struct("trackId", "static-target", "targetPositionInertial", [15; -4], ...
+        "targetVelocityInertial", [0; 8], "targetAccelerationInertial", [0; 0], ...
+        "targetYawInertial", pi/2, "targetYawRate", 0, "stateTime", 0, ...
+        "controllerErrorBound", localCertificate("target-state-v1", [0.2; 0.2; zeros(6, 1)]), ...
+        "encounterContract", crossing.encounterContract);
 end
 
 function certificate = localCertificate(kind, values)

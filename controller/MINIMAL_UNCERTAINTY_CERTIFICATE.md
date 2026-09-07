@@ -4,8 +4,10 @@ Requirement update (September 7, 2026): the governing
 [encounter-scoped contract](ENCOUNTER_SCOPED_CBF_CLF.md) permits a complete
 finite continuation to certified exit or valid transfer. The stationary-pose
 and zero-residual restrictions studied below are limits of this particular
-construction, not universal admission rules. Existing runtime restrictions
-remain until their replacement is implemented and verified.
+construction, not universal admission rules. Version 9 has replaced these
+runtime restrictions with finite swept-tube admission and guarded encounter
+discharge; see [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
+The dated analysis below concerns the separate stationary-pose construction.
 
 Implementation update (2026-09-07):
 [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md)

@@ -1,129 +1,90 @@
-# Finite target prediction in the version-8 runtime
+# Finite target motion and encounter-exit contracts
 
-Requirement update (September 7, 2026):
-[ENCOUNTER_SCOPED_CBF_CLF.md](ENCOUNTER_SCOPED_CBF_CLF.md) is the governing
-encounter contract. A target forecast must cover its certified continuation
-to exit or valid transfer. Visibility loss and forecast expiry do not discharge
-an encounter. The controller must retain active obligations until a verified
-guard applies, with sensing/admission conditions that prevent an unprotected
-gap. Nonzero bounded residuals are admissible when that complete finite
-certificate passes. These requirements are not yet implemented.
+Version 9 requires a current target enclosure, a finite motion contract, and an
+exit guard. Current estimator bounds do not establish future jerk limits,
+route nonreturn, or reliable detection. Those are separate caller assumptions.
+The governing requirement is [ENCOUNTER_SCOPED_CBF_CLF.md](ENCOUNTER_SCOPED_CBF_CLF.md).
 
-The earlier September 7, 2026 implementation assumes approximately constant
-target curvature and tangential acceleration during the short vehicle
-encounter. This is a finite prediction assumption, not a promise that the
-target never changes its maneuver. Targets need no specified road or corridor.
-Actual current radar visibility controls target publication: internal observer
-coasting does not keep a hidden target in the controller's constraint set.
+A target is a scalar record; the controller accepts a structure array of such
+records. Existing inertial position, velocity, acceleration, body heading,
+yaw-rate, extent, and current-error fields remain supported. `trackId`,
+`targetId`, `objectId`, or `id` must supply a stable unique identifier. Current
+`target-state-v1` estimator certificates override numeric current-bound aliases.
+Their timestamps must match `ego.stateTime`.
 
-The visibility behavior below describes the current code and the preceding
-experiment. It is insufficient for the revised continuation requirement.
-Likewise, the finite endpoint rows below are not an exit certificate.
+Each target also requires:
 
-## Prediction law and uncertainty
+```matlab
+target.encounterContract = struct( ...
+    "kind", "cartesian-jerk-exit-v1", ...
+    "id", "crossing-1", ...
+    "validFrom", 0.0, ...           % absolute seconds
+    "validUntil", 1.6, ...          % absolute seconds
+    "jerkBound", [0.0; 0.0], ...   % componentwise m/s^3
+    "yawAccelerationBound", 0.0, ... % rad/s^2
+    "exitNormal", [0.0; 1.0], ... % unit inertial normal
+    "exitOffset", 4.6, ...         % plane offset in metres
+    "postExitRoute", "nonreturningHalfspace");
+```
 
-For each prediction, let speed be `v`, course be `theta`, curvature be `k`,
-and tangential acceleration be `a`. Until a braking prediction stops,
+These example values describe the declared synthetic fixture in
+`tests/encounterTestFixture.m`. They are not defaults or measured contracts for
+an arbitrary target. Admission rejects missing fields, expired validity,
+anonymous identities, nonunit normals, and unsupported guard kinds.
 
-\[
- \dot p=v[\cos\theta,\sin\theta]^\top,\qquad
- \dot v=a,\qquad \dot\theta=kv,\qquad \dot k=\dot a=0.
-\]
+## Finite Cartesian inclusion
 
-Negative acceleration stops at `v=0`; it does not reverse the vehicle. Define
-the nonnegative traveled distance `L(t;v,a)` by integrating
-`max(v+a*t,0)`. Nominal curvature is reconstructed as yaw rate divided by
-speed, and tangential acceleration is the projection of acceleration onto
-course. The existing zero-speed direction fallback is retained.
+The current state is `[pX;pY;vX;vY;aX;aY;psi;omega]`. During the active encounter,
+`pDot=v`, `vDot=a`, `abs(aDot)<=jerkBound`, `psiDot=omega`, and
+`abs(omegaDot)<=yawAccelerationBound`. For elapsed time `t`, the nominal position
+is `p+v*t+a*t^2/2`; its radius is
+`rhoP+rhoV*t+rhoA*t^2/2+jerkBound*t^3/6`. Corresponding velocity, acceleration,
+yaw, and yaw-rate radii follow integration of the same inclusion. Body heading
+is independent of velocity course, so zero speed causes no curvature quotient.
+The legacy fixed-curvature utility methods remain available for independent
+model comparisons; the controller uses `admit`, `finiteFlow`, `advance`, and
+`exitMargin`.
 
-The initial estimation certificate is not zeroed. `targetPrediction.initialSet`
-maps its Cartesian velocity box into speed and course bounds, and its
-acceleration/yaw-rate errors into fixed parameter intervals. If
-`Bv=norm(b_velocity)` and `Ba=norm(b_acceleration)`, then
+Motion validity must cover every held interval up to that target's certified
+exit. A short forecast is rejected if no guarded exit can occur before expiry.
+The controller does not extrapolate an active obligation beyond its contract.
+No infinite target trajectory is requested after discharge.
 
-\[
- v\in[\max(0,\hat v-B_v),\hat v+B_v],\qquad
- b_\theta=\arcsin(B_v/\hat v)\quad(B_v<\hat v).
-\]
+## Implemented guard
 
-Otherwise all initial course directions are admitted. The zero-velocity
-case obtains direction from acceleration, with its own error radius.
-For nonzero acceleration, a conservative tangential acceleration error is
-`Ba + 2*norm(a_hat)*sin(b_theta/2)`. The curvature interval encloses all
-quotients of the yaw-rate interval and positive speed interval. It is
-unbounded if uncertain speed can approach zero with nonzero yaw rate;
-this does not make the finite position enclosure infinite. A point-valued
-zero yaw rate produces zero curvature.
+For unit normal `n`, exit requires
 
-Each member retains its own reconstructed parameters for this finite
-prediction. The construction adds neither future arbitrary maneuver changes
-nor repeated disturbances derived from estimator operating-domain maxima.
-The interval product discards correlations and can be conservative.
+`n'*centerPosition - abs(n)'*positionRadius - rectangleSupport`
 
-Let `Lmin`, `Lmax` come from the endpoints of the speed/acceleration ranges,
-let `Lhat` be nominal traveled distance, `bL=max(abs([Lmin,Lmax]-Lhat))`,
-`bk=max(abs(kRange-kHat))`, and `Lc=min(Lhat,Lmax)`. A componentwise position
-enclosure is
+at least `exitOffset + collision.clearanceMargin`, with the configured
+numerical reserve. Rectangle support is maximized over the complete yaw
+interval. Admission separately checks that every segment of the allowed ego
+route, its entire lateral domain, and its footprint remain upstream of the
+plane. The caller's `nonreturningHalfspace` assertion requires the target's
+whole footprint to stay at or beyond `exitOffset + collision.clearanceMargin`
+after exit. Together these premises
+constitute discharge; instantaneous separation alone does not.
 
-\[
- b_p(t)=b_p(0)+b_L+
- \min\{2L_c,\ b_\theta L_c+\tfrac12 b_kL_c^2\}.
-\]
+This guard is conservative and principally serves crossing routes. A target
+sharing the ego's indefinite route generally needs a different guard or
+monitoring/handoff contract, which this runtime does not implement. Waiting,
+forecast renewal, and route-contract replacement fail admission unless a new
+independent supported encounter is supplied. A later encounter needs a new
+stable identity and timely joint admission. The code does not itself certify
+sensor detection range or environmental completeness.
 
-This follows by separating unequal arc lengths and integrating the difference
-between two unit tangents on their common arc. For unbounded `bk`, use `2Lc`.
-Heading error is bounded by
-`min(pi, b_psi(0)+bk*Lmax+abs(kHat)*bL)`, with zero turn error at zero
-traveled distance. Exact initial motion gives zero additional prediction
-error, including across the stop. All-stopping families have constant bounds
-after their latest possible stopping time.
+## Observations and lifecycle
 
-The numeric `targetAccelerationInertialErrorBound` is accepted without a
-certificate; the older `targetPredictionAccelerationInertialErrorBound` adds
-to that initial acceleration uncertainty. A current certificate takes
-precedence over those aliases. A nonzero independent future yaw-acceleration
-disturbance is outside this fixed-curvature contract and is rejected.
+Missing observations retain the active target and its old motion inclusion.
+A known target may omit `encounterContract` on subsequent observation records;
+the controller then retains the existing contract. A supplied replacement must
+match it. A valid observation intersects the carried reachable box, keeps its nominal
+center, and can shrink its radius. The update must not silently replace jerk,
+yaw-acceleration, extent, route, validity, or identity contracts. A contradictory
+observation reports an assumption failure and authorizes no inherited fallback.
 
-## Finite constraints and continuation checks
-
-The currently published target has hard rectangle-separation rows at every
-head/tail node, including the last node. There is no infinite ray/orbit
-support calculation, support-direction grid, or infinite-time target gate.
-In the matched joint experiment, 24 head stages plus 74 continuation stages
-at 0.05 s give a 4.9 s imposed target forecast. The stored extra sample is
-used for shift comparison; it does not extend the accepted safety interval.
-
-The ego rest or dissipative terminal policy remains. Its remaining-pose
-budget can conservatively tighten the finite last target row, but that row
-does not establish permanent target separation. The diagnostics distinguish
-`terminalPredictionCertified` from `terminalInvariantCertified`; the latter
-is false while a target is present. The experiment evaluator checks finite
-terminal admission and does not require the withdrawn invariant-target claim.
-
-On consistent shifts, overlapping geometry may be carried. The newly appended
-target node is always rebuilt from the fresh finite forecast, including when
-the ego uses a dissipative terminal funnel. The old input sequence must pass
-the full new acceptance check before fallback is permitted. A rejected target
-extension requires a new accepted solve; feasibility at every future sample
-is not assumed. Version 8 prevents reuse of the preceding certificate format.
-
-The adapter already removes target publication on current radar exit. The
-controller then drops the corresponding rows and performs admission for that
-environment. It does not use predicted future range exit to discard a target
-that is still currently visible. Reacquisition creates a currently published
-target that must be considered again. The reported guarantee covers declared
-model prediction nodes for those targets, not unobserved traffic or a
-permanent parked-vehicle safety claim.
-
-## Validation scope
-
-`targetPredictionTest` checks initial error retention, exact-motion stopping,
-bounded finite forecasts near zero curvature, independence from legacy global
-motion limits, and propagation of all 256 corners of two eight-state boxes.
-Corner checks validate the implementation on those cases; the enclosure
-argument above, not vertex sampling alone, supplies its mathematical basis.
-Controller tests check finite oncoming forecasts, fresh continuation checks,
-and removal of all target rows after publication ceases. The adapter's existing
-radar lifecycle test separately checks visibility, internal coasting and
-retirement. None establishes nonlinear-plant robustness or eventual cruise
-convergence from a finite simulation.
+Each target exits on its own sample guard; joint optimization retains every
+active target until its guard is met. Discharged records retain the route
+assertion, without prediction beyond expiry. If a later observation contradicts
+that assertion, the controller reports `exitRouteViolation`. Missing perception
+by itself never discharges an active target.

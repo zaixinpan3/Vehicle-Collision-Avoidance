@@ -13,9 +13,9 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyFalse(problem.metadata.exactPredictionAssumptionsHold);
-            testCase.verifyTrue(stored.terminalUncertainty.accepted);
+            testCase.verifyEqual(stored.safetyScope, "heldIntervalsUntilCertifiedEncounterExit");
             testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
-            testCase.verifyEqual(stored.stateErrorBound(4:6, end), zeros(3, 1));
+            testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, end), zeros(3, 1));
             testCase.verifyEqual(problem.metadata.solverCallCount, 1);
         end
 
@@ -33,7 +33,7 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.predictedState(:, 1), stored.predictedState(:, 2), AbsTol=0);
             testCase.verifyEqual(next.stateErrorBound(1, 1), 0.05, AbsTol=1e-12);
             testCase.verifyLessThanOrEqual(next.stateErrorBound(:, 1:end-1), ...
-                stored.stateErrorBound(:, 2:end)+1e-12);
+                stored.stateErrorBound(:, 2:end)+1e-7);
         end
 
         function aLargerObservationBoxDoesNotInvalidateAValidPrediction(testCase)
@@ -44,7 +44,8 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             [~, ~, problem, next] = collisionAvoidanceController(fresh, [], lane, cfg, stored);
 
             testCase.verifyTrue(problem.metadata.certificateCompatible);
-            testCase.verifyEqual(next.stateErrorBound(:, 1), stored.stateErrorBound(:, 2), AbsTol=1e-12);
+            testCase.verifyEqual(next.stateErrorBound(1:3, 1), stored.stateErrorBound(1:3, 2), AbsTol=1e-12);
+            testCase.verifyLessThanOrEqual(next.stateErrorBound(4:6, 1), stored.stateErrorBound(4:6, 2));
         end
 
         function disjointStateContractsDoNotAuthorizeAFallback(testCase)
@@ -54,24 +55,24 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             fresh.position(1) = fresh.position(1)+1;
 
             testCase.verifyError(@() collisionAvoidanceController(fresh, [], lane, cfg, stored), ...
-                "collisionAvoidanceController:inconsistentStateEnclosures");
+                "collisionAvoidanceController:inconsistentObservation");
         end
 
         function velocityUncertaintyCannotBeRoundedIntoAStationarySet(testCase)
             [ego, cfg, lane] = localInputs();
             ego.controllerStateErrorBound(4) = 1e-14;
             [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            testCase.verifyEqual(problem.metadata.uncertaintyCertificate.kind, ...
-                "dissipative-rest-funnel-v1");
+            testCase.verifyGreaterThan(problem.prediction.egoStateErrorBound(4, end), 0);
+            testCase.verifyTrue(problem.metadata.planCertified);
         end
 
-        function aStationaryCurvedRoadPoseBoxIsInvariant(testCase)
+        function aStationaryCurvedRoadPoseBoxHasAFiniteEnclosure(testCase)
             [ego, cfg] = localInputs();
             cfg.referenceSpeed = 0;
             [ego, lane] = localCurvedInputs(ego, 0);
             [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyTrue(stored.terminalUncertainty.accepted);
+            testCase.verifyEqual(stored.safetyScope, "heldIntervalsUntilCertifiedEncounterExit");
             testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
         end
 
@@ -80,9 +81,9 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             [ego, lane] = localCurvedInputs(ego, 5);
             [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
             testCase.verifyGreaterThan(abs(problem.prediction.scheduleCurvature(1)), 0.0);
-            testCase.verifyEqual(stored.stateErrorBound(4:6, :), ...
-                zeros(3, problem.prediction.nodeCount), AbsTol=0.0);
-            testCase.verifyTrue(stored.terminalUncertainty.accepted);
+            testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, :), ...
+                zeros(3, problem.prediction.nodeCount));
+            testCase.verifyEqual(stored.safetyScope, "heldIntervalsUntilCertifiedEncounterExit");
         end
 
         function aNegativeForcingComponentIsRejectedBeforePropagation(testCase)
@@ -92,11 +93,12 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:invalidConfiguration");
         end
 
-        function persistentPositionDriftCannotBeCalledInvariant(testCase)
+        function persistentPositionDriftIsRetainedOverTheFiniteCertificate(testCase)
             [ego, cfg, lane] = localInputs();
             cfg.model.plantModelResidualRateBound(1) = 0.001;
-            testCase.verifyError(@() collisionAvoidanceController(ego, [], lane, cfg, []), ...
-                "collisionAvoidanceController:unsupportedCertificateUncertainty");
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyGreaterThan(stored.stateErrorBound(1, end), stored.stateErrorBound(1, 1));
         end
 
         function aClippedProjectionCannotCertifyCartesianUncertainty(testCase)

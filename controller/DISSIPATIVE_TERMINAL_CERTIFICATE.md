@@ -9,7 +9,8 @@ an active target. This construction could support a separately verified
 holding regime only with the required target, physical-model, and handoff
 premises; its existing ego proof does not establish those premises.
 
-Implementation date: 2026-09-07. This extends the stationary-pose certificate
+Utility implementation date: 2026-09-07. The version-9 controller does not invoke
+this optional construction. The utility extends the stationary-pose certificate
 to nonzero six-state estimation enclosures under the declared scheduled affine
 model. It does not establish robustness to an undeclared physical-model
 residual, arbitrary moving targets, or noninvertible polyline projection.

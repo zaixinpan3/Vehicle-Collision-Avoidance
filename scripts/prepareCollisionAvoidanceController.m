@@ -1,75 +1,33 @@
 function preparation = prepareCollisionAvoidanceController(ego, road, cfg)
-%prepareCollisionAvoidanceController Load and exercise code before sampling.
-% Run before enabling the periodic controller. Twelve discarded calculations
-% exercise empty-target, distant-target and crossing-target paths using
-% the initial ego/road and synthetic targets, never future sensor
-% samples. Explicit certificate state leaves the running controller intact.
-% Preparation time is reported separately and is not an online deadline
-% guarantee. No command computed here is applied to a vehicle.
-% A synthetic probe can be infeasible even when the real initial problem
-% is feasible. Record expected admission failures without vetoing the real
-% controller call; unexpected input/configuration errors still propagate.
-
+%prepareCollisionAvoidanceController Exercise the held-flow and conic kernels.
+% Three independent empty-target admissions are discarded. The supplied ego
+% and road are used verbatim; preparation invents no target-motion or exit
+% contracts and applies no commands. Explicit empty certificate state leaves
+% the running controller untouched. Preparation is not a deadline guarantee.
     timer = tic;
     cfg = collisionAvoidanceControllerConfig(cfg);
     if isfield(ego, "targetEstimates"), ego = rmfield(ego, "targetEstimates"); end
-    pose = readPlanningInputs(ego, [], road, cfg);
-    direction = [cos(pose.yaw); sin(pose.yaw)];
-    target = struct("targetId", "initializationOnly", ...
-        "targetPositionInertial", pose.position+1000.0*direction, ...
-        "targetVelocityInertial", cfg.referenceSpeed*direction, ...
-        "targetAccelerationInertial", zeros(2, 1), ...
-        "targetYawInertial", pose.yaw, "targetYawRate", 0.0, ...
-        "targetLength", cfg.target.defaultLength, ...
-        "targetWidth", cfg.target.defaultWidth);
-    crossing = target;
-    lateral = [-direction(2); direction(1)];
-    distance = max(45.0, cfg.referenceSpeed^2/cfg.terminal.backupDeceleration);
-    crossing.targetPositionInertial = pose.position+distance*direction+8.0*lateral;
-    crossing.targetVelocityInertial = -3.0*lateral;
-    crossing.targetYawInertial = pose.yaw-pi/2;
-    samples = zeros(4, 3);
-    certified = false(4, 3);
-    failureIdentifier = strings(4, 3);
-    for mode = 1:4
-        if mode == 1 || mode == 4
-            observation = [];
-        elseif mode == 2
-            observation = target;
-        else
-            observation = crossing;
-        end
-        certificate = [];
-        for repetition = 1:3
-            if mode == 3
-                % Exercise changing reference and geometry data without
-                % consulting any future observation or recorded trajectory.
-                observation.targetPositionInertial = crossing.targetPositionInertial ...
-                    - 5.0*(repetition-1)*direction;
+    samples = zeros(1, 3);
+    certified = false(1, 3);
+    failures = strings(1, 3);
+    for repetition = 1:3
+        sampleTimer = tic;
+        try
+            [~, ~, problem] = collisionAvoidanceController(ego, [], road, cfg, []);
+            certified(repetition) = problem.metadata.planCertified;
+        catch exception
+            if ~any(string(exception.identifier) == ["collisionAvoidanceController:noCertifiedContinuation", ...
+                    "collisionAvoidanceController:invalidUncertaintyChart"])
+                rethrow(exception);
             end
-            sampleTimer = tic;
-            try
-                [~, ~, problem, certificate] = collisionAvoidanceController( ...
-                    ego, observation, road, cfg, certificate);
-                certified(mode, repetition) = problem.metadata.planCertified;
-            catch exception
-                identifier = string(exception.identifier);
-                if ~any(identifier == ["collisionAvoidanceController:noSolution", ...
-                        "collisionAvoidanceController:optimizationFailure", ...
-                        "collisionAvoidanceController:invalidStoredCertificate"])
-                    rethrow(exception);
-                end
-                failureIdentifier(mode, repetition) = identifier;
-                certificate = [];
-            end
-            samples(mode, repetition) = toc(sampleTimer);
+            failures(repetition) = string(exception.identifier);
         end
+        samples(repetition) = toc(sampleTimer);
     end
     preparation = struct("performed", true, "elapsedSeconds", toc(timer), ...
         "callSeconds", samples, "attemptedCalls", numel(samples), ...
-        "discardedCommandCount", nnz(certified), ...
-        "probeCertified", certified, "failureIdentifier", failureIdentifier, ...
-        "allProbesCertified", all(certified, "all"), ...
+        "discardedCommandCount", nnz(certified), "probeCertified", certified, ...
+        "failureIdentifier", failures, "allProbesCertified", all(certified), ...
         "computationalThreads", maxNumCompThreads, ...
-        "scope", "Before periodic sampling; no commands applied; synthetic targets");
+        "scope", "Before periodic sampling; independent empty-target admissions; no commands applied");
 end

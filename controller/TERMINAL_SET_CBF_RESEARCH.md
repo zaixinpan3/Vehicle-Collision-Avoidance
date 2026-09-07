@@ -6,6 +6,10 @@ object is the availability of a valid certified continuation while an encounter
 is active. The endpoint is a verified event or handoff; it need not be a
 permanently invariant physical ego–target set.
 
+The executable version-9 implementation supplies a nonreturning-halfspace
+exit guard and a shrinking finite witness. Holding and general renewal remain
+unsupported guard classes; their absence is reported as admission failure.
+
 ## Required endpoint
 
 A complete continuation must reach one of the following:
@@ -48,15 +52,14 @@ derivatives. Maneuver, control, input smoothness, and switching choices enter
 the optimization. Neither a tracking cost nor a selected separating normal
 replaces these CLF and maneuver requirements.
 
-## Existing rest construction and its limits
+## Optional rest construction and its limits
 
-The version-8 implementation remains described in
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md). Its head and tail use
-the same scheduled six-state bicycle, exact held-input affine integration,
-signed braking-ratio/Fiala force scale, and physical input/slip-domain rows.
-This removed the earlier dynamic-head/kinematic-tail mismatch. Exact affine
-flow is still an approximation of the physical plant unless a valid residual
-enclosure is supplied.
+The optional rest utility uses the same scheduled six-state bicycle,
+held-input affine integration, signed braking-ratio/Fiala force scale, and
+physical input/slip domains. Exact affine flow remains an approximation of
+the physical plant unless a valid residual enclosure is supplied. The current
+runtime and its finite guard are described in
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 
 At zero scheduled speed, arbitrary admitted station, lateral offset, and
 heading with zero velocities are an equilibrium under
@@ -65,12 +68,10 @@ or the [dissipative extension](DISSIPATIVE_TERMINAL_CERTIFICATE.md) can certify
 ego behavior under their specific model premises. The braking schedule is an
 initial optimization template, not a safety proof.
 
-The current target row concerns the finite last predicted pose. It does not
-use infinite-future target support and does not certify encounter discharge.
-Ego rest or an ego dissipative funnel does not make the joint endpoint safe
-after that forecast. The runtime still checks prediction nodes and removes
-target rows when publication ceases; it therefore does not yet meet the
-revised contract.
+A target row at the final forecast pose alone cannot certify encounter
+discharge. Ego rest or an ego dissipative funnel does not resolve that missing
+obligation. Version 9 instead certifies swept intervals, retains targets after
+publication loss, and requires an explicit nonreturning-halfspace exit.
 
 Rest/dissipation remains an optional construction for a separately certified
 holding regime. Its rejection of persistent forcing is not a universal rule
@@ -78,7 +79,8 @@ for finite encounter certificates. Bounded nonzero residuals can be admitted
 when a sound finite tube and its discharge/transfer guard pass verification.
 No uncertainty may be zeroed merely to make that verification succeed.
 
-The revised specification lists the required interfaces, proof premises, and
-behavioral acceptance cases. It does not claim that a concrete exit guard,
-sampled-data physical safety theorem, or revised runtime has already been
-implemented.
+The revised specification lists the interfaces, proof premises, and behavioral
+acceptance cases. The implementation covers the stated finite affine inclusion
+and its supported exit guard. A physical-plant claim additionally requires a
+valid residual enclosure throughout every tube; holding and general handoff
+certificates remain separate work.

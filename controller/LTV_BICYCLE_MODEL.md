@@ -1,6 +1,8 @@
 # Scheduled Frenet bicycle and continuation model
 
-The prediction and certificate use `ltvBicycleModel.stageMatrices` at every stage.
+Version 9 uses `ltvBicycleModel.continuousMatrices` with finite swept tubes
+from `ltvBicycleModel.finitePredict`. The governing continuation requirement is
+[certified encounter discharge](ENCOUNTER_SCOPED_CBF_CLF.md).
 State is `x = [s; d; ePsi; vx; vy; r]`; input is front steering angle and
 signed braking ratio `u = [deltaF; beta]`. Station and lateral offset use the
 selected lane polyline; heading error is relative to its tangent.
@@ -50,15 +52,15 @@ Using the positive tire floor in the kinematic rows would destroy this rest
 property. The low-speed continuation is a regularized research model and
 has no independently validated nonlinear-vehicle accuracy claim.
 
-The continuous-time CLF reads this same generator through
-`ltvBicycleModel.continuousMatrices`, before held-input integration. It
-computes `LfV + LgV*u` at the current scheduled state with a fixed local
-cruise reference. Its Lyapunov matrix is obtained from the continuous
-Riccati equation at straight reference cruise. This performance change
-uses the same first-stage tire schedule as prediction. The local cruise target
-solves the three affine velocity balance equations. If a saturated tangent
-makes that system singular, its minimum-residual target is a soft performance
-reference, with no claim of attainable steady cornering.
+The predictive CLF uses this same continuous generator throughout every
+held interval. A common positive-definite Riccati metric is synthesized at
+straight reference cruise. The tracking reference includes explicit constant
+lateral-velocity/yaw-rate offsets and an optional affine rate in absolute time.
+Every reference derivative enters the dissipation bound. One nonnegative slack
+per interval bounds the residual over all swept control-point boxes; a common
+convex majorant per cell supplies the intermediate-time argument. The fixed
+cruise metric is a performance construction; curvature and constraints can
+require positive slack.
 
 ## Modified Fiala force and local linearization
 
@@ -132,78 +134,63 @@ paper's strictly nonzero-speed assumption.
 
 ## Schedule and condensation
 
-The admission schedule cruises at measured speed for `N` stages and then
-brakes to zero. `ltvBicycleModel.brakingSchedule` derives `Nb` from maximum speed and the
-configured nominal braking rate, with two additional rest stages. Initial
-scheduled station increments use trapezoidal integration of that speed
-profile, consistent with constant acceleration within a sample. Curvature is
-sampled from the supplied route.
+At admission, the finite schedule uses the initial measured speed over `N`
+held intervals and samples curvature along the corresponding nominal station
+profile. Its braking-ratio anchor balances declared road load and longitudinal
+bias. Both steering and signed braking ratio remain optimization variables at
+every stage; no braking or rest tail is appended.
 
-All `M=N+Nb` stages have two control variables. `ltvBicycleModel.predict`
-provides the stage matrices and the condensed map `x_j = F_j*plan + f_j`,
-including all lateral dynamics through rest. The native QP uses explicit
-states with sparse dynamic equalities; acceptance independently reconstructs
-states from the condensed map. Identical adjacent scheduling parameters reuse
-exactly the same stage matrices, including the scheduled braking ratio; no parameter quantization is used.
-The initial schedule input adds `Froad(vBar)/m` to its required net
-acceleration before dividing by `gBeta`. Rest uses zero road load; the beta force scale also enters the cruise Riccati design. A compatible certificate shifts the complete speed, station
-and curvature schedules verbatim and appends zero speed. Thus an old
-continuation stage and the executable stage it becomes have identical
-matrices. Scheduling is part of the augmented controller state, rather than
-a warm-start hint. A scheduled speed is an affine-model parameter, not a
-claim that the realized nonlinear vehicle equals that speed.
+`ltvBicycleModel.finitePredict` constructs condensed affine control-point and
+endpoint maps. The sparse native SOCP uses the held controls and interval CLF
+slacks, with linear hard rows and Lorentz cones. A carried witness retains and
+truncates its schedule, so an inherited stage keeps the same continuous
+matrices and physical residual assumptions. An uncertain observation refines
+the stored initial set without silently changing the model. A scheduled speed
+is a linearization parameter, not an assertion that the physical vehicle
+follows that speed exactly.
 
-The speed and braking-ratio schedules are exposed as `scheduleSpeedProfile`
-and `scheduleBrakingRatio`. The latter is derived from adjacent speeds and
-road load, so shifting the speed profile also preserves every overlapping
-Fiala tangent. `tireSlipRows` uses each stage's `max(vBar, floor)` consistently
-with its bicycle matrices. Command force diagnostics use that same first
-stage denominator. They do not silently recompute a different tire schedule
-from the measured speed after certification.
+The separately retained `ltvBicycleModel.predict` and `brakingSchedule`
+utilities support the optional rest/dissipation analysis. They are not called
+by the encounter controller. Their rest endpoint and braking-authority checks
+are specific to that construction.
 
 ## Constraints and uncertainty
 
-Braking-ratio/steering bounds and the configured slip-angle domains apply at
-all `M` stages. Slip limits are chosen model domains below `pi/2`, not
-friction-limit constraints or a certificate of tangent accuracy.
-There is no continuation acceleration-only input block and no kinematic
-lateral-band handoff. Nonnegative longitudinal speed, maximum speed, heading,
-lateral and affine-frame station limits are hard at every node. Exact-state rest
-requires zero longitudinal/lateral speed and yaw rate. With velocity uncertainty,
-a dissipative terminal set replaces those equalities; both branches use the
-final control `[0;-b/gBeta]`.
+Steering, signed braking ratio, slip-angle domains, longitudinal speed,
+lateral velocity, yaw rate, heading, lateral position and chart station are
+hard constraints throughout every held interval. Slip limits describe the
+admitted model domain; they do not establish the nonlinear tangent's accuracy.
+A positive minimum speed and weak braking authority can be admitted when a
+finite certificate passes. There is no universal exact-rest requirement.
 
-Error boxes are propagated through every stage as `rNext = abs(Ad)*r+d`.
-The two model rate fields now specify continuous derivative-error bounds,
-with `d` obtained by transition-weighted integration using a Metzler
-comparison. This includes forcing transported into other state channels.
-Initial Cartesian boxes cover all possible closest projection segments and
-their heading differences. Robust initial admission additionally requires
-one invertible interior chart.
+The two model rate fields specify continuous derivative-error bounds.
+`stateUncertainty.flowTube` encloses the complete affine flow using a Taylor
+polynomial, a remainder and arithmetic allowances, represented in Bernstein
+form. Endpoint propagation retains cancellation in the nominal transition.
+Initial Cartesian boxes require an invertible projection chart; a cell
+spanning a noncollinear polyline reference jump needs a separate jump/reset
+certificate and is currently rejected.
 
-The stationary-pose certificate retains exact velocity channels. The dissipative
-extension admits nonzero velocity uncertainty when the final zero-speed model
-has a Hurwitz Metzler velocity comparison and no persistent forcing. It
-reserves the complete remaining pose excursion and enforces invariant speed
-and slip domains. See
-[DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md) for
-the new inequalities and [MINIMAL_UNCERTAINTY_CERTIFICATE.md](MINIMAL_UNCERTAINTY_CERTIFICATE.md)
-for the original stationary-pose/set-membership argument.
-
-The former forward-Euler stiffness restriction is removed. Exact integration
-does not itself establish closed-loop stability, nonlinear-model validity or
-low-speed tire accuracy. Those require separate analysis and experiments.
+Bounded nonzero forcing and velocity uncertainty can grow over a finite
+certificate. They need not satisfy the optional perpetual-rest restrictions
+in [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
+The physical plant must remain inside the declared affine inclusion over its
+whole tube. Exact affine integration alone does not establish that premise,
+nonlinear stability, or low-speed tire accuracy.
 
 ## Geometry and proof scope
 
-Physical rectangle separation is evaluated in Cartesian space using an
-affine lane chart, with hard station-domain bounds and explicit position/yaw
-error allowances over every polyline segment intersecting that domain.
-Acceptance evaluates the actual polyline pose. Finite quadratic road bounds
-use analytic extrema over the admitted footprint interval.
-The proof and finite-precision acceptance protocol are in
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md). They cover prediction
-nodes of the declared model, and represented road boundaries where covered.
+Cartesian rectangle and road constraints use one fixed lane chart and one
+separating normal per target per cell. Directional support is maximized over
+the admitted yaw interval, and every Bernstein control-point box must satisfy
+the hard halfspaces. Finite quadratic road boundaries must cover the complete
+admitted footprint range. Target constraints remain active through certified
+exit, regardless of current publication.
+
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) states the finite-witness
+acceptance and fallback protocol. The certificate covers held intervals of
+the declared inclusion until its guarded exit; physical residual validity,
+route contracts and execution timing remain assumptions.
 
 ## Input contract and migration
 
@@ -213,8 +200,8 @@ nodes of the declared model, and represented road boundaries where covered.
 `clf.brakingRatioWeight` weights the normalized dimensionless input.
 The old acceleration bounds, acceleration weight, longitudinal gain and
 braking force distribution are rejected as unknown configuration fields.
-`terminal.backupDeceleration` remains a speed-schedule parameter in m/s^2;
-it is checked against the available beta braking range.
+`terminal.backupDeceleration` is an optional rest-schedule parameter in m/s^2.
+Its braking-authority check runs only when that separate utility is invoked.
 
 `command.longitudinalAcceleration` is a derived gross acceleration
 `gBeta*beta`, not the second control input or net body derivative. Passive

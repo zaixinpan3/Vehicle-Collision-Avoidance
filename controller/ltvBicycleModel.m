@@ -2,6 +2,82 @@ classdef ltvBicycleModel
     %ltvBicycleModel Held-input bicycle dynamics, horizon prediction and braking schedules.
 
     methods (Static)
+        function prediction = finitePredict(model, schedule)
+        %finitePredict A finite held-input witness, without an appended rest tail.
+            cfg = model.cfg;
+            count = model.horizonSteps;
+            planCount = 2*count;
+            h = model.sampleTime;
+            if isempty(schedule)
+                speed = model.initialEgoState(4);
+                station = model.initialEgoState(1)+(0:count)*h*speed;
+                curvature = arrayfun(@(value) laneGeometry.curvature(value, model.lane), station);
+                ratio = (longitudinalRoadLoad(speed, cfg)/cfg.vehicle.m ...
+                    -model.longitudinalAccelerationBias)/modifiedFialaTire.accelerationGain(cfg);
+                schedule = struct("speedProfile", repmat(speed, 1, count+1), ...
+                    "station", station, "curvature", curvature, ...
+                    "brakingRatio", repmat(min(max(ratio, -1+sqrt(eps)), 1-sqrt(eps)), 1, count));
+            end
+            reference = [atan(cfg.vehicle.wheelbase*schedule.curvature(1:count)); schedule.brakingRatio];
+            prediction = struct("stageCount", count, "nodeCount", count+1, ...
+                "planCount", planCount, "referencePlan", reference(:), ...
+                "scheduleForStore", schedule, "scheduleSpeedProfile", schedule.speedProfile, ...
+                "scheduleCurvature", schedule.curvature, "scheduleBrakingRatio", schedule.brakingRatio, ...
+                "egoStateMatrix", zeros(6, planCount, count+1), ...
+                "egoStateOffset", zeros(6, count+1), "egoStateErrorBound", zeros(6, count+1), ...
+                "continuousA", zeros(6, 6, count), "continuousB", zeros(6, 2, count), ...
+                "continuousC", zeros(6, count), "cells", []);
+            prediction.stageMatrixA = zeros(6, 6, count);
+            prediction.stageMatrixB = zeros(6, 2, count);
+            prediction.stageAffine = zeros(6, count);
+            map = zeros(6, planCount);
+            offset = model.initialEgoState;
+            radius = model.initialFrenetErrorBound;
+            prediction.egoStateOffset(:, 1) = offset;
+            prediction.egoStateErrorBound(:, 1) = radius;
+            rate = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
+            stateLimit = [model.lane.segmentStation(end)+model.lane.segmentLength(end); ...
+                cfg.model.lateralDomainRadius; cfg.model.headingDomainRadius; ...
+                cfg.model.speedMaximum; cfg.model.lateralVelocityMaximum; cfg.model.yawRateMaximum];
+            inputLimit = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+                max(abs([cfg.actuation.brakingRatioMinimum, cfg.actuation.brakingRatioMaximum]))], count, 1);
+            cells = cell(count, 1);
+            for stage = 1:count
+                [a, b, c] = ltvBicycleModel.continuousMatrices(schedule.curvature(stage), ...
+                    schedule.speedProfile(stage), cfg, schedule.brakingRatio(stage), ...
+                    model.longitudinalAccelerationBias);
+                prediction.continuousA(:, :, stage) = a;
+                prediction.continuousB(:, :, stage) = b;
+                prediction.continuousC(:, stage) = c;
+                exact = expm(h*[a, b, c; zeros(3, 9)]);
+                prediction.stageMatrixA(:, :, stage) = exact(1:6, 1:6);
+                prediction.stageMatrixB(:, :, stage) = exact(1:6, 7:8);
+                prediction.stageAffine(:, stage) = exact(1:6, 9);
+                cellCount = max(cfg.encounter.minimumCells, ceil(2*norm(a, inf)*h));
+                dt = h/cellCount;
+                heldMap = zeros(6, planCount);
+                heldMap(:, 2*stage-1:2*stage) = b;
+                stageCells = cell(cellCount, 1);
+                for cellIndex = 1:cellCount
+                    tube = stateUncertainty.flowTube(a, heldMap, c, map, offset, radius, ...
+                        rate, dt, cfg.encounter.taylorOrder, stateLimit, inputLimit);
+                    tube.stage = stage;
+                    tube.start = (stage-1)*h+(cellIndex-1)*dt;
+                    tube.duration = dt;
+                    tube.time = tube.start+(0:cfg.encounter.taylorOrder+1)*dt/(cfg.encounter.taylorOrder+1);
+                    stageCells{cellIndex} = tube;
+                    map = tube.endMap;
+                    offset = tube.endOffset;
+                    radius = tube.endRadius;
+                end
+                cells{stage} = vertcat(stageCells{:});
+                prediction.egoStateMatrix(:, :, stage+1) = map;
+                prediction.egoStateOffset(:, stage+1) = offset;
+                prediction.egoStateErrorBound(:, stage+1) = radius;
+            end
+            prediction.cells = vertcat(cells{:});
+        end
+
         function prediction = predict(model, storedSchedule)
         %ltvBicycleModel.predict One scheduled bicycle model over the complete plan.
         % Both steering and braking ratio are decisions at every stage. The final
@@ -215,6 +291,11 @@ classdef ltvBicycleModel
         % steps = ltvBicycleModel.brakingSchedule("steps", cfg)
         % profile = ltvBicycleModel.brakingSchedule("profile", cfg, steps, speed)
 
+            if cfg.model.speedMinimum > 0 || cfg.terminal.backupDeceleration ...
+                    > -cfg.actuation.brakingRatioMinimum*modifiedFialaTire.accelerationGain(cfg)
+                error("collisionAvoidanceController:invalidRestSchedule", ...
+                    "The optional rest schedule must admit rest and respect the declared braking limit.");
+            end
             switch string(action)
                 case "steps"
                     out = localSteps(cfg);

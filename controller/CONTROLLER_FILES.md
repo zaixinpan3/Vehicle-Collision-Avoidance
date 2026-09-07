@@ -13,33 +13,33 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility |
 | --- | --- |
-| `collisionAvoidanceController.m` | Controller entry, carried certificate, terminal admission and diagnostics |
+| `collisionAvoidanceController.m` | Encounter lifecycle, carried finite certificate and diagnostics |
 | `readPlanningInputs.m` | Input normalization and lane/target model construction |
-| `formulateAvoidanceProblem.m` | Objective, hard constraints and CLF construction |
-| `avoidanceStageQp.m` | Sparse stage-state QP transcription |
+| `formulateAvoidanceProblem.m` | Maneuver objective, hard swept constraints and predictive CLF cones |
+| `avoidanceStageQp.m` | Sparse quadratic/Lorentz-cone transcription and truncation |
 | `solveHardCbfClf.m` | Numerical solve and independent constraint acceptance |
 | `certifyAvoidancePlan.m` | Independent geometric verification of a plan |
-| `avoidanceSafetyGeometry.m` | Robust lane and obstacle geometry rows |
+| `avoidanceSafetyGeometry.m` | Swept lane and obstacle geometry rows |
 | `rectangleConfigurationDistance.m` | Oriented rectangle configuration distance |
-| `crossingCruiseReference.m` | Crossing-aware cruise reference |
+| `terminalDissipation.m` | Separately validated optional rest-funnel construction |
 | `laneGeometry.m` | Projection, Frenet pose, curvature and affine chart bounds |
 | `ltvBicycleModel.m` | Held-input stage matrices, full prediction and initial braking schedule |
 | `longitudinalRoadLoad.m` | Signed aerodynamic and equivalent rolling forces with their speed derivative |
 | `modifiedFialaTire.m` | Modified Fiala forces and scheduled local tire tangents |
 | `tireSlipRows.m` | Robust slip-angle model-domain rows |
 | `stateUncertainty.m` | Estimator certificate validation, Frenet boxes, disturbance propagation, intersection and terminal rest |
-| `targetPrediction.m` | Future target error envelope and analytic continuation support |
+| `targetPrediction.m` | Finite Cartesian target inclusion, conditioning and exit guard |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |
 | `solveAvoidanceSocpMex.cpp` | Native conic solver bridge |
 | `../config/collisionAvoidanceControllerConfig.m` | Controller defaults, merging and validation |
 
 The five grouped MATLAB modules expose named static methods, such as
-`laneGeometry.project`, `ltvBicycleModel.predict`, `modifiedFialaTire.evaluate`,
-`stateUncertainty.readCertificate` and `targetPrediction.initialSet` / `targetPrediction.errorEnvelope`.
-Their local helpers stay in the owning file. The controller entry signature,
-model equations, constraints and solver acceptance criteria are unchanged by
-this consolidation. Callers of the former standalone helpers must use the
+`laneGeometry.project`, `ltvBicycleModel.finitePredict`, `modifiedFialaTire.evaluate`,
+`stateUncertainty.flowTube` and `targetPrediction.admit` / `targetPrediction.finiteFlow`.
+Their local helpers stay in the owning file. Version 9 retains the controller
+entry signature and introduces the encounter contract and conic solver-hook
+interface documented in `PCBF_CLF_ARCHITECTURE.md`. Callers of the former standalone helpers must use the
 corresponding module methods; repository scripts and tests use these interfaces.
 
 When changing native geometry paths in a running MATLAB session, use

@@ -10,40 +10,9 @@ classdef avoidanceSafetyGeometryTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function batchedRoadSupportsBoundAllAdmittedRectangleHeadings(testCase)
-            cfg = collisionAvoidanceControllerConfig();
-            ego = struct("position", [0; 0], "yaw", 0, "speed", 1);
-            angles = linspace(-pi, pi, 25);
-            for angle = angles
-                tangent = [cos(angle); sin(angle)];
-                normal = [-sin(angle); cos(angle)];
-                boundary = struct("origin", [0; 0], "longitudinalDirection", tangent, ...
-                    "lateralDirection", normal, "coefficients", [-0.003, 0.1, -200], ...
-                    "parameterRange", [-1000, 1000], "safeSideSign", 1, ...
-                    "boundaryId", "rotated");
-                inputRoad = struct("centerline", [-100, 0; 100, 0], "boundaries", boundary);
-                [~, lane, road] = readPlanningInputs(ego, [], inputRoad, cfg);
-                model = struct("cfg", cfg, "lane", lane, "road", road, ...
-                    "hasTarget", false, "targetKey", "", ...
-                    "egoHalfLength", 2.4, "egoHalfWidth", 0.95);
-                prediction = struct("nodeCount", 5, "planCount", 8, ...
-                    "scheduleSpeedProfile", ones(1, 5), ...
-                    "egoStateErrorBound", repmat([0; 0; 0.07; 0; 0; 0], 1, 5));
-                state = zeros(6, 5);
-                state(1, :) = 90:2:98;
-                state(3, :) = linspace(-0.4, 0.4, 5);
-                geometry = avoidanceSafetyGeometry(model, prediction, state);
-                for index = 1:5
-                    node = geometry.road.nodes(index);
-                    yaw = linspace(-cfg.model.headingDomainRadius, cfg.model.headingDomainRadius, 201);
-                    uncertainYaw = yaw+[-0.07; 0.07];
-                    support = max(2.4*abs(cos(angle+pi/2-uncertainYaw)) ...
-                        + 0.95*abs(sin(angle+pi/2-uncertainYaw)), [], 1);
-                    bound = node.egoSupport+node.headingCoefficient*abs(yaw-state(3, index));
-                    testCase.verifyTrue(node.covered);
-                    testCase.verifyLessThanOrEqual(max(support-bound), 1.0e-12);
-                end
-            end
+        function directionalSupportsBoundAllAdmittedRectangleHeadings(testCase)
+            worst = localSupportResidual();
+            testCase.verifyLessThanOrEqual(worst, 1e-12);
         end
 
         function theChartBoundContainsPosesAcrossSegmentBoundaries(testCase)
@@ -67,30 +36,25 @@ classdef avoidanceSafetyGeometryTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(frame.stationUpper-frame.stationLower, 3.9);
         end
 
-        function aStationaryEndpointCanOccupyAPolylineVertex(testCase)
-            cfg = collisionAvoidanceControllerConfig();
-            ego = struct("position", [9.0; 0.0], "yaw", 0.0, ...
-                "speed", 1.0);
-            [~, lane] = readPlanningInputs( ...
-                ego, [], [0.0, 0.0; 10.0, 0.0; 20.0, 0.2], cfg);
-            model = struct("cfg", cfg, "lane", lane, "hasTarget", false, ...
-                "targetKey", "", "road", struct("boundaries", struct([])));
-            prediction = struct("nodeCount", 3, "planCount", 4, ...
-                "scheduleSpeedProfile", [1.0, 0.0, 0.0]);
-            anchor = zeros(6, 3);
-            anchor(1, :) = [9.0, 10.0+2.0e-5, 10.0-2.0e-5];
+        function aReferenceVertexRequiresAnExplicitJumpCertificate(testCase)
+            cfg = collisionAvoidanceControllerConfig(struct("controller",struct("horizonSteps",4)));
+            ego = struct("position",[9;0],"yaw",0,"speed",1);
+            testCase.verifyError(@() collisionAvoidanceController(ego,[],[0,0;10,0;20,0.2],cfg,[]), ...
+                "collisionAvoidanceController:noCertifiedContinuation");
+        end
+    end
+end
 
-            geometry = avoidanceSafetyGeometry(model, prediction, anchor);
-
-            last = geometry.frames(end-1:end);
-            testCase.verifyLessThanOrEqual(max([last.stationLower]), 10.0);
-            testCase.verifyGreaterThanOrEqual(min([last.stationUpper]), 10.0);
-            restPosition = [10.0; 0.4];
-            firstPose = last(1).origin ...
-                + [last(1).tangent, last(1).lateral]*restPosition;
-            secondPose = last(2).origin ...
-                + [last(2).tangent, last(2).lateral]*restPosition;
-            testCase.verifyEqual(firstPose, secondPose, AbsTol=1.0e-14);
+function worst = localSupportResidual()
+    worst = -inf;
+    for angle = linspace(-pi,pi,25)
+        normal = [cos(angle);sin(angle)];
+        for center = linspace(-pi,pi,13)
+            radius = 0.47;
+            support = targetPrediction.rectangleSupport(2.4,0.95,normal,center,radius);
+            yaw = linspace(center-radius,center+radius,501);
+            actual = 2.4*abs(cos(angle-yaw))+0.95*abs(sin(angle-yaw));
+            worst = max(worst,max(actual-support));
         end
     end
 end

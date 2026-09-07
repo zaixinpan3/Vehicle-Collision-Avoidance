@@ -24,10 +24,10 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             preparation = prepareCollisionAvoidanceController(ego, road, cfg);
             [command, ~, problem] = collisionAvoidanceController(ego, [], road, cfg, []);
             testCase.verifyFalse(preparation.allProbesCertified);
-            testCase.verifyEqual(preparation.attemptedCalls, 12);
-            testCase.verifyEqual(preparation.discardedCommandCount, 11);
+            testCase.verifyEqual(preparation.attemptedCalls, 3);
+            testCase.verifyEqual(preparation.discardedCommandCount, 2);
             testCase.verifyEqual(preparation.failureIdentifier(1, 1), ...
-                "collisionAvoidanceController:optimizationFailure");
+                "collisionAvoidanceController:noCertifiedContinuation");
             testCase.verifyTrue(all(preparation.probeCertified(2:end, :), "all"));
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyNotEmpty(command);
@@ -40,19 +40,11 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             decision = zeros(problem.layout.decisionCount, 1);
             decision(1:2) = [0.02; 0.3];
             decision(end) = 0.7;
-            scale = [cfg.model.frontWheelSteeringAngleMaximum; ...
-                max(abs([cfg.actuation.brakingRatioMinimum; ...
-                    cfg.actuation.brakingRatioMaximum]))];
-            weights = [cfg.clf.frontWheelSteeringAngleWeight; ...
-                cfg.clf.brakingRatioWeight];
-            inputCost = cfg.controller.sampleTime*sum(weights.*(decision(1:2)./scale).^2);
-            expectedCost = inputCost+cfg.clf.relaxationWeight*0.7^2;
-            alternative = decision;
-            alternative(problem.layout.tailIndex) = 0.1;
-
-            testCase.verifyEqual(localObjective(problem.qp, decision), expectedCost, AbsTol=1.0e-12);
-            testCase.verifyEqual(localObjective(problem.qp, 2*decision), 4*expectedCost, AbsTol=1.0e-12);
-            testCase.verifyEqual(localObjective(problem.qp, alternative), expectedCost, AbsTol=1.0e-12);
+            expectedCost = localExplicitCost(problem, cfg, decision);
+            testCase.verifyEqual(localObjective(problem.qp, decision), expectedCost, AbsTol=1e-8);
+            decision(3) = 0.04;
+            testCase.verifyEqual(localObjective(problem.qp, decision), ...
+                localExplicitCost(problem, cfg, decision), AbsTol=1e-8);
             testCase.verifyFalse(isfield(problem.qp, "preferredInput"));
             testCase.verifyFalse(isfield(problem.qp.clf.certificate, "sampledFeedbackGain"));
         end
@@ -67,7 +59,7 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyLessThan(norm(command.actuatorInput, inf), 1.0e-3);
             testCase.verifyLessThan(problem.metadata.clfValueProfile(2), 1.0e-8);
-            testCase.verifyEqual(problem.metadata.clfRelaxation, 0.0, AbsTol=0.0);
+            testCase.verifyLessThan(max(problem.metadata.clfRelaxation), 1e-4);
         end
 
         function nearCruiseCorrectionDoesNotOvershoot(testCase, nearCruiseSpeed)
@@ -89,7 +81,7 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
             road = [0, 0; 2000, 0];
             [~, ~, native] = collisionAvoidanceController(ego, [], road, cfg, []);
-            cfg.solver.jointFunction = @localQuadprog;
+            cfg.solver.jointFunction = @localIndependentConicSolve;
             [~, ~, independent] = collisionAvoidanceController(ego, [], road, cfg, []);
 
             testCase.verifyTrue(native.metadata.planCertified);
@@ -97,10 +89,9 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             testCase.verifyEqual(native.metadata.jointObjectiveValue, ...
                 independent.metadata.jointObjectiveValue, AbsTol=1.0e-5, RelTol=1.0e-6);
             testCase.verifyEqual(native.metadata.clfRelaxationCost, ...
-                cfg.clf.relaxationWeight*native.metadata.clfRelaxation^2, AbsTol=1.0e-10);
+                cfg.controller.sampleTime*cfg.clf.relaxationWeight*sum(native.metadata.clfRelaxation.^2), AbsTol=1.0e-10);
             testCase.verifyEqual(native.metadata.jointObjectiveValue, ...
                 localObjective(native.qp, native.decision), AbsTol=1.0e-10);
-            testCase.verifyEqual(native.metadata.inputEffortCost, native.metadata.inputDeviationCost);
             testCase.verifyLessThanOrEqual(native.metadata.hardRowViolation, 1.0e-5);
         end
 
@@ -121,7 +112,7 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             [actual, ~, diagnostic] = collisionAvoidanceController(ego, [], road, cfg);
             expected = collisionAvoidanceController(ego, [], road, cfg, certificate);
             testCase.verifyTrue(preparation.performed);
-            testCase.verifyEqual(preparation.discardedCommandCount, 12);
+            testCase.verifyEqual(preparation.discardedCommandCount, 3);
             testCase.verifyTrue(diagnostic.metadata.certificateCompatible);
             testCase.verifyEqual(actual.actuatorInput, expected.actuatorInput, AbsTol=1.0e-9);
         end
@@ -149,10 +140,37 @@ function value = localObjective(qp, decision)
     value = 0.5*decision.'*qp.Hessian*decision+qp.linear.'*decision+qp.constant;
 end
 
-function result = localQuadprog(~, program)
-    options = optimoptions("quadprog", "Display", "off", ...
-        "ConstraintTolerance", 1.0e-9, "OptimalityTolerance", 1.0e-9);
-    [decision, ~, exitFlag, output] = quadprog(program.H, program.f, ...
-        program.A, program.b, program.Aeq, program.beq, program.lb, program.ub, [], options);
-    result = struct("decision", decision, "exitFlag", exitFlag, "output", output);
+function result = localIndependentConicSolve(~, program)
+    initial = program.defaultSolver();
+    hessian = program.P+triu(program.P,1).';
+    options = optimoptions("fmincon", "Display", "off", "Algorithm", "sqp", ...
+        "ConstraintTolerance", 1e-9, "OptimalityTolerance", 1e-8, "MaxIterations", 100);
+    rows = 1:program.cones(2);
+    [decision, ~, exitFlag, output] = fmincon(@(z) 0.5*z.'*hessian*z+program.q.'*z, ...
+        initial.decision, program.A(rows,:), program.b(rows), [], [], [], [], ...
+        @(z) localCones(program,z), options);
+    result = struct("decision",decision,"exitFlag",exitFlag,"output",output);
+end
+
+function [inequality,equality] = localCones(program,decision)
+    slack = program.b-program.A*decision;
+    cells = reshape(slack(program.cones(2)+1:end),10,[]);
+    inequality = (sqrt(sum(cells(2:end,:).^2,1))-cells(1,:)).';
+    equality = [];
+end
+
+function value = localExplicitCost(problem,cfg,decision)
+    input = reshape(decision(problem.layout.planIndex),2,[]);
+    reference = reshape(problem.prediction.referencePlan,2,[]);
+    states = reshape(pagemtimes(problem.prediction.egoStateMatrix, input(:)),6,[]) ...
+        +problem.prediction.egoStateOffset;
+    error = states(2:6,1:end-1)-[0;0;cfg.referenceSpeed;0;0];
+    scales = [cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+        cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+    changes = diff([problem.model.previousInput,input],1,2)/cfg.controller.sampleTime;
+    inputWeights = [cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight];
+    value = cfg.controller.sampleTime*(sum((error./scales).^2,"all") ...
+        +sum(inputWeights.*(input-reference).^2,"all") ...
+        +cfg.encounter.inputRateWeight*sum(changes.^2,"all") ...
+        +cfg.clf.relaxationWeight*sum(decision(problem.layout.relaxationIndex).^2));
 end

@@ -1,67 +1,36 @@
 function result = solveHardCbfClf(problem, cfg)
-% solveHardCbfClf Minimize input effort and squared CLF relaxation.
-%
-% The certified decision assembled by formulateAvoidanceProblem is
-%
-%   z = [plan; delta],
-%
-% where every collision, road, physical, backup-tail, and terminal row is
-% hard. delta relaxes only LfV + LgV*u_0 <= -alpha*V + delta.
-% One quadratic program minimizes normalized head input effort plus w*delta^2
-% under affine hard constraints, without a desired input or a tail input cost.
-% The native backend uses explicit stage states with sparse dynamics;
-% the optional solver hook receives the equivalent condensed QP.
-
-    layout = problem.layout;
     result = localEmptyResult();
     if problem.certifiedInfeasible
+        result.message = "A constant hard constraint is infeasible.";
         result.exitFlag = -2;
-        result.message = "hard CBF, terminal, or physical constraints " ...
-            + "are infeasible";
         return;
     end
-    jointSolve = localRunJointProgram(problem, cfg);
+    solve = localRunJointProgram(problem, cfg);
     result.solverCalls = 1;
-    if ~jointSolve.feasible
-        result.exitFlag = jointSolve.exitFlag;
-        result.message = "CLF relaxation solve failed: " ...
-            + jointSolve.message;
-        return;
+    result.exitFlag = solve.exitFlag;
+    result.message = solve.message;
+    if ~solve.feasible, return; end
+    decision = solve.decision;
+    % Recompute only unbounded CLF slacks; preserve all controls verbatim.
+    slacks = zeros(problem.layout.relaxationCount, 1);
+    for index = 1:numel(problem.clf.constraints)
+        constraint = problem.clf.constraints(index);
+        value = constraint.map*decision+constraint.offset;
+        residual = norm(constraint.root*value)^2+constraint.linear.'*value+constraint.constant;
+        residual = residual+16*(numel(decision)+64)*eps*( ...
+            norm(abs(constraint.root)*abs(value))^2+abs(constraint.linear).'*abs(value)+abs(constraint.constant));
+        slacks(constraint.stage) = max(slacks(constraint.stage), residual);
     end
-
-    decision = jointSolve.decision(1:layout.decisionCount);
-    % Reconstruct the analytic minimum slack for this fixed input plan.
-    % No actuator or hard-safety variable is changed by this operation.
-    clf = problem.clf;
-    currentInput = decision(1:layout.inputDimension);
-    decision(layout.relaxationIndex) = max(0.0, ...
-        clf.lieDerivativeDrift+clf.lieDerivativeInput*currentInput ...
-        + clf.decayRate*clf.initialValue);
-    jointValue = localJointValue(problem, decision);
+    decision(problem.layout.relaxationIndex) = slacks ...
+        + cfg.encounter.numericalMargin*(1+abs(slacks));
     result.decision = decision;
-    result.exitFlag = jointSolve.exitFlag;
-    result.feasible = true;
-    result.iterations = localIterationCount(jointSolve.output);
-    result.algorithm = "joint CBF-CLF-QP";
-    if isfield(jointSolve.output, "algorithm")
-        result.algorithm = string(jointSolve.output.algorithm);
-    end
-    result.message = "candidate returned for independent acceptance: " ...
-        + jointSolve.message;
-    result.objectiveValue = jointValue;
-    result.clfValue = max( ...
-        decision(layout.relaxationIndex(1)), 0.0);
+    result.feasible = all(isfinite(decision));
+    result.iterations = localIterationCount(solve.output);
+    result.algorithm = "Clarabel predictive CBF-CLF SOCP";
+    result.objectiveValue = localJointValue(problem, decision);
+    result.clfValue = slacks;
 end
 
-function program = localJointProgram(problem)
-% Standard condensed QP: min 0.5*z'*H*z + f'*z, subject to affine rows.
-    program = struct("H", problem.Hessian, "f", problem.linear, ...
-        "constant", problem.constant, ...
-        "A", [problem.inequalityMatrix; problem.clf.inequalityMatrix], ...
-        "b", [problem.inequalityBound; problem.clf.inequalityBound], ...
-        "Aeq", problem.equalityMatrix, "beq", problem.equalityBound, ...
-        "lb", problem.lowerBound, "ub", problem.upperBound);
-end
 
 function solve = localRunJointProgram(problem, cfg)
     hook = cfg.solver.jointFunction;
@@ -69,8 +38,8 @@ function solve = localRunJointProgram(problem, cfg)
         if isempty(hook)
             solve = localDefaultSolve(problem, cfg);
         else
-            % The hook can solve the condensed QP or inject a failure.
-            program = localJointProgram(problem);
+            % The hook can solve the conic program or inject a failure.
+            program = problem.stageProgram;
             program.defaultSolver = @() localDefaultSolve(problem, cfg);
             solve = hook("joint", program);
         end
@@ -117,7 +86,7 @@ function solve = localDefaultSolve(problem, cfg)
             flag = 0;
     end
     physical = stageDecision(1:program.physicalDecisionCount);
-    output.algorithm = "Clarabel sparse CBF-CLF-QP";
+    output.algorithm = "Clarabel predictive CBF-CLF SOCP";
     output.message = "Clarabel status "+string(output.status);
     solve = struct("decision", physical, ...
         "exitFlag", flag, "output", output);
@@ -176,7 +145,7 @@ function result = localEmptyResult()
         "feasible", false, ...
         "iterations", 0, ...
         "solverCalls", 0, ...
-        "algorithm", "joint CBF-CLF-QP", ...
+        "algorithm", "predictive CBF-CLF SOCP", ...
         "message", "", ...
         "objectiveValue", inf, ...
         "clfValue", inf);

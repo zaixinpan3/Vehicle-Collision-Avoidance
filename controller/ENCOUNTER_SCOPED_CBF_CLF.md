@@ -1,7 +1,9 @@
 # Encounter-scoped predictive CBF, sampled-data CLF, and maneuver optimization
 
-Decision date: September 7, 2026. Status: governing mathematical specification;
-the version-8 MATLAB controller does not yet implement this contract.
+Decision and implementation date: September 7, 2026. Status: governing
+specification with a version-9 finite-witness implementation. The implemented
+nonreturning-halfspace exit guard is a sufficient special case; holding and
+arbitrary contract renewal are not implemented.
 
 The terminal requirement is **certified discharge of an encounter**. While an
 encounter is active, the controller must preserve a certified safe continuation
@@ -11,8 +13,8 @@ endpoint does not satisfy this requirement either.
 
 This specification supersedes the terminal, visibility, prediction-node, and
 current-state-only CLF requirements in earlier controller design notes.
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) documents the existing
-runtime and its narrower guarantee. The construction below is a project design
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) documents the implemented
+finite-witness runtime and its supported contracts. The construction below is a project design
 derived from the stated requirement; the cited papers supply its background,
 not a theorem for this repository's implementation.
 
@@ -512,71 +514,137 @@ admission must not be hidden by omitting the target. Changing the active set
 or normalization requires an explicit joint certificate transition, not
 reuse of a scalar bound whose meaning has changed.
 
-## 9. Runtime implementation obligations
+## 9. Executable finite-witness implementation
 
-The following are required changes, not completed MATLAB features:
+The version-9 controller implements the shrinking-clock construction with
+robust open-loop continuations. These are causal witnesses within the more
+general policy class in (12)–(13). It does not evaluate the exact optimal value
+function. The carried margin is an independently checked lower bound, capped
+by a configured finite value. Every accepted candidate preserves the required
+fraction of that bound; the inherited tail preserves its previous bound.
 
-| Area | Version-8 runtime | Required behavior |
-| --- | --- | --- |
-| Terminal | Ego rest/dissipation plus finite target endpoint | Exit or valid continuation/holding transfer with explicit guard |
-| Clock | Fixed head/tail; append a rest input and target node | Preserve absolute deadline; condition and truncate; recertify any extension |
-| Lifecycle | At most one currently published target | Encounter registry independent of visibility; joint admission and guarded discharge |
-| Prediction | Curvature quotient; finite arrays without discharge metadata | Finite-validity nonsingular enclosure and retained future-contract identity |
-| Ego residuals | Reject every nonzero persistent model residual | Admit bounded residuals when the complete finite tube and endpoint pass |
-| Safety | Node halfspaces and node rectangle diagnostics | Sound swept collision, road, and physical-domain bounds |
-| Observation | Target array shift equality; readmission on change | Conditioning/refinement of the certified future family |
-| CBF | Checked finite plan without the new margin state | Verified \(b_k,n_k,\Pi_k\) and explicit barrier inequality |
-| CLF | One relaxed current-state derivative; future values diagnostic | One bounded residual/slack per predicted held interval; full reference derivatives |
-| Maneuver | One chosen convex domain; crossing reference heuristic | Optimize explicit admissible modes, controls, input smoothness, and switching cost |
-| Fallback | Revalidate the shifted plan including a fresh last node | Retain the conditioned certified tail without requiring a new extension solve |
-| Acceptance | Numerical residual tolerances with node-level scope | Conservative proof bounds; explicit scope, validity, guard, and failure diagnostics |
+The implementation uses `cartesian-jerk-exit-v1` target contracts and a
+`nonreturningHalfspace` discharge guard. The entire uncertain target footprint
+must clear `exitOffset + d_min` along the supplied unit normal. Its declared
+post-exit route must keep the entire footprint beyond **that same clearance
+plane**, while the allowed ego route and footprint remain at or below
+`exitOffset`. This route assertion is an external assumption. It is not
+inferred from instantaneous velocity or from target disappearance.
 
-Own these changes in the existing controller modules and configuration; keep
-the estimator responsible for truthful current enclosures. Proposed certificate
-data include encounter IDs/status, assigned obligations, absolute contract
-validity, joint tubes and latent parameters, held controls, maneuver state,
-cell normals/rate/numerical bounds, CLF slacks and reference/metric versions,
-exit/transfer proof data, remaining intervals, and the verified barrier margin.
-A Boolean `exitCertified` supplied without verifiable premises is insufficient.
-The certificate format must be versioned to prevent version-8 node certificates
-from authorizing this stronger continuation guarantee.
-
-The first implementation must supply concrete discharge/monitoring contracts,
-physical residual/rate bounds, a sound CLF interval bound, and a witness class
-whose closure is established. These quantities are not present in the current
-public controller inputs. Keep the existing safety scope truthful until those
-components and the following acceptance cases are implemented together.
-
-## 10. Required behavioral validation
-
-These are acceptance criteria for the redesign, not tests reported as run:
-
-| Case | Required result |
+| Responsibility | Implemented behavior |
 | --- | --- |
-| Safe finite prefix, no exit or handoff | Reject continuation admission |
-| Target disappears, forecast ends, or ego stops before exit | Keep encounter obligation; do not declare discharge |
-| Crossing footprint clears but return/monitoring premise is absent | Reject exit guard |
-| Certified exit inside finite validity | Accept without post-exit target extrapolation |
-| Collision between clear sample nodes | Reject through swept-interval verification |
-| Endpoint normals differ | Use one common normal per cell or another valid interval proof |
-| Low-speed target set contains zero with nonzero yaw rate | Finite nonsingular propagation; no curvature division |
-| Bounded nonzero model residual | Retain residual; accept only if the complete certificate passes |
-| New observation refines carried futures but changes array values | Retain valid conditioned tail |
-| Disjoint observation or incompatible contract replacement | Report contract inconsistency; no inherited authority |
-| Solver failures after one admission | Execute inherited inputs to guarded exit, with a shrinking clock |
-| \(n=0\) with an active untransferred obligation | Reject; no automatic clock reset |
-| Tracking conflicts with safety | Increase CLF slack without weakening safety |
-| Changing reference/metric or chart transition | Account for derivative/jump terms in the tracking estimate |
-| Competing left/right/yield choices | Compare explicit admissible maneuvers; preserve switch constraints |
-| New target conflicts with incumbent maneuver | Require a jointly certified response, retaining every active target |
-| Waiting or extended deadline | Accept only a complete verified replacement/holding contract |
-| Solver success with an unsafe or numerically uncertified iterate | Reject and use a valid incumbent if available |
+| Encounter state | Stable identifiers, finite contracts, visibility-independent active records, guarded discharge |
+| Motion | Cartesian jerk/yaw-acceleration inclusions; finite nonzero ego residuals |
+| CBF | Swept safety and verified margin carried with a shrinking absolute deadline |
+| CLF | One robust dissipation slack per held interval; a common metric and explicit affine-reference derivative |
+| Maneuver | Three constant-mode candidates with overlapping corridors, input smoothness and switch cost |
+| Failure | Algebraic truncation of the accepted controls, tubes, safety rows and CLF bounds |
+| Admission | Missing exit, expiry, inconsistent observations, incompatible replacement, and infeasible joint admission reject authority |
+| Unsupported transfer | No finite-prefix waiting shortcut, automatic deadline extension, or unverified holding contract |
 
-Model-level regressions, physical-plant containment experiments, and execution
-deadline measurements must report their own scope. Finite simulations or dense
-sample checks alone do not prove interval enclosure, discharge, or indefinite
-renewability. No new controller run, tracking-decay result, or physical safety
-validation is claimed by this specification update.
+The runtime API and configuration are documented in
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) and
+[TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md).
+Noncollinear polyline chart transitions are rejected when a cell spans the
+reference jump. A jump/reset certificate or smooth reference representation
+would be needed to admit those transitions. Reference or metric changes during
+an active encounter cannot silently inherit its CLF estimate.
+
+### Swept Taylor/Bernstein tubes
+
+On a cell of duration \(\Delta\), write \(\dot x=Ax+Bu+c+w\),
+\(|w|\le\bar w\), and let \(p\) be the Taylor order. The nominal polynomial is
+
+\[
+x_p(t)=x_0+\sum_{m=1}^{p}\frac{t^m}{m!}A^{m-1}(Ax_0+Bu+c).
+\]
+
+Cells satisfy \(\|A\|_\infty\Delta<1\). Given absolute domain bounds and
+\(d_0=|A|\bar x+|B|\bar u+|c|\), a componentwise remainder bound is
+
+\[
+|x(t)-x_p(t)|\le
+\frac{|A|^p\mathbf1\,\|d_0\|_\infty}
+{(p+1)!(1-\|A\|_\infty\Delta)}t^{p+1}
+\]
+
+before adding initial uncertainty and process disturbance. The uncertainty
+polynomial includes \(|A^m|\rho_0 t^m/m!\), the corresponding disturbance
+integrals, and a tail bound using \(|A|\rho_0+\bar w\). Numerical allowances
+scale with operation counts and absolute coefficient magnitudes. Endpoint
+propagation uses the absolute value of the polynomial transition plus its
+error; it does not repeatedly use the looser swept absolute-power tube.
+
+For degree \(d=p+1\), the Bernstein control points of
+\(\sum_m c_m t^m\) are
+\(b_j=\sum_{m\le j}\binom jm c_m\Delta^m/\binom dm\).
+The nonnegative basis weights sum to one. The resulting control-point boxes
+therefore enclose the complete cell. Collision normals and lane charts are
+fixed throughout each cell; rectangle support is maximized over its yaw
+interval. All control-point halfspaces must pass. Quadratic road graphs must
+cover the complete admitted footprint range, including perception-limited
+boundaries. No interval proof rests solely on clear sample endpoints.
+
+### A common convex CLF upper bound on each cell
+
+After bounding the process term with Young's inequality, the CLF residual is a
+quadratic \(R(v)=v^\top Dv+f^\top v+q\) in error, held input and elapsed time.
+Choose \(\lambda>\|D\|_\infty\), \(K=D+\lambda I\succ0\), and **one common
+anchor \(\bar v\) for the entire cell**. Then
+
+\[
+R(v)\le v^\top Kv+(f-2\lambda\bar v)^\top v
+ +q+\lambda\|\bar v\|^2.
+\]
+
+For a control-point error box \(|\epsilon|\le\rho\), a positive Young parameter
+\(\kappa\) bounds the quadratic cross term by
+\((1+\kappa)v^\top Kv+(1+1/\kappa)\rho^\top|K|\rho\), with
+\(|f-2\lambda\bar v|^\top\rho\) covering the linear term. No Young enlargement
+is needed for an exact control point. A Lorentz cone represents each convex
+quadratic bound. Convexity of the **same cell majorant** and the Bernstein
+convex-hull property establish the bound for every intermediate time. Different
+anchors at different control points would not establish this result for an
+indefinite residual. The metric is constant; the affine reference derivative
+is included explicitly in \(R\). A constant reference uses a zero clock
+coordinate, avoiding an artificial time penalty in that case.
+
+The solver's returned controls are evaluated again. CLF slacks can be increased
+without changing those controls; hard safety margins cannot be relaxed.
+Dot-product allowances and the configured numerical reserve are charged before
+acceptance. The optimization uses twice that reserve on nonconstant hard rows,
+leaving room for independent acceptance at an active constraint. Solver
+termination and certificate arithmetic cannot both spend the same reserve.
+This is a declared-model certificate: physical residual bounds,
+execution timing, observation validity and route contracts remain premises.
+
+## 10. Behavioral validation and practical scope
+
+The behavior-focused tests cover absent exit contracts, footprint clearance,
+finite validity, visibility loss, stopped targets, zero-speed target uncertainty,
+between-node collision, common cell normals, nonzero residuals, set conditioning,
+contract/execution inconsistencies, repeated solver failure, a retained clock,
+CLF slack and reference derivatives, a concave interior dissipation peak,
+explicit maneuver comparison, joint admission, and rejection of unsafe solver
+iterates. A crossing that intersects the unmodified cruise path also tests
+strict acceptance near an active collision constraint and 15 consecutive
+stored-tail fallbacks through exit. Unsupported waiting, renewal and chart jumps are tested as rejection
+cases; they are not claimed as implemented capabilities.
+
+`runEncounterCertificateScenario` supplies a reproducible declared affine
+inclusion experiment. It uses deterministic nonzero residuals, independent
+matrix-exponential integration, target observation loss, and numerical failure
+after initial admission. Its dense rectangle, state-containment and CLF checks
+validate the implementation against that declared model. The interval guarantee
+comes from the tube/majorant construction, not from the density of those samples.
+
+The existing nonlinear vehicle scenarios do not supply all the motion,
+residual, route, chart and perception-coverage contracts required by version 9.
+They retain their failed-attempt inputs and report admission/continuation
+failures. Such regression results establish rejection behavior and adapter
+integrity, not successful nonlinear collision avoidance or physical safety.
+Reliable timely detection and any new handoff/holding guard need their own
+verified contracts. Runtime measurements do not establish a sampling deadline.
 
 ## Source verification and derivation scope
 

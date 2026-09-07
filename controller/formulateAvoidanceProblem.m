@@ -1,257 +1,138 @@
-function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
-%formulateAvoidanceProblem One convex domain with a carried safety witness.
-% The only slack is the continuous-time CLF relaxation. Every stage uses
-% the same bicycle, actuator, geometry and model-domain constraints.
-
-    arguments
-        model (1,1) struct
-        prediction (1,1) struct
-        anchorPlan (:,1) double
-        geometry = []
-    end
+function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
+% Convex maneuver-specific SOCP with one robust dissipation slack per sample.
     cfg = model.cfg;
-    count = prediction.planCount;
-    layout = struct("inputDimension", 2, "horizonSteps", model.horizonSteps, ...
-        "tailSteps", prediction.tailSteps, "inputCount", prediction.inputCount, ...
-        "planCount", count, "relaxationCount", 1, "decisionCount", count+1, ...
-        "inputIndex", 1:prediction.inputCount, "tailIndex", prediction.tailIndex, ...
-        "planIndex", 1:count, "relaxationIndex", count+1);
-    nominalState = squeeze(pagemtimes(prediction.egoStateMatrix, anchorPlan)) ...
-        + prediction.egoStateOffset;
-    geometry = avoidanceSafetyGeometry(model, prediction, nominalState, geometry);
-    families = [geometry.collision; geometry.road];
-    [slipMatrix, slipOffset, slipRows, slipConstant] = ...
-        tireSlipRows(prediction, model);
-    covered = arrayfun(@(family) nnz([family.nodes.covered]), families);
-    rowCount = 2*sum(covered)+8*prediction.nodeCount+numel(slipOffset);
-    matrix = zeros(rowCount, count+1);
-    bound = zeros(rowCount, 1);
-    rowFamily = strings(rowCount, 1);
-    rowNode = zeros(rowCount, 1);
-    localRows = zeros(rowCount, 8);
-    localBound = zeros(rowCount, 1);
-    stateNode = zeros(rowCount, 1);
-    inputStage = zeros(rowCount, 1);
-    cursor = 0;
-    for familyIdx = 1:numel(families)
-        nodes = families(familyIdx).nodes;
-        selected = find([nodes.covered]);
-        if isempty(selected), continue; end
-        normals = reshape([nodes(selected).normal], 2, []);
-        slope = [nodes(selected).headingCoefficient];
-        support = [nodes(selected).supportValue]+[nodes(selected).tightening];
-        heading = [nodes(selected).nominalHeading];
-        signs = [1.0; -1.0];
-        stateMap = prediction.egoStateMatrix(:, :, selected);
-        positionMap = pagemtimes(reshape(normals, 1, 2, []), stateMap(1:2, :, :));
-        headingMap = reshape(slope, 1, 1, []).*stateMap(3, :, :);
-        margins = [positionMap-headingMap; positionMap+headingMap];
-        offset = prediction.egoStateOffset(:, selected);
-        marginOffset = sum(normals.*offset(1:2, :), 1)-support ...
-            - signs.*slope.*(offset(3, :)-heading);
-        values = reshape(num2cell(margins, [1, 2]), 1, []);
-        [nodes(selected).marginMatrix] = values{:};
-        values = num2cell(marginOffset, 1);
-        [nodes(selected).marginOffset] = values{:};
-        [nodes(selected).imposed] = deal(true);
-        families(familyIdx).nodes = nodes;
-        range = cursor+(1:2*numel(selected));
-        matrix(range, 1:count) = -reshape(permute(margins, [1, 3, 2]), [], count);
-        bound(range) = marginOffset(:);
-        rowFamily(range) = families(familyIdx).name;
-        rowNode(range) = repelem(selected(:), 2);
-        localRows(range, 1:2) = repelem(-normals.', 2, 1);
-        localRows(range, 3) = reshape(signs.*slope, [], 1);
-        localBound(range) = reshape(-support+signs.*slope.*heading, [], 1);
-        stateNode(range) = repelem(selected(:)-1, 2);
-        cursor = cursor+numel(range);
+    count = prediction.stageCount;
+    planCount = prediction.planCount;
+    decisionCount = planCount+count;
+    model.anchorPlan = anchorPlan;
+    geometry = avoidanceSafetyGeometry(model, prediction);
+    lowerInput = repmat([-cfg.model.frontWheelSteeringAngleMaximum; cfg.actuation.brakingRatioMinimum], count, 1);
+    upperInput = repmat([cfg.model.frontWheelSteeringAngleMaximum; cfg.actuation.brakingRatioMaximum], count, 1);
+    hardMatrix = [geometry.matrix, zeros(size(geometry.matrix, 1), count); ...
+        eye(planCount), zeros(planCount, count); -eye(planCount), zeros(planCount, count); ...
+        zeros(count, planCount), -eye(count)];
+    physicalBound = [geometry.physicalBound; upperInput; -lowerInput; zeros(count, 1)];
+    safetyRows = [geometry.safety; false(2*planCount+count, 1)];
+    % Leave room for strict independent acceptance at an active constraint.
+    % Acceptance charges one reserve; solving with two does not spend that
+    % same allowance on both solver termination and certificate arithmetic.
+    reserve = 2*cfg.encounter.numericalMargin*double(any(hardMatrix ~= 0, 2));
+    reserve(end-count+1:end) = 0;
+    bound = physicalBound-model.requiredMargin*double(safetyRows)-reserve;
+    hessian = zeros(decisionCount);
+    linear = zeros(decisionCount, 1);
+    constant = cfg.encounter.maneuverSwitchWeight*double(model.maneuver ~= model.previousManeuver);
+    referenceStart = [0; 0; cfg.referenceSpeed; 0; 0]+cfg.clf.referenceOffset ...
+        +cfg.clf.referenceRate*(model.stateTime-cfg.clf.referenceEpoch);
+    clockScale = double(any(cfg.clf.referenceRate));
+    scales = [cfg.clf.lateralPositionErrorScale; cfg.clf.headingErrorScale; cfg.clf.speedErrorScale; ...
+        cfg.clf.lateralVelocityErrorScale; cfg.clf.yawRateErrorScale];
+    weight = diag(1./scales.^2);
+    for stage = 1:count
+        map = [prediction.egoStateMatrix(2:6, :, stage), zeros(5, count)];
+        offset = prediction.egoStateOffset(2:6, stage)-referenceStart ...
+            -cfg.clf.referenceRate*(stage-1)*model.sampleTime;
+        hessian = hessian+2*model.sampleTime*(map.'*weight*map);
+        linear = linear+2*model.sampleTime*map.'*weight*offset;
+        constant = constant+model.sampleTime*offset.'*weight*offset;
     end
-    geometry.collision = families(1);
-    geometry.road = families(2:end);
-    scale = [1.0; cfg.model.lateralDomainRadius; ...
-        cfg.model.headingDomainRadius; cfg.model.speedMaximum];
-    nodeCount = prediction.nodeCount;
-    lower = [[geometry.frames.stationLower]; ...
-        repmat([-cfg.model.lateralDomainRadius; -cfg.model.headingDomainRadius; 0.0], 1, nodeCount)] ...
-        + prediction.egoStateErrorBound(1:4, :);
-    upper = [[geometry.frames.stationUpper]; ...
-        repmat([cfg.model.lateralDomainRadius; cfg.model.headingDomainRadius; cfg.model.speedMaximum], 1, nodeCount)] ...
-        - prediction.egoStateErrorBound(1:4, :);
-    maps = prediction.egoStateMatrix(1:4, :, :)./scale;
-    maps = [maps; -maps];
-    offset = prediction.egoStateOffset(1:4, :);
-    limits = [(upper-offset)./scale; (offset-lower)./scale];
-    range = cursor+(1:8*nodeCount);
-    matrix(range, 1:count) = reshape(permute(maps, [1, 3, 2]), [], count);
-    bound(range) = limits(:);
-    rowFamily(range) = repmat(["routeDomain"; "lateralDomain"; ...
-        "headingDomain"; "speedDomain"], 2*nodeCount, 1);
-    rowNode(range) = repelem((1:nodeCount).', 8);
-    localRows(range, 1:4) = repmat([diag(1.0./scale); -diag(1.0./scale)], nodeCount, 1);
-    limits = [upper./scale; -lower./scale];
-    localBound(range) = limits(:);
-    stateNode(range) = repelem((0:nodeCount-1).', 8);
-    cursor = cursor+numel(range);
-    range = cursor+1:rowCount;
-    matrix(range, 1:count) = slipMatrix;
-    bound(range) = -slipOffset;
-    rowFamily(range) = "tireSlip";
-    localRows(range, :) = reshape(permute(slipRows, [1, 3, 2]), [], 8);
-    localBound(range) = -slipConstant(:);
-    stateNode(range) = repelem((0:prediction.stageCount-1).', size(slipRows, 1));
-    inputStage(range) = stateNode(range)+1;
-
-    % Exact rest in the three velocity states. The terminal policy cancels
-    % the declared constant longitudinal bias; its steering is zero.
-    terminalInput = [0.0; -model.longitudinalAccelerationBias ...
-        / modifiedFialaTire.accelerationGain(model.cfg)];
-    equalityMatrix = [prediction.egoStateMatrix(4:6, :, end), zeros(3, 1)];
-    equalityBound = -prediction.egoStateOffset(4:6, end);
-    terminalStateRows = [zeros(3), eye(3)];
-    if isfield(prediction, "terminalDissipation")
-        certificate = prediction.terminalDissipation;
-        radius = prediction.egoStateErrorBound(:, end);
-        terminal = stateNode == prediction.stageCount;
-        pose = terminal & any(localRows(:, 1:3), 2);
-        poseBound = localBound(pose);
-        poseMatrix = localRows(pose, 1:3);
-        % Geometry left the terminal uncertainty uncharged. Domain rows used
-        % the ordinary node box, which is replaced by the complete funnel.
-        domain = ismember(rowFamily(pose), ["routeDomain", "lateralDomain", "headingDomain"]);
-        poseBound(domain) = poseBound(domain)+abs(poseMatrix(domain, :))*radius(1:3);
-        [terminalRows, terminalBound] = terminalDissipation.poseRows( ...
-            poseMatrix, poseBound, radius, certificate);
-        velocityRows = [zeros(3), eye(3), zeros(3, 2); ...
-            zeros(3), -eye(3), zeros(3, 2)];
-        velocityBound = [certificate.velocityLimit-radius(4:6); ...
-            certificate.velocityLimit-radius(4:6)];
-        % Forward speed remains nonnegative. It decays independently under
-        % the terminal generator, so the lower halfspace is invariant.
-        velocityBound(4) = -radius(4);
-        terminalRows = [terminalRows; velocityRows];
-        terminalBound = [terminalBound; velocityBound];
-        terminalCount = size(terminalRows, 1);
-        keep = ~terminal;
-        localRows = [localRows(keep, :); terminalRows];
-        localBound = [localBound(keep); terminalBound];
-        stateNode = [stateNode(keep); repmat(prediction.stageCount, terminalCount, 1)];
-        inputStage = [inputStage(keep); zeros(terminalCount, 1)];
-        rowFamily = [rowFamily(keep); repmat("terminalDissipation", terminalCount, 1)];
-        rowNode = [rowNode(keep); repmat(prediction.nodeCount, terminalCount, 1)];
-        matrix = [matrix(keep, :); ...
-            terminalRows(:, 1:6)*prediction.egoStateMatrix(:, :, end), zeros(terminalCount, 1)];
-        terminalOffset = terminalBound-terminalRows(:, 1:6)*prediction.egoStateOffset(:, end);
-        bound = [bound(keep); terminalOffset];
-        equalityMatrix = zeros(0, count+1);
-        equalityBound = zeros(0, 1);
-        terminalStateRows = zeros(0, 6);
-    end
-    lowerInput = [-cfg.model.frontWheelSteeringAngleMaximum; ...
-        cfg.actuation.brakingRatioMinimum];
-    upperInput = [cfg.model.frontWheelSteeringAngleMaximum; ...
-        cfg.actuation.brakingRatioMaximum];
-    lowerBound = [repmat(lowerInput, prediction.stageCount, 1); 0.0];
-    upperBound = [repmat(upperInput, prediction.stageCount, 1); inf];
-    lowerBound(count-1:count) = terminalInput;
-    upperBound(count-1:count) = terminalInput;
-    common = struct("certificate", localClfCertificate(model), ...
-        "equilibrium", localCruiseEquilibriumProfile(model, prediction));
-    [hessian, linear, constant] = localObjective(model, layout);
-    qp = struct("problemClass", "certificatePreservingCbfClfQp", ...
-        "layout", layout, "label", "maintainedCertificate", ...
-        "Hessian", hessian, "linear", linear, "constant", constant, ...
-        "inequalityMatrix", matrix, "inequalityBound", bound, ...
-        "equalityMatrix", equalityMatrix, "equalityBound", equalityBound, ...
-        "rowFamily", rowFamily, "rowNode", rowNode, ...
-        "lowerBound", lowerBound, "upperBound", upperBound, ...
-        "collision", families(1), "road", families(2:end), ...
-        "clf", localClfData(prediction, model, layout, common), ...
-        "geometry", geometry, "linearizationPlan", anchorPlan, ...
-        "nominalState", nominalState, ...
-        "terminalInput", terminalInput, "terminalStateRows", terminalStateRows, ...
-        "certifiedInfeasible", ...
-            any(~isfinite(bound)) || any(lowerBound > upperBound) ...
-            || any(terminalInput < lowerInput) || any(terminalInput > upperInput));
-    qp.stageProgram = avoidanceStageQp(qp, prediction, ...
-        localRows, localBound, stateNode, inputStage);
-end
-
-function equilibrium = localCruiseEquilibriumProfile(model, prediction)
-    nodeCount = model.horizonSteps+1;
-    equilibrium = struct("input", zeros(2, model.horizonSteps), ...
-        "lateralVelocity", zeros(1, nodeCount), "yawRate", zeros(1, nodeCount));
-    for nodeIdx = 1:nodeCount
-        point = cruiseEquilibrium(model.referenceSpeed, ...
-            prediction.scheduleCurvature(nodeIdx), ...
-            model.longitudinalAccelerationBias, model.cfg);
-        equilibrium.lateralVelocity(nodeIdx) = point.lateralVelocity;
-        equilibrium.yawRate(nodeIdx) = point.yawRate;
-        if nodeIdx <= model.horizonSteps
-            equilibrium.input(:, nodeIdx) = ...
-                [point.steeringAngle; point.brakingRatio];
+    inputWeight = repmat([cfg.clf.frontWheelSteeringAngleWeight; cfg.clf.brakingRatioWeight], count, 1);
+    hessian(1:planCount, 1:planCount) = hessian(1:planCount, 1:planCount)+2*model.sampleTime*diag(inputWeight);
+    equilibrium = prediction.referencePlan;
+    linear(1:planCount) = linear(1:planCount)-2*model.sampleTime*inputWeight.*equilibrium;
+    constant = constant+model.sampleTime*sum(inputWeight.*equilibrium.^2);
+    difference = eye(planCount)-diag(ones(planCount-2, 1), -2);
+    prior = [model.previousInput; zeros(planCount-2, 1)];
+    smoothWeight = cfg.encounter.inputRateWeight/model.sampleTime;
+    hessian(1:planCount, 1:planCount) = hessian(1:planCount, 1:planCount)+2*smoothWeight*(difference.'*difference);
+    linear(1:planCount) = linear(1:planCount)-2*smoothWeight*difference.'*prior;
+    constant = constant+smoothWeight*(prior.'*prior);
+    hessian(planCount+1:end, planCount+1:end) = 2*model.sampleTime*cfg.clf.relaxationWeight*eye(count);
+    certificate = localClfCertificate(model);
+    scale = norm(certificate.lyapunovMatrix, inf);
+    certificate.lyapunovMatrix = certificate.lyapunovMatrix/scale;
+    certificate.decreaseMatrix = certificate.decreaseMatrix/scale;
+    p = certificate.lyapunovMatrix;
+    rate = cfg.clf.decreaseRateFraction*certificate.certifiedDecreaseRate;
+    residual = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
+    disturbance = residual(2:6);
+    youngRate = 0.1;
+    disturbanceCost = disturbance.'*abs(p)*disturbance/youngRate;
+    cellConstraints = cell(numel(prediction.cells), 1);
+    for cellIndex = 1:numel(prediction.cells)
+        tube = prediction.cells(cellIndex);
+        stage = tube.stage;
+        a = prediction.continuousA(2:6, 2:6, stage);
+        b = prediction.continuousB(2:6, :, stage);
+        c = prediction.continuousC(2:6, stage);
+        quadratic = zeros(8);
+        quadratic(1:5, 1:5) = a.'*p+p*a+(rate+youngRate)*p;
+        quadratic(1:5, 6:7) = p*b;
+        quadratic(6:7, 1:5) = b.'*p;
+        quadratic(1:5, 8) = p*a*cfg.clf.referenceRate;
+        quadratic(8, 1:5) = cfg.clf.referenceRate.'*a.'*p;
+        baseLinear = [2*p*(a*referenceStart+c-cfg.clf.referenceRate); zeros(3, 1)];
+        curvature = norm(quadratic, inf)+1;
+        positive = quadratic+curvature*eye(8);
+        factor = chol((positive+positive.')/2);
+        points = size(tube.offset, 2);
+        seedState = mean(reshape(pagemtimes(tube.map, anchorPlan), 6, [])+tube.offset, 2);
+        seedTime = mean(tube.time);
+        anchor = [seedState(2:6)-referenceStart-cfg.clf.referenceRate*seedTime; ...
+            anchorPlan(2*stage-1:2*stage); clockScale*seedTime];
+        % A single convex majorant must cover the entire cell. Independently
+        % reanchored bounds at individual control points would not justify
+        % the convex-hull argument for an indefinite CLF residual.
+        affine = baseLinear-2*curvature*anchor;
+        constraints = cell(points, 1);
+        for point = 1:points
+            map = zeros(8, decisionCount);
+            map(1:5, 1:planCount) = tube.map(2:6, :, point);
+            map(6:7, 2*stage-1:2*stage) = eye(2);
+            offset = [tube.offset(2:6, point)-referenceStart-cfg.clf.referenceRate*tube.time(point); ...
+                zeros(2, 1); clockScale*tube.time(point)];
+            % A constant reference has no clock term in its residual. Set
+            % that unused coordinate to zero to avoid artificial CLF slack.
+            error = [tube.radius(2:6, point); zeros(3, 1)];
+            errorQuadratic = error.'*abs(positive)*error;
+            expansion = 0;
+            ratio = 0;
+            if errorQuadratic > 0
+                ratio = max(1e-6, min(0.2, sqrt(errorQuadratic/max(1e-12, anchor.'*positive*anchor))));
+                expansion = (1+1/ratio)*errorQuadratic;
+            end
+            root = sqrt(1+ratio)*factor;
+            additive = curvature*(anchor.'*anchor)+disturbanceCost+expansion+abs(affine).'*error;
+            constraints{point} = struct("map", map, "offset", offset, "root", root, ...
+                "linear", affine, "constant", additive, "stage", stage);
         end
+        cellConstraints{cellIndex} = vertcat(constraints{:});
     end
-end
-
-function [hessian, linear, constant] = localObjective(model, layout)
-% Penalize head input effort and squared CLF relaxation without an input target.
-% The rest continuation certifies safety and carries no performance cost.
-    cfg = model.cfg;
-    scale = [cfg.model.frontWheelSteeringAngleMaximum; ...
-        max(abs([cfg.actuation.brakingRatioMinimum, ...
-            cfg.actuation.brakingRatioMaximum]))];
-    weight = [cfg.clf.frontWheelSteeringAngleWeight; ...
-        cfg.clf.brakingRatioWeight]./scale.^2;
-    diagonal = zeros(layout.decisionCount, 1);
-    diagonal(layout.inputIndex) = model.sampleTime ...
-        * repmat(weight, layout.horizonSteps, 1);
-    diagonal(layout.relaxationIndex) = cfg.clf.relaxationWeight;
-    hessian = diag(2.0*diagonal);
-    linear = zeros(layout.decisionCount, 1);
-    constant = 0.0;
-end
-
-function clf = localClfData(prediction, model, layout, common)
-% LfV + LgV*u_0 <= -alpha*V + delta at the current scheduled state.
-% P and the local cruise reference are held fixed for this derivative.
-% Future quadratic values are diagnostics, not optimization constraints.
-    certificate = common.certificate;
-    equilibrium = common.equilibrium;
-    nodeCount = model.horizonSteps+1;
-    errorDimension = numel(certificate.errorStateOrder);
-    errorMatrix = zeros(errorDimension, layout.planCount, nodeCount);
-    errorOffset = zeros(errorDimension, nodeCount);
-    for nodeIdx = 1:nodeCount
-        errorMatrix(:, :, nodeIdx) = ...
-            prediction.egoStateMatrix(2:6, :, nodeIdx);
-        errorOffset(:, nodeIdx) = prediction.egoStateOffset(2:6, nodeIdx) ...
-            - [0.0; 0.0; model.referenceSpeed; ...
-                equilibrium.lateralVelocity(nodeIdx); equilibrium.yawRate(nodeIdx)];
-    end
-    lyapunovMatrix = certificate.lyapunovMatrix;
-    currentError = errorOffset(:, 1);
-    initialValue = currentError.'*lyapunovMatrix*currentError;
-    [continuousA, continuousB, continuousC] = ltvBicycleModel.continuousMatrices( ...
-        prediction.scheduleCurvature(1), prediction.scheduleSpeedProfile(1), model.cfg, ...
-        prediction.scheduleBrakingRatio(1), model.longitudinalAccelerationBias);
-    drift = continuousA*prediction.egoStateOffset(:, 1)+continuousC;
-    lyapunovGradient = 2.0*currentError.'*lyapunovMatrix;
-    lieDerivativeDrift = lyapunovGradient*drift(2:6);
-    lieDerivativeInput = lyapunovGradient*continuousB(2:6, :);
-    decayRate = model.cfg.clf.decreaseRateFraction*certificate.certifiedDecreaseRate;
-    inequalityMatrix = zeros(1, layout.decisionCount);
-    inequalityMatrix(1:layout.inputDimension) = lieDerivativeInput;
-    inequalityMatrix(layout.relaxationIndex) = -1.0;
-    clf = struct( ...
-        "certificate", certificate, ...
-        "lyapunovMatrix", lyapunovMatrix, "decayRate", decayRate, ...
-        "lieDerivativeDrift", lieDerivativeDrift, ...
-        "lieDerivativeInput", lieDerivativeInput, ...
-        "inequalityMatrix", inequalityMatrix, ...
-        "inequalityBound", -lieDerivativeDrift-decayRate*initialValue, ...
-        "errorMatrix", errorMatrix, "errorOffset", errorOffset, ...
-        "equilibriumInput", equilibrium.input, ...
-        "initialValue", initialValue);
+    constraints = vertcat(cellConstraints{:});
+    initialError = model.initialEgoState(2:6)-referenceStart;
+    clf = struct("certificate", certificate, "lyapunovMatrix", p, "decayRate", rate, ...
+        "referenceStart", referenceStart, "referenceRate", cfg.clf.referenceRate, ...
+        "initialValue", initialError.'*p*initialError, "constraints", constraints);
+    drift = prediction.continuousA(:, :, 1)*model.initialEgoState+prediction.continuousC(:, 1);
+    clf.lieDerivativeDrift = 2*initialError.'*p*(drift(2:6)-cfg.clf.referenceRate);
+    clf.lieDerivativeInput = 2*initialError.'*p*prediction.continuousB(2:6, :, 1);
+    clf.errorOffset = prediction.egoStateOffset(2:6, :)-referenceStart ...
+        -cfg.clf.referenceRate*((0:count)*model.sampleTime);
+    clf.equilibriumInput = reshape(prediction.referencePlan, 2, []);
+    layout = struct("decisionCount", decisionCount, "planCount", planCount, ...
+        "horizonSteps", count, "inputDimension", 2, "inputIndex", 1:planCount, ...
+        "planIndex", 1:planCount, "relaxationIndex", planCount+1:decisionCount, ...
+        "tailSteps", 0, "tailIndex", [], "relaxationCount", count);
+    qp = struct("encounterMode", true, "problemClass", "encounterPredictiveCbfClfSocp", ...
+        "layout", layout, "geometry", geometry, "clf", clf, ...
+        "Hessian", hessian, "linear", linear, "constant", constant, ...
+        "inequalityMatrix", hardMatrix, "inequalityBound", bound, ...
+        "physicalBound", physicalBound, "safetyRows", safetyRows, ...
+        "requiredMargin", model.requiredMargin, "exitMargin", model.exitMargin, ...
+        "equalityMatrix", zeros(0, decisionCount), "equalityBound", zeros(0, 1), ...
+        "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
+        "certifiedInfeasible", any(bound(~any(hardMatrix, 2)) < 0));
+    qp.stageProgram = avoidanceStageQp(qp);
 end
 
 function certificate = localClfCertificate(model)
@@ -330,38 +211,4 @@ function certificate = localClfCertificate(model)
             "speedError"; "lateralVelocity"; "yawRateError"]);
     memoKey = key;
     memoCertificate = certificate;
-end
-
-function equilibrium = cruiseEquilibrium( ...
-        referenceSpeed, curvature, accelerationBias, cfg)
-% cruiseEquilibrium Steady cruise target of the declared model.
-%
-% Solve the three velocity balance equations of the scheduled affine Fiala
-% bicycle. A saturated tangent may not admit an exact cornering target;
-% in that case the minimum-residual target remains a soft CLF reference.
-    if referenceSpeed < 0.0
-        error("collisionAvoidanceController:invalidInput", ...
-            "cruiseEquilibrium requires a nonnegative reference speed.");
-    end
-    yawRate = curvature*referenceSpeed;
-    [stateMatrix, inputMatrix, affine] = ...
-        ltvBicycleModel.continuousMatrices(curvature, referenceSpeed, cfg, [], accelerationBias);
-    base = [0; 0; 0; referenceSpeed; 0; yawRate];
-    balance = [stateMatrix(4:6, 5), inputMatrix(4:6, :)];
-    residual = stateMatrix(4:6, :)*base+affine(4:6);
-    if rcond(balance) > 1.0e-12
-        target = -balance\residual;
-    else
-        target = -pinv(balance)*residual;
-    end
-    lateralVelocity = target(1);
-    steeringAngle = target(2);
-    brakingRatio = target(3);
-    equilibrium = struct( ...
-        "referenceSpeed", referenceSpeed, ...
-        "curvature", curvature, ...
-        "lateralVelocity", lateralVelocity, ...
-        "yawRate", yawRate, ...
-        "steeringAngle", steeringAngle, ...
-        "brakingRatio", brakingRatio);
 end
