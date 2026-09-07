@@ -74,7 +74,7 @@ ultimate radii without a small-gain condition, and the online error
 enclosure the controller consumes. The controller solves one quadratic
 program per sample on a scheduled Frenet bicycle integrated exactly under
 held inputs: rectangle separation, quadratic road boundaries, actuator,
-friction-polygon and domain rows are hard at every node of a horizon
+slip-domain and state-domain rows are hard at every node of a horizon
 terminating in a certified rest set. The objective combines input effort
 with squared relaxation of a continuous-time control Lyapunov condition
 obtained from the cruise Riccati equation. A shifted candidate gives
@@ -270,7 +270,7 @@ the scenario of Fig.~\ref{fig:driving_environment}: an ego vehicle
 with speed \(V_E\) and yaw angle \(\psi_E\) and an obstacle vehicle
 with speed \(V_C\) and yaw angle \(\psi_C\) travel on courses that may
 lead to a collision. The controller declares one ego model, the dynamic
-bicycle with linear cornering; the estimator uses only its kinematics and
+bicycle with locally linearized modified Fiala tires; the estimator uses only its kinematics and
 the kinematic single-track relation between yaw rate, speed and sideslip,
 so no cornering stiffness enters any estimation certificate. With
 \(\bm p_E\in\R^2\) and \(\bm v_E\in\R^2\) the inertial position and
@@ -298,20 +298,45 @@ The body-frame force and moment balances are
     \end{aligned}
     \label{eq:bicycle_model}
 \end{equation}
-with the linear-cornering tire forces
+with the slip convention and modified Fiala forces
 \begin{equation}
     \begin{aligned}
-    F_{yf}&=C_{f,E}
-    \Bigl(\delta_F-\frac{v_{y,E}+l_{f,E}\dot\psi_E}{v_{x,E}}\Bigr),\\
-    F_{yr}&=-C_{r,E}\,\frac{v_{y,E}-l_{r,E}\dot\psi_E}{v_{x,E}},
+    \alpha_f&=\frac{v_{y,E}+l_{f,E}\dot\psi_E}{v_{x,E}}-\delta_F,
+    & F_{yf}&=\Phi_f(\alpha_f;Q_f),\\
+    \alpha_r&=\frac{v_{y,E}-l_{r,E}\dot\psi_E}{v_{x,E}},
+    & F_{yr}&=\Phi_r(\alpha_r;Q_r).
     \end{aligned}
     \label{eq:tire_forces}
 \end{equation}
-where \(m_E\) is the mass, \(I_{z,E}\) the yaw inertia, \(C_{f,E}\)
-and \(C_{r,E}\) the front and rear cornering stiffnesses, \(l_{f,E}\)
-and \(l_{r,E}\) the front- and rear-axle distances, and the inputs are
-the total longitudinal tire force \(F_{x,E}\) and the front steering
-angle \(\delta_F\). The speed, sideslip, and course of
+For axle \(i\in\{f,r\}\), let \(t=\tan\alpha\), \(C_i>0\) be its
+nominal cornering stiffness, and \(Q_i=\eta_i\mu_iF_{zi}\). Following
+\cite{FahmyGhanyBaumann2018}, Section II-A, equations (7), (11) and (13),
+\begin{equation}
+    \Phi_i(\alpha;Q_i)=
+    \begin{cases}
+    -C_it+\dfrac{C_i^2}{3Q_i}|t|t-\dfrac{C_i^3}{27Q_i^2}t^3,
+       & |\alpha|<\alpha_{{\rm sl},i},\\[3pt]
+    -Q_i\operatorname{sgn}(\alpha), & |\alpha|\geq\alpha_{{\rm sl},i},
+    \end{cases}
+    \label{eq:fiala_force}
+\end{equation}
+where \(\alpha_{{\rm sl},i}=\arctan(3Q_i/C_i)\),
+\(\eta_i=\sqrt{1-\beta^2}\), and \(F_{xi}=\beta\mu_iF_{zi}\)
+for \(|\beta|<1\). The same signed input \(\beta\) applies to both axles: negative values brake and positive values request throttle. Static loads are
+\(F_{zf}=m_Egl_{r,E}/L\) and \(F_{zr}=m_Egl_{f,E}/L\), with
+\(L=l_{f,E}+l_{r,E}\). Each axle represents an equivalent wheel pair.
+Here \(m_E\) and \(I_{z,E}\) denote mass and yaw inertia; the lever arms
+are \(l_{f,E},l_{r,E}\), and \(\delta_F\) is front steering.
+We use the symmetric branch condition and the cited paper's equation (13);
+the additional arctangent printed in its equation (12) is inconsistent
+with (13). At \(|\beta|=1\), the force law is defined by
+\(Q_i=0\), \(\Phi_i=0\), without evaluating its singular polynomial.
+Joint derivatives are singular at these endpoints; linearization anchors
+are kept strictly inside the input interval.
+The controller linearizes this force locally as specified in
+Section~\ref{subsec:frenetModel}; separate axle friction-limit analysis
+is outside the present controller formulation.
+The speed, sideslip, and course of
 Fig.~\ref{fig:ego_obstacle_frames} are
 \begin{equation}
     V_E=\normtwo{\bm v_E},
@@ -1047,40 +1072,95 @@ Let
 \begin{equation}
     \bm x=[s,\,d,\,e_\psi,\,v_x,\,v_y,\,r]^{\trans},
     \qquad
-    \bm u=[\delta_F,\,a]^{\trans},
+    \bm u=[\delta_F,\,\beta]^{\trans},
     \label{eq:frenet_state}
 \end{equation}
 with \(s,d\) the station and signed lateral offset on the nominal path and
 \(e_\psi\) the heading error relative to its tangent. For a scheduled speed
 \(\bar v\geq0\) and curvature \(\kappa\), write \(\bar r=\kappa\bar v\) and
 \(v_\tau=\max(\bar v,v_{\rm f})\) with \(v_{\rm f}>0\) a tire-denominator
-floor. The scheduled affine dynamics
+floor. At \(\bar v_y=0\), use
+\(\bar\delta_F=\arctan(L\kappa)\bar v/v_\tau\) and compute
+\(\bar\alpha_i\) from \eqref{eq:tire_forces} with \(v_x=v_\tau\),
+\(r=\bar r\). Define the constant acceleration scale
+\(g_\beta=\sum_i\mu_iF_{zi}/m_E\), equal to \(\mu g\) when both axles
+have the same coefficient. The nominal ratio is obtained from
+\(\beta_j^{\rm ref}=((\bar v_{j+1}-\bar v_j)/T_s+F_R(\bar v_j)/m_E-b)/g_\beta\).
+For derivative evaluation only, clip this anchor to
+\([-1+\varepsilon_\beta,1-\varepsilon_\beta]\), where
+\(\varepsilon_\beta=\sqrt{\epsilon_{\rm mach}}\); the optimization retains
+its declared input endpoints. Each axle's nominal force is
+\(\bar\beta_j\mu_iF_{zi}\), and road load is modeled separately.
+Holding static loads and \(v_\tau\) fixed, define
+\begin{equation}
+    \begin{aligned}
+    k_i&=\left.\frac{\partial\Phi_i}{\partial\alpha}\right|_{\bar\alpha_i,\bar\beta},
+    & h_i&=\left.\frac{\partial\Phi_i}{\partial\beta}\right|_{\bar\alpha_i,\bar\beta},\\
+    d_i&=\Phi_i(\bar\alpha_i,\bar\beta)-k_i\bar\alpha_i-h_i\bar\beta,
+    & K_i&=-k_i,\\
+    F_{yi}^{\rm lin}&=k_i\alpha_i+h_i\beta+d_i .
+    \end{aligned}
+    \label{eq:fiala_tangent}
+\end{equation}
+In adhesion, with \(t_i=\tan\bar\alpha_i\),
+\(\bar\eta=\sqrt{1-\bar\beta^2}\) and
+\(q_i=C_i|t_i|/(3\mu_iF_{zi}\bar\eta)\),
+\begin{equation}
+    \begin{aligned}
+    k_i&=-C_i(1-q_i)^2\sec^2\bar\alpha_i,\\
+    h_i&=C_it_iq_i(1-2q_i/3)\bar\beta/\bar\eta^2 .
+    \end{aligned}
+    \label{eq:fiala_derivatives}
+\end{equation}
+In saturation, \(k_i=0\) and
+\(h_i=\mu_iF_{zi}\bar\beta\operatorname{sgn}(\bar\alpha_i)/\bar\eta\).
+At zero slip, \(K_i=C_i\), \(h_i=d_i=0\). The beta derivative carries
+braking--steering coupling directly into the QP. The approximation is local
+in \((\alpha,\beta)\); the tire-speed denominator remains scheduled.
+
+The scheduled affine dynamics
 \(\dot{\bm x}=A^c\bm x+B^c\bm u+\bm c^c\) are
 \begin{equation}
     \begin{aligned}
     \dot s&=v_x+\kappa\bar vd, \qquad
     \dot d=\bar ve_\psi+v_y,\\
-    \dot e_\psi&=r-\kappa v_x-\kappa^2\bar vd, \qquad
-    \dot v_x=a+\bar rv_y+b,\\
+    \dot e_\psi&=r-\kappa v_x-\kappa^2\bar vd,\\
+    \dot v_x&=g_\beta\beta-\widehat F_R(v_x;\bar v)/m_E+\bar rv_y+b,\\
     \dot v_y&=-\bar rv_x-\frac{c_0}{m_Ev_\tau}v_y
         -\Bigl(\frac{c_1}{m_Ev_\tau}+\bar v\Bigr)r\\
-        &\qquad+\frac{C_{f,E}}{m_E}\delta_F+\bar r\bar v,\\
+        &\qquad+\frac{K_f}{m_E}\delta_F+\frac{h_f+h_r}{m_E}\beta+\bar r\bar v+\frac{d_f+d_r}{m_E},\\
     \dot r&=-\frac{c_1}{I_{z,E}v_\tau}v_y
-        -\frac{c_2}{I_{z,E}v_\tau}r
-        +\frac{l_{f,E}C_{f,E}}{I_{z,E}}\delta_F,
+        -\frac{c_2}{I_{z,E}v_\tau}r\\
+        &\qquad+\frac{l_{f,E}K_f}{I_{z,E}}\delta_F
+        +\frac{l_{f,E}h_f-l_{r,E}h_r}{I_{z,E}}\beta\\
+        &\qquad+\frac{l_{f,E}d_f-l_{r,E}d_r}{I_{z,E}},
     \end{aligned}
     \label{eq:scheduled_bicycle}
 \end{equation}
-with \(c_0=C_{f,E}+C_{r,E}\), \(c_1=l_{f,E}C_{f,E}-l_{r,E}C_{r,E}\),
-\(c_2=l_{f,E}^2C_{f,E}+l_{r,E}^2C_{r,E}\), and \(b\) a declared constant
-longitudinal acceleration bias. Confining \(v_{\rm f}\) to the tire
+with \(c_0=K_f+K_r\), \(c_1=l_{f,E}K_f-l_{r,E}K_r\),
+\(c_2=l_{f,E}^2K_f+l_{r,E}^2K_r\), and \(b\) a declared constant
+longitudinal acceleration bias. The signed ratio maps to total commanded force \(m_Eg_\beta\beta\). Passive flat-road load in
+still air is
+\begin{equation}
+    \begin{aligned}
+    F_R(v)&=\tfrac12\rho_{\rm air}C_dA_fv|v|\\
+        &\quad+m_Eg(q_0+q_1|v|+q_4|v|^4)\tanh(v/v_{\rm tr}),\\
+    \widehat F_R(v;\bar v)&=F_R(\bar v)+F_R'(\bar v)(v-\bar v),
+    \end{aligned}
+    \label{eq:road_load}
+\end{equation}
+where the nonnegative rolling coefficients and positive transition speed
+are declared model parameters. This reduced model excludes dynamic wheel
+inertia, slip-dependent rolling moments, aerodynamic pitch, wind and grade.
+The CLF and held-flow predictor use the same affine expansion.
+Confining \(v_{\rm f}\) to the tire
 denominators keeps the kinematic rows exact at \(\bar v=0\), which
 Lemma~\ref{lem:rest} requires.
 
 Each stage is integrated exactly under its held input,
 \begin{equation}
-    \begin{bmatrix}A_j&B_j&\bm c_j\\0&0&0\end{bmatrix}
-    =\exp\!\left(T_s\begin{bmatrix}A^c_j&B^c_j&\bm c^c_j\\0&0&0\end{bmatrix}
+    \begin{bmatrix}A_j&B_j&\bm c_j\\0&I_2&0\\0&0&1\end{bmatrix}
+    =\exp\!\left(T_s\begin{bmatrix}A^c_j&B^c_j&\bm c^c_j\\0&0&0\\0&0&0\end{bmatrix}
     \right),
     \label{eq:held_flow}
 \end{equation}
@@ -1092,34 +1172,20 @@ condensed map is \(\bm x_j=F_j\bm U+\bm f_j\) with
 \label{subsec:hardRows}
 
 Every stage carries the actuator box \(|\delta_F|\leq\delta_{\max}\),
-\(a_{\min}\leq a\leq a_{\max}\), the linear-tire validity rows
+\(-1\leq\beta_{\min}\leq\beta\leq\beta_{\max}\leq1\), the selected slip-angle model-domain rows
 \(|\alpha_f|\leq\bar\alpha_f\), \(|\alpha_r|\leq\bar\alpha_r\) on the slip
 angles of \eqref{eq:tire_forces} evaluated at \(v_\tau\), and the domain
 rows \(0\leq v_x\leq v_{\max}\), \(|d|\leq d_{\max}\),
 \(|e_\psi|\leq e_{\max}\), \(s\in[\underline s_j,\bar s_j]\).
 
-Braking--steering coupling enters as two inscribed friction polygons.
-Longitudinal load transfer is affine in \(a\),
-\begin{equation}
-    F_{zf}=\frac{m_E(gl_{r,E}-ah)}{L},
-    \qquad
-    F_{zr}=\frac{m_E(gl_{f,E}+ah)}{L},
-    \label{eq:load_transfer}
-\end{equation}
-\(L=l_{f,E}+l_{r,E}\), and the axle longitudinal force is the requested
-share \(F_{xi}=\varrho_i(\bm n)m_Ea\), where \(\varrho_i\) takes the drive
-share on facets with \(n_x\geq0\) and the braking share otherwise. Each
-axle then satisfies the \(N_{\rm e}\)-edge polygon inscribed in its
-friction circle,
-\begin{equation}
-    n_xF_{xi}+n_yF_{yi}\leq\cos\frac{\pi}{N_{\rm e}}\;\mu_iF_{zi}(a),
-    \qquad i\in\{f,r\},
-    \label{eq:friction_polygon}
-\end{equation}
-which is linear in \((\bm x_j,\bm u_j)\) because \(F_{yi}\) is linear in
-\((v_y,r,\delta_F)\) and \(F_{zi}\) is affine in \(a\). The facet-wise
-choice of \(\varrho_i\) represents both one-sided actuator regimes as a
-single convex set, with no sign disjunction and no extra input.
+The slip limits are below \(\pi/2\) and define the chosen model domain;
+they do not certify friction feasibility or a bound on the Fiala tangent
+error. The ratio input influences both longitudinal force and the local lateral force
+through \eqref{eq:fiala_tangent}. No separate front/rear friction
+circles, polygon facets, utilization checks or load-transfer limits are
+imposed. The affine tangent can depart from the nonlinear force envelope
+away from its operating point, so the certificate remains conditional on
+the declared scheduled model and any justified residual bounds.
 
 \subsection{Terminal Rest}
 \label{subsec:terminal}
@@ -1133,14 +1199,14 @@ Section~\ref{subsec:hardRows}; no reduced backup model is used.
 \label{lem:rest}
 At \(\bar v=0\), every
 \(\bm x_R=[s_R,\,d_R,\,e_{\psi,R},\,0,\,0,\,0]^{\trans}\) is a fixed point
-of \eqref{eq:scheduled_bicycle} under \(\bm\pi_R=[0,\,-b]^{\trans}\), for
+of \eqref{eq:scheduled_bicycle} under \(\bm\pi_R=[0,\,-b/g_\beta]^{\trans}\), for
 any curvature \(\kappa\).
 \end{lemma}
 
 \begin{IEEEproof}
 At \(\bar v=0\) and \(v_x=v_y=r=0\) the first three rows of
 \eqref{eq:scheduled_bicycle} vanish identically, \(\bar r=0\) removes the
-remaining velocity couplings, \(\dot v_x=a+b=0\) at \(a=-b\), and
+remaining velocity couplings, \(F_R(0)=0\) gives \(\dot v_x=g_\beta\beta+b=0\) at \(\beta=-b/g_\beta\), and
 \(\dot v_y=\dot r=0\) at \(\delta_F=0\), since every retained term is
 proportional to \(v_y\) or \(r\).
 \end{IEEEproof}
@@ -1252,7 +1318,7 @@ and the performance row, in the form of \cite{AmesXuGrizzleTabuada2017}, is
 \subsection{The Program}
 \label{subsec:program}
 
-Collecting \eqref{eq:friction_polygon}--\eqref{eq:clf_row},
+Collecting the stage constraints, terminal conditions, separation rows and \eqref{eq:clf_row},
 \begin{equation}
     \begin{aligned}
     \min_{\bm U,\;\delta\geq0}\quad&T_s\sum_{j=0}^{N-1}\bm u_j^{\trans}R_u\bm u_j+\rho\delta^2\\
@@ -1306,7 +1372,7 @@ identical, so stages \(1,\dots,M-1\) of the previous solution satisfy the
 same \((G_j,H_j,h_j)\) and the same \(\underline g_{\ell j}\) as stages
 \(0,\dots,M-2\) of the new instance. The appended stage is the rest step:
 by Lemma~\ref{lem:rest} it reproduces \(\bm x_R\) exactly, so its domain,
-actuator and friction rows are those already verified at stage \(M-1\), and
+actuator and slip-domain rows are those already verified at stage \(M-1\), and
 \eqref{eq:terminal_separation} holds at the same point because
 \(\sigma_{\mathcal O}\) bounds the complete future occupancy and is
 therefore shift-invariant. Finally \(\delta\) is unbounded above and only
@@ -1483,6 +1549,13 @@ velocity and acceleration, against \(0.0935\)\,m, \(2.72\)\,m/s and
 seconds falls from \(346\) to \(34.4\)\,m/s\(^2\).
 
 \subsection{Closed Loop}
+
+The physical experiments in this subsection predate the modified Fiala and signed-ratio input
+revision. They used the earlier linear-cornering controller and its former
+constraint set. These retained results diagnose that earlier implementation;
+they do not validate the revised tire model or establish its physical
+performance. New plant experiments are required for that purpose.
+
 \label{subsec:controlResults}
 
 The recorded trials and fixed-state diagnostics preceding the quadratic
@@ -1548,8 +1621,7 @@ constrains only the sum. At straight-road \(t=7.2\)\,s,
 \end{equation}
 so the lateral energy grows at zero relaxation. This is not a solver
 artifact: linear programs minimizing \(\dot V_{\rm lat}\) at twelve probed
-states return a positive minimum at each, with front-axle facets of
-\eqref{eq:friction_polygon} active, and adding a hard
+states in the earlier controller return a positive minimum at each, and adding a hard
 \(\dot V_{\rm lat}\leq-\alpha V_{\rm lat}\) at \(\delta=0\) is infeasible
 at five of the twelve. Next, with \(\bm r_0\) and \(P\) frozen at both
 nodes,

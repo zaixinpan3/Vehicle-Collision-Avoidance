@@ -20,10 +20,10 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
         + prediction.egoStateOffset;
     geometry = avoidanceSafetyGeometry(model, prediction, nominalState, geometry);
     families = [geometry.collision; geometry.road];
-    [frictionMatrix, frictionOffset, frictionRows, frictionConstant] = ...
-        axleFriction.polygonRows(prediction, model);
+    [slipMatrix, slipOffset, slipRows, slipConstant] = ...
+        tireSlipRows(prediction, model);
     covered = arrayfun(@(family) nnz([family.nodes.covered]), families);
-    rowCount = 2*sum(covered)+8*prediction.nodeCount+numel(frictionOffset);
+    rowCount = 2*sum(covered)+8*prediction.nodeCount+numel(slipOffset);
     matrix = zeros(rowCount, count+1);
     bound = zeros(rowCount, 1);
     rowFamily = strings(rowCount, 1);
@@ -93,24 +93,24 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
     stateNode(range) = repelem((0:nodeCount-1).', 8);
     cursor = cursor+numel(range);
     range = cursor+1:rowCount;
-    matrix(range, 1:count) = frictionMatrix;
-    bound(range) = -frictionOffset;
-    rowFamily(range) = "friction";
-    localRows(range, :) = reshape(permute(frictionRows, [1, 3, 2]), [], 8);
-    localBound(range) = -frictionConstant(:);
-    stateNode(range) = repelem((0:prediction.stageCount-1).', size(frictionRows, 1));
+    matrix(range, 1:count) = slipMatrix;
+    bound(range) = -slipOffset;
+    rowFamily(range) = "tireSlip";
+    localRows(range, :) = reshape(permute(slipRows, [1, 3, 2]), [], 8);
+    localBound(range) = -slipConstant(:);
+    stateNode(range) = repelem((0:prediction.stageCount-1).', size(slipRows, 1));
     inputStage(range) = stateNode(range)+1;
 
     % Exact rest in the three velocity states. The terminal policy cancels
     % the declared constant longitudinal bias; its steering is zero.
     terminalInput = [0.0; -model.longitudinalAccelerationBias ...
-        / model.cfg.model.longitudinalInputGain];
+        / modifiedFialaTire.accelerationGain(model.cfg)];
     equalityMatrix = [prediction.egoStateMatrix(4:6, :, end), zeros(3, 1)];
     equalityBound = -prediction.egoStateOffset(4:6, end);
     lowerInput = [-cfg.model.frontWheelSteeringAngleMaximum; ...
-        cfg.actuation.longitudinalAccelerationMinimum];
+        cfg.actuation.brakingRatioMinimum];
     upperInput = [cfg.model.frontWheelSteeringAngleMaximum; ...
-        cfg.actuation.longitudinalAccelerationMaximum];
+        cfg.actuation.brakingRatioMaximum];
     lowerBound = [repmat(lowerInput, prediction.stageCount, 1); 0.0];
     upperBound = [repmat(upperInput, prediction.stageCount, 1); inf];
     lowerBound(count-1:count) = terminalInput;
@@ -148,7 +148,7 @@ function equilibrium = localCruiseEquilibriumProfile(model, prediction)
         equilibrium.yawRate(nodeIdx) = point.yawRate;
         if nodeIdx <= model.horizonSteps
             equilibrium.input(:, nodeIdx) = ...
-                [point.steeringAngle; point.longitudinalAcceleration];
+                [point.steeringAngle; point.brakingRatio];
         end
     end
 end
@@ -158,10 +158,10 @@ function [hessian, linear, constant] = localObjective(model, layout)
 % The rest continuation certifies safety and carries no performance cost.
     cfg = model.cfg;
     scale = [cfg.model.frontWheelSteeringAngleMaximum; ...
-        max(abs([cfg.actuation.longitudinalAccelerationMinimum, ...
-            cfg.actuation.longitudinalAccelerationMaximum]))];
+        max(abs([cfg.actuation.brakingRatioMinimum, ...
+            cfg.actuation.brakingRatioMaximum]))];
     weight = [cfg.clf.frontWheelSteeringAngleWeight; ...
-        cfg.clf.longitudinalAccelerationWeight]./scale.^2;
+        cfg.clf.brakingRatioWeight]./scale.^2;
     diagonal = zeros(layout.decisionCount, 1);
     diagonal(layout.inputIndex) = model.sampleTime ...
         * repmat(weight, layout.horizonSteps, 1);
@@ -192,8 +192,8 @@ function clf = localClfData(prediction, model, layout, common)
     currentError = errorOffset(:, 1);
     initialValue = currentError.'*lyapunovMatrix*currentError;
     [continuousA, continuousB, continuousC] = ltvBicycleModel.continuousMatrices( ...
-        prediction.scheduleCurvature(1), prediction.scheduleSpeedProfile(1), model.cfg);
-    continuousC(4) = continuousC(4)+model.longitudinalAccelerationBias;
+        prediction.scheduleCurvature(1), prediction.scheduleSpeedProfile(1), model.cfg, ...
+        prediction.scheduleBrakingRatio(1), model.longitudinalAccelerationBias);
     drift = continuousA*prediction.egoStateOffset(:, 1)+continuousC;
     lyapunovGradient = 2.0*currentError.'*lyapunovMatrix;
     lieDerivativeDrift = lyapunovGradient*drift(2:6);
@@ -230,14 +230,14 @@ function certificate = localClfCertificate(model)
 % require positive relaxation; this reference certificate is local.
     persistent memoKey memoCertificate
     cfg = model.cfg;
-    minimumAcceleration = cfg.actuation.longitudinalAccelerationMinimum;
-    maximumAcceleration = cfg.actuation.longitudinalAccelerationMaximum;
-    accelerationScale = max( ...
-        abs(minimumAcceleration), abs(maximumAcceleration));
+    minimumBrakingRatio = cfg.actuation.brakingRatioMinimum;
+    maximumBrakingRatio = cfg.actuation.brakingRatioMaximum;
+    brakingRatioScale = max( ...
+        abs(minimumBrakingRatio), abs(maximumBrakingRatio));
     key = struct( ...
         "referenceSpeed", max(model.referenceSpeed, ...
             cfg.clf.certificateSpeedFloor), ...
-        "longitudinalInputGain", cfg.model.longitudinalInputGain, ...
+        "brakingRatioAccelerationGain", modifiedFialaTire.accelerationGain(cfg), ...
         "scheduleSpeedFloor", cfg.model.scheduleSpeedFloor, ...
         "errorScale", [ ...
             cfg.clf.lateralPositionErrorScale; ...
@@ -247,12 +247,13 @@ function certificate = localClfCertificate(model)
             cfg.clf.yawRateErrorScale], ...
         "inputWeight", [ ...
             cfg.clf.frontWheelSteeringAngleWeight; ...
-            cfg.clf.longitudinalAccelerationWeight], ...
+            cfg.clf.brakingRatioWeight], ...
         "inputScale", [ ...
             cfg.model.frontWheelSteeringAngleMaximum; ...
-            accelerationScale], ...
+            brakingRatioScale], ...
         "vehicle", cfg.vehicle, ...
-        "corneringStiffness", cfg.tire.corneringStiffness);
+        "roadLoad", cfg.roadLoad, ...
+        "tire", cfg.tire, "actuation", cfg.actuation);
     if ~isempty(memoKey) && isequaln(key, memoKey)
         certificate = memoCertificate;
         return;
@@ -295,46 +296,32 @@ function equilibrium = cruiseEquilibrium( ...
         referenceSpeed, curvature, accelerationBias, cfg)
 % cruiseEquilibrium Steady cruise target of the declared model.
 %
-% Given the demanded cruise speed, the local path curvature, and the
-% estimator's longitudinal model bias, returns the state and input
-% that make the DECLARED model stationary in the path frame. Steady
-% cornering of the linear-cornering bicycle at speed v and yaw rate
-% r = curvature*v distributes the centripetal demand over the axles by
-% the moment balance, Fyf = lr/L m v r, Fyr = lf/L m v r; the rear slip
-% fixes the sideslip and the front slip the steering angle (the
-% classic understeer form), and the longitudinal equilibrium cancels
-% the bias and the centripetal cross term of vxdot = gamma*a + vy r + b.
-% Aiming the CLF at this fixed point instead of the kinematic guess is
-% what makes the closed loop stationary at zero error with no
-% integrator.
-    if referenceSpeed <= 0.0
+% Solve the three velocity balance equations of the scheduled affine Fiala
+% bicycle. A saturated tangent may not admit an exact cornering target;
+% in that case the minimum-residual target remains a soft CLF reference.
+    if referenceSpeed < 0.0
         error("collisionAvoidanceController:invalidInput", ...
-            "cruiseEquilibrium requires a positive reference speed.");
-    end
-    mass = cfg.vehicle.m;
-    lf = cfg.vehicle.lf;
-    lr = cfg.vehicle.lr;
-    wheelbase = lf+lr;
-    corneringStiffness = double(cfg.tire.corneringStiffness(:));
-    if isscalar(corneringStiffness)
-        corneringStiffness = repmat(corneringStiffness, 2, 1);
+            "cruiseEquilibrium requires a nonnegative reference speed.");
     end
     yawRate = curvature*referenceSpeed;
-    lateralForceTotal = mass*referenceSpeed*yawRate;
-    frontLateralForce = lr/wheelbase*lateralForceTotal;
-    rearLateralForce = lf/wheelbase*lateralForceTotal;
-    rearSlipAngle = -rearLateralForce/corneringStiffness(2);
-    lateralVelocity = referenceSpeed*rearSlipAngle+lr*yawRate;
-    frontSlipAngle = frontLateralForce/corneringStiffness(1);
-    steeringAngle = frontSlipAngle ...
-        + (lateralVelocity+lf*yawRate)/referenceSpeed;
-    longitudinalAcceleration = (-accelerationBias-lateralVelocity*yawRate) ...
-        / cfg.model.longitudinalInputGain;
+    [stateMatrix, inputMatrix, affine] = ...
+        ltvBicycleModel.continuousMatrices(curvature, referenceSpeed, cfg, [], accelerationBias);
+    base = [0; 0; 0; referenceSpeed; 0; yawRate];
+    balance = [stateMatrix(4:6, 5), inputMatrix(4:6, :)];
+    residual = stateMatrix(4:6, :)*base+affine(4:6);
+    if rcond(balance) > 1.0e-12
+        target = -balance\residual;
+    else
+        target = -pinv(balance)*residual;
+    end
+    lateralVelocity = target(1);
+    steeringAngle = target(2);
+    brakingRatio = target(3);
     equilibrium = struct( ...
         "referenceSpeed", referenceSpeed, ...
         "curvature", curvature, ...
         "lateralVelocity", lateralVelocity, ...
         "yawRate", yawRate, ...
         "steeringAngle", steeringAngle, ...
-        "longitudinalAcceleration", longitudinalAcceleration);
+        "brakingRatio", brakingRatio);
 end

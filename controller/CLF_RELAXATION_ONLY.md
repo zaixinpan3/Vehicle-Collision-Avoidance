@@ -1,5 +1,10 @@
 # CLF relaxation-only objective
 
+This report records experiments and diagnostics from before the modified Fiala
+tire revision. Its linear-tire and friction-limit results describe that earlier
+controller. The current model uses scheduled Fiala tangents and no separate
+axle-friction constraints; see [LTV_BICYCLE_MODEL.md](LTV_BICYCLE_MODEL.md).
+
 This is the historical relaxation-only experiment. The current controller
 uses [quadratic input effort and squared relaxation](QUADRATIC_CLF_INPUT_OBJECTIVE.md).
 The measurements and interpretation below refer to the preceding objective.

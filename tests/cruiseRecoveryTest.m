@@ -41,10 +41,10 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             decision(1:2) = [0.02; 0.3];
             decision(end) = 0.7;
             scale = [cfg.model.frontWheelSteeringAngleMaximum; ...
-                max(abs([cfg.actuation.longitudinalAccelerationMinimum; ...
-                    cfg.actuation.longitudinalAccelerationMaximum]))];
+                max(abs([cfg.actuation.brakingRatioMinimum; ...
+                    cfg.actuation.brakingRatioMaximum]))];
             weights = [cfg.clf.frontWheelSteeringAngleWeight; ...
-                cfg.clf.longitudinalAccelerationWeight];
+                cfg.clf.brakingRatioWeight];
             inputCost = cfg.controller.sampleTime*sum(weights.*(decision(1:2)./scale).^2);
             expectedCost = inputCost+cfg.clf.relaxationWeight*0.7^2;
             alternative = decision;
@@ -57,8 +57,10 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             testCase.verifyFalse(isfield(problem.qp.clf.certificate, "sampledFeedbackGain"));
         end
 
-        function nominalCruiseDoesNotCommandDeparture(testCase)
+        function nominalCruiseWithoutRoadLoadDoesNotCommandDeparture(testCase)
             cfg = localConfiguration();
+            cfg.roadLoad.dragCoefficient = 0.0;
+            cfg.roadLoad.rollingCoefficient = 0.0;
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", cfg.referenceSpeed);
             [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 
@@ -74,10 +76,10 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
             initialError = nearCruiseSpeed-cfg.referenceSpeed;
             nextError = initialError+cfg.controller.sampleTime ...
-                *cfg.model.longitudinalInputGain*command.actuatorInput(2);
+                *command.bodyLongitudinalVelocityDerivative;
 
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThan(initialError*command.actuatorInput(2), 0.0);
+            testCase.verifyLessThan(initialError*command.bodyLongitudinalVelocityDerivative, 0.0);
             testCase.verifyLessThan(abs(nextError), abs(initialError));
             testCase.verifyLessThan(problem.metadata.clfValueProfile(2), problem.metadata.clfInitialValue);
         end
@@ -140,8 +142,7 @@ function hook = localFailFirstSolve()
 end
 
 function cfg = localConfiguration()
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4), ...
-        "model", struct("longitudinalInputGain", 0.8)));
+    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
 end
 
 function value = localObjective(qp, decision)

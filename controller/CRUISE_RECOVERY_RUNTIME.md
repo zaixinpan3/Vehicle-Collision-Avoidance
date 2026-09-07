@@ -1,5 +1,10 @@
 # Cruise recovery and controller execution time
 
+This report records experiments and diagnostics from before the modified Fiala
+tire revision. Its linear-tire and friction-limit results describe that earlier
+controller. The current model uses scheduled Fiala tangents and no separate
+axle-friction constraints; see [LTV_BICYCLE_MODEL.md](LTV_BICYCLE_MODEL.md).
+
 Historical experiment record for commit `dc58ef1`. The subsequent
 [CLF relaxation-only experiment](CLF_RELAXATION_ONLY.md) removes the sampled
 LQR input preference and all head/continuation input costs at the user's

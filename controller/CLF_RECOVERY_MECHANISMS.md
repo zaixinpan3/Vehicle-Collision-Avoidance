@@ -1,5 +1,10 @@
 # Lateral and heading recovery: feasible-set and sampled-flow diagnosis
 
+This report records experiments and diagnostics from before the modified Fiala
+tire revision. Its linear-tire and friction-limit results describe that earlier
+controller. The current model uses scheduled Fiala tangents and no separate
+axle-friction constraints; see [LTV_BICYCLE_MODEL.md](LTV_BICYCLE_MODEL.md).
+
 ## Evidence scope
 
 This analysis extends the saved-data diagnosis in `CLF_RELAXATION_ONLY.md`.

@@ -2,8 +2,8 @@
 
 The core control algorithm has an upper limit of **20 source files**. Keep
 related operations together; fewer files are welcome when their responsibilities
-remain clear. The current implementation contains **18 source files**:
-14 MATLAB modules, three native C++ bridges, and one controller configuration.
+remain clear. The current implementation contains **20 source files**:
+16 MATLAB modules, three native C++ bridges, and one controller configuration.
 
 The count includes every source file under `controller/`, including any future
 subdirectories, plus `config/collisionAvoidanceControllerConfig.m`. Tests,
@@ -24,7 +24,9 @@ Do not move controller helpers into those directories to evade the limit.
 | `crossingCruiseReference.m` | Crossing-aware cruise reference |
 | `laneGeometry.m` | Projection, Frenet pose, curvature and affine chart bounds |
 | `ltvBicycleModel.m` | Held-input stage matrices, full prediction and initial braking schedule |
-| `axleFriction.m` | Front/rear tire parameters and hard friction polygon rows |
+| `longitudinalRoadLoad.m` | Signed aerodynamic and equivalent rolling forces with their speed derivative |
+| `modifiedFialaTire.m` | Modified Fiala forces and scheduled local tire tangents |
+| `tireSlipRows.m` | Robust slip-angle model-domain rows |
 | `stateUncertainty.m` | Estimator certificate validation, Frenet boxes, disturbance propagation, intersection and terminal rest |
 | `targetPrediction.m` | Future target error envelope and analytic continuation support |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
@@ -33,7 +35,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `../config/collisionAvoidanceControllerConfig.m` | Controller defaults, merging and validation |
 
 The five grouped MATLAB modules expose named static methods, such as
-`laneGeometry.project`, `ltvBicycleModel.predict`, `axleFriction.polygonRows`,
+`laneGeometry.project`, `ltvBicycleModel.predict`, `modifiedFialaTire.evaluate`,
 `stateUncertainty.readCertificate` and `targetPrediction.futureSupport`.
 Their local helpers stay in the owning file. The controller entry signature,
 model equations, constraints and solver acceptance criteria are unchanged by

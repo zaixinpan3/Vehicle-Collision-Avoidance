@@ -91,7 +91,7 @@ Independent physical acceptance remains mandatory.
 
 Other implementation changes are:
 
-- Batched friction and geometric-row assembly, with preallocated storage.
+- Batched slip-domain and geometric-row assembly, with preallocated storage.
 - Batched exhaustive polyline projection in C++, preserving first-minimum
   ties, endpoints and every segment; no nearest-neighbor approximation.
 - Batched frame-bound corner enumeration in C++, with binary station searches

@@ -209,7 +209,7 @@ h_{\mathcal S}((H_x+H_uK)^\top)
 \]
 
 where `h_C(a)=sup_{c in C} a^T c`, applied row by row. This directly covers
-state-input coupling, including affine axle/friction rows. Input-only rows
+state-input coupling, including affine tire-slip domain rows. Input-only rows
 reserve the correction `Kq`; no clipping is permitted after certification.
 State-dependent tire/load terms need robust bounds on their coefficients too.
 For a direct `D` tube, derive its matching input tightening using `q=d-e`;

@@ -1,5 +1,10 @@
 # Controller design-requirement experiments
 
+This report records experiments and diagnostics from before the modified Fiala
+tire revision. Its linear-tire and friction-limit results describe that earlier
+controller. The current model uses scheduled Fiala tangents and no separate
+axle-friction constraints; see [LTV_BICYCLE_MODEL.md](../controller/LTV_BICYCLE_MODEL.md).
+
 `runControllerDesignExperiments` compares nominal cruise with range-triggered
 avoidance on a straight path and a circular arc. Both trials use the same
 certificate-preserving predictive SOCP and the actual Vehicle Dynamics Blockset

@@ -26,7 +26,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function commandUsesSteeringAccelerationInputOrder(testCase)
+        function commandUsesSteeringBrakingRatioInputOrder(testCase)
             cfg = localSmallConfiguration();
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
                 [0.0; 0.0]);
@@ -35,13 +35,13 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 ego, [], localLane(), cfg);
 
             testCase.verifyEqual(command.actuatorInputOrder, ...
-                ["frontWheelSteeringAngle", "longitudinalAcceleration"]);
+                ["frontWheelSteeringAngle", "brakingRatio"]);
             testCase.verifySize(inputPlan, [2, cfg.controller.horizonSteps]);
             testCase.verifyEqual(command.actuatorInput, inputPlan(:, 1), ...
                 AbsTol=0.0);
             testCase.verifyEqual(command.actuatorInput, ...
                 [command.frontWheelSteeringAngle; ...
-                    command.longitudinalAcceleration], AbsTol=0.0);
+                    command.brakingRatio], AbsTol=0.0);
         end
 
         function outputCountDoesNotChangeThePlan(testCase)
@@ -67,8 +67,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
 
         function solvedPlanRespectsConfiguredInputBounds(testCase)
             cfg = localSmallConfiguration();
-            cfg.actuation = struct("longitudinalAccelerationMinimum", -8.0, ...
-                "longitudinalAccelerationMaximum", 2.0);
+            cfg.actuation = struct("brakingRatioMinimum", -1.0, ...
+                "brakingRatioMaximum", 0.25);
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
                 [0.0; 0.0]);
             target = localTarget("lead", [100.0; 0.0], [5.0; 0.0]);
@@ -79,8 +79,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             complete = collisionAvoidanceControllerConfig(cfg);
             testCase.verifyLessThanOrEqual(abs(inputPlan(1, :)), ...
                 complete.model.frontWheelSteeringAngleMaximum+1.0e-9);
-            testCase.verifyGreaterThanOrEqual(inputPlan(2, :), -8.0-1.0e-9);
-            testCase.verifyLessThanOrEqual(inputPlan(2, :), 2.0+1.0e-9);
+            testCase.verifyGreaterThanOrEqual(inputPlan(2, :), -1.0-1.0e-9);
+            testCase.verifyLessThanOrEqual(inputPlan(2, :), 0.25+1.0e-9);
         end
 
         function nominalRolloutMatchesTheCondensedPrediction(testCase)
@@ -463,6 +463,20 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 AbsTol=0.0);
         end
 
+        function olderInputContractCannotReuseStoredPlan(testCase)
+            cfg = localSmallConfiguration();
+            cfg.solver.jointFunction = @localJointSolveHook;
+            ego = localEgoState([0; 0; 0; 15; 0; 0], [0; 0]);
+            [command, ~, first, certificate] = collisionAvoidanceController( ...
+                ego, [], localLane(), cfg, []);
+            nextEgo = localNextEgo(first, command.actuatorInput);
+            certificate.version = 5;
+
+            testCase.verifyError(@() collisionAvoidanceController( ...
+                nextEgo, [], localLane(), cfg, certificate), ...
+                "collisionAvoidanceController:optimizationFailure");
+        end
+
         function identityChangeCannotReuseStoredPlan(testCase)
             cfg = localSmallConfiguration();
             cfg.solver.jointFunction = @localJointSolveHook;
@@ -482,6 +496,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
 
         function changedTargetPredictionRequiresFreshCertification(testCase)
             cfg = localSmallConfiguration();
+            % This witness remains feasible under speed rescheduling only
+            % in the zero-road-load longitudinal model used by this fixture.
+            cfg.roadLoad = struct("dragCoefficient", 0, "rollingCoefficient", 0);
             cfg.solver.jointFunction = @localJointSolveHook;
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], ...
                 [0.0; 0.0]);
@@ -500,6 +517,20 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyTrue(second.metadata.planCertified);
             testCase.verifyEqual(second.metadata.certificateSource, ...
                 "revalidatedContinuation");
+        end
+
+        function rescheduledRoadLoadRequiresRecheckingTheEntireCarriedTail(testCase)
+            cfg = localSmallConfiguration();
+            cfg.solver.jointFunction = @localJointSolveHook;
+            ego = localEgoState([0; 0; 0; 15; 0; 0], [0; 0]);
+            target = localTarget("lead", [100; 0], [5; 0]);
+            [command, ~, first] = collisionAvoidanceController(ego, target, localLane(), cfg);
+            nextEgo = localNextEgo(first, command.actuatorInput);
+            inconsistent = localTarget("lead", [101; 0], [5; 0]);
+
+            testCase.verifyError(@() collisionAvoidanceController( ...
+                nextEgo, inconsistent, localLane(), cfg), ...
+                "collisionAvoidanceController:optimizationFailure");
         end
 
         function nodeSafeFallbackAcceptsBetweenNodeCrossing(testCase)
@@ -646,9 +677,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(next, state, AbsTol=1.0e-14);
         end
 
-        function terminalPolicyCancelsBiasWithReducedInputGain(testCase)
+        function terminalBrakingRatioCancelsAccelerationBias(testCase)
             cfg = localSmallConfiguration();
-            cfg.model = struct("longitudinalInputGain", 0.8);
             ego = localEgoState([0.0; 0.0; 0.0; 4.0; 0.0; 0.0], [0.0; 0.0]);
             ego.longitudinalAccelerationBias = 0.7;
             [~, ~, problem, certificate] = collisionAvoidanceController( ...
@@ -660,7 +690,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             next = prediction.stageMatrixA(:, :, end)*terminal ...
                 + prediction.stageMatrixB(:, :, end)*problem.qp.terminalInput ...
                 + prediction.stageAffine(:, end);
-            testCase.verifyEqual(problem.qp.terminalInput, [0.0; -0.875], AbsTol=1.0e-14);
+            testCase.verifyEqual(problem.qp.terminalInput, [0.0; -0.7/modifiedFialaTire.accelerationGain(collisionAvoidanceControllerConfig(cfg))], AbsTol=1.0e-14);
             testCase.verifyEqual(next, terminal, AbsTol=1.0e-12);
         end
 

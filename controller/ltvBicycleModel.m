@@ -4,10 +4,11 @@ classdef ltvBicycleModel
     methods (Static)
         function prediction = predict(model, storedSchedule)
         %ltvBicycleModel.predict One scheduled bicycle model over the complete plan.
-        % Both steering and acceleration are decisions at every stage. The final
+        % Both steering and braking ratio are decisions at every stage. The final
         % zero-speed schedule admits a rest equilibrium. A carried schedule is
         % shifted verbatim, including across the performance/continuation boundary.
-        % Error boxes obey r(k+1) = abs(A(k))*r(k) + Ts*w at every node.
+        % Error boxes include Cartesian-to-Frenet projection and the integrated
+        % effect of bounded continuous disturbances at every prediction node.
 
             arguments
                 model (1,1) struct
@@ -19,7 +20,7 @@ classdef ltvBicycleModel
             nodeCount = stageCount+1;
             planCount = model.inputDimension*stageCount;
             sampleTime = model.sampleTime;
-            inputGain = cfg.model.longitudinalInputGain;
+            inputGain = modifiedFialaTire.accelerationGain(cfg);
             scheduleShifted = ~isempty(storedSchedule);
             if scheduleShifted
                 schedule = storedSchedule;
@@ -37,6 +38,18 @@ classdef ltvBicycleModel
                     "The carried schedule must be finite and end at zero speed.");
             end
 
+            reference = zeros(2, stageCount);
+            reference(1, :) = atan((cfg.vehicle.lf+cfg.vehicle.lr)*schedule.curvature(1:end-1)) ...
+                .* schedule.speedProfile(1:end-1) ...
+                ./ max(schedule.speedProfile(1:end-1), cfg.model.scheduleSpeedFloor);
+            reference(2, :) = (diff(schedule.speedProfile)/sampleTime ...
+                + longitudinalRoadLoad(schedule.speedProfile(1:end-1), cfg)/cfg.vehicle.m ...
+                - model.longitudinalAccelerationBias)/inputGain;
+            reference(:, end) = [0.0; -model.longitudinalAccelerationBias/inputGain];
+            % Only the linearization anchor stays strictly inside (-1,1).
+            % The optimization still admits both physical input endpoints.
+            nominalRatio = min(max(reference(2, :), -1.0+sqrt(eps)), 1.0-sqrt(eps));
+
             stateMatrix = zeros(6, 6, stageCount);
             inputMatrix = zeros(6, 2, stageCount);
             affine = zeros(6, stageCount);
@@ -45,22 +58,35 @@ classdef ltvBicycleModel
             stateOffset(:, 1) = model.initialEgoState;
             errorBound = zeros(6, nodeCount);
             measured = model.measuredEgoStateErrorBound(:);
-            errorBound(:, 1) = [sum(measured(1:2)); sum(measured(1:2)); measured(3:6)];
-            disturbance = sampleTime*(cfg.model.ltvModelErrorRateBound(:) ...
-                + cfg.model.plantModelResidualRateBound(:));
+            if isfield(model, "initialCartesianState")
+                cartesianState = model.initialCartesianState;
+            else
+                [position, heading] = laneGeometry.fromFrenet(model.initialEgoState, model.lane);
+                cartesianState = [position; heading; model.initialEgoState(4:6)];
+            end
+            if isfield(model, "initialFrenetErrorBound")
+                errorBound(:, 1) = model.initialFrenetErrorBound;
+            else
+                errorBound(:, 1) = stateUncertainty.toFrenet(cartesianState, measured, model.lane);
+            end
+            rateRadius = cfg.model.ltvModelErrorRateBound(:) ...
+                + cfg.model.plantModelResidualRateBound(:);
+            disturbanceBound = zeros(6, stageCount);
             for stageIdx = 1:stageCount
                 if stageIdx > 1 && schedule.curvature(stageIdx) == schedule.curvature(stageIdx-1) ...
-                        && schedule.speedProfile(stageIdx) == schedule.speedProfile(stageIdx-1)
+                        && schedule.speedProfile(stageIdx) == schedule.speedProfile(stageIdx-1) ...
+                        && nominalRatio(stageIdx) == nominalRatio(stageIdx-1)
                     stateMatrix(:, :, stageIdx) = stateMatrix(:, :, stageIdx-1);
                     inputMatrix(:, :, stageIdx) = inputMatrix(:, :, stageIdx-1);
                     affine(:, stageIdx) = affine(:, stageIdx-1);
+                    disturbanceBound(:, stageIdx) = disturbanceBound(:, stageIdx-1);
                 else
                     [stateMatrix(:, :, stageIdx), inputMatrix(:, :, stageIdx), ...
-                        affine(:, stageIdx)] = ltvBicycleModel.stageMatrices( ...
+                        affine(:, stageIdx), continuousA] = ltvBicycleModel.stageMatrices( ...
                         schedule.curvature(stageIdx), schedule.speedProfile(stageIdx), ...
-                        sampleTime, cfg);
-                    affine(:, stageIdx) = affine(:, stageIdx) ...
-                        + inputMatrix(:, 2, stageIdx)*(model.longitudinalAccelerationBias/inputGain);
+                        sampleTime, cfg, nominalRatio(stageIdx), model.longitudinalAccelerationBias);
+                    disturbanceBound(:, stageIdx) = stateUncertainty.heldDisturbance( ...
+                        continuousA, rateRadius, sampleTime);
                 end
                 inputRange = 2*stageIdx-1:2*stageIdx;
                 stateMap(:, :, stageIdx+1) = ...
@@ -70,18 +96,15 @@ classdef ltvBicycleModel
                 stateOffset(:, stageIdx+1) = ...
                     stateMatrix(:, :, stageIdx)*stateOffset(:, stageIdx)+affine(:, stageIdx);
                 errorBound(:, stageIdx+1) = ...
-                    abs(stateMatrix(:, :, stageIdx))*errorBound(:, stageIdx)+disturbance;
+                    abs(stateMatrix(:, :, stageIdx))*errorBound(:, stageIdx) ...
+                        + disturbanceBound(:, stageIdx);
             end
 
-            reference = zeros(2, stageCount);
-            reference(1, :) = atan(cfg.vehicle.wheelbase*schedule.curvature(1:end-1));
-            reference(2, :) = (diff(schedule.speedProfile)/sampleTime ...
-                - model.longitudinalAccelerationBias)/inputGain;
-            reference(:, end) = [0.0; -model.longitudinalAccelerationBias/inputGain];
             prediction = struct( ...
                 "scheduleSpeed", max(schedule.speedProfile(1), cfg.model.scheduleSpeedFloor), ...
                 "scheduleShifted", scheduleShifted, ...
                 "scheduleSpeedProfile", schedule.speedProfile, ...
+                "scheduleBrakingRatio", nominalRatio, ...
                 "scheduleStation", schedule.station, ...
                 "scheduleCurvature", schedule.curvature, ...
                 "referenceInput", reference(:, 1:headSteps), ...
@@ -93,44 +116,22 @@ classdef ltvBicycleModel
                 "headNodeCount", headSteps+1, "nodeCount", nodeCount, ...
                 "tailNodeIndex", headSteps+2:nodeCount, ...
                 "egoStateMatrix", stateMap, "egoStateOffset", stateOffset, ...
-                "egoStateErrorBound", errorBound, "scheduleForStore", schedule);
+                "egoStateErrorBound", errorBound, ...
+                "stageDisturbanceErrorBound", disturbanceBound, "scheduleForStore", schedule);
         end
 
-        function [stateMatrix, inputMatrix, affineVector] = ...
-                stageMatrices(kappa, vBar, sampleTime, cfg)
+        function [stateMatrix, inputMatrix, affineVector, continuousA] = ...
+                stageMatrices(kappa, vBar, sampleTime, cfg, betaBar, accelerationBias)
         % ltvBicycleModel.stageMatrices Exact held-input flow of a scheduled affine bicycle.
         %
-        % Closed-form linearization of the dynamic bicycle with linear
-        % cornering regularized at a positive tire-speed floor, in path coordinates
-        % along the lane centerline -
-        % state [s; d; ePsi; vx; vy; r] with s the station, d the left-positive
-        % lateral offset and ePsi the heading error to the path tangent - about
-        % the schedule point (d = 0, ePsi = 0, vy = 0, vx = vBar, r = kappa*vBar)
-        % at the local curvature kappa. One block matrix exponential integrates
-        % the affine model with constant input over the sample. This is exact for
-        % that scheduled linearization, not for the nonlinear bicycle or plant.
-        %
-        % Continuous model:
-        %   sdot    = (vx cos ePsi - vy sin ePsi)/(1 - kappa d)
-        %   ddot    = vx sin ePsi + vy cos ePsi
-        %   ePsidot = r - kappa sdot
-        %   vxdot   = gamma*a + vy r, gamma = cfg.model.longitudinalInputGain
-        %   vydot   = (Fyf + Fyr)/m - vx r
-        %   rdot    = (lf Fyf - lr Fyr)/Iz
-        %   Fyf = Cf (deltaF - (vy + lf r)/vTire), Fyr = -Cr (vy - lr r)/vTire
-        %   vTire = max(vBar, cfg.model.scheduleSpeedFloor)
-        %
-        % Input [deltaF; a] uses commanded acceleration, with a fixed declared
-        % longitudinal effectiveness gain. The default gain is one. The curvature is treated as
-        % locally constant at the schedule station of the stage (its variation
-        % along the horizon is carried node by node by the schedule). Prediction
-        % and continuation use this held-input flow; the CLF uses its continuous
-        % generator through continuousMatrices.
-        % Position and heading can therefore depend on the new first input. The
-        % discretization does not impose a forward-Euler stiffness restriction.
-
+        % State [s; d; ePsi; vx; vy; r], input [deltaF; beta]. Modified Fiala
+        % slip and beta derivatives are evaluated at the scheduled operating
+        % point. Static loads and the tire-speed denominator are frozen. The
+        % acceleration bias enters independently of the beta input column.
+            if nargin < 5, betaBar = []; end
+            if nargin < 6, accelerationBias = 0.0; end
             [continuousA, continuousB, continuousC] = ...
-                ltvBicycleModel.continuousMatrices(kappa, vBar, cfg);
+                ltvBicycleModel.continuousMatrices(kappa, vBar, cfg, betaBar, accelerationBias);
             heldTransition = expm(sampleTime*[continuousA, continuousB, continuousC; ...
                 zeros(3, 9)]);
             stateMatrix = heldTransition(1:6, 1:6);
@@ -138,34 +139,32 @@ classdef ltvBicycleModel
             affineVector = heldTransition(1:6, 9);
         end
 
-        function [continuousA, continuousB, continuousC] = continuousMatrices(kappa, vBar, cfg)
+        function [continuousA, continuousB, continuousC] = continuousMatrices(kappa, vBar, cfg, betaBar, accelerationBias)
         %continuousMatrices Continuous generator of the scheduled Frenet bicycle.
-        % xDot = continuousA*x + continuousB*u + continuousC. The caller
-        % adds the declared longitudinal acceleration bias to xDot(4).
+        % xDot = continuousA*x + continuousB*u + continuousC, including the
+        % independent declared longitudinal acceleration bias in continuousC.
 
             arguments
                 kappa (1,1) double {mustBeFinite}
                 vBar (1,1) double {mustBeFinite, mustBeNonnegative}
                 cfg (1,1) struct
+                betaBar = []
+                accelerationBias (1,1) double {mustBeReal, mustBeFinite} = 0.0
             end
 
             mass = cfg.vehicle.m;
             yawInertia = cfg.vehicle.Iz;
             lf = cfg.vehicle.lf;
             lr = cfg.vehicle.lr;
-            corneringStiffness = double(cfg.tire.corneringStiffness(:));
-            if isscalar(corneringStiffness)
-                corneringStiffness = repmat(corneringStiffness, 2, 1);
+            inputGain = modifiedFialaTire.accelerationGain(cfg);
+            if isempty(betaBar)
+                betaBar = (longitudinalRoadLoad(vBar, cfg)/mass-accelerationBias)/inputGain;
+                betaBar = min(max(betaBar, -1.0+sqrt(eps)), 1.0-sqrt(eps));
             end
-            if numel(corneringStiffness) ~= 2 ...
-                    || any(~isfinite(corneringStiffness)) ...
-                    || any(corneringStiffness <= 0.0)
-                error("collisionAvoidanceController:invalidConfiguration", ...
-                    "tire.corneringStiffness must be positive and scalar or " ...
-                    + "contain front/rear values.");
-            end
-            corneringFront = corneringStiffness(1);
-            corneringRear = corneringStiffness(2);
+            [tireSlope, ratioSlope, tireIntercept] = ...
+                modifiedFialaTire.linearize(kappa, vBar, betaBar, cfg);
+            corneringFront = -tireSlope(1);
+            corneringRear = -tireSlope(2);
             % At zero schedule speed the rest state is invariant. Only the tire
             % denominator is regularized; kinematic transport uses vBar itself.
             tireSpeed = max(vBar, cfg.model.scheduleSpeedFloor);
@@ -183,9 +182,13 @@ classdef ltvBicycleModel
             continuousA(3, 6) = 1.0;
             continuousA(3, 4) = -kappa;
             continuousA(3, 2) = -kappa^2*vBar;
-            % vxdot = gamma*a + vy*r, frozen at (vy = 0, r = rBar).
+            % Linearize passive road load at the scheduled speed, retaining
+            % both its slope and affine intercept in the held-input flow.
+            [roadForce, roadSlope] = longitudinalRoadLoad(vBar, cfg);
+            continuousA(4, 4) = -roadSlope/mass;
             continuousA(4, 5) = rBar;
-            continuousB(4, 2) = cfg.model.longitudinalInputGain;
+            continuousB(4, 2) = inputGain;
+            continuousC(4) = (roadSlope*vBar-roadForce)/mass+accelerationBias;
             % Lateral channel at the frozen speed.
             yawStiffness = (lf*corneringFront-lr*corneringRear)/tireSpeed;
             lateralStiffness = (corneringFront+corneringRear)/tireSpeed;
@@ -193,17 +196,20 @@ classdef ltvBicycleModel
             continuousA(5, 5) = -lateralStiffness/mass;
             continuousA(5, 6) = -(yawStiffness/mass+vBar);
             continuousB(5, 1) = corneringFront/mass;
-            continuousC(5) = rBar*vBar;
+            continuousB(5, 2) = sum(ratioSlope)/mass;
+            continuousC(5) = rBar*vBar+sum(tireIntercept)/mass;
             continuousA(6, 5) = -yawStiffness/yawInertia;
             continuousA(6, 6) = -(lf^2*corneringFront ...
                 + lr^2*corneringRear)/(tireSpeed*yawInertia);
             continuousB(6, 1) = lf*corneringFront/yawInertia;
+            continuousB(6, 2) = (lf*ratioSlope(1)-lr*ratioSlope(2))/yawInertia;
+            continuousC(6) = (lf*tireIntercept(1)-lr*tireIntercept(2))/yawInertia;
         end
 
         function out = brakingSchedule(action, cfg, varargin)
         %ltvBicycleModel.brakingSchedule Initial speed schedule and continuation length.
         % This helper only constructs an admission anchor. Every optimized stage
-        % uses ltvBicycleModel.stageMatrices with steering and acceleration decisions;
+        % uses ltvBicycleModel.stageMatrices with steering and braking-ratio decisions;
         % there is no kinematic handoff or separate backup vehicle model.
         %
         % steps = ltvBicycleModel.brakingSchedule("steps", cfg)

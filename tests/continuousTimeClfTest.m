@@ -103,22 +103,26 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
                 "egoHalfLength", cfg.vehicle.length/2, "egoHalfWidth", cfg.vehicle.width/2, ...
                 "targetHalfLength", 0, "targetHalfWidth", 0);
             decision = problem.decision;
-            decision(end) = decision(end)-0.1;
+            decision(end) = 0.0;
 
             accepted = certifyAvoidancePlan(problem.qp, problem.prediction, model, problem.decision);
             rejected = certifyAvoidancePlan(problem.qp, problem.prediction, model, decision);
 
-            testCase.verifyGreaterThan(problem.metadata.clfRelaxation, 0.1);
+            testCase.verifyGreaterThan(problem.metadata.clfRelaxation, ...
+                100*cfg.solver.constraintTolerance);
             testCase.verifyTrue(accepted.accepted);
             testCase.verifyFalse(rejected.accepted);
             testCase.verifyEqual(rejected.failedConditions, "continuousTimeClf");
-            testCase.verifyEqual(rejected.clfViolation, 0.1, AbsTol=1.0e-10);
+            testCase.verifyEqual(rejected.clfViolation, ...
+                problem.metadata.clfRelaxation, AbsTol=1.0e-10);
             testCase.verifyEqual(rejected.hardRowViolation, accepted.hardRowViolation, AbsTol=0.0);
         end
 
         function thePublicHookCanSolveTheStandardQpWithQuadprog(testCase)
-            native = localProblem("straight");
-            hooked = localProblem("straight", struct("solver", struct("jointFunction", @localQuadprog)));
+            solver = struct("constraintTolerance", 1.0e-9, "optimalityTolerance", 1.0e-9);
+            native = localProblem("straight", struct("solver", solver));
+            solver.jointFunction = @localQuadprog;
+            hooked = localProblem("straight", struct("solver", solver));
 
             testCase.verifyTrue(hooked.metadata.planCertified);
             testCase.verifyEqual(hooked.metadata.solverCallCount, 1);
@@ -135,7 +139,6 @@ function [problem, cfg, ego, route] = localProblem(laneCase, overrides)
     end
     cfg = collisionAvoidanceControllerConfig(overrides);
     cfg.controller.horizonSteps = 4;
-    cfg.model.longitudinalInputGain = 0.8;
     ego = struct("position", [0; 0.1], "yaw", 0.005, "speed", 8.0, ...
         "lateralVelocity", 0.01, "yawRate", 0.002, "longitudinalAccelerationBias", 0.3);
     route = [0, 0; 2000, 0];
@@ -148,9 +151,9 @@ end
 
 function errorState = localErrorAfterFlow(state, actuatorInput, step, prediction, cfg, ego, clf)
     [stateMatrix, inputMatrix, affine] = ltvBicycleModel.stageMatrices( ...
-        prediction.scheduleCurvature(1), prediction.scheduleSpeedProfile(1), step, cfg);
-    effectiveInput = actuatorInput+[0; ego.longitudinalAccelerationBias/cfg.model.longitudinalInputGain];
-    nextState = stateMatrix*state+inputMatrix*effectiveInput+affine;
+        prediction.scheduleCurvature(1), prediction.scheduleSpeedProfile(1), step, cfg, ...
+        prediction.scheduleBrakingRatio(1), ego.longitudinalAccelerationBias);
+    nextState = stateMatrix*state+inputMatrix*actuatorInput+affine;
     errorState = clf.errorOffset(:, 1)+nextState(2:6)-state(2:6);
 end
 

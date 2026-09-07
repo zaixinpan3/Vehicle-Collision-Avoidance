@@ -1,5 +1,10 @@
 # Why avoidance and cruise recovery stopped
 
+This report records experiments and diagnostics from before the modified Fiala
+tire revision. Its linear-tire and friction-limit results describe that earlier
+controller. The current model uses scheduled Fiala tangents and no separate
+axle-friction constraints; see [LTV_BICYCLE_MODEL.md](../controller/LTV_BICYCLE_MODEL.md).
+
 Analysis date: September 5, 2026. Examined implementation:
 `69a56a2bce56c20e48bf811d3449c9f4e541ae7e`.
 Input experiments and acceptance definitions are in

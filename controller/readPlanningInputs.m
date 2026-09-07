@@ -149,7 +149,7 @@ function value = localRequiredStateScalar(data, aliases, description)
 end
 
 function held = localOptionalHeldActuatorInput(data)
-% The actuator position the vehicle is currently holding, [deltaF; a].
+% The actuator position currently held, [deltaF; beta], in [rad; 1].
 %
 % This is ESTIMATOR data - a steering-angle sensor reading and the
 % actuator's share of the measured longitudinal acceleration - not a

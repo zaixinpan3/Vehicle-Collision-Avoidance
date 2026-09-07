@@ -70,6 +70,7 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
     results.headingError = zeros(stepCount, 1);
     results.steering = zeros(stepCount, 1);
     results.acceleration = zeros(stepCount, 1);
+    results.brakingRatio = zeros(stepCount, 1);
     results.solveTime = zeros(stepCount, 1);
     results.noSolution = false(stepCount, 1);
     results.failure = false(stepCount, 1);
@@ -162,7 +163,8 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
             realizedAcceleration = ...
                 (readout.longitudinalVelocity-previousSpeed) ...
                 / sampleTime;
-            modelledAcceleration = lastCommand(2) ...
+            modelledAcceleration = modifiedFialaTire.accelerationGain(cfg)*lastCommand(2) ...
+                - longitudinalRoadLoad(readout.longitudinalVelocity, cfg)/cfg.vehicle.m ...
                 + readout.lateralVelocity*readout.yawRate;
             accelerationBias = accelerationBias ...
                 + observerGain*(realizedAcceleration ...
@@ -239,7 +241,7 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
                     md.hardRowViolation;
             end
             % The commanded input is applied directly. The model bounds
-            % steering angle and longitudinal acceleration magnitude but
+            % steering angle and signed braking ratio but
             % does not constrain changes between samples.
             lastCommand = command.actuatorInput;
         catch err
@@ -247,7 +249,7 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
             % A "no solution" report is the controller's declared
             % answer (the program is infeasible), counted separately
             % from numerical failures. In both cases the harness holds
-            % the previous steering and sets acceleration to zero. What
+            % the previous steering and sets braking ratio to zero. What
             % the vehicle does after the controller has reported is
             % outside its contract, and holding a nonzero acceleration
             % indefinitely was measured to drive the plant out of the
@@ -273,7 +275,8 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
                 cos(readout.yaw-projection.heading));
         results.bias(stepIdx) = accelerationBias;
         results.steering(stepIdx) = lastCommand(1);
-        results.acceleration(stepIdx) = lastCommand(2);
+        results.acceleration(stepIdx) = modifiedFialaTire.accelerationGain(cfg)*lastCommand(2);
+        results.brakingRatio(stepIdx) = lastCommand(2);
         results.targetVisible(stepIdx) = gap <= perceptionRange ...
             && ~scene.noTarget;
         results.targetGap(stepIdx) = gap;
@@ -474,7 +477,7 @@ function out = plant14dof(action, varargin)
 % unsprung vertical travels, and 4 wheel spins. Tires use a linear
 % slip model saturated on the friction ellipse of the instantaneous
 % vertical load, so load transfer feeds back into grip. Deliberately
-% unlike the controller's declared forward-Euler LTV bicycle: it has
+% unlike the controller's declared held-input Fiala bicycle: it has
 % wheel-spin and vertical dynamics the controller never models.
 %
 %   parameters = plant14dof("parameters")
@@ -521,7 +524,6 @@ function p = localParameters()
     p.rollingResistance = 0.012;
     p.dragArea = 0.72;
     p.airDensity = 1.2;
-    p.brakeDistribution = [0.625; 0.375];
     % Corner geometry: [FL; FR; RL; RR] in body axes.
     p.cornerX = [p.lf; p.lf; -p.lr; -p.lr];
     p.cornerY = [p.halfTrack; -p.halfTrack; ...
@@ -575,7 +577,7 @@ function derivative = localDerivative(p, state, input)
     spin = state(21:24);
 
     steering = input(1);
-    accelerationDemand = input(2);
+    brakingRatio = input(2);
 
     % Suspension: body corner vertical position and rate.
     cornerZ = zBody+p.cornerX*(-sin(pitch)) ...
@@ -616,17 +618,9 @@ function derivative = localDerivative(p, state, input)
     contactFx = longitudinalLinear.*scale;
     contactFy = lateralLinear.*scale;
 
-    % Wheel torque from the acceleration demand, allocated the way
-    % the controller's own model declares.
-    if accelerationDemand >= 0.0
-        distribution = [0.5; 0.5; 0.0; 0.0];
-    else
-        distribution = 0.5*[p.brakeDistribution(1); ...
-            p.brakeDistribution(1); p.brakeDistribution(2); ...
-            p.brakeDistribution(2)];
-    end
-    wheelTorque = p.totalMass*accelerationDemand ...
-        * p.effectiveRadius*distribution;
+    % The paper's common beta requests Fx_i=beta*mu_i*Fz_i at static loads.
+    % Wheel dynamics and their actual contact-force losses remain in the plant.
+    wheelTorque = brakingRatio*p.frictionCoefficient*p.staticLoad*p.effectiveRadius;
     rollingTorque = p.rollingResistance*verticalLoad ...
         * p.effectiveRadius .* tanh(spin);
     spinDerivative = (wheelTorque-contactFx*p.effectiveRadius ...

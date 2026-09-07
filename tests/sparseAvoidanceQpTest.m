@@ -25,7 +25,7 @@ classdef sparseAvoidanceQpTest < matlab.unittest.TestCase
             testCase.verifyEqual(sparseResidual, original, AbsTol=1.0e-10);
             testCase.verifyGreaterThan(nnz(qp.rowFamily == "collision"), 0);
             testCase.verifyGreaterThan(nnz(qp.rowFamily == "road"), 0);
-            testCase.verifyGreaterThan(nnz(qp.rowFamily == "friction"), 0);
+            testCase.verifyGreaterThan(nnz(qp.rowFamily == "tireSlip"), 0);
         end
 
         function liftingAnyInputPlanPreservesDynamicsAndRestResiduals(testCase)
@@ -92,8 +92,7 @@ classdef sparseAvoidanceQpTest < matlab.unittest.TestCase
 end
 
 function problem = localProblem()
-    cfg = struct("controller", struct("horizonSteps", 4), ...
-        "model", struct("longitudinalInputGain", 0.8));
+    cfg = struct("controller", struct("horizonSteps", 4));
     ego = struct("position", [0.0; 0.1], "yaw", 0.005, "speed", 8.0, ...
         "longitudinalAccelerationBias", 0.3);
     target = struct("targetId", "lead", "targetPositionInertial", [80.0; 0.0], ...

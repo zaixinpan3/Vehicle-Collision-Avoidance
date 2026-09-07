@@ -4,13 +4,13 @@ The online objective is
 
 \[
 J=h\sum_{j=0}^{N-1}u_j^{\mathsf T}R_u u_j+\rho\delta^2,
-\qquad R_u=\operatorname{diag}(w_\phi/s_\phi^2,w_a/s_a^2).
+\qquad R_u=\operatorname{diag}(w_\phi/s_\phi^2,w_\beta/s_\beta^2).
 \]
 
-Here `u = [frontWheelSteeringAngle; longitudinalAcceleration]`, `h` is the
-control period, `sPhi` is the steering limit and `sA` is the largest absolute
-acceleration limit. The existing `clf.frontWheelSteeringAngleWeight` and
-`clf.longitudinalAccelerationWeight` supply positive input weights. They
+Here `u = [frontWheelSteeringAngle; brakingRatio]`, `h` is the
+control period, `sPhi` is the steering limit and `sBeta` is the largest absolute
+braking-ratio limit. The existing `clf.frontWheelSteeringAngleWeight` and
+`clf.brakingRatioWeight` supply positive input weights. They
 also retain their role in Riccati certificate synthesis. Defaults are both
 one; `clf.relaxationWeight = 100` weights squared relaxation.
 
@@ -43,14 +43,25 @@ safety certificate, or prove asymptotic recovery for the physical plant.
 A raw input penalty also does not explicitly compensate a nonzero constant
 model bias or prescribe a curved-road equilibrium input.
 
-Behavioral regression checks cover nominal straight-cruise preservation,
+Behavioral regression checks cover nominal straight-cruise preservation in
+the zero-road-load limit,
 small over/underspeed corrections without predicted overshoot, the squared
 cost scale, absence of a continuation cost, and agreement with independent
 `quadprog` solutions. The existing hard-row, sparse-lift and terminal-policy
 checks continue to apply. Closed-loop measurements are recorded separately
 from these model and optimization checks.
 
-## Validation on September 6, 2026
+The later [longitudinal force-balance correction](LONGITUDINAL_FORCE_BALANCE.md)
+adds aerodynamic and rolling resistance and aligns output force with the
+signed-beta force scale. The measurements below precede that correction. With
+nonzero road load, zero input does not preserve nominal speed; the raw input
+objective is unchanged and does not guarantee zero steady tracking error.
+
+## Historical validation on September 6, 2026
+
+The measurements below precede the modified Fiala and signed-beta input
+migration. They describe the former acceleration-input controller; they are
+not physical validation of the current tire and input model.
 
 The final full working-tree suite ran 379 cases: 371 passed and 8 failed,
 including 7 incomplete cases. All 66 controller, continuous-CLF, recovery

@@ -57,6 +57,10 @@ function result = runCenterlineCruiseScenario(varargin)
         initialVehicleParameters, sampleTime, cfg.referenceSpeed);
     plantAdapter.forceToTorqueRadius = ...
         initialization.effectiveRollingRadius;
+    plantParameters = localActiveRoadLoadParameters(plantParameters, plantAdapter.tireBlock);
+    cfg.roadLoad = localRoadLoadForPlant(plantParameters, ...
+        initialization.effectiveRollingRadius, cfg.roadLoad);
+    cfg = collisionAvoidanceControllerConfig(cfg);
 
     centerline = options.centerline;
     operatingPoint = [];
@@ -905,10 +909,72 @@ function parameters = localPlantParameters(model, adapter)
     parameters.gravity = gravity;
     parameters.frontalArea = double(vehicle.FrontalArea);
     parameters.dragCoefficient = localMaskScalar(bodyBlock, "Cd");
+    parameters.airDensity = localMaskScalar(bodyBlock, "Pabs") ...
+        /(287.058*localMaskScalar(bodyBlock, "Tair"));
+    parameters.rollingNominalLoad = nominalVerticalLoad;
+    parameters.rollingNominalSpeed = localMaskScalar(adapter.tireBlock, "LONGVL");
+    parameters.rollingUnloadedRadius = localMaskScalar(adapter.tireBlock, "UNLOADED_RADIUS");
+    parameters.rollingNominalPressure = localMaskScalar(adapter.tireBlock, "NOMPRES");
+    parameters.rollingPressure = localMaskScalar( ...
+        model+"/Wheels and Tires/VDBS/Pressure", "const");
+    parameters.rollingCoefficients = arrayfun(@(index) localMaskScalar( ...
+        adapter.tireBlock, "QSY"+index), (1:8).');
     parameters.tireWidth = tireWidth;
     parameters.staticNormalLoad = staticNormalLoad;
     parameters.corneringStiffness = corneringStiffness;
     parameters.frictionCoefficient = frictionCoefficient;
+end
+
+function roadLoad = localRoadLoadForPlant(parameters, rollingRadius, roadLoad)
+% Static-load, zero-camber reduction of the plant's Magic Formula moment.
+% Convert each wheel's rolling moment to an equivalent force with the
+% initialized effective radius. Dynamic loads, slip, and axle losses remain
+% model residuals. No fitted constant acceleration bias is introduced.
+    coefficients = parameters.rollingCoefficients;
+    if any(coefficients([2, 5, 6]) ~= 0.0)
+        error("runCenterlineCruiseScenario:unsupportedRoadLoad", ...
+            "The reduced rolling model requires QSY2, QSY5, and QSY6 to be zero.");
+    end
+    forceScale = sum(parameters.rollingUnloadedRadius./rollingRadius ...
+        * parameters.rollingNominalLoad ...
+        .* (parameters.staticNormalLoad/parameters.rollingNominalLoad).^coefficients(7)) ...
+        * (parameters.rollingPressure/parameters.rollingNominalPressure)^coefficients(8);
+    coefficientScale = forceScale/(parameters.mass*parameters.gravity);
+    roadLoad.airDensity = parameters.airDensity;
+    roadLoad.dragCoefficient = parameters.dragCoefficient;
+    roadLoad.frontalArea = parameters.frontalArea;
+    roadLoad.rollingCoefficient = coefficientScale*coefficients(1);
+    roadLoad.rollingSpeedCoefficient = coefficientScale*coefficients(3) ...
+        /parameters.rollingNominalSpeed;
+    roadLoad.rollingQuarticCoefficient = coefficientScale*coefficients(4) ...
+        /parameters.rollingNominalSpeed^4;
+end
+
+function parameters = localActiveRoadLoadParameters(parameters, tireBlock)
+% The built-in tire preset overrides inactive values retained in the mask.
+% Read its initialized MF62 parameter vector, not the external-file settings.
+% This adapter is deliberately tied to the verified R2026a template layout.
+    variables = get_param(tireBlock, "MaskWSVariables");
+    index = find(strcmp({variables.Name}, "vdynMF"), 1);
+    if isempty(index) || ~strcmp(version("-release"), "2026a") ...
+            || string(get_param(tireBlock, "tireType")) ~= "Mid-size passenger car 235/45R18"
+        error("runCenterlineCruiseScenario:unsupportedRoadLoad", ...
+            "The active tire-preset parameter layout must be verified for this template.");
+    end
+    values = variables(index).Value(:);
+    if numel(values) ~= 279 || values(12) ~= 62 || values(4) ~= 0 ...
+            || any(~isfinite(values([14, 24, 30, 38, 218:225]))) ...
+            || any(values([14, 24, 30, 38]) <= 0)
+        error("runCenterlineCruiseScenario:unsupportedRoadLoad", ...
+            "The initialized built-in MF62 vector does not match the verified layout.");
+    end
+    parameters.rollingParameterSource = "R2026a initialized built-in MF62 preset";
+    parameters.rollingInactiveMaskCoefficients = parameters.rollingCoefficients;
+    parameters.rollingNominalSpeed = values(14);
+    parameters.rollingUnloadedRadius = values(24);
+    parameters.rollingNominalPressure = values(30);
+    parameters.rollingNominalLoad = values(38);
+    parameters.rollingCoefficients = values(218:225);
 end
 
 function cfg = localControllerConfigurationForPlant( ...
@@ -1034,6 +1100,8 @@ function dataset = localPlantInputDataset( ...
         adapter.steeringAngleSign ...
             * command.frontWheelSteeringAngle * ones(2, 1); ...
         0.0; 0.0];
+    % command.axleLongitudinalForce = beta*[mu_f*Fzf; mu_r*Fzr].
+    % Apply the common signed ratio to both axles through drive/brake torque.
     wheelForce = 0.5*command.axleLongitudinalForce([1; 1; 2; 2]);
     axleTorque = max(wheelForce, 0.0) ...
         .* adapter.forceToTorqueRadius;
@@ -1114,6 +1182,10 @@ function trace = localExtractPlantTrace(outputDataset, adapter)
         * vehicle.BdyFrm.Cg.Vel.ydot.Data(:);
     trace.yawRate = adapter.yawStateSign ...
         * vehicle.BdyFrm.Cg.AngVel.r.Data(:);
+    trace.bodyAerodynamicForceX = vehicle.BdyFrm.Forces.Drag.Fx.Data(:);
+    trace.bodyGravityForceX = vehicle.BdyFrm.Forces.Grvty.Fx.Data(:);
+    trace.bodyNetForceX = vehicle.BdyFrm.Forces.Body.Fx.Data(:);
+    trace.bodyPitch = vehicle.InertFrm.Cg.Ang.theta.Data(:);
     sampleCount = numel(trace.time);
     trace.wheelAngularSpeed = localWheelTimeRows( ...
         wheel.Omega.Data, sampleCount, "wheel angular speed");
@@ -1121,6 +1193,12 @@ function trace = localExtractPlantTrace(outputDataset, adapter)
         wheel.Re.Data, sampleCount, "effective rolling radius");
     trace.longitudinalSlip = localWheelTimeRows( ...
         wheel.Kappa.Data, sampleCount, "longitudinal slip");
+    trace.wheelLongitudinalForce = localWheelTimeRows( ...
+        wheel.Fx.Data, sampleCount, "longitudinal tire force");
+    trace.wheelRollingMoment = localWheelTimeRows( ...
+        wheel.My.Data, sampleCount, "rolling resistance moment");
+    trace.wheelNormalLoad = localWheelTimeRows( ...
+        wheel.Fz.Data, sampleCount, "normal tire load");
 end
 
 function values = localWheelTimeRows(data, sampleCount, signalName)
@@ -1141,9 +1219,16 @@ function trace = localEmptyTrace()
         "longitudinalVelocity", zeros(0, 1), ...
         "lateralVelocity", zeros(0, 1), ...
         "yawRate", zeros(0, 1), ...
+        "bodyAerodynamicForceX", zeros(0, 1), ...
+        "bodyGravityForceX", zeros(0, 1), ...
+        "bodyNetForceX", zeros(0, 1), ...
+        "bodyPitch", zeros(0, 1), ...
         "wheelAngularSpeed", zeros(0, 4), ...
         "effectiveRollingRadius", zeros(0, 4), ...
-        "longitudinalSlip", zeros(0, 4));
+        "longitudinalSlip", zeros(0, 4), ...
+        "wheelLongitudinalForce", zeros(0, 4), ...
+        "wheelRollingMoment", zeros(0, 4), ...
+        "wheelNormalLoad", zeros(0, 4));
 end
 
 function combined = localAppendTrace(combined, segment)

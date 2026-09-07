@@ -11,15 +11,15 @@ braking acceleration into the head moved the newly predicted station forward
 by `-0.5*Ts^2*a`. Bounds on heading, lateral speed and yaw rate did not prove
 that the kinematic lateral certificate contained the dynamic handoff.
 
-The replacement uses steering and acceleration decisions, the same scheduled
+The replacement uses steering and signed braking-ratio decisions, the same scheduled
 six-state bicycle with exact held-input affine integration, and physical
-request rows at every stage. The declared longitudinal input gain is the
-same across this boundary. The schedule's speed
+input and slip-domain rows at every stage. The beta force scale and
+modified Fiala linearization are preserved across this boundary. The schedule's speed
 may reach zero; only tire-force denominators retain a positive floor. For a
 zero-speed schedule, arbitrary admitted station/lateral offset/heading and
 zero velocities form an equilibrium under zero steering and cancellation of
 the declared constant longitudinal bias: the resting command is
-`[0; -bias/longitudinalInputGain]`. Three exact terminal velocity
+`[0; -bias/brakingRatioAccelerationGain]`. Three exact terminal velocity
 equalities and a fixed last input close the continuation. The shifted tail
 therefore enters the head without changing its dynamics or constraints.
 The conic solver now parameterizes these equalities and fixed inputs

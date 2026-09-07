@@ -23,8 +23,8 @@ configuration/environment identity, committed actuator vector, and acceptance
 residuals. The four-input interface stores the same state persistently for
 existing scenario drivers. `resetNominalTrajectory` clears that convenience
 interface and does not change an explicitly supplied certificate.
-Certificates use version 4 for the route-interval geometry, held-input
-flow and commanded-input model contract. Earlier certificates must undergo initial admission again.
+Certificates use version 6 for the signed braking-ratio input and modified
+Fiala model contract. Earlier certificates must undergo initial admission again.
 
 Initial admission constructs one domain from the schedule reference and
 attempts one QP. This reference is not certified in advance. The augmented
@@ -45,39 +45,33 @@ and `M = N + Nb`. All `M` stages use the same scheduled Frenet bicycle:
 
 \[
  x_{j+1}=A_jx_j+B_ju_j+c_j,\qquad
- x=[s,d,e_\psi,v_x,v_y,r]^\top,\quad u=[\delta_f,a]^\top.
+ x=[s,d,e_\psi,v_x,v_y,r]^\top,\quad u=[\delta_f,\beta]^\top.
 \]
 
 Each stage integrates its scheduled affine model exactly under a held input,
 using one block matrix exponential. The CLF uses the continuous generator
-of that same scheduled model and a continuous-time cruise Riccati design. Acceleration bias propagates through the entire acceleration
-input column. The first predicted pose therefore includes the input's
+of that same scheduled model and a continuous-time cruise Riccati design. Acceleration bias enters the longitudinal affine term before
+integration, independently of the coupled beta input column. The first predicted pose therefore includes the input's
 within-sample effect. This replaces Euler integration consistently in both
 head and continuation; it does not make the nonlinear plant model exact.
 
-Every stage has both steering and acceleration decision variables. There is
+Every stage has both steering and braking-ratio decision variables. There is
 no dynamic-to-kinematic handoff. `ltvBicycleModel.brakingSchedule` only supplies an initial
 speed schedule and derives `Nb` from maximum speed and the configured
 braking rate, with two rest stages. The optimizer can steer and accelerate
 throughout the continuation subject to the same physical limits as the head.
 The configured braking rate does not replace those physical rows.
 
-`model.longitudinalInputGain` is a fixed declared gain `gamma` in `(0, 1]`:
-`vxDot = gamma*a + rBar*vy + b`. The input `a` remains the requested
-longitudinal acceleration used by the actuator adapter. The default is 1;
-the Blockset experiment uses 0.80 after observing a step-average braking
-response of 0.841 times its command. This is a fixed modeling choice motivated
-by the recorded response, not a certified lower bound on every nonlinear-plant response. Gain uncertainty
-and actuator dynamics have not been enclosed by a feedback tube.
+The input is `[deltaF; beta]` with the paper's signed ratio in `[-1,1]`.
+For static axle loads, `gBeta=sum(mu_i*Fzi)/m` and the gross longitudinal
+acceleration is `gBeta*beta`. The modified Fiala tangent includes both slip
+and beta derivatives. The constant longitudinal acceleration bias enters
+its own affine-generator term before exact held-input integration.
 
-The gain enters all head/continuation matrices, cruise equilibrium, CLF
-Riccati cache, bias propagation and resting input. Axle polygons still check
-the full requested longitudinal force `rho*m*a`, while their affine load
-transfer uses the model's effective acceleration `gamma*a`. For the declared
-gain no larger than one, the model's realized longitudinal force has no larger
-magnitude than that request. The same hard force/request envelope applies
-at every stage. The unsuccessful future-capacity-reserve variant is not
-part of the implemented controller.
+The same beta force scale enters head/continuation matrices, cruise reference,
+Riccati design and the resting input. No separate axle-force envelope or
+load-transfer inequality is imposed. The admissible beta interval and the
+selected slip domains remain hard at every stage.
 
 The condensed map is `x_j = F_j plan + f_j`. The decision is
 `z = [plan; delta]`, with one nonnegative scalar relaxation:
@@ -86,7 +80,7 @@ The condensed map is `x_j = F_j plan + f_j`. The decision is
  \begin{aligned}
  \min_{\mathrm{plan},\delta\ge0}\quad&
  h\sum_{j=0}^{N-1}u_j^{\mathsf T}R_u u_j+\rho\delta^2,\\
- \text{s.t.}\quad& \text{hard actuator, axle-friction, slip and domain rows},\\
+ \text{s.t.}\quad& \text{hard actuator, slip and domain rows},\\
  &\underline g_{\ell j}(\mathrm{plan};c_t)\ge0,\\
  &(v_x,v_y,r)_{M}=(0,0,0),\\
  &L_fV(x_0)+L_gV(x_0)u_0\le-\alpha V(x_0)+\delta.
@@ -150,7 +144,7 @@ The affine performance inequality follows the CLF-QP construction in
 [Ames, Xu, Grizzle and Tabuada (2017)](https://arxiv.org/abs/1609.06408).
 
 The native solver receives a diagonal positive-semidefinite Hessian and a
-zero linear objective. Let `s = [steeringMaximum; maximumAbsoluteAcceleration]`
+zero linear objective. Let `s = [steeringMaximum; maximumAbsoluteBrakingRatio]`
 and `w` contain the two configured input weights. Then
 `R_u = diag(w./s.^2)`, head Hessian blocks are `2*h*R_u`, and the slack
 coefficient is `2*rho`; tail and explicit-state coefficients are zero.
@@ -262,12 +256,12 @@ regularization floor. At zero schedule speed,
 
 \[
  x_R=[s_R,d_R,e_{\psi,R},0,0,0]^\top,
- \qquad \pi_R=[0,-b/\gamma]^\top
+ \qquad \pi_R=[0,-b/g_\beta]^\top
 \]
 
 is a fixed point of the same scheduled bicycle; `b` is the declared constant
-longitudinal bias and `gamma` the configured input gain. The last input is fixed to this policy and checked against
-actuator and axle constraints. The policy, zero-speed schedule and resting
+longitudinal bias and `gBeta=sum(mu_i*Fzi)/m` the beta acceleration scale. The last input is fixed to this policy and checked against
+actuator and slip-domain constraints. The policy, zero-speed schedule and resting
 frame can be appended indefinitely. Rest remains valid at nonzero lateral
 offset and heading error within the admitted geometry domain.
 
@@ -291,8 +285,8 @@ The implemented persistent certificate is an exact-model trajectory
 certificate. Nonzero ego estimation radii or model/disturbance rate bounds
 raise `unsupportedCertificateUncertainty`. A robust feedback tube with a
 robust terminal invariant set has not been implemented. The predictor itself
-now propagates all boxes through `r(j+1) = abs(A(j))*r(j) + Ts*w`; the former
-first-future-node-only update has been removed. Propagation alone does not
+propagates all boxes through `r(j+1) = abs(A(j))*r(j) + d(j)`, where
+`d(j)` bounds the continuous disturbance integrated over the held-input flow. Propagation alone does not
 supply terminal robustness, so it is not used to label such inputs certified.
 
 The estimator adapter now publishes its time-varying state-time enclosure
