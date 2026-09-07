@@ -5,7 +5,7 @@ function certificate = synthesizeTargetTrackerCertificate( ...
 % A normalized observer LMI selects l and the identity A(l)'P+PA(l)=-I
 % fixes its Lyapunov metric. The physical gains remain [l1*w;l2*w^2;l3*w^3].
 % Separate global Lipschitz channels Lq and Ls enter a two-multiplier
-% dissipation inequality after scaling epsilon=[w^2*eRho;w*eQ;eS].
+% dissipation inequality after scaling z=[eRho;eQ/w;eS/w^2].
 %
 % The engineering objective is the largest domain-normalized ultimate
 % component bound, subject to a guaranteed decay rate of at least the
@@ -277,15 +277,15 @@ function bound = localTargetBound(bandwidth,lyapunovMatrix, ...
         bound = struct("objectiveValue",Inf);
         return
     end
-    scale = [bandwidth^2;bandwidth;1];
+    scale = [1;1/bandwidth;1/bandwidth^2];
     physicalBounds = [chain.relativePositionMaximum;chain.speedMaximum; ...
         chain.accelerationNormBound];
     scaledBounds = scale.*physicalBounds;
     gyroCoefficient = sqrt(scaledBounds.'*abs(lyapunovMatrix)*scaledBounds);
-    velocityCoupling = bandwidth^2*sqrt(lyapunovMatrix(1,1));
-    radarCoefficient = bandwidth^3 ...
+    velocityCoupling = sqrt(lyapunovMatrix(1,1));
+    radarCoefficient = bandwidth ...
         *sqrt(injectionVector.'*lyapunovMatrix*injectionVector);
-    modelCoefficient = sqrt(lyapunovMatrix(3,3));
+    modelCoefficient = sqrt(lyapunovMatrix(3,3))/bandwidth^2;
     disturbanceBound = gyroCoefficient*chain.gyroscopeNoiseMaximum ...
         +radarCoefficient*chain.radarNoiseMaximum ...
         +modelCoefficient*chain.modelJerkMaximum;

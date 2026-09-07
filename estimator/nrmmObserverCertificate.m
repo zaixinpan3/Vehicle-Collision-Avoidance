@@ -1,9 +1,9 @@
 function certificate = nrmmObserverCertificate(stage)
 % nrmmObserverCertificate Construct the triangular core ISS certificate.
 %
-% For chi = [|ePsi|; Wv; WT], the comparison dynamics have the positive
+% For chi = [Wv; WT], the comparison dynamics have the positive
 % lower-triangular form D+chi <= A*chi+d. Positive weights are selected by
-% backward substitution so that w'*A = -[1,1,1]. The copositive function
+% backward substitution so that w'*A = -[1,1]. The copositive function
 % V = w'*chi therefore satisfies
 %
 %   D+V <= -(1/max(w))*V + w'*d.
@@ -11,37 +11,31 @@ function certificate = nrmmObserverCertificate(stage)
 % This explicit certificate replaces a generic Lyapunov-equation solve and
 % displays every feedforward coupling directly.
 
-    yawDecayRate = localPositive(stage, "yawDecayRate");
     velocityDecayRate = localPositive(stage, "velocityDecayRate");
     targetDecayRate = localPositive(stage, "targetDecayRate");
-    velocityYawCoupling = localNonnegative( ...
-        stage, "velocityYawCoupling");
     targetVelocityCoupling = localNonnegative( ...
         stage, "targetVelocityCoupling");
     input = localInput(stage);
 
     comparisonMatrix = [ ...
-        -yawDecayRate, 0.0, 0.0; ...
-        velocityYawCoupling, -velocityDecayRate, 0.0; ...
-        0.0, targetVelocityCoupling, -targetDecayRate];
+        -velocityDecayRate, 0.0; ...
+        targetVelocityCoupling, -targetDecayRate];
     targetWeight = 1.0/targetDecayRate;
     velocityWeight = ...
         (1.0+targetVelocityCoupling*targetWeight)/velocityDecayRate;
-    yawWeight = ...
-        (1.0+velocityYawCoupling*velocityWeight)/yawDecayRate;
-    weights = [yawWeight; velocityWeight; targetWeight];
+    weights = [velocityWeight; targetWeight];
     weightedMatrix = weights.'*comparisonMatrix;
-    residual = weightedMatrix+ones(1, 3);
+    residual = weightedMatrix+ones(1, 2);
     tolerance = 256.0*eps(max([1.0; abs(weights); ...
         abs(comparisonMatrix(:))]));
     if max(abs(residual), [], "all") > tolerance
         error("nrmmObserverCertificate:invalidWeights", ...
-            "The backward weights must satisfy w'*A = -ones(1,3).");
+            "The backward weights must satisfy w'*A = -ones(1,2).");
     end
 
     certificate = struct( ...
         "type", "linear-copositive", ...
-        "stateOrder", ["yaw"; "bodyVelocity"; "target"], ...
+        "stateOrder", ["bodyVelocity"; "target"], ...
         "matrix", comparisonMatrix, ...
         "input", input, ...
         "weights", weights, ...
@@ -87,9 +81,9 @@ function input = localInput(stage)
             "stage.input is required.");
     end
     input = double(stage.input);
-    if ~isequal(size(input), [3, 1]) || any(~isfinite(input)) ...
+    if ~isequal(size(input), [2, 1]) || any(~isfinite(input)) ...
             || any(input < 0.0)
         error("nrmmObserverCertificate:invalidStage", ...
-            "stage.input must be a finite nonnegative three-vector.");
+            "stage.input must be a finite nonnegative two-vector.");
     end
 end

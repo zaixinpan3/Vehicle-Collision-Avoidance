@@ -316,9 +316,10 @@ function egoInitial = localInitialEgoEstimate(frame, observerDesign)
 % localInitialEgoEstimate Seed the ego cascade from the latest GNSS sample.
 %
 % GNSS velocity is directly sensed, so the seed needs no history secant:
-% position and velocity come from the newest frame. Initial yaw applies the
-% same certified kinematic sideslip correction as the online course channel
-% instead of making a zero-sideslip assumption.
+% Position and velocity come from the newest frame. The body velocity seed
+% uses the direct kinematic extension, including its unclipped lateral entry.
+% An uninformative course uses an arbitrary initial output representative;
+% the runtime's whole-circle prior makes no orientation claim about it.
 
     latestFrame = frame{end};
     position = [latestFrame.xGps; latestFrame.yGps];
@@ -331,15 +332,16 @@ function egoInitial = localInitialEgoEstimate(frame, observerDesign)
         observerDesign.yaw.courseModel ...
             .singleTrackYawRateMismatchMaximum, ...
         observerDesign.yaw.courseModel.sideslipDomainMaximum);
-    if ~course.correspondence.informative
-        error("nrmmEstimatorControllerAdapter:unobservableInitialCourse", ...
-            "GNSS velocity and yaw rate did not certify an initial yaw.");
+    yaw = 0.0;
+    if course.correspondence.informative
+        yaw = course.correspondence.heading;
     end
-    yaw = course.correspondence.heading;
+    bodyVelocity = nrmmKinematicVelocityMeasurement( ...
+        inertialVelocity,latestFrame.yawRateMeasured,observerDesign);
     egoInitial = struct( ...
         "position", position, ...
         "yaw", yaw, ...
-        "bodyVelocity", localRotation(yaw).'*inertialVelocity, ...
+        "bodyVelocity", bodyVelocity, ...
         "inertialVelocity", inertialVelocity);
 end
 

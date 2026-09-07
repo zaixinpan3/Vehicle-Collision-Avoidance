@@ -76,17 +76,17 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(excess),1e-8);
         end
 
-        function yawBranchCrossingUsesAValidDefectAndCircularBound(testCase)
-            [excess,chartValid] = localDefectExcess(testCase.Config,testCase.Design,true);
+        function yawBranchCrossingDoesNotEnterTheNumericalCore(testCase)
+            [excess,orientationValid] = localDefectExcess(testCase.Config,testCase.Design,true);
             testCase.verifyLessThanOrEqual(max(excess),1e-8);
-            testCase.verifyFalse(chartValid);
+            testCase.verifyTrue(orientationValid);
         end
 
         function largeInitialErrorsRemainContainedThroughHighGainPeaking(testCase)
-            [slack,available,usedCircularFallback] = localLargeInitialErrors(testCase.Config,testCase.Design);
+            [slack,available,orientationContained] = localLargeInitialErrors(testCase.Config,testCase.Design);
             testCase.verifyGreaterThanOrEqual(min(slack),-1e-10);
             testCase.verifyTrue(all(available));
-            testCase.verifyTrue(usedCircularFallback);
+            testCase.verifyTrue(orientationContained);
         end
 
         function inconsistentRadarDisablesOnlyItsTrackBound(testCase)
@@ -176,7 +176,7 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
     end
 end
 
-function [slack,available,usedCircularFallback] = localLargeInitialErrors(cfg,design)
+function [slack,available,orientationContained] = localLargeInitialErrors(cfg,design)
     options = struct("egoInitialPosition",zeros(2,1),"egoInitialYaw",3.1, ...
         "egoInitialBodyVelocity",[-15;0],"targetCount",1, ...
         "targetInitialState",[-30;-2;-12;4;10;-8]);
@@ -185,7 +185,7 @@ function [slack,available,usedCircularFallback] = localLargeInitialErrors(cfg,de
     frame = rmfield(frame,"radarTargetIdentifiers");
     slack = zeros(30,1);
     available = false(30,1);
-    usedCircularFallback = false;
+    orientationContained = true;
     for index = 1:30
         frame.time = (index-1)*cfg.runtime.samplePeriod;
         frame.xGps = 15*frame.time;
@@ -193,11 +193,13 @@ function [slack,available,usedCircularFallback] = localLargeInitialErrors(cfg,de
         slack(index) = output.relativePositionErrorBound ...
             -norm([30;2]-output.targetEstimates.relativePosition);
         available(index) = output.positionErrorBoundAvailable;
-        usedCircularFallback = usedCircularFallback || ~runtime.positionErrorBound.lastYawChartValid;
+        orientationContained = orientationContained && output.orientationCertificateAvailable ...
+            && abs(atan2(sin(output.egoYaw),cos(output.egoYaw))) <= output.egoYawErrorBound+1e-12;
     end
 end
 
 function output = localExactCase(cfg)
+    cfg.ego.yaw.singleTrackYawRateMismatchMaximum = 0;
     cfg.measurement.gps.positionNoiseMaximum = 0;
     cfg.measurement.gps.velocityNoiseMaximum = 0;
     cfg.measurement.imu.noiseMaximum = 0;
@@ -303,7 +305,7 @@ function derivative = localField(state,input,design)
         -input.yawRate*[0,-1;1,0]*state.radarPredictor;
 end
 
-function [excess,chartValid] = localDefectExcess(cfg,design,crossing)
+function [excess,orientationValid] = localDefectExcess(cfg,design,crossing)
     before = localState(0.1);
     input = localInput(0);
     if crossing
@@ -321,8 +323,8 @@ function [excess,chartValid] = localDefectExcess(cfg,design,crossing)
     step = 0.02;
     result = nrmmPositionErrorBound("advance",bound,input,before,after,first,step);
     defect = result.lastDefect;
-    excess = zeros(6,51);
-    names = ["yaw","bodyVelocity","targetState","radarPredictor"];
+    excess = zeros(5,51);
+    names = ["bodyVelocity","targetState","radarPredictor"];
     for index = 1:51
         fraction = (index-1)/50;
         state = before;
@@ -333,11 +335,10 @@ function [excess,chartValid] = localDefectExcess(cfg,design,crossing)
         end
         field = localField(state,input,design);
         residual = slope.targetState-field.targetState;
-        excess(:,index) = [abs(slope.yaw-field.yaw)-defect.yaw; ...
-            norm(slope.bodyVelocity-field.bodyVelocity)-defect.bodyVelocity; ...
+        excess(:,index) = [norm(slope.bodyVelocity-field.bodyVelocity)-defect.bodyVelocity; ...
             norm(residual(1:2))-defect.target(1);norm(residual(3:4))-defect.target(2); ...
             norm(residual(5:6))-defect.target(3); ...
             norm(slope.radarPredictor-field.radarPredictor)-defect.radarPredictor];
     end
-    chartValid = result.lastYawChartValid;
+    orientationValid = result.orientationSet.valid;
 end

@@ -2,7 +2,8 @@ function bound = nrmmPositionErrorBound(action, varargin)
 % nrmmPositionErrorBound Maintain a deterministic sampled position enclosure.
 % initialize(design,cfg,state,time,prior), measure(bound,input,state),
 % advance(bound,input,before,after,firstDerivative,h), reset(bound,index,state).
-% State fields: yaw, bodyVelocity, targetState (6-by-N), radarPredictor (2-by-N).
+% State fields: bodyVelocity, targetState (6-by-N), radarPredictor (2-by-N).
+% An initial yaw supplies only the center of the optional orientation prior.
 % Prior, when supplied, declares true initial error norm bounds in fields yaw,
 % bodyVelocity and targetComponents (3-by-N). Otherwise use the physical domain.
 % The enclosure concerns the actual accepted numerical states. Linear-path
@@ -28,6 +29,10 @@ function bound = localInitialize(design,cfg,state,time,prior)
     if nargin < 5
         prior = struct();
     end
+    initialYaw = 0.0;
+    if isfield(state,"yaw")
+        initialYaw = state.yaw;
+    end
     count = size(state.targetState,2);
     holdBounds = struct( ...
         "acceleration",localHoldBound(cfg,"accelerationNormMaximum"), ...
@@ -39,7 +44,8 @@ function bound = localInitialize(design,cfg,state,time,prior)
         "radarPredictor",zeros(1,count), ...
         "trueRangeMaximum",repmat(design.target.domain.relativePositionMaximum,1,count), ...
         "egoValid",true,"valid",true(1,count),"reason",repmat("declared-domain-prior",1,count), ...
-        "lastRadarTime",NaN(1,count),"yawMeasurementRadius",pi,"yawHeading",0, ...
+        "lastRadarTime",NaN(1,count), ...
+        "orientationSet",nrmmYawSet("initialize",initialYaw,pi), ...
         "lastDefect",struct(),"lastComparison",struct([]), ...
         "integrationErrorIncluded",true,"floatingPointVerified",false, ...
         "scope","conditional deterministic containment; no sampled exponential stability claim");
@@ -64,6 +70,7 @@ function bound = localInitialize(design,cfg,state,time,prior)
         end
         bound.reason(:) = "declared-initial-error-prior";
     end
+    bound.orientationSet = nrmmYawSet("initialize",initialYaw,bound.yaw);
 end
 
 function bound = localReset(bound,index,state)
@@ -98,25 +105,32 @@ function bound = localMeasure(bound,input,state)
         sensors.gyroscopeNoiseMaximum, ...
         design.yaw.courseModel.singleTrackYawRateMismatchMaximum, ...
         design.yaw.courseModel.sideslipDomainMaximum);
-    yawDistance = abs(localWrap(course.correspondence.heading-state.yaw));
-    radius = course.correspondence.radius;
-    sensorConsistent = course.correspondence.informative && course.boundsConsistent ...
-        && norm(input.gnssVelocity) <= domain.egoSpeedMaximum+sensors.velocityNoiseMaximum ...
-        && norm(input.gnssVelocity)+sensors.velocityNoiseMaximum >= domain.egoSpeedMinimum ...
-        && abs(input.yawRate) <= domain.egoYawRateMaximum+sensors.gyroscopeNoiseMaximum ...
-        && norm(input.bodyAcceleration) <= bound.holdBounds.acceleration+sensors.accelerometerNoiseMaximum;
-    if ~sensorConsistent || yawDistance > localGuard(bound.yaw+radius)
+    [velocityMeasurement,feasible] = nrmmKinematicVelocityMeasurement( ...
+        input.gnssVelocity,input.yawRate,design);
+    sensorConsistent = feasible.consistent ...
+        && abs(input.yawRate) <= localGuard(domain.egoYawRateMaximum+sensors.gyroscopeNoiseMaximum) ...
+        && norm(input.bodyAcceleration) <= localGuard(bound.holdBounds.acceleration+sensors.accelerometerNoiseMaximum);
+    if ~sensorConsistent
         bound.egoValid = false;
         bound.valid(:) = false;
         bound.reason(:) = "ego-measurement-inconsistent-with-declared-bounds";
     end
-    bound.yaw = min(bound.yaw,localGuard(yawDistance+radius));
-    bound.yawMeasurementRadius = radius;
-    bound.yawHeading = course.correspondence.heading;
-    rotation = [cos(state.yaw),-sin(state.yaw);sin(state.yaw),cos(state.yaw)];
-    velocityNoise = sensors.velocityNoiseMaximum ...
-        + 2*domain.egoSpeedMaximum*sin(min(bound.yaw,pi)/2);
-    residual = norm(rotation.'*input.gnssVelocity-state.bodyVelocity);
+    % A failed yaw intersection invalidates only orientation-based outputs.
+    % An uninformative correspondence contributes S^1 and never a false center.
+    measurementSet = nrmmYawSet("initialize",course.correspondence.heading, ...
+        course.correspondence.radius);
+    if ~sensorConsistent
+        measurementSet.intervals = zeros(0,2);
+    end
+    bound.orientationSet = nrmmYawSet("intersect",bound.orientationSet,measurementSet);
+    bound.yaw = bound.orientationSet.radius;
+    model = design.yaw.courseModel;
+    % This scalar reconstruction error is used only for initial/measurement
+    % containment; propagation below combines the common gyro column first.
+    velocityNoise = (sensors.velocityNoiseMaximum+model.rearAxleDistance ...
+        *(sensors.gyroscopeNoiseMaximum+model.singleTrackYawRateMismatchMaximum)) ...
+        /cos(model.sideslipDomainMaximum);
+    residual = norm(velocityMeasurement-state.bodyVelocity);
     if residual > localGuard(bound.bodyVelocity+velocityNoise)
         bound.egoValid = false;
         bound.valid(:) = false;
@@ -158,19 +172,11 @@ function bound = localAdvance(bound,input,before,after,first,step)
     defect = localDefect(before,after,first,input,design,step);
     velocityCap = domain.egoSpeedMaximum ...
         + max(norm(before.bodyVelocity),norm(after.bodyVelocity));
-    headingRadius = min(pi,bound.yawMeasurementRadius+domain.egoYawRateMaximum*age);
-    yawPathBound = bound.yaw+domain.egoYawRateMaximum*step+abs(after.yaw-before.yaw);
-    chartValid = yawPathBound+headingRadius < pi;
-    egoMatrix = zeros(2);
-    egoInput = zeros(2,1);
-    egoInitial = [bound.yaw;bound.bodyVelocity];
-    if chartValid
-        egoMatrix(1,1) = -design.yaw.correctionBandwidth;
-        egoInput(1) = gyroError+design.yaw.correctionBandwidth*headingRadius+defect.yaw;
-    else
-        % Circular distance is bounded without selecting a linear-error chart.
-        egoInput(1) = domain.egoYawRateMaximum+abs(after.yaw-before.yaw)/step;
-    end
+    bound.orientationSet = nrmmYawSet("propagate",bound.orientationSet, ...
+        input.yawRate*step,gyroError*step);
+    egoMatrix = 0;
+    egoInput = 0;
+    egoInitial = bound.bodyVelocity;
     accelerationEnvelope = bound.holdBounds.acceleration;
     if isfinite(bound.holdBounds.bodyAccelerationRate)
         accelerationEnvelope = min(accelerationEnvelope,norm(input.bodyAcceleration) ...
@@ -184,18 +190,23 @@ function bound = localAdvance(bound,input,before,after,first,step)
         end
         velocityError = min(domain.egoSpeedMaximum+norm(input.gnssVelocity), ...
             design.sensors.velocityNoiseMaximum+accelerationEnvelope*age);
-        egoMatrix(2,:) = [design.velocity.gain*domain.egoSpeedMaximum,-design.velocity.gain];
-        egoInput(2) = accelerationError+domain.egoSpeedMaximum*gyroError ...
-            + design.velocity.gain*velocityError+defect.bodyVelocity;
+        effectiveSensors = design.sensors;
+        effectiveSensors.velocityNoiseMaximum = velocityError;
+        effectiveSensors.gyroscopeNoiseMaximum = gyroError;
+        effectiveSensors.accelerometerNoiseMaximum = accelerationError;
+        velocityCertificate = nrmmVelocityDisturbanceBound(design.velocity.gain, ...
+            [domain.egoSpeedMinimum,domain.egoSpeedMaximum], ...
+            design.yaw.courseModel,effectiveSensors);
+        egoMatrix = -design.velocity.gain;
+        egoInput = velocityCertificate.disturbanceBound+defect.bodyVelocity;
     else
         % A sample acceleration does not bound intersample acceleration.
         % The true speed domain still gives a finite uniform velocity error.
-        egoInitial(2) = localGuard(velocityCap);
+        egoInitial = localGuard(velocityCap);
     end
     velocityPathMaximum = velocityCap;
     if isfinite(accelerationEnvelope)
-        equilibrium = domain.egoSpeedMaximum*min(pi,yawPathBound) ...
-            +egoInput(2)/design.velocity.gain;
+        equilibrium = egoInput/design.velocity.gain;
         velocityPathMaximum = min(velocityPathMaximum, ...
             localGuard(max(bound.bodyVelocity,equilibrium)));
     end
@@ -203,41 +214,41 @@ function bound = localAdvance(bound,input,before,after,first,step)
     for index = 1:size(before.targetState,2)
         range = bound.trueRangeMaximum(index) ...
             + (domain.egoSpeedMaximum+target.domain.speedMaximum)*step;
-        h = [target.bandwidth^2*range;target.bandwidth*target.domain.speedMaximum; ...
-            target.domain.accelerationNormBound];
+        h = [range;target.domain.speedMaximum/target.bandwidth; ...
+            target.domain.accelerationNormBound/target.bandwidth^2];
         gyroCoefficient = sqrt(h.'*abs(target.lyapunovMatrix)*h);
         if input.radarDetectionAvailable(index)
-            matrix = zeros(4);
-            matrix(1:2,1:2) = egoMatrix;
-            matrix(3,2:4) = [design.coupling.targetVelocityCoupling, ...
+            matrix = zeros(3);
+            matrix(1,1) = egoMatrix;
+            matrix(2,1:3) = [design.coupling.targetVelocityCoupling, ...
                 -target.lambda,target.disturbanceCoefficients.radar];
-            matrix(4,2:3) = [1,target.componentConversion(2)];
+            matrix(3,1:2) = [1,target.componentConversion(2)];
             forcing = [egoInput;gyroCoefficient*gyroError ...
                 + target.disturbanceCoefficients.modelJerk*target.modelJerkMaximum ...
                 + localMetricBound(defect.target(:,index),design); ...
                 range*gyroError+defect.radarPredictor(index)];
             initial = [egoInitial;bound.targetLyapunov(index);bound.radarPredictor(index)];
             next = localComparisonStep(matrix,forcing,initial,step);
-            bound.targetLyapunov(index) = next(3);
-            components = target.componentConversion*next(3);
-            predictor = next(4);
+            bound.targetLyapunov(index) = next(2);
+            components = target.componentConversion*next(2);
+            predictor = next(3);
             mode = "radar-correction";
         else
             % No negative target decay is claimed when radar correction is off.
-            matrix = zeros(6);
-            matrix(1:2,1:2) = egoMatrix;
-            matrix(3,[2,4]) = 1;
-            matrix(4,5) = 1;
-            matrix(5,4:5) = [target.lipschitzCertificate.phiVelocity, ...
+            matrix = zeros(5);
+            matrix(1,1) = egoMatrix;
+            matrix(2,[1,3]) = 1;
+            matrix(3,4) = 1;
+            matrix(4,3:4) = [target.lipschitzCertificate.phiVelocity, ...
                 target.lipschitzCertificate.phiAcceleration];
-            matrix(6,[2,4]) = 1;
+            matrix(5,[1,3]) = 1;
             forcing = [egoInput;gyroError*[range;target.domain.speedMaximum; ...
                 target.domain.accelerationNormBound]+defect.target(:,index) ...
                 + [0;0;target.modelJerkMaximum];range*gyroError+defect.radarPredictor(index)];
             initial = [egoInitial;bound.targetComponents(:,index);bound.radarPredictor(index)];
             next = localComparisonStep(matrix,forcing,initial,step);
-            components = next(3:5);
-            predictor = next(6);
+            components = next(2:4);
+            predictor = next(5);
             bound.targetLyapunov(index) = localMetricBound(components,design);
             mode = "radar-dropout";
         end
@@ -262,12 +273,11 @@ function bound = localAdvance(bound,input,before,after,first,step)
             "final",next,"step",step,"mode",mode);
         comparison = [comparison;record]; %#ok<AGROW>
     end
-    bound.yaw = min([pi,localGuard(yawPathBound),next(1)]);
-    bound.bodyVelocity = min(next(2),localGuard(domain.egoSpeedMaximum+norm(after.bodyVelocity)));
+    bound.yaw = bound.orientationSet.radius;
+    bound.bodyVelocity = min(next(1),localGuard(domain.egoSpeedMaximum+norm(after.bodyVelocity)));
     bound.time = bound.time+step;
     bound.lastDefect = defect;
     bound.lastComparison = comparison;
-    bound.lastYawChartValid = chartValid;
     bound.lastGyroscopeHoldError = gyroError;
     bound.usesAccelerationEnvelope = isfinite(accelerationEnvelope);
 end
@@ -277,19 +287,12 @@ function defect = localDefect(before,after,first,input,design,step)
 % Affine target rows use their exact midpoint variation. Only Phi needs a
 % global Lipschitz remainder. No RK4 order or unbounded fifth derivative is used.
     cross = [0,-1;1,0];
-    deltaYaw = after.yaw-before.yaw;
     deltaVelocity = after.bodyVelocity-before.bodyVelocity;
-    yawGain = design.yaw.correctionBandwidth;
-    innovation = (first.yaw-input.yawRate)/yawGain;
-    if abs(innovation)+abs(deltaYaw) < pi
-        yawVariation = yawGain*abs(deltaYaw);
-    else
-        yawVariation = 2*pi*yawGain;
-    end
-    defect = struct("yaw",localGuard(abs(deltaYaw/step-first.yaw)+yawVariation), ...
-        "bodyVelocity",localGuard(norm(deltaVelocity/step-first.bodyVelocity) ...
-        + (abs(input.yawRate)+design.velocity.gain)*norm(deltaVelocity) ...
-        + design.velocity.gain*norm(input.gnssVelocity)*min(2,abs(deltaYaw))), ...
+    velocityDelta = -input.yawRate*cross*deltaVelocity ...
+        -design.velocity.gain*deltaVelocity;
+    defect = struct("bodyVelocity",localGuard( ...
+        norm(deltaVelocity/step-first.bodyVelocity-0.5*velocityDelta) ...
+        + 0.5*norm(velocityDelta)), ...
         "target",zeros(3,size(before.targetState,2)), ...
         "radarPredictor",zeros(1,size(before.targetState,2)));
     for index = 1:size(before.targetState,2)
@@ -325,7 +328,7 @@ function next = localComparisonStep(matrix,forcing,initial,step)
 end
 
 function value = localMetricBound(components,design)
-    scaled = [design.target.bandwidth^2;design.target.bandwidth;1].*components;
+    scaled = [1;1/design.target.bandwidth;1/design.target.bandwidth^2].*components;
     value = localGuard(sqrt(scaled.'*abs(design.target.lyapunovMatrix)*scaled));
 end
 
@@ -342,8 +345,4 @@ function value = localGuard(value)
     finite = isfinite(value);
     value(finite) = value(finite)+256*eps(max(1,abs(value(finite))));
     value(isnan(value)) = Inf;
-end
-
-function angle = localWrap(angle)
-    angle = mod(angle+pi,2*pi)-pi;
 end

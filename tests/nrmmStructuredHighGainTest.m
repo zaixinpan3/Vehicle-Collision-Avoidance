@@ -41,7 +41,7 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
             target = testCase.Design.target;
             metric = kron(target.lyapunovMatrix,eye(2));
             bandwidth = target.bandwidth;
-            scale = kron(diag([bandwidth^2,bandwidth,1]),eye(2));
+            scale = kron(diag([1,1/bandwidth,1/bandwidth^2]),eye(2));
             linear = bandwidth*kron(target.closedLoopMatrix,eye(2));
             rotation = kron(eye(3),[0,-1;1,0]);
             stream = RandStream("mt19937ar","Seed",53);
@@ -52,7 +52,7 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
                 epsilon = scale*physicalError;
                 deltaPhi = localPhi(q,s,target.domain) ...
                     -localPhi(q-physicalError(3:4),s-physicalError(5:6),target.domain);
-                derivative = linear*epsilon+[zeros(4,1);deltaPhi] ...
+                derivative = linear*epsilon+[zeros(4,1);deltaPhi/bandwidth^2] ...
                     -5*randn(stream)*rotation*epsilon;
                 value = epsilon.'*metric*epsilon;
                 actualDerivative = 2*epsilon.'*metric*derivative;
@@ -64,7 +64,7 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
         function eachComponentBoundIsAttainedOnItsEllipsoid(testCase)
             target = testCase.Design.target;
             inverseMetric = target.lyapunovMatrix\eye(3);
-            scale = [target.bandwidth^2;target.bandwidth;1];
+            scale = [1;1/target.bandwidth;1/target.bandwidth^2];
             for index = 1:3
                 epsilon = inverseMetric(:,index)/sqrt(inverseMetric(index,index));
                 testCase.verifyEqual(epsilon.'*target.lyapunovMatrix*epsilon,1,AbsTol=1e-12);
@@ -116,16 +116,14 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
             testCase.verifyEqual(changed.lastRadarTime(2),0,AbsTol=0);
         end
 
-        function yawChartFailureIsReportedWithoutClaimingGlobalLinearDecay(testCase)
+        function outputUsesOrientationSetsWithoutAChartCondition(testCase)
             runtime = localRuntime(testCase.Config,testCase.Design,1);
             runtime.yawEstimate = pi-1e-4;
             output = onlineNrmmTrackingRuntime("output",runtime,localFrame);
-            testCase.verifyFalse(output.yawInnovationChartCompatible);
+            testCase.verifyTrue(output.orientationCertificateAvailable);
+            testCase.verifyFalse(isfield(output,"yawInnovationChartCompatible"));
             testCase.verifyFalse(output.certificateScope.sampledImplementationCertified);
-            error = 3;
-            measurementError = 0.2;
-            wrapped = atan2(sin(error+measurementError),cos(error+measurementError));
-            testCase.verifyGreaterThan(-wrapped,-error+measurementError);
+            testCase.verifyEqual(output.targetStates,runtime.targetState.',AbsTol=0);
         end
 
         function heldOutNoisyScenarioRetainsUsefulAccelerationEstimation(testCase)

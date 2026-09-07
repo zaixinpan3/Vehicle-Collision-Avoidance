@@ -4,14 +4,15 @@ This document contains the implementation analysis and recorded experiments
 previously included in the observer theory document. The main derivation is in
 [OBSERVER_ISS_THEORY.md](../estimator/OBSERVER_ISS_THEORY.md) and treats the
 observer as a continuous-time system. The digital enclosure and experimental
-results below are separate from that continuous-time ISS theorem. Moving this
-material does not constitute a new experiment or a new implementation result.
+results below are separate from that continuous-time ISS theorem. Historical numerical tables retain their recorded versions; they do not validate
+the direct common-gyro redesign. Current implementation descriptions below use
+the redesigned core and position-normalized target metric.
 
 ## 1. Continuous design followed by digital realization
 
 `synthesizeNrmmObserverGains.m` determines the continuous gains from physical
 domains and sensor/model bounds. Its scalar minimum-bandwidth rule and target
-Lyapunov/Lipschitz optimization are specified in Section 6 of the theory
+Lyapunov/Lipschitz optimization are specified in Section 7 of the theory
 document. The design contains no sample period or sample-product constraint.
 
 `onlineNrmmTrackingRuntime.m` subsequently consumes `cfg.runtime.samplePeriod`
@@ -25,16 +26,18 @@ removed from synthesis. The following recorded experiments predate that
 change and retain their original gains and measurements; their numerical
 results do not validate the revised scalar gain-selection rule.
 
-The runtime's `yawInnovationChartCompatible` flag is only a pointwise
-diagnostic; it does not establish chart invariance or an initial true-error
-bound. The continuous theorem requires the invariant chart condition in
-Section 3 of the theory document.
+The current core has no continuous yaw state or yaw chart condition.
+`runtime.yawEstimate` caches the orientation set's output representative and is
+excluded from the RK4 state vector. It never enters the velocity or target
+innovation. `output.orientationSet` publishes the actual union of circular
+intervals and its validity. Uninformative course data contribute the whole
+circle; an empty intersection remains invalid without resetting body states.
 
 ## 2. Sampling, radar prediction, and scope of the theorem
 
 `onlineNrmmTrackingRuntime.m` receives a synchronized frame at `t`, resets its
 output predictors, and advances the continuous observers to `t+Ts` with RK4.
-The GNSS position predictor follows estimated inertial velocity. The radar
+The independent GNSS position predictor follows measured inertial GNSS velocity. The radar
 predictor uses its own moving-frame dynamics,
 
 \[
@@ -74,14 +77,16 @@ margins and from a sampled exponential-stability claim.
 The behavior tests check the NRMM coordinate correspondence, exact equality of
 `Phi_e` and `Phi` on the operating domain, global bounds across saturation
 regions, the nonlinear Lyapunov derivative, component ellipsoid factors,
-wrapped-yaw limitations, radar residual rotation, and track reset isolation.
+common gyro cancellation, forward-cone floor crossings, standstill operation,
+circular set intersections, radar residual rotation, and track reset isolation.
 A noisy seed outside the benchmark seed range checks acceleration performance.
 
 From the repository root:
 
 ```matlab
 addpath('estimator','config','scripts');
-results = runtests({'tests/nrmmStructuredHighGainTest.m', ...
+results = runtests({'tests/nrmmDirectVelocityTest.m','tests/nrmmYawSetTest.m', ...
+    'tests/nrmmStructuredHighGainTest.m', ...
     'tests/observerGainSynthesisTest.m','tests/nrmmCascadeCertificateTest.m', ...
     'tests/nrmmModelFormulationTest.m','tests/nrmmObserverVectorFieldTest.m', ...
     'tests/certifiedKinematicCourseCorrespondenceTest.m', ...
@@ -171,232 +176,182 @@ and conditions on sampling for inherited robustness
 follows from the inequalities below; their stability theorem is not assumed to
 apply automatically to this implementation.
 
-### 5.1 Continuous comparison recursion and initialization
+### 5.1 Comparison initialization
 
-For the continuous measurement model of the theory document, Section 5, initialize a nonnegative
-vector `z(0) >= [|ePsi(0)|, |ev(0)|, WT(0)]^T`. On an interval of length `h`
-with constant disturbance upper bound `d`, positivity gives
+The continuous core comparison has two states `[bv,WT]`, with the matrix and
+forcing in Section 6 of the theory document. Its affine flow, including initial
+error, is evaluated by an augmented matrix exponential; the steady-state bound
+alone cannot enclose an arbitrary initial condition. Use
+`D=diag(1,1/wT,1/wT^2)` for all target metric conversions.
 
-\[
-z^+=e^{Hh}z+\left(\int_0^h e^{H\tau}\,d\tau\right)d,
-\qquad B_\rho=c_1z_3,
-\quad c_1=\omega^{-2}\sqrt{(P^{-1})_{11}}.
-\]
+The default true prior is the whole yaw circle, `bv=VEmax+norm(vHat)`, and
+`bT=[R0+norm(rhoHat);VCmax+norm(qHat);S+norm(sHat)]`.
+Then `WT <= sqrt((D*bT)'*abs(P)*(D*bT))`. Smaller known initial errors can be
+supplied as `options.initialErrorBounds.yaw`, `bodyVelocity`, and
+`targetComponents` (3-by-target-count). The yaw prior is centered at the optional
+`egoInitialYaw`; if omitted, the whole circle needs no initial heading.
+These are premises on truth, not deductions from the estimates.
 
-The integral must be retained: the steady-state number `-H^{-1}d` by itself
-does not cover an arbitrary initialization. An augmented matrix exponential
-evaluates this affine update without inverting `H`, including zero-decay modes.
-
-The runtime defaults to the declared physical prior, not to zero error:
-
-\[
-b_\psi=\pi,\quad b_v=\bar V_E+\|\hat v\|,\quad
-b_T=\begin{bmatrix}R_0+\|\hat\rho\|\\b+\|\hat q\|\\S+\|\hat s\|\end{bmatrix},
-\qquad W_T\le\sqrt{(Db_T)^T|P|(Db_T)},
-\quad D=\operatorname{diag}(\omega^2,\omega,1).
-\]
-
-Here `R0` is the declared initial relative-position maximum. A caller may supply
-smaller *known initial error bounds* through `options.initialErrorBounds`, with
-fields `yaw`, `bodyVelocity`, and `targetComponents` (3-by-target-count). That is
-an additional initial-set premise, not a deduction from an estimated state.
-
-An independent true-range enclosure evolves as
-`R^+ = R + (VEmax+VCmax)*h`, since the rotation term vanishes from the derivative
-of `|rho|`. At detection it can be intersected with `|yR|+nR`. Thus the online
-argument does not keep imposing the initial 50 m range on a coasting target.
-Positive target speed, target speed/acceleration/curvature bounds, the declared
-model-jerk envelope, ego speed/yaw-rate bounds, sensor calibration and noise
-bounds remain premises on truth. Estimated-domain exits do not invalidate this
-global-extension argument.
+An independent range enclosure advances by
+`Rplus=R+(VEmax+VCmax)*h` and is tightened at detections by `norm(yR)+nR`.
+Thus the sampled bound does not keep imposing an initial range on a moving
+unobserved target. True target speed, acceleration, curvature and model-jerk
+bounds, the ego forward cone and mismatch, and the sensor bounds remain premises.
+Estimated-domain exits do not invalidate the global extension.
 
 ### 5.2 The additional predictor-error state
 
-The continuous theorem cannot use `nR` as the error of the evolving radar
-predictor. Introduce `bP >= |rho-yP|`. With a numerical predictor defect `etaP`,
+The evolving radar reference is not a measurement with fixed error `nR`.
+Introduce `bP >= norm(rho-yP)`. Its derivative bound, including numerical defect,
+is `bPdot <= bq+bv+R*epsilonOmega+etaP`.
+During a detection interval the comparison state is `zA=[bv,WT,bP]'`, with
 
 \[
-D^+\|\rho-y_P\|\le\|e_q\|+\|e_v\|+R\epsilon_\omega+\eta_P.
-\]
-
-During a detection interval use `zA=[bPsi,bv,WT,bP]^T`. On each integration
-substep, choose uniform input-error and numerical-defect bounds. In a compatible
-yaw chart the augmented comparison matrix and forcing are
-
-\[
-G_A=\begin{bmatrix}
--k_\psi&0&0&0\\
-k_v\bar V_E&-k_v&0&0\\
-0&g_{Tv}&-\lambda_T&g_R\\
-0&1&c_2&0
-\end{bmatrix},
-\qquad
-d_A=\begin{bmatrix}
-\epsilon_\omega+k_\psi B_F^h+\eta_\psi\\
-\epsilon_a+\bar V_E\epsilon_\omega+k_v\epsilon_V+\eta_v\\
-g_\omega(R)\epsilon_\omega+g_\Phi\bar\nu_\Phi+\eta_T\\
+G_A=\begin{bmatrix}-k_v&0&0\\c_{Tv}&-\lambda_T&c_{T\rho}\\1&c_2&0\end{bmatrix},
+\quad d_A=\begin{bmatrix}
+d_v^h+\eta_v\\c_{T\omega}(R)\epsilon_\omega+c_{Tj}\varepsilon_j+\eta_T\\
 R\epsilon_\omega+\eta_P
-\end{bmatrix},
+\end{bmatrix}.
 \]
 
-where `c2` is the velocity component factor from the theory document, Section 5,
-`etaT=sqrt((D*etaTarget)^T*abs(P)*(D*etaTarget))`, and `gOmega(R)` uses the
-propagated range upper bound rather than a fixed range. All off-diagonal entries
-are nonnegative. Therefore the actual implemented comparison update is
+Here `c2=wT*sqrt(inv(P)(2,2))`,
+`etaT=sqrt((D*etaTarget)'*abs(P)*(D*etaTarget))`, and the target gyro coefficient
+uses the propagated range. For a constant upper forcing over the substep,
 
 \[
-\boxed{\begin{bmatrix}z_A^+\\1\end{bmatrix}
-=\exp\!\left(h\begin{bmatrix}G_A&d_A\\0&0\end{bmatrix}\right)
-\begin{bmatrix}z_A\\1\end{bmatrix}.}
+\begin{bmatrix}z_A^+\\1\end{bmatrix}
+=\exp\left(h\begin{bmatrix}G_A&d_A\\0&0\end{bmatrix}\right)
+\begin{bmatrix}z_A\\1\end{bmatrix}.
 \]
 
-The predictor feedback loop means `GA` is not assumed Hurwitz. Its fourth state
-is reset at detections. Establishing a uniform contraction of the resulting
-reset/flow products would be a further sampled-stability result.
+All off-diagonal entries are nonnegative. The predictor feedback loop means
+`GA` need not be Hurwitz. Its third state is reset at detections. Finite-time
+containment does not establish uniform contraction of the hybrid reset/flow
+products or uniform sampled exponential stability.
 
-### 5.3 Held measurements and yaw charts
+### 5.3 Held measurements and separate orientation propagation
 
-Let `a` now denote measurement age (only in this subsection). Optional physical
-envelopes are `Ea=accelerationNormMaximum`,
-`Ja=bodyAccelerationRateMaximum`, and `Jomega=yawAccelerationMaximum` under
-`cfg.ego.domain`. The acceleration rate is the derivative of the *body-frame
-acceleration vector*. All three default to `Inf`, meaning unspecified.
-
-At a substep's maximum age, valid hold-error envelopes are
+Let `age` denote the largest measurement age on a substep. Optional physical
+envelopes under `cfg.ego.domain` are `Ea=accelerationNormMaximum`,
+`Ja=bodyAccelerationRateMaximum` and `Jomega=yawAccelerationMaximum`.
+The second bounds the derivative of the body-frame acceleration vector. They
+all default to `Inf`, meaning unspecified. Valid effective error bounds are
 
 \[
 \begin{aligned}
-\epsilon_\omega&=\min\{\bar\omega_E+|u_k|,\bar n_g+J_\omega a\},\\
-E_a^h&=\min\{E_a,\|a_{m,k}\|+\bar n_a+J_a a\},\\
-\epsilon_a&=\min\{E_a+\|a_{m,k}\|,\bar n_a+J_a a\},\\
-\epsilon_V&=\min\{\bar V_E+\|v_{m,k}\|,\bar n_v+E_a^h a\},\\
-B_F^h&=\min\{\pi,B_{F,k}+\bar\omega_E a\}.
+\epsilon_\omega&=\min(\bar\omega_E+|u_k|,\varepsilon_\omega+J_\omega\,\mathrm{age}),\\
+E_a^h&=\min(E_a,\|a_{m,k}\|+\varepsilon_a+J_a\,\mathrm{age}),\\
+\epsilon_a&=\min(E_a+\|a_{m,k}\|,\varepsilon_a+J_a\,\mathrm{age}),\\
+\epsilon_V&=\min(\bar V_E+\|m_{I,k}\|,\varepsilon_G+E_a^h\,\mathrm{age}).
 \end{aligned}
 \]
 
-An unspecified rate removes its candidate from the minimum. If no finite
-acceleration envelope is available, the implementation does not integrate an
-infinite velocity forcing or assume a held accelerometer is exact. It replaces
-the second comparison state over that substep by the uniform bound
-`VEmax + max(norm(vHatBefore),norm(vHatAfter))`; its comparison row is zero.
-This remains finite using the existing ego speed premise alone.
-
-For the line segment joining accepted yaw states, a uniform circular-error
-bound is `bPsi + omegaEmax*h + abs(deltaPsiHat)`. If this plus `BFh` is below
-`pi`, the stable yaw row above is valid throughout the substep. Otherwise use
-the first comparison row zero and forcing
-`omegaEmax + abs(deltaPsiHat)/h`, and cap its endpoint radius at `pi`. This
-fallback uses circular distance and does not assert an invalid linear-decay law
-near the antipodal chart boundary.
-
-With a finite acceleration envelope, a tighter uniform velocity bound is
+An unspecified envelope removes its candidate. The magnitude error is at most
+the GNSS vector hold error. With held `M_k` and `u_k`, the exact common-error
+identity still holds using `nOmegaEffective=u_k-omegaE(t)` and
+`nuEffective=M_k-norm(v(t))`. Consequently
 
 \[
-\bar b_v^h=\min\left\{\bar V_E+\max(\|\hat v_0\|,\|\hat v_1\|),\,
-\max\left(b_v,\bar V_E\min(\pi,b_\psi^h)+(d_A)_2/k_v\right)\right\}.
+d_v^h=\epsilon_a+k_v\sec b\,\epsilon_V
+ +C_\omega(k_v)\epsilon_\omega+k_vl_E\sec b\,\delta_{\rm st}.
 \]
 
-Together with `bqPath = VCmax + max(norm(qHatBefore),norm(qHatAfter))`, it gives
-an independent predictor endpoint cap
-`bP + h*(bqPath+bvPath+R*epsilonOmega+etaP)`. Taking the smaller of two proven
-upper bounds remains valid. No estimator gain is changed by these envelopes.
+The same effective gyro error is combined before bounding; it is never charged
+as two unrelated inputs. If no finite acceleration envelope exists, the runtime
+uses the uniform velocity cap
+`VEmax+max(norm(vHatBefore),norm(vHatAfter))`, sets the velocity comparison row
+to zero, and initializes that row to the cap for the substep. It never treats
+a held acceleration as exact or integrates an infinite forcing.
+
+With a finite envelope, a velocity-path cap is the minimum of the domain cap
+and `max(bv,(dvHold+etaV)/kv)`. Together with the target-velocity path cap this
+bounds `bP+h*(bqPath+bvPath+R*epsilonOmega+etaP)`; an independently valid cap can
+only tighten the comparison endpoint.
+
+Yaw is propagated outside that comparison by a circular Minkowski sum with
+`u_k*h` and radius `epsilonOmega*h`. This encloses the integral error even when
+only the true rate domain is available. The sensor radius alone would require
+continuous gyro measurements or an additional hold-error premise. At a sample,
+intersect with the certified course outer arc, using the whole circle when that
+arc is uninformative. The interval representation retains disconnected pieces.
+A failed intersection stays empty; only orientation-dependent outputs lose their
+certificate. No yaw representative is integrated in RK4, and a representative
+change never rotates or resets body-frame states.
 
 ### 5.4 Numerical trajectory defects
 
-For an accepted numerical step from `x0` to `x1`, define its continuous
-reconstruction `xHat(t)=x0+theta*(x1-x0)`, `theta in [0,1]`. It joins the
-actual values returned by RK4. Define
-
-\[
-\delta_{\rm num}(\theta)=(x_1-x_0)/h-F(x_0+\theta(x_1-x_0),u_k).
-\]
-
-The bound update encloses this defect over the *entire* line, rather than
-estimating integration error from the difference of two numerical runs.
-For an affine row with endpoint field increment `DeltaF`, its norm is bounded by
+For an accepted RK4 step, use the linear reconstruction between actual numerical
+endpoints. Its defect is `(x1-x0)/h-F(x0+theta*(x1-x0),u_k)`, `0<=theta<=1`.
+An affine row with endpoint field increment `DeltaF` has the uniform bound
 
 \[
 \eta=\|(x_1-x_0)/h-F(x_0)-\tfrac12\Delta F\|+\tfrac12\|\Delta F\|.
 \]
 
-This applies to target position, velocity and radar prediction. For the final
-target row use the same expression for its linear part and add
-`Lq*norm(deltaQ)+Ls*norm(deltaS)`. The existing global extension bounds justify
-that remainder even when the line crosses saturation boundaries. For body
-velocity, use its initial residual plus
-`(|u|+kv)*norm(deltaV)+kv*norm(vm)*min(2,abs(deltaPsi))`.
-For yaw use its initial residual plus `kPsi*abs(deltaPsi)` if the innovation
-does not cross a branch boundary, or `2*pi*kPsi` otherwise.
+This now applies directly to body velocity, target position/velocity, and the
+radar predictor. For body velocity,
+`DeltaF=(-kv*I-u_k*J)*(vHatAfter-vHatBefore)`; there is no yaw-dependent remainder.
+For the final target row apply the expression to its linear part and add
+`Lq*norm(deltaQ)+Ls*norm(deltaS)`. The global extension covers saturation crossings.
+There is no yaw numerical defect because orientation uses set operations.
 
-These are derivative-defect bounds. Their effects are integrated through the
-comparison system as `etaPsi`, `etav`, `etaTarget`, and `etaP`. Thus no
-unprovided fifth-derivative bound, assumed RK4 remainder constant, or convergence
-test is required. A finer reconstruction can reduce conservatism in later work.
-Ordinary floating-point evaluation is padded by a scale-dependent `256*eps`
-guard. This guard is explicitly an engineering allowance, not a proof of every
-rounding error in `expm`, trigonometric functions or gain synthesis.
+These derivative defects enter the comparison forcing. No assumed fifth
+measurement derivative, RK4 remainder constant, or comparison between two
+numerical trajectories is needed. Ordinary floating-point arithmetic has a
+`256*eps` engineering guard; it is not a directed-rounding verification of matrix
+exponentials, trigonometric functions, or gain synthesis.
 
-### 5.5 Measurement reset, component extraction, and dropout
+### 5.5 Measurement tightening, components and dropout
 
-At a detection, `yP^+=yR` gives `bP^+=nR`. The unchanged position estimate also
-admits `bRho^+=min(bRho^-,norm(yR-rhoHat)+nR)`. The circular yaw radius is
-intersected with `abs(wrap(yF-psiHat))+BF`. The GNSS sample gives
+At a detection, `yP=yR` resets `bP` to the radar error bound and permits
+`bRho=min(bRho,norm(yR-rhoHat)+nR)`. For the body-velocity measurement, the
+finite-error identity gives the sample-only bound
 
 \[
-b_v^+\le\min\{b_v^-,\|\hat R^Tv_m-\hat v\|+\bar n_v
- +2\bar V_E\sin(\min(b_\psi^+,\pi)/2)\}.
+E_y=\sec b\,\varepsilon_G+l_E\sec b(\varepsilon_\omega+\delta_{\rm st}),
+\qquad b_v^+\le\min(b_v^-,\|y_v-\hat v\|+E_y).
 \]
 
-Individual target component bounds can additionally be intersected with
-`[R+norm(rhoHat), VCmax+norm(qHat), S+norm(sHat)]^T`. After a component update,
-`sqrt((D*bT)^T*abs(P)*(D*bT))` is a valid new upper bound on `WT`. It may be
-intersected with the prior Lyapunov upper bound; no sign assumption on the
-off-diagonal entries of `P` is made.
+This scalar is used for measurement/prior containment only. It is never fed into
+the propagation forcing as an independent gyro disturbance or obtained through
+a geometric enclosing-ball construction.
 
-At a radar-active accepted endpoint, let `Wcomp` denote the Lyapunov bound
-returned by the comparison flow, before recertification from component caps.
-The reported position radius is
+Target components can be intersected with their norm-domain caps. Their metric
+bound is `sqrt((D*bT)'*abs(P)*(D*bT))`. At a radar-active endpoint the position
+radius is `min(c1*Wcomp,bP+norm(yP-rhoHat),R+norm(rhoHat))`, where
+`c1=sqrt(inv(P)(1,1))`. The capped components then recertify the metric for the
+next substep; no fixed-point iteration is used.
 
-\[
-\boxed{B_\rho=\min\{c_1W_{\rm comp},\ b_P+\|y_P-\hat\rho\|,\ R+\|\hat\rho\|\}.}
-\]
-
-The capped components then recertify `WT` for the next substep; the algorithm
-does not iterate this tightening to a fixed point. During dropout, replace the
-first candidate with the directly propagated position component bound.
-Specifically use `zC=[bPsi,bv,bRho,bq,bs,bP]^T`, with the same applicable ego rows
-and the target/predictor inequalities
+During dropout use `[bv,bRho,bq,bs,bP]'` and retain the applicable velocity row.
+The remaining positive comparison rows are
 
 \[
 \begin{aligned}
 \dot b_\rho&=b_q+b_v+R\epsilon_\omega+\eta_\rho,\\
-\dot b_q&=b_s+b\epsilon_\omega+\eta_q,\\
-\dot b_s&=L_qb_q+L_sb_s+S\epsilon_\omega+\bar\nu_\Phi+\eta_s,\\
+\dot b_q&=b_s+\bar V_T\epsilon_\omega+\eta_q,\\
+\dot b_s&=L_qb_q+L_sb_s+\bar a_T\epsilon_\omega+\varepsilon_j+\eta_s,\\
 \dot b_P&=b_q+b_v+R\epsilon_\omega+\eta_P.
 \end{aligned}
 \]
 
-Its affine Metzler flow is integrated by the same augmented exponential. There
-is no negative target-decay row during dropout. Reconstructing `WT` from its
-component bounds on return to detection preserves containment.
+There is no target decay claim with correction absent. The same augmented
+exponential propagates these bounds; component-to-metric conversion preserves
+containment on reacquisition.
 
-**Containment proposition.** Suppose the initial norm/range bounds contain
-truth, all declared model and sensor/hold envelopes hold on the interval, and
-the chosen defect bounds enclose the numerical reconstruction. On each substep,
-the derived error inequalities and Metzler comparison imply componentwise
-domination by the corresponding comparison solution. The independent domain
-and measurement caps also contain truth, so their minima preserve domination.
-Predictor resets are enclosed by the sample noise ball. Induction over substeps,
-detections and dropouts proves the claimed position containment. This proves
-finite-time containment, with no assertion that the radius necessarily shrinks
-or reaches a useful size for every permitted measurement sequence.
+**Containment proposition.** Valid initial sets, true sensor/model/hold envelopes
+and numerical-defect bounds imply the positive comparison dominates the actual
+error on each substep. Independent measurement/domain caps also contain truth,
+so taking their minima preserves domination. Radar resets are enclosed by their
+sample noise balls. Induction over substeps, detections and dropouts gives
+finite-time position containment. It does not assert useful radii for every
+signal or uniform hybrid exponential stability.
 
-Necessary measurement/prior consistency failures mark the affected bound
-unavailable and publish `Inf`, rather than an invented finite radius. A radar
-inconsistency affects its track; an ego inconsistency affects all tracks and
-requires runtime reinitialization. Resetting a target cannot repair an invalid
-ego bound. A fresh target reset reinitializes only that target's uncertainty.
-These are necessary checks, not an online verification of all premises on truth.
+An empty `C_m` or another detected ego measurement/prior inconsistency invalidates
+the body bound and all dependent target bounds. A radar inconsistency affects
+only its track. A yaw-prior intersection failure affects orientation outputs
+without invalidating an otherwise consistent body-frame cascade. Invalid sets
+are never silently reset; a target reset cannot repair an invalid ego bound.
+These necessary checks do not verify every premise on the unknown true motion.
 
 ### 5.6 Interface for subsequent collision-avoidance control
 
@@ -420,7 +375,7 @@ usableUnderDeclaredAssumptions = track.positionErrorBound.available;
 For an inertial *relative vector*, use the separately published bound
 
 \[
-B_{\Delta p}^I=B_\rho+2R\sin(\min(b_\psi,\pi)/2),
+B_{\Delta p}^I=B_\rho+2\min(R,\|\hat\rho\|)\sin(\min(b_\psi,\pi)/2),
 \quad \|p_C-p_E-\hat R\hat\rho\|\le B_{\Delta p}^I.
 \]
 
@@ -439,7 +394,10 @@ uniform component is scaled by `1/sqrt(2)`. Thus its declared vector maxima are
 actually Euclidean radii. Its interpolated ego-state/sampled-acceleration harness
 is not a validation against a continuous high-fidelity physical sensor stream.
 
-### 5.7 Containment experiment
+### 5.7 Historical containment experiment
+
+The recorded table below predates the direct common-gyro redesign and retains
+its original numerical results. It is not a validation of the current code.
 
 `scripts/runNrmmPositionBoundBenchmark.m` executes 32 trials: three seeds
 (71--73), five noisy cases and two envelope choices, plus one noise-free

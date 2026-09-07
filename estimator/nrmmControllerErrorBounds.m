@@ -17,14 +17,22 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
     end
     egoBounds = [egoPosition; egoPosition; bound.yaw; ...
         bound.bodyVelocity; bound.bodyVelocity; egoYawRate];
-    egoAvailable = bound.egoValid && all(isfinite(egoBounds));
+    egoAvailable = bound.egoValid && bound.orientationSet.valid && all(isfinite(egoBounds));
     if ~egoAvailable
         egoBounds(:) = inf;
     end
-    output.egoPositionErrorBound = egoBounds(1);
-    output.egoYawErrorBound = egoBounds(3);
-    output.egoBodyVelocityErrorBound = egoBounds(4);
-    output.egoYawRateErrorBound = egoBounds(6);
+    % These separate channels do not depend on an absolute orientation set.
+    % An empty yaw intersection makes the full controller vector unavailable,
+    % while retaining valid body-velocity, GNSS-position and gyro enclosures.
+    output.egoPositionErrorBound = egoPosition;
+    output.egoYawErrorBound = bound.yaw;
+    output.egoBodyVelocityErrorBound = bound.bodyVelocity;
+    output.egoYawRateErrorBound = egoYawRate;
+    if ~bound.egoValid
+        output.egoPositionErrorBound = Inf;
+        output.egoBodyVelocityErrorBound = Inf;
+        output.egoYawRateErrorBound = Inf;
+    end
     output.controllerStateErrorBound = egoBounds;
     output.controllerErrorBoundSource = "nrmm-state-time-enclosure";
     output.controllerErrorBound = localCertificate( ...

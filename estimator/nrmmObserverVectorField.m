@@ -2,22 +2,17 @@ function [derivative, model] = nrmmObserverVectorField( ...
         estimate, measurement, design)
 % nrmmObserverVectorField Evaluate the continuous observer equations.
 %
-% This function contains the mathematical observer core only: intrinsic yaw
-% correction on SO(2), the covariant body-velocity chain, inertial position
-% reconstruction, and the covariant third-order NRMM target chain. The
-% caller supplies already constructed measurement-set centers and the
-% continuous output-predictor references used by a sampled realization.
-% Synchronization, resets, numerical integration, track management, and
-% operating-domain audits remain outside this vector field.
+% The eight-state core for one target consists of body velocity and [rho;q;s].
+% Absolute yaw is used only by the output reconstruction, never by this field.
+% The independent inertial position output uses the GNSS velocity directly.
+% Synchronization, orientation sets, predictors and integration remain outside.
 
-    yawEstimate = localScalarField(estimate, "yaw");
     bodyVelocity = localVectorField(estimate, "bodyVelocity", 2);
     position = localVectorField(estimate, "position", 2);
     targetState = localMatrixField(estimate, "targetState", 6);
     targetCount = size(targetState, 2);
 
     yawRate = localScalarField(measurement, "yawRate");
-    yawHeading = localScalarField(measurement, "yawHeading");
     gnssVelocity = localVectorField(measurement, "gnssVelocity", 2);
     bodyAcceleration = localVectorField( ...
         measurement, "bodyAcceleration", 2);
@@ -32,17 +27,14 @@ function [derivative, model] = nrmmObserverVectorField( ...
     radarAvailable = localAvailability(measurement, targetCount);
 
     planarCross = [0.0, -1.0; 1.0, 0.0];
-    rotation = localRotation(yawEstimate);
-    yawInnovation = localWrapToPi(yawHeading-yawEstimate);
-    yawDerivative = yawRate ...
-        + design.yaw.correctionBandwidth*yawInnovation;
-
-    velocityInnovation = rotation.'*gnssVelocity-bodyVelocity;
+    velocityMeasurement = nrmmKinematicVelocityMeasurement( ...
+        gnssVelocity, yawRate, design);
+    velocityInnovation = velocityMeasurement-bodyVelocity;
     bodyVelocityDerivative = bodyAcceleration ...
         - yawRate*planarCross*bodyVelocity ...
         + design.velocity.gain*velocityInnovation;
 
-    inertialVelocity = rotation*bodyVelocity;
+    inertialVelocity = gnssVelocity;
     positionDerivative = inertialVelocity ...
         + design.position.gain*(positionReference-position);
 
@@ -67,7 +59,6 @@ function [derivative, model] = nrmmObserverVectorField( ...
     end
 
     derivative = struct( ...
-        "yaw", yawDerivative, ...
         "bodyVelocity", bodyVelocityDerivative, ...
         "position", positionDerivative, ...
         "targetState", targetDerivative);
@@ -119,12 +110,4 @@ function available = localAvailability(measurement, targetCount)
         error("nrmmObserverVectorField:targetCountMismatch", ...
             "radarAvailable must contain one flag per target.");
     end
-end
-
-function rotation = localRotation(yaw)
-    rotation = [cos(yaw), -sin(yaw); sin(yaw), cos(yaw)];
-end
-
-function value = localWrapToPi(value)
-    value = mod(value+pi, 2.0*pi)-pi;
 end

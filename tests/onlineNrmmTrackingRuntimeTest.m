@@ -1,6 +1,6 @@
 classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 % onlineNrmmTrackingRuntimeTest Tests for the cascaded measured-input observer.
-% The retained cascade is corrected GNSS-course yaw, body velocity, and the
+% The retained cascade is direct kinematic body velocity and the
 % covariant third-order NRMM target observer. Inertial position is an output
 % reconstruction stage. Consistent truth has nonzero ego jerk and angular
 % acceleration; neither input derivative is required by the vector field.
@@ -133,7 +133,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             cfg = nrmmTrackingConfig();
             design = synthesizeNrmmObserverGains(cfg);
             requiredOptionNames = ["egoInitialPosition", ...
-                "egoInitialYaw", "egoInitialBodyVelocity", ...
+                "egoInitialBodyVelocity", ...
                 "targetInitialState"];
 
             for optionName = requiredOptionNames
@@ -550,34 +550,25 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyLessThan(abs(localWrapToPi( ...
                 output.egoYaw-trueHeading)), 0.02, ...
                 "The yaw estimate must converge onto the GNSS course.");
-            testCase.verifyLessThan( ...
-                abs(output.yawCourseInnovation), 0.02);
+            testCase.verifyLessThan(output.orientationSet.radius,0.02);
         end
 
-        function eachSampleRefreshesTheYawCorrectionAndAudit(testCase)
-            runtime = localRuntime(1);
-            [runtime, ~] = onlineNrmmTrackingRuntime( ...
-                "step", runtime, localCruiseFrame(0.0));
-            frame = localConstantHeadingFrame(runtime.currentTime, 0.3, 12.0);
-            frame.yawRateMeasured = 0.08;
-            design = runtime.observerDesign;
-            sideslip = asin(design.yaw.courseModel.rearAxleDistance ...
-                * frame.yawRateMeasured/12.0);
-            heading = 0.3-sideslip;
-            equilibrium = heading ...
-                + frame.yawRateMeasured/design.yaw.correctionBandwidth;
-            expectedYaw = equilibrium+(runtime.yawEstimate-equilibrium) ...
-                * exp(-design.yaw.correctionBandwidth*runtime.samplePeriod);
-
-            [~, output] = onlineNrmmTrackingRuntime("step", runtime, frame);
-
-            testCase.verifyEqual(output.yawCoursePseudoHeading, heading, AbsTol=1.0e-12);
-            testCase.verifyEqual(output.yawCourseEstimatedSideslip, sideslip, AbsTol=1.0e-12);
-            testCase.verifyEqual(output.egoYaw, expectedYaw, AbsTol=1.0e-9);
-            testCase.verifyEqual(output.lastIntervalOperatingDomainAudit ...
-                .minimumCourseDirectionMagnitude, 12.0, AbsTol=1.0e-12);
-            testCase.verifyEqual(output.lastIntervalOperatingDomainAudit ...
-                .maximumMeasuredYawRate, 0.08, AbsTol=1.0e-12);
+        function inconsistentYawIntersectionPreservesTheBodyCore(testCase)
+            cfg = nrmmTrackingConfig();
+            runtime = onlineNrmmTrackingRuntime("initialize",cfg,localHeadingOptions(0,10));
+            [runtime,~] = onlineNrmmTrackingRuntime("step",runtime,localConstantHeadingFrame(0,0,10));
+            frame = localConstantHeadingFrame(runtime.currentTime,0.3,10);
+            baselineFrame = localConstantHeadingFrame(runtime.currentTime,0,10);
+            [changed,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
+            [baseline,~] = onlineNrmmTrackingRuntime("step",runtime,baselineFrame);
+            testCase.verifyFalse(output.orientationCertificateAvailable);
+            testCase.verifyEmpty(output.orientationSet.intervals);
+            testCase.verifyTrue(output.positionErrorBoundAvailable);
+            testCase.verifyFalse(output.controllerErrorBound.available);
+            testCase.verifyTrue(isfinite(output.egoBodyVelocityErrorBound));
+            testCase.verifyTrue(isfinite(output.egoPositionErrorBound));
+            testCase.verifyEqual(changed.bodyVelocityEstimate,baseline.bodyVelocityEstimate,AbsTol=1e-12);
+            testCase.verifyEqual(changed.targetState,baseline.targetState,AbsTol=1e-12);
         end
 
         function outputProbesUseTheirOwnCourseMeasurements(testCase)
@@ -592,23 +583,22 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(first.yawCoursePseudoHeading, 0.25, AbsTol=1.0e-12);
             testCase.verifyEqual(second.yawCoursePseudoHeading, -0.2, AbsTol=1.0e-12);
             testCase.verifyEqual(repeated, first);
-            testCase.verifyEqual(second.egoYaw, runtime.yawEstimate, AbsTol=0.0);
+            testCase.verifyEqual(second.egoYaw,-0.2,AbsTol=1e-12);
+            testCase.verifyEqual(second.egoBodyVelocity,runtime.bodyVelocityEstimate,AbsTol=0);
         end
 
-        function uninformativeCourseIsRejectedAfterAnInformativeSample(testCase)
+        function uninformativeCourseLeavesTheObserverDefined(testCase)
             runtime = localRuntime(1);
-            [runtime, ~] = onlineNrmmTrackingRuntime( ...
-                "step", runtime, localCruiseFrame(0.0));
+            [runtime,~] = onlineNrmmTrackingRuntime("step",runtime,localCruiseFrame(0));
             frame = localCruiseFrame(runtime.currentTime);
-            frame.vxGps = 0.0;
-            frame.vyGps = 0.0;
-
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "step", runtime, frame), ...
-                "onlineNrmmTrackingRuntime:uninformativeCourseChannel");
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "output", runtime, frame), ...
-                "onlineNrmmTrackingRuntime:uninformativeCourseChannel");
+            frame.vxGps = 0;
+            frame.vyGps = 0;
+            [changed,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
+            testCase.verifyTrue(all(isfinite(changed.bodyVelocityEstimate)));
+            testCase.verifyTrue(all(isfinite(changed.targetState)));
+            testCase.verifyFalse(output.yawCourseChannelValid);
+            % Zero speed contradicts this test's positive-speed domain.
+            testCase.verifyFalse(output.positionErrorBoundAvailable);
         end
 
         function offGridFramesAreRejectedBeforeTheirCourseIsUsed(testCase)

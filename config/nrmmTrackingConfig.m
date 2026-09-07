@@ -16,9 +16,8 @@ function cfg = nrmmTrackingConfig()
     cfg.target.model.curvatureRateMaximum = 0.0;      % 1/(m s)
 
     %% Ego operating domain (Assumption 1)
-    % The positive lower speed makes the corrected GNSS-course channel
-    % uniformly informative. It is a physical operating-domain assumption,
-    % not a yaw-gain tuning threshold.
+    % The body-frame core permits a zero lower speed. A positive value here
+    % declares this scenario's domain; it is not a core stability requirement.
     cfg.ego.domain.speedMinimum = 5.0;               % m/s   V_{E,min}
     cfg.ego.domain.speedMaximum = 20.0;              % m/s   Vbar_E
     cfg.ego.domain.yawRateMaximum = 0.30;            % rad/s omegabar_E
@@ -29,7 +28,7 @@ function cfg = nrmmTrackingConfig()
     cfg.ego.domain.bodyAccelerationRateMaximum = Inf; % m/s^3
     cfg.ego.domain.yawAccelerationMaximum = Inf;    % rad/s^2
 
-    %% Certified kinematic course measurement for the yaw stage
+    %% Forward kinematics for velocity and output-only orientation sets
     % The course channel estimates side slip pointwise from the measured
     % yaw rate and GNSS speed using the kinematic single-track relation.
     % sideslipDomainMaximum only selects the invertible principal branch;
@@ -59,10 +58,9 @@ function cfg = nrmmTrackingConfig()
     % upstream of the observer.
     cfg.measurement.gps.positionNoiseMaximum = 0.12; % m nbar_p
     cfg.measurement.gps.velocityNoiseMaximum = 0.02; % m/s nbar_v
-    % Accelerometer and gyroscope biases are neglected: the deployed
-    % inertial sensors are treated as unbiased, so each instrument
-    % contributes one bounded noise term and neither observer carries a
-    % bias state.
+    % Include residual compensation, calibration and bias errors in these
+    % deterministic bounds. Neither observer carries a bias state. Acceleration
+    % means R(psiE)'*pE_ddot, not the derivative of body-frame velocity.
     cfg.measurement.imu.noiseMaximum = 0.05;         % m/s^2 nbar_a
     cfg.measurement.gyroscope.noiseMaximum = 0.002;  % rad/s nbar_g
     cfg.measurement.radar.noiseMaximum = 0.12;       % m nbar_R

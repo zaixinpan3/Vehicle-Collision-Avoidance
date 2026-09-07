@@ -1,21 +1,26 @@
-# Multistage high-gain NRMM observer: model, design, and stability
+# Direct body-velocity and NRMM target observer: model and ISS certificate
 
-The estimator retains the framework of Sharma, Alai, and Rajamani,
-*Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using
-a multistage high gain observer*, Transportation Research Part C 182 (2026),
-105411, [DOI](https://doi.org/10.1016/j.trc.2025.105411). The relevant parts are
-Section 2.3, Section 3.3, Eq. (65), and Theorem 1, Eqs. (30)--(33).
+The continuous core is the two-state ego body-velocity observer followed by the
+six-state NRMM target observer. For one target it has eight continuous states.
+Yaw is a propagated and intersected orientation set used only for inertial
+outputs. There is no yaw correction gain, yaw-error differential inequality,
+or yaw-to-velocity coupling.
 
-The online architecture is the ego yaw observer, the ego body-velocity observer,
-and the third-order target observer. Inertial position is a downstream output
-stage. The target state remains `[rho; q; s]`; its gains remain
-`[l1*w; l2*w^2; l3*w^3]`. The improvements are analytic global Lipschitz bounds,
-a structured Lyapunov inequality, and a noise-aware choice of bandwidth.
+The target model and globally Lipschitz extension below retain the framework of
+Sharma, Alai, and Rajamani, *Simultaneous ego-vehicle state estimation and vehicle
+trajectory tracking using a multistage high gain observer*, Transportation
+Research Part C 182 (2026), 105411,
+[DOI](https://doi.org/10.1016/j.trc.2025.105411). The existing NRMM coordinate
+and extension derivations are retained. The ego redesign preserves the bounded
+single-track mismatch assumption and combines repeated gyro errors before
+bounding their effect.
 
-The analysis treats the plant and observer as continuous-time systems.
-Measurement-error and model-error bounds apply throughout the interval under
-consideration. The results concern solutions of the differential equations
-below under their stated operating-domain and yaw-chart assumptions.
+The claims are fewer assumptions for core stability, one fewer upstream error
+state, and smaller disturbance certificates under the comparison conditions in
+Section 8. They are not claims of uniformly better estimation trajectories.
+All continuous-time error bounds apply throughout time. The separate sampled
+realization and its hold-error assumptions are described in
+[NRMM_IMPLEMENTATION_NOTES.md](../scripts/NRMM_IMPLEMENTATION_NOTES.md).
 
 ## 1. Retained model and covariant chain
 
@@ -120,263 +125,348 @@ A maximum over finitely many Jacobian evaluations is not used as the proof. The 
 The legacy scalar `phi = hypot(Lq,Ls)` is only a diagnostic in numerical SI
 coordinates; the physical certificate below uses the separate channels.
 
-## 3. Observer equations and the yaw chart condition
+## 3. Direct forward-cone velocity measurement
 
-The continuous measurement model is
-`u3 = omegaE + dOmega`, `am = aE + na`,
-`vm = R(psiE)*vE + nv`, and `yR = rho + nR`, with the declared uniform norm
-bounds. The corrected GNSS-course correspondence supplies `yF` with a certified
-circular error radius `BF`. Its construction uses the declared single-track
-mismatch bound; it is not an additional zero-sideslip assumption.
-
-The retained ego observers are
-
+Let
 \[
-\dot{\hat\psi}=u_3+k_\psi\operatorname{wrap}(y_F-\hat\psi),
-\qquad \nabla_{u_3}\hat v=a_m+k_v(R(\hat\psi)^Tv_m-\hat v).
+J=\begin{bmatrix}0&-1\\1&0\end{bmatrix},\quad
+v=R(\psi_E)^T\dot p_E,\quad a=R(\psi_E)^T\ddot p_E,
+\qquad \dot v=a-\omega_EJv.
 \]
-
-Let `ePsi = psiE - psiHat` be a compatible lift and `dF = yF - psiE`.
-The linear comparison for yaw requires `|ePsi| + BF < pi`. A sufficient invariant
-condition is
-
+The measurements and deterministic errors are
 \[
-B_\psi=\max\{|e_\psi(0)|,B_F+\bar d_\omega/k_\psi\},
-\qquad B_\psi+B_F<\pi.
+m_I=R(\psi_E)v+n_G,\quad u=\omega_E+n_\omega,\quad a_m=a+n_a,
+\quad \|n_G\|\le\varepsilon_G,\quad |n_\omega|\le\varepsilon_\omega,
+\quad \|n_a\|\le\varepsilon_a.
 \]
+Acceleration must have the physical meaning above; compensation, calibration,
+and residual bias errors belong in its error bound. No derivative of a measured
+signal, measurement error, or kinematic mismatch is required by the core.
 
-Inside this chart, `wrap(ePsi+dF)=ePsi+dF`, so the scalar comparison and a
-first-exit argument preserve the condition. A proper measurement arc alone is
-insufficient: `ePsi=3`, `dF=0.2`, `kPsi=1` yields a positive derivative of
-`|ePsi|`, contradicting an unrestricted linear-decay claim. The initial true-error bound and the invariant chart condition are explicit
-premises of the continuous-time result.
+Retain the bounded-mismatch relation and true forward cone
+\[
+\omega_E=v_y/l_E+d_{\rm st},\quad |d_{\rm st}|\le\delta_{\rm st},\quad l_E>0,
+\]
+\[
+\mathcal D_E=\{v:\underline V_E\le\|v\|\le\overline V_E,
+\ v_x\ge\|v\|\cos b\},\quad 0\le b<\pi/2.
+\]
+The lower speed may be zero. This is not an exact-no-slip assumption. Write
+\(M=\|m_I\|\), \(\nu=M-\|v\|\), so \(|\nu|\le\varepsilon_G\).
+With \(c=\cos b\), define
+\[
+\phi(V,w)=\sqrt{\max\{V^2-w^2,c^2V^2\}},\qquad
+\boxed{y_v=[\phi(M,l_Eu),\ l_Eu]^T.}
+\]
+On the true cone, \(\phi(\|v\|,v_y)=v_x\). The map requires one scalar
+maximum and one square root, is defined at standstill, and has no polygon,
+projection, optimization, or measurement-enclosing ball. The longitudinal floor
+is an extension of the input map, not an assertion that noisy measurements lie
+in the true domain. In particular the lateral component is never clipped:
+\[
+y_y-v_y=l_E(n_\omega+d_{\rm st}).
+\]
+The observer implemented by `nrmmObserverVectorField.m` is
+\[
+\boxed{\dot{\hat v}=a_m-uJ\hat v+k_v(y_v-\hat v),\qquad k_v>0.}
+\]
+`nrmmKinematicVelocityMeasurement.m` implements the algebraic map.
 
-The target observer is exactly the third-order high-gain chain
+## 4. Exact common-error dynamics and explicit velocity certificate
 
+On the unfloored branch, the derivatives of \(\phi\) are
+\((\partial_V\phi,\partial_w\phi)=(\sec\theta,-\tan\theta)\),
+where \(\sin\theta=w/V\), \(|\theta|\le b\). On the floor branch they
+are \((c,0)\). The map is Lipschitz on \(V\ge0\); integrating along the
+segment from \((\|v\|,v_y)\) to \((M,l_Eu)\), including branch crossings
+and the origin by continuity, gives the exact finite-error identity
+\[
+y_v-v=\alpha e_1\nu+l_Eg(\zeta)(n_\omega+d_{\rm st}),\qquad
+g(\zeta)=[-\zeta,1]^T,
+\]
+\[
+(\alpha,\zeta)\in\operatorname{co}\bigl(
+\{(\sec\theta,\tan\theta):|\theta|\le b\}\cup\{(c,0)\}\bigr).
+\]
+Thus \(c\le\alpha\le\sec b\), \(|\zeta|\le\tan b\). These are proof
+variables, not online states. For \(e_v=\hat v-v\), substitution before taking
+norms gives
+\[
+\boxed{\dot e_v=(-k_vI-uJ)e_v+n_a+k_v\alpha e_1\nu
+ +(k_vl_Eg(\zeta)-Jv)n_\omega+k_vl_Eg(\zeta)d_{\rm st}.}
+\]
+The common gyro column is
+\[
+G_\omega=[v_y-k_vl_E\zeta,\ k_vl_E-v_x]^T.
+\]
+Its lateral entry is a signed difference. Treating the measurement error and
+propagation gyro error as independent disturbances would lose this cancellation.
+No statistical independence is assumed anywhere in the certificate.
+
+For the strongest instantaneous specification let
+\[
+\mathcal C_m=\{(v,n):v\in\mathcal D_E,\ |\|v\|-M|\le\varepsilon_G,
+\ |n|\le\varepsilon_\omega,\ |u-n-v_y/l_E|\le\delta_{\rm st}\}.
+\]
+Then a sharp forcing bound for these admitted constraints is
+\[
+\boxed{d_v^\star=\varepsilon_a+
+\sup_{(v,n)\in\mathcal C_m}\|k_v(y_v-v)-nJv\|.}
+\]
+For fixed \(v\), the feasible gyro interval is
+\([
+\max(-\varepsilon_\omega,u-v_y/l_E-\delta_{\rm st}),
+\min(\varepsilon_\omega,u-v_y/l_E+\delta_{\rm st})]\).
+The norm is convex in \(n\), so a maximum occurs at an endpoint. This is a
+certificate specification; the runtime does not solve this optimization.
+An empty set invalidates containment while leaving the algebraic observer defined.
+The code checks nonemptiness using the speed interval and the overlap of
+\([l_Eu-l_E(\varepsilon_\omega+\delta_{\rm st}),
+l_Eu+l_E(\varepsilon_\omega+\delta_{\rm st})]\)
+with the cone's lateral interval at the largest feasible speed.
+
+The implemented explicit alternative is
+\[
+\boxed{C_\omega(k)=\max_{V\in\{\underline V_E,\overline V_E\}}
+\sqrt{(V\sin b+kl_E\tan b)^2+(kl_E-V\cos b)^2}.}
+\]
+Maximizing first over \(\zeta\), then the true angle, gives the expression
+inside the maximum. Its square is convex in speed, hence the endpoint maximum.
+It follows that
+\[
+D^+\|e_v\|\le-k_v\|e_v\|+\bar d_v,\quad
+\bar d_v=\varepsilon_a+k_v\sec b\,\varepsilon_G
+ +C_\omega(k_v)\varepsilon_\omega+k_vl_E\sec b\,\delta_{\rm st},
+\]
+\[
+\boxed{U_v^{\rm new}=\frac{\bar d_v}{k_v}
+ =\sec b\,\varepsilon_G+
+ \frac{\varepsilon_a+C_\omega(k_v)\varepsilon_\omega}{k_v}
+ +l_E\sec b\,\delta_{\rm st}.}
+\]
+`nrmmVelocityDisturbanceBound.m` evaluates these expressions. The transient
+radius solves \(\dot B_v=-k_vB_v+d_v\), with a valid initial error bound,
+and either the explicit forcing or a certified upper bound on \(d_v^\star\).
+
+Away from standstill and the floor boundary, the first-order gyro and mismatch
+columns are respectively
+\[
+(k_vl_E/v_x-1)Jv,\qquad (k_vl_E/v_x)Jv.
+\]
+Choosing \(k_vl_E\) near a representative longitudinal speed suppresses the
+first-order gyro term, not mismatch. This is not exact finite-error cancellation
+throughout the cone. Optional state-free scheduling
+\(k_v(t)=\max(k_{\min},y_x(t)/l_E)\) preserves uniform homogeneous decay
+without a gain-derivative bound. The implementation uses a fixed gain.
+
+## 5. Retained target observer and position-normalized certificate
+
+For \(y_\rho=\rho+n_\rho\), \(\|n_\rho\|\le\varepsilon_\rho\), retain
 \[
 \begin{aligned}
-\nabla_{u_3}\hat\rho&=\hat q-\hat v+l_1\omega(y_R-\hat\rho),\\
-\nabla_{u_3}\hat q&=\hat s+l_2\omega^2(y_R-\hat\rho),\\
-\nabla_{u_3}\hat s&=\Phi_e(\hat q,\hat s)+l_3\omega^3(y_R-\hat\rho).
+\dot{\hat\rho}&=\hat q-\hat v-uJ\hat\rho+\ell_1\omega_T(y_\rho-\hat\rho),\\
+\dot{\hat q}&=\hat s-uJ\hat q+\ell_2\omega_T^2(y_\rho-\hat\rho),\\
+\dot{\hat s}&=\Phi_e(\hat q,\hat s)-uJ\hat s+\ell_3\omega_T^3(y_\rho-\hat\rho).
 \end{aligned}
 \]
+The true last row additionally contains \(d_j\), \(\|d_j\|\le\varepsilon_j\).
+For declared scalar-acceleration and curvature rates,
+\(\varepsilon_j=\sqrt{\bar{\dot A}^{\,2}+\bar V_T^4\bar{\dot\kappa}^{\,2}}\).
+The nominal observer still uses constant acceleration and curvature.
 
-There is no extra filter between these estimates and the published acceleration.
-
-## 4. Structured target Lyapunov inequality
-
-Let `Ac` be the three-state integrator-chain matrix, `C=e1^T`, and
-`Al=Ac-l*C`. The normalized Sharma-type observer LMI selects `l`. Its existing
-normalized pole region and bounded-real noise objective are retained. The
-identity `Al^T*P + P*Al = -I` fixes a positive definite, dimensionless metric.
-
-For true-minus-estimated errors use
-
+With estimate-minus-truth errors define
 \[
-\epsilon=\operatorname{diag}(\omega^2I_2,\omega I_2,I_2)e_T,
-\qquad W_T=\sqrt{\epsilon^T(P\otimes I_2)\epsilon}.
-\]
-
-All components of `epsilon` have acceleration units. The common rotation
-`-u3*(I3 tensor J)` contributes exactly zero to the quadratic derivative.
-Split `DeltaPhi = DeltaPhiq + DeltaPhis` by changing `q` first and then `s`.
-The two global bounds become
-
-\[
-\|\Delta\Phi_q\|\le(L_q/\omega)\|\epsilon_2\|,\qquad
-\|\Delta\Phi_s\|\le L_s\|\epsilon_3\|.
-\]
-
-Set `bP=P*e3`. For positive Young multipliers `tq,ts`, define
-
-\[
-M=\omega I-t_q(L_q/\omega)^2e_2e_2^T-t_sL_s^2e_3e_3^T
- -(t_q^{-1}+t_s^{-1})b_Pb_P^T.
-\]
-
-Twice applying `2 z^T d <= |z|^2/t + t |d|^2` gives
-
-\[
-\boxed{M\succeq 2\lambda_TP\quad\Longrightarrow\quad
- \dot W_T\le-\lambda_TW_T\quad\text{without exogenous error inputs}.}
-\]
-
-This is a Lyapunov/Lipschitz high-gain proof. It preserves the absence of
-position from `Phi` and the `1/omega` scaling of its velocity sensitivity.
-`synthesizeTargetTrackerCertificate.m` numerically searches the two positive
-multipliers, recovers the generalized-eigenvalue decay rate, subtracts a small
-numerical margin, and checks the final dissipation matrix. Feasibility of that
-matrix is the certificate; optimizer termination does not prove global
-optimality. Ordinary floating-point checks are not a directed-rounding proof.
-
-## 5. Disturbance directions and cascade ISS
-
-If the nominal constant-`A,kappa` model is relaxed, declare rate bounds. The
-additional physical jerk is `Adot*e + kappaDot*V^2*J*e`, so
-
-\[
-\bar\nu_\Phi=\sqrt{\bar{\dot A}^{\,2}+b^4\bar{\dot\kappa}^{\,2}}.
-\]
-
-Both rates default to zero. They enter as uncertainty in the last chain
-equation and do not change the nominal observer dynamics.
-
-Define `h = [omega^2*rhoMax, omega*b, S]^T`. Cauchy--Schwarz in the actual metric
-gives the directional coefficients
-
-\[
-g_{Tv}=\omega^2\sqrt{P_{11}},\quad
-g_R=\omega^3\sqrt{l^TPl},\quad
-g_\omega=\sqrt{h^T|P|h},\quad g_\Phi=\sqrt{P_{33}}.
-\]
-
-Here `|P|` is entrywise absolute value. The target comparison is
-
-\[
-D^+W_T\le-\lambda_TW_T+g_{Tv}\|e_v\|
- +g_\omega\bar d_\omega+g_R\bar n_R+g_\Phi\bar\nu_\Phi.
-\]
-
-Under the yaw chart condition, the full retained cascade satisfies
-
-\[
-D^+\begin{bmatrix}|e_\psi|\\\|e_v\|\\W_T\end{bmatrix}
-\le H\begin{bmatrix}|e_\psi|\\\|e_v\|\\W_T\end{bmatrix}+d,
-\quad H=\begin{bmatrix}
--k_\psi&0&0\\k_v\bar V_E&-k_v&0\\0&g_{Tv}&-\lambda_T
-\end{bmatrix},
+z_T=[e_\rho^T,e_q^T/\omega_T,e_s^T/\omega_T^2]^T,\quad
+W_T=\sqrt{z_T^T(P\otimes I_2)z_T},
 \]
 \[
-d=\begin{bmatrix}
-\bar d_\omega+k_\psi B_F\\
-\bar n_a+\bar V_E\bar d_\omega+k_v\bar n_v\\
-g_\omega\bar d_\omega+g_R\bar n_R+g_\Phi\bar\nu_\Phi
-\end{bmatrix}.
+A_\ell=\begin{bmatrix}-\ell_1&1&0\\-\ell_2&0&1\\-\ell_3&0&0\end{bmatrix},
+\qquad A_\ell^TP+PA_\ell=-I_3,\quad P>0.
 \]
+All components of \(z_T\) have position units. Relative to the earlier
+acceleration-normalized metric, \(W_T\) and every input coefficient are divided
+by \(\omega_T^2\); physical component bounds and the structured decay condition
+are invariant under this normalization.
 
-`H` is Hurwitz and Metzler. The positive vector `c=-H^{-T}*ones(3,1)` gives
-`c^T H=-ones(1,3)`. Therefore `Vc=c^T[|ePsi|,|ev|,WT]^T` is a copositive
-cascade Lyapunov function with an explicit ISS comparison. This is implemented
-in `nrmmObserverCertificate.m`. The ultimate comparison vector is `-H^{-1}d`.
-
-Component extraction uses the tight ellipsoid factors
-
+The common rotation term contributes zero to the quadratic derivative. Applying
+Young inequalities separately to the velocity and acceleration sensitivities
+of \(\Delta\Phi_e/\omega_T^2\) yields the sufficient condition
 \[
-\|e_{T,i}\|\le c_iW_T,\qquad
-(c_1,c_2,c_3)^T=\operatorname{diag}(\omega^{-2},\omega^{-1},1)
- \sqrt{\operatorname{diag}(P^{-1})}.
+\omega_TI_3-\tau_q(L_q/\omega_T)^2e_2e_2^T-\tau_sL_s^2e_3e_3^T
+ -(\tau_q^{-1}+\tau_s^{-1})(Pe_3)(Pe_3)^T\succeq2\lambda_TP.
 \]
+`synthesizeTargetTrackerCertificate.m` retains its normalized observer LMI,
+positive-multiplier search, generalized-eigenvalue rate, and checked residual.
+Feasibility of the returned matrix is the certificate; numerical optimization
+is not claimed globally optimal or verified with directed rounding.
 
-The square root is componentwise. This avoids using the worst eigenvalue for
-every component and the worst metric direction for every disturbance.
-Inertial position remains downstream:
-`|ep|_infinity <= np + (|ev|_infinity + VEmax*|ePsi|_infinity)/kp`.
-The ego-frame acceleration-difference error is bounded by the target
-acceleration error plus accelerometer error, with no velocity term added to
-an acceleration quantity.
-
-## 6. Explicit gain-selection preference
-
-The normalized gain shape is unchanged. The physical bandwidth minimizes the
-largest ultimate error bound divided by its corresponding declared physical
-scale, subject to `lambdaT >= 1/Tdomain` and `omega > 1/s`, where
-`Tdomain=rhoMax/(VEmax+VCmax)`. This is an engineering preference for disturbance
-rejection with a minimum decay rate. The ISS theorem does not force this
-objective or the transit-time convention. Numerical minimization is not claimed
-to be globally optimal. Initial error is treated by the continuous-time
-comparison solution in Section 7 and is not mixed into the persistent-noise
-objective.
-
-For the yaw, body-velocity, and position stages, the decay rate equals the
-positive scalar gain. The gain-design preference is to minimize that bandwidth
-subject to a 5 percent residual over the physical transit time:
-
+For true bounds \(\bar\rho,\bar V_T,\bar a_T\), set
 \[
-\min_{k>0} k\quad\text{subject to}\quad e^{-kT_{\rm domain}}\le0.05,
-\qquad k_\psi=k_v=k_p=\frac{\log20}{T_{\rm domain}}.
-\]
-
-Thus the unforced scalar error contracts to 5 percent over one domain transit
-time. The 5 percent criterion is a stated continuous settling preference. The yaw-chart premise must still be satisfied. Sensor and model bounds
-enter the achieved ultimate radii and the target-bandwidth optimization.
-This minimum-bandwidth preference is a declared continuous-time design rule,
-not an optimality consequence of ISS. In particular, the scalar ultimate
-expression `b+a/k` has no finite interior minimum when `a>0`; no such optimum
-is claimed. `synthesizeNrmmObserverGains.m` uses only the physical domains and
-continuous error bounds, and accepts a configuration with no `runtime` fields.
-
-## 7. Continuous-time transient and position bounds
-
-Let `chi(t) = [|ePsi(t)|, |ev(t)|, WT(t)]^T`, with `H`, `d`, and `c1`
-as defined in Section 5. Choose a nonnegative initial bound `z0 >= chi(0)`.
-For the constant disturbance envelope `d`, the continuous comparison solution is
-
-\[
-z(t)=e^{Ht}z_0+\int_0^t e^{H(t-\tau)}d\,d\tau.
-\]
-
-Since `H` is Metzler, its transition matrix is nonnegative. The differential
-comparison inequality in Section 5 therefore gives `chi(t) <= z(t)`
-componentwise. Component extraction then yields
-
-\[
-\boxed{\|\rho(t)-\hat\rho(t)\|\le B_\rho(t):=c_1z_3(t),
-\qquad c_1=\omega^{-2}\sqrt{(P^{-1})_{11}}.}
-\]
-
-This bound includes the initial yaw, body-velocity, and target errors through
-the entire cascade. A steady-state radius alone does not bound an arbitrary
-initial condition. Because `H` is Hurwitz,
-
-\[
-\limsup_{t\to\infty}\chi(t)\le-H^{-1}d,
-\qquad
-\limsup_{t\to\infty}\|\rho(t)-\hat\rho(t)\|
-\le c_1(-H^{-1}d)_3.
-\]
-
-An initial metric bound can be obtained from known component bounds
-`bT0 >= [|eRho(0)|, |eq(0)|, |es(0)|]^T`:
-
-\[
-W_T(0)\le\sqrt{(Db_{T0})^T|P|(Db_{T0})},
-\qquad D=\operatorname{diag}(\omega^2,\omega,1).
-\]
-
-The yaw component of `z0` must satisfy `z0_1 >= |ePsi(0)|` and
-`max(z0_1, BF+dOmegaBar/kPsi)+BF < pi`, which is the sufficient invariant
-chart condition of Section 3 with an initial upper bound in place of the
-unknown error. Initial-set bounds and operating-domain bounds are premises
-on truth; the estimate by itself does not establish them.
-
-For inertial reconstruction of the relative vector, let
-`R=R(psiE)` and `Rhat=R(psiHat)`. The rotation identity gives
-
-\[
-R\rho-\hat R\hat\rho
-=\hat R(\rho-\hat\rho)+(R-\hat R)\rho,
+h_T=[\bar\rho,\bar V_T/\omega_T,\bar a_T/\omega_T^2]^T,\quad
+c_{Tv}=\sqrt{P_{11}},\quad c_{T\rho}=\omega_T\sqrt{\ell^TP\ell},
 \]
 \[
-\boxed{\|p_C-p_E-\hat R\hat\rho\|
-\le B_\rho(t)+2\rho_{\max}\sin\!\left(\frac{\min\{z_1(t),\pi\}}{2}\right).}
+c_{Tj}=\sqrt{P_{33}}/\omega_T^2,\quad
+c_{T\omega}=\sqrt{h_T^T|P|h_T},\quad
+\bar d_T=c_{T\omega}\varepsilon_\omega+c_{T\rho}\varepsilon_\rho+c_{Tj}\varepsilon_j.
+\]
+Then
+\[
+D^+W_T\le-\lambda_TW_T+c_{Tv}\|e_v\|+\bar d_T,
+\]
+\[
+\|e_\rho\|\le\sqrt{(P^{-1})_{11}}W_T,\quad
+\|e_q\|\le\omega_T\sqrt{(P^{-1})_{22}}W_T,\quad
+\|e_s\|\le\omega_T^2\sqrt{(P^{-1})_{33}}W_T.
 \]
 
-An absolute target-position bound also requires an ego-position bound.
-For center distance, the reverse triangle inequality directly gives
-`|rho(t)| >= max(0, |rhoHat(t)|-Brho(t))`.
+## 6. Two-stage ISS cascade and transient containment
 
-## 8. Scope of the continuous-time result
+The complete continuous core certificate is
+\[
+\boxed{D^+\chi\le H\chi+d,\quad
+\chi=[\|e_v\|,W_T]^T,\quad
+H=\begin{bmatrix}-k_v&0\\c_{Tv}&-\lambda_T\end{bmatrix},\quad
+ d=[d_v,\bar d_T]^T.}
+\]
+The Hurwitz Metzler matrix admits positive backward weights
+\(w=-H^{-T}\mathbf1\), so \(w^TH=-\mathbf1^T\). Consequently
+\(D^+(w^T\chi)\le-(w^T\chi)/\max(w)+w^Td\).
+`nrmmObserverCertificate.m` constructs this two-state comparison.
+Given \(B_0\ge\chi(t_0)\), its nonnegative transition matrix gives
+\[
+\chi(t)\le e^{H(t-t_0)}B_0+\int_{t_0}^t e^{H(t-\tau)}d(\tau)\,d\tau,
+\qquad W_{T,\infty}\le(c_{Tv}U_v^{\rm new}+\bar d_T)/\lambda_T.
+\]
+Initial component radii give a metric bound using
+\(D=\operatorname{diag}(1,\omega_T^{-1},\omega_T^{-2})\):
+\(W_T(t_0)\le\sqrt{(Db_{T0})^T|P|(Db_{T0})}\).
+A steady-state radius does not certify arbitrary initial errors.
 
-The ISS and position bounds apply on every interval where the true operating
-domain, the measurement and model disturbance bounds, the positive gains,
-the target dissipation inequality, and the invariant yaw chart are satisfied.
-The nominal target model has constant `A` and `kappa`; their declared rate
-bounds enter only through the physical jerk disturbance in Section 5.
+The gyro is shared across both stages as well. Its exact stacked column is
+\[
+n_\omega\begin{bmatrix}k_vl_Eg(\zeta)-Jv\\-(S_T\otimes J)x_T\end{bmatrix},
+\quad S_T=\operatorname{diag}(1,\omega_T^{-1},\omega_T^{-2}),\quad
+x_T=[\rho^T,q^T,s^T]^T.
+\]
+A joint support-function or composite Lyapunov calculation must keep this
+column: its directional contribution is the absolute value of a sum, before
+any triangle inequality. The simple triangular norm certificate above exploits
+within-velocity cancellation and does not claim all cross-stage cancellations.
 
-These are estimation-error results. Rectangle orientation and footprint,
-road constraints, ego tracking, and future target prediction require their
-own controller analysis before a closed-loop collision-avoidance conclusion
-can be drawn.
+## 7. Explicit gain-selection preference and position output
 
-Implementation details and recorded validation results are documented in
-[NRMM_IMPLEMENTATION_NOTES.md](../scripts/NRMM_IMPLEMENTATION_NOTES.md).
+The target shape is unchanged. Its physical bandwidth minimizes the largest
+ultimate physical component bound normalized by its operating-domain scale,
+subject to \(\lambda_T\ge1/T_{\rm domain}\), \(\omega_T>1\), where
+\(T_{\rm domain}=\bar\rho/(\overline V_E+\bar V_T)\).
+The fixed velocity gain retains the declared minimum-bandwidth transit rule
+\(k_v=\log(20)/T_{\rm domain}\). This is an engineering preference, not
+an ISS optimality claim. Section 4 explains why gain increases need not improve
+the common-error certificate. Runtime timing does not enter synthesis.
+
+The independent inertial position output uses
+\(\dot{\hat p}_E=m_I+k_p(y_p-\hat p_E)\),
+\(k_p=\log(20)/T_{\rm domain}\). Its continuous radius is bounded ultimately
+by \(\varepsilon_p+\varepsilon_G/k_p\). This choice keeps all use of the
+orientation representative at output reconstruction. Position and sampled
+output predictors are not counted among the eight core observer states.
+
+## 8. Precise comparison with the yaw-mediated design
+
+For \(\overline V_E>0\), \(k>0\), and \(b<\pi/2\),
+\[
+C_\omega(k)<\overline V_E+kl_E\sec b.
+\]
+For a positive speed endpoint \(V\), the squared triangle bound minus the
+squared combined expression is \(4Vkl_E\cos b>0\). A zero endpoint also
+lies strictly below the bound using positive \(\overline V_E\).
+At \(b=0\),
+\(C_\omega(k)=\max(|kl_E-\underline V_E|,|kl_E-\overline V_E|)\).
+This finite-error improvement concerns a certificate, not sensor information.
+On the unfloored branch, rotating GNSS by the instantaneous pseudo-heading
+\(h_m=\arg(m_I)-\arcsin(l_Eu/M)\) gives exactly \(y_v\).
+
+For the original valid uniform yaw certificate let
+\[
+a_0=\underline V_E-\varepsilon_G,\quad b_0=\underline V_E-2\varepsilon_G>0,
+\quad U=\bar\omega_E+\varepsilon_\omega,
+\]
+\[
+L_\psi=(1-\max\{\sin b,l_EU/a_0\}^2)^{-1/2},\quad
+B_F=\arcsin(\varepsilon_G/a_0)+\frac{l_EL_\psi}{b_0}
+ (\varepsilon_\omega+\delta_{\rm st}+U\varepsilon_G/a_0).
+\]
+The old velocity certificate at the same \(k_v\) was
+\[
+U_v^{\rm old}=\varepsilon_G+\overline V_E(B_F+\varepsilon_\omega/k_\psi)
+ +(\varepsilon_a+\overline V_E\varepsilon_\omega)/k_v.
+\]
+Its raw inversion, proper arc, and invariant yaw-chart premises must hold before
+this comparison applies. The mismatch gains satisfy
+\[
+\Gamma_{\rm st}^{\rm new}=l_E\sec b\le
+\Gamma_{\rm st}^{\rm old}=(\overline V_E/b_0)l_EL_\psi.
+\]
+The redesign retains mismatch dependence while removing its speed-ratio
+amplification. For unchanged target gains, multiply the new mismatch coefficient
+by \(\sqrt{(P^{-1})_{11}}c_{Tv}/\lambda_T\) for the target-position bound.
+
+A sufficient complete-bound comparison is
+\[
+\boxed{\text{old certificate valid, same }k_v,\ b\le\pi/3
+\quad\Longrightarrow\quad U_v^{\rm new}\le U_v^{\rm old}.}
+\]
+Use \(C_\omega/k_v\le\overline V_E/k_v+l_E\sec b\),
+\(\overline V_E\arcsin(\varepsilon_G/a_0)\ge\varepsilon_G\),
+\(\overline V_EL_\psi/b_0\ge\sec b\), and \(\sec b\le2\).
+Positive gyro uncertainty makes the comparison strict. For larger cones compare
+actual bounds; the core theorem still applies. A smaller worst-case certificate
+does not imply better trajectories for every signal: a yaw filter can suppress
+particular noise histories.
+
+## 9. Output-only orientation sets
+
+The exact measurement consistency set is
+\[
+\mathcal Y_m=\{\psi\in S^1:\exists(v,n)\in\mathcal C_m,
+\ \|m_I-R(\psi)v\|\le\varepsilon_G\}.
+\]
+The implementation uses the retained course correspondence as a certified outer
+arc. If uninformative it contributes \(S^1\). It propagates and intersects
+\[
+\Psi^- =\operatorname{wrap}\bigl(\Psi(t_0)\oplus\{\int u\}
+ \oplus[-\varepsilon_\omega(t-t_0),\varepsilon_\omega(t-t_0)]\bigr),
+\qquad \Psi=\Psi^-\cap\mathcal Y_m.
+\]
+`nrmmYawSet.m` retains disconnected components as a union of closed circular
+intervals. For a sampled held gyro, the integral-error radius includes the hold
+uncertainty; the sensor error alone cannot certify an arbitrary intersample rate.
+Empty intersections stay empty and invalidate orientation outputs. They never
+reset the set to an arc center or invalidate an otherwise consistent body core.
+
+At output choose a minimax representative and its radius. The smallest covering
+arc is the complement of a largest circular gap; \(S^1\) has radius \(\pi\).
+A representative change does not rotate or reset any body-frame observer state.
+For a body vector with error radius \(E_z\), publish
+\[
+\hat z^I=R(\psi_{\rm out})\hat z,\qquad
+\mathcal Z^I=\bigcup_{\psi\in\Psi}R(\psi)(\hat z+\mathbb B_{E_z}).
+\]
+Using also the true norm bound \(\|z\|\le\bar z\), a certified error radius is
+\(E_z+2\min(\|\hat z\|,\bar z)\sin(B_\psi/2)\).
+The true norm bound can further intersect each body ball; this scalar radius
+need not enclose points in the unrestricted union that violate that bound.
+Absolute target position adds the ego-position radius. The runtime publishes
+orientation intervals, body centers/radii, and scalar controller enclosures.
+
+## 10. Scope
+
+Core ISS requires the forward branch, bounded single-track mismatch, continuous
+sensor-error bounds, true target operating domain, positive gains and the target
+dissipation inequality. It requires neither an ego low-speed inversion condition,
+nor admissible raw arcsine, informative yaw arcs, yaw charts or yaw bandwidth.
+The positive target-speed condition for the retained NRMM extension remains.
+Estimated-domain audits are diagnostics, not proof that truth obeys the premises.
+Sampled containment, floating-point qualifications and future prediction remain
+separate from the continuous theorem and from closed-loop collision avoidance.

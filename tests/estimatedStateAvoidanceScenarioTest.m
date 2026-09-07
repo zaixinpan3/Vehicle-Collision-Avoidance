@@ -20,6 +20,20 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function adapterInitializesAtStandstillWithoutACourseDirection(testCase)
+            cfg = estimatorControllerIntegrationConfig();
+            cfg.observer.ego.domain.speedMinimum = 0;
+            cfg.noiseModel = "none";
+            ego = struct("position",[0;0],"yawAngle",0.7, ...
+                "longitudinalVelocity",0,"lateralVelocity",0,"yawRate",0);
+            [context,initialization] = nrmmEstimatorControllerAdapter( ...
+                "initialize",cfg,ego,@localRadarExitTarget);
+            testCase.verifyEqual(initialization.egoInitialBodyVelocity,[0;0],AbsTol=0);
+            testCase.verifyTrue(context.currentOutput.orientationCertificateAvailable);
+            testCase.verifyEqual(context.currentOutput.egoYawErrorBound,pi,AbsTol=0);
+            testCase.verifyTrue(all(isfinite(context.runtime.targetState)));
+        end
+
         function configuredSensorsProduceCascadedHighGainDesign(testCase)
             cfg = estimatorControllerIntegrationConfig();
             initialEgo = struct( ...
@@ -55,7 +69,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             testCase.verifyEqual( ...
                 cfg.initialization.targetSpeedPrior, 15.0, ...
                 AbsTol=0.0);
-            testCase.verifyEqual(design.coreIss.stateOrder,["yaw";"bodyVelocity";"target"]);
+            testCase.verifyEqual(design.coreIss.stateOrder,["bodyVelocity";"target"]);
             testCase.verifyGreaterThan(design.target.lipschitzCertificate.phiAcceleration,0.0);
             testCase.verifyGreaterThan(design.target.lambda,0.0);
             testCase.verifyEqual( ...
