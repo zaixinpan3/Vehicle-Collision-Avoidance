@@ -1,6 +1,34 @@
 # Controller design-requirement experiments
 
-This report records experiments and diagnostics from before the modified Fiala
+## Current beta-input validation (2026-09-06)
+
+The signed-beta / modified-Fiala controller at `7d334ac48e117d80261c3ea3b885cafc39d493df` was evaluated with the current tracked working-tree stationary-pose admission changes. Controller equations and settings were held fixed. Two 30 s crossing-target trials and two 10 s nominal counterfactuals use the original scene parameters and road grid extended to station 1000 m. Exact-state control, 24 head steps at 0.05 s, 15 m/s reference, 50 m perception, and solver tolerances 1e-6 are retained.
+
+Each error triple is speed (m/s), lateral position (m), heading (rad); tolerances are 0.5, 0.2, 0.02.
+
+| Path | Completed avoidance | 9-10 s maximum errors | 25-30 s maximum errors | Final errors |
+| --- | ---: | --- | --- | --- |
+| straight | 30 s | 0.727707, 1.3491e-05, 7.04829e-07 | 0.0315122, 3.82211e-11, 4.10433e-11 | -0.0314215, -1.50792e-11, -2.46706e-11 |
+| arc | 30 s | 0.727975, 0.140574, 0.0012087 | 0.0802448, 0.0176978, 0.00231731 | -0.0789914, -0.0170936, -0.00162779 |
+
+Both paths fail the 9-10 s speed threshold, while lateral and heading recovery pass. All thresholds pass throughout 25-30 s. Entry into all tolerances is observed at 9.5 s (straight) and 9.4 s (arc), without a later violation through 30 s. Both avoidance trials complete 600 commands with no fallback or controller failure; minimum sampled rectangle SAT margins are 0.65006 m and 1.0613 m.
+
+Nonzero speed deficits remain, and the arc retains persistent steering, beta and heading oscillations. No-target nominal final speed errors at 10 s are -0.037117 m/s (straight) and -0.0802322 m/s (arc), so the residual is not specific to avoidance.
+
+Three sequential controller-only replays follow the concurrent physical jobs. All runs use one MATLAB computational thread. Preparation is excluded from timed calls; all measured deadline misses are retained.
+
+| Path | Replay median range (ms) | Worst observed call (ms) | Total calls over 50 ms |
+| --- | ---: | ---: | ---: |
+| straight | 18.337-18.601 | 33.018 | 0 |
+| arc | 21.345-21.521 | 38.346 | 0 |
+
+`benchmarkControllerRuntime` now reports dimensionless `brakingRatio` and physical `accelerationMetersPerSecondSquared` separately, with differences in their own units. The raw second input must not be labeled as acceleration. All 175 existing focused cases and one new report-unit regression pass; the new regression also passes on the isolated commit candidate. Two edited/new MATLAB files have zero factory Code Analyzer findings. No current full-suite passing claim is made.
+
+Raw results, exact run source, hashes, extended-run scripts, independent CSV checks, plots and sequential replay details are retained in the external archive under `2026-09-06_Beta_Controller_Recovery`. These are finite deterministic, sampled-pose experiments. Historical comparison includes multiple model/input changes and is not a single-change ablation; exact asymptotic convergence and hardware worst-case timing are not established.
+
+## Historical experiments before the Fiala revision
+
+The following material records experiments and diagnostics from before the modified Fiala
 tire revision. Its linear-tire and friction-limit results describe that earlier
 controller. The current model uses scheduled Fiala tangents and no separate
 axle-friction constraints; see [LTV_BICYCLE_MODEL.md](../controller/LTV_BICYCLE_MODEL.md).
