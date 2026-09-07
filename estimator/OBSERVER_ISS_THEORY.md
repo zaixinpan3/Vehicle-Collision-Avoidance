@@ -2,9 +2,10 @@
 
 The continuous core is the two-state ego body-velocity observer followed by the
 six-state NRMM target observer. For one target it has eight continuous states.
-Yaw is a propagated and intersected orientation set used only for inertial
-outputs. There is no yaw correction gain, yaw-error differential inequality,
-or yaw-to-velocity coupling.
+A parallel continuous yaw observer supplies the orientation estimate for inertial
+outputs, adding one scalar state. A propagated and intersected orientation set
+certifies its error about that estimate. Yaw does not enter the body-velocity or
+target dynamics or their two-stage ISS comparison.
 
 The target model and globally Lipschitz extension below retain the framework of
 Sharma, Alai, and Rajamani, *Simultaneous ego-vehicle state estimation and vehicle
@@ -369,7 +370,7 @@ The independent inertial position output uses
 \(\dot{\hat p}_E=m_I+k_p(y_p-\hat p_E)\),
 \(k_p=\log(20)/T_{\rm domain}\). Its continuous radius is bounded ultimately
 by \(\varepsilon_p+\varepsilon_G/k_p\). This choice keeps all use of the
-orientation representative at output reconstruction. Position and sampled
+orientation estimate at output reconstruction. Position and sampled
 output predictors are not counted among the eight core observer states.
 
 ## 8. Precise comparison with the yaw-mediated design
@@ -425,7 +426,30 @@ actual bounds; the core theorem still applies. A smaller worst-case certificate
 does not imply better trajectories for every signal: a yaw filter can suppress
 particular noise histories.
 
-## 9. Output-only orientation sets
+## 9. Parallel yaw observer and its orientation certificate
+
+Retain the original gyro-plus-heading observer as a parallel output estimator:
+\[
+\dot{\hat\psi}_E=u+\chi_m k_\psi
+ \operatorname{wrap}(h_m-\hat\psi_E),\qquad k_\psi>0.
+\]
+Here \(h_m\) is the certified kinematic course correspondence heading and
+\(\chi_m=1\) only when that correspondence is informative; otherwise
+\(\chi_m=0\) and the observer propagates the measured gyro alone. The estimate
+is never reset to a measurement center or the center of an orientation set.
+`nrmmYawObserverDerivative.m` implements this equation. The original bandwidth
+preference is retained: \(k_\psi=\log(20)/T_{\rm domain}\). It does not depend
+on runtime timing or impose a uniform low-speed inversion precondition.
+
+On a compatible innovation chart with continuous informative measurements and
+\(h_m=\psi_E+\eta_m\), the local yaw error satisfies
+\(\dot e_\psi=-k_\psi e_\psi+n_\omega+k_\psi\eta_m\).
+Its exponential comparison requires that chart and heading-error premises.
+During uninformative intervals only gyro propagation is available; no uniform
+yaw convergence claim is made over arbitrary such intervals. These conditions
+are separate from the body-frame core ISS theorem. The velocity innovation
+remains the direct algebraic map, and the position output still uses inertial
+GNSS velocity independently.
 
 The exact measurement consistency set is
 \[
@@ -445,9 +469,17 @@ uncertainty; the sensor error alone cannot certify an arbitrary intersample rate
 Empty intersections stay empty and invalidate orientation outputs. They never
 reset the set to an arc center or invalidate an otherwise consistent body core.
 
-At output choose a minimax representative and its radius. The smallest covering
-arc is the complement of a largest circular gap; \(S^1\) has radius \(\pi\).
-A representative change does not rotate or reset any body-frame observer state.
+At output use the continuous observer estimate and enclose the set about it:
+\[
+\psi_{\rm out}=\hat\psi_E,\qquad
+B_\psi=\sup_{\theta\in\Psi}d_{S^1}(\hat\psi_E,\theta).
+\]
+`nrmmYawSet("radiusAbout",...)` computes this radius from every retained
+interval, including \(\pi\) if an interval contains the observer's antipode.
+The set's smallest covering arc remains available as metadata, but its radius
+alone is not an error bound about a different \(\hat\psi_E\). The whole circle
+has radius \(\pi\) about every estimate; an empty set publishes an invalid,
+infinite radius. Changes in \(\hat\psi_E\) do not rotate or reset the body states.
 For a body vector with error radius \(E_z\), publish
 \[
 \hat z^I=R(\psi_{\rm out})\hat z,\qquad
@@ -459,6 +491,11 @@ The true norm bound can further intersect each body ball; this scalar radius
 need not enclose points in the unrestricted union that violate that bound.
 Absolute target position adds the ego-position radius. The runtime publishes
 orientation intervals, body centers/radii, and scalar controller enclosures.
+In the sampled implementation the actual RK4 yaw endpoint is used to compute
+\(B_\psi\). Set containment therefore bounds that numerical estimate without
+requiring a yaw integration-defect inequality. The core still has eight states
+for one target; the parallel yaw observer adds one, while the independent
+position output and sampled predictors remain outside that core count.
 
 ## 10. Scope
 

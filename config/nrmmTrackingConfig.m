@@ -28,7 +28,7 @@ function cfg = nrmmTrackingConfig()
     cfg.ego.domain.bodyAccelerationRateMaximum = Inf; % m/s^3
     cfg.ego.domain.yawAccelerationMaximum = Inf;    % rad/s^2
 
-    %% Forward kinematics for velocity and output-only orientation sets
+    %% Forward kinematics for velocity and the parallel yaw observer
     % The course channel estimates side slip pointwise from the measured
     % yaw rate and GNSS speed using the kinematic single-track relation.
     % sideslipDomainMaximum only selects the invertible principal branch;

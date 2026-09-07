@@ -45,11 +45,13 @@ classdef nrmmCascadeCertificateTest < matlab.unittest.TestCase
                 RelTol=1.0e-12);
         end
 
-        function orientationIsAnOutputSetWithNoCorrectionGain(testCase)
+        function parallelYawObserverRetainsASeparateOrientationCertificate(testCase)
             design = testCase.Design;
-            testCase.verifyFalse(isfield(design.yaw,"correctionBandwidth"));
+            testCase.verifyEqual(design.yaw.correctionBandwidth, ...
+                log(20)/design.gainSelection.domainTransitTime,AbsTol=1e-14);
             testCase.verifyEqual(design.yaw.maximumRadius,pi,AbsTol=0);
-            testCase.verifyEqual(design.yaw.representation,"propagated-intersected-circle-set");
+            testCase.verifyEqual(design.yaw.representation, ...
+                "continuous-observer-with-propagated-intersected-circle-set");
         end
 
         function coreHasNoYawInputOrCoupling(testCase)

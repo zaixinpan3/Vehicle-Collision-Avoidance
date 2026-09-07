@@ -2,8 +2,9 @@ function bound = nrmmPositionErrorBound(action, varargin)
 % nrmmPositionErrorBound Maintain a deterministic sampled position enclosure.
 % initialize(design,cfg,state,time,prior), measure(bound,input,state),
 % advance(bound,input,before,after,firstDerivative,h), reset(bound,index,state).
-% State fields: bodyVelocity, targetState (6-by-N), radarPredictor (2-by-N).
-% An initial yaw supplies only the center of the optional orientation prior.
+% State fields: yaw, bodyVelocity, targetState (6-by-N), radarPredictor (2-by-N).
+% Yaw centers the optional initial prior. Subsequent yaw bounds enclose the
+% propagated/intersected orientation set about the actual numerical yaw estimate.
 % Prior, when supplied, declares true initial error norm bounds in fields yaw,
 % bodyVelocity and targetComponents (3-by-N). Otherwise use the physical domain.
 % The enclosure concerns the actual accepted numerical states. Linear-path
@@ -123,7 +124,7 @@ function bound = localMeasure(bound,input,state)
         measurementSet.intervals = zeros(0,2);
     end
     bound.orientationSet = nrmmYawSet("intersect",bound.orientationSet,measurementSet);
-    bound.yaw = bound.orientationSet.radius;
+    bound.yaw = nrmmYawSet("radiusAbout",bound.orientationSet,state.yaw);
     model = design.yaw.courseModel;
     % This scalar reconstruction error is used only for initial/measurement
     % containment; propagation below combines the common gyro column first.
@@ -273,7 +274,7 @@ function bound = localAdvance(bound,input,before,after,first,step)
             "final",next,"step",step,"mode",mode);
         comparison = [comparison;record]; %#ok<AGROW>
     end
-    bound.yaw = bound.orientationSet.radius;
+    bound.yaw = nrmmYawSet("radiusAbout",bound.orientationSet,after.yaw);
     bound.bodyVelocity = min(next(1),localGuard(domain.egoSpeedMaximum+norm(after.bodyVelocity)));
     bound.time = bound.time+step;
     bound.lastDefect = defect;

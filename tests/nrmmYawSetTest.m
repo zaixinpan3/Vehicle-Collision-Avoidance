@@ -6,6 +6,41 @@ classdef nrmmYawSetTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function radiusAboutAnObserverIncludesItsOffsetFromTheArcCenter(testCase)
+            set = nrmmYawSet("initialize",0.2,0.1);
+            radius = nrmmYawSet("radiusAbout",set,-0.4);
+            testCase.verifyEqual(radius,0.7,AbsTol=1e-12);
+        end
+
+        function interiorAntipodeSetsTheMaximumCircularDistance(testCase)
+            set = nrmmYawSet("initialize",pi,0.2);
+            radius = nrmmYawSet("radiusAbout",set,0);
+            testCase.verifyEqual(radius,pi,AbsTol=0);
+        end
+
+        function disconnectedComponentsAreAllIncludedAboutTheObserver(testCase)
+            first = nrmmYawSet("initialize",0,2.5);
+            second = nrmmYawSet("initialize",pi,2.5);
+            set = nrmmYawSet("intersect",first,second);
+            radius = nrmmYawSet("radiusAbout",set,0);
+            testCase.verifyEqual(radius,2.5,AbsTol=1e-12);
+        end
+
+        function invalidAndFullSetsHaveTheDeclaredObserverRadii(testCase)
+            first = nrmmYawSet("initialize",0,0.1);
+            second = nrmmYawSet("initialize",pi,0.1);
+            empty = nrmmYawSet("intersect",first,second);
+            full = nrmmYawSet("initialize",0,pi);
+            testCase.verifyTrue(isinf(nrmmYawSet("radiusAbout",empty,0.8)));
+            testCase.verifyEqual(nrmmYawSet("radiusAbout",full,0.8),pi,AbsTol=0);
+        end
+
+        function observerRadiusRespectsTheCircleCut(testCase)
+            set = nrmmYawSet("initialize",pi-0.02,0.1);
+            radius = nrmmYawSet("radiusAbout",set,-pi+0.03);
+            testCase.verifyEqual(radius,0.15,AbsTol=1e-12);
+        end
+
         function wrappingRetainsOnePhysicalArc(testCase)
             set = nrmmYawSet("initialize",pi-0.01,0.1);
             set = nrmmYawSet("propagate",set,0.03,0.02);

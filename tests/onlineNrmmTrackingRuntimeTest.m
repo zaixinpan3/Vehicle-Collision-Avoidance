@@ -571,7 +571,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(changed.targetState,baseline.targetState,AbsTol=1e-12);
         end
 
-        function outputProbesUseTheirOwnCourseMeasurements(testCase)
+        function outputProbesUpdateCourseCertificatesWithoutChangingYaw(testCase)
             runtime = localRuntime(1);
             firstFrame = localConstantHeadingFrame(0.0, 0.25, 10.0);
             secondFrame = localConstantHeadingFrame(0.0, -0.2, 12.0);
@@ -583,7 +583,10 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(first.yawCoursePseudoHeading, 0.25, AbsTol=1.0e-12);
             testCase.verifyEqual(second.yawCoursePseudoHeading, -0.2, AbsTol=1.0e-12);
             testCase.verifyEqual(repeated, first);
-            testCase.verifyEqual(second.egoYaw,-0.2,AbsTol=1e-12);
+            testCase.verifyEqual(first.egoYaw,runtime.yawEstimate,AbsTol=0);
+            testCase.verifyEqual(second.egoYaw,runtime.yawEstimate,AbsTol=0);
+            testCase.verifyEqual(second.orientationSet.heading,-0.2,AbsTol=1e-12);
+            testCase.verifyGreaterThanOrEqual(second.egoYawErrorBound,0.2);
             testCase.verifyEqual(second.egoBodyVelocity,runtime.bodyVelocityEstimate,AbsTol=0);
         end
 

@@ -26,12 +26,16 @@ removed from synthesis. The following recorded experiments predate that
 change and retain their original gains and measurements; their numerical
 results do not validate the revised scalar gain-selection rule.
 
-The current core has no continuous yaw state or yaw chart condition.
-`runtime.yawEstimate` caches the orientation set's output representative and is
-excluded from the RK4 state vector. It never enters the velocity or target
-innovation. `output.orientationSet` publishes the actual union of circular
-intervals and its validity. Uninformative course data contribute the whole
-circle; an empty intersection remains invalid without resetting body states.
+The current eight-state body-frame core has no yaw input or yaw chart condition.
+`runtime.yawEstimate` is the state of the parallel continuous yaw observer,
+integrated by RK4 with `psiHatDot=u+chi*kPsi*wrap(hm-psiHat)`. The correction is
+active only for an informative certified course heading; otherwise the observer
+propagates the gyro alone. This adds one scalar observer state and never enters
+the velocity or target innovation. `output.orientationSet` publishes the separate
+union of circular intervals and its validity. `output.egoYaw` is the integrated
+observer estimate, and `egoYawErrorBound` encloses the set about that estimate.
+Uninformative course data contribute the whole circle; an empty intersection
+remains invalid without resetting either the yaw observer or body states.
 
 ## 2. Sampling, radar prediction, and scope of the theorem
 
@@ -268,15 +272,19 @@ and `max(bv,(dvHold+etaV)/kv)`. Together with the target-velocity path cap this
 bounds `bP+h*(bqPath+bvPath+R*epsilonOmega+etaP)`; an independently valid cap can
 only tighten the comparison endpoint.
 
-Yaw is propagated outside that comparison by a circular Minkowski sum with
+The true orientation set is propagated outside that comparison by a circular Minkowski sum with
 `u_k*h` and radius `epsilonOmega*h`. This encloses the integral error even when
 only the true rate domain is available. The sensor radius alone would require
 continuous gyro measurements or an additional hold-error premise. At a sample,
 intersect with the certified course outer arc, using the whole circle when that
 arc is uninformative. The interval representation retains disconnected pieces.
 A failed intersection stays empty; only orientation-dependent outputs lose their
-certificate. No yaw representative is integrated in RK4, and a representative
-change never rotates or resets body-frame states.
+certificate. The parallel yaw observer is integrated with RK4 using the held
+course heading and gyro. Neither a measurement intersection nor an output query
+resets its state. At every published time the yaw error radius is the maximum
+circular distance from the actual observer estimate to the orientation set,
+computed by `nrmmYawSet("radiusAbout",...)`. A change in the yaw estimate never
+rotates or resets body-frame states.
 
 ### 5.4 Numerical trajectory defects
 
@@ -293,7 +301,10 @@ radar predictor. For body velocity,
 `DeltaF=(-kv*I-u_k*J)*(vHatAfter-vHatBefore)`; there is no yaw-dependent remainder.
 For the final target row apply the expression to its linear part and add
 `Lq*norm(deltaQ)+Ls*norm(deltaS)`. The global extension covers saturation crossings.
-There is no yaw numerical defect because orientation uses set operations.
+No yaw numerical defect enters this comparison: the independent orientation
+set is enclosed about the actual numerical yaw endpoint. Its radius includes
+any discrepancy of that endpoint, including integration error. The set itself
+is propagated with the declared gyro integral-error bound.
 
 These derivative defects enter the comparison forcing. No assumed fifth
 measurement derivative, RK4 remainder constant, or comparison between two

@@ -1,11 +1,13 @@
 function set = nrmmYawSet(action, varargin)
 % nrmmYawSet Propagate and intersect closed orientation sets on the circle.
 % initialize(center,radius), propagate(set,integralMeasuredRate,errorRadius),
-% intersect(set,measurementSet). Intervals are a union in [0,2*pi]. The
+% intersect(set,measurementSet), radiusAbout(set,estimate). Intervals are a
+% union in [0,2*pi]. radiusAbout returns the maximum circular distance from
+% the supplied estimate, including pi when its antipode belongs to the set. The
 % representative is the center of a smallest covering arc (largest gap's
 % complement). An empty intersection stays empty and has infinite radius.
 % Propagation requires a certified integral-error radius, including hold error
-% when the measured rate is sampled. There is no yaw correction state or gain.
+% when the measured rate is sampled. The yaw observer is maintained separately.
 
     switch string(action)
         case "initialize"
@@ -44,6 +46,24 @@ function set = nrmmYawSet(action, varargin)
                 end
             end
             set = localSet(intervals,previous.heading);
+        case "radiusAbout"
+            orientation = varargin{1};
+            heading = varargin{2};
+            validateattributes(heading, {'double'}, {'real','finite','scalar'});
+            set = Inf;
+            if ~isempty(orientation.intervals)
+                antipode = mod(heading+pi,2*pi);
+                tolerance = 256*eps(2*pi);
+                endpoints = orientation.intervals;
+                antipodes = antipode+[-2*pi,0,2*pi];
+                containsAntipode = any(antipodes >= endpoints(:,1)-tolerance ...
+                    & antipodes <= endpoints(:,2)+tolerance,"all");
+                set = min(pi,max(abs(mod(endpoints-heading+pi,2*pi)-pi),[],"all") ...
+                    + tolerance);
+                if containsAntipode
+                    set = pi;
+                end
+            end
         otherwise
             error("nrmmYawSet:unknownAction","Unknown orientation-set action.");
     end
