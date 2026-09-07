@@ -39,6 +39,95 @@ acceptance and final-band membership for both, with convergence still
 `notEstablishedByFiniteRun`. This is analysis of existing data, not a new plant
 simulation or a convergence proof.
 
+## Joint estimator-controller admission experiment (2026-09-06)
+
+Both requested 30 s joint trials stop at the first controller call, at time
+zero, with `collisionAvoidanceController:unsupportedCertificateUncertainty`.
+No control command is applied and no avoidance interval is simulated. This
+is an initial-admission failure, not a completed collision-avoidance or cruise
+recovery result. Initializing the PassVeh14DOF template is not counted as a
+completed closed-loop interval.
+
+The frozen source is `36aa52b564758cd28c52edcef07ebaf4cbf7f677` plus the
+pre-existing tracked stationary-pose admission changes. The straight and
+400 m radius crossing-target scenes retain 15 m/s ego speed, 8 m/s target
+speed, 50 m sensing, 0.05 s control sampling, 24 head stages, current Fiala/beta
+equations and solver settings, and the original road grid extended to station
+1000 m. The NRMM observer runs at 0.0125 s (four samples per controller period)
+with its current integration settings and 0.5 s synthetic initialization
+history. This setup requests eventual nominal cruise without a settling
+deadline.
+
+`UseStateEstimator=true` publishes actual NRMM estimates and their current
+enclosures. Bounded uniform sensor noise uses GNSS position/velocity bounds
+0.04 m / 0.05 m/s, body-acceleration bound 0.03 m/s^2, gyro bound 0.0015 rad/s,
+and radar-position bound 0.04 m. Seeds are 20260906 and 20260907. The target
+speed prior is 8 m/s; its provisional direction remains the adapter's declared
+line-of-sight initialization, not target-truth velocity. Rear-axle geometry is
+bound to the loaded plant. No uncertainty bound is zeroed or replaced with a
+fixed permissive value.
+
+Discarded synthetic controller-preparation probes are disabled for these
+admission attempts so the real first-call rejection and complete input are
+returned in `failureContext`. This changes initialization instrumentation,
+not the controller or its acceptance rules. These runs do not measure warmed
+controller or end-to-end real-time performance.
+
+### Measured initial admission and diagnostic replay
+
+| Quantity | Straight | Arc |
+| --- | ---: | ---: |
+| Requested closed-loop duration (s) | 30 | 30 |
+| Completed closed-loop duration (s) | 0 | 0 |
+| Applied commands | 0 | 0 |
+| Initial longitudinal-speed estimation error (m/s) | 0.0326242 | 0.0260734 |
+| Published body-velocity component radius (m/s) | 0.387876 | 0.388352 |
+| Predicted terminal longitudinal-velocity radius (m/s) | 0.316000 | 0.317623 |
+| Predicted terminal longitudinal-position radius (m) | 1.94925 | 2.01383 |
+| Same position radius after one rest-policy step (m) | 1.96496 | 2.02962 |
+
+At the failed sample all six actual ego errors lie inside their published
+current bounds; those bounds are available and timestamped at zero. Neither
+scene has acquired or published a target yet. The rejection therefore precedes
+the target constraint, QP solve and CLF optimization. It cannot be attributed
+to a recovery window, a failed evasive maneuver, or an observed estimator
+divergence.
+
+A non-pausing conditional breakpoint replays each exact failed input and
+captures the unmodified prediction and terminal certificate. The prediction
+contains 98 stages (4.9 s at 0.05 s). Its scheduled terminal speed is zero and
+the declared disturbance radius is zero, but the terminal velocity radius is
+nonzero and the next uncertainty box is not contained in the terminal box.
+Both `stationaryVelocities` and `invariant` are false. In particular, the
+roughly 0.316 m/s longitudinal radius is not a floating-point residue that
+can be removed by a numerical tolerance.
+
+The current rest certificate requires a stationary-pose uncertainty box with
+zero velocity radii. Bringing the nominal prediction to rest does not bring
+every possible actual velocity to zero under the same continuation. The
+missing capability is a terminal policy and invariant set that accommodate
+velocity uncertainty. Removing the rejection or omitting estimator bounds
+would change the claimed safety contract rather than validate this joint
+controller. Future uncertain target-motion admission remains a separate
+obligation that these time-zero failures do not reach.
+
+### Validation and retained evidence
+
+All 66 tests across `nrmmControllerErrorBoundsTest`, `nrmmPositionErrorBoundTest`,
+`controllerEstimatorBoundsTest` and `onlineNrmmTrackingRuntimeTest` pass. This
+validates the tested interfaces and observer behaviors; it does not turn the
+failed joint trials into successful ones. The experiment wrapper has zero
+factory Code Analyzer findings. Controller, estimator and configuration
+MATLAB source hashes remain unchanged.
+
+The external archive retains the exact source and existing working-tree
+patch, both failed MAT trials, first-call estimates and bounds, observer
+initialization records, complete logs, non-pausing replay probes and test
+results under `2026-09-06_Joint_Estimator_Controller_Admission`. The retained
+`runJointAdmission(1)` and `runJointAdmission(2)` wrappers reproduce the two
+requests against their sibling `source` snapshot. No joint collision success,
+cruise convergence, trajectory RMSE, or successful online timing claim is made.
+
 ## Current beta-input validation (2026-09-06)
 
 The signed-beta / modified-Fiala controller at `7d334ac48e117d80261c3ea3b885cafc39d493df` was evaluated with the current tracked working-tree stationary-pose admission changes. Controller equations and settings were held fixed. Two 30 s crossing-target trials and two 10 s nominal counterfactuals use the original scene parameters and road grid extended to station 1000 m. Exact-state control, 24 head steps at 0.05 s, 15 m/s reference, 50 m perception, and solver tolerances 1e-6 are retained.
