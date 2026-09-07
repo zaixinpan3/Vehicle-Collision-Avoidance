@@ -58,11 +58,12 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:missingEstimatorBound");
         end
 
-        function currentEstimationDoesNotSupplyFutureMotionPremises(testCase)
+        function currentCertificatesUseTheControllersFixedPredictionModel(testCase)
             [ego, target, cfg, lane] = localInputs();
-            target = rmfield(target, "targetPredictionMotionBounds");
-            testCase.verifyError(@() readPlanningInputs(ego, target, lane, cfg), ...
-                "collisionAvoidanceController:missingPredictionBound");
+            [~, ~, ~, parsed] = readPlanningInputs(ego, target, lane, cfg);
+            testCase.verifyEqual(parsed.positionErrorBound, ...
+                target.controllerErrorBound.bounds(1:2), AbsTol=0.0);
+            testCase.verifyFalse(isfield(parsed, "predictionMotionBounds"));
         end
 
         function theOrientationBoundUsesThePublishedBodyHeading(testCase)
@@ -117,31 +118,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
                 "dissipative-rest-funnel-v1");
         end
 
-        function velocityUncertaintyEnlargesTheFuturePositionBound(testCase)
-            model = localPredictionModel();
-            [position, yaw] = targetPrediction.errorEnvelope([0, 1, 2], model);
-            testCase.verifyEqual(position(:, 1), model.targetPositionErrorBound, AbsTol=0.0);
-            testCase.verifyGreaterThan(position(:, 3), position(:, 2));
-            testCase.verifyGreaterThanOrEqual(position(:, 2), ...
-                model.targetPositionErrorBound+model.targetVelocityErrorBound);
-            testCase.verifyGreaterThan(yaw(3), yaw(1));
-        end
 
-        function aNominalStopDoesNotUseASmoothJerkBoundAcrossTheJump(testCase)
-            model = localPredictionModel();
-            model.targetSpeed = 2;
-            model.targetTangentialAcceleration = -2;
-            model.targetStopTime = 1;
-            model.targetPositionErrorBound(:) = 0;
-            model.targetVelocityErrorBound(:) = 0;
-            model.targetAccelerationErrorBound(:) = 0;
-            model.targetPredictionMotionBounds.jerkNormMaximum = 0;
-            model.targetPredictionMotionBounds.accelerationNormMaximum = 2;
-            model.targetPredictionMotionBounds.speedMaximum = 10;
-            [position, ~] = targetPrediction.errorEnvelope([1, 2], model);
-            testCase.verifyEqual(position(:, 1), zeros(2, 1), AbsTol=0.0);
-            testCase.verifyGreaterThanOrEqual(position(:, 2), ones(2, 1));
-        end
     end
 end
 
@@ -155,22 +132,11 @@ function [ego, target, cfg, lane] = localInputs()
     target = struct("trackId", "static-target", "targetPositionInertial", [60; 3], ...
         "targetVelocityInertial", [0; 0], "targetAccelerationInertial", [0; 0], ...
         "targetYawInertial", 0, "targetYawRate", 0, "stateTime", 0, ...
-        "controllerErrorBound", localCertificate("target-state-v1", [0.2; 0.2; zeros(6, 1)]), ...
-        "targetPredictionMotionBounds", struct("speedMaximum", 0, ...
-        "accelerationNormMaximum", 0, "yawRateMaximum", 0, "jerkNormMaximum", 0));
+        "controllerErrorBound", localCertificate("target-state-v1", [0.2; 0.2; zeros(6, 1)]));
 end
 
 function certificate = localCertificate(kind, values)
     certificate = struct("kind", kind, "time", 0, "bounds", values, ...
         "available", true, "source", "declared-test-enclosure", ...
         "futurePredictionIncluded", false);
-end
-
-function model = localPredictionModel()
-    model = struct("hasTarget", true, "targetPositionErrorBound", [0.1; 0.1], ...
-        "targetVelocityErrorBound", [0.2; 0.2], "targetAccelerationErrorBound", [0.1; 0.1], ...
-        "targetPredictionAccelerationErrorBound", zeros(2, 1), "targetYawErrorBound", 0.03, ...
-        "targetSpeed", 5, "targetTangentialAcceleration", 0, "targetCurvature", 0, ...
-        "targetStopTime", inf, "targetPredictionMotionBounds", struct( ...
-        "speedMaximum", 10, "accelerationNormMaximum", 2, "jerkNormMaximum", 1, "yawRateMaximum", 0.1));
 end

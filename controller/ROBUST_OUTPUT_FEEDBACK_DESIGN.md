@@ -1,5 +1,16 @@
 # Closing the NRMM estimator and collision-avoidance control loop
 
+Current scope update (September 7, 2026): the user specifies approximately
+constant target curvature and tangential acceleration only during the short
+encounter, and stops considering a target after current radar exit. The
+infinite-future target occupancy/corridor proposals below are not requirements
+of the implemented experiment. The current implementation uses finite-node
+prediction and fresh appended-node acceptance; permanent target separation
+and indefinite traffic-dependent recursive feasibility are not claimed.
+See [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md). The remaining
+material records the earlier broader robustness investigation.
+
+
 Research date: 2026-09-05. Status: proposed architecture and proof obligations,
 with reproducible diagnostics; not an implemented robust vehicle controller.
 

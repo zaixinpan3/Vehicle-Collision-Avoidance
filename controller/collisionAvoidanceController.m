@@ -104,13 +104,16 @@ function [command, predictedInput, planningProblem, certificate] = ...
         witnessDecision = localWitnessDecision(qp, anchorPlan);
         witnessCheck = certifyAvoidancePlan(qp, prediction, model, witnessDecision);
         witnessValid = witnessCheck.accepted;
-        if compatible && ~witnessValid
+        if compatible && ~witnessValid && ~model.hasTarget
             error("collisionAvoidanceController:invalidStoredCertificate", ...
                 "The carried continuation failed certificate preservation: %s.", ...
                 strjoin(witnessCheck.failedConditions, ", "));
         end
     end
 
+    % A finite target forecast does not certify the newly appended node.
+    % Its fresh hard row was checked above; failed extension needs a new solve.
+    compatible = compatible && (~model.hasTarget || witnessValid);
     runtimeFormulation = toc(runtimeClock);
     result = solveHardCbfClf(qp, cfg);
     runtimeSolve = toc(runtimeClock);
@@ -142,7 +145,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     command = localCommand(predictedInput, model, prediction);
     predictedState = squeeze(pagemtimes(prediction.egoStateMatrix, plan)) ...
         + prediction.egoStateOffset;
-    certificate = struct("version", 7, "plan", plan, ...
+    certificate = struct("version", 8, "plan", plan, ...
         "schedule", prediction.scheduleForStore, "geometry", qp.geometry, ...
         "targetHorizon", model.targetHorizon, "episodeIdentity", model.episodeIdentity, ...
         "predictedState", predictedState, "appliedInput", command.actuatorInput, ...
@@ -150,7 +153,10 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "setMembershipEnabled", model.setMembershipUpdate ...
             || any(prediction.egoStateErrorBound, "all"), ...
         "terminalUncertainty", terminalUncertainty, "stateTime", model.stateTime, ...
-        "safetyScope", "declaredModelPredictionNodes", "acceptance", check);
+        "safetyScope", "declaredModelPredictionNodes", ...
+        "targetPredictionDuration", model.targetHorizon.predictionDuration, ...
+        "targetSafetyScope", "currentlyPublishedTargetWithinPredictionHorizon", ...
+        "acceptance", check);
     if ~explicitState
         previousCertificate = certificate;
     end
@@ -201,7 +207,7 @@ function related = localCertificateRelated(certificate, model)
 % from the new environment. It supplies no unverified fallback authority.
     related = isstruct(certificate) && isscalar(certificate) ...
         && all(isfield(certificate, ["version", "episodeIdentity", ...
-            "plan", "schedule", "predictedState"])) && isequal(certificate.version, 7);
+            "plan", "schedule", "predictedState"])) && isequal(certificate.version, 8);
     if ~related
         return;
     end
@@ -259,7 +265,7 @@ function [compatible, model] = localCertificateCompatible(certificate, identity,
         && all(isfield(certificate, ["version", "episodeIdentity", "plan", ...
             "predictedState", "targetHorizon", "schedule", "geometry", "appliedInput", ...
             "stateErrorBound", "stateTime", "terminalUncertainty"])) ...
-        && isequal(certificate.version, 7) ...
+        && isequal(certificate.version, 8) ...
         && isequaln(certificate.episodeIdentity, identity);
     if ~compatible
         return;
@@ -332,49 +338,6 @@ function matches = localTargetShiftMatches(previous, fresh, tolerance)
             return;
         end
     end
-    matches = localTargetContinuationShiftMatches( ...
-        previous, fresh, tolerance);
-end
-
-function matches = localTargetContinuationShiftMatches( ...
-        previous, fresh, tolerance)
-% The new complete predicted continuation must be contained in the old
-% one in every fixed terminal support direction. Under an exact
-% shift-consistent predictor, advancing the start of a future trajectory
-% can only reduce its support. This check covers the part beyond the
-% finite node overlap without imposing a trajectory class.
-    directionName = "terminalSupportDirection";
-    supportName = "terminalFuturePositionSupport";
-    required = [directionName, supportName];
-    matches = all(isfield(previous, required)) ...
-        && all(isfield(fresh, required));
-    if ~matches
-        return;
-    end
-    previousDirection = previous.(directionName);
-    freshDirection = fresh.(directionName);
-    previousSupport = previous.(supportName);
-    freshSupport = fresh.(supportName);
-    matches = localNumericallyEqual( ...
-            previousDirection, freshDirection, tolerance) ...
-        && isequal(size(previousSupport), size(freshSupport)) ...
-        && isreal(previousSupport) && isreal(freshSupport) ...
-        && ~any(isnan(previousSupport), "all") ...
-        && ~any(isnan(freshSupport), "all") ...
-        && ~any(isinf(previousSupport) & previousSupport < 0.0, "all") ...
-        && ~any(isinf(freshSupport) & freshSupport < 0.0, "all");
-    if ~matches
-        return;
-    end
-    finitePrevious = isfinite(previousSupport);
-    matches = all(isfinite(freshSupport(finitePrevious)), "all");
-    if ~matches
-        return;
-    end
-    scale = 1.0+max(abs(previousSupport(finitePrevious)), ...
-        abs(freshSupport(finitePrevious)));
-    matches = all(freshSupport(finitePrevious) ...
-        <= previousSupport(finitePrevious)+tolerance*scale, "all");
 end
 
 function equal = localNumericallyEqual(first, second, tolerance)
@@ -579,33 +542,33 @@ function metadata = localTerminalDiagnostics(metadata, qp, plan, model, predicti
     metadata.terminalLateralVelocity = state(5, end);
     metadata.terminalYawRateError = state(6, end);
     metadata.terminalRestResidual = norm(state(4:6, end), inf);
-    metadata.terminalInvariantCertified = metadata.terminalRestResidual ...
+    metadata.terminalPredictionCertified = metadata.terminalRestResidual ...
         <= 10.0*model.cfg.solver.constraintTolerance;
     metadata.terminalInvariantMargin = inf;
     metadata.terminalContinuationAxis = "none";
-    metadata.terminalFutureSupport = inf;
-    metadata.terminalSupportDirection = zeros(2, 1);
     metadata.terminalSegmentIndex = qp.geometry.frames(end).segmentIndex;
     if model.hasTarget
         node = qp.collision.nodes(end);
         metadata.terminalInvariantMargin = min(node.marginMatrix*plan+node.marginOffset);
-        metadata.terminalInvariantCertified = metadata.terminalInvariantCertified ...
-            && node.terminalInvariant && metadata.terminalInvariantMargin ...
+        metadata.terminalPredictionCertified = metadata.terminalPredictionCertified ...
+            && metadata.terminalInvariantMargin ...
                 >= -10.0*model.cfg.solver.constraintTolerance;
         metadata.terminalContinuationAxis = node.terminalContinuationAxis;
-        metadata.terminalFutureSupport = node.terminalFutureSupport;
-        metadata.terminalSupportDirection = node.terminalSupportDirection;
     end
     if isfield(prediction, "terminalDissipation")
         rows = qp.rowFamily == "terminalDissipation";
         metadata.terminalInvariantMargin = min(qp.inequalityBound(rows) ...
             -qp.inequalityMatrix(rows, qp.layout.planIndex)*plan);
-        metadata.terminalInvariantCertified = prediction.terminalDissipation.accepted ...
+        metadata.terminalPredictionCertified = prediction.terminalDissipation.accepted ...
             && metadata.terminalInvariantMargin >= -10*model.cfg.solver.constraintTolerance;
         metadata.terminalVelocityLimit = prediction.terminalDissipation.velocityLimit;
         metadata.remainingPoseExcursionBound = prediction.terminalDissipation.poseExcursionMatrix ...
             *(abs(state(4:6, end))+prediction.egoStateErrorBound(4:6, end));
     end
+    metadata.terminalInvariantCertified = metadata.terminalPredictionCertified && ~model.hasTarget;
+    metadata.terminalPredictionMargin = metadata.terminalInvariantMargin;
+    metadata.targetSafetyScope = "currentlyPublishedTargetWithinPredictionHorizon";
+    metadata.targetPredictionDuration = model.targetHorizon.predictionDuration;
 end
 
 function cfg = localControllerConfiguration(userCfg)
@@ -688,14 +651,14 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
     model.targetHalfWidth = 0.0;
     model.targetPositionErrorBound = zeros(2, 1);
     model.targetVelocityErrorBound = zeros(2, 1);
-    model.targetPredictionAccelerationErrorBound = zeros(2, 1);
+    model.targetAcceleration = zeros(2, 1);
+    model.targetYawRate = 0.0;
     model.targetAccelerationErrorBound = zeros(2, 1);
-    model.targetPredictionMotionBounds = [];
     model.targetErrorCertificate = [];
     model.targetYawErrorBound = 0.0;
     model.targetYawRateErrorBound = 0.0;
-    model.targetPredictionYawAccelerationErrorBound = 0.0;
     model.targetPrediction = struct();
+    model.targetPredictionSet = struct();
     if model.hasTarget
         target = targets(1);
         model.targetKey = target.key;
@@ -716,19 +679,6 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
             curvature = 0.0;
         end
         tangentialAcceleration = dot(target.acceleration, courseDirection);
-        courseNormal = [-courseDirection(2); courseDirection(1)];
-        nominalAcceleration = tangentialAcceleration*courseDirection ...
-            + courseNormal*(curvature*targetSpeed^2);
-        accelerationResidual = target.acceleration-nominalAcceleration;
-        yawRateResidual = target.yawRate-curvature*targetSpeed;
-        reconstructionTolerance = 100.0*eps(max([1.0, ...
-            norm(target.acceleration), norm(nominalAcceleration), ...
-            abs(target.yawRate), abs(curvature*targetSpeed)]));
-        accelerationResidual( ...
-            abs(accelerationResidual) <= reconstructionTolerance) = 0.0;
-        if abs(yawRateResidual) <= reconstructionTolerance
-            yawRateResidual = 0.0;
-        end
         model.targetSpeed = targetSpeed;
         model.targetCourseDirection = courseDirection;
         model.targetCurvature = curvature;
@@ -740,17 +690,12 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
         model.targetHalfWidth = 0.5*target.width;
         model.targetPositionErrorBound = target.positionErrorBound;
         model.targetVelocityErrorBound = target.velocityErrorBound;
+        model.targetAcceleration = target.acceleration;
+        model.targetYawRate = target.yawRate;
         model.targetAccelerationErrorBound = target.accelerationErrorBound;
-        model.targetPredictionMotionBounds = target.predictionMotionBounds;
         model.targetErrorCertificate = target.errorCertificate;
-        model.targetPredictionAccelerationErrorBound = ...
-            target.predictionAccelerationErrorBound ...
-            + abs(accelerationResidual);
         model.targetYawErrorBound = target.yawErrorBound;
-        model.targetYawRateErrorBound = target.yawRateErrorBound ...
-            + abs(yawRateResidual);
-        model.targetPredictionYawAccelerationErrorBound = ...
-            target.predictionYawAccelerationErrorBound;
+        model.targetYawRateErrorBound = target.yawRateErrorBound;
         model.targetPrediction = struct( ...
             "initialPosition", model.targetPosition, ...
             "initialCourseDirection", model.targetCourseDirection, ...
@@ -759,6 +704,7 @@ function model = localPredictionModel(ego, targets, lane, road, cfg)
                 model.targetTangentialAcceleration, ...
             "curvature", model.targetCurvature, ...
             "stopTime", model.targetStopTime);
+        model.targetPredictionSet = targetPrediction.initialSet(model);
     end
     model.targetHorizon = localTargetHorizon(model);
 end
@@ -785,10 +731,9 @@ function model = localStaticPredictionModel(cfg)
 end
 
 function horizon = localTargetHorizon(model)
-% The target's predicted pose and published uncertainty at every finite
-% node, plus the exact support of the controller's complete continuation
-% from the rest time. The terminal support interface carries every future
-% point and therefore needs no stationary/straight/monotone target gate.
+% Freeze target curvature and tangential acceleration over this finite
+% encounter forecast, retaining uncertainty in their initial reconstruction.
+% No target restriction is imposed after the prediction horizon.
     nodeTime = (0:model.horizonSteps+model.tailSteps+1)*model.sampleTime;
     [position, yaw] = localTargetMotionAtTimes(nodeTime, model);
     [positionErrorBound, yawErrorBound] = ...
@@ -799,43 +744,9 @@ function horizon = localTargetHorizon(model)
     horizon.targetPositionErrorBound = positionErrorBound;
     horizon.targetYawErrorBound = yawErrorBound;
     horizon.estimationErrorCertificate = model.targetErrorCertificate;
-    horizon.terminalSupportDirection = zeros(2, 0);
-    horizon.terminalFuturePositionSupport = zeros(1, 0);
-    horizon.terminalSupportStartTime = ...
-        (model.horizonSteps+model.tailSteps)*model.sampleTime;
-    if ~model.hasTarget
-        return;
-    end
-    directionCount = ...
-        model.cfg.terminal.supportDirectionCount;
-    angle = (0:directionCount-1)*(2.0*pi/directionCount);
-    direction = [cos(angle); sin(angle)];
-    direction(abs(direction) < 100.0*eps) = 0.0;
-    direction = direction./vecnorm(direction);
-    horizon.terminalSupportDirection = direction;
-    if ~isempty(model.targetPredictionMotionBounds)
-        % Speed/acceleration domains alone do not restrict the target to a
-        % bounded future halfspace. A present B(t) is not such a restriction.
-        horizon.terminalFuturePositionSupport = inf(1, directionCount);
-        if model.targetPredictionMotionBounds.speedMaximum == 0.0
-            horizon.terminalFuturePositionSupport = model.targetPosition.'*direction ...
-                + model.targetPositionErrorBound.'*abs(direction);
-        end
-        return;
-    end
-    horizon.terminalFuturePositionSupport = ...
-        targetPrediction.futureSupport( ...
-            horizon.terminalSupportDirection, ...
-            horizon.terminalSupportStartTime, model.targetPrediction);
-    % Independent velocity/acceleration error boxes grow without bound.
-    % Admit a terminal direction only when its complete future support is
-    % finite; a rest-node error radius alone cannot certify future safety.
-    horizon.terminalFuturePositionSupport = ...
-        horizon.terminalFuturePositionSupport ...
-        + model.targetPositionErrorBound.'*abs(direction);
-    growth = (model.targetVelocityErrorBound ...
-        + model.targetPredictionAccelerationErrorBound).'*abs(direction);
-    horizon.terminalFuturePositionSupport(growth > 0.0) = inf;
+    horizon.predictionContract = "finite-frozen-parameter-prediction-v1";
+    horizon.predictionDuration = (model.horizonSteps+model.tailSteps)*model.sampleTime;
+    horizon.initialPredictionSet = model.targetPredictionSet;
 end
 
 function [position, yaw] = localTargetMotionAtTimes(time, model)

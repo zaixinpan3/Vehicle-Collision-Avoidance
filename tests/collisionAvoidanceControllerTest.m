@@ -173,7 +173,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                     + problem.metadata.clfRelaxationCost, ...
                 AbsTol=1.0e-8);
             testCase.verifyEqual(problem.metadata.solverCallCount, 1);
-            testCase.verifyTrue(problem.metadata.terminalInvariantCertified);
+            testCase.verifyTrue(problem.metadata.terminalPredictionCertified);
             testCase.verifyTrue(problem.metadata.planCertified);
         end
 
@@ -312,7 +312,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:noSolution");
         end
 
-        function fullBicycleContinuationCanSteerClearOfFutureOncomingPath(testCase)
+        function remoteOncomingTargetDoesNotRequireAvoidingItsInfiniteRay(testCase)
             cfg = localSmallConfiguration();
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
             target = localTarget("oncoming", [100.0; 0.0], [-5.0; 0.0]);
@@ -321,12 +321,13 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 ego, target, localLane(), cfg, []);
 
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(abs(certificate.predictedState(2, end)), 3.5);
+            testCase.verifyLessThan(abs(certificate.predictedState(2, end)), 0.1);
+            testCase.verifyFalse(problem.metadata.terminalInvariantCertified);
             testCase.verifyLessThan(problem.metadata.terminalRestResidual, 1.0e-6);
             testCase.verifyGreaterThanOrEqual( ...
                 problem.metadata.terminalInvariantMargin, -1.0e-6);
             testCase.verifyEqual(problem.metadata.solverCallCount, 1);
-            testCase.verifyGreaterThan(max(abs(problem.tailPlan(1, :))), 0.001);
+
         end
 
         function curvedPredictionIsNotRejectedByMotionClass(testCase)
@@ -339,9 +340,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem] = collisionAvoidanceController( ...
                 ego, target, localLane(), cfg);
 
-            testCase.verifyTrue(problem.metadata.terminalInvariantCertified);
+            testCase.verifyTrue(problem.metadata.terminalPredictionCertified);
             testCase.verifyEqual(problem.metadata.terminalContinuationAxis, ...
-                "predictedTrajectorySupport");
+                "finitePredictionNode");
             testCase.verifyTrue(problem.metadata.planCertified);
         end
 
@@ -356,9 +357,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem] = collisionAvoidanceController( ...
                 ego, target, localLane(), cfg);
 
-            testCase.verifyTrue(problem.metadata.terminalInvariantCertified);
+            testCase.verifyTrue(problem.metadata.terminalPredictionCertified);
             testCase.verifyEqual(problem.metadata.terminalContinuationAxis, ...
-                "predictedTrajectorySupport");
+                "finitePredictionNode");
             testCase.verifyTrue(problem.metadata.planCertified);
         end
 
@@ -373,7 +374,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem] = collisionAvoidanceController( ...
                 ego, target, localPiecewiseLane(), cfg);
 
-            testCase.verifyTrue(problem.metadata.terminalInvariantCertified);
+            testCase.verifyTrue(problem.metadata.terminalPredictionCertified);
             testCase.verifyGreaterThan( ...
                 problem.metadata.terminalSegmentIndex, 1);
             testCase.verifyTrue(problem.metadata.planCertified);
@@ -456,7 +457,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(second.metadata.targetContinuationShifted);
             testCase.verifyTrue(second.metadata.fallbackUsed);
-            testCase.verifyTrue(second.metadata.terminalInvariantCertified);
+            testCase.verifyTrue(second.metadata.terminalPredictionCertified);
             testCase.verifyEqual(secondCommand.actuatorInput, ...
                 firstPlan(:, 2), AbsTol=0.0);
             testCase.verifyEqual(secondPlan(:, 1), firstPlan(:, 2), ...
@@ -645,15 +646,58 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.solverCallCount, 1);
         end
 
-        function growingTargetUncertaintyCannotUseARestNodeOnlyBound(testCase)
+        function uncertainDepartingTargetUsesOnlyItsFiniteForecast(testCase)
             cfg = localSmallConfiguration();
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
             target = localTarget("uncertain", [100.0; 0.0], [5.0; 0.0]);
             target.targetVelocityInertialErrorBound = [0.1; 0.1];
 
-            testCase.verifyError(@() collisionAvoidanceController( ...
-                ego, target, localLane(), cfg, []), ...
-                "collisionAvoidanceController:noSolution");
+            [~, ~, problem, certificate] = collisionAvoidanceController( ...
+                ego, target, localLane(), cfg, []);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyFalse(problem.metadata.terminalInvariantCertified);
+            testCase.verifyFalse(isfield(certificate.targetHorizon, "terminalFuturePositionSupport"));
+            testCase.verifyGreaterThan(certificate.targetHorizon.targetPositionErrorBound(:, end), 0);
+        end
+
+        function anUnpublishedTargetLeavesNoCarriedCollisionConstraints(testCase)
+            cfg = localSmallConfiguration();
+            ego = localEgoState([0; 0; 0; 15; 0; 0], [0; 0]);
+            target = localTarget("departing", [100; 0], [5; 0]);
+            [command, ~, first, stored] = collisionAvoidanceController( ...
+                ego, target, localLane(), cfg, []);
+            nextEgo = localNextEgo(first, command.actuatorInput);
+            nextEgo.targetEstimates = struct([]);
+
+            [~, ~, second, fresh] = collisionAvoidanceController( ...
+                nextEgo, [], localLane(), cfg, stored);
+
+            testCase.verifyFalse(second.metadata.hasTarget);
+            testCase.verifyEqual(second.metadata.collisionImposedCount, 0);
+            testCase.verifyEqual(second.metadata.rowCounts.collision, 0);
+            testCase.verifyEqual(fresh.episodeIdentity.targetKey, "");
+            testCase.verifyTrue(second.metadata.planCertified);
+        end
+
+        function aNewlyUnsafeLastTargetNodeCannotReuseTheOldFallback(testCase)
+            cfg = collisionAvoidanceControllerConfig(localSmallConfiguration());
+            cfg.solver.jointFunction = @localJointSolveHook;
+            ego = localEgoState([0; 0; 0; 0; 0; 0], [0; 0]);
+            steps = cfg.controller.horizonSteps+ltvBicycleModel.brakingSchedule("steps", cfg);
+            speed = 120;
+            start = speed*(steps+1)*cfg.controller.sampleTime;
+            target = localTarget("approaching", [start; 0], [-speed; 0]);
+            [command, ~, first, stored] = collisionAvoidanceController( ...
+                ego, target, localLane(), cfg, []);
+            nextEgo = localNextEgo(first, command.actuatorInput);
+            target.targetPositionInertial(1) = start-speed*cfg.controller.sampleTime;
+
+            outcome = localAttemptPlan(nextEgo, target, cfg, stored);
+
+            testCase.verifyFalse(outcome.accepted);
+            testCase.verifyTrue(ismember(outcome.identifier, ...
+                ["collisionAvoidanceController:noSolution", ...
+                 "collisionAvoidanceController:optimizationFailure"]));
         end
 
         function uncertainEgoWithoutAStateTimestampIsRejected(testCase)
@@ -789,6 +833,16 @@ function ego = localNextEgo(problem, appliedInput)
         + problem.prediction.stageMatrixB(:, :, 1)*appliedInput ...
         + problem.prediction.stageAffine(:, 1);
     ego = localEgoState(state, appliedInput);
+end
+
+function outcome = localAttemptPlan(ego, target, cfg, stored)
+    outcome = struct("accepted", false, "identifier", "");
+    try
+        [~, ~, problem] = collisionAvoidanceController(ego, target, localLane(), cfg, stored);
+        outcome.accepted = problem.metadata.planCertified;
+    catch exception
+        outcome.identifier = string(exception.identifier);
+    end
 end
 
 function solve = localJointSolveHook(phase, problem)

@@ -1,5 +1,65 @@
 # Controller design-requirement experiments
 
+
+## Finite target-prediction correction (2026-09-07)
+
+The user specifies constant target curvature and tangential acceleration only
+during the short encounter. Targets cease to be considered after current radar
+visibility is lost. The earlier demand for an infinite-future target occupancy
+or road/corridor contract was an extra requirement and is withdrawn.
+
+The controller now propagates current target errors through a finite family of
+frozen-parameter predictions and imposes finite rectangle constraints through
+the last head/tail node. No infinite ray/orbit support is computed. Every newly
+appended target node is rebuilt and checked before a shifted plan can serve as
+fallback. The existing visibility/publication policy removes hidden targets.
+Finite terminal acceptance is distinguished from invariant terminal safety in
+both diagnostics and the experiment evaluator. The objective and ego/tire/load
+models are unchanged. See [the target contract](../controller/TARGET_PREDICTION_CONTRACT.md).
+
+Both matched physical joint experiments were actually rerun for a requested
+30 s on the straight and 400 m arc, with the same 15 m/s ego, 8 m/s crossing
+target, 50 m radar, 0.05 s control, 0.0125 s observer, 24 head and 74 continuation
+stages, bounded-uniform sensor radii and seeds 20260906/20260907 described below.
+Preparation probes remained disabled. Neither run completed:
+
+| Trial | Completed time / commands | Current outcome |
+| --- | --- | --- |
+| Straight | 3.10 s / 62 | First target's finite propagated error enclosure leaves no accepted plan in the selected domain |
+| 400 m arc | 0.00 s / 0 | Existing initial uncertain polyline-chart rejection |
+
+The straight failure has **zero nonfinite hard bounds**, finite position
+bounds at every target node, and an accepted ego dissipative terminal model.
+Its initial target velocity, acceleration and yaw-rate radii are
+27.902881 m/s per component, 4.868243 m/s^2 per component, and 0.124999 rad/s.
+Position-component radii grow from 1.013855 m at the current sample to
+61.049819 m at 1 s and 390.714908 m at the 4.9 s forecast endpoint. These are
+conservative enclosures, not observed target errors or realized movements.
+The intervals discard current-state correlations and do not exploit all
+estimator operating-domain intersections.
+
+A diagnostic retaining ego, target position and target heading uncertainty,
+while zeroing only target velocity/acceleration/yaw-rate uncertainty, admits
+the same failed input. An explicit no-target diagnostic also admits it.
+Neither diagnostic is an accepted noisy avoidance experiment, and production
+bounds are not changed. The remaining straight issue is the initial motion
+state enclosure and its conservative propagation, rather than infinite-time
+support. The target is first acquired in the failed call; completed-sample
+metrics omit that acquisition.
+
+Validation passes 240 distinct cases across 17 test classes (one selected
+radar-lifecycle case in the scenario class), with zero factory Code Analyzer
+findings in 12 changed MATLAB files. Tests cover current bounds, finite
+propagation, 256 corners in each of two initial boxes, endpoint extension,
+visibility removal, objective/force behavior and the evaluator. The deliberately
+unsafe new terminal-node regression verifies that a solver failure cannot use
+an old fallback whose appended target node is now unsafe. No completed joint
+avoidance, eventual cruise convergence or new real-time success is claimed.
+
+The following earlier experiments and metrics are preserved as historical
+checkpoints. Their infinite-future target requirement is superseded by this
+correction; their actual measured stopping conditions are not rewritten.
+
 ## Recovery objective and rollback audit (2026-09-06 clarification)
 
 The required recovery behavior is eventual dissipation to nominal constant-speed
@@ -128,12 +188,11 @@ allowed 3.10 s. The timestamp repair removed the spurious gyro-bound jumps;
 it did not supply the missing target-motion premise. All intermediate raw
 results and source snapshots are preserved outside the repository.
 
-Remaining work requires a sound curved-path chart and a justified
-complete-future target occupancy contract. Speed and acceleration maxima
-alone cannot make a fixed stopping location safe against every possible future
-target trajectory. Persistent physical-model forcing, low-speed observer
-validity and head/tail intersample safety also remain outside this certificate.
-No arbitrary route premise or passive-safety substitution is silently applied.
+At this earlier checkpoint, an infinite-future target contract was listed as
+remaining work. The finite-encounter correction above withdraws that extra
+requirement. Curved-path uncertainty, current target initialization/propagation,
+physical-model forcing, low-speed observer validity and head/tail intersample
+safety remain separate issues.
 
 ## Joint estimator-controller admission experiment (2026-09-06)
 

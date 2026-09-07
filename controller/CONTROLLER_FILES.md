@@ -36,7 +36,7 @@ Do not move controller helpers into those directories to evade the limit.
 
 The five grouped MATLAB modules expose named static methods, such as
 `laneGeometry.project`, `ltvBicycleModel.predict`, `modifiedFialaTire.evaluate`,
-`stateUncertainty.readCertificate` and `targetPrediction.futureSupport`.
+`stateUncertainty.readCertificate` and `targetPrediction.initialSet` / `targetPrediction.errorEnvelope`.
 Their local helpers stay in the owning file. The controller entry signature,
 model equations, constraints and solver acceptance criteria are unchanged by
 this consolidation. Callers of the former standalone helpers must use the

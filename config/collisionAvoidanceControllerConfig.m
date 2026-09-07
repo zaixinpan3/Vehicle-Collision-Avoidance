@@ -94,8 +94,7 @@ function cfg = localDefaults()
     % The complete bicycle continuation reaches rest. backupDeceleration
     % determines only the initial braking schedule and continuation length;
     % actuator and slip-domain constraints apply at every stage.
-    cfg.terminal = struct("backupDeceleration", 5.0, ...
-        "supportDirectionCount", 64);
+    cfg.terminal = struct("backupDeceleration", 5.0);
 
     % Road-geometry implementation allowances.
     cfg.road = struct( ...
@@ -245,12 +244,6 @@ function localValidate(cfg)
             "collision.clearanceMargin must be a nonnegative finite " ...
             + "scalar.");
     end
-    localValidateNonnegativeInteger( ...
-        cfg.terminal.supportDirectionCount, "terminal.supportDirectionCount");
-    if cfg.terminal.supportDirectionCount < 8
-        error("collisionAvoidanceController:invalidConfiguration", ...
-            "terminal.supportDirectionCount must be an integer of at least 8.");
-    end
     localValidateNonnegativeScalar( ...
         cfg.controller.shiftConsistencyTolerance, ...
         "controller.shiftConsistencyTolerance");
@@ -273,14 +266,6 @@ function localValidate(cfg)
             "solver.maxIterations must be a positive integer.");
     end
     localValidateTerminal(cfg);
-end
-
-function localValidateNonnegativeInteger(value, name)
-    if ~isnumeric(value) || ~isreal(value) || ~isscalar(value) ...
-            || ~isfinite(value) || value < 0.0 || value ~= round(value)
-        error("collisionAvoidanceController:invalidConfiguration", ...
-            "%s must be a nonnegative integer.", name);
-    end
 end
 
 function localValidateNonnegativeScalar(value, name)

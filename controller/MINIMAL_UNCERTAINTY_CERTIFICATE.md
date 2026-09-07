@@ -90,10 +90,9 @@ state-input support calculation.
 Collision and road rows use the existing fixed-normal support construction:
 directional position-box support, rectangle support maximized over heading
 uncertainty, and the frame/road error allowances are all included. Terminal
-target support still covers the complete allowed future center trajectory,
-with a target circumradius for arbitrary future heading. Current bounds plus
-speed/acceleration domains alone do not give such a finite future halfspace.
-No new target-motion premise is inferred from a current estimator bound.
+target support now uses only the finite last predicted pose and its propagated
+uncertainty. The September 7 clarification removes the former infinite-future
+target condition; see [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md).
 
 ## The smallest invariant terminal extension
 
@@ -165,8 +164,9 @@ Conditional theorem in exact arithmetic: assume initial feasible admission,
 sound current estimation sets in the controller chart, the declared affine
 dynamics and exact actuator execution, zero persistent model disturbance,
 the stationary-pose terminal certificate, applicable unchanged road coverage,
-and target finite-horizon shift consistency with contained complete-future
-support. Then the accepted controller maintains the represented hard
+and no active target. With an active target, the newly appended finite node
+must independently pass readmission; its feasibility is not automatic. Under
+these conditions the accepted controller maintains the represented hard
 constraints at prediction nodes, and its shifted stored plan remains a
 feasible fallback at each subsequent compatible sample.
 

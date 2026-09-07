@@ -31,13 +31,6 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         "ego-state-v1", output.stateTime, egoBounds, egoAvailable, bound.scope);
 
     domain = design.target.domain;
-    motion = struct("speedMaximum", domain.speedMaximum, ...
-        "accelerationNormMaximum", domain.accelerationNormBound, ...
-        "yawRateMaximum", domain.yawRateMaximum, ...
-        "jerkNormMaximum", domain.yawRateMaximum^2*domain.speedMaximum ...
-            + 3*domain.scalarAccelerationMaximum*domain.yawRateMaximum ...
-            + design.target.modelJerkMaximum, ...
-        "scope", "declared true target motion domain; future measurements not assumed");
     rotationError = 2*sin(min(bound.yaw, pi)/2);
     for index = 1:numel(output.targetEstimates)
         target = output.targetEstimates(index);
@@ -78,7 +71,6 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         output.targetEstimates(index).targetAccelerationInertialErrorBound = values(5:6);
         output.targetEstimates(index).targetYawErrorBound = values(7);
         output.targetEstimates(index).targetYawRateErrorBound = values(8);
-        output.targetEstimates(index).targetPredictionMotionBounds = motion;
     end
 end
 

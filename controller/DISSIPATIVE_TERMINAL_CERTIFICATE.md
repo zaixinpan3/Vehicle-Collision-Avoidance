@@ -24,7 +24,7 @@ objective remains raw head-input effort plus squared current CLF slack.
 The exact-state and zero-velocity-radius stationary-pose cases retain their
 previous terminal equalities. A nonzero velocity radius selects the new
 certificate, even if the radius is numerically very small. A compatible
-carried dissipative certificate keeps its type. Certificate version 7
+carried dissipative certificate keeps its type. Certificate version 8
 prevents an older contract from authorizing the new continuation.
 
 ## Infinite continuation and invariant inequalities
@@ -91,7 +91,7 @@ future terminal slip domains without assuming future measurements improve.
 
 ## Geometry and continuation preservation
 
-Terminal road and target halfspaces use the ego circumradius. This covers
+Terminal road and finite-node target halfspaces use the ego circumradius. This covers
 all terminal headings while the velocity-dependent pose budget covers
 translation and heading-domain limits. The stationary-pose branch retains
 its less conservative orientation-dependent rectangle support.
@@ -143,10 +143,11 @@ The remaining limitations are substantive:
   terminal inequalities cover continuous terminal time but do not close the
   between-node gap before terminal entry.
 - NRMM course-based estimation is not thereby certified at standstill.
-- Speed/acceleration bounds alone allow a moving target to reach any fixed
-  stopping location eventually. Complete-future target support remains
-  infinite under that contract. A route/occupancy premise must be supplied
-  and justified before claiming indefinite safety from such a target.
+- Target geometry now covers the finite encounter prediction only. The
+  September 7 user clarification withdraws the former demand for infinite
+  future target support. The ego terminal funnel still has the stated
+  invariant dynamics/road property; it does not certify permanent target
+  separation. See [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md).
 - Generic curved-polyline uncertainty still requires a sound invertible
   chart or a separately implemented smooth-path representation.
 

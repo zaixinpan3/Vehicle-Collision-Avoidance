@@ -11,7 +11,7 @@ target prediction. Nonzero ego velocity radii now use a dissipative terminal
 certificate that reserves their complete remaining pose excursion under the
 declared affine model. This does **not** complete physical robust closed-loop
 admission: persistent forcing, generic noninvertible curved-polyline charts,
-and moving targets without a complete-future occupancy premise remain open.
+remain open. Targets use finite encounter predictions, as specified below.
 See [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
 
 ## Current-state contract
@@ -92,22 +92,22 @@ which has a different center when sideslip is nonzero.
 
 ## Future prediction
 
-`targetPrediction.errorEnvelope` encloses future true position about the
-controller's fixed nominal trajectory. It starts from the current certificate
-and takes the minimum of valid speed, acceleration and jerk envelopes. For
-example, the acceleration envelope is
+The target model assumes constant curvature and constant tangential
+acceleration during the finite encounter prediction. It does not assert that
+the target retains those parameters forever. Current estimation error remains
+part of the prediction; no future observer contraction is presumed. See
+[TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md) for the enclosure.
 
-\[
-b_p(t+\tau\mid t)=b_p(t)+b_v(t)\tau
- +\tfrac12(\bar a_T+\bar a_{nom}(\tau))\tau^2.
-\]
+The estimator no longer publishes `targetPredictionMotionBounds`. Its
+operating-domain bounds remain premises of the current estimation enclosure;
+they are not independent adversarial future maneuvers. Legacy records carrying
+that extra field do not override the controller's finite prediction law.
 
-The jerk envelope starts from current acceleration error. Nominal maxima
-cover the complete prefix `[0,tau]`; the jerk alternative is disabled across
-the nominal stop's acceleration jump. Heading error integrates true and
-nominal yaw-rate limits and is capped at pi. All margins are fixed data in
-one SOCP. Future observer corrections are not assumed: a better future
-estimate does not retroactively correct the trajectory propagated today.
+Every currently published target receives hard geometry rows at all head/tail
+nodes, including the last node. There is no infinite-future target support row.
+A currently visible target is not removed early merely because its forecast
+leaves the sensor range. The adapter stops publication on actual current radar
+exit; the controller then removes that target's rows and re-admits the plan.
 
 ## Remaining certificate obligations
 
@@ -117,31 +117,23 @@ continuous forcing. Cartesian-to-Frenet bounds include possible tangent
 changes; uncertain admission requires an invertible interior initial chart.
 The compatible continuation intersects the new current estimator box with
 the previous reachable box at the retained nominal center.
-Propagation alone does not establish terminal
-closure: with initial velocity error `+/-epsilon`, the same open-loop inputs
-can stop the nominal state while actual velocities still differ by
-`2*epsilon`. The nominal zero terminal input does not turn that set into a
-rest equilibrium. The `unsupportedCertificateUncertainty` guard remains for that case.
+The dissipative terminal set handles nonzero initial velocity radii under
+the declared affine ego dynamics. Persistent forcing still requires a different
+certificate and remains rejected. This ego/road invariant construction does
+not establish permanent separation from a target beyond the finite forecast.
 
-A finite current target bound plus global speed/acceleration limits also
-does not establish finite support of the complete future position set. For
-this domain-only future model, terminal support is conservatively infinite
-unless zero target speed is guaranteed, which gives a stationary position
-ball. A route or more informative complete-future motion certificate could
-admit additional cases; the current estimator does not provide one. The
-implementation does not freeze `B(t)` forever or truncate growth to manufacture
-a terminal certificate.
-
-Changed target bounds trigger the existing compatibility/readmission logic.
-The old input sequence must pass acceptance with the new margins. Stationary-pose
-and dissipative-rest certificates maintain an ego enclosure under compatible
-observations. The latter handles velocity uncertainty under the declared model;
-a moving target still needs an adequate complete-future motion contract.
+Changed target bounds trigger readmission. On a consistent shift, overlapping
+rows retain their validity, but the appended target node gets a fresh row and
+a new acceptance check. The old plan is used as fallback only if it passes
+that check. `terminalPredictionCertified` reports finite terminal admission;
+`terminalInvariantCertified` is false when a target is present. Solver failure
+and a rejected appended node can leave no admitted command: indefinite
+recursive feasibility against future targets is not claimed.
 
 ## Verification
 
 `controllerEstimatorBoundsTest` checks current-bound precedence and updates,
-timestamp/availability rejection, heading consistency, prediction growth,
+timestamp/availability rejection, heading consistency, finite prediction propagation,
 nominal stopping, SOCP tightening and continuation readmission. Its accepted
 SOCP examples use an explicitly declared stationary target enclosure and exact
 ego dynamics; they are not NRMM closed-loop robustness experiments.

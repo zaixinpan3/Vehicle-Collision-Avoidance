@@ -1,6 +1,6 @@
 # Certificate-preserving predictive CBF-CLF-QP
 
-This is the implemented controller contract as of 2026-09-06. The online
+This is the implemented controller contract as of 2026-09-07. The online
 controller uses one performance objective, a maintained safe continuation,
 and at most one QP call per sample. It does not optimize over alternative
 geometric starts. It is a conservative predictive controller on a selected
@@ -23,8 +23,8 @@ configuration/environment identity, committed actuator vector, and acceptance
 residuals. The four-input interface stores the same state persistently for
 existing scenario drivers. `resetNominalTrajectory` clears that convenience
 interface and does not change an explicitly supplied certificate.
-Certificates use version 7 for the signed braking-ratio, modified Fiala and
-dissipative-terminal contracts. Earlier certificates must undergo initial admission again.
+Certificates use version 8 for the signed braking-ratio, modified Fiala and
+dissipative-terminal and finite-target-prediction contracts. Earlier certificates must undergo initial admission again.
 
 Initial admission constructs one domain from the schedule reference and
 attempts one QP. This reference is not certified in advance. The augmented
@@ -249,7 +249,7 @@ range is not covered. Diagnostics report which nodes carry rows. Consequently,
 road guarantees concern the represented, covered boundaries only; unknown
 road geometry is not certified. Strict partial coverage raises an error.
 
-## Rest and complete target continuation
+## Ego rest and finite target prediction
 
 The schedule reaches zero speed, while tire denominators use the positive
 regularization floor. At zero schedule speed,
@@ -265,19 +265,18 @@ actuator and slip-domain constraints. The policy, zero-speed schedule and restin
 frame can be appended indefinitely. Rest remains valid at nonzero lateral
 offset and heading error within the admitted geometry domain.
 
-For targets, the last node has a hard halfspace separating the resting ego
-from the target's complete future center-trajectory support. A target
-circumradius covers every future yaw; the resting ego retains its directional
-rectangle support. `targetPrediction.futureSupport` supplies the nominal
-complete-future support. Constant position uncertainty is added directionally.
-A direction with persistent velocity or acceleration uncertainty is treated
-conservatively as having infinite future support and cannot certify rest.
-This can reject cases where nominal motion would dominate the uncertainty.
-A finite error radius at the rest time is never substituted for future support.
+For a currently published target, the last node has the same finite-time
+rectangle-separation contract as earlier prediction nodes. Curvature and
+tangential acceleration are frozen over the head/tail forecast, with current
+state uncertainty propagated through that law. Target support over an infinite
+ray, future orbit, or arbitrary future maneuver set is no longer imposed.
+The target is removed when the adapter stops publishing it after current
+radar visibility is lost. No target road/corridor constraint is introduced.
 
-The halfspace is sufficient, not necessary. A safe resting point inside the
-convex hull of a target's complete orbit can remain outside this certificate
-class. More optimization starts would not repair that restriction.
+`terminalPredictionCertified` reports acceptance at the finite endpoint.
+`terminalInvariantCertified` is false while a target is present: the invariant
+ego rest/funnel construction does not prove permanent target separation.
+See [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md).
 
 ## Uncertainty and sampling contract
 
@@ -298,12 +297,12 @@ for the original stationary-pose implementation and conditional proof.
 The estimator adapter now publishes its time-varying state-time enclosure
 instead of fixed configured state-error margins. The controller validates
 timestamps and availability, converts the relative target bound to absolute
-state bounds, and propagates future target uncertainty from declared motion
-limits. These interface changes do not remove the terminal restriction above.
+state bounds, and propagates their uncertainty through the finite frozen-parameter
+target model.
 See [ESTIMATOR_BOUND_INTERFACE.md](ESTIMATOR_BOUND_INTERFACE.md) for the field
 contract, derivation and distinction between current estimation and prediction.
 
-For a compatible uncertain continuation, version 7 retains the shifted
+For a compatible uncertain continuation, version 8 retains the shifted
 nominal center and intersects its reachable box with the new estimator box.
 The symmetric outer enclosure remains contained in the carried box. This
 can preserve the witness under changing current estimation radii without
@@ -311,10 +310,10 @@ assuming any future observer contraction. Empty intersection is a contract
 inconsistency. Timestamp mismatch or changed environment premises require
 readmission; the recursive guarantee does not cover those changes.
 
-Static target uncertainty is admitted when the directional rows and complete
-future support remain feasible. State, actuator execution, target finite-node
-overlap, complete target support, route and model assumptions must agree with
-the carried certificate before its shift can be treated as applicable.
+Target uncertainty is admitted when the finite directional rows remain feasible.
+State, actuator execution, target finite-node overlap, route and model assumptions
+must agree with the carried certificate. Its newly appended target row is always
+rebuilt and checked before the shifted plan is eligible for fallback.
 A changed observation or environment requires admission again. When the
 track, route and controller configuration still identify the same operation,
 the old shifted inputs supply the single admission proposal. Its model uses
@@ -380,30 +379,24 @@ are numerical checks, not interval-arithmetic proofs of exact equalities or
 infinite-time invariance. In particular, a small nonzero terminal velocity
 residual must not be interpreted as an exact physical resting state.
 
-## Conditional recursive-feasibility argument
+## Conditional continuation argument
 
-In exact arithmetic, assume initial admission, sound represented geometry,
-exact execution of the declared scheduled model, unchanged applicable road
-coverage, shift-consistent target prediction with contained complete future
-support, and an admissible rest policy. Then:
+With sound initial sets, exact execution of the declared scheduled model and
+unchanged geometry, a consistent shift preserves constraints on the overlapping
+prediction nodes. The stationary-pose or dissipative-rest construction supplies
+an invariant ego endpoint in the represented road/domain constraints.
 
-1. The current stored plan is a feasible witness. A geometric replacement is
-   adopted only if it admits the witness.
-2. Any accepted feasible plan satisfies the declared node constraints.
-3. After applying its first input, all overlapping state transitions use the
-   identical shifted matrices, affine terms and two-input sequence. No speed,
-   tire or heading constraint becomes stricter at a head/continuation boundary.
-4. Appending the resting model/policy preserves the endpoint and terminal
-   separation. The unbounded nonnegative CLF slack admits this continuation.
-5. The next convex problem therefore has a feasible witness. Solver failure
-   does not require another optimization to preserve the certificate.
+A finite target forecast supplies no permanent target-separation premise.
+The newly appended target node therefore receives a fresh hard row, even when
+all overlapping samples match. The shifted input sequence is checked against
+the resulting problem. If it passes, it is an eligible fallback; if it fails,
+a new checked solve is required. An unaccepted solver result cannot bypass
+this check. A feasible solution need not exist at every later sample.
 
-This is an induction on augmented controller state. It establishes neither
-optimality, maneuver completeness, global navigation, nonlinear-plant safety,
-nor continuous-time safety. A maintained local domain may brake or wait while
-another safe passing maneuver exists. An application requiring a particular
-passing side, liveness or recovery deadline must supply and validate that
-behavioral requirement; there is no hidden global planner in this controller.
+Thus this implementation certifies accepted finite model predictions and
+checked continuations. It does not claim indefinite recursive feasibility
+against future traffic, nonlinear-plant safety, or between-node safety. There
+is no imposed early cruise-recovery deadline.
 
 ## Relation to literature
 
