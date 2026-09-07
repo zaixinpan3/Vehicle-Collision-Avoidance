@@ -210,7 +210,11 @@ end
 function output = localCurrentOutput(runtime, frame)
     observerInput = localSynchronizedInput(frame, runtime);
     outputRuntime = localRecordMeasurementTimes(runtime, observerInput);
-    outputRuntime.currentTime = runtime.currentTime;
+    % localSynchronizedInput already verifies that these timestamps denote
+    % the same sample within floating-point grid tolerance. Publish using
+    % the accepted sensor timestamp so a fresh gyro is not assigned a tiny
+    % positive age and consequently the full rate-domain uncertainty.
+    outputRuntime.currentTime = observerInput.time;
     boundState = localBoundState(localPackState(runtime),runtime.targetCount);
     boundState.radarPredictor(:,observerInput.radarDetectionAvailable) = ...
         observerInput.radarRelativePosition(observerInput.radarDetectionAvailable,:).';

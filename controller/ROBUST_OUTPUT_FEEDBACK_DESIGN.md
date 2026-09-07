@@ -3,6 +3,14 @@
 Research date: 2026-09-05. Status: proposed architecture and proof obligations,
 with reproducible diagnostics; not an implemented robust vehicle controller.
 
+Implementation update (2026-09-07):
+[DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md)
+extends the earlier stationary-pose implementation to uncertain terminal
+velocities using passive dissipation in the declared affine model. The current
+implementation retains open-loop inputs and set-membership intersections.
+The broader physical-model, curved-chart, target-motion and low-speed observer
+obligations below remain open; the proposals are not completed components.
+
 The recommended first implementation is a scheduled output-feedback tube
 around the existing sparse SOCP, with a verified braking-to-hold backup and a
 set-valued target-motion contract. Keep the present uncertainty rejection

@@ -39,9 +39,12 @@ trajectory, not a finite horizon or only the final predicted target pose.
 The target circumradius covers future rotation. The resting ego's orientation
 is unchanged, so a directional rectangle support with a certified heading
 bound replaces its former circumradius. Persistent directional target motion
-uncertainty currently makes that direction inadmissible. A feedback tube and
-robust invariant terminal set would be needed for disturbed ego dynamics;
-the trajectory implementation rejects nonzero ego/model error bounds.
+uncertainty currently makes that direction inadmissible. Ego velocity uncertainty
+now has a dissipative-rest extension: terminal pose halfspaces reserve the
+complete remaining motion under the existing affine rest input, with a
+circumradius covering changing ego heading. Persistent disturbance remains
+unsupported. The extension and its limits are documented in
+[DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
 
 Halfspace separability is conservative: a target orbit can surround a safe
 resting ego without meeting any separating halfspace. This construction does

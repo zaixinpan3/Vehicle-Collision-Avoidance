@@ -23,8 +23,8 @@ configuration/environment identity, committed actuator vector, and acceptance
 residuals. The four-input interface stores the same state persistently for
 existing scenario drivers. `resetNominalTrajectory` clears that convenience
 interface and does not change an explicitly supplied certificate.
-Certificates use version 6 for the signed braking-ratio input and modified
-Fiala model contract. Earlier certificates must undergo initial admission again.
+Certificates use version 7 for the signed braking-ratio, modified Fiala and
+dissipative-terminal contracts. Earlier certificates must undergo initial admission again.
 
 Initial admission constructs one domain from the schedule reference and
 attempts one QP. This reference is not certified in advance. The augmented
@@ -281,13 +281,19 @@ class. More optimization starts would not repair that restriction.
 
 ## Uncertainty and sampling contract
 
-The implemented persistent certificate is an exact-model trajectory
-certificate. Nonzero ego estimation radii or model/disturbance rate bounds
-raise `unsupportedCertificateUncertainty`. A robust feedback tube with a
-robust terminal invariant set has not been implemented. The predictor itself
-propagates all boxes through `r(j+1) = abs(A(j))*r(j) + d(j)`, where
-`d(j)` bounds the continuous disturbance integrated over the held-input flow. Propagation alone does not
-supply terminal robustness, so it is not used to label such inputs certified.
+The certificate admits stationary-pose uncertainty or a dissipative terminal
+funnel with nonzero velocity radii. The latter replaces exact terminal velocity
+equalities with invariant pose-budget and velocity-domain inequalities under
+the same rest input. Persistent forcing and noncontractive terminal velocity
+dynamics remain unsupported. No nonzero radius is rounded into rest. See
+[DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
+
+The predictor propagates `r(j+1) = abs(A(j))*r(j) + d(j)`, where `d(j)`
+integrates continuous derivative-error bounds through a Metzler comparison
+of the held flow. Initial Cartesian boxes include projection-induced heading
+uncertainty; uncertain admission requires an invertible interior initial
+chart. Tire-slip rows include directional state-error support. See [MINIMAL_UNCERTAINTY_CERTIFICATE.md](MINIMAL_UNCERTAINTY_CERTIFICATE.md)
+for the original stationary-pose implementation and conditional proof.
 
 The estimator adapter now publishes its time-varying state-time enclosure
 instead of fixed configured state-error margins. The controller validates
@@ -296,6 +302,14 @@ state bounds, and propagates future target uncertainty from declared motion
 limits. These interface changes do not remove the terminal restriction above.
 See [ESTIMATOR_BOUND_INTERFACE.md](ESTIMATOR_BOUND_INTERFACE.md) for the field
 contract, derivation and distinction between current estimation and prediction.
+
+For a compatible uncertain continuation, version 7 retains the shifted
+nominal center and intersects its reachable box with the new estimator box.
+The symmetric outer enclosure remains contained in the carried box. This
+can preserve the witness under changing current estimation radii without
+assuming any future observer contraction. Empty intersection is a contract
+inconsistency. Timestamp mismatch or changed environment premises require
+readmission; the recursive guarantee does not cover those changes.
 
 Static target uncertainty is admitted when the directional rows and complete
 future support remain feasible. State, actuator execution, target finite-node

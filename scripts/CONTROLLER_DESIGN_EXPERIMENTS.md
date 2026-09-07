@@ -39,6 +39,102 @@ acceptance and final-band membership for both, with convergence still
 `notEstablishedByFiniteRun`. This is analysis of existing data, not a new plant
 simulation or a convergence proof.
 
+## Dissipative terminal integration (2026-09-07)
+
+The uncertain-velocity admission gap is now implemented under the declared
+scheduled affine model. See
+[the terminal derivation](../controller/DISSIPATIVE_TERMINAL_CERTIFICATE.md).
+The complete physical NRMM/controller experiment remains **incomplete**.
+The user requires eventual nominal constant-speed cruise; no 9-10 s recovery
+deadline is introduced by this work.
+
+The terminal extension keeps the existing rest input and reserves the complete
+remaining pose excursion while uncertain velocity dissipates. Linear sign
+expansion gives hard terminal inequalities with no new decision variables.
+Raw input effort and squared CLF slack remain the performance objective.
+Finite-node frames now include propagated station uncertainty, and a replaced
+frame must admit the complete box. Collinear polyline segments share a chart.
+The signed-beta/Fiala and air/rolling-load models are retained.
+
+A separate integration defect was found: roundoff between two representations
+of one synchronized sample instant could assign a tiny positive age to a fresh
+gyro, increasing its error bound from 0.0015 rad/s to about 0.75 rad/s. The
+read-only observer output now uses the already accepted sensor timestamp.
+Actual held-sample outputs still charge their age, and off-grid frames remain
+rejected. The final straight prefix keeps its gyro bound at 0.0015 rad/s.
+
+| Declared-model continuation measurement | Result |
+| --- | ---: |
+| Initial state-box vertices | 64 |
+| Held inputs / duration | 1,200 / 60 s |
+| Successful optimizations | 1 |
+| Deliberately failed subsequent optimizations | 1,199 |
+| Minimum rectangle clearance | 14.552611 m |
+| Maximum enclosure excess (roundoff) | 1.177e-13 |
+| Final maximum velocity-component magnitude | 1.155090e-05 |
+
+Initial ego speed is 15 m/s. Box radii are
+`[0.04, 0.04, 0.014, 0.388, 0.388, 0.0015]` in
+`[m, m, rad, m/s, m/s, rad/s]`. The stationary target is at `[60; 0]` m,
+the required clearance is 0.25 m, and the sample period is 0.05 s.
+`runRobustVelocityCertificateScenario` executes all vertices under the same
+inputs and varying current estimation bounds. The final velocity number is a
+finite observation; the separate invariant-set derivation establishes the
+conditional affine terminal dissipation. This is not a nonlinear-plant run.
+
+The physical experiments retain the previous requested 30 s straight and
+400 m arc paths, 15 m/s cruise, 8 m/s crossing target, 50 m radar, 24 head
+stages, 0.05 s controller period and 0.0125 s observer period. Uniform bounded
+sensor-noise seeds are 20260906 and 20260907; noise radii remain 0.04 m GNSS
+position, 0.05 m/s GNSS velocity, 0.03 m/s^2 IMU, 0.0015 rad/s gyro and
+0.04 m radar position. Discarded preparation probes are disabled. The actual
+plant is PassVeh14DOF; intermediate synthetic observer samples use the existing
+endpoint interpolation harness. No truth state replaces a published estimate.
+
+| Physical joint trial | Completed time | Applied commands | Outcome |
+| --- | ---: | ---: | --- |
+| Straight, final revision | 3.10 s | 62 | First target publication has infinite complete-future support in all 64 directions |
+| 400 m arc | 0.00 s | 0 | Initial uncertain box spans noninvertible polyline charts |
+
+The first target appears at the failed straight call at 3.10 s. Its record is
+retained in `failureContext`; completed-sample target metrics omit that failed
+call and therefore do not report acquisition. A non-pausing diagnostic confirms
+that the ego dissipative certificate is accepted while the target creates
+16 nonfinite hard bounds. Explicitly removing both sources of target input
+(the optional argument must override the bundled ego record) admits the same
+current ego state. This ablation is a diagnosis, not an obstacle-avoidance result.
+
+All six ego errors in the 62 completed straight input records lie inside their
+published enclosures. Prefix position/velocity/yaw RMSE are
+0.008441 m, 0.010050 m/s and
+2.877490e-04 rad. These are pre-acquisition metrics, not full avoidance
+or post-obstacle recovery measurements.
+
+There are 153 passing focused MATLAB cases across 12 classes,
+including sparse/condensed equivalence, terminal invariance, force/damping
+rejection, old exact-state behavior, NRMM bounds and fresh-versus-aged gyro
+handling. Factory Code Analyzer reports zero findings in 15 in-scope MATLAB
+files. Re-evaluation of the 62 saved physical input records succeeds, with a
+maximum command difference of 1.198946e-05; exact
+command reproduction is not established. No controller-only replay timing
+claim is made. In the unprepared physical prefix, median and maximum observed
+controller times are 22.049 and
+512.505 ms, with
+4 calls over 50 ms. This is not a passed real-time experiment.
+
+The first integration revision stopped straight at 0.05 s because the fixed
+station chart was too narrow. Widening charts by the reachable station radius
+allowed 3.10 s. The timestamp repair removed the spurious gyro-bound jumps;
+it did not supply the missing target-motion premise. All intermediate raw
+results and source snapshots are preserved outside the repository.
+
+Remaining work requires a sound curved-path chart and a justified
+complete-future target occupancy contract. Speed and acceleration maxima
+alone cannot make a fixed stopping location safe against every possible future
+target trajectory. Persistent physical-model forcing, low-speed observer
+validity and head/tail intersample safety also remain outside this certificate.
+No arbitrary route premise or passive-safety substitution is silently applied.
+
 ## Joint estimator-controller admission experiment (2026-09-06)
 
 Both requested 30 s joint trials stop at the first controller call, at time

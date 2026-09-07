@@ -84,6 +84,17 @@ classdef stateUncertainty
             chartValid = nnz(possible) == 1 ...
                 && all(along(possible)-alongRadius > 0) ...
                 && all(along(possible)+alongRadius < lengths);
+            % Consecutive collinear segments form one invertible chart even
+            % when a finely sampled straight centerline has internal vertices.
+            active = find(possible);
+            straight = all(diff(active) == 1) ...
+                && all(abs(tangents-tangents(1, :)) <= 32*eps, "all");
+            if straight
+                firstAlong = along(active(1));
+                span = sum(lengths);
+                chartValid = firstAlong-alongRadius(1) > 0 ...
+                    && firstAlong+alongRadius(1) < span;
+            end
             if any(cartesianRadius(1:2))
                 stationLower = starts+min(max(along(possible)-alongRadius, 0), lengths);
                 stationUpper = starts+min(max(along(possible)+alongRadius, 0), lengths);

@@ -656,14 +656,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:noSolution");
         end
 
-        function nonzeroEgoBoundsRequireAFeedbackTubeCertificate(testCase)
+        function uncertainEgoWithoutAStateTimestampIsRejected(testCase)
             cfg = localSmallConfiguration();
             ego = localEgoState([0.0; 0.0; 0.0; 15.0; 0.0; 0.0], [0.0; 0.0]);
             ego.controllerStateErrorBound = [0.1; 0.1; 0.01; 0.1; 0.1; 0.01];
 
             testCase.verifyError(@() collisionAvoidanceController( ...
                 ego, [], localLane(), cfg, []), ...
-                "collisionAvoidanceController:unsupportedCertificateUncertainty");
+                "collisionAvoidanceController:invalidUncertaintyChart");
         end
 
         function zeroSpeedSchedulePreservesOffsetRestOnACurve(testCase)

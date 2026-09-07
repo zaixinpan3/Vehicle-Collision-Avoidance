@@ -7,9 +7,12 @@ Sensor noise and true-motion limits remain premises of the enclosure, not
 fixed bounds on the estimated state error.
 
 This implements publication, validation, frame conversion and finite-horizon
-target prediction. It does **not** complete robust closed-loop admission:
-the existing exact-rest certificate still rejects nonzero ego/model uncertainty.
-Changing the source of a bound does not remove that terminal limitation.
+target prediction. Nonzero ego velocity radii now use a dissipative terminal
+certificate that reserves their complete remaining pose excursion under the
+declared affine model. This does **not** complete physical robust closed-loop
+admission: persistent forcing, generic noninvertible curved-polyline charts,
+and moving targets without a complete-future occupancy premise remain open.
+See [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
 
 ## Current-state contract
 
@@ -66,6 +69,13 @@ At the gyro sample time its noise bound applies. At a later state time, the
 declared yaw-acceleration limit times sample age is added. Without a finite
 rate premise, the true yaw-rate domain supplies the enclosure.
 
+The synchronized read-only runtime output uses the accepted sensor-frame
+timestamp as its canonical state timestamp. The input has already passed the
+existing sample-grid tolerance check. This prevents roundoff between two
+representations of the same grid instant from falsely making a fresh gyro
+old. The `step` output remains one actual sample period ahead and retains
+the corresponding hold/domain uncertainty; off-grid frames are still rejected.
+
 Target orientation uses body heading. The velocity-direction radius is
 `asin(B_q/|qhat|)` when the velocity ball excludes zero, and pi otherwise.
 For the saturated yaw-rate inverse, valid global Lipschitz coefficients are
@@ -101,15 +111,17 @@ estimate does not retroactively correct the trajectory propagated today.
 
 ## Remaining certificate obligations
 
-The ego predictor already propagates its initial box through
-`r_(j+1) = abs(A_j)*r_j + w_j`. It does not need a historical maximum or a
-constant first-sample radius. An admitted uncertain-state design must also
-enclose the inertial-to-Frenet transformation of that initial box.
+The ego predictor propagates its initial box through
+`r_(j+1) = abs(A_j)*r_j + w_j`, with transition-weighted integration of
+continuous forcing. Cartesian-to-Frenet bounds include possible tangent
+changes; uncertain admission requires an invertible interior initial chart.
+The compatible continuation intersects the new current estimator box with
+the previous reachable box at the retained nominal center.
 Propagation alone does not establish terminal
 closure: with initial velocity error `+/-epsilon`, the same open-loop inputs
 can stop the nominal state while actual velocities still differ by
 `2*epsilon`. The nominal zero terminal input does not turn that set into a
-rest equilibrium. The `unsupportedCertificateUncertainty` guard remains.
+rest equilibrium. The `unsupportedCertificateUncertainty` guard remains for that case.
 
 A finite current target bound plus global speed/acceleration limits also
 does not establish finite support of the complete future position set. For
@@ -121,9 +133,10 @@ implementation does not freeze `B(t)` forever or truncate growth to manufacture
 a terminal certificate.
 
 Changed target bounds trigger the existing compatibility/readmission logic.
-The old input sequence must pass acceptance with the new margins. Full
-uncertainty-aware operation still needs an output-feedback tube, a valid
-terminal policy and an adequate future target-motion contract.
+The old input sequence must pass acceptance with the new margins. Stationary-pose
+and dissipative-rest certificates maintain an ego enclosure under compatible
+observations. The latter handles velocity uncertainty under the declared model;
+a moving target still needs an adequate complete-future motion contract.
 
 ## Verification
 

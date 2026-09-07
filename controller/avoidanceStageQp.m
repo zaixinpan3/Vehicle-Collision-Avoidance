@@ -36,13 +36,17 @@ function program = avoidanceStageQp(qp, prediction, rows, bound, stateNode, inpu
     [index, stage, inputValue] = find(reshape(-prediction.stageMatrixB, 12, []));
     inputRows = 6*(stage-1)+mod(index-1, 6)+1;
     inputColumns = 2*(stage-1)+floor((index-1)/6)+1;
-    terminalColumns = [physicalCount+6*(stages-1)+(4:6), controls-1:controls].';
-    equality = sparse([dynamicRows; previousRows; inputRows; 6*stages+(1:5).'], ...
+    [terminalRow, component, terminalValue] = find(qp.terminalStateRows);
+    terminalCount = size(qp.terminalStateRows, 1);
+    terminalColumns = [physicalCount+6*(stages-1)+component; (controls-1:controls).'];
+    terminalRows = [terminalRow; terminalCount+(1:2).'];
+    equality = sparse([dynamicRows; previousRows; inputRows; 6*stages+terminalRows], ...
         [nextColumns; previousColumns; inputColumns; terminalColumns], ...
-        [ones(6*stages, 1); stateValue; inputValue; ones(5, 1)], 6*stages+5, count);
+        [ones(6*stages, 1); stateValue; inputValue; terminalValue; ones(2, 1)], ...
+        6*stages+terminalCount+2, count);
     right = prediction.stageAffine;
     right(:, 1) = right(:, 1)+prediction.stageMatrixA(:, :, 1)*prediction.egoStateOffset(:, 1);
-    right = [right(:); zeros(3, 1); qp.terminalInput];
+    right = [right(:); zeros(terminalCount, 1); qp.terminalInput];
 
     % Fixed final inputs are already equality rows. Avoid duplicating them
     % as zero-interior inequality slacks in the native conic solver.

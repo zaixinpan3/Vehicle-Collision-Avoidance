@@ -107,6 +107,28 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "onlineNrmmTrackingRuntime:offSampleGrid");
         end
 
+        function freshGyroKeepsItsSensorBoundAcrossTimestampRoundoff(testCase)
+            runtime = localRuntime(1);
+            [runtime, ~] = onlineNrmmTrackingRuntime("step", runtime, localCruiseFrame(0));
+            frame = localCruiseFrame(runtime.currentTime);
+            runtime.currentTime = runtime.currentTime+8*eps(max(1, runtime.currentTime));
+
+            output = onlineNrmmTrackingRuntime("output", runtime, frame);
+
+            testCase.verifyEqual(output.stateTime, frame.time, AbsTol=0);
+            testCase.verifyEqual(output.controllerErrorBound.time, frame.time, AbsTol=0);
+            testCase.verifyEqual(output.egoYawRateErrorBound, ...
+                runtime.observerDesign.sensors.gyroscopeNoiseMaximum, AbsTol=0);
+        end
+
+        function anAdvancedStateStillChargesActualGyroAge(testCase)
+            runtime = localRuntime(1);
+            [~, output] = onlineNrmmTrackingRuntime("step", runtime, localCruiseFrame(0));
+            testCase.verifyGreaterThan(output.stateTime-output.lastGyroscopeTime, 0);
+            testCase.verifyGreaterThan(output.egoYawRateErrorBound, ...
+                runtime.observerDesign.sensors.gyroscopeNoiseMaximum);
+        end
+
         function initializationRequiresEveryInitialStateOption(testCase)
             cfg = nrmmTrackingConfig();
             design = synthesizeNrmmObserverGains(cfg);

@@ -108,10 +108,13 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.metadata.solverCallCount, 1);
         end
 
-        function uncertainEgoVelocityStillNeedsAValidTerminalTube(testCase)
+        function uncertainEgoVelocityUsesTheDissipativeTerminalCertificate(testCase)
             [ego, ~, cfg, lane] = localInputs();
-            testCase.verifyError(@() collisionAvoidanceController(ego, [], lane, cfg, []), ...
-                "collisionAvoidanceController:unsupportedCertificateUncertainty");
+            ego.position(1) = 10;
+            [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(problem.metadata.uncertaintyCertificate.kind, ...
+                "dissipative-rest-funnel-v1");
         end
 
         function velocityUncertaintyEnlargesTheFuturePositionBound(testCase)

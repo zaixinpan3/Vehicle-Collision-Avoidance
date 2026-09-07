@@ -168,15 +168,27 @@ all `M` stages. Slip limits are chosen model domains below `pi/2`, not
 friction-limit constraints or a certificate of tangent accuracy.
 There is no continuation acceleration-only input block and no kinematic
 lateral-band handoff. Nonnegative longitudinal speed, maximum speed, heading,
-lateral and affine-frame station limits are hard at every node. Rest requires
-zero longitudinal/lateral speed and yaw rate; the final control is `[0;-b/gBeta]`.
+lateral and affine-frame station limits are hard at every node. Exact-state rest
+requires zero longitudinal/lateral speed and yaw rate. With velocity uncertainty,
+a dissipative terminal set replaces those equalities; both branches use the
+final control `[0;-b/gBeta]`.
 
-Prediction propagates `rNext = abs(Ad)*r + d`, where `d` integrates the
-configured continuous disturbance-rate bounds through the held-input flow.
-The Cartesian-to-Frenet conversion is supplied by `stateUncertainty.toFrenet`.
-The persistent trajectory certificate requires exact ego and model
-prediction and rejects nonzero error bounds. Admitting nonzero terminal
-uncertainty requires a separate terminal certificate.
+Error boxes are propagated through every stage as `rNext = abs(Ad)*r+d`.
+The two model rate fields now specify continuous derivative-error bounds,
+with `d` obtained by transition-weighted integration using a Metzler
+comparison. This includes forcing transported into other state channels.
+Initial Cartesian boxes cover all possible closest projection segments and
+their heading differences. Robust initial admission additionally requires
+one invertible interior chart.
+
+The stationary-pose certificate retains exact velocity channels. The dissipative
+extension admits nonzero velocity uncertainty when the final zero-speed model
+has a Hurwitz Metzler velocity comparison and no persistent forcing. It
+reserves the complete remaining pose excursion and enforces invariant speed
+and slip domains. See
+[DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md) for
+the new inequalities and [MINIMAL_UNCERTAINTY_CERTIFICATE.md](MINIMAL_UNCERTAINTY_CERTIFICATE.md)
+for the original stationary-pose/set-membership argument.
 
 The former forward-Euler stiffness restriction is removed. Exact integration
 does not itself establish closed-loop stability, nonlinear-model validity or

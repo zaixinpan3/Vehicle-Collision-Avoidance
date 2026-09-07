@@ -17,9 +17,26 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
         "nodes", repmat(empty, count, 1));
     road = repmat(struct("name", "road", "id", "", ...
         "nodes", repmat(empty, count, 1)), numel(model.road.boundaries), 1);
+    chartRadius = model.cfg.controller.stationTrustRadius;
+    if isfield(prediction, "egoStateErrorBound")
+        % The trust radius is freedom for the nominal plan. A geometric
+        % chart must additionally cover the entire reachable station box.
+        chartRadius = chartRadius+max(prediction.egoStateErrorBound(1, :));
+    end
     candidates = laneGeometry.frameBounds(model.lane, state(1, :), ...
-        model.cfg.controller.stationTrustRadius, model.cfg.model.lateralDomainRadius);
-    if prediction.scheduleSpeedProfile(end-1) == 0.0
+        chartRadius, model.cfg.model.lateralDomainRadius);
+    dissipative = isfield(prediction, "terminalDissipation");
+    if dissipative
+        radius = prediction.egoStateErrorBound(:, end);
+        excursion = prediction.terminalDissipation.poseExcursionMatrix ...
+            *(abs(state(4:6, end))+radius(4:6));
+        candidates(end) = laneGeometry.frameBounds(model.lane, state(1, end), ...
+            model.cfg.controller.stationTrustRadius+radius(1)+excursion(1), ...
+            model.cfg.model.lateralDomainRadius);
+        % Terminal pose rows charge uncertainty and remaining motion together
+        % in terminalDissipation.poseRows, without counting either twice.
+        prediction.egoStateErrorBound(:, end) = 0;
+    elseif prediction.scheduleSpeedProfile(end-1) == 0.0
         % The final rest step has a single pose and must use one chart.
         candidates(count-1) = candidates(count);
     end
@@ -33,12 +50,25 @@ function geometry = avoidanceSafetyGeometry(model, prediction, state, carried)
     frames = candidates;
     replaced = 0;
     for nodeIdx = 1:count
+        if dissipative && nodeIdx == count && ~isempty(carried)
+            % A fixed supporting chart is part of the invariant funnel.
+            frames(nodeIdx) = carried.frames(nodeIdx);
+            collision.nodes(nodeIdx) = carried.collision.nodes(nodeIdx);
+            for boundaryIdx = 1:numel(road)
+                road(boundaryIdx).nodes(nodeIdx) = carried.road(boundaryIdx).nodes(nodeIdx);
+            end
+            continue;
+        end
         nominal = state(:, nodeIdx);
         frame = candidates(nodeIdx);
         targetNode = localTargetNode(empty, model, prediction, nominal, frame, nodeIdx);
         roadNodes = repmat(empty, numel(road), 1);
-        admitted = nominal(1) >= frame.stationLower ...
-            && nominal(1) <= frame.stationUpper;
+        stationRadius = 0;
+        if isfield(prediction, "egoStateErrorBound")
+            stationRadius = prediction.egoStateErrorBound(1, nodeIdx);
+        end
+        admitted = nominal(1)-stationRadius >= frame.stationLower ...
+            && nominal(1)+stationRadius <= frame.stationUpper;
         if targetNode.covered
             admitted = admitted && targetNode.nominalMargin >= 0.0;
         end
@@ -179,6 +209,11 @@ function nodes = localSupportNodes(empty, model, prediction, state, frames, ...
     slope = localSupportSlopeBound(model.egoHalfLength, model.egoHalfWidth, ...
         inertialNormal, frameHeading+min(-headingDomain, state(3, :)-radius), ...
         frameHeading+max(headingDomain, state(3, :)+radius));
+    if isfield(prediction, "terminalDissipation")
+        terminal = indices == prediction.nodeCount;
+        egoSupport(terminal) = hypot(model.egoHalfLength, model.egoHalfWidth);
+        slope(terminal) = 0;
+    end
     origins = reshape([frames.origin], 2, []);
     errors = reshape([frames.positionErrorBound], 2, []);
     supportValue = obstacleSupport+egoSupport-sum(inertialNormal.*origins, 1);
@@ -219,6 +254,10 @@ function node = localSupportNode(node, model, prediction, state, frame, ...
     slope = localSupportSlopeBound(model.egoHalfLength, model.egoHalfWidth, ...
         inertialNormal, frame.heading+min(-headingDomain, state(3)-radius), ...
         frame.heading+max(headingDomain, state(3)+radius));
+    if isfield(prediction, "terminalDissipation") && nodeIdx == prediction.nodeCount
+        egoSupport = hypot(model.egoHalfLength, model.egoHalfWidth);
+        slope = 0;
+    end
     node.covered = true;
     node.normal = normal;
     node.egoSupport = egoSupport;

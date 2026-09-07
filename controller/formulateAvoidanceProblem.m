@@ -107,6 +107,45 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
         / modifiedFialaTire.accelerationGain(model.cfg)];
     equalityMatrix = [prediction.egoStateMatrix(4:6, :, end), zeros(3, 1)];
     equalityBound = -prediction.egoStateOffset(4:6, end);
+    terminalStateRows = [zeros(3), eye(3)];
+    if isfield(prediction, "terminalDissipation")
+        certificate = prediction.terminalDissipation;
+        radius = prediction.egoStateErrorBound(:, end);
+        terminal = stateNode == prediction.stageCount;
+        pose = terminal & any(localRows(:, 1:3), 2);
+        poseBound = localBound(pose);
+        poseMatrix = localRows(pose, 1:3);
+        % Geometry left the terminal uncertainty uncharged. Domain rows used
+        % the ordinary node box, which is replaced by the complete funnel.
+        domain = ismember(rowFamily(pose), ["routeDomain", "lateralDomain", "headingDomain"]);
+        poseBound(domain) = poseBound(domain)+abs(poseMatrix(domain, :))*radius(1:3);
+        [terminalRows, terminalBound] = terminalDissipation.poseRows( ...
+            poseMatrix, poseBound, radius, certificate);
+        velocityRows = [zeros(3), eye(3), zeros(3, 2); ...
+            zeros(3), -eye(3), zeros(3, 2)];
+        velocityBound = [certificate.velocityLimit-radius(4:6); ...
+            certificate.velocityLimit-radius(4:6)];
+        % Forward speed remains nonnegative. It decays independently under
+        % the terminal generator, so the lower halfspace is invariant.
+        velocityBound(4) = -radius(4);
+        terminalRows = [terminalRows; velocityRows];
+        terminalBound = [terminalBound; velocityBound];
+        terminalCount = size(terminalRows, 1);
+        keep = ~terminal;
+        localRows = [localRows(keep, :); terminalRows];
+        localBound = [localBound(keep); terminalBound];
+        stateNode = [stateNode(keep); repmat(prediction.stageCount, terminalCount, 1)];
+        inputStage = [inputStage(keep); zeros(terminalCount, 1)];
+        rowFamily = [rowFamily(keep); repmat("terminalDissipation", terminalCount, 1)];
+        rowNode = [rowNode(keep); repmat(prediction.nodeCount, terminalCount, 1)];
+        matrix = [matrix(keep, :); ...
+            terminalRows(:, 1:6)*prediction.egoStateMatrix(:, :, end), zeros(terminalCount, 1)];
+        terminalOffset = terminalBound-terminalRows(:, 1:6)*prediction.egoStateOffset(:, end);
+        bound = [bound(keep); terminalOffset];
+        equalityMatrix = zeros(0, count+1);
+        equalityBound = zeros(0, 1);
+        terminalStateRows = zeros(0, 6);
+    end
     lowerInput = [-cfg.model.frontWheelSteeringAngleMaximum; ...
         cfg.actuation.brakingRatioMinimum];
     upperInput = [cfg.model.frontWheelSteeringAngleMaximum; ...
@@ -129,7 +168,8 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan, geometry)
         "clf", localClfData(prediction, model, layout, common), ...
         "geometry", geometry, "linearizationPlan", anchorPlan, ...
         "nominalState", nominalState, ...
-        "terminalInput", terminalInput, "certifiedInfeasible", ...
+        "terminalInput", terminalInput, "terminalStateRows", terminalStateRows, ...
+        "certifiedInfeasible", ...
             any(~isfinite(bound)) || any(lowerBound > upperBound) ...
             || any(terminalInput < lowerInput) || any(terminalInput > upperInput));
     qp.stageProgram = avoidanceStageQp(qp, prediction, ...
