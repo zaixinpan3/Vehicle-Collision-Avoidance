@@ -42,8 +42,12 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     linear = zeros(decisionCount, 1);
     constant = cfg.encounter.maneuverSwitchWeight*double(model.maneuver ~= model.previousManeuver);
     certificate = localClfCertificate(model);
-    equilibriumState = ltvBicycleModel.cruiseEquilibrium( ...
-        laneGeometry.curvature(model.initialEgoState(1),model.lane),cfg,model.longitudinalAccelerationBias);
+    if certificate.operatingState(4)==cfg.referenceSpeed
+        equilibriumState = certificate.operatingState;
+    else
+        equilibriumState = ltvBicycleModel.cruiseEquilibrium( ...
+            certificate.operatingCurvature,cfg,model.longitudinalAccelerationBias);
+    end
     referenceStart = equilibriumState(2:6)+cfg.clf.referenceOffset ...
         +cfg.clf.referenceRate*(model.stateTime-cfg.clf.referenceEpoch);
     clockScale = double(any(cfg.clf.referenceRate));
@@ -176,17 +180,16 @@ end
 function certificate = localClfCertificate(model)
 % Continuous Riccati CLF certificate of the path-frame cruise error.
 %
-% The error state [d; ePsi; vx - vRef; vy; r] is the [d; ePsi; vx; vy;
-% r] block of the continuous Frenet generator at the straight reference cruise
-% (kappa = 0) - the station row does not feed back into it. The
+% The error is relative to the nonlinear cruise trim at the current road
+% curvature. The station coordinate is cyclic at frozen curvature. The
 % continuous Riccati solution P and gain K certify, for the
 % unconstrained linearized error dynamics,
 %
 %   Vdot(e) = -e' (Q + K' R K) e <= -lambdaMin(W,P)*V(e).
 %
 % The configured fraction scales this certified rate in inverse seconds.
-% Curvature, a different scheduled speed, and actuator constraints can
-% require positive relaxation; this reference certificate is local.
+% The metric and trim remain frozen within each formulated horizon. Changes
+% between frames are scheduled local certificates, not a common Lyapunov proof.
     persistent memoKey memoCertificate
     cfg = model.cfg;
     minimumBrakingRatio = cfg.actuation.brakingRatioMinimum;
@@ -194,6 +197,8 @@ function certificate = localClfCertificate(model)
     brakingRatioScale = max( ...
         abs(minimumBrakingRatio), abs(maximumBrakingRatio));
     key = struct( ...
+        "curvature", laneGeometry.curvature(model.initialEgoState(1),model.lane), ...
+        "accelerationBias", model.longitudinalAccelerationBias, ...
         "referenceSpeed", max(model.referenceSpeed, ...
             cfg.clf.certificateSpeedFloor), ...
         "brakingRatioAccelerationGain", modifiedFialaTire.accelerationGain(cfg), ...
@@ -219,12 +224,15 @@ function certificate = localClfCertificate(model)
     end
     operatingCfg = cfg;
     operatingCfg.referenceSpeed = key.referenceSpeed;
-    [operatingState, operatingInput] = ltvBicycleModel.cruiseEquilibrium(0.0,operatingCfg);
-    % Match continuousMatrices' existing default tire operating ratio. The
-    % certificate uses zero declared acceleration bias and zero curvature.
-    operatingInput(2) = min(max(operatingInput(2),-1+sqrt(eps)),1-sqrt(eps));
+    [operatingState, operatingInput] = ltvBicycleModel.cruiseEquilibrium( ...
+        key.curvature,operatingCfg,key.accelerationBias);
+    if abs(operatingInput(2))>=1-sqrt(eps)
+        error("collisionAvoidanceController:invalidCruiseOperatingPoint", ...
+            "The certificate cruise trim is outside the differentiable tire domain.");
+    end
     [continuousA, continuousB] = ltvBicycleModel.continuousMatrices( ...
-        0.0, key.referenceSpeed, cfg, operatingInput(2), 0.0);
+        key.curvature,key.referenceSpeed,cfg,[],key.accelerationBias, ...
+        struct("state",operatingState,"input",operatingInput));
     errorIndex = 2:6;
     errorStateMatrix = continuousA(errorIndex, errorIndex);
     errorInputMatrix = continuousB(errorIndex, :);
@@ -248,7 +256,7 @@ function certificate = localClfCertificate(model)
     certificate = struct( ...
         "operatingState", operatingState, ...
         "operatingInput", operatingInput, ...
-        "operatingCurvature", 0.0, "operatingAccelerationBias", 0.0, ...
+        "operatingCurvature", key.curvature, "operatingAccelerationBias", key.accelerationBias, ...
         "lyapunovMatrix", lyapunovMatrix, ...
         "feedbackGain", feedbackGain, ...
         "decreaseMatrix", decreaseMatrix, ...

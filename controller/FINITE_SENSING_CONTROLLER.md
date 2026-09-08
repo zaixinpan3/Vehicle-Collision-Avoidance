@@ -92,7 +92,8 @@ that cannot fit never relaxes the physical domain or the robust executed
 interval. Nonlinear acceptance checks those actual physical limits.
 
 The objective includes state error, input deviation from the fixed operating
-input used for CLF/LQR certificate synthesis, input changes, and squared CLF
+input used for CLF/LQR certificate synthesis at the current road curvature,
+input changes, and squared CLF
 slack. Both solver transcriptions read `qp.clf.certificate.operatingInput`;
 the stage-dependent prediction seed is not a cost center. See the
 [objective definition](QUADRATIC_CLF_INPUT_OBJECTIVE.md). There is no

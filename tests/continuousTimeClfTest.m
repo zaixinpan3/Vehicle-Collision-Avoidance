@@ -22,7 +22,7 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
         function theRiccatiCertificateHasAPositiveContinuousDecreaseRate(testCase)
             [problem, cfg] = localProblem(zeros(5, 1));
             certificate = problem.qp.clf.certificate;
-            [a, b] = ltvBicycleModel.continuousMatrices(0, max(cfg.referenceSpeed, cfg.clf.certificateSpeedFloor), cfg);
+            [a, b] = localCertificateMatrices(certificate,cfg);
             closedLoop = a(2:6, 2:6)-b(2:6, :)*certificate.feedbackGain;
             derivative = closedLoop.'*certificate.lyapunovMatrix+certificate.lyapunovMatrix*closedLoop;
             testCase.verifyEqual(derivative, -certificate.decreaseMatrix, AbsTol=1e-10);
@@ -38,13 +38,13 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
             qp = formulateAvoidanceProblem(model,problem.prediction,problem.inputPlan(:));
             certificate = qp.clf.certificate;
             speed = max(certificateReferenceSpeed,cfg.clf.certificateSpeedFloor);
-            [a,b,c] = ltvBicycleModel.continuousMatrices(0,speed,cfg);
+            [a,b,c] = localCertificateMatrices(certificate,cfg);
             flow = a*certificate.operatingState+b*certificate.operatingInput+c;
             closedLoop = a(2:6,2:6)-b(2:6,:)*certificate.feedbackGain;
 
             testCase.verifyEqual(certificate.operatingState,[0;0;0;speed;0;0],AbsTol=0);
             testCase.verifyEqual(certificate.operatingCurvature,0,AbsTol=0);
-            testCase.verifyEqual(certificate.operatingAccelerationBias,0,AbsTol=0);
+            testCase.verifyEqual(certificate.operatingAccelerationBias,model.longitudinalAccelerationBias,AbsTol=0);
             testCase.verifyEqual(flow,[speed;zeros(5,1)],AbsTol=1e-12);
             testCase.verifyEqual(closedLoop.'*certificate.lyapunovMatrix ...
                 +certificate.lyapunovMatrix*closedLoop,-certificate.decreaseMatrix,AbsTol=1e-10);
@@ -104,6 +104,12 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.qp.clf.decayRate, 2*second.clf.decayRate, AbsTol=1e-12);
         end
     end
+end
+
+function [a,b,c] = localCertificateMatrices(certificate,cfg)
+    [a,b,c] = ltvBicycleModel.continuousMatrices(certificate.operatingCurvature, ...
+        certificate.operatingState(4),cfg,[],certificate.operatingAccelerationBias, ...
+        struct("state",certificate.operatingState,"input",certificate.operatingInput));
 end
 
 function [problem, cfg] = localProblem(referenceRate)

@@ -24,48 +24,41 @@ continues to normalize its input weights by the actuator scales.
 constant retain their existing roles. Every finite-horizon stage is included;
 there is no appended, unpenalized stopping tail in the current controller.
 
-The certificate uses a fixed straight-path operating state
-`[s; d; ePsi; vx; vy; r] = [0; 0; 0; vStar; 0; 0]`, with
-`vStar = max(referenceSpeed, clf.certificateSpeedFloor)`, zero curvature, and
-zero declared longitudinal acceleration bias. Its steering input is zero.
-Its signed longitudinal input balances the passive road load at `vStar`:
+The certificate now uses the nonlinear cruise trim at the current road
+curvature, `vStar = max(referenceSpeed, clf.certificateSpeedFloor)`, and the
+model's declared longitudinal acceleration bias. The state and input solve
+constant-speed Frenet kinematics and the full modified-Fiala axle-force
+balance, including rotation of front-wheel forces and passive road load.
+The synthesis matrices are the Jacobians evaluated at that same trim.
+See [the curved-cruise derivation](CURVED_CRUISE_CERTIFICATE.md).
 
-\[
-\beta_\star=\frac{F_{\mathrm{air}}(v_\star)+F_{\mathrm{roll}}(v_\star)}
- {m\,g_\beta}.
-\]
+`qp.clf.certificate` records `operatingState`, `operatingInput`,
+`operatingCurvature`, and `operatingAccelerationBias`. Both objective
+transcriptions read this one `operatingInput`. They do not use
+`prediction.referencePlan` as the cost center; that stage-dependent plan
+remains an initialization and linearization seed. No `uStar - K*z` input
+target or desired acceleration is introduced. Curvature and bias enter the
+certificate cache key, so a changed working point cannot reuse a stale metric.
 
-As before, the tire linearization clips this ratio into
-`[-1 + sqrt(eps), 1 - sqrt(eps)]`. The recorded operating input is that exact
-clipped ratio, and the same value is passed explicitly into certificate matrix
-construction. If clipping is active, the point is a linearization operating
-point and need not be a force-balanced equilibrium. This does not waive input
-bounds or establish feasibility.
+The metric and input center are fixed within a formulated horizon. On an
+unchanging arc at the reference speed, the CLF state target, Riccati point and
+input center agree. Below the synthesis speed floor, the state target still
+uses the configured reference speed, while the metric and input center use
+the declared floor; this remains a local regularization, not an exact trim
+tracking guarantee. State-reference offsets/rates, all cost weights, hard
+safety constraints, squared nonnegative slack and delayed execution retain
+their existing roles.
 
-`qp.clf.certificate` now records `operatingState`, `operatingInput`,
-`operatingCurvature`, and `operatingAccelerationBias`. Both the condensed and
-sparse lifted objectives read this one `operatingInput`. They no longer use
-`prediction.referencePlan` as the cost center. That stage-dependent plan
-remains an initialization and linearization seed. The ambiguous diagnostic
-`qp.clf.equilibriumInput` is removed in favor of the certificate's explicit
-operating-point fields.
+For changing curvature, newly formulated frames can change the metric and
+reference. `clfReferenceSwitchValue` reports the resulting value jump at the
+same current state; `clfMetricChanged` reports a metric change. The per-frame
+CLF constraints do not bound that jump. No common Lyapunov function or global
+convergence proof for arbitrary curvature variation is claimed. Finite
+squared slack also permits a tracking/dissipation tradeoff. Current measured
+curve results and their precise plant/timing scope are documented
+[separately](../scripts/CURVED_CONTROLLER_RESULTS.md).
 
-This differs from the previous objective when the predicted speed or curvature
-differs from the certificate point. The center is fixed over the horizon; it
-is not `uStar - K*z`, a desired acceleration, or an additional feedback law.
-The CLF metric, its synthesis matrices and decay rate, the state reference,
-road-load dynamics, hard Predictive CBF constraints, squared nonnegative CLF
-slack, delayed-command contract and independent acceptance remain unchanged.
-The certificate's zero-bias straight point is not replaced by the current
-prediction's curvature or declared acceleration bias.
-
-A finite squared slack weight permits trading dissipation against performance
-cost. This change alone therefore does not prove asymptotic recovery or remove
-steady-state error for a disturbed physical plant. Existing physical and
-runtime results predate this objective revision; no new closed-loop realtime
-pass is implied.
-
-## Validation of the September 8 objective change
+## Historical straight-certificate validation (September 8, 2026)
 
 All 157 distinct targeted MATLAB tests in 11 classes pass. Coverage includes
 an explicit objective evaluation at a current speed different from the

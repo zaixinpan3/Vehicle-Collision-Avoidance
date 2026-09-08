@@ -70,7 +70,7 @@ classdef ltvBicycleModel
             end
         end
         function [state, input] = cruiseEquilibrium(curvature, cfg, accelerationBias)
-        % Solve the frozen bicycle's constant-speed path equilibrium.
+        % Solve the nonlinear bicycle's constant-speed path equilibrium.
         % Steering, lateral velocity, body heading and road-load force are
         % compatible with one model; no desired acceleration is introduced.
             if nargin < 3, accelerationBias = 0; end
@@ -84,13 +84,41 @@ classdef ltvBicycleModel
                 input = [0;ratio];
                 return;
             end
+            % Necessary lateral-force feasibility: |vx*r| >= |kappa|*vx^2,
+            % while the sum of axle force magnitudes cannot exceed mu*Fz.
+            lateralCapacity = modifiedFialaTire.accelerationGain(cfg);
+            if abs(curvature)*speed^2>lateralCapacity*(1+64*eps)
+                error("collisionAvoidanceController:invalidCruiseOperatingPoint", ...
+                    "The requested steady turn exceeds the tire lateral-force capacity.");
+            end
             [a,b,c] = ltvBicycleModel.continuousMatrices(curvature,speed,cfg,0,accelerationBias);
             state = [0;0;0;speed;0;curvature*speed];
             rows = 4:6;
             solution = [a(rows,5),b(rows,:)]\(-a(rows,:)*state-c(rows));
             state(5) = solution(1);
-            if speed > 0, state(3) = -state(5)/speed; end
             input = solution(2:3);
+            if speed==0,return;end
+            point = [state(5);input];
+            for iteration = 1:20
+                [state,input,residual,jacobian] = localCruiseResidual(point,speed,curvature,cfg,accelerationBias);
+                if norm(residual,inf)<=1e-10,return;end
+                step = -jacobian\residual;
+                fraction = 1;
+                accepted = false;
+                for backtrack = 1:12
+                    trial = point+fraction*step;
+                    if all(isfinite(trial)) && abs(trial(3))<1-sqrt(eps)
+                        [~,~,trialResidual] = localCruiseResidual(trial,speed,curvature,cfg,accelerationBias);
+                        accepted = norm(trialResidual,inf)<norm(residual,inf);
+                        if accepted,break;end
+                    end
+                    fraction = fraction/2;
+                end
+                if ~accepted,break;end
+                point = trial;
+            end
+            error("collisionAvoidanceController:invalidCruiseOperatingPoint", ...
+                "No nonlinear cruise trim was found at curvature %.6g and speed %.6g.",curvature,speed);
         end
 
         function [allA,allB,allC,allTires,allReserve] = linearizationKernel(states,inputs,curvatures,cfg,bias,rate,h)
@@ -642,6 +670,19 @@ function profile = localProfile(cfg, steps, speed)
             "The braking tail cannot reach rest within %d stages " ...
             + "from %.3f m/s.", steps, speed);
     end
+end
+
+function [state,input,residual,jacobian] = localCruiseResidual(point,speed,curvature,cfg,bias)
+% Exact Frenet station keeping reduces the trim solve to three force balances.
+    lateralSpeed = point(1);
+    pathSpeed = hypot(speed,lateralSpeed);
+    state = [0;0;-atan2(lateralSpeed,speed);speed;lateralSpeed;curvature*pathSpeed];
+    input = point(2:3);
+    [a,b,c] = localOperatingPointMatrices(curvature,state,input,cfg,bias);
+    flow = a*state+b*input+c;
+    residual = flow(4:6);
+    stateSlope = [0;0;-speed/pathSpeed^2;0;1;curvature*lateralSpeed/pathSpeed];
+    jacobian = [a(4:6,:)*stateSlope,b(4:6,:)];
 end
 
 function [a,b,c,tire] = localOperatingPointMatrices(curvature,state,input,cfg,bias)

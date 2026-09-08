@@ -362,6 +362,19 @@ function [command, predictedInput, planningProblem, certificate] = ...
         -qp.clf.referenceRate*((0:prediction.stageCount)*model.sampleTime);
     metadata.clfValueProfile = sum(trackingError.*(qp.clf.lyapunovMatrix*trackingError), 1);
     metadata.clfInitialValue = metadata.clfValueProfile(1);
+    metadata.clfOperatingCurvature = qp.clf.certificate.operatingCurvature;
+    metadata.clfOperatingInput = qp.clf.certificate.operatingInput;
+    metadata.clfMetricChanged = false;
+    metadata.clfReferenceSwitchValue = 0;
+    if ~isempty(controllerState)
+        priorClf = controllerState.qp.clf;
+        priorReference = priorClf.referenceStart ...
+            +priorClf.referenceRate*(model.stateTime-controllerState.stateTime);
+        priorError = model.initialEgoState(2:6)-priorReference;
+        metadata.clfReferenceSwitchValue = metadata.clfInitialValue ...
+            -priorError.'*priorClf.lyapunovMatrix*priorError;
+        metadata.clfMetricChanged = ~isequal(qp.clf.lyapunovMatrix,priorClf.lyapunovMatrix);
+    end
     metadata.jointObjectiveValue = 0.5*decision.'*qp.Hessian*decision+qp.linear.'*decision+qp.constant;
     metadata.clfRelaxationCost = model.sampleTime*cfg.clf.relaxationWeight*sum(metadata.clfRelaxation.^2);
     metadata.hardRowViolation = check.hardRowViolation;

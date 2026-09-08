@@ -68,13 +68,13 @@ uncertainty enclosures remain hard even at zero optional fraction.
 The propagated initial estimation uncertainty also stays mandatory in future
 state-domain and tire-slip rows; only the additional process reserve is allocated.
 The joint objective contains state errors, input deviation from the fixed
-CLF/LQR certificate operating input, input changes, and squared nonnegative
+CLF/LQR certificate operating input at the current road curvature, input changes, and squared nonnegative
 CLF slack. Both transcriptions use `qp.clf.certificate.operatingInput`, not
 the stage-dependent prediction seed. See the
 [objective definition](QUADRATIC_CLF_INPUT_OBJECTIVE.md). It has no
 desired-acceleration objective. The positive-definite Riccati metric is
-synthesized at the straight certificate point; the CLF state reference still
-uses compatible curved-cruise heading, lateral velocity and yaw rate. Convex majorants
+synthesized at the nonlinear curved-cruise trim, including declared bias;
+the state reference uses the same trim at the configured reference speed. Convex majorants
 of the disturbed CLF derivative constrain each certified interval. Positive
 slack and persistent errors imply no claim of exact asymptotic convergence.
 

@@ -55,10 +55,11 @@ classdef constantCurvatureReferenceTest < matlab.unittest.TestCase
         function curvedCruiseIncludesConsistentHeadingAndYawRate(testCase)
             cfg = collisionAvoidanceControllerConfig();cfg.referenceSpeed = 10;
             [state,input] = ltvBicycleModel.cruiseEquilibrium(1/400,cfg);
-            [a,b,c] = ltvBicycleModel.continuousMatrices(1/400,10,cfg,0,0);
+            [a,b,c] = ltvBicycleModel.continuousMatrices(1/400,10,cfg,[],0, ...
+                struct("state",state,"input",input));
             derivative = a*state+b*input+c;
             testCase.verifyEqual(derivative(2:6),zeros(5,1),AbsTol=1e-10);
-            testCase.verifyEqual(state(6),0.025,AbsTol=1e-12);
+            testCase.verifyEqual(state(6),hypot(state(4),state(5))/400,AbsTol=1e-12);
             testCase.verifyGreaterThan(input(2),0);
         end
     end
