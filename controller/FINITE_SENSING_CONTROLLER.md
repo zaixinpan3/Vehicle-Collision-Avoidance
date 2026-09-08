@@ -10,6 +10,21 @@ the presence of persistent measurement noise and nonzero CLF slack.
 
 ## Execution and prediction
 
+The delay-aware straight validation uses a 100 ms control period and
+`controller.inputDelaySteps = 1`. At time `t`, the already committed input
+executes through `t + 0.1`; a fresh result is scheduled for the next
+100 ms interval. `certifiedSteps = 2` covers both intervals. The first
+input is eliminated exactly from the optimization and independently checked;
+the returned command is the second stage. A previous scheduled command must
+match its verified plan and the next measured execution contract. The
+measurement, computation completion and scheduled actuation times are
+recorded separately. A failed solve or deadline miss terminates the experiment;
+it does not authorize continuing the scheduled sequence after failure.
+See [the execution study](../scripts/STRAIGHT_DELAYED_EXECUTION_RESULTS.md)
+for the corrected scope and actual results. The default zero-delay setting
+remains available for idealized model studies and is not a deployment timing
+claim.
+
 At each sample, the controller uses the current observer estimate and its
 error enclosure. It intersects this enclosure with the previous executed
 prediction and centers the planning box at the midpoint of that intersection.

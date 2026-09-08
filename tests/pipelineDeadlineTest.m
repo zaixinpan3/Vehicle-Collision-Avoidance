@@ -21,7 +21,7 @@ classdef pipelineDeadlineTest < matlab.unittest.TestCase
 
         function aFailedPureGatePreventsTheJointPhysicalExperiment(testCase)
             testCase.assumeFalse(isempty(which("PassVeh14DOF.sltx")));
-            report = runStraightRealtimeValidation(Duration=0.05, ...
+            report = runStraightRealtimeValidation(Duration=0.1, ...
                 DeadlineSeconds=1e-12,Progress=false);
             testCase.verifyFalse(report.passed);
             testCase.verifyEmpty(report.joint);

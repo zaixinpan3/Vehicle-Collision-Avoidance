@@ -147,6 +147,9 @@ classdef ltvBicycleModel
                     retained = min(count,size(model.linearizationInputs,2));
                     anchorInputs(:,1:retained) = model.linearizationInputs(:,1:retained);
                 end
+                if isfield(model,"committedInput") && ~isempty(model.committedInput)
+                    anchorInputs(:,1) = model.committedInput;
+                end
                 [nonlinearAnchor,nominalStateJacobian,nominalInputJacobian] = ...
                     ltvBicycleModel.nominalRollout(model,anchorInputs);
                 model.linearizationStates = nonlinearAnchor(:,1:end-1);

@@ -1,5 +1,14 @@
 # Straight avoidance: complete-frame runtime optimization
 
+**Timing correction, September 8, 2026:** the results below are historical
+computation measurements with instantaneous actuation in simulated time.
+Their 71.802/94.244 ms maxima exceed the 50 ms control period. They do not
+pass a runnable 20 Hz control requirement, even though they are below a
+separate 100 ms threshold. The strict entry now uses a 100 ms control period
+and explicitly scheduled actuation delay; see
+[the corrected execution study](STRAIGHT_DELAYED_EXECUTION_RESULTS.md).
+The historical raw results and their original archive record are preserved.
+
 Research date: September 8, 2026. The current requirement is **100 ms for
 every complete online frame**, including the observer and road fitting.
 The earlier 50 ms runtime requirement is superseded. Physical experiments
@@ -30,9 +39,10 @@ Consequently an observed 100 ms pass does not establish schedulability at
 20 Hz, delay-aware closed-loop safety, a platform WCET bound, or exact
 asymptotic convergence. No early recovery deadline is introduced.
 
-## Final straight physical results
+## Historical straight physical results without computation delay
 
-The final sequential validation **passes both gates**. Each run completes
+The historical sequential validation passes its instantaneous-actuation
+functional gates and separate 100 ms computation threshold. Each run completes
 600 attempted and applied intervals over 30 s, with zero solve failures,
 zero deadline misses, fresh independently checked controls and no fallback.
 

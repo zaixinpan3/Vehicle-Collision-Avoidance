@@ -18,6 +18,10 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
     restoreThreads = onCleanup(@() maxNumCompThreads(threadCount));
     cfg = collisionAvoidanceControllerConfig(cfg);
     h = cfg.controller.sampleTime;
+    if options.EnforceRuntimeDeadline && options.DeadlineSeconds>h
+        error("runFiniteBicycleDiagnostic:deadlineExceedsPeriod", ...
+            "The complete-frame deadline cannot exceed the control update period.");
+    end
     steps = round(duration/h);
     state = [0;0;0;cfg.referenceSpeed;0;0];
     states = state.';times = 0;inputs = zeros(0,2);metadata = cell(0,1);
@@ -29,6 +33,11 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
     estimates = cell(steps,1);targetEstimates = cell(steps,1);audits = cell(steps,1);
     frameSeconds = nan(steps,1);estimatorSeconds = zeros(steps,1);controllerSeconds = nan(steps,1);
     preparation = struct("performed",false,"elapsedSeconds",0);
+    committedInput = zeros(0,1);
+    if cfg.controller.inputDelaySteps>0
+        [~,committedInput] = ltvBicycleModel.cruiseEquilibrium(0,cfg);
+    end
+    computedCommand = cell(steps,1);
     if estimated
         estimatorCfg = options.EstimatorConfiguration;
         estimatorCfg.observer.ego.yaw.rearAxleDistance = cfg.vehicle.lr;
@@ -40,6 +49,8 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
     if options.PrepareController
         initialEgo = struct("position",state(1:2),"yaw",state(3),"speed",state(4), ...
             "lateralVelocity",state(5),"yawRate",state(6),"stateTime",0);
+        initialEgo.heldActuatorInput = committedInput;
+        initialEgo.committedActuatorInput = committedInput;
         preparation = prepareCollisionAvoidancePipeline(initialEgo,road,cfg,options.EstimatorConfiguration);
     end
     for index = 1:steps
@@ -64,9 +75,15 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
             if index>1,ego.heldActuatorInput = inputs(end,:).';end
         end
         estimates{index} = ego;targetEstimates{index} = target;
+        if cfg.controller.inputDelaySteps>0
+            ego.committedActuatorInput = committedInput;
+            if index==1,ego.heldActuatorInput = committedInput;end
+            estimates{index} = ego;
+        end
         controllerTimer = tic;
         try
             [command,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,stored);
+            computedCommand{index} = command;
             controllerSeconds(index) = toc(controllerTimer);
             frameSeconds(index) = toc(frameTimer);
         catch exception
@@ -83,6 +100,10 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
             break;
         end
         input = command.actuatorInput;
+        if cfg.controller.inputDelaySteps>0
+            input = committedInput;
+            committedInput = command.actuatorInput;
+        end
         [localTime,trajectory] = ode45(@(~,x) localFlow(x,input,cfg),[0,h],state, ...
             odeset(RelTol=1e-9,AbsTol=1e-11));
         traceTime = [traceTime;time+localTime(2:end)]; %#ok<AGROW>
@@ -97,10 +118,15 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         "plant","nonlinear modified-Fiala bicycle with rotated front forces and passive road load", ...
         "observations","exact current states; target only inside 30 m");
     result.estimatorEnabled = estimated;
+    result.computedCommand = computedCommand(1:index);
     result.runtime = struct("frameSeconds",frameSeconds(1:index), ...
         "estimatorSeconds",estimatorSeconds(1:index),"controllerSeconds",controllerSeconds(1:index), ...
         "deadlineSeconds",options.DeadlineSeconds,"deadlineMet",all(frameSeconds(1:index)<=options.DeadlineSeconds), ...
         "enforced",options.EnforceRuntimeDeadline, ...
+        "controlPeriodSeconds",h,"inputDelaySeconds",cfg.controller.inputDelaySteps*h, ...
+        "commandReadyTime",(0:index-1).'*h+frameSeconds(1:index), ...
+        "scheduledActuationTime",((0:index-1).'+cfg.controller.inputDelaySteps)*h, ...
+        "appliedSourceFrame",max(0,(1:size(inputs,1)).'-cfg.controller.inputDelaySteps), ...
         "preparation",preparation,"scope","Online synthetic sensors, observer, bounds, input assembly and controller; plant and offline preparation excluded");
     result.egoEstimate = estimates(1:index);
     result.targetEstimate = targetEstimates(1:index);

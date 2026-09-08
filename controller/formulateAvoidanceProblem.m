@@ -163,6 +163,13 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
         "certifiedInfeasible", any(bound(~any(hardMatrix, 2)) < 0));
     qp.stageProgram = avoidanceStageQp(qp,prediction,model);
+    if isfield(model,"committedInput") && ~isempty(model.committedInput)
+        % Eliminate the already scheduled input exactly in both numerical
+        % solves. The independent checker separately enforces this prefix.
+        qp.fixedInput = model.committedInput;
+        qp.stageProgram.fixedDecisionIndex = (1:2).';
+        qp.stageProgram.fixedDecisionValue = model.committedInput;
+    end
 end
 
 function certificate = localClfCertificate(model)

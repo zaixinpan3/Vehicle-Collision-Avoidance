@@ -37,6 +37,10 @@ function result = runCenterlineCruiseScenario(varargin)
     end
     collisionAvoidanceController("resetNominalTrajectory");
     sampleTime = cfg.controller.sampleTime;
+    if options.enforceRuntimeDeadline && options.deadlineSeconds>sampleTime
+        error("runCenterlineCruiseScenario:deadlineExceedsPeriod", ...
+            "The complete-frame deadline cannot exceed the control update period.");
+    end
     requestedStepCount = round(options.duration / sampleTime);
     if abs(requestedStepCount * sampleTime - options.duration) ...
             > 100.0 * eps(max(1.0, options.duration))
@@ -158,9 +162,24 @@ function result = runCenterlineCruiseScenario(varargin)
     terminalTaskCompleted = false;
     maximumTargetCount = 0;
     controllerPreparation = struct("performed", false, "elapsedSeconds", 0.0);
+    committedInput = zeros(0,1);
+    if cfg.controller.inputDelaySteps>0
+        if isfield(options.geometry,"referenceCurve")
+            initialCurvature = options.geometry.referenceCurve.curvature;
+        elseif size(centerline,1)==2
+            initialCurvature = 0;
+        else
+            error("runCenterlineCruiseScenario:missingReferenceCurve", ...
+                "Delayed startup requires an analytic reference or a straight two-point centerline.");
+        end
+        [~,committedInput] = ltvBicycleModel.cruiseEquilibrium(initialCurvature,cfg);
+    end
+    computedCommand = cell(requestedStepCount,1);
     if options.prepareController
         initialRoad = localRoadPerception(centerline,state,options);
         initialControllerState = state;initialControllerState.stateTime = 0;
+        initialControllerState.heldActuatorInput = committedInput;
+        initialControllerState.committedActuatorInput = committedInput;
         controllerPreparation = prepareCollisionAvoidancePipeline( ...
             initialControllerState,initialRoad.roadGeometry,cfg,estimatorConfiguration);
     end
@@ -192,6 +211,15 @@ function result = runCenterlineCruiseScenario(varargin)
                 targetTruthAtControlSample{stepIdx}, ...
                 state.position, options.perceptionRange);
         end
+        if cfg.controller.inputDelaySteps>0
+            controllerState.committedActuatorInput = committedInput;
+            if stepIdx==1
+                controllerState.heldActuatorInput = committedInput;
+            else
+                controllerState.heldActuatorInput = command{stepIdx-1}.actuatorInput;
+            end
+            egoEstimate{stepIdx} = controllerState;
+        end
         if options.useStateEstimator
             targetDetectionAvailable(stepIdx) = ...
                 sensorFrame{stepIdx}.radarDetectionAvailable;
@@ -210,11 +238,15 @@ function result = runCenterlineCruiseScenario(varargin)
         roadFitTime(stepIdx) = toc(roadTimer);
         solveTimer = tic;
         try
-            [command{stepIdx}, ~, planningProblem] = ...
+            [computedCommand{stepIdx}, ~, planningProblem] = ...
                 collisionAvoidanceController( ...
                     controllerState, targetEstimate{stepIdx}, ...
                     controllerRoadGeometry, cfg);
             solveTime(stepIdx) = toc(solveTimer);
+            command{stepIdx} = computedCommand{stepIdx};
+            if cfg.controller.inputDelaySteps>0
+                command{stepIdx} = computedCommand{stepIdx}.delayIntervalCommand;
+            end
             pipelineTime(stepIdx) = toc(pipelineTimer);
             controllerRoadAudit{stepIdx} = ...
                 localControllerRoadAudit(planningProblem);
@@ -247,6 +279,9 @@ function result = runCenterlineCruiseScenario(varargin)
         if isempty(command{stepIdx})
             terminalTaskCompleted = true;
             break;
+        end
+        if cfg.controller.inputDelaySteps>0
+            committedInput = computedCommand{stepIdx}.actuatorInput;
         end
 
         inputDataset = localPlantInputDataset( ...
@@ -287,6 +322,7 @@ function result = runCenterlineCruiseScenario(varargin)
         "targetEstimate", {targetEstimate(1:attemptedStepCount)}, ...
         "sensorFrame", {sensorFrame(1:attemptedStepCount)}, ...
         "measurementAudit", {sensorAudit(1:attemptedStepCount)}, ...
+        "computedCommand",{computedCommand(1:attemptedStepCount)}, ...
         "targetTruth", {targetTruthAtControlSample(1:attemptedStepCount)}, ...
         "roadPerception", {roadPerception(1:attemptedStepCount)});
     controlTime = controlTime(1:(completedStepCount + 1));
@@ -359,6 +395,11 @@ function result = runCenterlineCruiseScenario(varargin)
         "controllerSeconds",attempts.solveTime,"deadlineSeconds",options.deadlineSeconds, ...
         "deadlineMet",all(pipelineTime(1:attemptedStepCount)<=options.deadlineSeconds), ...
         "enforced",options.enforceRuntimeDeadline,"preparation",controllerPreparation, ...
+        "controlPeriodSeconds",sampleTime, ...
+        "inputDelaySeconds",cfg.controller.inputDelaySteps*sampleTime, ...
+        "commandReadyTime",attempts.time+pipelineTime(1:attemptedStepCount), ...
+        "scheduledActuationTime",attempts.time+cfg.controller.inputDelaySteps*sampleTime, ...
+        "appliedSourceFrame",max(0,(1:completedStepCount).'-cfg.controller.inputDelaySteps), ...
         "scope","Online synthetic sensors, observer, error bounds, road fitting and control; plant and offline preparation excluded");
     result.attempts = attempts;
     result.plantTrace = plantTrace;

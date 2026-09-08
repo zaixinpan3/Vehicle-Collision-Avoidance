@@ -4,9 +4,9 @@ function report = runStraightRealtimeValidation(options)
 % solve or expired frame stops before its command reaches the plant. The
 % joint experiment starts only after the controller-only experiment passes
 % collision, road, completion, eventual-cruise and runtime checks.
-% Offline compilation/preparation and simulated plant integration are not
-% online computations. The controller model still uses a 0.05 s interval;
-% this experiment does not model computation-induced actuation delay.
+% Each solve uses measurements at t and schedules its command for t+0.1 s.
+% The already committed input executes during computation. Prediction and
+% robust certification include both that delay and the new held interval.
     arguments
         options.Duration (1,1) double {mustBePositive} = 30
         options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
@@ -17,6 +17,14 @@ function report = runStraightRealtimeValidation(options)
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"config"));
     cfg = finiteSensingValidationConfig();
+    cfg.controller.sampleTime = 0.1;
+    cfg.controller.horizonSteps = 16;
+    cfg.controller.certifiedSteps = 2;
+    cfg.controller.inputDelaySteps = 1;
+    if options.DeadlineSeconds>cfg.controller.sampleTime
+        error("runStraightRealtimeValidation:deadlineExceedsPeriod", ...
+            "The complete-frame deadline cannot exceed the 100 ms control period.");
+    end
     estimator = estimatorControllerIntegrationConfig();
     estimator.randomSeed = options.RandomSeed;
     % One RK4 step per held sensor interval. The runtime still includes
@@ -24,7 +32,7 @@ function report = runStraightRealtimeValidation(options)
     estimator.observer.runtime.integrationStepMaximum = estimator.observer.runtime.samplePeriod;
     report = struct("passed",false,"controllerOnly",[],"joint",[], ...
         "deadlineSeconds",options.DeadlineSeconds,"randomSeed",options.RandomSeed, ...
-        "scope","Straight PassVeh14DOF; all attempted online frames; no delay-in-the-loop or platform WCET proof");
+        "scope","Straight PassVeh14DOF; 100 ms period and scheduled input delay; all attempted online frames; no platform WCET proof");
     report.execution = struct("matlabVersion",string(version), ...
         "architecture",string(computer('arch')),"computationalThreads",maxNumCompThreads, ...
         "allowedCpuList","");

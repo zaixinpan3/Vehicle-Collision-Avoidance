@@ -8,6 +8,10 @@ function check = certifyAvoidancePlan(qp, ~, model, decision)
         return;
     end
     decision = decision(:);
+    if isfield(qp,"fixedInput") && ~isequal(decision(1:2),qp.fixedInput)
+        check.failedConditions = "committedInput";
+        return;
+    end
     operations = numel(decision)+2;
     gamma = operations*eps/(1-operations*eps);
     evaluationAllowance = gamma*(abs(qp.physicalBound)+abs(qp.inequalityMatrix)*abs(decision));

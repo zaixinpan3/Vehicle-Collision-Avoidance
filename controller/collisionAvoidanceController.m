@@ -59,6 +59,18 @@ function [command, predictedInput, planningProblem, certificate] = ...
                 || ~isequal(controllerState.appliedInput, controllerState.plan(:, 1))
             error("collisionAvoidanceController:invalidStoredCertificate", "The stored witness failed verification.");
         end
+        if cfg.controller.inputDelaySteps>0 ...
+                && (~isfield(controllerState,"scheduledInput") ...
+                || size(controllerState.plan,2)<2 ...
+                || ~isequal(controllerState.scheduledInput,controllerState.plan(:,2)))
+            error("collisionAvoidanceController:invalidStoredCertificate", ...
+                "The stored scheduled input must match the previously verified second stage.");
+        end
+        if cfg.controller.inputDelaySteps>0 ...
+                && ~isequal(ego.committedActuatorInput,controllerState.scheduledInput)
+            error("collisionAvoidanceController:executionContractViolation", ...
+                "The computation interval must execute the previously scheduled checked command.");
+        end
         predicted = reshape(pagemtimes(controllerState.prediction.egoStateMatrix(:, :, 2), controllerState.plan(:)), 6, 1) ...
             +controllerState.prediction.egoStateOffset(:, 2);
         % Keep the intersection itself. An outer box about a displaced
@@ -218,7 +230,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
                     nominalChecks(end+1) = nominalCheck; %#ok<AGROW>
                     if nominalViolation>0
                         if refinement>=cfg.encounter.maximumNominalRefinements || any(~isfinite(nominal),"all")
-                            failures(end+1,1) = maneuver+": nonlinear nominal lookahead remains infeasible"; %#ok<AGROW>
+                            failures(end+1,1) = maneuver+": nonlinear nominal lookahead remains infeasible (" ...
+                                +nominalCheck.label+", stage "+nominalCheck.stage+", excess "+nominalCheck.violation+")"; %#ok<AGROW>
                             break;
                         end
                         candidateModel.linearizationStates = nominal(:,1:end-1);
@@ -256,7 +269,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
                 else
                     inputs(1,:) = (inputs(1,:)+reference(1,:))/2;
                 end
-                anchor = inputs(:);
+                anchor = localRateLimitedAnchor(inputs,candidateModel);
+                inputs = reshape(anchor,2,[]);
                 if string(cfg.model.linearizationPolicy)~="cruise"
                     candidateModel.linearizationInputs = inputs;
                     candidatePrediction = ltvBicycleModel.finitePredict(candidateModel,[]);
@@ -288,13 +302,20 @@ function [command, predictedInput, planningProblem, certificate] = ...
     source = "checkedOptimization";
     margin = check.margin;
     predictedInput = reshape(decision(qp.layout.planIndex), 2, []);
-    command = localCommand(predictedInput, model, prediction);
+    command = localCommand(predictedInput, model, prediction,1+cfg.controller.inputDelaySteps);
+    command.measurementTime = model.stateTime;
+    command.actuationTime = model.stateTime+cfg.controller.inputDelaySteps*model.sampleTime;
+    command.holdSeconds = model.sampleTime;
+    if cfg.controller.inputDelaySteps>0
+        command.delayIntervalCommand = localCommand(predictedInput,model,prediction,1);
+    end
     predictedState = reshape(pagemtimes(prediction.egoStateMatrix, predictedInput(:)), 6, [])+prediction.egoStateOffset;
     certificate = struct("version", 10, "identity", identity, "stateTime", model.stateTime, ...
         "deadline", model.stateTime+prediction.stageCount*model.sampleTime, ...
         "remainingSteps", prediction.stageCount, "margin", margin, "maneuver", maneuver, ...
         "plan", predictedInput, "decision", decision, "qp", qp, "prediction", prediction, ...
-        "predictedState", predictedState, "appliedInput", command.actuatorInput, ...
+        "predictedState", predictedState, "appliedInput", predictedInput(:,1), ...
+        "scheduledInput",command.actuatorInput, ...
         "stateErrorBound", prediction.egoStateErrorBound, ...
         "encounters", encounters, "acceptance", check, "safetyScope", "executedIntervalWithNominalLookahead", ...
         "certifiedDuration",min(cfg.controller.certifiedSteps,prediction.stageCount)*model.sampleTime);
@@ -326,6 +347,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.safetyScope = certificate.safetyScope;
     metadata.certifiedDuration = certificate.certifiedDuration;
     metadata.lookaheadDuration = prediction.stageCount*model.sampleTime;
+    metadata.inputDelaySeconds = cfg.controller.inputDelaySteps*model.sampleTime;
+    metadata.commandActuationTime = command.actuationTime;
     if cfg.controller.certifiedSteps<prediction.stageCount
         metadata.collisionDiscretization = "sweptExecutedIntervalsAndNominalChordLookahead";
     end
@@ -363,7 +386,8 @@ function model = localFiniteModel(ego, lane, road, cfg)
         "horizonSteps", cfg.controller.horizonSteps, "referenceSpeed", cfg.referenceSpeed, ...
         "initialEgoState", [projection.station; projection.lateralPosition; heading; ego.modelState(4:6)], ...
         "initialFrenetErrorBound", radius, "longitudinalAccelerationBias", ego.longitudinalAccelerationBias, ...
-        "previousInput", previousInput, "previousManeuver", "track", "requiredMargin", 0);
+        "previousInput", previousInput, "committedInput",ego.committedActuatorInput, ...
+        "previousManeuver", "track", "requiredMargin", 0);
 end
 
 function [steps, margin] = localExitSchedule(model)
@@ -454,7 +478,11 @@ function anchor = localRateLimitedAnchor(inputs,model)
     change = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     prior = model.previousInput;
     for stage = 1:size(inputs,2)
-        inputs(:,stage) = min(max(inputs(:,stage),max(lower,prior-change)),min(upper,prior+change));
+        if stage==1 && ~isempty(model.committedInput)
+            inputs(:,stage) = model.committedInput;
+        else
+            inputs(:,stage) = min(max(inputs(:,stage),max(lower,prior-change)),min(upper,prior+change));
+        end
         prior = inputs(:,stage);
     end
     anchor = inputs(:);
@@ -598,11 +626,11 @@ function localAddConfigurationPath()
 end
 
 
-function command = localCommand(inputPlan, model, prediction)
-    firstInput = inputPlan(:, 1);
+function command = localCommand(inputPlan, model, prediction,stage)
+    firstInput = inputPlan(:,stage);
     cfg = model.cfg;
-    state = model.initialEgoState;
-    forceScheduleSpeed = max(prediction.scheduleSpeedProfile(1), ...
+    state = prediction.egoStateMatrix(:,:,stage)*inputPlan(:)+prediction.egoStateOffset(:,stage);
+    forceScheduleSpeed = max(prediction.scheduleSpeedProfile(stage), ...
         cfg.model.scheduleSpeedFloor);
     tire = modifiedFialaTire.parameters(cfg);
     steeringAngle = firstInput(1);
@@ -614,8 +642,8 @@ function command = localCommand(inputPlan, model, prediction)
     rearSlipAngle = (state(5)-cfg.vehicle.lr*state(6)) ...
         / forceScheduleSpeed;
     [tireSlope, ratioSlope, tireIntercept] = modifiedFialaTire.linearize( ...
-        prediction.scheduleCurvature(1), prediction.scheduleSpeedProfile(1), ...
-        prediction.scheduleBrakingRatio(1), cfg);
+        prediction.scheduleCurvature(stage), prediction.scheduleSpeedProfile(stage), ...
+        prediction.scheduleBrakingRatio(stage), cfg);
     axleLateralForce = tireSlope.*[frontSlipAngle; rearSlipAngle] ...
         +ratioSlope*brakingRatio+tireIntercept;
     axleLongitudinalForce = modifiedFialaTire.longitudinalForce(brakingRatio, cfg);
@@ -682,9 +710,9 @@ function [model, prediction, anchor] = localPlanningWindow(model, prediction, an
             break;
         end
     end
-    if count < 1
+    if count <= cfg.controller.inputDelaySteps
         error("collisionAvoidanceController:roadBoundaryCoverageGap", ...
-            "Sensed road geometry cannot certify even the next held interval.");
+            "Sensed road geometry must cover the delay and the new command's complete held interval.");
     end
     if count < prediction.stageCount
         model.horizonSteps = count;

@@ -19,6 +19,15 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
     end
     ego = localReadEgoState(egoState, cfg);
     ego.stateTime = localOptionalStateScalar(egoState, "stateTime", NaN);
+    ego.committedActuatorInput = zeros(0,1);
+    if cfg.controller.inputDelaySteps>0
+        if ~isfield(egoState,"committedActuatorInput") || ~isfinite(ego.stateTime)
+            error("collisionAvoidanceController:missingCommittedInput", ...
+                "A delayed solve requires the timestamp and input already scheduled during computation.");
+        end
+        ego.committedActuatorInput = localFiniteVector( ...
+            egoState.committedActuatorInput,2,"egoState.committedActuatorInput");
+    end
     ego.completePerception = false;
     ego.perceptionRange = NaN;
     if isstruct(egoState) && isfield(egoState,"perception")

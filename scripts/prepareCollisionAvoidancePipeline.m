@@ -56,15 +56,23 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
     probeSeconds = zeros(probeCount,1);certified = false(probeCount,1);failures = strings(probeCount,1);
     refinements = zeros(probeCount,1);solverCalls = zeros(probeCount,1);
     certificate = [];
+    [~,probeInitialInput] = ltvBicycleModel.cruiseEquilibrium(0,cfg);
+    probeHeldInput = probeInitialInput;probeCommittedInput = probeInitialInput;
     for sample = 1:probeCount
         sampleTimer = tic;
         time = (sample-1)*cfg.controller.sampleTime;
         [context,estimate,targets] = nrmmEstimatorControllerAdapter("sample",context,time,truth(time),target(time,[]));
+        if cfg.controller.inputDelaySteps>0
+            estimate.heldActuatorInput = probeHeldInput;
+            estimate.committedActuatorInput = probeCommittedInput;
+        end
         try
-            [~,~,problem,certificate] = collisionAvoidanceController(estimate,targets,road,cfg,certificate);
+            [command,~,problem,certificate] = collisionAvoidanceController(estimate,targets,road,cfg,certificate);
             certified(sample) = problem.metadata.planCertified;
             refinements(sample) = problem.metadata.nominalRefinementCount;
             solverCalls(sample) = problem.metadata.solverCallCount;
+            probeHeldInput = probeCommittedInput;
+            probeCommittedInput = command.actuatorInput;
         catch exception
             if ~any(string(exception.identifier)==["collisionAvoidanceController:noCertifiedContinuation", ...
                     "collisionAvoidanceController:invalidUncertaintyChart", ...
@@ -73,6 +81,7 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
             end
             failures(sample) = string(exception.identifier);
             certificate = [];
+            probeHeldInput = probeInitialInput;probeCommittedInput = probeInitialInput;
         end
         probeSeconds(sample) = toc(sampleTimer);
     end

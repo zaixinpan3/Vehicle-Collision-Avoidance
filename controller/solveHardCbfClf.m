@@ -69,6 +69,10 @@ function [problem,solve] = localReserveMargin(problem,cfg)
         "cones",[equalityCount;hardCount+2],"physicalDecisionCount",physical+1, ...
         "inactiveSlackIndex",problem.layout.relaxationIndex);
     auxiliary = struct("layout",struct("decisionCount",physical+1),"stageProgram",program);
+    if isfield(original,"fixedDecisionIndex")
+        auxiliary.stageProgram.fixedDecisionIndex = original.fixedDecisionIndex;
+        auxiliary.stageProgram.fixedDecisionValue = original.fixedDecisionValue;
+    end
     solve = localRunJointProgram(auxiliary,cfg);
     if ~solve.feasible,return;end
     margins = problem.inequalityBound-problem.inequalityMatrix*solve.decision(1:physical);
@@ -147,11 +151,20 @@ function solve = localDefaultSolve(problem, cfg)
     program = problem.stageProgram;
     retained = true(numel(program.q),1);
     if isfield(program,"inactiveSlackIndex"),retained(program.inactiveSlackIndex) = false;end
+    fixed = zeros(0,1);value = zeros(0,1);
+    if isfield(program,"fixedDecisionIndex")
+        fixed = program.fixedDecisionIndex;value = program.fixedDecisionValue;
+        retained(fixed) = false;
+    end
+    linear = program.q(retained) ...
+        +(program.P(retained,fixed)+program.P(fixed,retained).')*value;
+    bound = program.b-program.A(:,fixed)*value;
     [nativeDecision, output] = nativeSolver( ...
-        program.P(retained,retained), program.q(retained), program.A(:,retained), program.b, program.cones, ...
+        program.P(retained,retained), linear, program.A(:,retained), bound, program.cones, ...
         [cfg.solver.constraintTolerance, ...
             cfg.solver.optimalityTolerance, cfg.solver.maxIterations]);
     stageDecision = zeros(numel(program.q),1);stageDecision(retained) = nativeDecision;
+    stageDecision(fixed) = value;
     flag = -7;
     switch output.status
         case 1
