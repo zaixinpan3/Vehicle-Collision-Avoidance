@@ -20,6 +20,18 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function adapterRetainsThePublishedControllerTimeEstimate(testCase)
+            cfg = estimatorControllerIntegrationConfig();
+            ego = struct("position",[0;0],"yawAngle",0, ...
+                "longitudinalVelocity",10,"lateralVelocity",0,"yawRate",0);
+            context = nrmmEstimatorControllerAdapter("initialize",cfg,ego,@localRadarExitTarget);
+            [context,published] = nrmmEstimatorControllerAdapter( ...
+                "sample",context,0,ego,localRadarExitTarget(0,ego));
+            testCase.verifyEqual(context.currentOutput,published,AbsTol=0);
+            testCase.verifyEqual(published.stateTime,0,AbsTol=0);
+            testCase.verifyEqual(context.runtime.currentTime,cfg.observer.runtime.samplePeriod,AbsTol=1e-14);
+        end
+
         function adapterInitializesAtStandstillWithoutACourseDirection(testCase)
             cfg = estimatorControllerIntegrationConfig();
             cfg.observer.ego.domain.speedMinimum = 0;
@@ -62,7 +74,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             testCase.verifyEqual( ...
                 cfg.observer.ego.yaw ...
                     .singleTrackYawRateMismatchMaximum, ...
-                0.10, AbsTol=0.0);
+                0.25, AbsTol=0.0);
             testCase.verifyEqual( ...
                 cfg.initialization.minimumRadarSamples, 1, ...
                 AbsTol=0.0);

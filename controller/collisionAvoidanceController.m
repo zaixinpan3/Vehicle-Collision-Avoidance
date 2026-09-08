@@ -163,9 +163,9 @@ function [command, predictedInput, planningProblem, certificate] = ...
         model.linearizationInputs = controllerState.plan(:,2:end);
         if isempty(model.linearizationInputs), model.linearizationInputs = model.previousInput; end
     end
-    prediction = ltvBicycleModel.finitePredict(model, schedule);
-    [model,prediction] = localPlanningWindow(model,prediction);
-    [model.exitSteps,model.exitMargin] = localExitSchedule(model);
+    initializeManeuver = active && model.previousManeuver=="track" ...
+        && string(cfg.model.linearizationPolicy)~="cruise";
+    prediction = ltvBicycleModel.finitePredict(model, schedule,initializeManeuver);
     predictionSeconds = toc(timer)-preparationSeconds;
     maneuvers = "track";
     if active, maneuvers = ["yield", "passLeft", "passRight"]; end
@@ -184,6 +184,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     solverCalls = 0;
     geometryRebuildCount = 0;
     nominalRefinementCount = 0;
+    nominalChecks = struct("violation",{},"label",{},"stage",{});
     failures = strings(0, 1);
     formulationSeconds = 0;
     solveSeconds = 0;
@@ -213,7 +214,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
                 solverCalls = solverCalls+result.solverCalls;
                 check = certifyAvoidancePlan(qp, candidatePrediction, candidateModel, result.decision);
                 if result.feasible && check.accepted
-                    [nominal,nominalViolation] = localNominalLookahead(qp,candidateModel,result.decision);
+                    [nominal,nominalViolation,nominalCheck] = localNominalLookahead(qp,candidateModel,result.decision);
+                    nominalChecks(end+1) = nominalCheck; %#ok<AGROW>
                     if nominalViolation>0
                         if refinement>=cfg.encounter.maximumNominalRefinements || any(~isfinite(nominal),"all")
                             failures(end+1,1) = maneuver+": nonlinear nominal lookahead remains infeasible"; %#ok<AGROW>
@@ -317,6 +319,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "solveSeconds", solveSeconds, "acceptanceAndCommitSeconds", verificationSeconds+toc(phase), ...
         "diagnosticsSeconds", 0);
     metadata.solverAlgorithm = "Clarabel predictive CBF-CLF SOCP";
+    metadata.nominalChecks = nominalChecks;
     metadata.setMembershipUpdate = ~isempty(controllerState);
     metadata.certificateCompatible = ~isempty(incumbent);
     metadata.carriedWitnessFeasible = false;
@@ -394,7 +397,7 @@ function anchor = localAnchor(model, prediction, incumbent)
         inputs = reshape(prediction.referencePlan,2,[]);
         retained = min(size(inputs,2),size(incumbent.plan,2));
         inputs(:,1:retained) = incumbent.plan(:,1:retained);
-        anchor = inputs(:);
+        anchor = localRateLimitedAnchor(inputs,model);
         return;
     end
     inputs = reshape(prediction.referencePlan, 2, []);
@@ -412,19 +415,15 @@ function anchor = localAnchor(model, prediction, incumbent)
         % This only chooses separating planes; it adds no tracking objective.
         for encounter = model.encounters(:).'
             if encounter.discharged, continue; end
-            distances = inf(1,count+1);
-            lateral = zeros(1,count+1);
-            for node = 1:count+1
-                duration = (node-1)*model.sampleTime;
-                if targetPrediction.isFiniteSensing(encounter)
-                    center = targetPrediction.nominalFlow(encounter,duration);
-                else
-                    center = targetPrediction.finiteFlow(encounter,duration);
-                end
-                targetFrame = laneGeometry.project(center(1:2),model.lane);
-                distances(node) = abs(nominal(1,node)-targetFrame.station);
-                lateral(node) = targetFrame.lateralPosition;
+            times = (0:count)*model.sampleTime;
+            if targetPrediction.isFiniteSensing(encounter)
+                centers = targetPrediction.nominalFlow(encounter,times);
+            else
+                centers = targetPrediction.finiteFlow(encounter,times);
             end
+            targetFrame = laneGeometry.project(centers(1:2,:),model.lane);
+            distances = abs(nominal(1,:)-targetFrame.station);
+            lateral = targetFrame.lateralPosition;
             [~,node] = min(distances);
             targetState = targetPrediction.nominalFlow(encounter,(node-1)*model.sampleTime);
             routeHeading = laneGeometry.project(targetState(1:2),model.lane).heading;
@@ -435,12 +434,28 @@ function anchor = localAnchor(model, prediction, incumbent)
             required = clearance+direction*(lateral(node)-nominal(2,node));
             if abs(response(2,node))>sqrt(eps)
                 amplitude = max(amplitude,required/abs(response(2,node)));
+
             end
         end
         amplitude = min(amplitude,model.cfg.model.frontWheelSteeringAngleMaximum);
         inputs(1,:) = inputs(1,:)+direction*amplitude*shape;
     elseif model.maneuver == "yield"
         inputs(2, :) = max(model.cfg.actuation.brakingRatioMinimum, inputs(2, :)-0.15);
+    end
+    anchor = localRateLimitedAnchor(inputs,model);
+end
+
+function anchor = localRateLimitedAnchor(inputs,model)
+% Seed the nonlinear prediction with controls inside the actuator envelope.
+% This initializes optimization only; it is never an executable fallback.
+    cfg = model.cfg;
+    lower = [-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    upper = [cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+    change = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    prior = model.previousInput;
+    for stage = 1:size(inputs,2)
+        inputs(:,stage) = min(max(inputs(:,stage),max(lower,prior-change)),min(upper,prior+change));
+        prior = inputs(:,stage);
     end
     anchor = inputs(:);
 end
@@ -644,10 +659,12 @@ function [model, prediction, anchor] = localPlanningWindow(model, prediction, an
 % a perceived boundary. No failed optimization or stored control is used here.
     cfg = model.cfg;
     if nargin<3,anchor = prediction.referencePlan;end
+    if isempty(model.road.boundaries),return;end
     count = prediction.stageCount;
+    [frames,nominal] = laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
     for index = 1:numel(prediction.cells)
-        cell = prediction.cells(index);
-        frame = laneGeometry.sweptCellFrame(model,cell,anchor);
+        tube = prediction.cells(index);
+        frame = frames(index);
         covered = true;
         for boundary = model.road.boundaries(:).'
             direction = boundary.longitudinalDirection;
@@ -661,7 +678,7 @@ function [model, prediction, anchor] = localPlanningWindow(model, prediction, an
                 && range(2)<=boundary.parameterRange(2);
         end
         if ~covered
-            count = cell.stage-1;
+            count = tube.stage-1;
             break;
         end
     end
@@ -674,11 +691,16 @@ function [model, prediction, anchor] = localPlanningWindow(model, prediction, an
         prediction = ltvBicycleModel.finitePredict(model,[]);
         anchor = anchor(1:prediction.planCount);
         [model,prediction,anchor] = localPlanningWindow(model,prediction,anchor);
+    else
+        prediction.geometryAnchor = anchor;
+        prediction.geometryFrames = frames;
+        prediction.geometryNominal = nominal;
     end
 end
 
-function [states,violation] = localNominalLookahead(qp,model,decision)
+function [states,violation,details] = localNominalLookahead(qp,model,decision)
     states = [];violation = 0;
+    details = struct("violation",0,"label","","stage",0);
     if model.cfg.controller.certifiedSteps>=model.horizonSteps ...
             || string(model.cfg.model.linearizationPolicy)=="cruise"
         return;
@@ -688,6 +710,22 @@ function [states,violation] = localNominalLookahead(qp,model,decision)
     cfg = model.cfg;
     slipLimit = cfg.model.slipAngleMaximum(:);
     if isscalar(slipLimit), slipLimit = repmat(slipLimit,2,1); end
+    if isfield(qp.geometry,"nominalCheckCells")
+        data = struct("cells",qp.geometry.nominalCheckCells,"states",states,"inputs",inputs, ...
+            "settings",[cfg.controller.certifiedSteps;cfg.model.scheduleSpeedFloor; ...
+            cfg.vehicle.lf;cfg.vehicle.lr;slipLimit;cfg.encounter.numericalMargin]);
+        if exist("avoidanceNominalCheckKernelMex","file")==3
+            checked = avoidanceNominalCheckKernelMex(data);
+        else
+            checked = avoidanceSafetyGeometry("nominalCheck",data);
+        end
+        violation = checked.violation;
+        if violation>0
+            geometry = qp.geometry.local(checked.cellIndex);row = checked.rowIndex;
+            details = struct("violation",violation,"label",geometry.nodeLabels(row)+":"+string(row),"stage",geometry.stage);
+        end
+        return;
+    end
     for geometry = qp.geometry.local(:).'
         if geometry.stage<=model.cfg.controller.certifiedSteps,continue;end
         value = reshape(pagemtimes(geometry.nodeStateRows, ...
@@ -709,6 +747,11 @@ function [states,violation] = localNominalLookahead(qp,model,decision)
                 [scheduledSlip;-scheduledSlip]-[slipLimit;slipLimit]+geometry.nodeInitialReserve(tireRows,point), ...
                 [slip;-slip]-[slipLimit;slipLimit])+cfg.encounter.numericalMargin;
         end
-        violation = max(violation,max(value,[],"all"));
+        [peak,index] = max(value,[],"all");
+        if peak>violation
+            [row,~] = ind2sub(size(value),index);
+            details = struct("violation",peak,"label",geometry.nodeLabels(row)+":"+string(row),"stage",geometry.stage);
+            violation = peak;
+        end
     end
 end

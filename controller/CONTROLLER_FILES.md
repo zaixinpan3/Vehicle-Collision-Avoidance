@@ -19,15 +19,15 @@ Do not move controller helpers into those directories to evade the limit.
 | `avoidanceStageQp.m` | Sparse quadratic/Lorentz-cone transcription and truncation |
 | `solveHardCbfClf.m` | Numerical solve and independent constraint acceptance |
 | `certifyAvoidancePlan.m` | Independent geometric verification of a plan |
-| `avoidanceSafetyGeometry.m` | Swept lane and obstacle geometry rows |
+| `avoidanceSafetyGeometry.m` | Swept geometry, complete row projection and shared nonlinear nominal checks |
 | `rectangleConfigurationDistance.m` | Oriented rectangle configuration distance |
 | `terminalDissipation.m` | Separately validated optional rest-funnel construction |
 | `laneGeometry.m` | Polyline and analytic-arc projection, Frenet poses and chart bounds |
-| `ltvBicycleModel.m` | Held-input stage matrices, full prediction and initial braking schedule |
+| `ltvBicycleModel.m` | Held-input stage matrices, full prediction, shared native kernels and initial braking schedule |
 | `longitudinalRoadLoad.m` | Signed aerodynamic and equivalent rolling forces with their speed derivative |
 | `modifiedFialaTire.m` | Modified Fiala forces, local tire tangents and nominal combined-force rows |
 | `tireSlipRows.m` | Robust slip-angle model-domain rows |
-| `stateUncertainty.m` | Estimator certificate validation, Frenet boxes, disturbance propagation, intersection and terminal rest |
+| `stateUncertainty.m` | Estimator certificates, Frenet boxes, shared held-interval enclosures, intersection and terminal rest |
 | `targetPrediction.m` | Finite target inclusion, nominal motion, footprint support and encounter lifecycle |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |

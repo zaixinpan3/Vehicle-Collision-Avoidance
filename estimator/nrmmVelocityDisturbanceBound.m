@@ -4,6 +4,27 @@ function certificate = nrmmVelocityDisturbanceBound(gain, speedInterval, model, 
 % C_omega bounds [v_y-k*l*zeta; k*l-v_x], with |zeta| <= tan(b).
 % Sensor fields may also contain certified effective held-input error bounds.
 
+    persistent cachedGeometry cachedCoefficients
+    geometry = {gain,speedInterval,model};
+    if ~isequaln(geometry,cachedGeometry)
+        cachedCoefficients = localCoefficients(gain,speedInterval,model);
+        cachedGeometry = geometry;
+    end
+    sensorFields = ["velocityNoiseMaximum","gyroscopeNoiseMaximum","accelerometerNoiseMaximum"];
+    for field = sensorFields
+        validateattributes(sensors.(field), {'double'}, {'real','finite','scalar','nonnegative'});
+    end
+    certificate = cachedCoefficients;
+    forcing = sensors.accelerometerNoiseMaximum ...
+        + certificate.speedCoefficient*sensors.velocityNoiseMaximum ...
+        + certificate.gyroCoefficient*sensors.gyroscopeNoiseMaximum ...
+        + certificate.mismatchCoefficient*model.singleTrackYawRateMismatchMaximum;
+    certificate.disturbanceBound = forcing;
+    certificate.ultimateBound = forcing/gain;
+end
+
+function certificate = localCoefficients(gain,speedInterval,model)
+% Geometry and observer gain are fixed across changing held sensor bounds.
     validateattributes(gain, {'double'}, {'real','finite','scalar','positive'});
     validateattributes(speedInterval, {'double'}, {'real','finite','numel',2,'nonnegative'});
     if speedInterval(1) > speedInterval(2)
@@ -14,10 +35,6 @@ function certificate = nrmmVelocityDisturbanceBound(gain, speedInterval, model, 
     distance = model.rearAxleDistance;
     validateattributes(angle, {'double'}, {'real','finite','scalar','>=',0,'<',pi/2});
     validateattributes(distance, {'double'}, {'real','finite','scalar','positive'});
-    sensorFields = ["velocityNoiseMaximum","gyroscopeNoiseMaximum","accelerometerNoiseMaximum"];
-    for field = sensorFields
-        validateattributes(sensors.(field), {'double'}, {'real','finite','scalar','nonnegative'});
-    end
     mismatch = model.singleTrackYawRateMismatchMaximum;
     validateattributes(mismatch, {'double'}, {'real','finite','scalar','nonnegative'});
     cosine = cos(angle);
@@ -26,11 +43,8 @@ function certificate = nrmmVelocityDisturbanceBound(gain, speedInterval, model, 
         gain*distance-speed*cosine));
     speedCoefficient = gain/cosine;
     mismatchCoefficient = gain*distance/cosine;
-    forcing = sensors.accelerometerNoiseMaximum ...
-        + speedCoefficient*sensors.velocityNoiseMaximum ...
-        + gyro*sensors.gyroscopeNoiseMaximum+mismatchCoefficient*mismatch;
     certificate = struct("gyroCoefficient",gyro, ...
         "separatedGyroCoefficient",max(speed)+gain*distance/cosine, ...
         "speedCoefficient",speedCoefficient,"mismatchCoefficient",mismatchCoefficient, ...
-        "disturbanceBound",forcing,"ultimateBound",forcing/gain);
+        "disturbanceBound",0,"ultimateBound",0);
 end

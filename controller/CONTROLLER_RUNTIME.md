@@ -7,6 +7,11 @@ relinearization and independently checked physical decisions. See
 measurements and earlier formulations below are historical engineering records;
 they do not state the current controller's timing or certification guarantees.
 
+The September 8 complete-frame requirement and current build/validation entry
+are documented in [the straight runtime study](../scripts/STRAIGHT_REALTIME_RESULTS.md).
+Its 100 ms frame timer includes the NRMM observer, bounds and road fitting;
+the older controller-only 50 ms measurements below remain historical.
+
 ## Quadratic input and relaxation objective (2026-09-06)
 
 The current formulation minimizes normalized head input effort and squared

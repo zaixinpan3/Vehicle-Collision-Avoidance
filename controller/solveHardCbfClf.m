@@ -9,22 +9,14 @@ function [result,problem] = solveHardCbfClf(problem, cfg)
     solve = [];
     if string(cfg.encounter.safetyMarginPolicy)=="maximize" ...
             && any(startsWith(problem.geometry.label,"collision:"))
-        fullReserve = localApplyReserve(problem,max(0,problem.reserveFractionMaximum-10*cfg.encounter.numericalMargin));
-        solve = localRunJointProgram(fullReserve,cfg);
+        % The reserve problem is linear because CLF slacks are unbounded.
+        % Allocate it directly, avoiding a speculative infeasible SOCP.
+        [problem,marginSolve] = localReserveMargin(problem,cfg);
         solveCalls = 1;
-        if solve.feasible
-            % A feasible full-reserve solve attains the allocation upper
-            % bound (up to its arithmetic guard). No separate LP is needed.
-            problem = fullReserve;
-        else
-            [problem,marginSolve] = localReserveMargin(problem,cfg);
-            solveCalls = solveCalls+1;
-            if ~marginSolve.feasible
-                result.solverCalls = solveCalls;result.exitFlag = marginSolve.exitFlag;
-                result.message = "margin optimization: "+marginSolve.message;
-                return;
-            end
-            solve = [];
+        if ~marginSolve.feasible
+            result.solverCalls = solveCalls;result.exitFlag = marginSolve.exitFlag;
+            result.message = "margin optimization: "+marginSolve.message;
+            return;
         end
     end
     if isempty(solve)
@@ -64,16 +56,18 @@ function [problem,solve] = localReserveMargin(problem,cfg)
     original = problem.stageProgram;
     physical = problem.layout.decisionCount;
     equalityCount = original.cones(1);
-    hardCount = numel(problem.inequalityBound);
+    inequalityIndices = localInequalityIndices(problem);
+    hardCount = numel(inequalityIndices);
     selected = 1:equalityCount+hardCount;
-    marginColumn = [zeros(equalityCount,1);problem.anticipationReserve];
+    marginColumn = [zeros(equalityCount,1);problem.anticipationReserve(inequalityIndices)];
     matrix = [original.A(selected,1:physical),sparse(marginColumn),original.A(selected,physical+1:end)];
     total = size(matrix,2);
     extra = sparse(2,total);extra(:,physical+1) = [1;-1];
     linear = zeros(total,1);linear(physical+1) = -1;
     program = struct("P",sparse(total,total),"q",linear,"A",[matrix;extra], ...
         "b",[original.b(selected);problem.reserveFractionMaximum;0], ...
-        "cones",[equalityCount;hardCount+2],"physicalDecisionCount",physical+1);
+        "cones",[equalityCount;hardCount+2],"physicalDecisionCount",physical+1, ...
+        "inactiveSlackIndex",problem.layout.relaxationIndex);
     auxiliary = struct("layout",struct("decisionCount",physical+1),"stageProgram",program);
     solve = localRunJointProgram(auxiliary,cfg);
     if ~solve.feasible,return;end
@@ -83,7 +77,12 @@ function [problem,solve] = localReserveMargin(problem,cfg)
     % Leave an interior allocation for the subsequent nonlinear refinement.
     % The physical constraints do not change. Maximizing an optional buffer
     % to its exact feasibility frontier made the performance solve fragile.
-    fraction = max(0,0.99*fraction-10*cfg.encounter.numericalMargin);
+    if fraction>=problem.reserveFractionMaximum-10*cfg.encounter.numericalMargin
+        fraction = problem.reserveFractionMaximum;
+    else
+        fraction = 0.99*fraction;
+    end
+    fraction = max(0,fraction-10*cfg.encounter.numericalMargin);
     problem = localApplyReserve(problem,fraction);
 end
 
@@ -91,8 +90,16 @@ function problem = localApplyReserve(problem,fraction)
     reserve = fraction*problem.anticipationReserve;
     problem.reserveFraction = fraction;
     problem.inequalityBound = problem.inequalityBound-reserve;
-    rows = problem.stageProgram.cones(1)+(1:numel(problem.inequalityBound));
-    problem.stageProgram.b(rows) = problem.stageProgram.b(rows)-reserve;
+    inequalityIndices = localInequalityIndices(problem);
+    rows = problem.stageProgram.cones(1)+(1:numel(inequalityIndices));
+    problem.stageProgram.b(rows) = problem.stageProgram.b(rows)-reserve(inequalityIndices);
+end
+
+function indices = localInequalityIndices(problem)
+    indices = (1:numel(problem.inequalityBound)).';
+    if isfield(problem.stageProgram,"inequalityIndices")
+        indices = problem.stageProgram.inequalityIndices;
+    end
 end
 
 
@@ -138,10 +145,13 @@ function solve = localDefaultSolve(problem, cfg)
         nativeSolver = @solveAvoidanceSocpMex;
     end
     program = problem.stageProgram;
-    [stageDecision, output] = nativeSolver( ...
-        program.P, program.q, program.A, program.b, program.cones, ...
+    retained = true(numel(program.q),1);
+    if isfield(program,"inactiveSlackIndex"),retained(program.inactiveSlackIndex) = false;end
+    [nativeDecision, output] = nativeSolver( ...
+        program.P(retained,retained), program.q(retained), program.A(:,retained), program.b, program.cones, ...
         [cfg.solver.constraintTolerance, ...
             cfg.solver.optimalityTolerance, cfg.solver.maxIterations]);
+    stageDecision = zeros(numel(program.q),1);stageDecision(retained) = nativeDecision;
     flag = -7;
     switch output.status
         case 1

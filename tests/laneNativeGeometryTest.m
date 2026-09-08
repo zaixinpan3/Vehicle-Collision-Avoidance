@@ -47,6 +47,19 @@ classdef laneNativeGeometryTest < matlab.unittest.TestCase
             testCase.verifyEqual(nativeFrames, referenceFrames, AbsTol=2e-12);
         end
 
+        function individualRadiiRetainEveryPolylineCornerBound(testCase)
+            lane = localLane([0,0;1,0;1,1;2,1]);
+            station = [0.5,1,1.5,2.5];radii = [0.1,0.5,1,0.25];
+            frames = laneGeometry.frameBounds(lane,station,radii,2);
+            for index = 1:numel(station)
+                expected = laneGeometry.frameBounds(lane,station(index),radii(index),2);
+                testCase.verifyEqual(frames(index),expected,AbsTol=1e-14);
+            end
+            testCase.verifyEqual([frames.stationLower],[0.4,0.5,0.5,2.25],AbsTol=1e-14);
+            testCase.verifyEqual([frames.stationUpper],[0.6,1.5,2.5,2.75],AbsTol=1e-14);
+            testCase.verifyEqual([frames.headingErrorBound],[0,pi/2,pi/2,0],AbsTol=1e-14);
+        end
+
         function nativeProjectionRejectsZeroLengthSegments(testCase)
             testCase.verifyError(@localZeroLengthProjection, "projectLanePolylineMex:length");
         end

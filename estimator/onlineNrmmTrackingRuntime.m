@@ -26,6 +26,8 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % domain; domain exits are audited and reported, not gated on. All
 % continuous stages are advanced by fixed-step RK4 substeps with the frame
 % measurements held over the interval.
+% [nextRuntime,currentOutput] = onlineNrmmTrackingRuntime('sample',runtime,frame)
+% shares measurement admission between a current output and the next interval.
 % The Lyapunov/Lipschitz theorem covers the continuous vector field. Holds,
 % output-predictor resets, dropouts and RK4 are explicitly outside that
 % exponential-stability theorem. A separate comparison recursion in
@@ -39,20 +41,26 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
     action = lower(string(action));
     if ~isscalar(action)
         error("onlineNrmmTrackingRuntime:invalidAction", ...
-            "action must be 'initialize', 'step', 'output', or 'resetTarget'.");
+            "action must be 'initialize', 'step', 'sample', 'output', or 'resetTarget'.");
     end
     switch action
         case "initialize"
             varargout{1} = localInitialize(varargin{:});
         case "step"
-            [varargout{1}, varargout{2}] = localStep(varargin{:});
+            if nargout>1
+                [varargout{1}, varargout{2}] = localStep(varargin{:});
+            else
+                varargout{1} = localStep(varargin{:});
+            end
+        case "sample"
+            [varargout{1},varargout{2}] = localStep(varargin{:},true);
         case "output"
             varargout{1} = localCurrentOutput(varargin{:});
         case "resettarget"
             varargout{1} = localResetTarget(varargin{:});
         otherwise
             error("onlineNrmmTrackingRuntime:invalidAction", ...
-                "action must be 'initialize', 'step', 'output', or 'resetTarget'.");
+                "action must be 'initialize', 'step', 'sample', 'output', or 'resetTarget'.");
     end
 end
 
@@ -166,7 +174,8 @@ function runtime = localInitialize(cfg, options, observerDesign)
     end
 end
 
-function [runtime, output] = localStep(runtime, frame)
+function [runtime, output] = localStep(runtime, frame, publishCurrent)
+    if nargin<3,publishCurrent = false;end
     observerInput = localSynchronizedInput(frame, runtime);
 
     runtime.gnssPositionPredictor = observerInput.gnssPosition;
@@ -177,6 +186,11 @@ function [runtime, output] = localStep(runtime, frame)
     runtime.positionErrorBound = nrmmPositionErrorBound("measure", ...
         runtime.positionErrorBound,observerInput, ...
         localBoundState(localPackState(runtime),runtime.targetCount));
+    if publishCurrent
+        outputRuntime = localRecordMeasurementTimes(runtime,observerInput);
+        outputRuntime.currentTime = observerInput.time;
+        output = localOutput(outputRuntime,observerInput);
+    end
     [state, intervalAudit, runtime.positionErrorBound] = localRungeKuttaInterval( ...
         localPackState(runtime), observerInput, runtime);
     [runtime.bodyVelocityEstimate, ...
@@ -197,7 +211,7 @@ function [runtime, output] = localStep(runtime, frame)
     runtime.currentTime = observerInput.time+runtime.samplePeriod;
     runtime.positionErrorBound.time = runtime.currentTime;
     runtime = localRecordMeasurementTimes(runtime, observerInput);
-    output = localOutput(runtime, observerInput);
+    if nargout>1 && ~publishCurrent,output = localOutput(runtime, observerInput);end
 end
 
 function output = localCurrentOutput(runtime, frame)
@@ -223,23 +237,27 @@ function [nextState, intervalAudit, positionErrorBound] = localRungeKuttaInterva
         nextState, runtime, "interval-start", observerInput);
     step = runtime.integrationStep;
     positionErrorBound = runtime.positionErrorBound;
+    design = runtime.observerDesign;
+    kernelDesign = struct("velocity",struct("gain",design.velocity.gain), ...
+        "position",struct("gain",design.position.gain), ...
+        "target",struct("innovationGains",design.target.innovationGains,"domain",design.target.domain), ...
+        "yaw",struct("correctionBandwidth",design.yaw.correctionBandwidth,"courseModel", ...
+        struct("rearAxleDistance",design.yaw.courseModel.rearAxleDistance, ...
+        "sideslipDomainMaximum",design.yaw.courseModel.sideslipDomainMaximum)));
+    correspondence = observerInput.courseGeometry.correspondence;
+    measurement = struct("yawRate",observerInput.yawRate,"gnssVelocity",observerInput.gnssVelocity, ...
+        "bodyAcceleration",observerInput.bodyAcceleration, ...
+        "radarDetectionAvailable",observerInput.radarDetectionAvailable(:), ...
+        "correspondence",struct("informative",correspondence.informative,"heading",correspondence.heading));
+    if exist("nrmmObserverRk4IntervalMex","file")==3
+        [states,firstDerivatives] = nrmmObserverRk4IntervalMex(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
+    else
+        [states,firstDerivatives] = nrmmObserverRk4Interval(state,measurement,kernelDesign,step,runtime.integrationSubstepCount);
+    end
     for substepIdx = 1:runtime.integrationSubstepCount
-        first = localObserverDerivative( ...
-            nextState, observerInput, runtime);
-        second = localObserverDerivative( ...
-            nextState+0.5*step*first, observerInput, runtime);
-        third = localObserverDerivative( ...
-            nextState+0.5*step*second, observerInput, runtime);
-        fourth = localObserverDerivative( ...
-            nextState+step*third, observerInput, runtime);
-        previousState = nextState;
-        nextState = nextState+(step/6.0)*(first+2.0*second ...
-            + 2.0*third+fourth);
-        if any(~isfinite(nextState))
-            error("onlineNrmmTrackingRuntime:nonfiniteObserverState", ...
-                "The cascaded observer produced a nonfinite state.");
-        end
-        nextState(end) = localWrapToPi(nextState(end));
+        previousState = states(:,substepIdx);
+        nextState = states(:,substepIdx+1);
+        first = firstDerivatives(:,substepIdx);
         positionErrorBound = nrmmPositionErrorBound("advance",positionErrorBound, ...
             observerInput,localBoundState(previousState,runtime.targetCount), ...
             localBoundState(nextState,runtime.targetCount), ...
@@ -251,43 +269,6 @@ function [nextState, intervalAudit, positionErrorBound] = localRungeKuttaInterva
         intervalAudit = localMergeDomainAudits( ...
             intervalAudit, substepAudit);
     end
-end
-
-function derivative = localObserverDerivative(state, observerInput, runtime)
-    [bodyVelocity, ...
-        position, gnssPositionPredictor, targetState, ...
-        targetOutputPredictor, yaw] = ...
-        localUnpackState(state, runtime.targetCount);
-    design = runtime.observerDesign;
-    yawRateMeasured = observerInput.yawRate;
-    gnssVelocity = observerInput.gnssVelocity;
-
-    measuredBodyAcceleration = observerInput.bodyAcceleration;
-    observerEstimate = struct( ...
-        "bodyVelocity", bodyVelocity, ...
-        "position", position, ...
-        "targetState", targetState);
-    vectorFieldInput = struct( ...
-        "yawRate", yawRateMeasured, ...
-        "gnssVelocity", gnssVelocity, ...
-        "bodyAcceleration", measuredBodyAcceleration, ...
-        "positionReference", gnssPositionPredictor, ...
-        "radarReference", targetOutputPredictor, ...
-        "radarAvailable", observerInput.radarDetectionAvailable);
-    [observerDerivative, observerModel] = nrmmObserverVectorField( ...
-        observerEstimate, vectorFieldInput, design);
-    gnssPredictorDerivative = observerModel.inertialVelocity;
-    % The radar reference is expressed in the moving ego frame too.
-    % Its residual obeys rDot = -(K1*I+u3*J)*r while radar is available.
-    planarCross = [0,-1;1,0];
-    targetPredictorDerivative = observerModel.targetPlantDerivative(1:2,:) ...
-        -yawRateMeasured*planarCross*(targetOutputPredictor-targetState(1:2,:));
-    yawDerivative = nrmmYawObserverDerivative(yaw,yawRateMeasured, ...
-        observerInput.courseGeometry.correspondence,design);
-    derivative = [ ...
-        observerDerivative.bodyVelocity; ...
-        observerDerivative.position; gnssPredictorDerivative; ...
-        observerDerivative.targetState(:); targetPredictorDerivative(:); yawDerivative];
 end
 
 function audit = localOperatingDomainAudit( ...
@@ -959,4 +940,6 @@ function localAddProjectPaths()
     repoRoot = fileparts(estimatorRoot);
     addpath(fullfile(repoRoot, "config"));
     addpath(estimatorRoot);
+    nativePath = fullfile(repoRoot,"solver","nrmm");
+    if isfolder(nativePath),addpath(nativePath);end
 end

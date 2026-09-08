@@ -1,6 +1,10 @@
 function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
 % Convex maneuver-specific SOCP with one robust dissipation slack per sample.
     cfg = model.cfg;
+    if isfield(prediction,"initializationOnly") && prediction.initializationOnly
+        error("collisionAvoidanceController:uncertifiedInitialization", ...
+            "An input-seed prediction cannot formulate executable controls.");
+    end
     count = prediction.stageCount;
     planCount = prediction.planCount;
     decisionCount = planCount+count;
@@ -44,15 +48,16 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     clockScale = double(any(cfg.clf.referenceRate));
     scales = [cfg.clf.lateralPositionErrorScale; cfg.clf.headingErrorScale; cfg.clf.speedErrorScale; ...
         cfg.clf.lateralVelocityErrorScale; cfg.clf.yawRateErrorScale];
-    weight = diag(1./scales.^2);
-    for stage = 1:count
-        map = [prediction.egoStateMatrix(2:6, :, stage), zeros(5, count)];
-        offset = prediction.egoStateOffset(2:6, stage)-referenceStart ...
-            -cfg.clf.referenceRate*(stage-1)*model.sampleTime;
-        hessian = hessian+2*model.sampleTime*(map.'*weight*map);
-        linear = linear+2*model.sampleTime*map.'*weight*offset;
-        constant = constant+model.sampleTime*offset.'*weight*offset;
-    end
+    % Stack state costs once. The slack columns are identically zero in
+    % every state map and need not enter the repeated dense products.
+    stateMap = reshape(permute(prediction.egoStateMatrix(2:6,:,1:count),[1,3,2]),[],planCount);
+    stateOffset = prediction.egoStateOffset(2:6,1:count)-referenceStart ...
+        -cfg.clf.referenceRate*((0:count-1)*model.sampleTime);
+    weightedMap = stateMap./repmat(scales,count,1);
+    weightedOffset = stateOffset(:)./repmat(scales,count,1);
+    hessian(1:planCount,1:planCount) = 2*model.sampleTime*(weightedMap.'*weightedMap);
+    linear(1:planCount) = 2*model.sampleTime*weightedMap.'*weightedOffset;
+    constant = constant+model.sampleTime*(weightedOffset.'*weightedOffset);
     inputWeight = repmat([cfg.clf.frontWheelSteeringAngleWeight; cfg.clf.brakingRatioWeight], count, 1);
     hessian(1:planCount, 1:planCount) = hessian(1:planCount, 1:planCount)+2*model.sampleTime*diag(inputWeight);
     equilibrium = prediction.referencePlan;
@@ -114,8 +119,8 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
                 zeros(2, 1); clockScale*tube.time(point)];
             % A constant reference has no clock term in its residual. Set
             % that unused coordinate to zero to avoid artificial CLF slack.
-            error = [tube.radius(2:6, point); zeros(3, 1)];
-            errorQuadratic = error.'*abs(positive)*error;
+            stateErrorBound = [tube.radius(2:6, point); zeros(3, 1)];
+            errorQuadratic = stateErrorBound.'*abs(positive)*stateErrorBound;
             expansion = 0;
             ratio = 0;
             if errorQuadratic > 0
@@ -123,7 +128,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
                 expansion = (1+1/ratio)*errorQuadratic;
             end
             root = sqrt(1+ratio)*factor;
-            additive = curvature*(anchor.'*anchor)+disturbanceCost+expansion+abs(affine).'*error;
+            additive = curvature*(anchor.'*anchor)+disturbanceCost+expansion+abs(affine).'*stateErrorBound;
             constraints{point} = struct("map", map, "offset", offset, "root", root, ...
                 "linear", affine, "constant", additive, "stage", stage,"cellIndex",cellIndex,"pointIndex",point);
         end

@@ -2,6 +2,20 @@ classdef stateUncertainty
     %stateUncertainty Estimator certificates and state-box propagation, intersection and rest.
 
     methods (Static)
+        function tubes = heldInterval(a,b,c,map,offset,radius,rate,duration,order,stateLimit,inputLimit,numericalRadius,cellCount)
+        %heldInterval Share one complete held-interval enclosure algorithm.
+            step = duration/cellCount;
+            first = stateUncertainty.flowTube(a,b,c,map,offset,radius,rate,step,order, ...
+                stateLimit,inputLimit,numericalRadius);
+            tubes = repmat(first,cellCount,1);
+            for index = 2:cellCount
+                previous = tubes(index-1);
+                tubes(index) = stateUncertainty.flowTube(a,b,c,previous.endMap, ...
+                    previous.endOffset,previous.endRadius,rate,step,order, ...
+                    stateLimit,inputLimit,previous.endNumericalRadius);
+            end
+        end
+
         function tube = flowTube(a, b, c, map, offset, radius, rate, duration, order, stateLimit, inputLimit, numericalRadius)
         %flowTube Taylor/Bernstein enclosure of a complete held-input cell.
         % The polynomial is affine in the state and held input. Its remainder
@@ -54,22 +68,22 @@ classdef stateUncertainty
             transform = stateUncertainty.bernsteinTransform(degree, duration);
             controls = reshape(reshape(polynomial, [], degree+1)*transform.', ...
                 sizeState, columnCount, degree+1);
-            tube.map = pagemtimes(controls(:, 1:sizeState, :), map);
+            tubeMap = pagemtimes(controls(:, 1:sizeState, :), map);
             for index = 1:degree+1
-                tube.map(:, :, index) = tube.map(:, :, index)+controls(:, sizeState+(1:size(b, 2)), index);
+                tubeMap(:, :, index) = tubeMap(:, :, index)+controls(:, sizeState+(1:size(b, 2)), index);
             end
             % b contains the condensed held-input columns, so controls already
             % use the same decision coordinates as map.
-            tube.offset = reshape(pagemtimes(controls(:, 1:sizeState, :), offset), sizeState, []) ...
+            tubeOffset = reshape(pagemtimes(controls(:, 1:sizeState, :), offset), sizeState, []) ...
                 + reshape(controls(:, end, :), sizeState, []);
-            tube.radius = radiusPolynomial*transform.';
-            tube.numericalRadius = numericalPolynomial*transform.';
-            tube.localStateMap = controls(:,1:sizeState,:);
-            tube.localInputMap = controls(:,sizeState+(1:size(b,2)),:);
-            tube.localOffset = reshape(controls(:,end,:),sizeState,[]);
+            tubeRadius = radiusPolynomial*transform.';
+            tubeNumericalRadius = numericalPolynomial*transform.';
+            tubeLocalStateMap = controls(:,1:sizeState,:);
+            tubeLocalInputMap = controls(:,sizeState+(1:size(b,2)),:);
+            tubeLocalOffset = reshape(controls(:,end,:),sizeState,[]);
             transition = controls(:, 1:sizeState, end);
-            tube.endMap = tube.map(:, :, end);
-            tube.endOffset = tube.offset(:, end);
+            tubeEndMap = tubeMap(:, :, end);
+            tubeEndOffset = tubeOffset(:, end);
             % Retain cancellation in the endpoint transition; the swept tube
             % uses absolute power bounds, while the next cell uses |Phi(h)|.
             process = radiusPolynomial;
@@ -84,24 +98,33 @@ classdef stateUncertainty
                     -abs(powerA*a)*numericalRadius/factorial(powerIndex);
                 powerA = powerA*a;
             end
-            tube.endRadius = abs(transition)*radius+max(0, process*transform(end, :).');
-            tube.endNumericalRadius = abs(transition)*numericalRadius+max(0,numericalProcess*transform(end,:).');
+            tubeEndRadius = abs(transition)*radius+max(0, process*transform(end, :).');
+            tubeEndNumericalRadius = abs(transition)*numericalRadius+max(0,numericalProcess*transform(end,:).');
+            tube = struct("map",tubeMap,"offset",tubeOffset,"radius",tubeRadius, ...
+                "numericalRadius",tubeNumericalRadius,"localStateMap",tubeLocalStateMap, ...
+                "localInputMap",tubeLocalInputMap,"localOffset",tubeLocalOffset, ...
+                "endMap",tubeEndMap,"endOffset",tubeEndOffset,"endRadius",tubeEndRadius, ...
+                "endNumericalRadius",tubeEndNumericalRadius);
         end
 
         function transform = bernsteinTransform(degree, duration)
         %bernsteinTransform Power coefficients to Bernstein control points.
-            persistent priorDegree normalized
-            if ~isequal(degree,priorDegree)
-                normalized = zeros(degree+1);
-                normalized(:,1) = 1;
-                for row = 1:degree
-                    for power = 1:row
-                        normalized(row+1,power+1) = normalized(row+1,power) ...
-                            *(row-power+1)/(degree-power+1);
-                    end
+            persistent priorDegree priorNormalized
+            if coder.target('MATLAB')
+                if isequal(degree,priorDegree)
+                    transform = priorNormalized.*duration.^(0:degree);
+                    return;
                 end
-                priorDegree = degree;
             end
+            normalized = zeros(degree+1);
+            normalized(:,1) = 1;
+            for row = 1:degree
+                for power = 1:row
+                    normalized(row+1,power+1) = normalized(row+1,power) ...
+                        *(row-power+1)/(degree-power+1);
+                end
+            end
+            if coder.target('MATLAB'),priorDegree = degree;priorNormalized = normalized;end
             transform = normalized.*duration.^(0:degree);
         end
 

@@ -26,6 +26,29 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function sharedMeasurementPreservesCurrentPublicationAndEveryNextState(testCase)
+            runtime = localRuntime(1);
+            for detected = [true,false,true]
+                frame = localCruiseFrame(runtime.currentTime);
+                frame.radarDetectionAvailable = detected;
+                if ~detected,frame.radarRelativePosition(:) = NaN;end
+                expectedOutput = onlineNrmmTrackingRuntime("output",runtime,frame);
+                expectedRuntime = onlineNrmmTrackingRuntime("step",runtime,frame);
+                [actualRuntime,actualOutput] = onlineNrmmTrackingRuntime("sample",runtime,frame);
+                testCase.verifyEqual(actualOutput,expectedOutput);
+                testCase.verifyEqual(actualRuntime,expectedRuntime);
+                runtime = actualRuntime;
+            end
+        end
+
+        function omittedOutputPreservesEveryObserverAndBoundState(testCase)
+            initial = localRuntime(1);
+            frame = localCruiseFrame(0);
+            withoutPublication = onlineNrmmTrackingRuntime("step",initial,frame);
+            [withPublication,~] = onlineNrmmTrackingRuntime("step",initial,frame);
+            testCase.verifyEqual(withoutPublication,withPublication);
+        end
+
         function stepAdvancesOutputTimeByOneSamplePeriod(testCase)
             runtime = localRuntime(1);
             samplePeriod = runtime.samplePeriod;

@@ -336,10 +336,30 @@ function defect = localDefect(before,after,first,input,design,step)
 end
 
 function next = localComparisonStep(matrix,forcing,initial,step)
-% Augmentation integrates constant nonnegative forcing without inverting H.
+% Cache the state/input flow, which is independent of the changing forcing.
+% The augmented identity integrates constant inputs without inverting H.
+    persistent cachedMatrices cachedSteps cachedFlows
     count = numel(initial);
-    flow = expm(step*[matrix,forcing;zeros(1,count+1)]);
-    next = localGuard(max(0,flow(1:count,:)*[initial;1]));
+    if isempty(cachedMatrices)
+        cachedMatrices = cell(0,1);cachedSteps = zeros(0,1);cachedFlows = cell(0,1);
+    end
+    selected = [];
+    for index = 1:numel(cachedSteps)
+        if step==cachedSteps(index) && isequal(matrix,cachedMatrices{index})
+            selected = index;break;
+        end
+    end
+    if isempty(selected)
+        transition = expm(step*[matrix,eye(count);zeros(count,2*count)]);
+        flow = transition(1:count,:);
+        if numel(cachedSteps)==4
+            cachedMatrices(1) = [];cachedSteps(1) = [];cachedFlows(1) = [];
+        end
+        cachedMatrices{end+1,1} = matrix;cachedSteps(end+1,1) = step;cachedFlows{end+1,1} = flow;
+    else
+        flow = cachedFlows{selected};
+    end
+    next = localGuard(max(0,flow*[initial;forcing]));
 end
 
 function value = localMetricBound(components,design)

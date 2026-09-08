@@ -151,18 +151,18 @@ function [context, egoEstimate, targetEstimate, frame, audit] = ...
             egoTruth, bodyAcceleration, targetTruth);
     end
 
-    egoEstimate = localCurrentEgoEstimate( ...
-        context.runtime, frame);
+    observerPoint = struct("egoPositionInertial",context.runtime.positionEstimate, ...
+        "egoYaw",context.runtime.yawEstimate);
     [context, targetJustAcquired] = ...
         localUpdateTargetAcquisition( ...
-            context, frame, egoEstimate);
+            context, frame, observerPoint);
     context = localUpdateTargetLifecycle( ...
-        context, frame, egoEstimate);
-    if targetJustAcquired
-        context.currentOutput = onlineNrmmTrackingRuntime( ...
-            "output", context.runtime, frame);
-        egoEstimate = localCurrentEgoEstimate( ...
-            context.runtime, frame);
+        context, frame, observerPoint);
+    shareMeasurement = context.targetAcquired && ~targetJustAcquired;
+    if shareMeasurement
+        [nextRuntime,egoEstimate] = onlineNrmmTrackingRuntime("sample",context.runtime,frame);
+    else
+        egoEstimate = localCurrentEgoEstimate(context.runtime,frame);
     end
     if context.targetAcquired
         rawTargetEstimate = egoEstimate.targetEstimates;
@@ -214,9 +214,15 @@ function [context, egoEstimate, targetEstimate, frame, audit] = ...
     if ~context.targetAcquired || targetJustAcquired
         observerFrame = localFrameWithoutRadar(frame);
     end
-    [context.runtime, context.currentOutput] = ...
-        onlineNrmmTrackingRuntime( ...
-            "step", context.runtime, observerFrame);
+    % Retain the output actually published at this controller time. The
+    % internal observer still advances all states/bounds to the next sensor
+    % sample, but no consumer uses a second full future-time publication.
+    context.currentOutput = egoEstimate;
+    if shareMeasurement
+        context.runtime = nextRuntime;
+    else
+        context.runtime = onlineNrmmTrackingRuntime("step",context.runtime,observerFrame);
+    end
     context.previousControllerTime = time;
     context.previousControllerEgoTruth = egoTruth;
     context.previousObserverEgoTruth = egoTruth;
@@ -269,24 +275,21 @@ function context = localAdvanceObserverToControllerTime( ...
             context.configuration, context.randomStream, sampleTime, ...
             intermediateEgoTruth, bodyAcceleration, ...
             intermediateTargetTruth);
-        intermediateEgoEstimate = localCurrentEgoEstimate( ...
-            context.runtime, frame);
+        % Track initialization uses only the current observer point. Full
+        % output enclosures are published at controller times; every sensor
+        % update still measures and propagates the complete bound state.
+        intermediateEgoEstimate = struct("egoPositionInertial",context.runtime.positionEstimate, ...
+            "egoYaw",context.runtime.yawEstimate);
         [context, targetJustAcquired] = ...
             localUpdateTargetAcquisition( ...
                 context, frame, intermediateEgoEstimate);
         context = localUpdateTargetLifecycle( ...
             context, frame, intermediateEgoEstimate);
-        if targetJustAcquired
-            context.currentOutput = onlineNrmmTrackingRuntime( ...
-                "output", context.runtime, frame);
-        end
         observerFrame = frame;
         if ~context.targetAcquired || targetJustAcquired
             observerFrame = localFrameWithoutRadar(frame);
         end
-        [context.runtime, context.currentOutput] = ...
-            onlineNrmmTrackingRuntime( ...
-                "step", context.runtime, observerFrame);
+        context.runtime = onlineNrmmTrackingRuntime("step",context.runtime,observerFrame);
         context.previousObserverEgoTruth = intermediateEgoTruth;
     end
     context.observerSamplesSinceLastControllerTime = ...

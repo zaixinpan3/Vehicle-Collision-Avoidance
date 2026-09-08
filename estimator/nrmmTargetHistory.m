@@ -37,6 +37,16 @@ function value = nrmmTargetHistory(action, varargin)
             value.position = [value.position(:,keep),position(:)];
             value.radius = [value.radius(:,keep),radius(:)];
         case "enclose"
+            history = varargin{1};
+            if ~isempty(history.time) && isfield(history,"positionNoise") ...
+                    && numel(history.records)==numel(history.time) ...
+                    && exist("nrmmTargetHistoryKernelMex","file")==3
+                value = nrmmTargetHistoryKernelMex(history,varargin{2});
+            else
+                value = localEnclose(varargin{:});
+            end
+        case "encloseKernel"
+            % Shared numeric path for native/reference enclosure checks.
             value = localEnclose(varargin{:});
         case "sensor"
             value = varargin{1};input = varargin{2};design = varargin{3};index = varargin{4};
@@ -93,6 +103,7 @@ function enclosure = localEnclose(history, time)
         upper(3:4) = min(upper(3:4),min(centers+radii,[],2));
     end
     correlated = isfinite(history.yawAccelerationMaximum) && numel(history.records)==count;
+    transport = struct("relative",zeros(2,count),"angleRadius",zeros(1,count),"headingRadius",0);
     if correlated
         transport = localTransport(history);
         for index = 1:count-1

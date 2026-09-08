@@ -146,6 +146,9 @@ function result = runCenterlineCruiseScenario(varargin)
     controllerRoadAudit = cell(requestedStepCount, 1);
     targetDetectionAvailable = false(requestedStepCount, 1);
     solveTime = NaN(requestedStepCount, 1);
+    pipelineTime = NaN(requestedStepCount,1);
+    observerTime = zeros(requestedStepCount,1);
+    roadFitTime = NaN(requestedStepCount,1);
     controllerMetadata = cell(requestedStepCount, 1);
     attemptedStepCount = 0;
     plantTrace = localEmptyTrace();
@@ -155,20 +158,29 @@ function result = runCenterlineCruiseScenario(varargin)
     terminalTaskCompleted = false;
     maximumTargetCount = 0;
     controllerPreparation = struct("performed", false, "elapsedSeconds", 0.0);
+    if options.prepareController
+        initialRoad = localRoadPerception(centerline,state,options);
+        initialControllerState = state;initialControllerState.stateTime = 0;
+        controllerPreparation = prepareCollisionAvoidancePipeline( ...
+            initialControllerState,initialRoad.roadGeometry,cfg,estimatorConfiguration);
+    end
 
     for stepIdx = 1:requestedStepCount
+        pipelineTimer = tic;
         attemptedStepCount = stepIdx;
         intervalStart = (stepIdx - 1) * sampleTime;
         intervalEnd = stepIdx * sampleTime;
         targetTruthAtControlSample{stepIdx} = ...
             options.targetStateFunction(intervalStart, state);
         if options.useStateEstimator
+            observerTimer = tic;
             [estimatorContext, egoEstimate{stepIdx}, ...
                 targetEstimate{stepIdx}, sensorFrame{stepIdx}, ...
                 sensorAudit{stepIdx}] = ...
                 nrmmEstimatorControllerAdapter( ...
                     "sample", estimatorContext, intervalStart, ...
                     state, targetTruthAtControlSample{stepIdx});
+            observerTime(stepIdx) = toc(observerTimer);
             controllerState = egoEstimate{stepIdx};
         else
             controllerState = state;
@@ -187,38 +199,15 @@ function result = runCenterlineCruiseScenario(varargin)
             targetDetectionAvailable(stepIdx) = ...
                 ~isempty(targetEstimate{stepIdx});
         end
-        if isempty(options.roadBoundaryOffsets)
-            % Retain route and shoulder geometry for scenario diagnostics.
-            % No sensed boundary constraint is asserted in this mode.
-            terminalGeometryPerceptionRange = ...
-                min(options.perceptionRange, 30.0);
-            roadPerception{stepIdx} = fitPerceivedRoadBoundaries( ...
-                centerline, localControllerPose(controllerState), ...
-                PerceptionRange=terminalGeometryPerceptionRange, ...
-                RightOffset=6.0, LeftOffset=8.0, ...
-                ShoulderWidth=options.roadShoulderWidth);
-            controllerRoadGeometry = ...
-                roadPerception{stepIdx}.roadGeometry;
-            controllerRoadGeometry.boundaries = struct([]);
-        else
-            roadPerception{stepIdx} = fitPerceivedRoadBoundaries( ...
-                centerline, localControllerPose(controllerState), ...
-                PerceptionRange=options.perceptionRange, ...
-                RightOffset=options.roadBoundaryOffsets(1), ...
-                LeftOffset=options.roadBoundaryOffsets(2), ...
-                ShoulderWidth=options.roadShoulderWidth);
-            controllerRoadGeometry = ...
-                roadPerception{stepIdx}.roadGeometry;
-        end
+        roadTimer = tic;
+        roadPerception{stepIdx} = localRoadPerception(centerline,controllerState,options);
+        controllerRoadGeometry = roadPerception{stepIdx}.roadGeometry;
         maximumTargetCount = max( ...
             maximumTargetCount, numel(targetEstimate{stepIdx}));
         if isfield(options.geometry, "referenceCurve")
             controllerRoadGeometry.referenceCurve = options.geometry.referenceCurve;
         end
-        if stepIdx == 1 && options.prepareController
-            controllerPreparation = prepareCollisionAvoidanceController( ...
-                controllerState, controllerRoadGeometry, cfg);
-        end
+        roadFitTime(stepIdx) = toc(roadTimer);
         solveTimer = tic;
         try
             [command{stepIdx}, ~, planningProblem] = ...
@@ -226,11 +215,13 @@ function result = runCenterlineCruiseScenario(varargin)
                     controllerState, targetEstimate{stepIdx}, ...
                     controllerRoadGeometry, cfg);
             solveTime(stepIdx) = toc(solveTimer);
+            pipelineTime(stepIdx) = toc(pipelineTimer);
             controllerRoadAudit{stepIdx} = ...
                 localControllerRoadAudit(planningProblem);
             controllerMetadata{stepIdx} = planningProblem.metadata;
         catch exception
             solveTime(stepIdx) = toc(solveTimer);
+            pipelineTime(stepIdx) = toc(pipelineTimer);
             if startsWith(string(exception.identifier), ...
                     "collisionAvoidanceController:")
                 failure = localControllerFailure( ...
@@ -243,6 +234,15 @@ function result = runCenterlineCruiseScenario(varargin)
                 break;
             end
             rethrow(exception);
+        end
+        if options.enforceRuntimeDeadline && pipelineTime(stepIdx)>options.deadlineSeconds
+            exception = MException("collisionAvoidanceController:runtimeDeadlineExceeded", ...
+                "The complete frame took %.6f s, exceeding the %.6f s deadline.", ...
+                pipelineTime(stepIdx),options.deadlineSeconds);
+            failure = localControllerFailure(exception,stepIdx,intervalStart);
+            failureContext = struct("controllerState",controllerState, ...
+                "targetEstimate",targetEstimate{stepIdx},"controllerRoadGeometry",controllerRoadGeometry);
+            break;
         end
         if isempty(command{stepIdx})
             terminalTaskCompleted = true;
@@ -281,6 +281,7 @@ function result = runCenterlineCruiseScenario(varargin)
         "time", (0:attemptedStepCount-1).'*sampleTime, ...
         "targetVisible", targetDetectionAvailable(1:attemptedStepCount), ...
         "solveTime", solveTime(1:attemptedStepCount), ...
+        "pipelineTime",pipelineTime(1:attemptedStepCount), ...
         "metadata", {controllerMetadata(1:attemptedStepCount)}, ...
         "controllerEgoEstimate", {egoEstimate(1:attemptedStepCount)}, ...
         "targetEstimate", {targetEstimate(1:attemptedStepCount)}, ...
@@ -352,6 +353,13 @@ function result = runCenterlineCruiseScenario(varargin)
     result.targetTruthAtControlSample = targetTruthAtControlSample;
     result.controllerEgoEstimate = egoEstimate;
     result.solveTime = solveTime;
+    result.runtime = struct("frameSeconds",pipelineTime(1:attemptedStepCount), ...
+        "observerSeconds",observerTime(1:attemptedStepCount), ...
+        "roadFitSeconds",roadFitTime(1:attemptedStepCount), ...
+        "controllerSeconds",attempts.solveTime,"deadlineSeconds",options.deadlineSeconds, ...
+        "deadlineMet",all(pipelineTime(1:attemptedStepCount)<=options.deadlineSeconds), ...
+        "enforced",options.enforceRuntimeDeadline,"preparation",controllerPreparation, ...
+        "scope","Online synthetic sensors, observer, error bounds, road fitting and control; plant and offline preparation excluded");
     result.attempts = attempts;
     result.plantTrace = plantTrace;
     result.failure = failure;
@@ -418,6 +426,19 @@ function result = runCenterlineCruiseScenario(varargin)
     end
 end
 
+function perceived = localRoadPerception(centerline,state,options)
+    offsets = options.roadBoundaryOffsets;
+    range = options.perceptionRange;
+    if isempty(offsets),offsets = [6;8];range = min(range,30);end
+    perceived = fitPerceivedRoadBoundaries(centerline,localControllerPose(state), ...
+        PerceptionRange=range,RightOffset=offsets(1),LeftOffset=offsets(2), ...
+        ShoulderWidth=options.roadShoulderWidth);
+    if isempty(options.roadBoundaryOffsets),perceived.roadGeometry.boundaries = struct([]);end
+    if isfield(options.geometry,"referenceCurve")
+        perceived.roadGeometry.referenceCurve = options.geometry.referenceCurve;
+    end
+end
+
 function options = localOptions(varargin)
     parser = inputParser;
     parser.FunctionName = "runCenterlineCruiseScenario";
@@ -460,6 +481,8 @@ function options = localOptions(varargin)
     addParameter(parser, "Progress", false, @localLogicalScalar);
     addParameter(parser,"InitializeCruiseEquilibrium",false,@localLogicalScalar);
     addParameter(parser, "PrepareController", true, @localLogicalScalar);
+    addParameter(parser,"DeadlineSeconds",0.1,@localPositiveScalar);
+    addParameter(parser,"EnforceRuntimeDeadline",false,@localLogicalScalar);
     addParameter(parser, "ComputationalThreads", 1, ...
         @(value) localPositiveScalar(value) && value == fix(value));
     parse(parser, varargin{:});
@@ -487,6 +510,8 @@ function options = localOptions(varargin)
         parser.Results.EstimatorConfiguration;
     options.controllerConfiguration = parser.Results.ControllerConfiguration;
     options.prepareController = parser.Results.PrepareController;
+    options.deadlineSeconds = parser.Results.DeadlineSeconds;
+    options.enforceRuntimeDeadline = parser.Results.EnforceRuntimeDeadline;
     options.computationalThreads = parser.Results.ComputationalThreads;
     options.perceptionRange = ...
         double(parser.Results.PerceptionRange);

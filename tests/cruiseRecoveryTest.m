@@ -162,16 +162,18 @@ end
 
 function [inequality,equality,gradient,equalityGradient] = localCones(program,decision)
     slack = program.b-program.A*decision;
-    cells = reshape(slack(sum(program.cones(1:2))+1:end),10,[]);
-    inequality = (sqrt(sum(cells(2:end,:).^2,1))-cells(1,:)).';
+    dimensions = program.cones(3:end);
+    inequality = zeros(numel(dimensions),1);
     equality = [];
-    gradient = zeros(numel(decision),size(cells,2));
+    gradient = zeros(numel(decision),numel(dimensions));
     offset = sum(program.cones(1:2));
-    for index = 1:size(cells,2)
-        rows = offset+10*(index-1)+(1:10);
-        vector = cells(2:end,index);
+    for index = 1:numel(dimensions)
+        rows = offset+(1:dimensions(index));
+        vector = slack(rows(2:end));
+        inequality(index) = norm(vector)-slack(rows(1));
         gradient(:,index) = program.A(rows(1),:).' ...
             -program.A(rows(2:end),:).'*(vector/max(norm(vector),realmin));
+        offset = offset+dimensions(index);
     end
     equalityGradient = [];
 end

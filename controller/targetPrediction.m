@@ -11,22 +11,18 @@ classdef targetPrediction
             localNormal = rotation.'*normal;
             vertices = [halfLength,halfLength,-halfLength,-halfLength; ...
                 halfWidth,-halfWidth,halfWidth,-halfWidth];
-            offset = zeros(0,1);slope = zeros(0,1);
-            for vertex = vertices
-                a = localNormal.'*vertex;
-                b = localNormal.'*[-vertex(2);vertex(1)];
-                phase = atan2(b,a);
-                for period = -1:1
-                    lower = max(-errorMaximum,phase-pi/2+2*pi*period);
-                    upper = min(errorMaximum,phase+pi/2+2*pi*period);
-                    if lower>upper,continue;end
-                    point = min(max(anchor,lower),upper);
-                    derivative = -a*sin(point)+b*cos(point);
-                    value = a*cos(point)+b*sin(point);
-                    offset(end+1,1) = value-derivative*point+64*eps*(1+abs(a)+abs(b)); %#ok<AGROW>
-                    slope(end+1,1) = derivative; %#ok<AGROW>
-                end
-            end
+            a = localNormal.'*vertices;
+            b = localNormal.'*[-vertices(2,:);vertices(1,:)];
+            phase = atan2(b,a);
+            periods = 2*pi*(-1:1).';
+            lower = max(-errorMaximum,phase-pi/2+periods);
+            upper = min(errorMaximum,phase+pi/2+periods);
+            point = min(max(anchor,lower),upper);
+            derivative = -a.*sin(point)+b.*cos(point);
+            value = a.*cos(point)+b.*sin(point);
+            intercept = value-derivative.*point+64*eps*(1+abs(a)+abs(b));
+            retained = lower<=upper;
+            offset = intercept(retained);slope = derivative(retained);
         end
         function finite = isFiniteSensing(encounter)
             finite = string(encounter.contract.kind) == "finite-sensing-motion-v1";
@@ -121,6 +117,7 @@ classdef targetPrediction
             center = [x(1:2)+x(3:4)*duration+x(5:6)*(duration.^2/2); ...
                 x(3:4)+x(5:6)*duration; repmat(x(5:6), 1, numel(duration)); ...
                 x(7)+x(8)*duration; repmat(x(8), 1, numel(duration))];
+            if nargout<2,return;end
             radius = [r(1:2)+r(3:4)*duration+r(5:6)*(duration.^2/2)+jerk*(duration.^3/6); ...
                 r(3:4)+r(5:6)*duration+jerk*(duration.^2/2); ...
                 r(5:6)+jerk*duration; r(7)+r(8)*duration+yawAcceleration*(duration.^2/2); ...
@@ -137,10 +134,15 @@ classdef targetPrediction
         % Constant curvature and tangential acceleration, used for lookahead.
         % This trajectory does not replace the uncertain executed-step tube.
             x = encounter.center;
+            duration = double(duration(:).');
+            if any(~isfinite(duration) | duration<0)
+                error("collisionAvoidanceController:invalidPredictionTime","Prediction times must be finite and nonnegative.");
+            end
             if isfield(encounter,"nominalCenter"), x = encounter.nominalCenter; end
             speed = norm(x(3:4));
             if speed<=sqrt(eps)
-                center = x;center(3:6) = 0;center(8) = 0;jerk = 0;yawAcceleration = 0;
+                center = repmat(x,1,numel(duration));center(3:6,:) = 0;center(8,:) = 0;
+                jerk = zeros(size(duration));yawAcceleration = jerk;
                 return;
             end
             acceleration = dot(x(3:4),x(5:6))/speed;
@@ -149,7 +151,7 @@ classdef targetPrediction
                 acceleration = min(max(acceleration,-limit),limit);
             end
             curvature = x(8)/speed;
-            stopped = acceleration<0 && duration>=speed/-acceleration;
+            stopped = acceleration<0 & duration>=speed/-acceleration;
             if acceleration<0, duration = min(duration,speed/-acceleration); end
             arc = speed*duration+acceleration*duration.^2/2;
             initialCourse = atan2(x(4),x(3));
@@ -160,16 +162,17 @@ classdef targetPrediction
                 position = x(1:2)+[sin(course)-sin(initialCourse);cos(initialCourse)-cos(course)]/curvature;
             end
             speed = max(0,speed+acceleration*duration);
-            if stopped, acceleration = 0; end
+            acceleration = acceleration+zeros(size(duration));
+            acceleration(stopped) = 0;
             direction = [cos(course);sin(course)];
             center = [position;speed.*direction; ...
-                acceleration*direction+speed.^2*curvature.*[-direction(2,:);direction(1,:)]; ...
+                acceleration.*direction+speed.^2*curvature.*[-direction(2,:);direction(1,:)]; ...
                 x(7)+curvature*arc;curvature*speed];
             % Uniform nominal derivatives over a complete controller interval.
             interval = 0;
             if isfield(encounter.contract,"predictionSampleTime"), interval = encounter.contract.predictionSampleTime; end
             maximumSpeed = speed+abs(acceleration)*interval;
-            jerk = hypot(maximumSpeed.^3*curvature^2,3*maximumSpeed*abs(acceleration*curvature));
+            jerk = hypot(maximumSpeed.^3*curvature^2,3*maximumSpeed.*abs(acceleration*curvature));
             yawAcceleration = abs(acceleration*curvature);
         end
 

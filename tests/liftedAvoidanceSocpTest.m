@@ -8,6 +8,16 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function screenedConesPreserveTheRequiredClfSlack(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            cfg.controller.certifiedSteps = 1;
+            cfg.model.frontWheelSteeringRateMaximum = 0.5;
+            cfg.model.brakingRatioRateMaximum = 2;
+            [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            discrepancy = localClfScreeningError(problem,cfg);
+            testCase.verifyLessThanOrEqual(discrepancy,1e-8);
+            testCase.verifyLessThanOrEqual(numel(problem.qp.stageProgram.clfConstraintIndices),numel(problem.qp.clf.constraints));
+        end
         function routeStationOriginDoesNotChangeTheAvoidanceInput(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             cfg.controller.certifiedSteps = 1;
@@ -51,7 +61,9 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
                 residual = sparseProgram.A*decision-sparseProgram.b;
                 expected = condensed.A*decision(1:sparseProgram.physicalDecisionCount)-condensed.b;
                 testCase.verifyEqual(residual(1:equalities),zeros(equalities,1),AbsTol=1e-9);
-                testCase.verifyEqual(residual(equalities+1:end),expected,AbsTol=1e-8);
+                hard = sparseProgram.cones(2);
+                testCase.verifyEqual(residual(equalities+(1:hard)),expected(sparseProgram.inequalityIndices),AbsTol=1e-8);
+                testCase.verifyLessThanOrEqual(localClfEncodingError(sparseProgram,decision,problem.qp),1e-6);
             end
             newDifference = localObjective(sparseProgram,secondLift)-localObjective(sparseProgram,firstLift);
             oldDifference = localObjective(condensed,second)-localObjective(condensed,first);
@@ -69,6 +81,43 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
                 testCase.verifyLessThanOrEqual(max(rows.input(1:sides,:)*input-rows.bound(1:sides)),1e-12);
             end
         end
+    end
+end
+
+function error = localClfScreeningError(problem,cfg)
+    lower = max(problem.qp.lowerBound(1:2),problem.model.previousInput ...
+        -cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]);
+    upper = min(problem.qp.upperBound(1:2),problem.model.previousInput ...
+        +cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]);
+    [first,second] = ndgrid(linspace(lower(1),upper(1),7),linspace(lower(2),upper(2),7));
+    inputs = [first(:),second(:)].';error = 0;
+    for input = inputs
+        decision = problem.decision;decision(1:2) = input;
+        residual = zeros(numel(problem.qp.clf.constraints),1);
+        for index = 1:numel(residual)
+            constraint = problem.qp.clf.constraints(index);
+            value = constraint.map*decision+constraint.offset;
+            residual(index) = norm(constraint.root*value)^2+constraint.linear.'*value+constraint.constant;
+        end
+        error = max(error,abs(max(residual)-max(residual(problem.qp.stageProgram.clfConstraintIndices))));
+    end
+end
+
+function error = localClfEncodingError(program,decision,qp)
+    slack = program.b-program.A*decision;
+    cursor = sum(program.cones(1:2));
+    error = 0;
+    for index = 1:numel(program.clfConstraintIndices)
+        dimension = program.cones(index+2);
+        cone = slack(cursor+(1:dimension));
+        constraint = qp.clf.constraints(program.clfConstraintIndices(index));
+        physical = decision(1:qp.layout.decisionCount);
+        value = constraint.map*physical+constraint.offset;
+        expected = physical(qp.layout.relaxationIndex(constraint.stage)) ...
+            -norm(constraint.root*value)^2-constraint.linear.'*value-constraint.constant;
+        actual = (cone(1)^2-sum(cone(2:end).^2))/4;
+        error = max(error,abs(actual-expected));
+        cursor = cursor+dimension;
     end
 end
 

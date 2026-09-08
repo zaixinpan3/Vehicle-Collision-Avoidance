@@ -7,6 +7,18 @@ classdef targetPredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function batchedNominalFlowPreservesCurvatureAndTheStop(testCase)
+            encounter = struct("center",[0;0;2;0;-2;.2;0;.1], ...
+                "contract",struct("scalarAccelerationMaximum",2,"predictionSampleTime",.05));
+            time = [0,.25,.5,1,2];
+            [batch,jerk,yawAcceleration] = targetPrediction.nominalFlow(encounter,time);
+            [states,jerks,yawAccelerations] = arrayfun(@(t) targetPrediction.nominalFlow(encounter,t), ...
+                time,UniformOutput=false);
+            testCase.verifyEqual(batch,horzcat(states{:}),AbsTol=1e-14);
+            testCase.verifyEqual(jerk,horzcat(jerks{:}),AbsTol=1e-14);
+            testCase.verifyEqual(yawAcceleration,horzcat(yawAccelerations{:}),AbsTol=1e-14);
+            testCase.verifyEqual(batch(:,end),batch(:,end-1),AbsTol=1e-14);
+        end
         function exactInitialMotionStaysExactAcrossTheStop(testCase)
             model = localModel([2; 0], [-2; 0], 0, zeros(8, 1));
             [position, yaw] = targetPrediction.errorEnvelope([0, 0.5, 1, 2, 100], model);

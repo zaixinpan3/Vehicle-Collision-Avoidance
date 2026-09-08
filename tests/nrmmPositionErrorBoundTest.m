@@ -15,6 +15,21 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function changingForcingAndRadarModeRetainsTheExactComparisonFlow(testCase)
+            for detected = [true,false,true]
+                [runtime,frame] = localRuntime(localSmoothConfig(testCase.Config),testCase.Design,1,struct());
+                frame.radarDetectionAvailable = detected;
+                if ~detected,frame.radarRelativePosition(:) = NaN;end
+                frame.yawRateMeasured = 0.03*double(detected);
+                changed = onlineNrmmTrackingRuntime("step",runtime,frame);
+                record = changed.positionErrorBound.lastComparison;
+                count = numel(record.initial);
+                transition = expm(record.step*[record.matrix,record.input;zeros(1,count+1)]);
+                expected = max(0,transition(1:count,:)*[record.initial;1]);
+                testCase.verifyEqual(record.final,expected,AbsTol=1e-9,RelTol=1e-12);
+            end
+        end
+
         function noisyTrajectoryIsContainedWithOnlyExistingDomainBounds(testCase)
             result = localScenario(testCase.Config,testCase.Design,"retained",zeros(0,2));
             testCase.verifyTrue(all(result.estimate.positionErrorBoundAvailable));
@@ -87,6 +102,19 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(min(slack),-1e-10);
             testCase.verifyTrue(all(available));
             testCase.verifyTrue(orientationContained);
+        end
+
+        function oneStepPerSensorIntervalRetainsContainmentThroughPeaking(testCase)
+            cfg = localSmoothConfig(testCase.Config);
+            cfg.runtime.samplePeriod = 0.0125;
+            cfg.runtime.integrationStepMaximum = cfg.runtime.samplePeriod;
+            design = synthesizeNrmmObserverGains(cfg);
+            [slack,available,orientationContained] = localLargeInitialErrors(cfg,design);
+            testCase.verifyGreaterThanOrEqual(min(slack),-1e-10);
+            testCase.verifyTrue(all(available));
+            testCase.verifyTrue(orientationContained);
+            excess = localDefectExcess(cfg,design,false,cfg.runtime.samplePeriod);
+            testCase.verifyLessThanOrEqual(max(excess,[],"all"),1e-8);
         end
 
         function inconsistentRadarDisablesOnlyItsTrackBound(testCase)
@@ -305,7 +333,8 @@ function derivative = localField(state,input,design)
         -input.yawRate*[0,-1;1,0]*state.radarPredictor;
 end
 
-function [excess,orientationValid] = localDefectExcess(cfg,design,crossing)
+function [excess,orientationValid] = localDefectExcess(cfg,design,crossing,step)
+    if nargin < 4,step = 0.02;end
     before = localState(0.1);
     input = localInput(0);
     if crossing
@@ -320,7 +349,6 @@ function [excess,orientationValid] = localDefectExcess(cfg,design,crossing)
     after.targetState = before.targetState+[0.05;-0.02;4;0.2;-0.4;0.7];
     after.radarPredictor = before.radarPredictor+[0.03;-0.01];
     first = localField(before,input,design);
-    step = 0.02;
     result = nrmmPositionErrorBound("advance",bound,input,before,after,first,step);
     defect = result.lastDefect;
     excess = zeros(5,51);

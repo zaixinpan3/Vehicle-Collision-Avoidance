@@ -4,28 +4,60 @@ classdef ltvBicycleModel
     methods (Static)
         function [states,stateJacobian,inputJacobian] = nominalRollout(model,inputs)
         % Nonlinear nominal prediction only; the executed tube is separate.
+            cfg = model.cfg;
+            kernelCfg = struct("vehicle",struct("m",cfg.vehicle.m,"Iz",cfg.vehicle.Iz, ...
+                "lf",cfg.vehicle.lf,"lr",cfg.vehicle.lr,"gravity",cfg.vehicle.gravity), ...
+                "model",struct("scheduleSpeedFloor",cfg.model.scheduleSpeedFloor),"roadLoad",cfg.roadLoad);
+            parameters = modifiedFialaTire.parameters(cfg);
+            tire = struct("corneringStiffness",parameters.corneringStiffness, ...
+                "longitudinalForceScale",parameters.longitudinalForceScale);
+            station = model.lane.segmentStation(:);
+            curvature = model.lane.segmentCurvature(:);
+            if isfield(model.lane,"referenceCurve")
+                station = 0;curvature = model.lane.referenceCurve.curvature;
+            end
+            if exist("bicycleNominalKernelMex","file")==3
+                [states,stateJacobian,inputJacobian] = bicycleNominalKernelMex( ...
+                    model.initialEgoState,inputs,model.sampleTime,station,curvature,kernelCfg,tire, ...
+                    model.longitudinalAccelerationBias,nargout>1);
+            else
+                [states,stateJacobian,inputJacobian] = ltvBicycleModel.nominalKernel( ...
+                    model.initialEgoState,inputs,model.sampleTime,station,curvature,kernelCfg,tire, ...
+                    model.longitudinalAccelerationBias,nargout>1);
+            end
+        end
+
+        function [states,stateJacobian,inputJacobian] = nominalKernel( ...
+                initialState,inputs,sampleTime,segmentStation,segmentCurvature,cfg,parameters,bias,linearize)
+        % Shared MATLAB/native RK4 implementation; all data remain runtime inputs.
             count = size(inputs,2);states = zeros(6,count+1);
-            states(:,1) = model.initialEgoState;
-            linearize = nargout>1;
+            states(:,1) = initialState;
             stateJacobian = zeros(6,6,count);inputJacobian = zeros(6,2,count);
-            cfg = model.cfg;parameters = modifiedFialaTire.parameters(cfg);
-            subdivisions = max(1,ceil(model.sampleTime/0.01));
-            h = model.sampleTime/subdivisions;
+            subdivisions = max(1,ceil(sampleTime/0.01));
+            h = sampleTime/subdivisions;
+            coder.varsize('x',[6,17],[false,true]);
+            coder.varsize('u',[2,17],[false,true]);
             for stage = 1:count
                 x = states(:,stage);u = inputs(:,stage);
-                curvature = laneGeometry.curvature(x(1),model.lane);
+                segment = 1;
+                for index = 2:numel(segmentStation)
+                    if segmentStation(index)>x(1),break;end
+                    segment = index;
+                end
+                curvature = segmentCurvature(segment);
+                differenceStep = ones(8,1);
                 if linearize
-                    point = [x;u];
+                    point = [states(:,stage);inputs(:,stage)];
                     differenceStep = eps^(1/3)*(1+abs(point));
                     differenceStep(8) = min(differenceStep(8),max(1e-10,(1-abs(u(2)))/4));
                     batch = point+[zeros(8,1),diag(differenceStep),-diag(differenceStep)];
                     x = batch(1:6,:);u = batch(7:8,:);
                 end
                 for substep = 1:subdivisions
-                    k1 = localNominalFlow(x,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
-                    k2 = localNominalFlow(x+h*k1/2,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
-                    k3 = localNominalFlow(x+h*k2/2,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
-                    k4 = localNominalFlow(x+h*k3,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
+                    k1 = localNominalFlow(x,u,curvature,cfg,parameters,bias);
+                    k2 = localNominalFlow(x+h*k1/2,u,curvature,cfg,parameters,bias);
+                    k3 = localNominalFlow(x+h*k2/2,u,curvature,cfg,parameters,bias);
+                    k4 = localNominalFlow(x+h*k3,u,curvature,cfg,parameters,bias);
                     x = x+h*(k1+2*k2+2*k3+k4)/6;
                 end
                 states(:,stage+1) = x(:,1);
@@ -43,6 +75,15 @@ classdef ltvBicycleModel
         % compatible with one model; no desired acceleration is introduced.
             if nargin < 3, accelerationBias = 0; end
             speed = cfg.referenceSpeed;
+            if curvature==0
+                % Exact straight equilibrium: lateral forces vanish and
+                % longitudinal tire force balances the passive road load.
+                state = [0;0;0;speed;0;0];
+                ratio = (longitudinalRoadLoad(speed,cfg)/cfg.vehicle.m-accelerationBias) ...
+                    /modifiedFialaTire.accelerationGain(cfg);
+                input = [0;ratio];
+                return;
+            end
             [a,b,c] = ltvBicycleModel.continuousMatrices(curvature,speed,cfg,0,accelerationBias);
             state = [0;0;0;speed;0;curvature*speed];
             rows = 4:6;
@@ -52,9 +93,26 @@ classdef ltvBicycleModel
             input = solution(2:3);
         end
 
-        function prediction = finitePredict(model, schedule)
+        function [allA,allB,allC,allTires,allReserve] = linearizationKernel(states,inputs,curvatures,cfg,bias,rate,h)
+        % Shared native/MATLAB stage Jacobians and Metzler disturbance flow.
+            count = size(inputs,2);
+            assert(count>=1);
+            allA = zeros(6,6,count);allB = zeros(6,2,count);allC = zeros(6,count);
+            allReserve = zeros(6,count);
+            first = modifiedFialaTire.affineModel(states(:,1),inputs(:,1),cfg);
+            allTires = repmat(first,count,1);
+            for stage = 1:count
+                [a,b,c,tire] = localOperatingPointMatrices(curvatures(stage),states(:,stage),inputs(:,stage),cfg,bias);
+                allA(:,:,stage) = a;allB(:,:,stage) = b;allC(:,stage) = c;allTires(stage) = tire;
+                allReserve(:,stage) = stateUncertainty.heldDisturbance(a,rate,h);
+            end
+        end
+
+        function prediction = finitePredict(model, schedule, initializationOnly)
         %finitePredict A finite held-input witness, without an appended rest tail.
             cfg = model.cfg;
+            if nargin<3,initializationOnly = false;end
+            initializationOnly = initializationOnly && string(cfg.model.linearizationPolicy)~="cruise";
             count = model.horizonSteps;
             planCount = 2*count;
             h = model.sampleTime;
@@ -95,6 +153,7 @@ classdef ltvBicycleModel
                 model.linearizationInputs = anchorInputs;
             end
             prediction = struct("stageCount", count, "nodeCount", count+1, ...
+                "initializationOnly",initializationOnly, ...
                 "planCount", planCount, "referencePlan", reference(:), ...
                 "scheduleForStore", schedule, "scheduleSpeedProfile", schedule.speedProfile, ...
                 "scheduleCurvature", schedule.curvature, "scheduleBrakingRatio", schedule.brakingRatio, ...
@@ -123,6 +182,25 @@ classdef ltvBicycleModel
             prediction.egoStateOffset(:, 1) = offset;
             prediction.egoStateErrorBound(:, 1) = radius;
             baseRate = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
+            nativeStages = ~isempty(nonlinearAnchor) && exist("bicycleLinearizationKernelMex","file")==3;
+            if nativeStages
+                tireParameters = modifiedFialaTire.parameters(cfg);
+                kernelCfg = struct("vehicle",struct("m",cfg.vehicle.m,"Iz",cfg.vehicle.Iz, ...
+                    "lf",cfg.vehicle.lf,"lr",cfg.vehicle.lr,"gravity",cfg.vehicle.gravity), ...
+                    "model",struct("scheduleSpeedFloor",cfg.model.scheduleSpeedFloor), ...
+                    "roadLoad",cfg.roadLoad,"tire",struct("corneringStiffness",tireParameters.corneringStiffness, ...
+                    "frictionCoefficient",tireParameters.frictionCoefficient));
+                stageStates = model.linearizationStates;
+                refine = isfield(model,"refineNominalLookahead") && model.refineNominalLookahead;
+                if string(cfg.model.linearizationPolicy)=="currentState" && ~refine
+                    stageStates = repmat(model.initialEgoState,1,count);
+                end
+                linearizedCount = count;
+                if initializationOnly,linearizedCount = min(count,cfg.controller.certifiedSteps);end
+                [allA,allB,allC,allTires,allReserve] = bicycleLinearizationKernelMex( ...
+                    stageStates(:,1:linearizedCount),model.linearizationInputs(:,1:linearizedCount),schedule.curvature(1:linearizedCount), ...
+                    kernelCfg,model.longitudinalAccelerationBias,baseRate,h);
+            end
             stateLimit = [model.lane.segmentStation(end)+model.lane.segmentLength(end); ...
                 cfg.model.lateralDomainRadius; cfg.model.headingDomainRadius; ...
                 cfg.model.speedMaximum; cfg.model.lateralVelocityMaximum; cfg.model.yawRateMaximum];
@@ -132,6 +210,31 @@ classdef ltvBicycleModel
             tireModels = cell(count,1);
             priorOperatingPoint = [];
             for stage = 1:count
+                if initializationOnly && stage>cfg.controller.certifiedSteps
+                    % This temporary prediction selects an input seed only.
+                    % Preserve its exact nominal maps but omit uncertainty
+                    % tubes that the maneuver-specific prediction replaces.
+                    stateBar = model.linearizationStates(:,stage);
+                    refine = isfield(model,"refineNominalLookahead") && model.refineNominalLookahead;
+                    if string(cfg.model.linearizationPolicy)=="currentState" && ~refine
+                        stateBar = model.initialEgoState;
+                    end
+                    comparison = [stateBar(2:6);model.linearizationInputs(:,stage);schedule.curvature(stage)];
+                    if ~isequal(comparison,priorOperatingPoint)
+                        exact = [nominalStateJacobian(:,:,stage),nominalInputJacobian(:,:,stage),zeros(6,1)];
+                    end
+                    priorOperatingPoint = comparison;
+                    localState = exact(1:6,1:6);
+                    localInput = exact(1:6,7:8);
+                    localOffset = nonlinearAnchor(:,stage+1)-localState*nonlinearAnchor(:,stage) ...
+                        -localInput*anchorInputs(:,stage);
+                    map = localState*map;
+                    map(:,2*stage-1:2*stage) = map(:,2*stage-1:2*stage)+localInput;
+                    offset = localState*offset+localOffset;
+                    prediction.egoStateMatrix(:,:,stage+1) = map;
+                    prediction.egoStateOffset(:,stage+1) = offset;
+                    continue;
+                end
                 changed = stage==1 || schedule.curvature(stage)~=schedule.curvature(stage-1) ...
                     || schedule.speedProfile(stage)~=schedule.speedProfile(stage-1) ...
                     || schedule.brakingRatio(stage)~=schedule.brakingRatio(stage-1);
@@ -157,15 +260,20 @@ classdef ltvBicycleModel
                     prediction.scheduleBrakingRatio(stage) = inputBar(2);
                 end
                 if changed
-                    [a,b,c,tireModel] = ltvBicycleModel.continuousMatrices(schedule.curvature(stage), ...
-                        schedule.speedProfile(stage),cfg,schedule.brakingRatio(stage),model.longitudinalAccelerationBias,operatingPoint);
+                    if nativeStages
+                        a = allA(:,:,stage);b = allB(:,:,stage);c = allC(:,stage);tireModel = allTires(stage);
+                        processReserve = allReserve(:,stage);
+                    else
+                        [a,b,c,tireModel] = ltvBicycleModel.continuousMatrices(schedule.curvature(stage), ...
+                            schedule.speedProfile(stage),cfg,schedule.brakingRatio(stage),model.longitudinalAccelerationBias,operatingPoint);
+                        processReserve = stateUncertainty.heldDisturbance(a,baseRate,h);
+                    end
                     rate = baseRate;
                     if stage<=cfg.controller.certifiedSteps || isempty(nonlinearAnchor)
                         exact = expm(h*[a,b,c;zeros(3,9)]);
                     else
                         exact = [nominalStateJacobian(:,:,stage),nominalInputJacobian(:,:,stage),zeros(6,1)];
                     end
-                    processReserve = stateUncertainty.heldDisturbance(a,rate,h);
                     executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound+processReserve;
                 end
                 tireModels{stage} = tireModel;
@@ -213,10 +321,16 @@ classdef ltvBicycleModel
                 dt = h/cellCount;
                 heldMap = zeros(6, planCount);
                 heldMap(:, 2*stage-1:2*stage) = b;
+                if exist("bicycleHeldIntervalKernelMex","file")==3
+                    stageTubes = bicycleHeldIntervalKernelMex(a,heldMap,c,map,offset,radius, ...
+                        rate,h,cfg.encounter.taylorOrder,stateLimit,inputLimit,numericalRadius,cellCount);
+                else
+                    stageTubes = stateUncertainty.heldInterval(a,heldMap,c,map,offset,radius, ...
+                        rate,h,cfg.encounter.taylorOrder,stateLimit,inputLimit,numericalRadius,cellCount);
+                end
                 stageCells = cell(cellCount, 1);
                 for cellIndex = 1:cellCount
-                    tube = stateUncertainty.flowTube(a, heldMap, c, map, offset, radius, ...
-                        rate, dt, cfg.encounter.taylorOrder, stateLimit, inputLimit,numericalRadius);
+                    tube = stageTubes(cellIndex);
                     tube.localInputMap = tube.localInputMap(:,2*stage-1:2*stage,:);
                     tube.stage = stage;
                     tube.start = (stage-1)*h+(cellIndex-1)*dt;

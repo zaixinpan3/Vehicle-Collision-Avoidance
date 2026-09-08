@@ -11,6 +11,20 @@ classdef certifiedKinematicCourseCorrespondenceTest < ...
     end
 
     methods (Test)
+        function repeatedGeometryStillRespondsToChangedNoiseAndRejectsWrongShape(testCase)
+            inputs = {[10;0.1],0.02,1.5,0.02,0.001,0.05,0.12};
+            first = certifiedKinematicCourseCorrespondence(inputs{:});
+            repeated = certifiedKinematicCourseCorrespondence(inputs{:});
+            testCase.verifyEqual(repeated,first);
+            inputs{5} = 0.01;
+            changed = certifiedKinematicCourseCorrespondence(inputs{:});
+            testCase.verifyGreaterThan(changed.sineErrorMaximum,first.sineErrorMaximum);
+            testCase.verifyGreaterThan(changed.correspondence.radius,first.correspondence.radius);
+            inputs{1} = inputs{1}.';
+            testCase.verifyError(@() certifiedKinematicCourseCorrespondence(inputs{:}), ...
+                "certifiedKinematicCourseCorrespondence:invalidVector");
+        end
+
         function exactSingleTrackDataRecoversBodyYaw(testCase)
             yaw = 0.4;
             sideslip = 0.06;

@@ -61,7 +61,9 @@ classdef modifiedFialaTire
             persistent priorKey priorParameters
             key = [cfg.vehicle.m;cfg.vehicle.gravity;cfg.vehicle.lf;cfg.vehicle.lr; ...
                 cfg.tire.corneringStiffness(:);cfg.tire.frictionCoefficient(:)];
-            if isequal(key,priorKey),parameters = priorParameters;return;end
+            if coder.target('MATLAB')
+                if isequal(key,priorKey),parameters = priorParameters;return;end
+            end
             mass = localPositiveScalar(cfg.vehicle.m, "vehicle.m");
             gravity = localPositiveScalar(cfg.vehicle.gravity, "vehicle.gravity");
             lf = localPositiveScalar(cfg.vehicle.lf, "vehicle.lf");
@@ -74,7 +76,7 @@ classdef modifiedFialaTire
                 "frictionCoefficient", friction, "staticNormalLoad", normalLoad, ...
                 "longitudinalForceScale", forceScale, ...
                 "brakingRatioAccelerationGain", sum(forceScale)/mass);
-            priorKey = key;priorParameters = parameters;
+            if coder.target('MATLAB'),priorKey = key;priorParameters = parameters;end
         end
 
         function gain = accelerationGain(cfg)

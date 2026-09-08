@@ -10,6 +10,23 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function initializationPreservesSeedMapsButCannotIssueAControl(testCase)
+            model = localModel();
+            model.cfg.model.linearizationPolicy = "trajectory";
+            model.cfg.controller.certifiedSteps = 1;
+            model.initialEgoState = [10;0.2;0.03;10;0.2;0.1];
+            model.initialFrenetErrorBound = [.01;.01;.001;.02;.01;.005];
+            model.previousInput = [0.03;0.05];
+            model.linearizationInputs = repmat([0.03;0.05],1,model.horizonSteps);
+            full = ltvBicycleModel.finitePredict(model,[]);
+            initial = ltvBicycleModel.finitePredict(model,[],true);
+            testCase.verifyEqual(initial.referencePlan,full.referencePlan,AbsTol=1e-14);
+            testCase.verifyEqual(initial.egoStateMatrix,full.egoStateMatrix,AbsTol=1e-12);
+            testCase.verifyEqual(initial.egoStateOffset,full.egoStateOffset,AbsTol=1e-12);
+            testCase.verifyError(@() formulateAvoidanceProblem(model,initial,initial.referencePlan), ...
+                "collisionAvoidanceController:uncertifiedInitialization");
+        end
+
         function futureDisturbancesStayContainedWithoutRepeatedBoxInflation(testCase)
             model = localModel();
             model.horizonSteps = 30;

@@ -4,23 +4,37 @@ classdef laneGeometry
     methods (Static)
         function [frame,nominal] = sweptCellFrame(model,tube,anchor)
         % One frame construction for horizon admission and geometry rows.
+            [frame,values] = laneGeometry.sweptCellFrames(model,tube,anchor);
+            nominal = values{1};
+        end
+
+        function [frames,nominal] = sweptCellFrames(model,tubes,anchor)
+        % Batch charts with individual station radii over one validated lane.
             cfg = model.cfg;
-            nominal = reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
-            radius = tube.numericalRadius;
-            if tube.stage<=cfg.controller.certifiedSteps,radius = tube.radius;end
-            station = (min(nominal(1,:))+max(nominal(1,:)))/2;
-            extent = cfg.controller.stationTrustRadius ...
-                +(max(nominal(1,:))-min(nominal(1,:)))/2+max(radius(1,:));
-            frame = laneGeometry.frameBounds(model.lane,station,extent,cfg.model.lateralDomainRadius);
-            frame.referenceHeadingErrorBound = frame.headingErrorBound;
-            if tube.stage>cfg.controller.certifiedSteps
-                tire = modifiedFialaTire.parameters(cfg);
-                acceleration = sum(tire.longitudinalForceScale)/cfg.vehicle.m ...
-                    +longitudinalRoadLoad(cfg.model.speedMaximum,cfg)/cfg.vehicle.m ...
-                    +abs(model.longitudinalAccelerationBias);
-                yawAcceleration = dot([cfg.vehicle.lf;cfg.vehicle.lr],tire.longitudinalForceScale)/cfg.vehicle.Iz;
-                frame.positionErrorBound = frame.positionErrorBound+acceleration*tube.duration^2/8;
-                frame.headingErrorBound = frame.headingErrorBound+yawAcceleration*tube.duration^2/8;
+            nominal = cell(numel(tubes),1);
+            station = zeros(numel(tubes),1);extent = station;
+            for index = 1:numel(tubes)
+                tube = tubes(index);
+                values = reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
+                nominal{index} = values;
+                radius = tube.numericalRadius;
+                if tube.stage<=cfg.controller.certifiedSteps,radius = tube.radius;end
+                station(index) = (min(values(1,:))+max(values(1,:)))/2;
+                extent(index) = cfg.controller.stationTrustRadius ...
+                    +(max(values(1,:))-min(values(1,:)))/2+max(radius(1,:));
+            end
+            frames = laneGeometry.frameBounds(model.lane,station,extent,cfg.model.lateralDomainRadius);
+            tire = modifiedFialaTire.parameters(cfg);
+            acceleration = sum(tire.longitudinalForceScale)/cfg.vehicle.m ...
+                +longitudinalRoadLoad(cfg.model.speedMaximum,cfg)/cfg.vehicle.m ...
+                +abs(model.longitudinalAccelerationBias);
+            yawAcceleration = dot([cfg.vehicle.lf;cfg.vehicle.lr],tire.longitudinalForceScale)/cfg.vehicle.Iz;
+            for index = 1:numel(tubes)
+                frames(index).referenceHeadingErrorBound = frames(index).headingErrorBound;
+                if tubes(index).stage>cfg.controller.certifiedSteps
+                    frames(index).positionErrorBound = frames(index).positionErrorBound+acceleration*tubes(index).duration^2/8;
+                    frames(index).headingErrorBound = frames(index).headingErrorBound+yawAcceleration*tubes(index).duration^2/8;
+                end
             end
         end
         function curve = validateReferenceCurve(curve)
@@ -190,9 +204,10 @@ classdef laneGeometry
         % over the admitted rectangle occur at its four corners. Heading variation
         % is constant per segment. These bounds include both sides of every vertex.
 
+            if isscalar(radius),radius = repmat(radius,numel(station),1);end
             if isfield(lane, "referenceCurve")
-                frame = arrayfun(@(s) laneGeometry.referenceFrame( ...
-                    lane.referenceCurve,s,radius,lateralRadius),station(:));
+                frame = arrayfun(@(s,r) laneGeometry.referenceFrame( ...
+                    lane.referenceCurve,s,r,lateralRadius),station(:),radius(:));
                 return;
             end
             persistent nativeFrames
@@ -219,9 +234,9 @@ classdef laneGeometry
                     "headingErrorBound", num2cell(values(11, :)));
                 frame = frame(:);
             else
-                frame = repmat(localFrame(lane, station(1), radius, lateralRadius), numel(station), 1);
+                frame = repmat(localFrame(lane, station(1), radius(1), lateralRadius), numel(station), 1);
                 for nodeIdx = 2:numel(station)
-                    frame(nodeIdx) = localFrame(lane, station(nodeIdx), radius, lateralRadius);
+                    frame(nodeIdx) = localFrame(lane, station(nodeIdx), radius(nodeIdx), lateralRadius);
                 end
             end
         end

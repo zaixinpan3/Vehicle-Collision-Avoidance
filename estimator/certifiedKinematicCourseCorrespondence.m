@@ -30,6 +30,16 @@ function course = certifiedKinematicCourseCorrespondence( ...
 % inconsistent declared bounds, or when the resulting yaw arc is not
 % proper.
 
+    % The synchronized runtime, measurement enclosure and history update
+    % request the same held geometry. Cache only identical complete inputs;
+    % a changed value or shape still takes the full validation path.
+    persistent cachedInputs cachedCourse
+    inputs = {gnssVelocity,yawRateMeasured,rearAxleDistance,velocityErrorMaximum, ...
+        yawRateErrorMaximum,modelYawRateMismatchMaximum,sideslipDomainMaximum};
+    if isequaln(inputs,cachedInputs)
+        course = cachedCourse;
+        return;
+    end
     gnssVelocity = localPlanarVector(gnssVelocity, "gnssVelocity");
     yawRateMeasured = localFiniteScalar( ...
         yawRateMeasured, "yawRateMeasured");
@@ -106,14 +116,13 @@ function course = certifiedKinematicCourseCorrespondence( ...
     else
         measuredBodyDirection = [1.0; 0.0];
     end
-    correspondence = certifiedRotationCorrespondence( ...
-        gnssVelocity, measuredBodyDirection, ...
-        velocityErrorMaximum, 0.0, 0.0);
     if boundsConsistent
         correspondence = certifiedRotationCorrespondence( ...
             gnssVelocity, measuredBodyDirection, ...
             velocityErrorMaximum, 0.0, sideslipErrorMaximum);
     else
+        correspondence = certifiedRotationCorrespondence( ...
+            gnssVelocity, measuredBodyDirection,velocityErrorMaximum,0.0,0.0);
         correspondence.radius = Inf;
         correspondence.informative = false;
         correspondence.rawRadius = Inf;
@@ -143,6 +152,8 @@ function course = certifiedKinematicCourseCorrespondence( ...
         "modelYawRateMismatchMaximum", ...
             modelYawRateMismatchMaximum, ...
         "sideslipDomainMaximum", sideslipDomainMaximum);
+    cachedInputs = inputs;
+    cachedCourse = course;
 end
 
 function vector = localPlanarVector(vector, name)

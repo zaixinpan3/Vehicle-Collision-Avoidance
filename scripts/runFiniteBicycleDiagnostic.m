@@ -8,6 +8,9 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         cfg (1,1) struct
         duration (1,1) double {mustBePositive} = 10
         options.EstimatorConfiguration (1,1) struct = struct()
+        options.PrepareController (1,1) logical = true
+        options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
+        options.EnforceRuntimeDeadline (1,1) logical = false
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     for folder = ["controller","config","estimator"],addpath(fullfile(root,folder));end
@@ -24,6 +27,8 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
     road = [-200,0;3000,0];
     estimated = ~isempty(fieldnames(options.EstimatorConfiguration));
     estimates = cell(steps,1);targetEstimates = cell(steps,1);audits = cell(steps,1);
+    frameSeconds = nan(steps,1);estimatorSeconds = zeros(steps,1);controllerSeconds = nan(steps,1);
+    preparation = struct("performed",false,"elapsedSeconds",0);
     if estimated
         estimatorCfg = options.EstimatorConfiguration;
         estimatorCfg.observer.ego.yaw.rearAxleDistance = cfg.vehicle.lr;
@@ -32,7 +37,13 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
             dot([cfg.vehicle.lf;cfg.vehicle.lr],tire.longitudinalForceScale)/cfg.vehicle.Iz;
         estimatorContext = nrmmEstimatorControllerAdapter("initialize",estimatorCfg,localEgoTruth(state),@localTargetTruth);
     end
+    if options.PrepareController
+        initialEgo = struct("position",state(1:2),"yaw",state(3),"speed",state(4), ...
+            "lateralVelocity",state(5),"yawRate",state(6),"stateTime",0);
+        preparation = prepareCollisionAvoidancePipeline(initialEgo,road,cfg,options.EstimatorConfiguration);
+    end
     for index = 1:steps
+        frameTimer = tic;
         time = (index-1)*h;
         ego = struct("position",state(1:2),"yaw",state(3),"speed",state(4), ...
             "lateralVelocity",state(5),"yawRate",state(6),"stateTime",time, ...
@@ -45,17 +56,30 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
                 "jerkBound",[0;0],"yawAccelerationBound",0,"scalarAccelerationMaximum",0));
         if norm(target.targetPositionInertial-state(1:2))>30,target = [];end
         if estimated
+            estimatorTimer = tic;
             [estimatorContext,ego,target,~,audit] = nrmmEstimatorControllerAdapter( ...
                 "sample",estimatorContext,time,localEgoTruth(state),localTargetTruth(time,[]));
+            estimatorSeconds(index) = toc(estimatorTimer);
             audits{index} = audit;
             if index>1,ego.heldActuatorInput = inputs(end,:).';end
         end
         estimates{index} = ego;targetEstimates{index} = target;
+        controllerTimer = tic;
         try
             [command,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,stored);
+            controllerSeconds(index) = toc(controllerTimer);
+            frameSeconds(index) = toc(frameTimer);
         catch exception
+            controllerSeconds(index) = toc(controllerTimer);
+            frameSeconds(index) = toc(frameTimer);
             failure = struct("occurred",true,"time",time,"identifier",string(exception.identifier), ...
                 "message",string(exception.message));
+            break;
+        end
+        if options.EnforceRuntimeDeadline && frameSeconds(index)>options.DeadlineSeconds
+            failure = struct("occurred",true,"time",time, ...
+                "identifier","collisionAvoidanceController:runtimeDeadlineExceeded", ...
+                "message","The complete online frame exceeded its deadline; no command was applied.");
             break;
         end
         input = command.actuatorInput;
@@ -73,6 +97,11 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         "plant","nonlinear modified-Fiala bicycle with rotated front forces and passive road load", ...
         "observations","exact current states; target only inside 30 m");
     result.estimatorEnabled = estimated;
+    result.runtime = struct("frameSeconds",frameSeconds(1:index), ...
+        "estimatorSeconds",estimatorSeconds(1:index),"controllerSeconds",controllerSeconds(1:index), ...
+        "deadlineSeconds",options.DeadlineSeconds,"deadlineMet",all(frameSeconds(1:index)<=options.DeadlineSeconds), ...
+        "enforced",options.EnforceRuntimeDeadline, ...
+        "preparation",preparation,"scope","Online synthetic sensors, observer, bounds, input assembly and controller; plant and offline preparation excluded");
     result.egoEstimate = estimates(1:index);
     result.targetEstimate = targetEstimates(1:index);
     result.measurementAudit = audits(1:index);

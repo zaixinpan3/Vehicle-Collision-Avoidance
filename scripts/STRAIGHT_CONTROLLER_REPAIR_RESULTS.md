@@ -6,6 +6,11 @@ current solve terminates simulation before the next plant interval; no fallback
 input is executed. A 30 s observation window assesses post-encounter cruise,
 without an early-return deadline or a claim of exact asymptotic convergence.
 
+These measurements use commit `d0bea504e556315dcfc8abe5519f0a61e3c8e518`.
+The later [complete-frame runtime study](STRAIGHT_REALTIME_RESULTS.md) changes
+the validation horizon and numerical implementation; use that commit to
+reproduce the settings and measurements recorded here.
+
 ## Final physical results
 
 Both 30 s straight PassVeh14DOF gates pass, with no collision or road-boundary
