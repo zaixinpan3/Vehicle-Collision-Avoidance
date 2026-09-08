@@ -182,7 +182,8 @@ function program = localLiftedProgram(qp,prediction,model)
     slackIndex = qp.layout.relaxationIndex;
     hessian(slackIndex,slackIndex) = 2*h*cfg.clf.relaxationWeight*speye(count);
     linear = zeros(total,1);
-    linear(1:planCount) = -2*h*inputWeight.*prediction.referencePlan ...
+    operatingInput = repmat(qp.clf.certificate.operatingInput,count,1);
+    linear(1:planCount) = -2*h*inputWeight.*operatingInput ...
         -2*smoothWeight*difference.'*[model.previousInput;zeros(planCount-2,1)];
     scales = [cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
         cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];

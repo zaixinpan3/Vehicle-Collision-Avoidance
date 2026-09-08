@@ -91,9 +91,12 @@ chart are excluded; their swept-frame construction is separate. A reserve
 that cannot fit never relaxes the physical domain or the robust executed
 interval. Nonlinear acceptance checks those actual physical limits.
 
-The objective continues to include state error, input effort about the
-physical cruise equilibrium, input changes, and squared CLF slack. There is
-no desired-acceleration objective. Every issued input comes from a new
+The objective includes state error, input deviation from the fixed operating
+input used for CLF/LQR certificate synthesis, input changes, and squared CLF
+slack. Both solver transcriptions read `qp.clf.certificate.operatingInput`;
+the stage-dependent prediction seed is not a cost center. See the
+[objective definition](QUADRATIC_CLF_INPUT_OBJECTIVE.md). There is no
+desired-acceleration objective. Every issued input comes from a new
 optimization result that passes independent condensed-form checks. No
 stored input or backup controller is executed after a failed solve.
 

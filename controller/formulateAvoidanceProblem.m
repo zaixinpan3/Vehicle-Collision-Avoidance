@@ -41,6 +41,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     hessian = zeros(decisionCount);
     linear = zeros(decisionCount, 1);
     constant = cfg.encounter.maneuverSwitchWeight*double(model.maneuver ~= model.previousManeuver);
+    certificate = localClfCertificate(model);
     equilibriumState = ltvBicycleModel.cruiseEquilibrium( ...
         laneGeometry.curvature(model.initialEgoState(1),model.lane),cfg,model.longitudinalAccelerationBias);
     referenceStart = equilibriumState(2:6)+cfg.clf.referenceOffset ...
@@ -60,9 +61,11 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     constant = constant+model.sampleTime*(weightedOffset.'*weightedOffset);
     inputWeight = repmat([cfg.clf.frontWheelSteeringAngleWeight; cfg.clf.brakingRatioWeight], count, 1);
     hessian(1:planCount, 1:planCount) = hessian(1:planCount, 1:planCount)+2*model.sampleTime*diag(inputWeight);
-    equilibrium = prediction.referencePlan;
-    linear(1:planCount) = linear(1:planCount)-2*model.sampleTime*inputWeight.*equilibrium;
-    constant = constant+model.sampleTime*sum(inputWeight.*equilibrium.^2);
+    % Center input effort at the same operating input used for Riccati
+    % synthesis. Prediction seeds and scheduled equilibria are not targets.
+    operatingInput = repmat(certificate.operatingInput,count,1);
+    linear(1:planCount) = linear(1:planCount)-2*model.sampleTime*inputWeight.*operatingInput;
+    constant = constant+model.sampleTime*sum(inputWeight.*operatingInput.^2);
     difference = eye(planCount)-diag(ones(planCount-2, 1), -2);
     prior = [model.previousInput; zeros(planCount-2, 1)];
     smoothWeight = cfg.encounter.inputRateWeight/model.sampleTime;
@@ -70,7 +73,6 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     linear(1:planCount) = linear(1:planCount)-2*smoothWeight*difference.'*prior;
     constant = constant+smoothWeight*(prior.'*prior);
     hessian(planCount+1:end, planCount+1:end) = 2*model.sampleTime*cfg.clf.relaxationWeight*eye(count);
-    certificate = localClfCertificate(model);
     scale = norm(certificate.lyapunovMatrix, inf);
     certificate.lyapunovMatrix = certificate.lyapunovMatrix/scale;
     certificate.decreaseMatrix = certificate.decreaseMatrix/scale;
@@ -144,7 +146,6 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     clf.lieDerivativeInput = 2*initialError.'*p*prediction.continuousB(2:6, :, 1);
     clf.errorOffset = prediction.egoStateOffset(2:6, :)-referenceStart ...
         -cfg.clf.referenceRate*((0:count)*model.sampleTime);
-    clf.equilibriumInput = reshape(prediction.referencePlan, 2, []);
     layout = struct("decisionCount", decisionCount, "planCount", planCount, ...
         "horizonSteps", count, "inputDimension", 2, "inputIndex", 1:planCount, ...
         "planIndex", 1:planCount, "relaxationIndex", planCount+1:decisionCount, ...
@@ -216,8 +217,14 @@ function certificate = localClfCertificate(model)
         certificate = memoCertificate;
         return;
     end
+    operatingCfg = cfg;
+    operatingCfg.referenceSpeed = key.referenceSpeed;
+    [operatingState, operatingInput] = ltvBicycleModel.cruiseEquilibrium(0.0,operatingCfg);
+    % Match continuousMatrices' existing default tire operating ratio. The
+    % certificate uses zero declared acceleration bias and zero curvature.
+    operatingInput(2) = min(max(operatingInput(2),-1+sqrt(eps)),1-sqrt(eps));
     [continuousA, continuousB] = ltvBicycleModel.continuousMatrices( ...
-        0.0, key.referenceSpeed, cfg);
+        0.0, key.referenceSpeed, cfg, operatingInput(2), 0.0);
     errorIndex = 2:6;
     errorStateMatrix = continuousA(errorIndex, errorIndex);
     errorInputMatrix = continuousB(errorIndex, :);
@@ -239,6 +246,9 @@ function certificate = localClfCertificate(model)
             "The continuous CLF certificate must have a positive finite decay rate.");
     end
     certificate = struct( ...
+        "operatingState", operatingState, ...
+        "operatingInput", operatingInput, ...
+        "operatingCurvature", 0.0, "operatingAccelerationBias", 0.0, ...
         "lyapunovMatrix", lyapunovMatrix, ...
         "feedbackGain", feedbackGain, ...
         "decreaseMatrix", decreaseMatrix, ...

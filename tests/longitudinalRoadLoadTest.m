@@ -85,9 +85,8 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             [~, problem, cfg] = localProblem(15);
             requiredInput = longitudinalRoadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
 
-            testCase.verifyEqual(problem.qp.clf.equilibriumInput(2, 1), requiredInput, AbsTol=1.0e-12);
+            testCase.verifyEqual(problem.qp.clf.certificate.operatingInput, [0;requiredInput], AbsTol=1.0e-12);
             testCase.verifyGreaterThan(requiredInput, 0.0);
-            testCase.verifyLessThan(problem.qp.linear(2), 0);
         end
 
         function tireNormalLoadsUseTheStaticWeightDistribution(testCase)
@@ -104,6 +103,8 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             [~, ~, second] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 
             testCase.verifyGreaterThan(norm(first.qp.clf.lyapunovMatrix-second.qp.clf.lyapunovMatrix), 1.0e-10);
+            testCase.verifyGreaterThan(second.qp.clf.certificate.operatingInput(2), ...
+                first.qp.clf.certificate.operatingInput(2));
         end
 
         function passiveCoefficientsMustBeFiniteNonnegativeScalars(testCase, invalidCoefficient)

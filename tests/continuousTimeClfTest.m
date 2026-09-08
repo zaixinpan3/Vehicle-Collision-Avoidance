@@ -3,6 +3,7 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
     properties (TestParameter)
         invalidRateFraction = {0, -0.1, 1.01, NaN, Inf, [0.1, 0.2], 1i};
         referenceRate = {[0;0;0;0;0], [0.02;0.001;0.3;0.01;0.001]};
+        certificateReferenceSpeed = struct("aboveFloor",15,"belowFloor",3);
     end
     methods (TestClassSetup)
         function addControllerPaths(testCase)
@@ -27,6 +28,41 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
             testCase.verifyEqual(derivative, -certificate.decreaseMatrix, AbsTol=1e-10);
             testCase.verifyGreaterThan(min(eig(certificate.lyapunovMatrix)), 0);
             testCase.verifyGreaterThan(min(eig(certificate.decreaseMatrix-problem.qp.clf.decayRate*certificate.lyapunovMatrix)), 0);
+        end
+
+        function theCertificateRecordsItsActualSynthesisOperatingPoint(testCase, certificateReferenceSpeed)
+            [problem, cfg] = localProblem(zeros(5, 1));
+            model = problem.model;
+            model.referenceSpeed = certificateReferenceSpeed;
+            model.cfg.referenceSpeed = certificateReferenceSpeed;
+            qp = formulateAvoidanceProblem(model,problem.prediction,problem.inputPlan(:));
+            certificate = qp.clf.certificate;
+            speed = max(certificateReferenceSpeed,cfg.clf.certificateSpeedFloor);
+            [a,b,c] = ltvBicycleModel.continuousMatrices(0,speed,cfg);
+            flow = a*certificate.operatingState+b*certificate.operatingInput+c;
+            closedLoop = a(2:6,2:6)-b(2:6,:)*certificate.feedbackGain;
+
+            testCase.verifyEqual(certificate.operatingState,[0;0;0;speed;0;0],AbsTol=0);
+            testCase.verifyEqual(certificate.operatingCurvature,0,AbsTol=0);
+            testCase.verifyEqual(certificate.operatingAccelerationBias,0,AbsTol=0);
+            testCase.verifyEqual(flow,[speed;zeros(5,1)],AbsTol=1e-12);
+            testCase.verifyEqual(closedLoop.'*certificate.lyapunovMatrix ...
+                +certificate.lyapunovMatrix*closedLoop,-certificate.decreaseMatrix,AbsTol=1e-10);
+        end
+
+        function predictionSeedsDoNotChangeTheInputCostCenter(testCase)
+            [problem, ~] = localProblem(zeros(5, 1));
+            prediction = problem.prediction;
+            anchor = problem.inputPlan(:);
+            first = formulateAvoidanceProblem(problem.model,prediction,anchor);
+            prediction.referencePlan = prediction.referencePlan+repmat([0.02;0.1],prediction.stageCount,1);
+            second = formulateAvoidanceProblem(problem.model,prediction,anchor);
+
+            testCase.verifyEqual(second.Hessian,first.Hessian,AbsTol=0);
+            testCase.verifyEqual(second.linear,first.linear,AbsTol=0);
+            testCase.verifyEqual(second.constant,first.constant,AbsTol=0);
+            testCase.verifyEqual(second.stageProgram.P,first.stageProgram.P,AbsTol=0);
+            testCase.verifyEqual(second.stageProgram.q,first.stageProgram.q,AbsTol=0);
         end
 
         function everyHeldIntervalBoundsDissipationWithReferenceDerivatives(testCase, referenceRate)

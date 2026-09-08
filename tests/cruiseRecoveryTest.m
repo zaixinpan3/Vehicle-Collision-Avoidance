@@ -33,8 +33,10 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             testCase.verifyNotEmpty(command);
         end
 
-        function quadraticCostPenalizesHeadInputsAndRelaxation(testCase)
+        function quadraticCostUsesTheCertificateOperatingInputAndRelaxation(testCase)
             cfg = localConfiguration();
+            cfg.clf.frontWheelSteeringAngleWeight = 2;
+            cfg.clf.brakingRatioWeight = 3;
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.4);
             [~, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
             decision = zeros(problem.layout.decisionCount, 1);
@@ -180,16 +182,20 @@ end
 
 function value = localExplicitCost(problem,cfg,decision)
     input = reshape(decision(problem.layout.planIndex),2,[]);
-    reference = reshape(problem.prediction.referencePlan,2,[]);
+    certificateSpeed = max(cfg.referenceSpeed,cfg.clf.certificateSpeedFloor);
+    operatingInput = [0;longitudinalRoadLoad(certificateSpeed,cfg) ...
+        /(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg))];
     states = reshape(pagemtimes(problem.prediction.egoStateMatrix, input(:)),6,[]) ...
         +problem.prediction.egoStateOffset;
-    error = states(2:6,1:end-1)-[0;0;cfg.referenceSpeed;0;0];
+    error = states(2:6,1:end-1)-problem.qp.clf.referenceStart ...
+        -problem.qp.clf.referenceRate*((0:size(input,2)-1)*cfg.controller.sampleTime);
     scales = [cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
         cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
     changes = diff([problem.model.previousInput,input],1,2)/cfg.controller.sampleTime;
     inputWeights = [cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight];
     value = cfg.controller.sampleTime*(sum((error./scales).^2,"all") ...
-        +sum(inputWeights.*(input-reference).^2,"all") ...
+        +sum(inputWeights.*(input-operatingInput).^2,"all") ...
         +cfg.encounter.inputRateWeight*sum(changes.^2,"all") ...
-        +cfg.clf.relaxationWeight*sum(decision(problem.layout.relaxationIndex).^2));
+        +cfg.clf.relaxationWeight*sum(decision(problem.layout.relaxationIndex).^2)) ...
+        +cfg.encounter.maneuverSwitchWeight*double(problem.model.maneuver~=problem.model.previousManeuver);
 end

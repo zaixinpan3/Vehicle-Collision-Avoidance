@@ -1,61 +1,96 @@
-# Quadratic input effort and CLF relaxation
+# Quadratic input deviation and CLF relaxation
 
-The online objective is
+## Current objective: certificate operating input (September 8, 2026)
+
+For each predicted stage, the input cost is centered at the operating input
+used to construct the continuous CLF/LQR certificate:
 
 \[
-J=h\sum_{j=0}^{N-1}u_j^{\mathsf T}R_u u_j+\rho\delta^2,
-\qquad R_u=\operatorname{diag}(w_\phi/s_\phi^2,w_\beta/s_\beta^2).
+J=h\sum_{j=0}^{N-1}\left[
+ z_j^{\mathsf T}Q_z z_j
+ +(u_j-u_\star)^{\mathsf T}R_u(u_j-u_\star)
+ +w_{\Delta u}\left\|\frac{u_j-u_{j-1}}{h}\right\|^2
+ +\rho\delta_j^2\right]+c_{\mathrm{switch}}.
 \]
 
-Here `u = [frontWheelSteeringAngle; brakingRatio]`, `h` is the
-control period, `sPhi` is the steering limit and `sBeta` is the largest absolute
-braking-ratio limit. The existing `clf.frontWheelSteeringAngleWeight` and
-`clf.brakingRatioWeight` supply positive input weights. They
-also retain their role in Riccati certificate synthesis. Defaults are both
-one; `clf.relaxationWeight = 100` weights squared relaxation.
+Here `u = [frontWheelSteeringAngle; brakingRatio]`, `u(-1)` is the
+previous applied input, and `z` is the predicted five-coordinate state error
+relative to `clf.referenceStart + clf.referenceRate*t`. The diagonal state
+weights are the inverse squared error scales. The online input weights remain
+`diag(clf.frontWheelSteeringAngleWeight, clf.brakingRatioWeight)`; this change
+only replaces the center, without changing any weight. Riccati synthesis
+continues to normalize its input weights by the actuator scales.
+`encounter.inputRateWeight`, `clf.relaxationWeight`, and the maneuver-switch
+constant retain their existing roles. Every finite-horizon stage is included;
+there is no appended, unpenalized stopping tail in the current controller.
 
-Only the performance head, stages `0` through `N-1`, has an input cost. The
-complete braking/steering continuation remains a hard safety witness without
-an input penalty. Penalizing its required stopping effort could favor early
-braking even at nominal cruise. No desired acceleration, steering reference,
-sampled LQR target or input-rate cost is introduced.
+The certificate uses a fixed straight-path operating state
+`[s; d; ePsi; vx; vy; r] = [0; 0; 0; vStar; 0; 0]`, with
+`vStar = max(referenceSpeed, clf.certificateSpeedFloor)`, zero curvature, and
+zero declared longitudinal acceleration bias. Its steering input is zero.
+Its signed longitudinal input balances the passive road load at `vStar`:
 
-The continuous CLF constraint remains
-`LfV + LgV*u0 <= -alpha*V + delta`, with `delta >= 0`. Collision, road,
-physical, model-domain, terminal-rest and acceptance constraints are unchanged.
-The condensed Hessian has `2*h*Ru` head blocks, a `2*rho` slack coefficient,
-and zero continuation blocks. All linear coefficients and the objective
-constant are zero. The sparse stage lift preserves exactly this objective;
-no native solver rebuild, second optimization or cone change is required.
+\[
+\beta_\star=\frac{F_{\mathrm{air}}(v_\star)+F_{\mathrm{roll}}(v_\star)}
+ {m\,g_\beta}.
+\]
 
-`inputEffortCost`, `clfRelaxationCost` and `jointObjectiveValue` expose the
-cost split. `inputDeviationCost` remains a compatibility alias for
-`inputEffortCost`. Given a returned input plan, reconstructing its smallest
-feasible nonnegative slack remains valid because the squared slack penalty
-is increasing on the nonnegative domain.
+As before, the tire linearization clips this ratio into
+`[-1 + sqrt(eps), 1 - sqrt(eps)]`. The recorded operating input is that exact
+clipped ratio, and the same value is passed explicitly into certificate matrix
+construction. If clipping is active, the point is a linearization operating
+point and need not be a force-balanced equilibrium. This does not waive input
+bounds or establish feasibility.
 
-A finite squared slack penalty permits trading CLF violation for input
-reduction; it is not equivalent to first minimizing slack and then input.
-Positive head weights remove ambiguity in the applied controls on a fixed
-convex feasible domain, although the unpenalized tail may remain nonunique.
-The objective does not impose sampled CLF decrease, establish an intersample
-safety certificate, or prove asymptotic recovery for the physical plant.
-A raw input penalty also does not explicitly compensate a nonzero constant
-model bias or prescribe a curved-road equilibrium input.
+`qp.clf.certificate` now records `operatingState`, `operatingInput`,
+`operatingCurvature`, and `operatingAccelerationBias`. Both the condensed and
+sparse lifted objectives read this one `operatingInput`. They no longer use
+`prediction.referencePlan` as the cost center. That stage-dependent plan
+remains an initialization and linearization seed. The ambiguous diagnostic
+`qp.clf.equilibriumInput` is removed in favor of the certificate's explicit
+operating-point fields.
 
-Behavioral regression checks cover nominal straight-cruise preservation in
-the zero-road-load limit,
-small over/underspeed corrections without predicted overshoot, the squared
-cost scale, absence of a continuation cost, and agreement with independent
-`quadprog` solutions. The existing hard-row, sparse-lift and terminal-policy
-checks continue to apply. Closed-loop measurements are recorded separately
-from these model and optimization checks.
+This differs from the previous objective when the predicted speed or curvature
+differs from the certificate point. The center is fixed over the horizon; it
+is not `uStar - K*z`, a desired acceleration, or an additional feedback law.
+The CLF metric, its synthesis matrices and decay rate, the state reference,
+road-load dynamics, hard Predictive CBF constraints, squared nonnegative CLF
+slack, delayed-command contract and independent acceptance remain unchanged.
+The certificate's zero-bias straight point is not replaced by the current
+prediction's curvature or declared acceleration bias.
 
-The later [longitudinal force-balance correction](LONGITUDINAL_FORCE_BALANCE.md)
-adds aerodynamic and rolling resistance and aligns output force with the
-signed-beta force scale. The measurements below precede that correction. With
-nonzero road load, zero input does not preserve nominal speed; the raw input
-objective is unchanged and does not guarantee zero steady tracking error.
+A finite squared slack weight permits trading dissipation against performance
+cost. This change alone therefore does not prove asymptotic recovery or remove
+steady-state error for a disturbed physical plant. Existing physical and
+runtime results predate this objective revision; no new closed-loop realtime
+pass is implied.
+
+## Validation of the September 8 objective change
+
+All 157 distinct targeted MATLAB tests in 11 classes pass. Coverage includes
+an explicit objective evaluation at a current speed different from the
+certificate speed, an independent optimizer comparison, both SOCP
+transcriptions, certificate force balance and Riccati identities above and
+below the synthesis speed floor, invariance to changes in the prediction seed,
+road-load changes, finite sensing, scheduled input elimination and
+failure-without-fallback behavior. The new explicit-cost regression first
+fails against the unmodified controller (cost difference 3.5378922e-5), then
+passes after both centers are corrected.
+
+Factory Code Analyzer checks cover all seven edited MATLAB files. Six have no
+findings; the sparse transcription retains 16 sparse-indexing performance
+advisories, reproduced on its unchanged baseline. No new finding is introduced.
+The tests include declared-model scenarios; no new PassVeh14DOF, joint
+closed-loop or realtime qualification is claimed.
+
+## Historical scope
+
+The September 6 results below belong to the older raw-input objective,
+`h*sum(u'*Ru*u) + rho*delta^2`, with its former head/continuation structure and
+acceleration-input plant. They are retained as experimental history and do not
+validate the current finite-horizon signed-beta controller or objective.
+The [force-balance study](LONGITUDINAL_FORCE_BALANCE.md) records the later
+addition of aerodynamic and rolling resistance.
 
 ## Historical validation on September 6, 2026
 

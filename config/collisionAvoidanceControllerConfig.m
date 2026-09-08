@@ -118,7 +118,7 @@ function cfg = localDefaults()
         "parameterRangeTolerance", 1.0e-3);
 
     % Continuous Riccati error scales and normalized input effort weights.
-    % Input weights also penalize every predicted control in the online SOCP.
+    % Online input weights penalize deviation from the certificate operating input.
     % decreaseRateFraction scales the certified decay rate (1/s); slack has
     % units of V per second and a squared cost weighted by relaxationWeight.
     cfg.clf = struct( ...

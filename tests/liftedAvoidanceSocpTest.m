@@ -46,6 +46,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
         function sparseAndCondensedProgramsDescribeTheSameDecisions(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             cfg.controller.certifiedSteps = 1;
+            cfg.referenceSpeed = 10;
             cfg.model.frontWheelSteeringRateMaximum = 1;
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
             sparseProgram = problem.qp.stageProgram;
@@ -54,6 +55,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             second = first;
             second(1:problem.layout.planCount) = second(1:problem.layout.planCount) ...
                 +0.001*sin((1:problem.layout.planCount).');
+            second(2:2:problem.layout.planCount) = second(2:2:problem.layout.planCount)+0.02;
             firstLift = localLift(first,problem);
             secondLift = localLift(second,problem);
             equalities = sparseProgram.cones(1);
