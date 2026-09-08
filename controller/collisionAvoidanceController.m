@@ -61,13 +61,19 @@ function [command, predictedInput, planningProblem, certificate] = ...
         end
         predicted = reshape(pagemtimes(controllerState.prediction.egoStateMatrix(:, :, 2), controllerState.plan(:)), 6, 1) ...
             +controllerState.prediction.egoStateOffset(:, 2);
-        [radius, consistent] = stateUncertainty.intersect(model.initialEgoState,model.initialFrenetErrorBound, ...
-            predicted,controllerState.prediction.egoStateErrorBound(:,2));
-        if ~consistent
+        % Keep the intersection itself. An outer box about a displaced
+        % observer point would discard part of the previous certificate.
+        % This changes the planning-set center, not the observer state.
+        lower = max(model.initialEgoState-model.initialFrenetErrorBound, ...
+            predicted-controllerState.prediction.egoStateErrorBound(:,2));
+        upper = min(model.initialEgoState+model.initialFrenetErrorBound, ...
+            predicted+controllerState.prediction.egoStateErrorBound(:,2));
+        if any(lower>upper)
             error("collisionAvoidanceController:inconsistentObservation", ...
                 "The ego observation is inconsistent with the executed certified tube.");
         end
-        model.initialFrenetErrorBound = radius;
+        model.initialEgoState = lower+(upper-lower)/2;
+        model.initialFrenetErrorBound = max(upper-model.initialEgoState,model.initialEgoState-lower);
         model.previousInput = controllerState.appliedInput;
         model.previousManeuver = controllerState.maneuver;
         model.requiredMargin = (1-cfg.encounter.barrierFraction)*controllerState.margin;
@@ -686,6 +692,7 @@ function [states,violation] = localNominalLookahead(qp,model,decision)
         if geometry.stage<=model.cfg.controller.certifiedSteps,continue;end
         value = reshape(pagemtimes(geometry.nodeStateRows, ...
             reshape(states(:,geometry.stage:geometry.stage+1),6,1,2)),[],2) ...
+            +reshape(pagemtimes(geometry.nodeStartStateRows,states(:,geometry.stage)),[],2) ...
             +reshape(pagemtimes(geometry.nodeInputRows,inputs(:,geometry.stage)),[],2)-geometry.nodeLimits;
         % Evaluate physical tire constraints on the nonlinear trajectory.
         % Reusing a force tangent at a different state can reject feasible
@@ -695,8 +702,12 @@ function [states,violation] = localNominalLookahead(qp,model,decision)
             input = inputs(:,geometry.stage);
             slip = atan2(state(5)+[cfg.vehicle.lf;-cfg.vehicle.lr]*state(6), ...
                 max(state(4),cfg.model.scheduleSpeedFloor))-[input(1);0];
-            value(geometry.nodeLabels=="tireSlip",point) = ...
-                [slip;-slip]-[slipLimit;slipLimit]+cfg.encounter.numericalMargin;
+            tireRows = find(geometry.nodeLabels=="tireSlip");
+            scheduledSlip = (state(5)+[cfg.vehicle.lf;-cfg.vehicle.lr]*state(6)) ...
+                /max(states(4,geometry.stage),cfg.model.scheduleSpeedFloor)-[input(1);0];
+            value(tireRows,point) = max( ...
+                [scheduledSlip;-scheduledSlip]-[slipLimit;slipLimit]+geometry.nodeInitialReserve(tireRows,point), ...
+                [slip;-slip]-[slipLimit;slipLimit])+cfg.encounter.numericalMargin;
         end
         violation = max(violation,max(value,[],"all"));
     end

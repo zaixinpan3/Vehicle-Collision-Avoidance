@@ -8,6 +8,16 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function routeStationOriginDoesNotChangeTheAvoidanceInput(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            cfg.controller.certifiedSteps = 1;
+            [near,~,nearProblem] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            route(1,1) = route(1,1)-10000;
+            [far,~,farProblem] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            testCase.verifyTrue(nearProblem.metadata.planCertified);
+            testCase.verifyTrue(farProblem.metadata.planCertified);
+            testCase.verifyEqual(far.actuatorInput,near.actuatorInput,AbsTol=1e-5);
+        end
         function optionalReserveCannotMakeAnOtherwiseSafePlanUnavailable(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             cfg.controller.certifiedSteps = 1;
@@ -67,10 +77,10 @@ function decision = localLift(physical,problem)
     decision = zeros(size(program.A,2),1);
     decision(1:numel(physical)) = physical;
     plan = physical(problem.layout.planIndex);
-    decision(program.stateIndex(:,1)) = problem.model.initialEgoState;
+    decision(program.stateIndex(:,1)) = problem.model.initialEgoState-program.stateCenter(:,1);
     for index = 1:numel(problem.prediction.cells)
         tube = problem.prediction.cells(index);
-        decision(program.stateIndex(:,index+1)) = tube.endMap*plan+tube.endOffset;
+        decision(program.stateIndex(:,index+1)) = tube.endMap*plan+tube.endOffset-program.stateCenter(:,index+1);
     end
 end
 

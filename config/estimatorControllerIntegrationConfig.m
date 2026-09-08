@@ -41,8 +41,8 @@ function cfg = estimatorControllerIntegrationConfig()
     % The scalar gain SDPs use sample time to bound the one-sample
     % correction, and the predictor-reset realization also depends on it.
     % The 80 Hz observer rate keeps the target innovation well resolved
-    % during the aggressive avoidance maneuvers. The controller remains at
-    % 10 Hz; its adapter runs observer samples between controller instants.
+    % during the avoidance maneuvers. The adapter runs observer samples
+    % between the separately configured controller instants.
     observer.runtime.samplePeriod = 0.0125;           % s
     observer.runtime.integrationStepMaximum = 0.0025; % s
 
@@ -50,14 +50,14 @@ function cfg = estimatorControllerIntegrationConfig()
     % and R=60 m avoidance maneuvers, not merely centerline cornering.
     observer.ego.domain.speedMaximum = 25.0;          % m/s
     observer.ego.domain.yawRateMaximum = 0.75;        % rad/s
-    % The measured circular probe reached 0.0792 rad before the
-    % controller's current QP failure; retain explicit inversion-domain
-    % margin. The rear-axle distance is replaced by the loaded plant value
-    % in runCenterlineCruiseScenario. The mismatch value is a declared
-    % research-model bound, not an empirical PassVeh14DOF certification.
+    % The rear-axle distance is replaced by the loaded plant value.
+    % Straight avoidance identification reached 0.1768 rad/s in PassVeh14DOF
+    % and 0.1978 rad/s in the nonlinear bicycle. The former 0.10 premise
+    % was violated. The 0.25 allowance is explicit and must be audited in
+    % subsequent runs; it is not a proven global vehicle-model bound.
     observer.ego.yaw.rearAxleDistance = 1.45;         % m
     observer.ego.yaw.sideslipDomainMaximum = 0.12;    % rad
-    observer.ego.yaw.singleTrackYawRateMismatchMaximum = 0.10; % rad/s
+    observer.ego.yaw.singleTrackYawRateMismatchMaximum = 0.25; % rad/s
 
     % Target operating domain for the avoidance suites: straight-driving
     % targets between 10 and 15 m/s. The certified speed floor no longer

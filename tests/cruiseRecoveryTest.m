@@ -144,21 +144,36 @@ function result = localIndependentConicSolve(~, program)
     initial = program.defaultSolver();
     hessian = program.P+triu(program.P,1).';
     options = optimoptions("fmincon", "Display", "off", "Algorithm", "sqp", ...
-        "ConstraintTolerance", 1e-9, "OptimalityTolerance", 1e-8, "MaxIterations", 100);
+        "ConstraintTolerance", 1e-9, "OptimalityTolerance", 1e-8, "MaxIterations", 100, ...
+        "StepTolerance",1e-12,"SpecifyObjectiveGradient",true,"SpecifyConstraintGradient",true);
     equalities = 1:program.cones(1);
     rows = program.cones(1)+(1:program.cones(2));
-    [decision, ~, exitFlag, output] = fmincon(@(z) 0.5*z.'*hessian*z+program.q.'*z, ...
-        initial.decision, program.A(rows,:), program.b(rows), ...
-        program.A(equalities,:),program.b(equalities),[],[], ...
+    [decision, ~, exitFlag, output] = fmincon(@(z) localQuadraticCost(z,hessian,program.q), ...
+        initial.decision, full(program.A(rows,:)), program.b(rows), ...
+        full(program.A(equalities,:)),program.b(equalities),[],[], ...
         @(z) localCones(program,z), options);
     result = struct("decision",decision,"exitFlag",exitFlag,"output",output);
 end
 
-function [inequality,equality] = localCones(program,decision)
+function [value,gradient] = localQuadraticCost(decision,hessian,linear)
+    value = 0.5*decision.'*hessian*decision+linear.'*decision;
+    gradient = hessian*decision+linear;
+end
+
+function [inequality,equality,gradient,equalityGradient] = localCones(program,decision)
     slack = program.b-program.A*decision;
     cells = reshape(slack(sum(program.cones(1:2))+1:end),10,[]);
     inequality = (sqrt(sum(cells(2:end,:).^2,1))-cells(1,:)).';
     equality = [];
+    gradient = zeros(numel(decision),size(cells,2));
+    offset = sum(program.cones(1:2));
+    for index = 1:size(cells,2)
+        rows = offset+10*(index-1)+(1:10);
+        vector = cells(2:end,index);
+        gradient(:,index) = program.A(rows(1),:).' ...
+            -program.A(rows(2:end),:).'*(vector/max(norm(vector),realmin));
+    end
+    equalityGradient = [];
 end
 
 function value = localExplicitCost(problem,cfg,decision)

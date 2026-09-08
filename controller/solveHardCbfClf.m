@@ -80,7 +80,10 @@ function [problem,solve] = localReserveMargin(problem,cfg)
     margins = problem.inequalityBound-problem.inequalityMatrix*solve.decision(1:physical);
     selectedReserve = problem.anticipationReserve>0;
     fraction = min([solve.decision(physical+1);margins(selectedReserve)./problem.anticipationReserve(selectedReserve);problem.reserveFractionMaximum]);
-    fraction = max(0,fraction-10*cfg.encounter.numericalMargin);
+    % Leave an interior allocation for the subsequent nonlinear refinement.
+    % The physical constraints do not change. Maximizing an optional buffer
+    % to its exact feasibility frontier made the performance solve fragile.
+    fraction = max(0,0.99*fraction-10*cfg.encounter.numericalMargin);
     problem = localApplyReserve(problem,fraction);
 end
 

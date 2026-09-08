@@ -15,8 +15,8 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
     elseif age == 0.0
         egoYawRate = design.sensors.gyroscopeNoiseMaximum;
     end
-    egoBounds = [egoPosition; egoPosition; bound.yaw; ...
-        bound.bodyVelocity; bound.bodyVelocity; egoYawRate];
+    velocityBounds = localVelocityBounds(output, bound, input, design, age);
+    egoBounds = [egoPosition; egoPosition; bound.yaw; velocityBounds; egoYawRate];
     egoAvailable = bound.egoValid && bound.orientationSet.valid && all(isfinite(egoBounds));
     if ~egoAvailable
         egoBounds(:) = inf;
@@ -109,6 +109,43 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
             "scalarAccelerationMaximum",domain.scalarAccelerationMaximum, ...
             "yawAccelerationBound",domain.scalarAccelerationMaximum*domain.yawRateMaximum/domain.speedMinimum ...
                 +design.target.modelJerkMaximum/domain.speedMinimum);
+    end
+end
+
+function radius = localVelocityBounds(output, bound, input, design, age)
+    radius = repmat(bound.bodyVelocity, 2, 1);
+    if ~bound.orientationSet.valid || ~isfield(output, "egoBodyVelocity") ...
+            || ~isfield(input, "gnssVelocity")
+        return;
+    end
+    noise = design.sensors.velocityNoiseMaximum;
+    if age > 0
+        if ~isfield(bound.holdBounds, "acceleration") ...
+                || ~isfinite(bound.holdBounds.acceleration)
+            return;
+        end
+        noise = noise+bound.holdBounds.acceleration*age;
+    end
+    % Rotate the timestamped GNSS velocity ball over the certified yaw set.
+    % Keep the observer point unchanged. Taking extrema before boxing retains
+    % the small longitudinal error near straight travel; a norm radius copied
+    % to both body components discards this directional information.
+    velocity = input.gnssVelocity(:);
+    coefficients = [velocity(1), velocity(2); velocity(2), -velocity(1)];
+    intervals = bound.orientationSet.intervals;
+    for component = 1:2
+        cosine = coefficients(component, 1);
+        sine = coefficients(component, 2);
+        phase = atan2(sine, cosine);
+        stationary = phase+(-2:3)*pi;
+        inside = any(stationary >= intervals(:, 1) & stationary <= intervals(:, 2), 1);
+        angles = [intervals(:); stationary(inside).'];
+        values = cosine*cos(angles)+sine*sin(angles);
+        padding = noise+64*eps(max(1, norm(velocity)));
+        lower = min(values)-padding;
+        upper = max(values)+padding;
+        radius(component) = min(radius(component), ...
+            max(abs([lower, upper]-output.egoBodyVelocity(component))));
     end
 end
 

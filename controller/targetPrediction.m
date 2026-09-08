@@ -202,17 +202,22 @@ classdef targetPrediction
                 end
                 next.center(7) = measured.center(7)+atan2(sin(next.center(7)-measured.center(7)), ...
                     cos(next.center(7)-measured.center(7)));
-                [measured.radius,consistent] = stateUncertainty.intersect( ...
-                    measured.center,measured.radius,next.center,next.radius);
-                if ~consistent
+                lower = max(measured.center-measured.radius,next.center-next.radius);
+                upper = min(measured.center+measured.radius,next.center+next.radius);
+                if any(lower>upper)
                     error("collisionAvoidanceController:inconsistentObservation","Target measurements contradict the motion enclosure.");
                 end
+                measured.center = lower+(upper-lower)/2;
+                measured.radius = max(upper-measured.center,measured.center-lower);
                 nominal = targetPrediction.nominalFlow(encounter,duration);
                 difference = nominal-measured.center;
                 difference(7) = atan2(sin(difference(7)),cos(difference(7)));
-                if all(abs(difference)<=measured.radius)
-                    measured.nominalCenter = nominal;
-                end
+                % Correct only coordinates excluded by the new enclosure.
+                % A tiny yaw-rate or position correction must not replace
+                % every still-compatible motion parameter with a noisy point
+                % estimate and reverse the complete future trajectory.
+                measured.nominalCenter = measured.center ...
+                    +min(max(difference,-measured.radius),measured.radius);
                 next = measured;
                 return;
             end
@@ -352,6 +357,16 @@ function encounter = localEncounter(target,time,contract)
         "time",time,"halfLength",target.length/2,"halfWidth",target.width/2, ...
         "discharged",false,"exitMargin",-inf);
     encounter.nominalCenter = encounter.center;
+    if string(contract.kind)=="finite-sensing-motion-v1"
+        % A position-only acquisition does not measure motion derivatives.
+        % Seed unresolved acceleration and turning from the constant-velocity
+        % hypothesis, projected into the published enclosure. Hard execution
+        % still uses the complete uncertain state, including nonzero turns.
+        derivativeRows = [5,6,8];
+        lower = encounter.center(derivativeRows)-encounter.radius(derivativeRows);
+        upper = encounter.center(derivativeRows)+encounter.radius(derivativeRows);
+        encounter.nominalCenter(derivativeRows) = min(max(0,lower),upper);
+    end
 end
 
 function distance = localArc(time, speed, acceleration)

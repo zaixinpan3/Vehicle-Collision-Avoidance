@@ -106,6 +106,15 @@ classdef ltvBicycleModel
             prediction.stageMatrixB = zeros(6, 2, count);
             prediction.stageAffine = zeros(6, count);
             prediction.executionReserve = zeros(6,count);
+            prediction.domainErrorBound = zeros(6,count+1);
+            prediction.domainErrorBound(:,1) = model.initialFrenetErrorBound;
+            prediction.initialErrorBound = zeros(6,count+1);
+            prediction.initialErrorBound(:,1) = model.initialFrenetErrorBound;
+            initialGenerators = diag(model.initialFrenetErrorBound);
+            % Preserve signed correlations across future linear maps.
+            % Reboxing at every step turns a damped coupled model into a
+            % growing comparison system and consumes the clearance reserve.
+            domainGenerators = diag(model.initialFrenetErrorBound);
             prediction.modelErrorRateBound = zeros(6,count);
             map = zeros(6, planCount);
             offset = model.initialEgoState;
@@ -156,12 +165,16 @@ classdef ltvBicycleModel
                     else
                         exact = [nominalStateJacobian(:,:,stage),nominalInputJacobian(:,:,stage),zeros(6,1)];
                     end
-                    executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound ...
-                        +h*expm(h*abs(a))*rate;
+                    processReserve = stateUncertainty.heldDisturbance(a,rate,h);
+                    executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound+processReserve;
                 end
                 tireModels{stage} = tireModel;
                 prediction.modelErrorRateBound(:,stage) = rate;
                 prediction.executionReserve(:,stage) = executionReserve;
+                initialGenerators = exact(1:6,1:6)*initialGenerators;
+                prediction.initialErrorBound(:,stage+1) = sum(abs(initialGenerators),2);
+                domainGenerators = [exact(1:6,1:6)*domainGenerators,diag(processReserve)];
+                prediction.domainErrorBound(:,stage+1) = sum(abs(domainGenerators),2);
                 prediction.continuousA(:, :, stage) = a;
                 prediction.continuousB(:, :, stage) = b;
                 prediction.continuousC(:, stage) = c;
@@ -174,8 +187,7 @@ classdef ltvBicycleModel
                     localInput = exact(1:6,7:8);
                     localOffset = exact(1:6,9);
                     if ~isempty(nonlinearAnchor)
-                        startAtAnchor = map*anchorInputs(:)+offset;
-                        localOffset = nonlinearAnchor(:,stage+1)-localState*startAtAnchor ...
+                        localOffset = nonlinearAnchor(:,stage+1)-localState*nonlinearAnchor(:,stage) ...
                             -localInput*anchorInputs(:,stage);
                         prediction.stageAffine(:,stage) = localOffset;
                     end
@@ -220,6 +232,8 @@ classdef ltvBicycleModel
                 prediction.egoStateMatrix(:, :, stage+1) = map;
                 prediction.egoStateOffset(:, stage+1) = offset;
                 prediction.egoStateErrorBound(:, stage+1) = radius;
+                prediction.domainErrorBound(:,stage+1) = radius;
+                domainGenerators = diag(radius);
             end
             prediction.cells = vertcat(cells{:});
             prediction.tireModels = tireModels;

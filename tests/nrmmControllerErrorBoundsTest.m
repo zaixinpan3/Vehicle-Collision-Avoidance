@@ -26,7 +26,49 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
                 [published.controllerErrorBound.bounds; ...
                 published.targetEstimates.controllerErrorBound.bounds]-actualError, -1e-10);
         end
+        function freshVelocityBoundsRetainDirectionalInformation(testCase)
+            [output, bound, input] = localVelocityFixture();
+            published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+            testCase.verifyLessThan(published.controllerStateErrorBound(4), 0.08);
+            testCase.verifyGreaterThan(published.controllerStateErrorBound(5), 0.49);
+            testCase.verifyEqual(published.egoBodyVelocity, output.egoBodyVelocity);
+            testCase.verifyEqual(published.egoBodyVelocityErrorBound, bound.bodyVelocity);
+            for center = [0, 3.13, -1.2]
+                bound.orientationSet = nrmmYawSet("initialize", center, 0.05);
+                input.gnssVelocity = localRotation(center)*[10;0];
+                published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+                for heading = center+linspace(-0.05, 0.05, 21)
+                    for direction = linspace(-pi, pi, 21)
+                        noise = testCase.Design.sensors.velocityNoiseMaximum ...
+                            *[cos(direction);sin(direction)];
+                        truth = localRotation(heading).'*(input.gnssVelocity-noise);
+                        testCase.verifyLessThanOrEqual(abs(truth-output.egoBodyVelocity), ...
+                            published.controllerStateErrorBound(4:5)+1e-12);
+                    end
+                end
+            end
+        end
+        function staleVelocityRequiresAnAccelerationEnvelope(testCase)
+            [output, bound, input] = localVelocityFixture();
+            output.stateTime = 0.1;
+            bound.holdBounds.acceleration = Inf;
+            published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+            testCase.verifyEqual(published.controllerStateErrorBound(4:5), [0.8;0.8]);
+            bound.holdBounds.acceleration = 2;
+            published = nrmmControllerErrorBounds(output, bound, input, testCase.Design);
+            testCase.verifyGreaterThan(published.controllerStateErrorBound(4), 0.2);
+            testCase.verifyLessThan(published.controllerStateErrorBound(4), 0.28);
+        end
     end
+end
+
+function [output, bound, input] = localVelocityFixture()
+    output = struct("stateTime",0,"egoPositionInertial",[0;0], ...
+        "egoBodyVelocity",[10;0],"targetEstimates",struct.empty);
+    bound = struct("yaw",0.05,"bodyVelocity",0.8,"egoValid",true, ...
+        "holdBounds",struct("yawAcceleration",0,"acceleration",Inf), ...
+        "orientationSet",nrmmYawSet("initialize",0,0.05),"scope","test enclosure");
+    input = struct("time",0,"yawRate",0,"gnssPosition",[0;0],"gnssVelocity",[10;0]);
 end
 
 function [published, actualError] = localReconstruction(design, geometry)

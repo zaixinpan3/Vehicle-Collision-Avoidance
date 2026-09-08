@@ -39,12 +39,29 @@ classdef finiteSensingControllerTest < matlab.unittest.TestCase
             parsed.position = expected(1:2);
             parsed.velocity(2) = parsed.velocity(2)+0.2;
             updated = targetPrediction.advance(encounter,0.1,parsed,lane,cfg);
-            testCase.verifyEqual(updated.center(3:4),parsed.velocity,AbsTol=0);
             testCase.verifyEqual(updated.nominalCenter,expected,AbsTol=1e-12);
+            testCase.verifyLessThanOrEqual(abs(updated.center(3:4)-parsed.velocity) ...
+                +updated.radius(3:4),parsed.velocityErrorBound+1e-12);
             parsed.velocity(2) = parsed.velocity(2)+0.3;
             parsed.velocityErrorBound = 0.01*ones(2,1);
             replaced = targetPrediction.advance(encounter,0.1,parsed,lane,cfg);
-            testCase.verifyEqual(replaced.nominalCenter,replaced.center,AbsTol=0);
+            testCase.verifyEqual(replaced.nominalCenter([1:3,5:8]),expected([1:3,5:8]),AbsTol=1e-12);
+            testCase.verifyEqual(replaced.nominalCenter(4), ...
+                replaced.center(4)-replaced.radius(4),AbsTol=1e-12);
+        end
+        function targetIntersectionPreservesBothEnclosures(testCase)
+            [ego,target,route,cfg] = localFixture();
+            [~,lane,~,parsed] = readPlanningInputs(ego,target,route,cfg);
+            parsed.positionErrorBound = ones(2,1);
+            encounter = targetPrediction.admit(parsed,0,lane,cfg);
+            [predicted,radius] = targetPrediction.finiteFlow(encounter,0.1);
+            parsed.position = predicted(1:2)+[0.5;0];
+            parsed.positionErrorBound = [0.8;0.8];
+            updated = targetPrediction.advance(encounter,0.1,parsed,lane,cfg);
+            lower = max(predicted(1:2)-radius(1:2),parsed.position-parsed.positionErrorBound);
+            upper = min(predicted(1:2)+radius(1:2),parsed.position+parsed.positionErrorBound);
+            testCase.verifyEqual(updated.center(1:2)-updated.radius(1:2),lower,AbsTol=1e-12);
+            testCase.verifyEqual(updated.center(1:2)+updated.radius(1:2),upper,AbsTol=1e-12);
         end
         function localMotionDoesNotRequireAPerpetualExitRoute(testCase)
             [ego,target,route,cfg] = localFixture();

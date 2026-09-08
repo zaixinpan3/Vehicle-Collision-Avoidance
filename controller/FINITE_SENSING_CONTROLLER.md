@@ -12,8 +12,11 @@ the presence of persistent measurement noise and nonzero CLF slack.
 
 At each sample, the controller uses the current observer estimate and its
 error enclosure. It intersects this enclosure with the previous executed
-prediction, centered about the **new estimate**. An empty intersection
-remains an error. The previous input and timestamp are checked as well.
+prediction and centers the planning box at the midpoint of that intersection.
+This preserves both enclosures instead of expanding their intersection
+again around a displaced observer point. It does not reset the observer.
+An empty intersection remains an error. The previous input and timestamp
+are checked as well.
 
 With `controller.certifiedSteps = 1`, collision and road constraints cover
 the complete next held interval using Taylor/Bernstein tubes, current state
@@ -27,11 +30,51 @@ when a first position-only detection leaves target motion unobservable.
 
 An extra lookahead reserve anticipates the next measurement enclosure. A
 bounded scalar fraction allocates only the achievable part of that extra
-reserve; its range is `[0,1]`. Physical collision and road rows stay hard at
-fraction zero. The allocation phase supplies a constraint target, never an
+reserve. `anticipationReserveFractionMaximum` sets its cap, currently 0.25.
+This is a calibrated planning parameter, not a reduction of the executed
+uncertainty enclosure or a proof about future measurement errors. A reduced
+allocation uses 99% of its LP optimum, less the arithmetic guard, to leave
+space for the subsequent nonlinear refinement. Thus the reduced-buffer
+allocation is deliberately interior, not an exact lexicographic optimum.
+Physical collision and road rows stay hard at fraction zero.
+The allocation phase supplies a constraint target, never an
 execution input. The joint performance solve and independent acceptance
 are still required. An unattainable optional reserve is therefore not
 misreported as a violation of physical clearance.
+
+Future state-domain, tire-slip and clearance margins anticipate consecutive disturbances. A
+single-step allowance at every future node omits accumulated heading error;
+with a steering-rate limit, a nominal path can then approach the heading
+boundary before the vehicle can turn back. The planning allowance follows
+
+\[
+ G_{j+1}=[A_{d,j}G_j,\ \operatorname{diag}(q_j)],
+ \qquad \rho_{j+1}=\sum_\ell |G_{j+1}(:,\ell)|,\qquad
+ q_j=\int_0^h\exp(M_j\tau)\,\bar w\,d\tau,
+ \qquad (M_j)_{ii}=(A_j)_{ii},\quad
+ (M_j)_{ik}=|(A_j)_{ik}|\quad(i\ne k).
+\]
+
+The executed stage initializes the generators with the diagonal of its
+Taylor/Bernstein endpoint radius. Signed generators preserve correlations
+across discrete maps. Replacing them with an independent box at every
+future node discards cancellation in the coupled lateral dynamics and can
+inflate a stable system's error allowance. Retaining the diagonal of the continuous generator
+preserves damping in the comparison system. Replacing it with `abs(A)`
+unnecessarily turns negative diagonal entries into exponential growth.
+Future discrete Jacobians belong to the nominal nonlinear rollout; this
+recursion supplies a planning reserve, not a nonlinear tube certificate.
+The current estimation box is propagated separately, with
+`Ginitial(j+1) = Ad(j)*Ginitial(j)`. Its future state-domain and tire-slip
+supports remain mandatory: allocating optional process reserves must not
+scale down uncertainty already known to exist. Only the remaining future
+process support enters the optional fraction. Target
+clearance also accounts for the current target enclosure propagated one
+sample and its displacement from the retained nominal hypothesis.
+The station limits defining a local coordinate
+chart are excluded; their swept-frame construction is separate. A reserve
+that cannot fit never relaxes the physical domain or the robust executed
+interval. Nonlinear acceptance checks those actual physical limits.
 
 The objective continues to include state error, input effort about the
 physical cruise equilibrium, input changes, and squared CLF slack. There is
@@ -59,9 +102,16 @@ Without complete perception, missing observations do not silently release
 the target. A later detection is admitted and checked again.
 
 The longer nominal prediction follows constant curvature and tangential
-acceleration. A propagated previous nominal trajectory is retained while
-it remains inside the new target-state enclosure. Otherwise, the current
-observer estimate initializes a new nominal trajectory. This uses the
+acceleration. Target motion sets are intersected without discarding their
+tighter midpoint representation. A propagated previous nominal state is
+projected componentwise into the new enclosure; compatible coordinates
+remain unchanged. A small excluded yaw-rate coordinate therefore cannot
+reset all motion parameters and reverse the complete forecast.
+At first admission, unresolved acceleration and yaw-rate coordinates use
+the nearest admissible values to zero. A nonzero value is retained when the
+enclosure excludes zero. This is a nominal hypothesis, not a measurement
+or an assumption that the target must drive straight or occupy a lane.
+This uses the
 constant-motion assumption to avoid changing a still-compatible forecast
 in response to every noisy acceleration estimate. It does not assert that
 the retained nominal trajectory is the unknown true trajectory: the
@@ -69,6 +119,19 @@ executed-interval safety calculation still uses the full uncertainty set.
 The NRMM observer state and its gains are not changed by this selection.
 
 ## Estimation bounds from measurement history
+
+The ego velocity enclosure also uses the timestamped GNSS velocity ball and
+the certified orientation set. For measured inertial velocity `g`, each
+body component of `R(-psi)*g` is a sinusoid in `psi`. Its exact extrema over
+the union of yaw intervals occur at interval endpoints or included
+stationary angles. Expand these extrema by the GNSS noise radius, then
+intersect the resulting component bounds about the unchanged body-velocity
+observer point with the existing norm-based enclosure. Near straight travel,
+heading uncertainty mainly affects lateral velocity; copying a single norm
+radius into both components needlessly inflates longitudinal uncertainty.
+For an aged sample, add `accelerationMaximum*age` to its inertial velocity
+ball. If no finite acceleration envelope exists, an aged GNSS sample does
+not tighten this channel. Empty orientation sets remain unavailable.
 
 `nrmmTargetHistory` adds bounded-noise derivative enclosures to the existing
 observer error calculation. With position measurements separated by
@@ -156,16 +219,25 @@ The default `trajectory` linearization evaluates the Fiala tire tangent at
 the actual nominal slip, steering and braking ratio. Its body dynamics
 include rotation of the front longitudinal and lateral forces, Coriolis
 terms, road-load derivatives and the nonlinear Frenet Jacobian. A nonlinear
-RK4 rollout supplies the nominal anchor. Future affine offsets reproduce
-that anchor's endpoints. Batched central differences of the actual RK4 map
+RK4 rollout supplies the nominal anchor. Each future affine offset uses
+the same nonlinear start state at which its Jacobians were evaluated;
+it does not cancel an upstream frozen-step discrepancy by resetting the
+following endpoint. Batched central differences of the actual RK4 map
 supply future discrete Jacobians; the executed generator retains its
 continuous tangent and separate residual allowance.
 
 Every accepted affine candidate is rolled out again through the nonlinear
 bicycle. Future road, collision, state-domain and tire constraints are
 checked on that rollout. A violating candidate causes a bounded number of
-new trajectory linearizations. Future front-slip rows touch the actual
-`atan2` slip at each endpoint and rear slip uses its exact linear wedge.
+new trajectory linearizations. Future tire rows linearize the same
+scheduled slip used to admit the next executed interval:
+`(vy + axleDistance*r)/max(vxStart,speedFloor) - steering` for the front
+axle, with rear axle distance `-lr` and no rear steering. The denominator
+derivative acts on the interval-start state, including at the endpoint;
+the numerator acts on that endpoint. Acceptance evaluates both this
+scheduled expression and the physical `atan2` slip on the nonlinear
+rollout. This prevents a future plan from passing a different slip test
+than the one applied when its interval becomes current.
 The Fiala law itself satisfies the physical combined-force circle; an
 additional future inner polygon is unnecessary. Substituting a different
 state into an old force tangent created a repeatable refinement cycle in
@@ -202,6 +274,11 @@ do not prove a global physical-model error bound.
 equalities. Its constraints and objective differences are tested against
 the independent condensed program. The auxiliary solver states are not
 used to bypass acceptance of the physical control sequence.
+These auxiliary states are deviations from the current anchor trajectory.
+Centering the dynamics, geometry, CLF cones and objective together removes
+large absolute route stations from equality right-hand sides without
+changing the optimization problem. This avoids a needless mismatch between
+the solver's relative residual scaling and strict physical-unit checks.
 The external solver hook and its default solver both return the full lifted
 decision vector; independent acceptance extracts and checks its physical
 input and CLF-slack prefix.
@@ -211,6 +288,14 @@ validated tire parameters are cached or reused. The performance solve is
 tried at full optional reserve first; a successful solve attains the reserve
 cap and avoids a redundant allocation LP. Independent acceptance remains
 mandatory.
+
+The optional reserve cap is intentionally a performance/safety-buffer
+tradeoff within the unchanged hard execution constraints. In the straight
+diagnostics, maximizing the complete open-loop planning allowance drove
+the nominal trajectory toward heading and tire limits. The smaller cap and
+interior allocation removed that behavior in the tested noise seeds.
+Neither those experiments nor the linear generator algebra establishes
+recursive feasibility for this nonlinear output-feedback controller.
 
 Exploratory terminal state costs, proximal input penalties, capped hard
 target buffers, fixed lateral separating normals and pulse-hold steering

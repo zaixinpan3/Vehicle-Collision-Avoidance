@@ -35,28 +35,36 @@ function program = localLiftedProgram(qp,prediction,model)
     cellCount = numel(cells);
     total = physicalCount+6*(cellCount+1);
     stateIndex = reshape(physicalCount+(1:6*(cellCount+1)),6,[]);
+    % Auxiliary states are deviations from the current anchor. Absolute
+    % route station can be hundreds of metres while active clearances are
+    % micrometres; leaving that translation in equality right-hand sides
+    % needlessly degrades the solver's relative feasibility scaling.
+    stateCenter = zeros(6,cellCount+1);
+    stateCenter(:,1) = model.initialEgoState;
     dynamics = spalloc(6*(cellCount+1),total,60*cellCount+6);
     dynamics(1:6,stateIndex(:,1)) = speye(6);
     dynamicsBound = zeros(6*(cellCount+1),1);
-    dynamicsBound(1:6) = model.initialEgoState;
     localRows = cell(cellCount,1);
     localBounds = cell(cellCount,1);
     rowStart = 0;
     for index = 1:cellCount
         tube = cells(index);
+        stateCenter(:,index+1) = tube.endMap*model.anchorPlan+tube.endOffset;
         inputIndex = 2*tube.stage-1:2*tube.stage;
         rows = 6*index+(1:6);
         dynamics(rows,stateIndex(:,index+1)) = speye(6);
         dynamics(rows,stateIndex(:,index)) = -tube.localStateMap(:,:,end);
         dynamics(rows,inputIndex) = -tube.localInputMap(:,:,end);
-        dynamicsBound(rows) = tube.localOffset(:,end);
+        dynamicsBound(rows) = tube.localOffset(:,end) ...
+            +tube.localStateMap(:,:,end)*stateCenter(:,index)-stateCenter(:,index+1);
         geometry = qp.geometry.local(index);
         rowCount = numel(geometry.bound);
         block = spalloc(rowCount,total,8*rowCount);
         block(:,stateIndex(:,index)) = geometry.stateMatrix;
         block(:,inputIndex) = geometry.inputMatrix;
         selected = rowStart+(1:rowCount);
-        localBounds{index} = geometry.bound+qp.inequalityBound(selected)-qp.geometry.physicalBound(selected);
+        localBounds{index} = geometry.bound-geometry.stateMatrix*stateCenter(:,index) ...
+            +qp.inequalityBound(selected)-qp.geometry.physicalBound(selected);
         localRows{index} = block;
         rowStart = rowStart+rowCount;
     end
@@ -75,7 +83,8 @@ function program = localLiftedProgram(qp,prediction,model)
         map(1:5,stateIndex(:,constraint.cellIndex)) = tube.localStateMap(2:6,:,point);
         map(1:5,inputIndex) = tube.localInputMap(2:6,:,point);
         map(6:7,inputIndex) = eye(2);
-        errorOffset = tube.localOffset(2:6,point)-qp.clf.referenceStart ...
+        errorOffset = tube.localOffset(2:6,point) ...
+            +tube.localStateMap(2:6,:,point)*stateCenter(:,constraint.cellIndex)-qp.clf.referenceStart ...
             -qp.clf.referenceRate*tube.time(point);
         offset = [errorOffset;zeros(2,1);constraint.offset(8)];
         tMap = -constraint.linear.'*map;
@@ -107,11 +116,11 @@ function program = localLiftedProgram(qp,prediction,model)
         rows = stateIndex(2:6,index);
         reference = qp.clf.referenceStart+qp.clf.referenceRate*(stage-1)*h;
         hessian(rows,rows) = 2*h*weight;
-        linear(rows) = -2*h*weight*reference;
+        linear(rows) = 2*h*weight*(stateCenter(2:6,index)-reference);
     end
     program = struct("P",triu(hessian),"q",linear, ...
         "A",[dynamics;hard;vertcat(coneRows{:})], ...
         "b",[dynamicsBound;hardBound;vertcat(coneBounds{:})], ...
         "cones",[size(dynamics,1);numel(hardBound);10*ones(numel(cones),1)], ...
-        "physicalDecisionCount",physicalCount,"stateIndex",stateIndex);
+        "physicalDecisionCount",physicalCount,"stateIndex",stateIndex,"stateCenter",stateCenter);
 end

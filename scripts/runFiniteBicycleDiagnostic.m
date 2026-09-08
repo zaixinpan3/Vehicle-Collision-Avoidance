@@ -1,8 +1,9 @@
 function result = runFiniteBicycleDiagnostic(cfg,duration,options)
 %runFiniteBicycleDiagnostic Isolate planning with a nonlinear bicycle plant.
-% Exact state observations and finite-range straight target truth isolate the
-% planner from NRMM and PassVeh14DOF differences. This is a diagnostic model,
-% not high-fidelity validation. A failed current solve ends the experiment.
+% Exact observations isolate planning; EstimatorConfiguration enables the
+% bounded-noise NRMM sensor adapter. Both use a finite-range straight target.
+% This is a diagnostic model, not high-fidelity validation. A failed current
+% solve ends the experiment before advancing the plant.
     arguments
         cfg (1,1) struct
         duration (1,1) double {mustBePositive} = 10
@@ -39,7 +40,7 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         if index>1, ego.heldActuatorInput = inputs(end,:).';end
         target = struct("trackId","diagnostic-target","targetPositionInertial",[100-10*time;0.8], ...
             "targetVelocityInertial",[-10;0],"targetAccelerationInertial",[0;0], ...
-            "targetHeadingInertial",pi,"targetYawRate",0,"length",5,"width",2, ...
+            "targetHeadingInertial",pi,"targetYawRate",0,"targetLength",5,"targetWidth",2, ...
             "predictionMotion",struct("kind","finite-sensing-motion-v1", ...
                 "jerkBound",[0;0],"yawAccelerationBound",0,"scalarAccelerationMaximum",0));
         if norm(target.targetPositionInertial-state(1:2))>30,target = [];end

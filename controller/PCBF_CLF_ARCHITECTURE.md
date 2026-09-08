@@ -23,7 +23,8 @@ before advancing the plant. No stored control or alternate controller is execute
 
 The observer publishes point estimates and current componentwise error bounds.
 It does not supply future-state truth. The ego enclosure is intersected with
-the previous executed tube about the new estimate. Timestamps, applied input,
+the previous executed tube and represented about the intersection midpoint;
+the observer point state remains unchanged. Timestamps, applied input,
 model, reference and CLF configuration must remain consistent. An updated road
 measurement is admitted into the new problem instead of compared by exact array
 identity with the previous fit. Coverage still limits the complete footprint.
@@ -59,8 +60,13 @@ candidates does not prove global infeasibility of the nonconvex problem.
 
 ## Objective and acceptance
 
-An optional first phase allocates the achievable fraction of extra future
-clearance reserve, with physical safety constraints hard even at zero fraction.
+An optional first phase allocates extra future state, tire-slip and clearance
+reserves. The configured fraction cap is 0.25, and a reduced allocation retains
+99% of its LP optimum to provide an interior target for nonlinear refinement.
+These are planning settings; physical safety constraints and complete current
+uncertainty enclosures remain hard even at zero optional fraction.
+The propagated initial estimation uncertainty also stays mandatory in future
+state-domain and tire-slip rows; only the additional process reserve is allocated.
 The joint objective contains state errors, input effort about the physical
 cruise equilibrium, input changes, and squared nonnegative CLF slack. It has no
 desired-acceleration objective. The positive-definite Riccati metric uses the

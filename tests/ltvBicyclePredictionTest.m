@@ -10,6 +10,48 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function futureDisturbancesStayContainedWithoutRepeatedBoxInflation(testCase)
+            model = localModel();
+            model.horizonSteps = 30;
+            model.cfg.controller.horizonSteps = 30;
+            model.cfg.controller.certifiedSteps = 1;
+            model.initialEgoState(4) = 10;
+            model.initialFrenetErrorBound = zeros(6,1);
+            model.previousInput = zeros(2,1);
+            model.cfg.model.plantModelResidualRateBound = [0;0;0;0;0;0.2];
+            prediction = ltvBicycleModel.finitePredict(model,[]);
+            stream = RandStream('mt19937ar','Seed',713);
+            samples = prediction.domainErrorBound(:,2).*(2*rand(stream,6,200)-1);
+            reboxed = prediction.domainErrorBound(:,2);
+            for stage = 2:model.horizonSteps
+                a = prediction.stageMatrixA(:,:,stage);
+                disturbance = stateUncertainty.heldDisturbance( ...
+                    prediction.continuousA(:,:,stage),model.cfg.model.plantModelResidualRateBound,model.sampleTime);
+                samples = a*samples+disturbance.*(2*rand(stream,6,200)-1);
+                testCase.verifyLessThanOrEqual(max(abs(samples),[],2), ...
+                    prediction.domainErrorBound(:,stage+1)+1e-11);
+                reboxed = abs(a)*reboxed+disturbance;
+            end
+            testCase.verifyLessThan(prediction.domainErrorBound(3,end),0.99*reboxed(3));
+        end
+        function executionReservesContainDisturbanceWithoutReversingDamping(testCase)
+            model = localModel();
+            model.initialFrenetErrorBound = zeros(6,1);
+            model.previousInput = zeros(2,1);
+            model.cfg.model.plantModelResidualRateBound = [0;0;0;0;0;0.2];
+            prediction = ltvBicycleModel.finitePredict(model,[]);
+            rate = model.cfg.model.plantModelResidualRateBound;
+            a = prediction.continuousA(:,:,2);
+            for sign = [-1,1]
+                [~,errorState] = ode45(@(time,error) a*error ...
+                    +sign*(1-2*(time>model.sampleTime/2))*rate, ...
+                    [0,model.sampleTime],zeros(6,1),odeset(RelTol=1e-10,AbsTol=1e-12));
+                testCase.verifyLessThanOrEqual(abs(errorState(end,:).'), ...
+                    prediction.executionReserve(:,2)+1e-10);
+            end
+            testCase.verifyGreaterThan(prediction.executionReserve(3,2),0);
+            testCase.verifyLessThan(prediction.executionReserve(6,2),2*rate(6)*model.sampleTime);
+        end
         function discreteNominalSensitivitiesMatchIndependentOdePerturbations(testCase)
             model = localModel();
             model.initialEgoState = [10;0.2;0.03;10;0.2;0.1];
