@@ -2,11 +2,17 @@
 
 Implementation study: September 7, 2026.
 
-This document describes the finite-sensing policy implemented by the current
+This document describes the default `encounter.completionPolicy = "lookahead"`
+finite-sensing policy implemented by the current
 controller. It separates the interval that will actually be executed from
 the nominal trajectory used to anticipate an encounter. It does not claim
 recursive feasibility, infinite-future separation, or exact convergence in
 the presence of persistent measurement noise and nonzero CLF slack.
+
+For the separate retained-deadline mode, its terminal perception-exit rows,
+and the hard predictive barrier proof, see
+[HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). The fresh-solve-only execution
+rules and measured runtimes below apply to the default lookahead policy.
 
 ## Execution and prediction
 

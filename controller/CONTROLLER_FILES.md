@@ -2,8 +2,8 @@
 
 The core control algorithm has an upper limit of **20 source files**. Keep
 related operations together; fewer files are welcome when their responsibilities
-remain clear. The current implementation contains **19 source files**:
-15 MATLAB modules, three native C++ bridges, and one controller configuration.
+remain clear. The current implementation contains **20 source files**:
+16 MATLAB modules, three native C++ bridges, and one controller configuration.
 
 The count includes every source file under `controller/`, including any future
 subdirectories, plus `config/collisionAvoidanceControllerConfig.m`. Tests,
@@ -14,6 +14,7 @@ Do not move controller helpers into those directories to evade the limit.
 | Source | Responsibility |
 | --- | --- |
 | `collisionAvoidanceController.m` | Encounter lifecycle, carried finite certificate and diagnostics |
+| `hardEncounterBarrier.m` | Retained-deadline hard witness, perception-exit rows and certified execution |
 | `readPlanningInputs.m` | Input normalization and lane/target model construction |
 | `formulateAvoidanceProblem.m` | Maneuver objective, hard swept constraints and predictive CLF cones |
 | `avoidanceStageQp.m` | Sparse quadratic/Lorentz-cone transcription and truncation |
@@ -40,6 +41,8 @@ Their local helpers stay in the owning file. Version 10 retains the controller
 entry signature and supports finite-sensing and optional strong encounter contracts and conic solver-hook
 interface documented in `PCBF_CLF_ARCHITECTURE.md`. Callers of the former standalone helpers must use the
 corresponding module methods; repository scripts and tests use these interfaces.
+Version 11 is the explicit `retainedPerceptionExit` mode documented in
+`HARD_PREDICTIVE_CBF.md`; command conversion stays local to the controller entry.
 
 When changing native geometry paths in a running MATLAB session, use
 `clear laneGeometry` to release both retained geometry backend handles.

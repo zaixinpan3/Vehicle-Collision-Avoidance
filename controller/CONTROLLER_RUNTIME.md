@@ -1,5 +1,9 @@
 # Controller runtime and sparse QP implementation
 
+The optional version-11 retained-deadline mode is documented in
+[HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). Existing runtime measurements
+below do not qualify its full-horizon certificate or optional reoptimization.
+
 Current runtime: version 10 uses a sparse SOCP, with bounded geometric
 relinearization and independently checked physical decisions. See
 [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md) for current scope and

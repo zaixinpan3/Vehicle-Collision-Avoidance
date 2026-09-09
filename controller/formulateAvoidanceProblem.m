@@ -26,6 +26,15 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         -rateMap(selected,:),zeros(nnz(selected),count)];
     physicalBound = [physicalBound;rateLimit(selected)+ratePrior(selected);rateLimit(selected)-ratePrior(selected)];
     safetyRows = [safetyRows;false(2*nnz(selected),1)];
+    retainedExit = string(cfg.encounter.completionPolicy) == "retainedPerceptionExit";
+    completionRows = zeros(0, 1);
+    if retainedExit
+        [exitMatrix, exitBound] = hardEncounterBarrier.completionRows(model, prediction, geometry);
+        completionRows = numel(physicalBound)+(1:numel(exitBound)).';
+        hardMatrix = [hardMatrix; exitMatrix, zeros(numel(exitBound), count)];
+        physicalBound = [physicalBound; exitBound];
+        safetyRows = [safetyRows; true(numel(exitBound), 1)];
+    end
     % Leave room for strict independent acceptance at an active constraint.
     % Acceptance charges one reserve; solving with two does not spend that
     % same allowance on both solver termination and certificate arithmetic.
@@ -167,7 +176,17 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         "equalityMatrix", zeros(0, decisionCount), "equalityBound", zeros(0, 1), ...
         "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
         "certifiedInfeasible", any(bound(~any(hardMatrix, 2)) < 0));
-    qp.stageProgram = avoidanceStageQp(qp,prediction,model);
+    if retainedExit
+        % One unit in each hard row's native units normalizes its margin.
+        % CLF slack nonnegativity has no safety-margin coefficient.
+        scale = ones(size(bound));
+        scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
+        qp.barrier = struct("baseBound", bound, "scale", scale, ...
+            "completionRows", completionRows);
+        qp.stageProgram = avoidanceStageQp(qp);
+    else
+        qp.stageProgram = avoidanceStageQp(qp,prediction,model);
+    end
     if isfield(model,"committedInput") && ~isempty(model.committedInput)
         % Eliminate the already scheduled input exactly in both numerical
         % solves. The independent checker separately enforces this prefix.

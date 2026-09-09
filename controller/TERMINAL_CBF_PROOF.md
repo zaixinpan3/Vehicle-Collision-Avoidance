@@ -2,6 +2,12 @@
 
 Research and implementation date: September 8, 2026.
 
+The subsequent hard-margin, retained-deadline implementation and its conditional
+encounter proof are in [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). It uses
+perception exit rather than the retired invariant terminal set audited here.
+References below to the current online controller concern the default
+version-10 lookahead policy; the nonlinear counterexamples remain applicable.
+
 ## Result and scope
 
 The dissipative terminal construction evaluated in this audit yields a locally Lipschitz,

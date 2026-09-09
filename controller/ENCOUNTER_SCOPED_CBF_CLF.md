@@ -1,5 +1,11 @@
 # Encounter-scoped predictive CBF, sampled-data CLF, and maneuver optimization
 
+For the implemented version-11 hard predictive barrier with a retained circular
+perception-exit deadline, see [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md).
+That mode executes an admitted full witness and optionally reoptimizes inside
+its unchanged certificate. The strong nonreturn contracts and fresh-solve-only
+runtime described below are the separate version-10 construction.
+
 Strong-contract design note, September 7, 2026. The construction below concerns
 finite witnesses with certified nonreturning exits. Version 10's default finite
 perception policy is specified in [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md)

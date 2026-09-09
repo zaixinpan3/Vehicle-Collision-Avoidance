@@ -6,8 +6,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
 % contracts; missing observations retain their active obligations. Controls
 % are held for cfg.controller.sampleTime. Finite-sensing observations renew
 % the nominal lookahead; issued controls require a fresh verified solve.
-% Every issued command requires a verified solution from the current call.
-% If no candidate supplies one, report failure without applying stored inputs.
+% retainedPerceptionExit instead retains the complete certified witness and
+% its absolute deadline; see HARD_PREDICTIVE_CBF.md for the conditional proof.
     persistent previousCertificate
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -28,6 +28,19 @@ function [command, predictedInput, planningProblem, certificate] = ...
     model = localFiniteModel(ego, lane, road, cfg);
     identity = struct("configuration", rmfield(cfg, "solver"), "lane", lane, ...
         "accelerationBias", ego.longitudinalAccelerationBias);
+    retainedExit = string(cfg.encounter.completionPolicy) == "retainedPerceptionExit";
+    if retainedExit
+        identity.road = road;
+        identity.perceptionRange = ego.perceptionRange;
+        model.perceptionRange = ego.perceptionRange;
+        if ~isempty(controllerState)
+            [command, predictedInput, planningProblem, certificate] = ...
+                hardEncounterBarrier.advance(controllerState, ego, model, observations, identity, @localCommand);
+            if ~explicitState, previousCertificate = certificate; end
+            return;
+        end
+        hardEncounterBarrier.validateAdmission(ego, observations);
+    end
     incumbent = [];
     encounters = struct("key", {}, "contract", {}, "center", {}, "radius", {}, ...
         "time", {}, "halfLength", {}, "halfWidth", {}, "discharged", {}, "exitMargin", {},"nominalCenter",{});
@@ -381,6 +394,9 @@ function [command, predictedInput, planningProblem, certificate] = ...
     planningProblem = struct("problemClass", qp.problemClass, "qp", qp, "layout", qp.layout, ...
         "prediction", prediction, "model", model, "decision", decision, "plan", predictedInput(:), ...
         "inputPlan", predictedInput, "tailPlan", zeros(2, 0), "metadata", metadata);
+    if retainedExit
+        [certificate, planningProblem] = hardEncounterBarrier.admit(certificate, planningProblem);
+    end
     if ~explicitState, previousCertificate = certificate; end
 end
 
@@ -728,6 +744,10 @@ function [model, prediction, anchor] = localPlanningWindow(model, prediction, an
             "Sensed road geometry must cover the delay and the new command's complete held interval.");
     end
     if count < prediction.stageCount
+        if string(cfg.encounter.completionPolicy) == "retainedPerceptionExit"
+            error("collisionAvoidanceController:roadBoundaryCoverageGap", ...
+                "The complete retained deadline must lie inside certified road coverage.");
+        end
         model.horizonSteps = count;
         prediction = ltvBicycleModel.finitePredict(model,[]);
         anchor = anchor(1:prediction.planCount);

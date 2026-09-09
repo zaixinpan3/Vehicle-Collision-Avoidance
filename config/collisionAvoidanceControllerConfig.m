@@ -49,8 +49,11 @@ function cfg = localDefaults()
 
     % Finite encounter certificates. A maneuver selects a corridor; support
     % normals are separate certificate variables. All cells share the issued
-    % held input within a sample. Margins are measured in metres.
+    % held input within a sample. Lookahead margins are in metres; retained
+    % encounter margins are normalized across the physical hard rows.
     cfg.encounter = struct("barrierFraction", 1.0, ...
+        "completionPolicy", "lookahead", "perceptionExitBuffer", 0.1, ...
+        "reoptimizeContinuation", false, ...
         "minimumCells", 2, "taylorOrder", 6, ...
         "numericalMargin", 1.0e-6, "maximumCarriedMargin", 1.0, ...
         "corridorOverlap", 0.75, "maximumGeometryRebuilds", 2, ...
@@ -193,6 +196,17 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    if ~isscalar(string(cfg.encounter.completionPolicy)) ...
+            || ~any(string(cfg.encounter.completionPolicy) == ["lookahead", "retainedPerceptionExit"])
+        error("collisionAvoidanceController:invalidConfiguration", "Unknown encounter completion policy.");
+    end
+    validateattributes(cfg.encounter.perceptionExitBuffer, {'double'}, {'scalar', 'real', 'finite', 'positive'});
+    validateattributes(cfg.encounter.reoptimizeContinuation, {'logical'}, {'scalar'});
+    if string(cfg.encounter.completionPolicy) == "retainedPerceptionExit" ...
+            && (cfg.controller.certifiedSteps < cfg.controller.horizonSteps || cfg.controller.inputDelaySteps ~= 0)
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "Retained perception exit requires full-horizon certification and zero input delay.");
+    end
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0

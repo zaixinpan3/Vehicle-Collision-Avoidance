@@ -1,5 +1,14 @@
 # Finite-sensing predictive CBF–CLF controller
 
+The explicit `encounter.completionPolicy = "retainedPerceptionExit"` mode
+implements the hard predictive witness construction in
+[HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). Its version-11 certificate
+retains a complete interval-certified plan, fixed perception-exit deadline,
+nonnegative max–min margin, and executable continuation. It has a conditional
+recursive-feasibility proof for the declared inclusion, requires zero input
+delay, and does not establish a physical-vehicle guarantee. The version-10
+lookahead policy described below remains the default.
+
 The terminal-invariance proof audit, conditional Huang-style value-function
 theorem, and nonlinear counterexample are documented in
 [TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md). The retired rest-terminal

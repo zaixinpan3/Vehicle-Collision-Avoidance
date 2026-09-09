@@ -5,6 +5,10 @@ function [result,problem] = solveHardCbfClf(problem, cfg)
         result.exitFlag = -2;
         return;
     end
+    if isfield(problem, "barrier")
+        [result, problem] = localHardMarginSolve(problem, cfg);
+        return;
+    end
     solveCalls = 0;
     solve = [];
     if string(cfg.encounter.safetyMarginPolicy)=="maximize" ...
@@ -28,7 +32,66 @@ function [result,problem] = solveHardCbfClf(problem, cfg)
     result.message = solve.message;
     if ~solve.feasible, return; end
     decision = solve.decision;
-    % Recompute only unbounded CLF slacks; preserve all controls verbatim.
+    [decision, slacks] = localRepairClf(problem, decision, cfg);
+    result.decision = decision;
+    result.feasible = all(isfinite(decision));
+    result.iterations = localIterationCount(solve.output);
+    result.algorithm = "Clarabel predictive CBF-CLF SOCP";
+    result.objectiveValue = localJointValue(problem, decision);
+    result.clfValue = slacks;
+end
+
+function [result, problem] = localHardMarginSolve(problem, cfg)
+% Maximize a nonnegative tightening of every physical hard row, then track.
+% The checked LP control is retained if the subordinate SOCP fails.
+    physical = problem.layout.decisionCount;
+    scale = problem.barrier.scale;
+    matrix = [sparse(problem.inequalityMatrix), sparse(scale)];
+    extra = sparse(2, physical+1);
+    extra(:, end) = [1; -1];
+    program = struct("P", sparse(physical+1, physical+1), ...
+        "q", [zeros(physical, 1); -1], "A", [matrix; extra], ...
+        "b", [problem.barrier.baseBound; cfg.encounter.maximumCarriedMargin; -problem.requiredMargin], ...
+        "cones", [0; numel(scale)+2], "physicalDecisionCount", physical+1, ...
+        "inactiveSlackIndex", problem.layout.relaxationIndex);
+    if isfield(problem.stageProgram, "fixedDecisionIndex")
+        program.fixedDecisionIndex = problem.stageProgram.fixedDecisionIndex;
+        program.fixedDecisionValue = problem.stageProgram.fixedDecisionValue;
+    end
+    auxiliary = struct("layout", struct("decisionCount", physical+1), "stageProgram", program);
+    marginSolve = localRunJointProgram(auxiliary, cfg);
+    result = localEmptyResult();
+    result.solverCalls = 1;
+    result.exitFlag = marginSolve.exitFlag;
+    result.message = "hard margin: "+marginSolve.message;
+    if ~marginSolve.feasible, return; end
+    candidate = localRepairClf(problem, marginSolve.decision(1:physical), cfg);
+    model = struct("cfg", cfg);
+    check = certifyAvoidancePlan(problem, [], model, candidate);
+    if ~check.accepted, return; end
+    result = localCertifiedResult(problem, candidate, marginSolve, 1);
+    % Give the performance solve an interior target without spending the
+    % inherited certificate margin. This remains a lower bound, not H_N.
+    problem.requiredMargin = max(problem.requiredMargin, 0.99*check.margin);
+    problem.inequalityBound = problem.barrier.baseBound-problem.requiredMargin*scale;
+    fixedProgram = problem.stageProgram;
+    problem.stageProgram = avoidanceStageQp(problem);
+    if isfield(fixedProgram, "fixedDecisionIndex")
+        problem.stageProgram.fixedDecisionIndex = fixedProgram.fixedDecisionIndex;
+        problem.stageProgram.fixedDecisionValue = fixedProgram.fixedDecisionValue;
+    end
+    solve = localRunJointProgram(problem, cfg);
+    result.solverCalls = 2;
+    if ~solve.feasible, return; end
+    decision = localRepairClf(problem, solve.decision, cfg);
+    check = certifyAvoidancePlan(problem, [], model, decision);
+    if check.accepted
+        result = localCertifiedResult(problem, decision, solve, 2);
+    end
+end
+
+function [decision, slacks] = localRepairClf(problem, decision, cfg)
+% Only performance slacks may be repaired; inputs are preserved verbatim.
     slacks = zeros(problem.layout.relaxationCount, 1);
     for index = 1:numel(problem.clf.constraints)
         constraint = problem.clf.constraints(index);
@@ -38,14 +101,20 @@ function [result,problem] = solveHardCbfClf(problem, cfg)
             norm(abs(constraint.root)*abs(value))^2+abs(constraint.linear).'*abs(value)+abs(constraint.constant));
         slacks(constraint.stage) = max(slacks(constraint.stage), residual);
     end
-    decision(problem.layout.relaxationIndex) = slacks ...
-        + cfg.encounter.numericalMargin*(1+abs(slacks));
+    decision(problem.layout.relaxationIndex) = slacks+cfg.encounter.numericalMargin*(1+abs(slacks));
+end
+
+function result = localCertifiedResult(problem, decision, solve, calls)
+    result = localEmptyResult();
+    result.feasible = true;
     result.decision = decision;
-    result.feasible = all(isfinite(decision));
+    result.exitFlag = solve.exitFlag;
+    result.message = solve.message;
+    result.solverCalls = calls;
     result.iterations = localIterationCount(solve.output);
-    result.algorithm = "Clarabel predictive CBF-CLF SOCP";
     result.objectiveValue = localJointValue(problem, decision);
-    result.clfValue = slacks;
+    result.clfValue = decision(problem.layout.relaxationIndex);
+    result.algorithm = "hard predictive margin LP and CLF SOCP";
 end
 
 function [problem,solve] = localReserveMargin(problem,cfg)
