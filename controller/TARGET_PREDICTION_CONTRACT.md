@@ -1,11 +1,6 @@
-# Finite target motion and encounter-exit contracts
+# Finite target motion and joint admission
 
-Version 10 supports renewing local finite predictions and the optional stronger
-nonreturning-exit contract. Current observer bounds do not establish future jerk
-limits or complete detection; these are separate caller assumptions. The default
-policy is described in [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md).
-
-## Local finite prediction
+Every target uses the same finite motion descriptor:
 
 ```matlab
 target.predictionMotion = struct( ...
@@ -14,107 +9,36 @@ target.predictionMotion = struct( ...
     "yawAccelerationBound", yawRateRate); % rad/s^2
 ```
 
-The optional `scalarAccelerationMaximum` bounds the magnitude of tangential
-acceleration used in nominal lookahead. Every current observation renews the
-requested finite window after intersecting the old reachable set. Changed
-physical derivative bounds or dimensions are rejected. The observer's point
-estimate remains unchanged. A prior constant-curvature, constant-tangential-
-acceleration nominal trajectory is retained while it lies in the new enclosure;
-otherwise it is reinitialized. The robust executed interval uses the full set.
+Stable track identity, position, velocity, acceleration, heading, yaw rate,
+footprint dimensions and current componentwise estimation errors identify the
+initial target set. The declared derivative bounds must cover the complete
+remaining encounter. Observer estimation bounds alone do not establish these
+future-motion premises.
 
-A timestamped `ego.perception` with `completeWithinRange=true` and a sensor
-`range` permits retirement after absence, unless the whole reachable position
-set remains inside range. Missing observations without complete perception do
-not retire the target. New detections re-enter admission. There is no infinite
-forecast or prescribed target road corridor in this mode.
+`finiteFlow` encloses Cartesian constant-acceleration propagation plus bounded
+jerk and yaw acceleration. Every safety cell uses that full uncertain flow.
+`nominalFlow` supplies a constant-curvature, tangential-acceleration anchor for
+model studies; its optional `scalarAccelerationMaximum` does not tighten the
+uncertain safety enclosure.
 
-## Optional strong exit contract
+The controller retains each target's first-detection time and original set.
+Compatible measurements are checked against the retained flow. They cannot
+renew its validity or replace old safety obligations. The independent
+`advance` utility conditions an observation set for prediction studies; it is
+not an alternative controller continuation path.
 
-The remainder of this document describes the stronger nonreturn mode. Its exit
-and nonrenewal requirements do not apply to `predictionMotion` encounters.
+The accepted research assumption is joint feasibility at first detection,
+including old targets, stored geometry, remaining deadline and executed
+controls. Admission appends the new swept and endpoint constraints to the
+retained program. It requires an independently checked joint witness. An
+uncertified event is outside the declared research domain and produces no
+command; a negative solver status is not proof of mathematical infeasibility.
 
-A target is a scalar record; the controller accepts a structure array of such
-records. Existing inertial position, velocity, acceleration, body heading,
-yaw-rate, extent, and current-error fields remain supported. `trackId`,
-`targetId`, `objectId`, or `id` must supply a stable unique identifier. Current
-`target-state-v1` estimator certificates override numeric current-bound aliases.
-Their timestamps must match `ego.stateTime`.
+Admission requires complete timestamped circular perception with a fixed
+positive range. Missing observations cannot silently remove old constraints.
+Verified exit ends the finite encounter; it does not establish nonreturn,
+post-exit vehicle safety or indefinite cruise feasibility. The removed
+`encounterContract` exit-route interface is rejected.
 
-In this strong mode, each target also requires:
-
-```matlab
-target.encounterContract = struct( ...
-    "kind", "cartesian-jerk-exit-v1", ...
-    "id", "crossing-1", ...
-    "validFrom", 0.0, ...           % absolute seconds
-    "validUntil", 1.6, ...          % absolute seconds
-    "jerkBound", [0.0; 0.0], ...   % componentwise m/s^3
-    "yawAccelerationBound", 0.0, ... % rad/s^2
-    "exitNormal", [0.0; 1.0], ... % unit inertial normal
-    "exitOffset", 4.6, ...         % plane offset in metres
-    "postExitRoute", "nonreturningHalfspace");
-```
-
-These example values describe the declared synthetic fixture in
-`tests/encounterTestFixture.m`. They are not defaults or measured contracts for
-an arbitrary target. Admission rejects missing fields, expired validity,
-anonymous identities, nonunit normals, and unsupported guard kinds.
-
-## Finite Cartesian inclusion
-
-The current state is `[pX;pY;vX;vY;aX;aY;psi;omega]`. During the active encounter,
-`pDot=v`, `vDot=a`, `abs(aDot)<=jerkBound`, `psiDot=omega`, and
-`abs(omegaDot)<=yawAccelerationBound`. For elapsed time `t`, the nominal position
-is `p+v*t+a*t^2/2`; its radius is
-`rhoP+rhoV*t+rhoA*t^2/2+jerkBound*t^3/6`. Corresponding velocity, acceleration,
-yaw, and yaw-rate radii follow integration of the same inclusion. Body heading
-is independent of velocity course, so zero speed causes no curvature quotient.
-The legacy fixed-curvature utility methods remain available for independent
-model comparisons; the controller uses `admit`, `finiteFlow`, `advance`, and
-`exitMargin`.
-
-Motion validity must cover every held interval up to that target's certified
-exit. A short forecast is rejected if no guarded exit can occur before expiry.
-The controller does not extrapolate an active obligation beyond its contract.
-No infinite target trajectory is requested after discharge.
-
-## Implemented guard
-
-For unit normal `n`, exit requires
-
-`n'*centerPosition - abs(n)'*positionRadius - rectangleSupport`
-
-at least `exitOffset + collision.clearanceMargin`, with the configured
-numerical reserve. Rectangle support is maximized over the complete yaw
-interval. Admission separately checks that every segment of the allowed ego
-route, its entire lateral domain, and its footprint remain upstream of the
-plane. The caller's `nonreturningHalfspace` assertion requires the target's
-whole footprint to stay at or beyond `exitOffset + collision.clearanceMargin`
-after exit. Together these premises
-constitute discharge; instantaneous separation alone does not.
-
-This guard is conservative and principally serves crossing routes. A target
-sharing the ego's indefinite route generally needs a different guard or
-monitoring/handoff contract, which this runtime does not implement. Waiting,
-forecast renewal, and route-contract replacement fail admission unless a new
-independent supported encounter is supplied. A later encounter needs a new
-stable identity and timely joint admission. The code does not itself certify
-sensor detection range or environmental completeness.
-
-## Observations and lifecycle
-
-Missing observations retain the active target and its old motion inclusion.
-A known target may omit `encounterContract` on subsequent observation records;
-the controller then retains the existing contract. A supplied replacement must
-match it. A valid observation intersects the carried reachable box, keeps its nominal
-center, and can shrink its radius. The update must not silently replace jerk,
-yaw-acceleration, extent, route, validity, or identity contracts. A contradictory
-observation reports an assumption failure. Every issued command requires a
-verified current solution; a missing feasible solution terminates simulation
-without replaying stored controls.
-
-Each target exits on its own sample guard; joint optimization retains every
-active target until its guard is met. Discharged records retain the route
-assertion, without prediction beyond expiry. If a later observation contradicts
-that assertion, the controller reports `exitRouteViolation`. Missing perception
-by itself never discharges an active target.
+See [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md) for the equations,
+execution premises and successor-witness argument.

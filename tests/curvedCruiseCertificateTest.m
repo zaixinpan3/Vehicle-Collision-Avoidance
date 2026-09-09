@@ -57,13 +57,15 @@ end
 
 function [ego,road,cfg,state,input] = localFixture(curvature)
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",10, ...
-        "controller",struct("horizonSteps",8,"sampleTime",0.1,"certifiedSteps",2), ...
+        "controller",struct("horizonSteps",8,"sampleTime",0.1), ...
         "model",struct("lateralDomainRadius",3)));
     curve = struct("origin",[0;0],"heading",0,"curvature",curvature,"length",300);
     [position,heading] = laneGeometry.referencePose(20,0,curve);
     [state,input] = ltvBicycleModel.cruiseEquilibrium(curvature,cfg);
     ego = struct("position",position,"yaw",heading+state(3),"speed",state(4), ...
         "lateralVelocity",state(5),"yawRate",state(6),"heldActuatorInput",input,"stateTime",0);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
     centerline = laneGeometry.referencePose(0:2:300,0,curve).';
     road = struct("centerline",centerline,"referenceCurve",curve);
 end

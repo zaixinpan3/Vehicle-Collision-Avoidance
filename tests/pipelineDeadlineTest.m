@@ -26,7 +26,7 @@ classdef pipelineDeadlineTest < matlab.unittest.TestCase
             testCase.verifyFalse(report.passed);
             testCase.verifyEmpty(report.joint);
             testCase.verifyEqual(report.controllerOnly.failure.identifier, ...
-                "collisionAvoidanceController:runtimeDeadlineExceeded");
+                "collisionAvoidanceController:noCertifiedContinuation");
             testCase.verifyEqual(report.controllerOnly.controlTime,0);
             testCase.verifyEmpty(report.controllerOnly.command);
         end
@@ -36,6 +36,8 @@ classdef pipelineDeadlineTest < matlab.unittest.TestCase
             cfg = collisionAvoidanceControllerConfig(struct("controller",struct("horizonSteps",4)));
             ego = struct("position",[0;0],"yawAngle",0, ...
                 "longitudinalVelocity",15,"lateralVelocity",0,"yawRate",0);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             target = @(time,~) struct("targetPositionInertial",[25-10*time;0.8], ...
                 "targetVelocityInertial",[-10;0],"targetAccelerationInertial",[0;0]);
             expectedContext = nrmmEstimatorControllerAdapter("initialize",estimator,ego,target);

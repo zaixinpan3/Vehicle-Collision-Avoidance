@@ -5,40 +5,7 @@ function [result,problem] = solveHardCbfClf(problem, cfg)
         result.exitFlag = -2;
         return;
     end
-    if isfield(problem, "barrier")
-        [result, problem] = localHardMarginSolve(problem, cfg);
-        return;
-    end
-    solveCalls = 0;
-    solve = [];
-    if string(cfg.encounter.safetyMarginPolicy)=="maximize" ...
-            && any(startsWith(problem.geometry.label,"collision:"))
-        % The reserve problem is linear because CLF slacks are unbounded.
-        % Allocate it directly, avoiding a speculative infeasible SOCP.
-        [problem,marginSolve] = localReserveMargin(problem,cfg);
-        solveCalls = 1;
-        if ~marginSolve.feasible
-            result.solverCalls = solveCalls;result.exitFlag = marginSolve.exitFlag;
-            result.message = "margin optimization: "+marginSolve.message;
-            return;
-        end
-    end
-    if isempty(solve)
-        solve = localRunJointProgram(problem, cfg);
-        solveCalls = solveCalls+1;
-    end
-    result.solverCalls = solveCalls;
-    result.exitFlag = solve.exitFlag;
-    result.message = solve.message;
-    if ~solve.feasible, return; end
-    decision = solve.decision;
-    [decision, slacks] = localRepairClf(problem, decision, cfg);
-    result.decision = decision;
-    result.feasible = all(isfinite(decision));
-    result.iterations = localIterationCount(solve.output);
-    result.algorithm = "Clarabel predictive CBF-CLF SOCP";
-    result.objectiveValue = localJointValue(problem, decision);
-    result.clfValue = slacks;
+    [result, problem] = localHardMarginSolve(problem, cfg);
 end
 
 function [result, problem] = localHardMarginSolve(problem, cfg)
@@ -116,65 +83,6 @@ function result = localCertifiedResult(problem, decision, solve, calls)
     result.clfValue = decision(problem.layout.relaxationIndex);
     result.algorithm = "hard predictive margin LP and CLF SOCP";
 end
-
-function [problem,solve] = localReserveMargin(problem,cfg)
-% Maximize the achievable fraction of the additional lookahead reserve.
-% Physical safety rows remain hard even when the desired reserve cannot fit.
-% This phase supplies a margin target only; it never supplies an input for
-% execution. The second phase and the independent checker retain authority.
-    original = problem.stageProgram;
-    physical = problem.layout.decisionCount;
-    equalityCount = original.cones(1);
-    inequalityIndices = localInequalityIndices(problem);
-    hardCount = numel(inequalityIndices);
-    selected = 1:equalityCount+hardCount;
-    marginColumn = [zeros(equalityCount,1);problem.anticipationReserve(inequalityIndices)];
-    matrix = [original.A(selected,1:physical),sparse(marginColumn),original.A(selected,physical+1:end)];
-    total = size(matrix,2);
-    extra = sparse(2,total);extra(:,physical+1) = [1;-1];
-    linear = zeros(total,1);linear(physical+1) = -1;
-    program = struct("P",sparse(total,total),"q",linear,"A",[matrix;extra], ...
-        "b",[original.b(selected);problem.reserveFractionMaximum;0], ...
-        "cones",[equalityCount;hardCount+2],"physicalDecisionCount",physical+1, ...
-        "inactiveSlackIndex",problem.layout.relaxationIndex);
-    auxiliary = struct("layout",struct("decisionCount",physical+1),"stageProgram",program);
-    if isfield(original,"fixedDecisionIndex")
-        auxiliary.stageProgram.fixedDecisionIndex = original.fixedDecisionIndex;
-        auxiliary.stageProgram.fixedDecisionValue = original.fixedDecisionValue;
-    end
-    solve = localRunJointProgram(auxiliary,cfg);
-    if ~solve.feasible,return;end
-    margins = problem.inequalityBound-problem.inequalityMatrix*solve.decision(1:physical);
-    selectedReserve = problem.anticipationReserve>0;
-    fraction = min([solve.decision(physical+1);margins(selectedReserve)./problem.anticipationReserve(selectedReserve);problem.reserveFractionMaximum]);
-    % Leave an interior allocation for the subsequent nonlinear refinement.
-    % The physical constraints do not change. Maximizing an optional buffer
-    % to its exact feasibility frontier made the performance solve fragile.
-    if fraction>=problem.reserveFractionMaximum-10*cfg.encounter.numericalMargin
-        fraction = problem.reserveFractionMaximum;
-    else
-        fraction = 0.99*fraction;
-    end
-    fraction = max(0,fraction-10*cfg.encounter.numericalMargin);
-    problem = localApplyReserve(problem,fraction);
-end
-
-function problem = localApplyReserve(problem,fraction)
-    reserve = fraction*problem.anticipationReserve;
-    problem.reserveFraction = fraction;
-    problem.inequalityBound = problem.inequalityBound-reserve;
-    inequalityIndices = localInequalityIndices(problem);
-    rows = problem.stageProgram.cones(1)+(1:numel(inequalityIndices));
-    problem.stageProgram.b(rows) = problem.stageProgram.b(rows)-reserve(inequalityIndices);
-end
-
-function indices = localInequalityIndices(problem)
-    indices = (1:numel(problem.inequalityBound)).';
-    if isfield(problem.stageProgram,"inequalityIndices")
-        indices = problem.stageProgram.inequalityIndices;
-    end
-end
-
 
 function solve = localRunJointProgram(problem, cfg)
     hook = cfg.solver.jointFunction;

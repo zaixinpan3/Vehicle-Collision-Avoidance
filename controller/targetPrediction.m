@@ -28,12 +28,8 @@ classdef targetPrediction
             finite = string(encounter.contract.kind) == "finite-sensing-motion-v1";
         end
 
-        function encounter = admit(target, time, lane, cfg)
-        %admit Validate a finite motion descriptor or an optional exit contract.
-        % The route assertion is an input assumption. The geometric check
-        % proves that its downstream halfspace is disjoint from the complete
-        % allowed ego route, including the footprint and lateral domain.
-            contract = target.encounterContract;
+        function encounter = admit(target, time, ~, cfg)
+        %admit Validate the finite motion bounds used by every certificate.
             if isfield(target,"predictionMotion") && ~isempty(target.predictionMotion)
                 motion = target.predictionMotion;
                 if ~isstruct(motion) || ~isscalar(motion) ...
@@ -62,46 +58,8 @@ classdef targetPrediction
                 encounter = localEncounter(target,time,contract);
                 return;
             end
-            required = ["kind", "id", "validFrom", "validUntil", "jerkBound", ...
-                "yawAccelerationBound", "exitNormal", "exitOffset", "postExitRoute"];
-            if ~isstruct(contract) || ~isscalar(contract) || ~all(isfield(contract, required))
-                error("collisionAvoidanceController:missingEncounterContract", ...
-                    "Every admitted target needs a finite motion and certified exit contract.");
-            end
-            if ~isscalar(string(contract.kind)) || string(contract.kind) ~= "cartesian-jerk-exit-v1" ...
-                    || ~isscalar(string(contract.postExitRoute)) ...
-                    || string(contract.postExitRoute) ~= "nonreturningHalfspace" ...
-                    || ~isscalar(string(contract.id)) || strlength(string(contract.id)) == 0
-                error("collisionAvoidanceController:invalidEncounterContract", ...
-                    "Use cartesian-jerk-exit-v1 with an identified nonreturningHalfspace route.");
-            end
-            validateattributes(time, {'double'}, {'real', 'finite', 'scalar'});
-            validateattributes(contract.validFrom, {'double'}, {'real', 'finite', 'scalar'});
-            validateattributes(contract.validUntil, {'double'}, {'real', 'finite', 'scalar'});
-            validateattributes(contract.jerkBound, {'double'}, {'real', 'finite', 'nonnegative', 'numel', 2});
-            validateattributes(contract.yawAccelerationBound, {'double'}, {'real', 'finite', 'nonnegative', 'scalar'});
-            validateattributes(contract.exitNormal, {'double'}, {'real', 'finite', 'numel', 2});
-            validateattributes(contract.exitOffset, {'double'}, {'real', 'finite', 'scalar'});
-            contract.jerkBound = contract.jerkBound(:);
-            contract.exitNormal = contract.exitNormal(:);
-            if abs(norm(contract.exitNormal)-1) > 64*eps || time < contract.validFrom ...
-                    || time > contract.validUntil || contract.validFrom >= contract.validUntil ...
-                    || startsWith(target.key, "anonymousTarget:") ...
-                    || target.predictionYawAccelerationErrorBound > contract.yawAccelerationBound
-                error("collisionAvoidanceController:invalidEncounterContract", ...
-                    "Contract time, unit normal, stable track identity or yaw bound is invalid.");
-            end
-            n = contract.exitNormal;
-            endpoints = [lane.segmentStart; lane.segmentStart+lane.segment];
-            lateral = [-lane.tangent(:, 2), lane.tangent(:, 1)];
-            routeSupport = max(endpoints*n) ...
-                + cfg.model.lateralDomainRadius*max(abs(lateral*n)) ...
-                + hypot(cfg.vehicle.length/2, cfg.vehicle.width/2);
-            if routeSupport+cfg.encounter.numericalMargin > contract.exitOffset
-                error("collisionAvoidanceController:invalidExitRoute", ...
-                    "The exit halfspace must clear the entire allowed ego route and footprint.");
-            end
-            encounter = localEncounter(target,time,contract);
+            error("collisionAvoidanceController:missingPredictionMotion", ...
+                "Every target requires identified finite-sensing motion bounds.");
         end
 
         function [center, radius] = finiteFlow(encounter, duration)
@@ -131,8 +89,8 @@ classdef targetPrediction
         end
 
         function [center, jerk, yawAcceleration] = nominalFlow(encounter, duration)
-        % Constant curvature and tangential acceleration, used for lookahead.
-        % This trajectory does not replace the uncertain executed-step tube.
+        % Constant curvature and tangential acceleration for objective anchors.
+        % Safety uses the uncertain flow on every held interval.
             x = encounter.center;
             duration = double(duration(:).');
             if any(~isfinite(duration) | duration<0)
@@ -176,26 +134,12 @@ classdef targetPrediction
             yawAcceleration = abs(acceleration*curvature);
         end
 
-        function margin = exitMargin(encounter, duration, cfg)
-        %exitMargin Entire uncertain footprint beyond the declared exit plane.
-            if targetPrediction.isFiniteSensing(encounter)
-                margin = -inf(size(duration));
-                return;
-            end
-            [center, radius] = targetPrediction.finiteFlow(encounter, duration);
-            n = encounter.contract.exitNormal;
-            support = targetPrediction.rectangleSupport(encounter.halfLength, ...
-                encounter.halfWidth, n, center(7, :), radius(7, :));
-            margin = n.'*center(1:2, :)-abs(n).'*radius(1:2, :)-support ...
-                - encounter.contract.exitOffset-cfg.collision.clearanceMargin;
-        end
-
         function next = advance(encounter, duration, observation, lane, cfg)
         %advance Condition the carried set; observation replacement is not renewal.
             next = encounter;
             [next.center, next.radius] = targetPrediction.finiteFlow(encounter, duration);
             next.time = encounter.time+duration;
-            if targetPrediction.isFiniteSensing(encounter) && ~isempty(observation)
+            if ~isempty(observation)
                 measured = targetPrediction.admit(observation,next.time,lane,cfg);
                 if ~targetPrediction.isFiniteSensing(measured) ...
                         || ~isequal(measured.contract.jerkBound,encounter.contract.jerkBound) ...
@@ -223,37 +167,6 @@ classdef targetPrediction
                     +min(max(difference,-measured.radius),measured.radius);
                 next = measured;
                 return;
-            end
-            if ~isempty(observation)
-                if isempty(observation.encounterContract)
-                    observation.encounterContract = encounter.contract;
-                end
-                measured = targetPrediction.admit(observation, next.time, lane, cfg);
-                if ~isequaln(measured.contract, encounter.contract) ...
-                        || measured.halfLength ~= encounter.halfLength || measured.halfWidth ~= encounter.halfWidth
-                    error("collisionAvoidanceController:changedEncounterContract", ...
-                        "A replacement motion or exit contract needs independent admission.");
-                end
-                measured.center(7) = next.center(7)+atan2(sin(measured.center(7)-next.center(7)), ...
-                    cos(measured.center(7)-next.center(7)));
-                [next.radius, consistent] = stateUncertainty.intersect( ...
-                    next.center, next.radius, measured.center, measured.radius);
-                if ~consistent
-                    error("collisionAvoidanceController:inconsistentObservation", ...
-                        "The target observation is inconsistent with its certified reachable set.");
-                end
-            end
-            next.exitMargin = targetPrediction.exitMargin(next, 0, cfg);
-            if encounter.discharged
-                % Once discharged, future target motion is governed by the
-                % route assertion, not by an extrapolated expired forecast.
-                next.discharged = true;
-            else
-                if next.time > encounter.contract.validUntil+128*eps(max(1, abs(next.time)))
-                    error("collisionAvoidanceController:expiredEncounterContract", ...
-                        "An active encounter cannot outlive its motion contract.");
-                end
-                next.discharged = next.exitMargin >= cfg.encounter.numericalMargin;
             end
         end
 
@@ -357,8 +270,7 @@ function encounter = localEncounter(target,time,contract)
         "center",[target.position;target.velocity;target.acceleration;target.yaw;target.yawRate], ...
         "radius",[target.positionErrorBound;target.velocityErrorBound; ...
             target.accelerationErrorBound;target.yawErrorBound;target.yawRateErrorBound], ...
-        "time",time,"halfLength",target.length/2,"halfWidth",target.width/2, ...
-        "discharged",false,"exitMargin",-inf);
+        "time",time,"halfLength",target.length/2,"halfWidth",target.width/2);
     encounter.nominalCenter = encounter.center;
     if string(contract.kind)=="finite-sensing-motion-v1"
         % A position-only acquisition does not measure motion derivatives.

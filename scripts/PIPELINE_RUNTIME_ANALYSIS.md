@@ -1,5 +1,10 @@
 # Estimator and controller pipeline runtime attribution
 
+Historical result notice, September 9, 2026: the delayed/partial-horizon
+controller and its replay branch have been removed. These dated observations
+retain their original experimental scope and do not validate version 13.
+See [the current architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
+
 Analysis date: September 8, 2026. Algorithm baseline:
 `d0c08bd4dc7826d691528e138de272fffc561ab5`.
 

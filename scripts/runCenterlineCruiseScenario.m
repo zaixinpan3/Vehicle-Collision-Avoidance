@@ -162,24 +162,11 @@ function result = runCenterlineCruiseScenario(varargin)
     terminalTaskCompleted = false;
     maximumTargetCount = 0;
     controllerPreparation = struct("performed", false, "elapsedSeconds", 0.0);
-    committedInput = zeros(0,1);
-    if cfg.controller.inputDelaySteps>0
-        if isfield(options.geometry,"referenceCurve")
-            initialCurvature = options.geometry.referenceCurve.curvature;
-        elseif size(centerline,1)==2
-            initialCurvature = 0;
-        else
-            error("runCenterlineCruiseScenario:missingReferenceCurve", ...
-                "Delayed startup requires an analytic reference or a straight two-point centerline.");
-        end
-        [~,committedInput] = ltvBicycleModel.cruiseEquilibrium(initialCurvature,cfg);
-    end
     computedCommand = cell(requestedStepCount,1);
     if options.prepareController
         initialRoad = localRoadPerception(centerline,state,options);
         initialControllerState = state;initialControllerState.stateTime = 0;
-        initialControllerState.heldActuatorInput = committedInput;
-        initialControllerState.committedActuatorInput = committedInput;
+        initialControllerState.perception = struct("time",0,"range",options.perceptionRange,"completeWithinRange",true);
         controllerPreparation = prepareCollisionAvoidancePipeline( ...
             initialControllerState,initialRoad.roadGeometry,cfg,estimatorConfiguration);
     end
@@ -211,15 +198,6 @@ function result = runCenterlineCruiseScenario(varargin)
                 targetTruthAtControlSample{stepIdx}, ...
                 state.position, options.perceptionRange);
         end
-        if cfg.controller.inputDelaySteps>0
-            controllerState.committedActuatorInput = committedInput;
-            if stepIdx==1
-                controllerState.heldActuatorInput = committedInput;
-            else
-                controllerState.heldActuatorInput = command{stepIdx-1}.actuatorInput;
-            end
-            egoEstimate{stepIdx} = controllerState;
-        end
         if options.useStateEstimator
             targetDetectionAvailable(stepIdx) = ...
                 sensorFrame{stepIdx}.radarDetectionAvailable;
@@ -244,9 +222,6 @@ function result = runCenterlineCruiseScenario(varargin)
                     controllerRoadGeometry, cfg);
             solveTime(stepIdx) = toc(solveTimer);
             command{stepIdx} = computedCommand{stepIdx};
-            if cfg.controller.inputDelaySteps>0
-                command{stepIdx} = computedCommand{stepIdx}.delayIntervalCommand;
-            end
             pipelineTime(stepIdx) = toc(pipelineTimer);
             controllerRoadAudit{stepIdx} = ...
                 localControllerRoadAudit(planningProblem);
@@ -279,9 +254,6 @@ function result = runCenterlineCruiseScenario(varargin)
         if isempty(command{stepIdx})
             terminalTaskCompleted = true;
             break;
-        end
-        if cfg.controller.inputDelaySteps>0
-            committedInput = computedCommand{stepIdx}.actuatorInput;
         end
 
         inputDataset = localPlantInputDataset( ...
@@ -396,10 +368,10 @@ function result = runCenterlineCruiseScenario(varargin)
         "deadlineMet",all(pipelineTime(1:attemptedStepCount)<=options.deadlineSeconds), ...
         "enforced",options.enforceRuntimeDeadline,"preparation",controllerPreparation, ...
         "controlPeriodSeconds",sampleTime, ...
-        "inputDelaySeconds",cfg.controller.inputDelaySteps*sampleTime, ...
+        "inputDelaySeconds",0, ...
         "commandReadyTime",attempts.time+pipelineTime(1:attemptedStepCount), ...
-        "scheduledActuationTime",attempts.time+cfg.controller.inputDelaySteps*sampleTime, ...
-        "appliedSourceFrame",max(0,(1:completedStepCount).'-cfg.controller.inputDelaySteps), ...
+        "scheduledActuationTime",attempts.time, ...
+        "appliedSourceFrame",(1:completedStepCount).', ...
         "scope","Online synthetic sensors, observer, error bounds, road fitting and control; plant and offline preparation excluded");
     result.attempts = attempts;
     result.plantTrace = plantTrace;
@@ -504,8 +476,8 @@ function options = localOptions(varargin)
         @localScalarStruct);
     addParameter(parser, "ControllerConfiguration", struct(), ...
         @localScalarStruct);
-    addParameter(parser, "PerceptionRange", Inf, ...
-        @localPositiveOrInfScalar);
+    addParameter(parser, "PerceptionRange", 30, ...
+        @localPositiveScalar);
     addParameter(parser, "RoadBoundaryOffsets", [], ...
         @localEmptyOrPositiveTwoVector);
     addParameter(parser, "RoadShoulderWidth", 2.6, ...
@@ -603,11 +575,6 @@ end
 function valid = localPositiveScalar(value)
     valid = isnumeric(value) && isreal(value) && isscalar(value) ...
         && isfinite(value) && value > 0.0;
-end
-
-function valid = localPositiveOrInfScalar(value)
-    valid = isnumeric(value) && isreal(value) && isscalar(value) ...
-        && ~isnan(value) && value > 0.0;
 end
 
 function valid = localEmptyOrPositiveTwoVector(value)

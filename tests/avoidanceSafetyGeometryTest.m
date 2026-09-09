@@ -18,6 +18,8 @@ classdef avoidanceSafetyGeometryTest < matlab.unittest.TestCase
         function theChartBoundContainsPosesAcrossSegmentBoundaries(testCase)
             cfg = collisionAvoidanceControllerConfig();
             ego = struct("position", [0.0; 0.0], "yaw", 0.0, "speed", 1.0);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             [~, lane] = readPlanningInputs(ego, [], ...
                 [0.0, 0.0; 5.0, 0.0; 6.0, 0.03; 7.0, 0.08; 20.0, 0.9], cfg);
             frame = laneGeometry.frameBounds(lane, 6.0, 2.0, 12.0);
@@ -39,6 +41,8 @@ classdef avoidanceSafetyGeometryTest < matlab.unittest.TestCase
         function aReferenceVertexRequiresAnExplicitJumpCertificate(testCase)
             cfg = collisionAvoidanceControllerConfig(struct("controller",struct("horizonSteps",4)));
             ego = struct("position",[9;0],"yaw",0,"speed",1);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             testCase.verifyError(@() collisionAvoidanceController(ego,[],[0,0;10,0;20,0.2],cfg,[]), ...
                 "collisionAvoidanceController:noCertifiedContinuation");
         end

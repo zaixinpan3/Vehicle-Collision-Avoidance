@@ -20,6 +20,8 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             cfg = localConfiguration();
             cfg.solver.jointFunction = localFailFirstSolve();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 15);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             road = [0, 0; 2000, 0];
             preparation = prepareCollisionAvoidanceController(ego, road, cfg);
             [command, ~, problem] = collisionAvoidanceController(ego, [], road, cfg, []);
@@ -38,6 +40,8 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             cfg.clf.frontWheelSteeringAngleWeight = 2;
             cfg.clf.brakingRatioWeight = 3;
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.4);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             [~, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
             decision = zeros(problem.layout.decisionCount, 1);
             decision(1:2) = [0.02; 0.3];
@@ -56,6 +60,8 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             cfg.roadLoad.dragCoefficient = 0.0;
             cfg.roadLoad.rollingCoefficient = 0.0;
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", cfg.referenceSpeed);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 
             testCase.verifyTrue(problem.metadata.planCertified);
@@ -67,6 +73,8 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
         function nearCruiseCorrectionDoesNotOvershoot(testCase, nearCruiseSpeed)
             cfg = localConfiguration();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", nearCruiseSpeed);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
             initialError = nearCruiseSpeed-cfg.referenceSpeed;
             nextError = initialError+cfg.controller.sampleTime ...
@@ -81,6 +89,8 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
         function quadraticObjectiveMatchesAnIndependentSolver(testCase, speed)
             cfg = localConfiguration();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             road = [0, 0; 2000, 0];
             [~, ~, native] = collisionAvoidanceController(ego, [], road, cfg, []);
             cfg.solver.jointFunction = @localIndependentConicSolve;
@@ -100,6 +110,8 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
         function preparationDoesNotConsumeOrReplaceTheLiveCertificate(testCase)
             cfg = localConfiguration();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 15);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             road = [0, 0; 2000, 0];
             collisionAvoidanceController("resetNominalTrajectory");
             testCase.addTeardown(@() collisionAvoidanceController("resetNominalTrajectory"));
@@ -110,6 +122,9 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             ego.speed = next(4);
             ego.lateralVelocity = next(5);
             ego.yawRate = next(6);
+            ego.stateTime = cfg.controller.sampleTime;
+            ego.perception.time = ego.stateTime;
+            ego.heldActuatorInput = certificate.appliedInput;
             preparation = prepareCollisionAvoidanceController(ego, road, cfg);
             [actual, ~, diagnostic] = collisionAvoidanceController(ego, [], road, cfg);
             expected = collisionAvoidanceController(ego, [], road, cfg, certificate);
@@ -196,6 +211,5 @@ function value = localExplicitCost(problem,cfg,decision)
     value = cfg.controller.sampleTime*(sum((error./scales).^2,"all") ...
         +sum(inputWeights.*(input-operatingInput).^2,"all") ...
         +cfg.encounter.inputRateWeight*sum(changes.^2,"all") ...
-        +cfg.clf.relaxationWeight*sum(decision(problem.layout.relaxationIndex).^2)) ...
-        +cfg.encounter.maneuverSwitchWeight*double(problem.model.maneuver~=problem.model.previousManeuver);
+        +cfg.clf.relaxationWeight*sum(decision(problem.layout.relaxationIndex).^2));
 end

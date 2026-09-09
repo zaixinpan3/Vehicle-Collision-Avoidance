@@ -7,9 +7,9 @@ classdef hardEncounterBarrier
     methods (Static)
         function validateAdmission(ego, observations)
             if ~isfinite(ego.stateTime) || ~isfinite(ego.perceptionRange) ...
-                    || ~ego.completePerception || isempty(observations)
+                    || ~ego.completePerception
                 error("collisionAvoidanceController:invalidBarrierAdmission", ...
-                    "Admission needs timestamped complete circular perception and at least one target.");
+                    "Admission needs timestamped complete circular perception and a declared sensor radius.");
             end
             if any(arrayfun(@(target) isempty(target.predictionMotion), observations))
                 error("collisionAvoidanceController:invalidBarrierAdmission", ...
@@ -47,7 +47,7 @@ classdef hardEncounterBarrier
         end
 
         function [stored, problem] = admit(stored, problem)
-            stored.version = 12;
+            stored.version = 13;
             stored.admissionTime = stored.stateTime;
             stored.consumedSteps = 0;
             stored.targetAdmissionSteps = zeros(numel(stored.encounters), 1);
@@ -119,17 +119,15 @@ classdef hardEncounterBarrier
                 qp.stageProgram.fixedDecisionIndex = (1:2*consumed).';
                 qp.stageProgram.fixedDecisionValue = rootPlan(:, 1:consumed);
                 qp.stageProgram.fixedDecisionValue = qp.stageProgram.fixedDecisionValue(:);
-                if model.cfg.encounter.reoptimizeContinuation
-                    attempted = true;
-                    [result, candidateQp] = solveHardCbfClf(qp, model.cfg);
-                    calls = result.solverCalls;
-                    candidate = certifyAvoidancePlan(candidateQp, stored.prediction, model, result.decision);
-                    if result.feasible && candidate.accepted && candidate.margin >= stored.margin
-                        stored.decision = result.decision;
-                        qp = candidateQp;
-                        check = candidate;
-                        source = "checkedContinuationOptimization";
-                    end
+                attempted = true;
+                [result, candidateQp] = solveHardCbfClf(qp, model.cfg);
+                calls = result.solverCalls;
+                candidate = certifyAvoidancePlan(candidateQp, stored.prediction, model, result.decision);
+                if result.feasible && candidate.accepted && candidate.margin >= stored.margin
+                    stored.decision = result.decision;
+                    qp = candidateQp;
+                    check = candidate;
+                    source = "checkedContinuationOptimization";
                 end
                 stored.qp = qp;
             else
@@ -188,9 +186,9 @@ function localValidateStored(stored, identity)
     required = ["version", "admissionTime", "consumedSteps", "encounterComplete", ...
         "witnessModel", "qp", "decision", "prediction", "metadata", "identity", "targetAdmissionSteps"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored, required)) ...
-            || stored.version ~= 12 || stored.encounterComplete
+            || stored.version ~= 13 || stored.encounterComplete
         error("collisionAvoidanceController:invalidStoredCertificate", ...
-            "Continuation requires an active version-12 hard encounter certificate.");
+            "Continuation requires an active version-13 hard encounter certificate.");
     end
     if ~isequaln(identity, stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...
@@ -199,7 +197,7 @@ function localValidateStored(stored, identity)
     validateattributes(stored.consumedSteps, {'double'}, ...
         {'scalar', 'integer', 'nonnegative', '<', stored.prediction.stageCount});
     validateattributes(stored.targetAdmissionSteps, {'double'}, ...
-        {'vector', 'integer', 'nonnegative', '<=', stored.consumedSteps, 'numel', numel(stored.encounters)});
+        {'integer', 'nonnegative', '<=', stored.consumedSteps, 'numel', numel(stored.encounters)});
     if stored.deadline ~= stored.admissionTime+stored.prediction.stageCount*stored.witnessModel.sampleTime
         error("collisionAvoidanceController:invalidStoredCertificate", "The retained deadline changed.");
     end
@@ -207,7 +205,7 @@ end
 
 function exited = localCheckTargets(stored, ego, model, observations, consumed)
 % The admission envelope is evaluated at absolute time; it is never renewed.
-    exited = true;
+    exited = ~isempty(stored.encounters);
     for index = 1:numel(stored.encounters)
         encounter = stored.encounters(index);
         targetElapsed = (consumed-stored.targetAdmissionSteps(index))*model.sampleTime;
@@ -260,7 +258,8 @@ function [stored, check, calls, jointCheck] = localAdmitNewTargets(stored, model
     jointModel = stored.witnessModel;
     jointModel.stateTime = stored.stateTime;
     jointModel.anchorPlan = rootPlan(:);
-    jointModel.encounters = repmat(stored.encounters(1), numel(observations), 1);
+    jointModel.encounters = repmat(targetPrediction.admit(observations(1), ...
+        stored.stateTime, model.lane, cfg), numel(observations), 1);
     for index = 1:numel(observations)
         jointModel.encounters(index) = targetPrediction.admit(observations(index), ...
             stored.stateTime, model.lane, cfg);
@@ -274,8 +273,7 @@ function [stored, check, calls, jointCheck] = localAdmitNewTargets(stored, model
     [exitMatrix, exitBound] = hardEncounterBarrier.completionRows(jointModel, prediction, geometry);
     matrix = [geometry.matrix(collisionRows, :); exitMatrix];
     bound = [geometry.physicalBound(collisionRows); exitBound];
-    initialReserve = [geometry.initialReserve(collisionRows); zeros(numel(exitBound), 1)];
-    reserve = 2*cfg.encounter.numericalMargin*double(any(matrix ~= 0, 2))+initialReserve;
+    reserve = 2*cfg.encounter.numericalMargin*double(any(matrix ~= 0, 2));
     qp = stored.qp;
     oldCount = numel(qp.physicalBound);
     qp.inequalityMatrix = [qp.inequalityMatrix; matrix, zeros(numel(bound), qp.layout.relaxationCount)];

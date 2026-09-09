@@ -4,7 +4,7 @@ Decision and implementation status: September 9, 2026.
 
 ## Required behavior
 
-The controller must ultimately have one safety formulation and execution
+The controller has one safety formulation and execution
 contract, without a selectable weaker lookahead policy. Recursive feasibility
 must follow from an explicit successor-witness construction rather than an
 assumption that every ordinary online solve remains feasible. Model enclosure,
@@ -24,7 +24,7 @@ case, and that failure response is not itself a safety guarantee.
 
 ## Implemented admission step
 
-The version-12 hard encounter certificate now appends a new target's swept
+The version-13 hard encounter certificate now appends a new target's swept
 collision constraints and endpoint exit constraint to the original hard
 program. The old constraints, absolute deadline and executed controls are
 preserved. Admission requires a checked joint decision. The incumbent can be
@@ -71,15 +71,37 @@ unconditional solver completion. Those are different premises.
 
 ## Completion criteria and present status
 
-The complete requested refactor is still unfinished. The current admission
-change establishes neither continuing-driving recursive feasibility nor the
-removal of the default `lookahead` path. No metadata is changed to claim those
-results. `physicalVehicleGuaranteeEstablished` remains false.
+The old controller branches and selectors are removed. Version 13 uses one
+complete-horizon optimization for zero or more targets, with no discrete
+maneuver selection, delayed-input execution, nominal-only safety suffix or
+nonreturn-route contract. Continuation always attempts the same hard program
+and can execute its independently checked incumbent if replacement fails.
+The first-detection joint-admission assumption remains unchanged.
 
-Completion requires a proved and executable terminal continuation, its
-integration into the same optimization for cruise and avoidance, removal of
-the weaker controller path and its configuration selectors, and migrated
-scenario tests. Validation must cover operation past the original horizon,
-no-target operation, new-target admission near the former endpoint, valid
-uncertain successors, and solver failure with an available certified witness.
-Finite-encounter test success alone does not satisfy these criteria.
+The broader continuing-driving requirement is still unfinished: no executable
+invariant terminal continuation has been established. At finite completion,
+the controller returns no further input. `physicalVehicleGuaranteeEstablished`
+remains false. Removing branches does not fill that proof gap.
+
+Completing that broader requirement requires a proved terminal continuation
+integrated into the same optimization. Validation must cover operation past
+the original horizon, new-target admission near that endpoint, uncertain
+successors, and solver failure with a complete successor witness. Passing the
+finite-encounter tests alone does not establish those results.
+
+## Validation of the branch removal
+
+The complete MATLAB suite ran 593 tests: 592 passed and one retained an
+obsolete expectation of measured wheel output after admission rejection.
+That assertion was changed to require absent plant measurements. Two
+straight-scene tests and two encounter-audit tests were then rerun successfully;
+the latter also validate the corrected current-suffix CLF-slack audit index.
+The resulting verified coverage is 593/593 with no unresolved failures or
+incomplete tests. This is a full run plus four targeted reruns, not a second
+full execution. A preceding focused migration regression passed 96/96 tests.
+
+Both complete-interval geometry kernels compiled successfully. Factory Code
+Analyzer checks on 44 changed/new MATLAB files found 16 sparse-index
+performance advisories and no other findings. Old empirical short-prefix
+physical profiles are tested for their actual full-horizon admission rejection;
+those tests do not demonstrate successful physical avoidance or cruise recovery.

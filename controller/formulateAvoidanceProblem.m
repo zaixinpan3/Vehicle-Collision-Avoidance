@@ -1,10 +1,6 @@
 function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
-% Convex maneuver-specific SOCP with one robust dissipation slack per sample.
+% One convex hard-safety SOCP with one robust dissipation slack per sample.
     cfg = model.cfg;
-    if isfield(prediction,"initializationOnly") && prediction.initializationOnly
-        error("collisionAvoidanceController:uncertifiedInitialization", ...
-            "An input-seed prediction cannot formulate executable controls.");
-    end
     count = prediction.stageCount;
     planCount = prediction.planCount;
     decisionCount = planCount+count;
@@ -26,30 +22,20 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         -rateMap(selected,:),zeros(nnz(selected),count)];
     physicalBound = [physicalBound;rateLimit(selected)+ratePrior(selected);rateLimit(selected)-ratePrior(selected)];
     safetyRows = [safetyRows;false(2*nnz(selected),1)];
-    retainedExit = string(cfg.encounter.completionPolicy) == "retainedPerceptionExit";
-    completionRows = zeros(0, 1);
-    if retainedExit
-        [exitMatrix, exitBound] = hardEncounterBarrier.completionRows(model, prediction, geometry);
-        completionRows = numel(physicalBound)+(1:numel(exitBound)).';
-        hardMatrix = [hardMatrix; exitMatrix, zeros(numel(exitBound), count)];
-        physicalBound = [physicalBound; exitBound];
-        safetyRows = [safetyRows; true(numel(exitBound), 1)];
-    end
+    [exitMatrix, exitBound] = hardEncounterBarrier.completionRows(model, prediction, geometry);
+    completionRows = numel(physicalBound)+(1:numel(exitBound)).';
+    hardMatrix = [hardMatrix; exitMatrix, zeros(numel(exitBound), count)];
+    physicalBound = [physicalBound; exitBound];
+    safetyRows = [safetyRows; true(numel(exitBound), 1)];
     % Leave room for strict independent acceptance at an active constraint.
     % Acceptance charges one reserve; solving with two does not spend that
     % same allowance on both solver termination and certificate arithmetic.
     reserve = 2*cfg.encounter.numericalMargin*double(any(hardMatrix ~= 0, 2));
     reserve(size(geometry.matrix,1)+2*planCount+(1:count)) = 0;
-    domainReserve = [geometry.domainReserve;zeros(numel(physicalBound)-numel(geometry.domainReserve),1)];
-    % Future-domain and clearance reserves share the feasible allocation.
-    % They prepare future execution without redefining physical limits.
-    initialReserve = [geometry.initialReserve;zeros(numel(physicalBound)-numel(geometry.initialReserve),1)];
-    bound = physicalBound-model.requiredMargin*double(safetyRows)-reserve-initialReserve;
-    anticipationReserve = domainReserve ...
-        +[geometry.anticipationReserve;zeros(numel(bound)-numel(geometry.anticipationReserve),1)];
+    bound = physicalBound-model.requiredMargin*double(safetyRows)-reserve;
     hessian = zeros(decisionCount);
     linear = zeros(decisionCount, 1);
-    constant = cfg.encounter.maneuverSwitchWeight*double(model.maneuver ~= model.previousManeuver);
+    constant = 0;
     certificate = localClfCertificate(model);
     if certificate.operatingState(4)==cfg.referenceSpeed
         equilibriumState = certificate.operatingState;
@@ -93,12 +79,12 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     rate = cfg.clf.decreaseRateFraction*certificate.certifiedDecreaseRate;
     residual = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
     if isfield(prediction,"modelErrorRateBound")
-        residual = max(prediction.modelErrorRateBound(:,1:min(count,cfg.controller.certifiedSteps)),[],2);
+        residual = max(prediction.modelErrorRateBound,[],2);
     end
     disturbance = residual(2:6);
     youngRate = 0.1;
     disturbanceCost = disturbance.'*abs(p)*disturbance/youngRate;
-    certifiedCells = prediction.cells([prediction.cells.stage]<=cfg.controller.certifiedSteps);
+    certifiedCells = prediction.cells;
     cellConstraints = cell(numel(certifiedCells), 1);
     for cellIndex = 1:numel(certifiedCells)
         tube = certifiedCells(cellIndex);
@@ -163,37 +149,22 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         "horizonSteps", count, "inputDimension", 2, "inputIndex", 1:planCount, ...
         "planIndex", 1:planCount, "relaxationIndex", planCount+1:decisionCount, ...
         "tailSteps", 0, "tailIndex", [], "relaxationCount", count);
-    qp = struct("encounterMode", true, "problemClass", "encounterPredictiveCbfClfSocp", ...
+    qp = struct("problemClass", "encounterPredictiveCbfClfSocp", ...
         "layout", layout, "geometry", geometry, "clf", clf, ...
         "Hessian", hessian, "linear", linear, "constant", constant, ...
         "inequalityMatrix", hardMatrix, "inequalityBound", bound, ...
         "physicalBound", physicalBound, "safetyRows", safetyRows, ...
-        "domainReserve",domainReserve,"initialReserve",initialReserve, ...
         "requiredMargin", model.requiredMargin, "exitMargin", model.exitMargin, ...
-        "anticipationReserve",anticipationReserve, ...
-        "reserveFraction",0, ...
-        "reserveFractionMaximum",cfg.encounter.anticipationReserveFractionMaximum, ...
         "equalityMatrix", zeros(0, decisionCount), "equalityBound", zeros(0, 1), ...
         "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
         "certifiedInfeasible", any(bound(~any(hardMatrix, 2)) < 0));
-    if retainedExit
-        % One unit in each hard row's native units normalizes its margin.
-        % CLF slack nonnegativity has no safety-margin coefficient.
-        scale = ones(size(bound));
-        scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
-        qp.barrier = struct("baseBound", bound, "scale", scale, ...
-            "completionRows", completionRows);
-        qp.stageProgram = avoidanceStageQp(qp);
-    else
-        qp.stageProgram = avoidanceStageQp(qp,prediction,model);
-    end
-    if isfield(model,"committedInput") && ~isempty(model.committedInput)
-        % Eliminate the already scheduled input exactly in both numerical
-        % solves. The independent checker separately enforces this prefix.
-        qp.fixedInput = model.committedInput;
-        qp.stageProgram.fixedDecisionIndex = (1:2).';
-        qp.stageProgram.fixedDecisionValue = model.committedInput;
-    end
+    % One unit in each hard row's native units normalizes its margin.
+    scale = ones(size(bound));
+    scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
+    qp.barrier = struct("baseBound", bound, "scale", scale, ...
+        "completionRows", completionRows);
+    qp.stageProgram = avoidanceStageQp(qp);
+
 end
 
 function certificate = localClfCertificate(model)

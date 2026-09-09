@@ -13,7 +13,7 @@ classdef circularCenterlineCruiseScenarioTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function anAnalyticArcSupportsContinuousCruisePrediction(testCase)
+        function uncertifiedFullHorizonPreservesAnalyticArcAndPlantEvidence(testCase)
             result = runCircularCenterlineCruiseScenario( ...
                 Duration=0.1, Radius=100.0, ...
                 ControllerConfiguration=finiteSensingValidationConfig(), ...
@@ -45,9 +45,10 @@ classdef circularCenterlineCruiseScenarioTest < matlab.unittest.TestCase
                 result.controllerConfiguration.tire.corneringStiffness, ...
                 expectedCorneringStiffness, ...
                 RelTol=1.0e-12);
-            testCase.verifyFalse(result.failure.occurred);
-            testCase.verifyNumElements(result.command,2);
-            testCase.verifyTrue(result.metrics.controllerCompletedScenario);
+            testCase.verifyTrue(result.failure.occurred);
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyEmpty(result.command);
+            testCase.verifyFalse(result.metrics.controllerCompletedScenario);
             testCase.verifyFalse(isfield(result, "diagnostics"));
         end
     end

@@ -57,10 +57,6 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
     estimates = cell(steps,1);targetEstimates = cell(steps,1);audits = cell(steps,1);
     frameSeconds = nan(steps,1);estimatorSeconds = zeros(steps,1);controllerSeconds = nan(steps,1);
     preparation = struct("performed",false,"elapsedSeconds",0);
-    committedInput = zeros(0,1);
-    if cfg.controller.inputDelaySteps>0
-        committedInput = trimInput;
-    end
     computedCommand = cell(steps,1);
     if estimated
         estimatorCfg = options.EstimatorConfiguration;
@@ -73,9 +69,8 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
     end
     if options.PrepareController
         initialEgo = struct("position",state(1:2),"yaw",state(3),"speed",state(4), ...
-            "lateralVelocity",state(5),"yawRate",state(6),"stateTime",0);
-        initialEgo.heldActuatorInput = committedInput;
-        initialEgo.committedActuatorInput = committedInput;
+            "lateralVelocity",state(5),"yawRate",state(6),"stateTime",0, ...
+            "perception",struct("time",0,"range",30,"completeWithinRange",true));
         preparation = prepareCollisionAvoidancePipeline(initialEgo,road,cfg,options.EstimatorConfiguration);
     end
     for index = 1:steps
@@ -97,11 +92,6 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         end
         estimates{index} = ego;targetEstimates{index} = target;
         if index==1 && curvature~=0,ego.heldActuatorInput = trimInput;end
-        if cfg.controller.inputDelaySteps>0
-            ego.committedActuatorInput = committedInput;
-            if index==1,ego.heldActuatorInput = committedInput;end
-            estimates{index} = ego;
-        end
         controllerTimer = tic;
         lastAttemptMetadata = [];
         try
@@ -123,11 +113,8 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
                 "message","The complete online frame exceeded its deadline; no command was applied.");
             break;
         end
+        if isempty(command), break; end
         input = command.actuatorInput;
-        if cfg.controller.inputDelaySteps>0
-            input = committedInput;
-            committedInput = command.actuatorInput;
-        end
         [localTime,trajectory] = ode45(@(~,x) localFlow(x,input,cfg),[0,h],state, ...
             odeset(RelTol=1e-9,AbsTol=1e-11));
         traceTime = [traceTime;time+localTime(2:end)]; %#ok<AGROW>
@@ -157,10 +144,10 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         "estimatorSeconds",estimatorSeconds(1:index),"controllerSeconds",controllerSeconds(1:index), ...
         "deadlineSeconds",options.DeadlineSeconds,"deadlineMet",all(frameSeconds(1:index)<=options.DeadlineSeconds), ...
         "enforced",options.EnforceRuntimeDeadline, ...
-        "controlPeriodSeconds",h,"inputDelaySeconds",cfg.controller.inputDelaySteps*h, ...
+        "controlPeriodSeconds",h,"inputDelaySeconds",0, ...
         "commandReadyTime",(0:index-1).'*h+frameSeconds(1:index), ...
-        "scheduledActuationTime",((0:index-1).'+cfg.controller.inputDelaySteps)*h, ...
-        "appliedSourceFrame",max(0,(1:size(inputs,1)).'-cfg.controller.inputDelaySteps), ...
+        "scheduledActuationTime",(0:index-1).'*h, ...
+        "appliedSourceFrame",(1:size(inputs,1)).', ...
         "preparation",preparation,"scope","Online synthetic sensors, observer, bounds, input assembly and controller; plant and offline preparation excluded");
     result.egoEstimate = estimates(1:index);
     result.targetEstimate = targetEstimates(1:index);

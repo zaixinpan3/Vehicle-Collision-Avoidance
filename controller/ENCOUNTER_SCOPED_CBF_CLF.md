@@ -1,38 +1,11 @@
-# Encounter-scoped predictive CBF, sampled-data CLF, and maneuver optimization
+# Historical nonreturning-exit design analysis
 
-For the implemented version-12 hard predictive barrier with a retained circular
-perception-exit deadline, see [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md).
-That mode executes an admitted full witness and optionally reoptimizes inside
-its unchanged certificate. The strong nonreturn contracts and fresh-solve-only
-runtime described below are the separate version-10 construction.
-
-Strong-contract design note, September 7, 2026. The construction below concerns
-finite witnesses with certified nonreturning exits. Version 10's default finite
-perception policy is specified in [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md)
-and [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md). The stronger terminal
-premises below are not requirements imposed on ordinary sensor-range encounters.
-Claims below about nonrenewing forecasts apply to the explicit strong-contract
-mode, not the default renewing local prediction.
-
-Execution policy, clarified September 7, 2026: every command requires a
-verified solution from the current optimization call. No stored-tail or
-backup controller is executed when that call supplies no verified feasible
-candidate. The controller reports failure and the simulation ends at that
-sample. A retained witness remains mathematical and optimization context;
-it does not authorize operation through solver outages.
-
-The terminal requirement is **certified discharge of an encounter**. While an
-encounter is active, the controller must preserve a certified safe continuation
-at every time. Ordinary encounters do not require a permanently invariant
-joint ego–target terminal set. A finite safe prediction with an uncertified
-endpoint does not satisfy this requirement either.
-
-This stronger design superseded earlier terminal design notes; its nonreturn
-premises are now optional rather than governing the finite-sensing experiments.
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) documents the implemented
-finite-witness runtime and its supported contracts. The construction below is a project design
-derived from the stated requirement; the cited papers supply its background,
-not a theorem for this repository's implementation.
+This September 7, 2026 design is retired. Its strong exit-route contract,
+renewing/fresh-solve execution and discrete maneuver implementation have been
+removed. The equations below preserve the research argument and its premises;
+they do not describe an available runtime branch. The current single controller
+and its finite-encounter proof are in
+[HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md).
 
 ## 1. Safety obligation and encounter lifecycle
 

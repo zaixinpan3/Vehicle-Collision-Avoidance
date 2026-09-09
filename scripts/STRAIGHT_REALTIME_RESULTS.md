@@ -1,5 +1,10 @@
 # Straight avoidance: complete-frame runtime optimization
 
+Historical result notice, September 9, 2026: the delayed/partial-horizon
+controller and its replay branch have been removed. These dated observations
+retain their original experimental scope and do not validate version 13.
+See [the current architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
+
 **Timing correction, September 8, 2026:** the results below are historical
 computation measurements with instantaneous actuation in simulated time.
 Their 71.802/94.244 ms maxima exceed the 50 ms control period. They do not

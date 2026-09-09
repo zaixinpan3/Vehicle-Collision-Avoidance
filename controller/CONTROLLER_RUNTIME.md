@@ -1,20 +1,23 @@
-# Controller runtime and sparse QP implementation
+# Controller runtime and numerical implementation
 
-The optional version-12 retained-deadline mode is documented in
-[HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). Existing runtime measurements
-below do not qualify its full-horizon certificate or optional reoptimization.
+The current version-13 controller solves one hard-margin LP followed by a CLF
+SOCP and independently checks every executable decision. All intervals use
+uncertain held-flow certificates. Continuation fixes the executed prefix and
+keeps the original geometry and deadline; a failed replacement retains the
+checked incumbent. Numerical MATLAB and generated geometry kernels implement
+the same constraints. The lifted SOCP utility is an equivalent numerical
+transcription used by tests, not a selectable controller policy.
 
-Current runtime: version 10 uses a sparse SOCP, with bounded geometric
-relinearization and independently checked physical decisions. See
-[FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md) for current scope and
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the interface. The dated
-measurements and earlier formulations below are historical engineering records;
-they do not state the current controller's timing or certification guarantees.
+The build entry `scripts/buildAvoidanceGeometryKernel.m` generates the two
+complete-interval geometry kernels. No nominal-only check kernel is generated.
+Old compiled artifacts are outside the tracked project and must not be used
+as evidence for the current source.
 
-The September 8 complete-frame requirement and current build/validation entry
-are documented in [the straight runtime study](../scripts/STRAIGHT_REALTIME_RESULTS.md).
-Its 100 ms frame timer includes the NRMM observer, bounds and road fitting;
-the older controller-only 50 ms measurements below remain historical.
+The declared input is immediate and held over the sample interval. Solver and
+pipeline timing measurements do not prove physical zero-latency execution.
+See [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md) for scope. All dated
+measurements below are historical engineering records of preceding code;
+they are not current timing or certification claims.
 
 ## Quadratic input and relaxation objective (2026-09-06)
 

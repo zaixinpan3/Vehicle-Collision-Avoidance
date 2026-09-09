@@ -100,6 +100,8 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             [~, first, cfg] = localProblem(14.8);
             cfg.roadLoad.dragCoefficient = 1.2;
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.8);
+    ego.stateTime = 0;
+    ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             [~, ~, second] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 
             testCase.verifyGreaterThan(norm(first.qp.clf.lyapunovMatrix-second.qp.clf.lyapunovMatrix), 1.0e-10);
@@ -125,5 +127,7 @@ end
 function [command, problem, cfg] = localProblem(speed)
     cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
     ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
+    ego.stateTime = 0;
+    ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
     [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 end

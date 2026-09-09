@@ -20,8 +20,8 @@ classdef sweptFlowCertificateTest < matlab.unittest.TestCase
             target.targetVelocityInertialErrorBound = [0.1;0.1];
             target.targetYawRate = 0.2;
             target.targetYawRateErrorBound = 0.1;
-            target.encounterContract.jerkBound = [0.2;0.3];
-            target.encounterContract.yawAccelerationBound = 0.1;
+            target.predictionMotion.jerkBound = [0.2;0.3];
+            target.predictionMotion.yawAccelerationBound = 0.1;
             [~, lane, ~, parsed] = readPlanningInputs(ego, target, route, cfg);
             encounter = targetPrediction.admit(parsed, 0, lane, cfg);
             [center, radius] = targetPrediction.finiteFlow(encounter, [0,0.5,1.6]);
@@ -32,7 +32,7 @@ classdef sweptFlowCertificateTest < matlab.unittest.TestCase
 
         function jerkVerticesReachTheAnalyticPositionBounds(testCase)
             [ego, target, route, cfg] = encounterTestFixture.crossing();
-            target.encounterContract.jerkBound = [0.2;0.3];
+            target.predictionMotion.jerkBound = [0.2;0.3];
             [~, lane, ~, parsed] = readPlanningInputs(ego, target, route, cfg);
             encounter = targetPrediction.admit(parsed, 0, lane, cfg);
             [~, radius] = targetPrediction.finiteFlow(encounter, 1.5);

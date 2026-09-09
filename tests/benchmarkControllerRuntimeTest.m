@@ -14,6 +14,8 @@ classdef benchmarkControllerRuntimeTest < matlab.unittest.TestCase
         function brakingRatioAndPhysicalAccelerationHaveDistinctUnits(testCase)
             cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.8);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             road = [0, 0; 2000, 0];
             command = collisionAvoidanceController(ego, [], road, cfg, []);
             trial = struct("command", {{command}}, "controllerEgoEstimate", {{ego}}, ...

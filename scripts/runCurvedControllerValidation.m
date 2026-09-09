@@ -13,8 +13,6 @@ function report = runCurvedControllerValidation(options)
     cfg.referenceSpeed = 10;
     cfg.controller.sampleTime = 0.1;
     cfg.controller.horizonSteps = 20;
-    cfg.controller.certifiedSteps = 2;
-    cfg.controller.inputDelaySteps = 1;
     cfg.model.frontWheelSteeringRateMaximum = 0.5;
     cfg.model.brakingRatioRateMaximum = 2;
     % Diagnostic allowances selected after the recorded failed calibration
@@ -25,7 +23,7 @@ function report = runCurvedControllerValidation(options)
     % center strip therefore contains every rectangle orientation in the road.
     cfg.model.lateralDomainRadius = roadHalfWidth-hypot(cfg.vehicle.length/2,cfg.vehicle.width/2);
     report = struct("passed",false,"configuration",cfg,"roadHalfWidth",roadHalfWidth, ...
-        "scope","Controller-only nonlinear bicycle; exact observations; 100 ms delayed execution; sampled residual and geometry audits", ...
+        "scope","Controller-only nonlinear bicycle; exact observations; 100 ms sampling with declared immediate execution; sampled residual and geometry audits", ...
         "trials",struct([]));
     curvatures = [0,1/400,1/100,-1/100];
     for curvature = curvatures

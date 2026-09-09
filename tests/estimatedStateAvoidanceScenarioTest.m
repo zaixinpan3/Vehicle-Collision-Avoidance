@@ -203,7 +203,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             testCase.verifyFalse(isfield(result, "sCurve"));
         end
 
-        function circularCruiseDoesNotNeedAnUnseenTargetExitContract( ...
+        function circularFullHorizonAdmissionFailureRetainsSensorEvidence( ...
                 testCase)
             cfg = localConfiguration(20260908);
             cfg.initialization.targetSpeedPrior = 10.0;
@@ -224,10 +224,10 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
                     ControllerConfiguration=finiteSensingValidationConfig(), ...
                     Plot=false, Report=false);
 
-            localVerifyEstimatedPrefix(testCase,result);
+            localVerifyUncertifiedFullHorizon(testCase,result);
         end
 
-        function straightCruiseDoesNotNeedAnUnseenTargetExitContract( ...
+        function straightFullHorizonAdmissionFailureRetainsSensorEvidence( ...
                 testCase)
             cfg = localConfiguration(20260728);
             cfg.initialization.targetSpeedPrior = 10.0;
@@ -245,15 +245,15 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
                 ControllerConfiguration=finiteSensingValidationConfig(), ...
                 Plot=false, Report=false);
 
-            localVerifyEstimatedPrefix(testCase,result);
+            localVerifyUncertifiedFullHorizon(testCase,result);
         end
 
-        function preDetectionCruiseContinuesBeforeAcquisition(testCase)
+        function unseenTargetsDoNotHideAnUncertifiedEgoHorizon(testCase)
             result = runOncomingVehicleAvoidanceScenario(Duration=0.1, ...
                 TargetInitialLongitudinalDistance=100, UseStateEstimator=true, ...
                 EstimatorConfiguration=localConfiguration(20260731), ...
                 ControllerConfiguration=finiteSensingValidationConfig(), Plot=false, Report=false);
-            localVerifyEstimatedPrefix(testCase,result);
+            localVerifyUncertifiedFullHorizon(testCase,result);
             testCase.verifyFalse(result.estimator.initialization.targetInitiallyAcquired);
             testCase.verifyFalse(result.attempts.targetVisible(1));
             testCase.verifyFalse(result.estimator.metrics.targetAcquisitionOccurred);
@@ -347,7 +347,7 @@ function localVerifyReportedAdmissionFailure(testCase,result)
     testCase.verifyTrue(any(string(result.failure.identifier) == [ ...
         "collisionAvoidanceController:noCertifiedContinuation", ...
         "collisionAvoidanceController:invalidUncertaintyChart", ...
-        "collisionAvoidanceController:missingEncounterContract"]));
+        "collisionAvoidanceController:invalidBarrierAdmission"]));
     testCase.verifyEqual(result.metrics.completedControlSteps,0);
     testCase.verifyEmpty(result.command);
     testCase.verifyEqual(result.scenario.stateSource,"onlineNrmmTrackingRuntime");
@@ -365,11 +365,8 @@ function target = localRadarExitTarget(time, ~)
         "targetPositionInertial", [29.0 + 30.0*time; 0.0]);
 end
 
-function localVerifyEstimatedPrefix(testCase,result)
-    testCase.verifyFalse(result.failure.occurred);
-    testCase.verifyEqual(result.metrics.completedControlSteps,2);
-    testCase.verifyEqual(result.scenario.stateSource,"onlineNrmmTrackingRuntime");
-    testCase.verifyTrue(result.estimator.metrics.controllerInputsFromEstimator);
-    testCase.verifyEmpty(result.targetEstimate{1});
-    testCase.verifyTrue(all(cellfun(@(m)m.planCertified && ~m.fallbackUsed,result.attempts.metadata)));
+function localVerifyUncertifiedFullHorizon(testCase,result)
+    localVerifyReportedAdmissionFailure(testCase,result);
+    testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+    testCase.verifyEmpty(result.attempts.targetEstimate{1});
 end

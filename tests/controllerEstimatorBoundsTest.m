@@ -102,6 +102,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             ego.yawRate = state(6);
             ego.heldActuatorInput = command.actuatorInput;
             ego.stateTime = cfg.controller.sampleTime;
+            ego.perception.time = ego.stateTime;
             target.stateTime = cfg.controller.sampleTime;
             target.controllerErrorBound.time = cfg.controller.sampleTime;
             target.controllerErrorBound.bounds(1:2) = 0.25;
@@ -110,7 +111,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             [~, ~, next] = collisionAvoidanceController(ego, target, lane, cfg, stored);
             testCase.verifyTrue(first.metadata.planCertified && next.metadata.planCertified);
             testCase.verifyTrue(next.metadata.certificateCompatible);
-            testCase.verifyTrue(next.metadata.setMembershipUpdate);
+            testCase.verifyTrue(next.metadata.carriedWitnessFeasible);
             testCase.verifyGreaterThanOrEqual(next.metadata.solverCallCount,1);
             testCase.verifyFalse(next.metadata.fallbackUsed);
         end
@@ -131,13 +132,14 @@ function [ego, target, cfg, lane] = localInputs()
     [~, crossing, lane, cfg] = encounterTestFixture.crossing();
     ego = struct("position", [0; 0], "yawAngle", 0, ...
         "longitudinalVelocity", 10, "lateralVelocity", 0, "yawRate", 0, ...
-        "stateTime", 0, "controllerErrorBound", ...
+        "stateTime", 0, "perception",struct("time",0,"range",16,"completeWithinRange",true), ...
+        "controllerErrorBound", ...
         localCertificate("ego-state-v1", [0.1; 0.1; 0.01; 0.1; 0.1; 0.001]));
     target = struct("trackId", "static-target", "targetPositionInertial", [15; -4], ...
-        "targetVelocityInertial", [0; 8], "targetAccelerationInertial", [0; 0], ...
+        "targetVelocityInertial", [0; 32], "targetAccelerationInertial", [0; 0], ...
         "targetYawInertial", pi/2, "targetYawRate", 0, "stateTime", 0, ...
         "controllerErrorBound", localCertificate("target-state-v1", [0.2; 0.2; zeros(6, 1)]), ...
-        "encounterContract", crossing.encounterContract);
+        "predictionMotion", crossing.predictionMotion);
 end
 
 function certificate = localCertificate(kind, values)

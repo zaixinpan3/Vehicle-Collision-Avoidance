@@ -17,24 +17,14 @@ classdef laneGeometry
                 tube = tubes(index);
                 values = reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
                 nominal{index} = values;
-                radius = tube.numericalRadius;
-                if tube.stage<=cfg.controller.certifiedSteps,radius = tube.radius;end
+                radius = tube.radius;
                 station(index) = (min(values(1,:))+max(values(1,:)))/2;
                 extent(index) = cfg.controller.stationTrustRadius ...
                     +(max(values(1,:))-min(values(1,:)))/2+max(radius(1,:));
             end
             frames = laneGeometry.frameBounds(model.lane,station,extent,cfg.model.lateralDomainRadius);
-            tire = modifiedFialaTire.parameters(cfg);
-            acceleration = sum(tire.longitudinalForceScale)/cfg.vehicle.m ...
-                +longitudinalRoadLoad(cfg.model.speedMaximum,cfg)/cfg.vehicle.m ...
-                +abs(model.longitudinalAccelerationBias);
-            yawAcceleration = dot([cfg.vehicle.lf;cfg.vehicle.lr],tire.longitudinalForceScale)/cfg.vehicle.Iz;
             for index = 1:numel(tubes)
                 frames(index).referenceHeadingErrorBound = frames(index).headingErrorBound;
-                if tubes(index).stage>cfg.controller.certifiedSteps
-                    frames(index).positionErrorBound = frames(index).positionErrorBound+acceleration*tubes(index).duration^2/8;
-                    frames(index).headingErrorBound = frames(index).headingErrorBound+yawAcceleration*tubes(index).duration^2/8;
-                end
             end
         end
         function curve = validateReferenceCurve(curve)

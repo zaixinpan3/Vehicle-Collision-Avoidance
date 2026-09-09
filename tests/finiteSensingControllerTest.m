@@ -57,7 +57,7 @@ classdef finiteSensingControllerTest < matlab.unittest.TestCase
             [ego,target,route,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             next = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            next.perception = struct("time",next.stateTime,"range",30,"completeWithinRange",true);
+            next.perception = struct("time",next.stateTime,"range",16,"completeWithinRange",true);
             testCase.verifyError(@() collisionAvoidanceController(next,[],route,cfg,stored), ...
                 "collisionAvoidanceController:inconsistentPerception");
         end
@@ -98,44 +98,46 @@ classdef finiteSensingControllerTest < matlab.unittest.TestCase
             [ego,target,route,cfg] = localFixture();
             [~,~,problem,certificate] = collisionAvoidanceController(ego,target,route,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyFalse(problem.metadata.recursiveFeasibilityClaimed);
-            testCase.verifyEqual(certificate.safetyScope,"executedIntervalWithNominalLookahead");
-            testCase.verifyEqual(certificate.certifiedDuration,cfg.controller.sampleTime);
-            testCase.verifyGreaterThan(problem.metadata.lookaheadDuration,certificate.certifiedDuration);
+            testCase.verifyTrue(problem.metadata.recursiveFeasibilityClaimed);
+            testCase.verifyEqual(certificate.safetyScope,"completeEncounterForDeclaredInclusion");
+            testCase.verifyEqual(certificate.certifiedDuration,cfg.controller.sampleTime*cfg.controller.horizonSteps);
+            testCase.verifyEqual(problem.metadata.lookaheadDuration,certificate.certifiedDuration);
         end
         function completeCurrentPerceptionEndsAnAbsentEncounter(testCase)
             [ego,target,route,cfg] = localFixture();
-            target.targetPositionInertial = [-29.5;0];
+            target.targetPositionInertial = [-15.5;0];
             target.targetVelocityInertial = [-8;0];
             target.targetHeadingInertial = pi;
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             next = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            next.perception = struct("time",next.stateTime,"range",30,"completeWithinRange",true);
+            next.perception = struct("time",next.stateTime,"range",16,"completeWithinRange",true);
             [~,~,updated,certificate] = collisionAvoidanceController(next,[],route,cfg,stored);
-            testCase.verifyTrue(certificate.encounters.discharged);
+            testCase.verifyTrue(certificate.encounterComplete);
             testCase.verifyEmpty(updated.metadata.activeTargetKeys);
             testCase.verifyFalse(updated.metadata.fallbackUsed);
-            testCase.verifyEqual(updated.metadata.certificateSource,"checkedOptimization");
+            testCase.verifyTrue(updated.metadata.encounterComplete);
         end
         function aMissingObservationAloneDoesNotEndAnEncounter(testCase)
             [ego,target,route,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             next = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            testCase.verifyError(@() collisionAvoidanceController(next,[],route,cfg,stored), ...
-                "collisionAvoidanceController:expiredEncounterContract");
+            [command,~,~,continued] = collisionAvoidanceController(next,[],route,cfg,stored);
+            testCase.verifyNotEmpty(command);
+            testCase.verifyFalse(continued.encounterComplete);
         end
-        function solverFailureStillStopsTheFiniteSensingController(testCase)
+        function solverFailureRetainsTheCertifiedFiniteWitness(testCase)
             [ego,target,route,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             next = encounterTestFixture.nextEgo(stored,problem.model.lane);
             target.targetPositionInertial = target.targetPositionInertial+cfg.controller.sampleTime*target.targetVelocityInertial;
             cfg.solver.jointFunction = @encounterTestFixture.fail;
-            testCase.verifyError(@() collisionAvoidanceController(next,target,route,cfg,stored), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+            [command,~,problem] = collisionAvoidanceController(next,target,route,cfg,stored);
+            testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
+            testCase.verifyTrue(problem.metadata.fallbackUsed);
         end
         function nonfinitePerceptionTimeCannotAuthorizeDischarge(testCase)
             [ego,target,route,cfg] = localFixture();
-            ego.perception = struct("time",NaN,"range",30,"completeWithinRange",true);
+            ego.perception = struct("time",NaN,"range",16,"completeWithinRange",true);
             testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
                 "MATLAB:expectedFinite");
         end
@@ -156,10 +158,8 @@ end
 
 function [ego,target,route,cfg] = localFixture()
     [ego,target,route,cfg] = encounterTestFixture.crossing();
-    cfg.controller.certifiedSteps = 1;
-    target = rmfield(target,"encounterContract");
     target.predictionMotion = struct("kind","finite-sensing-motion-v1", ...
-        "jerkBound",[2;2],"yawAccelerationBound",1);
+        "jerkBound",[0.02;0.02],"yawAccelerationBound",0.01);
 end
 
 function [ego, cfg, lane] = localUncertainInputs()
@@ -167,5 +167,6 @@ function [ego, cfg, lane] = localUncertainInputs()
     lane = [0, 0; 1000, 0];
     ego = struct("position", [10; 0], "yawAngle", 0, ...
         "longitudinalVelocity", 10, "lateralVelocity", 0, "yawRate", 0, ...
-        "stateTime", 0, "controllerStateErrorBound", [.04; .04; .014; .388; .388; .0015]);
+        "stateTime", 0, "perception", struct("time",0,"range",30,"completeWithinRange",true), ...
+        "controllerStateErrorBound", [.04; .04; .014; .388; .388; .0015]);
 end

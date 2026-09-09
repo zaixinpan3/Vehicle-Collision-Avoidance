@@ -1,5 +1,10 @@
 # Finite-sensing integration repair: experimental results
 
+Historical result notice, September 9, 2026: the delayed/partial-horizon
+controller and its replay branch have been removed. These dated observations
+retain their original experimental scope and do not validate version 13.
+See [the current architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
+
 Experiment date: September 7, 2026. MATLAB R2026a Update 3,
 26.1.0.3276743. Outcome: **partial repair; joint avoidance is not complete**.
 

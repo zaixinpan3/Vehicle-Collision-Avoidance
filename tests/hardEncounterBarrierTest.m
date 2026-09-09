@@ -10,6 +10,52 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function targetFreeAdmissionUsesTheSameCountdownCertificate(testCase)
+            [ego,~,route,cfg] = localFixture();
+            [~,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,[]);
+            deadline = stored.deadline;
+            for index = 1:cfg.controller.horizonSteps
+                ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
+                ego.perception.completeWithinRange = true;
+                [command,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,stored);
+                testCase.verifyEqual(stored.deadline,deadline,AbsTol=0);
+                testCase.verifyEqual(stored.remainingSteps,cfg.controller.horizonSteps-index);
+            end
+            testCase.verifyTrue(stored.encounterComplete);
+            testCase.verifyEmpty(command);
+        end
+
+        function firstDetectionCanAugmentATargetFreeCertificate(testCase)
+            [ego,target,route,cfg] = localFixture();
+            [~,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,[]);
+            ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
+            ego.perception.completeWithinRange = true;
+            target.targetPositionInertial = [-8.8;0];
+            [command,~,next,updated] = collisionAvoidanceController(ego,target,route,cfg,stored);
+            testCase.verifyNotEmpty(command);
+            testCase.verifyTrue(next.metadata.jointAdmissionPerformed);
+            testCase.verifyEqual(updated.deadline,stored.deadline,AbsTol=0);
+            testCase.verifyEqual(numel(updated.encounters),1);
+        end
+
+        function removedModeSelectorsCannotRestoreAnOldController(testCase)
+            for field = ["completionPolicy","reoptimizeContinuation","safetyMarginPolicy", ...
+                    "barrierFraction","maneuverSelectionPolicy","corridorOverlap","maneuverSwitchWeight"]
+                override = struct("encounter",struct(field,"lookahead"));
+                testCase.verifyError(@() collisionAvoidanceControllerConfig(override), ...
+                    "collisionAvoidanceController:invalidConfiguration");
+            end
+        end
+
+        function earlierCertificateVersionsCannotResumeTheController(testCase)
+            [ego,target,route,cfg] = localFixture();
+            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            [ego,target] = localNext(stored,problem.model.lane,target);
+            stored.version = 12;
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,stored), ...
+                "collisionAvoidanceController:invalidStoredCertificate");
+        end
+
         function admissionCertifiesExitWithHardSafetyAndSoftPerformance(testCase)
             [ego, target, route, cfg] = localFixture();
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
@@ -49,21 +95,20 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(history(end).stateTime, 0.4, AbsTol=1e-12);
         end
 
-        function retainedExecutionDoesNotNeedAnOptimizer(testCase)
+        function optimizerFailureStillExecutesTheCertifiedWitness(testCase)
             [ego, target, route, cfg] = localFixture();
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             [ego, target] = localNext(stored, problem.model.lane, target);
             cfg.solver.jointFunction = @encounterTestFixture.fail;
             [command, ~, next, updated] = collisionAvoidanceController(ego, target, route, cfg, stored);
             testCase.verifyEqual(command.actuatorInput, stored.plan(:, 2), AbsTol=0);
-            testCase.verifyEqual(next.metadata.solverCallCount, 0);
+            testCase.verifyGreaterThan(next.metadata.solverCallCount, 0);
             testCase.verifyEqual(next.metadata.certificateSource, "retainedCertifiedWitness");
             testCase.verifyGreaterThanOrEqual(updated.margin, stored.margin);
         end
 
         function failedReoptimizationKeepsTheCertifiedTail(testCase)
             [ego, target, route, cfg] = localFixture();
-            cfg.encounter.reoptimizeContinuation = true;
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             [ego, target] = localNext(stored, problem.model.lane, target);
             cfg.solver.jointFunction = @encounterTestFixture.fail;
@@ -76,7 +121,6 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
 
         function reoptimizationPreservesTheExecutedPrefixAndMargin(testCase)
             [ego, target, route, cfg] = localFixture();
-            cfg.encounter.reoptimizeContinuation = true;
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             [ego, target] = localNext(stored, problem.model.lane, target);
             [~, ~, next, updated] = collisionAvoidanceController(ego, target, route, cfg, stored);
@@ -87,7 +131,6 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
 
         function aSolverCannotChangeAnExecutedInput(testCase)
             [ego, target, route, cfg] = localFixture();
-            cfg.encounter.reoptimizeContinuation = true;
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             [ego, target] = localNext(stored, problem.model.lane, target);
             cfg.solver.jointFunction = @encounterTestFixture.unsafe;
@@ -357,9 +400,8 @@ end
 
 function [ego, target, route, cfg] = localFixture()
     cfg = collisionAvoidanceControllerConfig(struct('referenceSpeed', 8, ...
-        'controller', struct('horizonSteps', 4, 'sampleTime', 0.1, 'certifiedSteps', Inf), ...
-        'model', struct('linearizationPolicy', 'cruise', 'lateralDomainRadius', 2), ...
-        'encounter', struct('completionPolicy', 'retainedPerceptionExit')));
+        'controller', struct('horizonSteps', 4, 'sampleTime', 0.1), ...
+        'model', struct('linearizationPolicy', 'cruise', 'lateralDomainRadius', 2)));
     ego = struct('position', [0; 0], 'yaw', 0, 'speed', 8, 'stateTime', 0, ...
         'perception', struct('time', 0, 'range', 13.5, 'completeWithinRange', true));
     target = struct('trackId', 1, 'targetPositionInertial', [-8; 0], ...

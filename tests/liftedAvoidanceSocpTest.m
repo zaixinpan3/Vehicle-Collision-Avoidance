@@ -10,17 +10,17 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
     methods (Test)
         function screenedConesPreserveTheRequiredClfSlack(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
-            cfg.controller.certifiedSteps = 1;
             cfg.model.frontWheelSteeringRateMaximum = 0.5;
             cfg.model.brakingRatioRateMaximum = 2;
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            problem.model.anchorPlan = problem.prediction.referencePlan;
+            problem.qp.stageProgram = avoidanceStageQp(problem.qp,problem.prediction,problem.model);
             discrepancy = localClfScreeningError(problem,cfg);
             testCase.verifyLessThanOrEqual(discrepancy,1e-8);
             testCase.verifyLessThanOrEqual(numel(problem.qp.stageProgram.clfConstraintIndices),numel(problem.qp.clf.constraints));
         end
         function routeStationOriginDoesNotChangeTheAvoidanceInput(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
-            cfg.controller.certifiedSteps = 1;
             [near,~,nearProblem] = collisionAvoidanceController(ego,target,route,cfg,[]);
             route(1,1) = route(1,1)-10000;
             [far,~,farProblem] = collisionAvoidanceController(ego,target,route,cfg,[]);
@@ -28,27 +28,13 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             testCase.verifyTrue(farProblem.metadata.planCertified);
             testCase.verifyEqual(far.actuatorInput,near.actuatorInput,AbsTol=1e-5);
         end
-        function optionalReserveCannotMakeAnOtherwiseSafePlanUnavailable(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            cfg.controller.certifiedSteps = 1;
-            [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            qp = problem.qp;
-            qp.anticipationReserve = 1e4*double(qp.safetyRows);
-            cfg.encounter.safetyMarginPolicy = "maximize";
-            [result,allocated] = solveHardCbfClf(qp,cfg);
-            testCase.assertTrue(result.feasible);
-            testCase.verifyLessThan(allocated.reserveFraction,0.01);
-            check = certifyAvoidancePlan(allocated,problem.prediction,problem.model,result.decision);
-            testCase.verifyTrue(check.accepted);
-            testCase.verifyLessThanOrEqual(max(qp.inequalityMatrix*result.decision-qp.inequalityBound),1e-7);
-            testCase.verifyEqual(allocated.physicalBound,qp.physicalBound,AbsTol=0);
-        end
         function sparseAndCondensedProgramsDescribeTheSameDecisions(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
-            cfg.controller.certifiedSteps = 1;
             cfg.referenceSpeed = 10;
             cfg.model.frontWheelSteeringRateMaximum = 1;
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            problem.model.anchorPlan = problem.prediction.referencePlan;
+            problem.qp.stageProgram = avoidanceStageQp(problem.qp,problem.prediction,problem.model);
             sparseProgram = problem.qp.stageProgram;
             condensed = avoidanceStageQp(problem.qp);
             first = problem.decision;

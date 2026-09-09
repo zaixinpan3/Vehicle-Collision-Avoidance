@@ -4,9 +4,8 @@ function report = runStraightRealtimeValidation(options)
 % solve or expired frame stops before its command reaches the plant. The
 % joint experiment starts only after the controller-only experiment passes
 % collision, road, completion, eventual-cruise and runtime checks.
-% Each solve uses measurements at t and schedules its command for t+0.1 s.
-% The already committed input executes during computation. Prediction and
-% robust certification include both that delay and the new held interval.
+% The declared controller has zero input delay and a finite certificate.
+% Runtime measurements do not establish a physical zero-latency implementation.
     arguments
         options.Duration (1,1) double {mustBePositive} = 30
         options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
@@ -19,8 +18,6 @@ function report = runStraightRealtimeValidation(options)
     cfg = finiteSensingValidationConfig();
     cfg.controller.sampleTime = 0.1;
     cfg.controller.horizonSteps = 16;
-    cfg.controller.certifiedSteps = 2;
-    cfg.controller.inputDelaySteps = 1;
     if options.DeadlineSeconds>cfg.controller.sampleTime
         error("runStraightRealtimeValidation:deadlineExceedsPeriod", ...
             "The complete-frame deadline cannot exceed the 100 ms control period.");
@@ -32,7 +29,7 @@ function report = runStraightRealtimeValidation(options)
     estimator.observer.runtime.integrationStepMaximum = estimator.observer.runtime.samplePeriod;
     report = struct("passed",false,"controllerOnly",[],"joint",[], ...
         "deadlineSeconds",options.DeadlineSeconds,"randomSeed",options.RandomSeed, ...
-        "scope","Straight PassVeh14DOF; 100 ms period and scheduled input delay; all attempted online frames; no platform WCET proof");
+        "scope","Straight PassVeh14DOF; 100 ms period and zero-delay declared execution; all attempted online frames; no platform WCET proof");
     report.execution = struct("matlabVersion",string(version), ...
         "architecture",string(computer('arch')),"computationalThreads",maxNumCompThreads, ...
         "allowedCpuList","");

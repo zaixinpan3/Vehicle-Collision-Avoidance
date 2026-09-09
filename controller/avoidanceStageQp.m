@@ -90,7 +90,7 @@ function program = localLiftedProgram(qp,prediction,model)
     hardBound = [vertcat(localBounds{:});qp.inequalityBound(rowStart+1:end)];
     % Input and slew rows below remain explicit. Their reachable box can
     % therefore prove geometric rows redundant for every admissible plan,
-    % including the maximum optional reserve. Keep the complete unpruned
+    % Keep the complete unpruned
     % rows in qp for independent post-solve certification.
     cfg = model.cfg;
     stages = reshape(repelem(1:count,2),[],1);
@@ -109,14 +109,12 @@ function program = localLiftedProgram(qp,prediction,model)
     maximum = min(maximum,slewSupport);
     error = 64*(qp.layout.planCount+1)^2*eps*(1+abs(geometryMap)*max(abs(lower),abs(upper)) ...
         +abs(qp.inequalityBound(1:rowStart)));
-    retained = maximum+error>qp.inequalityBound(1:rowStart) ...
-        -qp.reserveFractionMaximum*qp.anticipationReserve(1:rowStart);
+    retained = maximum+error>qp.inequalityBound(1:rowStart);
     if any(lower>upper),retained(:) = true;end
     inequalityIndices = [find(retained);(rowStart+1:numel(hardBound)).'];
     hard = hard(inequalityIndices,:);
     hardBound = hardBound(inequalityIndices);
-    uniqueRows = localUndominatedRows(hard,hardBound, ...
-        qp.anticipationReserve(inequalityIndices),qp.reserveFractionMaximum);
+    uniqueRows = localUndominatedRows(hard,hardBound);
     inequalityIndices = inequalityIndices(uniqueRows);
     hard = hard(uniqueRows,:);hardBound = hardBound(uniqueRows);
     cones = qp.clf.constraints;
@@ -203,13 +201,11 @@ function program = localLiftedProgram(qp,prediction,model)
         "physicalDecisionCount",physicalCount,"stateIndex",stateIndex,"stateCenter",stateCenter, ...
         "inequalityIndices",inequalityIndices, ...
         "clfConstraintIndices",coneIndices, ...
-        "inactiveSlackIndex",qp.layout.relaxationIndex(min(count,cfg.controller.certifiedSteps)+1:end));
+        "inactiveSlackIndex",zeros(1, 0));
 end
 
-function retained = localUndominatedRows(matrix,bound,reserve,maximumFraction)
-% Identical left sides need only bounds not dominated over the reserve range.
-% Comparing both endpoints suffices because each right side is affine in
-% the common allocation fraction. Keep the complete rows in the outer qp.
+function retained = localUndominatedRows(matrix,bound)
+% Keep the tightest bound for each exactly identical left side.
     count = numel(bound);
     % A sparse row is identified exactly by its ordered nonzero columns
     % and values. Compare that compact representation instead of hundreds
@@ -223,7 +219,7 @@ function retained = localUndominatedRows(matrix,bound,reserve,maximumFraction)
     signature(sub2ind(size(signature),row,2*ordinal)) = column;
     signature(sub2ind(size(signature),row,2*ordinal+1)) = value;
     [~,~,group] = unique(signature,'rows');
-    endpoint = bound-maximumFraction*reserve;
+    endpoint = bound;
     ordered = sortrows([group,bound,endpoint,(1:count).'],[1,2,3]);
     first = [true;diff(ordered(:,1))~=0];
     representatives = ordered(first,4);

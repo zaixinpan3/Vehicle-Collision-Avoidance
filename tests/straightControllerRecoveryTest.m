@@ -1,5 +1,5 @@
 classdef straightControllerRecoveryTest < matlab.unittest.TestCase
-    % Declared bicycle regression for the September 7 heading/rate failure.
+    % Full-horizon rejection of the old empirical short-prefix profile.
     % This test complements, and does not replace, PassVeh14DOF validation.
     properties (TestParameter)
         targetSpeedPrior = struct('matched',10,'overestimated',15);
@@ -13,50 +13,24 @@ classdef straightControllerRecoveryTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function boundedNoisyEstimatesSupportTheCompleteEncounter(testCase, targetSpeedPrior)
+        function theOldEmpiricalProfileCannotClaimFullHorizonAdmission(testCase,targetSpeedPrior)
             cfg = localConfiguration();
             estimator = estimatorControllerIntegrationConfig();
             estimator.randomSeed = 20260907;
             estimator.initialization.targetSpeedPrior = targetSpeedPrior;
             estimator.vehicle.targetSpeed = targetSpeedPrior;
-            result = runFiniteBicycleDiagnostic(cfg,12,EstimatorConfiguration=estimator);
-            testCase.assertFalse(result.failure.occurred,result.failure.message);
-            audits = cellfun(@(value)value.truthEnclosure,result.measurementAudit);
-            testCase.verifyTrue(all([audits.egoPremisesSatisfied]));
-            testCase.verifyTrue(all([audits.egoContained]));
-            testCase.verifyTrue(all([audits.checkedTargetComponentsContained]));
-            testCase.verifyGreaterThan(result.minimumSampledSeparationMargin,0.25);
-            testCase.verifyTrue(all(cellfun(@(m)m.planCertified,result.metadata)));
-            testCase.verifyFalse(any(cellfun(@(m)m.fallbackUsed,result.metadata)));
-            tail = result.time>=11;
-            testCase.verifyLessThan(max(abs(result.state(tail,4)-10)),0.02);
-            testCase.verifyLessThan(max(abs(result.state(tail,2))),0.02);
-            testCase.verifyLessThan(max(abs(result.state(tail,3))),0.002);
+            result = runFiniteBicycleDiagnostic(cfg,0.1,EstimatorConfiguration=estimator,PrepareController=false);
+            testCase.verifyTrue(result.failure.occurred);
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyEqual(result.time,0);
+            testCase.verifyEmpty(result.input);
         end
-        function rateLimitedAvoidanceCompletesAndReturnsToCruise(testCase)
-            cfg = localConfiguration();
-            result = runFiniteBicycleDiagnostic(cfg,12);
-            testCase.assertFalse(result.failure.occurred,result.failure.message);
-            testCase.verifyEqual(result.time(end),12,AbsTol=1e-12);
-            testCase.verifyGreaterThan(result.minimumSampledSeparationMargin,0);
-            trace = result.plantTrace;
-            near = find(abs(trace.state(:,1)-(100-10*trace.time))<8);
-            distance = zeros(numel(near),1);
-            for index = 1:numel(near)
-                row = near(index);
-                distance(index) = rectangleConfigurationDistance(trace.state(row,1:2).', ...
-                    trace.state(row,3),[100-10*trace.time(row);0.8],pi,[2.5;1;2.5;1]);
-            end
-            testCase.verifyGreaterThan(min(distance),0.25);
-            testCase.verifyLessThan(max(abs(result.state(:,3))),0.4);
-            testCase.verifyLessThanOrEqual(max(abs(diff(result.input(:,1))))/0.05,0.5);
-            testCase.verifyLessThanOrEqual(max(abs(diff(result.input(:,2))))/0.05,2);
-            tail = result.time>=11;
-            testCase.verifyLessThan(max(abs(result.state(tail,4)-10)),0.01);
-            testCase.verifyLessThan(max(abs(result.state(tail,2))),0.02);
-            testCase.verifyLessThan(max(abs(result.state(tail,3))),0.002);
-            testCase.verifyTrue(all(cellfun(@(m)m.planCertified,result.metadata)));
-            testCase.verifyFalse(any(cellfun(@(m)m.fallbackUsed,result.metadata)));
+        function exactObservationsCannotHideAnUncertifiedResidualHorizon(testCase)
+            result = runFiniteBicycleDiagnostic(localConfiguration(),0.1,PrepareController=false);
+            testCase.verifyTrue(result.failure.occurred);
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyEqual(result.time,0);
+            testCase.verifyEmpty(result.input);
         end
     end
 end

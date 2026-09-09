@@ -19,14 +19,9 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
     end
     ego = localReadEgoState(egoState, cfg);
     ego.stateTime = localOptionalStateScalar(egoState, "stateTime", NaN);
-    ego.committedActuatorInput = zeros(0,1);
-    if cfg.controller.inputDelaySteps>0
-        if ~isfield(egoState,"committedActuatorInput") || ~isfinite(ego.stateTime)
-            error("collisionAvoidanceController:missingCommittedInput", ...
-                "A delayed solve requires the timestamp and input already scheduled during computation.");
-        end
-        ego.committedActuatorInput = localFiniteVector( ...
-            egoState.committedActuatorInput,2,"egoState.committedActuatorInput");
+    if isfield(egoState, "committedActuatorInput") && ~isempty(egoState.committedActuatorInput)
+        error("collisionAvoidanceController:invalidInput", ...
+            "The complete retained certificate does not support an input-delay queue.");
     end
     ego.completePerception = false;
     ego.perceptionRange = NaN;
@@ -678,7 +673,7 @@ function target = localEmptyTarget()
         "yawErrorBound", 0.0, "yawRateErrorBound", 0.0, ...
         "predictionYawAccelerationErrorBound", 0.0, ...
         "accelerationErrorBound", zeros(2, 1), ...
-        "errorCertificate", [], "encounterContract", [], "predictionMotion", []);
+        "errorCertificate", [], "predictionMotion", []);
 end
 
 function key = localTargetRecordKey(data, recordIdx)
@@ -732,7 +727,8 @@ function [target, active] = localReadTargetRecord(data, ego, cfg)
     target.yaw = yaw;
     target.yawRate = yawRate;
     if isfield(data, "encounterContract")
-        target.encounterContract = data.encounterContract;
+        error("collisionAvoidanceController:invalidInput", ...
+            "Exit-route contracts are unsupported; supply predictionMotion.");
     end
     if isfield(data,"predictionMotion"), target.predictionMotion = data.predictionMotion; end
     target.errorCertificate = stateUncertainty.readCertificate(data, "target-state-v1");

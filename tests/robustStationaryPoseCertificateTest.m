@@ -13,13 +13,13 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyFalse(problem.metadata.exactPredictionAssumptionsHold);
-            testCase.verifyEqual(stored.safetyScope, "uncertainFiniteHorizon");
+            testCase.verifyEqual(stored.safetyScope, "completeEncounterForDeclaredInclusion");
             testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
             testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, end), zeros(3, 1));
-            testCase.verifyEqual(problem.metadata.solverCallCount, 1);
+            testCase.verifyEqual(problem.metadata.solverCallCount, 2);
         end
 
-        function aNewEstimateCentersTheIntersectedCarriedBox(testCase)
+        function aCompatibleNewEstimatePreservesTheOriginalWitnessEnclosure(testCase)
             [ego, cfg, lane] = localInputs();
             [command, ~, ~, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
             fresh = localNextEgo(ego, stored, command);
@@ -28,10 +28,10 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             [~, ~, problem, next] = collisionAvoidanceController(fresh, [], lane, cfg, stored);
 
             testCase.verifyTrue(problem.metadata.certificateCompatible);
-            testCase.verifyTrue(problem.metadata.setMembershipUpdate);
+            testCase.verifyTrue(problem.metadata.carriedWitnessFeasible);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(next.predictedState(1:2,1),fresh.position,AbsTol=1e-12);
-            testCase.verifyEqual(next.stateErrorBound(1,1),0.03,AbsTol=1e-12);
+            testCase.verifyEqual(next.predictedState(1:2,1),stored.predictedState(1:2,2),AbsTol=1e-12);
+            testCase.verifyEqual(next.stateErrorBound(:,1),stored.stateErrorBound(:,2),AbsTol=1e-12);
             testCase.verifyGreaterThanOrEqual(next.predictedState(:,1)-next.stateErrorBound(:,1), ...
                 stored.predictedState(:,2)-stored.stateErrorBound(:,2)-1e-10);
             testCase.verifyLessThanOrEqual(next.predictedState(:,1)+next.stateErrorBound(:,1), ...
@@ -74,7 +74,7 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             [ego, lane] = localCurvedInputs(ego, 0);
             [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(stored.safetyScope, "uncertainFiniteHorizon");
+            testCase.verifyEqual(stored.safetyScope, "completeEncounterForDeclaredInclusion");
             testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
         end
 
@@ -85,7 +85,7 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(abs(problem.prediction.scheduleCurvature(1)), 0.0);
             testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, :), ...
                 zeros(3, problem.prediction.nodeCount));
-            testCase.verifyEqual(stored.safetyScope, "uncertainFiniteHorizon");
+            testCase.verifyEqual(stored.safetyScope, "completeEncounterForDeclaredInclusion");
         end
 
         function aNegativeForcingComponentIsRejectedBeforePropagation(testCase)
@@ -129,11 +129,13 @@ function [ego, lane] = localCurvedInputs(ego, speed)
 end
 
 function [ego, cfg, lane] = localInputs()
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4,"certifiedSteps",Inf)));
+    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
     lane = [0, 0; 1000, 0];
     ego = struct("position", [10; 0], "yawAngle", 0, ...
         "longitudinalVelocity", 5, "lateralVelocity", 0, "yawRate", 0, ...
         "stateTime", 0, "controllerStateErrorBound", [0.1; 0.1; 0.001; 0; 0; 0]);
+            ego.stateTime = 0;
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
 end
 
 function fresh = localNextEgo(previous, stored, command)
@@ -145,6 +147,7 @@ function fresh = localNextEgo(previous, stored, command)
     fresh.lateralVelocity = state(5);
     fresh.yawRate = state(6);
     fresh.stateTime = previous.stateTime+0.05;
+    fresh.perception.time = fresh.stateTime;
     fresh.heldActuatorInput = command.actuatorInput;
 end
 

@@ -2,7 +2,7 @@
 
 Retained-deadline construction implemented September 8, 2026; joint target
 admission added September 9, 2026. This construction keeps collision, road,
-actuator, slew, maneuver and model-domain constraints hard. The only relaxation
+actuator, slew and model-domain constraints hard. The only relaxation
 variables are the existing CLF performance slacks. It establishes recursive
 feasibility and interval safety **conditional on the declared prediction
 inclusion and execution assumptions below**. It does not certify the nonlinear
@@ -10,21 +10,17 @@ physical vehicle merely from exact target prediction.
 
 ## 1. Runtime contract and use
 
-The controller exposes this construction explicitly:
+The controller uses this construction for every call:
 
 ```matlab
-cfg.encounter.completionPolicy = "retainedPerceptionExit";
-cfg.controller.certifiedSteps = Inf;
-cfg.controller.inputDelaySteps = 0;
-cfg.encounter.reoptimizeContinuation = false;
-cfg = collisionAvoidanceControllerConfig(cfg);
+cfg = collisionAvoidanceControllerConfig();
 certificate = [];
 [command, inputs, problem, certificate] = ...
     collisionAvoidanceController(ego, targets, road, cfg, certificate);
 ```
 
-The initial call requires at least one identified target with a
-`finite-sensing-motion-v1` descriptor and timestamped complete perception:
+The initial call accepts zero or more identified targets, each with a
+`finite-sensing-motion-v1` descriptor, and requires timestamped complete perception:
 `ego.perception = struct("time", ego.stateTime, "range", R,
 "completeWithinRange", true)`, where finite `R > 0` is a circular,
 center-based detection radius in metres. Every target present at admission
@@ -42,14 +38,14 @@ New targets trigger the joint admission check described below. Contradictory
 measurements and changed execution contracts are rejected; an error in those
 cases is not a protective action.
 
-With the target set unchanged, the default continuation uses the already
-certified plan and calls no numerical optimizer. A new target triggers the
-joint admission solve even when continuation reoptimization is disabled. Setting `reoptimizeContinuation = true` **before admission** enables
-LP/SOCP replacement inside the retained certificate. The incumbent is selected
-if the replacement fails independent verification. This synchronous optional
-solve still requires a completion-time assumption; no hard real-time or
-asynchronous solver watchdog is established here. The original default
-`completionPolicy = "lookahead"` remains available with its narrower guarantee.
+Every continuation attempts the same hard-margin LP and subordinate CLF SOCP
+with the executed prefix fixed. A replacement must preserve the independently
+verified margin. If it fails verification, the checked incumbent remains the
+execution witness. This is witness selection within one certificate, without
+a second control law or a selectable execution policy. The synchronous solver
+still requires a completion-time premise; no asynchronous watchdog is proved.
+There is no partial-horizon, delayed-input, nonreturn-contract, or discrete
+maneuver controller. The sole formulation applies to zero or more targets.
 
 At verified early exit, or at the certified terminal time after execution of
 all admitted intervals, the controller returns `command = []`, `inputs = []`,
@@ -57,7 +53,7 @@ and `problem.metadata.encounterComplete = true`. The calling system must handle
 that completion explicitly. No control is certified beyond that endpoint; a
 completed certificate must not be reused as a new encounter admission.
 
-Version-12 certificates retain `qp`, `prediction`, and `decision` in their
+Version-13 certificates retain `qp`, `prediction`, and `decision` in their
 **original admission coordinates**. `consumedSteps` locates the executable
 suffix, `plan` and `predictedState` expose that suffix, and `deadline` stays
 fixed. Likewise `problem.layout` describes the retained full decision while
@@ -76,7 +72,7 @@ z=(x,u_{\mathrm{previous}},q_T,t),\qquad z^+=F(z,u),
 where \(x\) is the six-state ego pose/velocity state and \(q_T\) identifies the
 same absolute-time target trajectory at every update. With delay, a committed
 queue would also be necessary; this implementation explicitly rejects nonzero
-delay in this mode. Assume compact physical inputs \(U\), a continuous
+delay in this construction. Assume compact physical inputs \(U\), a continuous
 well-posed flow, and continuous normalized margin maps on the full rollout
 domain. Operating-domain restrictions belong among the margins, rather than
 silently removing trajectories from the compact maximization argument.
@@ -173,7 +169,7 @@ The runtime retains the entire declared sampled affine inclusion from admission:
 
 All stages use `finitePredict` held-interval Taylor/Bernstein enclosures.
 There are no nominal-only future stages. Previously certified matrices, complete cell tubes, road charts, separating
-normals and maneuver rows stay fixed during an encounter. New target admission
+normals and physical rows stay fixed during an encounter. New target admission
 appends rows without replacing them. These rows conservatively imply the physical interval constraints
 provided their geometry and enclosure premises hold. A nonlinear vehicle
 falls under (6) only if its residual is uniformly bounded by the declared
@@ -327,7 +323,7 @@ from the practical premise that a checked witness is available before actuation.
 After a successful event, all joint rows are retained and the same fixed-prefix
 argument in Section 4 applies. Each target has its own integer detection-step
 origin in `targetAdmissionSteps`; later observations cannot renew that origin.
-The version-12 certificate rejects earlier stored-certificate formats.
+The version-13 certificate rejects earlier stored-certificate formats.
 
 Thus induction covers any sequence of successful joint admissions **within the
 original complete encounter**. Between information changes, the verified margin
@@ -340,12 +336,12 @@ This premise does not establish terminal invariance, post-exit driving, a safe
 transition after an exhausted deadline, or protection before a target's first
 detection. The requested single-path continuing controller still needs the
 terminal construction specified in [the design requirements](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
-The default lookahead path has not been removed by this admission change.
+The weaker lookahead path and its configuration selectors have been removed.
 
 ## 6. Terminal continuation required for a single controller
 
 A vehicle following another indefinitely may be safe without reaching (7).
-This mode rejects that admission. A fixed-horizon alternative needs a joint
+This finite-encounter controller rejects that admission. A fixed-horizon alternative needs a joint
 ego–target–actuator terminal set and controller satisfying
 
 \[

@@ -3,7 +3,7 @@ classdef ltvBicycleModel
 
     methods (Static)
         function [states,stateJacobian,inputJacobian] = nominalRollout(model,inputs)
-        % Nonlinear nominal prediction only; the executed tube is separate.
+        % Nonlinear anchor prediction; safety uses complete uncertain held tubes.
             cfg = model.cfg;
             kernelCfg = struct("vehicle",struct("m",cfg.vehicle.m,"Iz",cfg.vehicle.Iz, ...
                 "lf",cfg.vehicle.lf,"lr",cfg.vehicle.lr,"gravity",cfg.vehicle.gravity), ...
@@ -136,11 +136,9 @@ classdef ltvBicycleModel
             end
         end
 
-        function prediction = finitePredict(model, schedule, initializationOnly)
+        function prediction = finitePredict(model, schedule)
         %finitePredict A finite held-input witness, without an appended rest tail.
             cfg = model.cfg;
-            if nargin<3,initializationOnly = false;end
-            initializationOnly = initializationOnly && string(cfg.model.linearizationPolicy)~="cruise";
             count = model.horizonSteps;
             planCount = 2*count;
             h = model.sampleTime;
@@ -175,16 +173,12 @@ classdef ltvBicycleModel
                     retained = min(count,size(model.linearizationInputs,2));
                     anchorInputs(:,1:retained) = model.linearizationInputs(:,1:retained);
                 end
-                if isfield(model,"committedInput") && ~isempty(model.committedInput)
-                    anchorInputs(:,1) = model.committedInput;
-                end
-                [nonlinearAnchor,nominalStateJacobian,nominalInputJacobian] = ...
+                nonlinearAnchor = ...
                     ltvBicycleModel.nominalRollout(model,anchorInputs);
                 model.linearizationStates = nonlinearAnchor(:,1:end-1);
                 model.linearizationInputs = anchorInputs;
             end
             prediction = struct("stageCount", count, "nodeCount", count+1, ...
-                "initializationOnly",initializationOnly, ...
                 "planCount", planCount, "referencePlan", reference(:), ...
                 "scheduleForStore", schedule, "scheduleSpeedProfile", schedule.speedProfile, ...
                 "scheduleCurvature", schedule.curvature, "scheduleBrakingRatio", schedule.brakingRatio, ...
@@ -222,12 +216,10 @@ classdef ltvBicycleModel
                     "roadLoad",cfg.roadLoad,"tire",struct("corneringStiffness",tireParameters.corneringStiffness, ...
                     "frictionCoefficient",tireParameters.frictionCoefficient));
                 stageStates = model.linearizationStates;
-                refine = isfield(model,"refineNominalLookahead") && model.refineNominalLookahead;
-                if string(cfg.model.linearizationPolicy)=="currentState" && ~refine
+                if string(cfg.model.linearizationPolicy)=="currentState"
                     stageStates = repmat(model.initialEgoState,1,count);
                 end
                 linearizedCount = count;
-                if initializationOnly,linearizedCount = min(count,cfg.controller.certifiedSteps);end
                 [allA,allB,allC,allTires,allReserve] = bicycleLinearizationKernelMex( ...
                     stageStates(:,1:linearizedCount),model.linearizationInputs(:,1:linearizedCount),schedule.curvature(1:linearizedCount), ...
                     kernelCfg,model.longitudinalAccelerationBias,baseRate,h);
@@ -241,31 +233,6 @@ classdef ltvBicycleModel
             tireModels = cell(count,1);
             priorOperatingPoint = [];
             for stage = 1:count
-                if initializationOnly && stage>cfg.controller.certifiedSteps
-                    % This temporary prediction selects an input seed only.
-                    % Preserve its exact nominal maps but omit uncertainty
-                    % tubes that the maneuver-specific prediction replaces.
-                    stateBar = model.linearizationStates(:,stage);
-                    refine = isfield(model,"refineNominalLookahead") && model.refineNominalLookahead;
-                    if string(cfg.model.linearizationPolicy)=="currentState" && ~refine
-                        stateBar = model.initialEgoState;
-                    end
-                    comparison = [stateBar(2:6);model.linearizationInputs(:,stage);schedule.curvature(stage)];
-                    if ~isequal(comparison,priorOperatingPoint)
-                        exact = [nominalStateJacobian(:,:,stage),nominalInputJacobian(:,:,stage),zeros(6,1)];
-                    end
-                    priorOperatingPoint = comparison;
-                    localState = exact(1:6,1:6);
-                    localInput = exact(1:6,7:8);
-                    localOffset = nonlinearAnchor(:,stage+1)-localState*nonlinearAnchor(:,stage) ...
-                        -localInput*anchorInputs(:,stage);
-                    map = localState*map;
-                    map(:,2*stage-1:2*stage) = map(:,2*stage-1:2*stage)+localInput;
-                    offset = localState*offset+localOffset;
-                    prediction.egoStateMatrix(:,:,stage+1) = map;
-                    prediction.egoStateOffset(:,stage+1) = offset;
-                    continue;
-                end
                 changed = stage==1 || schedule.curvature(stage)~=schedule.curvature(stage-1) ...
                     || schedule.speedProfile(stage)~=schedule.speedProfile(stage-1) ...
                     || schedule.brakingRatio(stage)~=schedule.brakingRatio(stage-1);
@@ -278,8 +245,7 @@ classdef ltvBicycleModel
                         stateBar = model.linearizationStates(:,stage);
                         inputBar = model.linearizationInputs(:,min(stage,size(model.linearizationInputs,2)));
                     end
-                    refine = isfield(model,"refineNominalLookahead") && model.refineNominalLookahead;
-                    if stage==1 || (string(cfg.model.linearizationPolicy)=="currentState" && ~refine)
+                    if stage==1 || (string(cfg.model.linearizationPolicy)=="currentState")
                         stateBar = model.initialEgoState;
                         if isempty(nonlinearAnchor), inputBar = model.previousInput;end
                     end
@@ -300,11 +266,7 @@ classdef ltvBicycleModel
                         processReserve = stateUncertainty.heldDisturbance(a,baseRate,h);
                     end
                     rate = baseRate;
-                    if stage<=cfg.controller.certifiedSteps || isempty(nonlinearAnchor)
-                        exact = expm(h*[a,b,c;zeros(3,9)]);
-                    else
-                        exact = [nominalStateJacobian(:,:,stage),nominalInputJacobian(:,:,stage),zeros(6,1)];
-                    end
+                    exact = expm(h*[a,b,c;zeros(3,9)]);
                     executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound+processReserve;
                 end
                 tireModels{stage} = tireModel;
@@ -320,34 +282,6 @@ classdef ltvBicycleModel
                 prediction.stageMatrixA(:, :, stage) = exact(1:6, 1:6);
                 prediction.stageMatrixB(:, :, stage) = exact(1:6, 7:8);
                 prediction.stageAffine(:, stage) = exact(1:6, 9);
-                if stage>cfg.controller.certifiedSteps
-                    startMap = map;startOffset = offset;startRadius = numericalRadius;
-                    localState = exact(1:6,1:6);
-                    localInput = exact(1:6,7:8);
-                    localOffset = exact(1:6,9);
-                    if ~isempty(nonlinearAnchor)
-                        localOffset = nonlinearAnchor(:,stage+1)-localState*nonlinearAnchor(:,stage) ...
-                            -localInput*anchorInputs(:,stage);
-                        prediction.stageAffine(:,stage) = localOffset;
-                    end
-                    map = localState*map;
-                    map(:,2*stage-1:2*stage) = map(:,2*stage-1:2*stage)+localInput;
-                    offset = localState*offset+localOffset;
-                    numericalRadius = abs(localState)*numericalRadius ...
-                        +128*eps*(1+abs(map)*inputLimit+abs(offset));
-                    radius = numericalRadius;
-                    tube = struct("map",cat(3,startMap,map),"offset",[startOffset,offset],"radius",[startRadius,radius], ...
-                        "numericalRadius",[startRadius,numericalRadius],"localStateMap",cat(3,eye(6),localState), ...
-                        "localInputMap",cat(3,zeros(6,2),localInput),"localOffset",[zeros(6,1),localOffset], ...
-                        "endMap",map,"endOffset",offset,"endRadius",radius, ...
-                        "endNumericalRadius",numericalRadius,"stage",stage, ...
-                        "start",(stage-1)*h,"duration",h,"time",[(stage-1)*h,stage*h]);
-                    cells{stage} = tube;
-                    prediction.egoStateMatrix(:,:,stage+1) = map;
-                    prediction.egoStateOffset(:,stage+1) = offset;
-                    prediction.egoStateErrorBound(:,stage+1) = radius;
-                    continue;
-                end
                 cellCount = max(cfg.encounter.minimumCells, ceil(2*norm(a, inf)*h));
                 dt = h/cellCount;
                 heldMap = zeros(6, planCount);

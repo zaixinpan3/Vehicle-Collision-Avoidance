@@ -10,28 +10,20 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function initializationPreservesSeedMapsButCannotIssueAControl(testCase)
+        function everyStageRetainsACompleteUncertainHeldTube(testCase)
             model = localModel();
-            model.cfg.model.linearizationPolicy = "trajectory";
-            model.cfg.controller.certifiedSteps = 1;
-            model.initialEgoState = [10;0.2;0.03;10;0.2;0.1];
             model.initialFrenetErrorBound = [.01;.01;.001;.02;.01;.005];
-            model.previousInput = [0.03;0.05];
-            model.linearizationInputs = repmat([0.03;0.05],1,model.horizonSteps);
-            full = ltvBicycleModel.finitePredict(model,[]);
-            initial = ltvBicycleModel.finitePredict(model,[],true);
-            testCase.verifyEqual(initial.referencePlan,full.referencePlan,AbsTol=1e-14);
-            testCase.verifyEqual(initial.egoStateMatrix,full.egoStateMatrix,AbsTol=1e-12);
-            testCase.verifyEqual(initial.egoStateOffset,full.egoStateOffset,AbsTol=1e-12);
-            testCase.verifyError(@() formulateAvoidanceProblem(model,initial,initial.referencePlan), ...
-                "collisionAvoidanceController:uncertifiedInitialization");
+            prediction = ltvBicycleModel.finitePredict(model,[]);
+            testCase.verifyEqual(unique([prediction.cells.stage]),1:model.horizonSteps);
+            testCase.verifyGreaterThan(prediction.egoStateErrorBound(:,end),zeros(6,1));
+            testCase.verifyGreaterThan(arrayfun(@(cell) size(cell.offset,2),prediction.cells),2);
+            testCase.verifyEqual(sum([prediction.cells.duration]),model.horizonSteps*model.sampleTime,AbsTol=1e-12);
         end
 
-        function futureDisturbancesStayContainedWithoutRepeatedBoxInflation(testCase)
+        function futureDisturbancesStayInsideEveryCertifiedNode(testCase)
             model = localModel();
             model.horizonSteps = 30;
             model.cfg.controller.horizonSteps = 30;
-            model.cfg.controller.certifiedSteps = 1;
             model.initialEgoState(4) = 10;
             model.initialFrenetErrorBound = zeros(6,1);
             model.previousInput = zeros(2,1);
@@ -39,7 +31,6 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
             prediction = ltvBicycleModel.finitePredict(model,[]);
             stream = RandStream('mt19937ar','Seed',713);
             samples = prediction.domainErrorBound(:,2).*(2*rand(stream,6,200)-1);
-            reboxed = prediction.domainErrorBound(:,2);
             for stage = 2:model.horizonSteps
                 a = prediction.stageMatrixA(:,:,stage);
                 disturbance = stateUncertainty.heldDisturbance( ...
@@ -47,9 +38,7 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
                 samples = a*samples+disturbance.*(2*rand(stream,6,200)-1);
                 testCase.verifyLessThanOrEqual(max(abs(samples),[],2), ...
                     prediction.domainErrorBound(:,stage+1)+1e-11);
-                reboxed = abs(a)*reboxed+disturbance;
             end
-            testCase.verifyLessThan(prediction.domainErrorBound(3,end),0.99*reboxed(3));
         end
         function executionReservesContainDisturbanceWithoutReversingDamping(testCase)
             model = localModel();

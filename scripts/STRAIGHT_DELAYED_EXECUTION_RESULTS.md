@@ -1,5 +1,10 @@
 # Straight avoidance with scheduled computation delay
 
+Historical result notice, September 9, 2026: the delayed/partial-horizon
+controller and its replay branch have been removed. These dated observations
+retain their original experimental scope and do not validate version 13.
+See [the current architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
+
 Research date: September 8, 2026.
 
 ## Corrected requirement
