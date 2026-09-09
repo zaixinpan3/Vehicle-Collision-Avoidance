@@ -2,12 +2,16 @@
 
 The explicit `encounter.completionPolicy = "retainedPerceptionExit"` mode
 implements the hard predictive witness construction in
-[HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). Its version-11 certificate
+[HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). Its version-12 certificate
 retains a complete interval-certified plan, fixed perception-exit deadline,
 nonnegative max–min margin, and executable continuation. It has a conditional
 recursive-feasibility proof for the declared inclusion, requires zero input
 delay, and does not establish a physical-vehicle guarantee. The version-10
-lookahead policy described below remains the default.
+lookahead policy described below remains the default. Version 12 adds joint
+first-detection admission under the explicit feasible-domain research assumption
+in Section 5 of `HARD_PREDICTIVE_CBF.md`. The requested single-path architecture
+and its remaining terminal proof obligation are recorded in
+[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
 
 The terminal-invariance proof audit, conditional Huang-style value-function
 theorem, and nonlinear counterexample are documented in

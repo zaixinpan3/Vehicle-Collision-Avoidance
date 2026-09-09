@@ -47,9 +47,10 @@ classdef hardEncounterBarrier
         end
 
         function [stored, problem] = admit(stored, problem)
-            stored.version = 11;
+            stored.version = 12;
             stored.admissionTime = stored.stateTime;
             stored.consumedSteps = 0;
+            stored.targetAdmissionSteps = zeros(numel(stored.encounters), 1);
             stored.encounterComplete = false;
             stored.witnessModel = problem.model;
             stored.safetyScope = "completeEncounterForDeclaredInclusion";
@@ -88,7 +89,8 @@ classdef hardEncounterBarrier
                 error("collisionAvoidanceController:inconsistentObservation", ...
                     "The ego measurement contradicts the retained execution enclosure.");
             end
-            exited = localCheckTargets(stored, ego, model, observations, consumed*h);
+            exited = localCheckTargets(stored, ego, model, observations, consumed);
+            newTargets = observations(~ismember(string({observations.key}), string({stored.encounters.key})));
             stored.consumedSteps = consumed;
             stored.stateTime = expectedTime;
             stored.remainingSteps = count-consumed;
@@ -96,7 +98,18 @@ classdef hardEncounterBarrier
             source = "retainedCertifiedWitness";
             calls = 0;
             attempted = false;
-            if ~stored.encounterComplete
+            jointAdmission = ~isempty(newTargets);
+            jointCheck = struct("incumbentAccepted", false, "usedIncumbent", false);
+            if jointAdmission
+                if consumed == count
+                    error("collisionAvoidanceController:jointAdmissionNotCertified", ...
+                        "A new target cannot enter an exhausted retained deadline.");
+                end
+                hardEncounterBarrier.validateAdmission(ego, newTargets);
+                [stored, check, calls, jointCheck] = localAdmitNewTargets(stored, model, newTargets, rootPlan);
+                stored.encounterComplete = false;
+                source = "checkedJointAdmission";
+            elseif ~stored.encounterComplete
                 % The initial matrices stay intact. No new normals, tubes,
                 % terminal times, or numerical allowances replace the witness.
                 qp = stored.qp;
@@ -145,6 +158,13 @@ classdef hardEncounterBarrier
                 stored.scheduledInput = inputs(:, 1);
             end
             metadata = localMetadata(stored.metadata, stored, source, calls, attempted);
+            metadata.jointAdmissionPerformed = jointAdmission;
+            metadata.newlyAdmittedTargetKeys = string({newTargets.key});
+            if jointAdmission
+                metadata.carriedWitnessFeasible = jointCheck.incumbentAccepted;
+                metadata.certificateCompatible = false;
+                metadata.fallbackUsed = jointCheck.usedIncumbent;
+            end
             metadata.runtimeSeconds = toc(timer);
             metadata.runtime = struct("continuationSeconds", metadata.runtimeSeconds);
             metadata.requiredMargin = stored.qp.requiredMargin;
@@ -166,11 +186,11 @@ end
 
 function localValidateStored(stored, identity)
     required = ["version", "admissionTime", "consumedSteps", "encounterComplete", ...
-        "witnessModel", "qp", "decision", "prediction", "metadata", "identity"];
+        "witnessModel", "qp", "decision", "prediction", "metadata", "identity", "targetAdmissionSteps"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored, required)) ...
-            || stored.version ~= 11 || stored.encounterComplete
+            || stored.version ~= 12 || stored.encounterComplete
         error("collisionAvoidanceController:invalidStoredCertificate", ...
-            "Continuation requires an active version-11 hard encounter certificate.");
+            "Continuation requires an active version-12 hard encounter certificate.");
     end
     if ~isequaln(identity, stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...
@@ -178,22 +198,20 @@ function localValidateStored(stored, identity)
     end
     validateattributes(stored.consumedSteps, {'double'}, ...
         {'scalar', 'integer', 'nonnegative', '<', stored.prediction.stageCount});
+    validateattributes(stored.targetAdmissionSteps, {'double'}, ...
+        {'vector', 'integer', 'nonnegative', '<=', stored.consumedSteps, 'numel', numel(stored.encounters)});
     if stored.deadline ~= stored.admissionTime+stored.prediction.stageCount*stored.witnessModel.sampleTime
         error("collisionAvoidanceController:invalidStoredCertificate", "The retained deadline changed.");
     end
 end
 
-function exited = localCheckTargets(stored, ego, model, observations, elapsed)
+function exited = localCheckTargets(stored, ego, model, observations, consumed)
 % The admission envelope is evaluated at absolute time; it is never renewed.
-    keys = string({stored.encounters.key});
-    if any(~ismember(string({observations.key}), keys))
-        error("collisionAvoidanceController:newTargetRequiresAdmission", ...
-            "A newly appearing target requires a new joint encounter admission.");
-    end
     exited = true;
     for index = 1:numel(stored.encounters)
         encounter = stored.encounters(index);
-        [center, radius] = targetPrediction.finiteFlow(encounter, elapsed);
+        targetElapsed = (consumed-stored.targetAdmissionSteps(index))*model.sampleTime;
+        [center, radius] = targetPrediction.finiteFlow(encounter, targetElapsed);
         match = find(string({observations.key}) == encounter.key, 1);
         if ~isempty(match)
             measured = targetPrediction.admit(observations(match), model.stateTime, model.lane, model.cfg);
@@ -220,6 +238,82 @@ function exited = localCheckTargets(stored, ego, model, observations, elapsed)
     end
 end
 
+function [stored, check, calls, jointCheck] = localAdmitNewTargets(stored, model, observations, rootPlan)
+% Joint admission changes the information state, never the old obligations.
+% New target rows start at detection; old rows and the absolute deadline stay.
+    cfg = model.cfg;
+    prediction = stored.prediction;
+    remaining = [prediction.cells.stage] > stored.consumedSteps;
+    prediction.cells = prediction.cells(remaining);
+    elapsed = stored.consumedSteps*model.sampleTime;
+    for index = 1:numel(prediction.cells)
+        prediction.cells(index).start = prediction.cells(index).start-elapsed;
+        prediction.cells(index).time = prediction.cells(index).time-elapsed;
+    end
+    prediction.geometryAnchor = rootPlan(:);
+    prediction.geometryFrames = stored.qp.geometry.frames(remaining);
+    prediction.geometryNominal = cell(numel(prediction.cells), 1);
+    for index = 1:numel(prediction.cells)
+        tube = prediction.cells(index);
+        prediction.geometryNominal{index} = reshape(pagemtimes(tube.map, rootPlan(:)), 6, [])+tube.offset;
+    end
+    jointModel = stored.witnessModel;
+    jointModel.stateTime = stored.stateTime;
+    jointModel.anchorPlan = rootPlan(:);
+    jointModel.encounters = repmat(stored.encounters(1), numel(observations), 1);
+    for index = 1:numel(observations)
+        jointModel.encounters(index) = targetPrediction.admit(observations(index), ...
+            stored.stateTime, model.lane, cfg);
+    end
+    jointModel.exitSteps = repmat(stored.prediction.stageCount, numel(observations), 1);
+    geometry = avoidanceSafetyGeometry(jointModel, prediction);
+    collisionRows = startsWith(geometry.label, "collision:");
+    % Only completionRows uses stageCount here; input maps retain admission
+    % coordinates so the previously executed input prefix cannot change.
+    prediction.stageCount = stored.remainingSteps;
+    [exitMatrix, exitBound] = hardEncounterBarrier.completionRows(jointModel, prediction, geometry);
+    matrix = [geometry.matrix(collisionRows, :); exitMatrix];
+    bound = [geometry.physicalBound(collisionRows); exitBound];
+    initialReserve = [geometry.initialReserve(collisionRows); zeros(numel(exitBound), 1)];
+    reserve = 2*cfg.encounter.numericalMargin*double(any(matrix ~= 0, 2))+initialReserve;
+    qp = stored.qp;
+    oldCount = numel(qp.physicalBound);
+    qp.inequalityMatrix = [qp.inequalityMatrix; matrix, zeros(numel(bound), qp.layout.relaxationCount)];
+    qp.physicalBound = [qp.physicalBound; bound];
+    qp.safetyRows = [qp.safetyRows; true(numel(bound), 1)];
+    qp.barrier.baseBound = [qp.barrier.baseBound; bound-reserve];
+    qp.barrier.scale = [qp.barrier.scale; ones(numel(bound), 1)];
+    qp.barrier.completionRows = [qp.barrier.completionRows; ...
+        oldCount+nnz(collisionRows)+(1:numel(exitBound)).'];
+    qp.requiredMargin = 0;
+    qp.inequalityBound = qp.barrier.baseBound;
+    qp.certifiedInfeasible = any(qp.inequalityBound(~any(qp.inequalityMatrix, 2)) < 0);
+    qp.stageProgram = avoidanceStageQp(qp);
+    qp.stageProgram.fixedDecisionIndex = (1:2*stored.consumedSteps).';
+    qp.stageProgram.fixedDecisionValue = rootPlan(:, 1:stored.consumedSteps);
+    qp.stageProgram.fixedDecisionValue = qp.stageProgram.fixedDecisionValue(:);
+    incumbent = certifyAvoidancePlan(qp, stored.prediction, model, stored.decision);
+    jointCheck = struct("incumbentAccepted", incumbent.accepted, "usedIncumbent", false);
+    [result, candidate] = solveHardCbfClf(qp, cfg);
+    check = certifyAvoidancePlan(candidate, stored.prediction, model, result.decision);
+    if result.feasible && check.accepted
+        stored.qp = candidate;
+        stored.decision = result.decision;
+    elseif incumbent.accepted
+        % The old controls are admissible only after checking every new row.
+        stored.qp = qp;
+        check = incumbent;
+        jointCheck.usedIncumbent = true;
+    else
+        error("collisionAvoidanceController:jointAdmissionNotCertified", ...
+            "No joint witness was certified for all retained and new targets before the unchanged deadline.");
+    end
+    stored.encounters = [stored.encounters(:); jointModel.encounters(:)];
+    stored.targetAdmissionSteps = [stored.targetAdmissionSteps(:); ...
+        repmat(stored.consumedSteps, numel(observations), 1)];
+    calls = result.solverCalls;
+end
+
 function metadata = localMetadata(metadata, stored, source, calls, attempted)
     metadata.certificateSource = source;
     metadata.solverCallCount = calls;
@@ -237,9 +331,12 @@ function metadata = localMetadata(metadata, stored, source, calls, attempted)
     metadata.certifiedDuration = stored.certifiedDuration;
     metadata.lookaheadDuration = stored.certifiedDuration;
     metadata.recursiveFeasibilityClaimed = true;
-    metadata.recursiveFeasibilityScope = "conditionalOnDeclaredInclusionAndExecution";
+    metadata.recursiveFeasibilityScope = "conditionalOnDeclaredInclusionExecutionAndJointAdmission";
     metadata.exactPredictionAssumptionsHold = false;
     metadata.physicalVehicleGuaranteeEstablished = false;
+    metadata.newTargetAdmissionAssumption = "jointStateInCertifiableDomainAtFirstDetection";
+    metadata.jointAdmissionPerformed = false;
+    metadata.newlyAdmittedTargetKeys = strings(1, 0);
     metadata.planCertified = ~stored.encounterComplete;
     metadata.acceptance = stored.acceptance;
     metadata.hardRowViolation = stored.acceptance.hardRowViolation;
@@ -247,6 +344,7 @@ function metadata = localMetadata(metadata, stored, source, calls, attempted)
     metadata.jointObjectiveValue = 0.5*stored.decision.'*stored.qp.Hessian*stored.decision ...
         +stored.qp.linear.'*stored.decision+stored.qp.constant;
     metadata.commandActuationTime = stored.stateTime;
+    metadata.activeTargetKeys = string({stored.encounters.key});
     if stored.encounterComplete
         metadata.activeTargetKeys = strings(1, 0);
         metadata.dischargedTargetKeys = string({stored.encounters.key});

@@ -123,13 +123,128 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:inconsistentObservation');
         end
 
-        function newTargetsRequireJointAdmission(testCase)
+        function feasibleNewTargetsReceiveAJointCertificate(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            nextTarget = target;
+            nextTarget.trackId = 2;
+            nextTarget.targetPositionInertial(2) = 3;
+            [command, ~, next, updated] = collisionAvoidanceController(ego, [target; nextTarget], route, cfg, stored);
+            testCase.verifyNotEmpty(command);
+            testCase.verifyTrue(next.metadata.jointAdmissionPerformed);
+            testCase.verifyEqual(next.metadata.newlyAdmittedTargetKeys, "trackId:2");
+            testCase.verifyEqual(next.metadata.activeTargetKeys, ["trackId:1", "trackId:2"]);
+            testCase.verifyEqual(updated.deadline, stored.deadline, AbsTol=0);
+            testCase.verifyEqual(updated.decision(1:2), stored.appliedInput, AbsTol=0);
+            testCase.verifyGreaterThanOrEqual(updated.margin, 0);
+            testCase.verifyGreaterThan(updated.acceptance.exitMargin, 0);
+            testCase.verifyLessThanOrEqual(stored.qp.inequalityMatrix*updated.decision, stored.qp.physicalBound);
+        end
+
+        function anUncertifiedNewTargetCannotUseTheOldTargetOnlyPlan(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            nextTarget = target;
+            nextTarget.trackId = 2;
+            nextTarget.targetPositionInertial = ego.position;
+            testCase.verifyError(@() collisionAvoidanceController(ego, [target; nextTarget], route, cfg, stored), ...
+                'collisionAvoidanceController:jointAdmissionNotCertified');
+        end
+
+        function jointAdmissionCannotOmitARetainedInRangeTarget(testCase)
             [ego, target, route, cfg] = localFixture();
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             [ego, target] = localNext(stored, problem.model.lane, target);
             target.trackId = 2;
             testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, stored), ...
-                'collisionAvoidanceController:newTargetRequiresAdmission');
+                'collisionAvoidanceController:inconsistentPerception');
+        end
+
+        function solverFailureCanRetainAnIndependentlyCheckedJointWitness(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            nextTarget = target;
+            nextTarget.trackId = 2;
+            cfg.solver.jointFunction = @encounterTestFixture.fail;
+            [command, ~, next, updated] = collisionAvoidanceController(ego, [target; nextTarget], route, cfg, stored);
+            testCase.verifyEqual(command.actuatorInput, stored.plan(:, 2), AbsTol=0);
+            testCase.verifyTrue(next.metadata.jointAdmissionPerformed);
+            testCase.verifyTrue(updated.acceptance.accepted);
+            testCase.verifyEqual(numel(updated.encounters), 2);
+        end
+
+        function solverFailureCannotRetainAWitnessThatViolatesANewTarget(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            nextTarget = target;
+            nextTarget.trackId = 2;
+            nextTarget.targetPositionInertial = ego.position;
+            cfg.solver.jointFunction = @encounterTestFixture.fail;
+            testCase.verifyError(@() collisionAvoidanceController(ego, [target; nextTarget], route, cfg, stored), ...
+                'collisionAvoidanceController:jointAdmissionNotCertified');
+        end
+
+        function aNewTargetsForecastStartsAtItsDetectionTime(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            nextTarget = target;
+            nextTarget.trackId = 2;
+            [~, ~, next, updated] = collisionAvoidanceController(ego, [target; nextTarget], route, cfg, stored);
+            nextEgo = encounterTestFixture.nextEgo(updated, next.model.lane);
+            nextEgo.perception = struct('time', nextEgo.stateTime, 'range', 13.5, 'completeWithinRange', true);
+            oldFlow = targetPrediction.finiteFlow(updated.encounters(1), nextEgo.stateTime-updated.encounters(1).time);
+            newFlow = targetPrediction.finiteFlow(updated.encounters(2), nextEgo.stateTime-updated.encounters(2).time);
+            observations = [localTargetState(target, oldFlow); localTargetState(nextTarget, newFlow)];
+            [command, ~, continuation, continued] = collisionAvoidanceController(nextEgo, observations, route, cfg, updated);
+            testCase.verifyNotEmpty(command);
+            testCase.verifyFalse(continuation.metadata.jointAdmissionPerformed);
+            testCase.verifyGreaterThanOrEqual(continued.margin, updated.margin);
+            testCase.verifyEqual(continued.deadline, stored.deadline, AbsTol=0);
+        end
+
+        function aNewTargetCannotRenewTheDeadlineToHideAnUncertifiedExit(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            nextTarget = target;
+            nextTarget.trackId = 2;
+            nextTarget.targetPositionInertial = ego.position+[8; 0];
+            nextTarget.targetVelocityInertial = [8; 0];
+            nextTarget.targetHeadingInertial = 0;
+            testCase.verifyError(@() collisionAvoidanceController(ego, [target; nextTarget], route, cfg, stored), ...
+                'collisionAvoidanceController:jointAdmissionNotCertified');
+        end
+
+        function aNewTargetsUncertaintyIsIncludedInTheJointCertificate(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            target.targetPositionInertialErrorBound = [0.001; 0.001];
+            nextTarget = target;
+            nextTarget.trackId = 2;
+            nextTarget.predictionMotion.jerkBound = [0.1; 0.1];
+            [~, ~, next, updated] = collisionAvoidanceController(ego, [target; nextTarget], route, cfg, stored);
+            [~, radius] = targetPrediction.finiteFlow(updated.encounters(2), updated.certifiedDuration);
+            testCase.verifyTrue(next.metadata.jointAdmissionPerformed);
+            testCase.verifyGreaterThan(radius(1:2), [0.001; 0.001]);
+            testCase.verifyGreaterThan(updated.acceptance.exitMargin, 0);
+            testCase.verifyGreaterThanOrEqual(updated.margin, 0);
+        end
+
+        function repeatedJointAdmissionsCompleteAtTheOriginalDeadline(testCase)
+            [history, commands] = localRunJointEncounter();
+            testCase.verifyEqual([history.deadline], repmat(0.4, 1, 5), AbsTol=1e-12);
+            testCase.verifyEqual([history.remainingSteps], 4:-1:0);
+            testCase.verifyEqual(numel(history(end).encounters), 4);
+            testCase.verifyTrue(history(end).encounterComplete);
+            testCase.verifyEmpty(commands{end});
+            testCase.verifyGreaterThanOrEqual([history.margin], zeros(1, 5));
+            testCase.verifyGreaterThanOrEqual(history(end).margin, history(end-1).margin);
         end
 
         function changedSensorRangeCannotInheritTheTerminalCertificate(testCase)
@@ -289,6 +404,32 @@ function solve = localFailPerformance(~, program)
         solve = encounterTestFixture.fail([], []);
     else
         solve = program.defaultSolver();
+    end
+end
+
+function [history, commands] = localRunJointEncounter()
+    [ego, template, route, cfg] = localFixture();
+    [command, ~, problem, stored] = collisionAvoidanceController(ego, template, route, cfg, []);
+    history = repmat(stored, 1, 5);
+    commands = cell(1, 5);
+    commands{1} = command;
+    for step = 1:4
+        ego = encounterTestFixture.nextEgo(stored, problem.model.lane);
+        ego.perception = struct('time', ego.stateTime, 'range', 13.5, 'completeWithinRange', true);
+        targets = repmat(template, numel(stored.encounters)+double(step < 4), 1);
+        for index = 1:numel(stored.encounters)
+            encounter = stored.encounters(index);
+            targets(index) = localTargetState(template, ...
+                targetPrediction.finiteFlow(encounter, ego.stateTime-encounter.time));
+            targets(index).trackId = index;
+        end
+        if step < 4
+            targets(end) = targets(1);
+            targets(end).trackId = numel(targets);
+        end
+        [command, ~, problem, stored] = collisionAvoidanceController(ego, targets, route, cfg, stored);
+        history(step+1) = stored;
+        commands{step+1} = command;
     end
 end
 

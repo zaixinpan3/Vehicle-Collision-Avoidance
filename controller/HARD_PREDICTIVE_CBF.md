@@ -1,6 +1,7 @@
 # Hard predictive barrier with a retained encounter deadline
 
-Implemented September 8, 2026. This construction keeps collision, road,
+Retained-deadline construction implemented September 8, 2026; joint target
+admission added September 9, 2026. This construction keeps collision, road,
 actuator, slew, maneuver and model-domain constraints hard. The only relaxation
 variables are the existing CLF performance slacks. It establishes recursive
 feasibility and interval safety **conditional on the declared prediction
@@ -37,11 +38,13 @@ and the exactly executed `heldActuatorInput`. The road, route, configuration
 and sensor radius must remain unchanged during the witness. Missing target
 measurements do not renew the forecast or discharge the obligation. A missing
 target whose entire retained set is still in complete perception is rejected.
-New targets, contradictory measurements and changed execution contracts require
-separate joint admission; an error in those cases is not a protective action.
+New targets trigger the joint admission check described below. Contradictory
+measurements and changed execution contracts are rejected; an error in those
+cases is not a protective action.
 
-The default continuation uses the already certified plan and calls no numerical
-optimizer. Setting `reoptimizeContinuation = true` **before admission** enables
+With the target set unchanged, the default continuation uses the already
+certified plan and calls no numerical optimizer. A new target triggers the
+joint admission solve even when continuation reoptimization is disabled. Setting `reoptimizeContinuation = true` **before admission** enables
 LP/SOCP replacement inside the retained certificate. The incumbent is selected
 if the replacement fails independent verification. This synchronous optional
 solve still requires a completion-time assumption; no hard real-time or
@@ -54,7 +57,7 @@ and `problem.metadata.encounterComplete = true`. The calling system must handle
 that completion explicitly. No control is certified beyond that endpoint; a
 completed certificate must not be reused as a new encounter admission.
 
-Version-11 certificates retain `qp`, `prediction`, and `decision` in their
+Version-12 certificates retain `qp`, `prediction`, and `decision` in their
 **original admission coordinates**. `consumedSteps` locates the executable
 suffix, `plan` and `predictedState` expose that suffix, and `deadline` stays
 fixed. Likewise `problem.layout` describes the retained full decision while
@@ -169,16 +172,16 @@ The runtime retains the entire declared sampled affine inclusion from admission:
 \]
 
 All stages use `finitePredict` held-interval Taylor/Bernstein enclosures.
-There are no nominal-only future stages. The matrices, complete cell tubes,
-road charts, separating normals and maneuver rows stay fixed during an
-encounter. These rows conservatively imply the physical interval constraints
+There are no nominal-only future stages. Previously certified matrices, complete cell tubes, road charts, separating
+normals and maneuver rows stay fixed during an encounter. New target admission
+appends rows without replacing them. These rows conservatively imply the physical interval constraints
 provided their geometry and enclosure premises hold. A nonlinear vehicle
 falls under (6) only if its residual is uniformly bounded by the declared
 \(\bar w_i\) on every certified interval and domain. A measured residual or
 zero configuration value does not prove that condition.
 
 Target motion remains the original Cartesian jerk/yaw-acceleration inclusion,
-evaluated from the admission state at the appropriate absolute elapsed time.
+evaluated from each target's admission state at the appropriate elapsed time.
 New observations are checked against it without renewing it or replacing its
 nominal point. A curved exact target need not have zero jerk. For example,
 constant speed \(v\) and curvature \(\kappa\) yield Cartesian jerk magnitude
@@ -239,8 +242,8 @@ not the solver's raw \(\rho\), is stored.
 
 ## 4. Why the stored witness survives
 
-Let \(d_k\) be the checked full admission-coordinate decision after \(k\)
-executed intervals. The admissible successor family keeps the same matrices,
+With the target set unchanged, let \(d_k\) be the checked full
+admission-coordinate decision after \(k\) executed intervals. The admissible successor family keeps the same matrices,
 base bounds, target envelopes and deadline, and fixes one additional input
 pair to the input just issued. Therefore \(d_k\) itself remains a member of
 that family. Its remaining intervals still end at \(T\).
@@ -277,7 +280,8 @@ integrity remain premises, rather than being proved by a nonempty intersection.
 
 Safety is conditional on admission before the first issued held interval,
 execution of the certified inputs on schedule, valid full-horizon ego and
-target enclosures, and no unadmitted targets or changed hard constraints.
+target enclosures, and successful joint admission of newly detected targets before issuing the
+next input. Other changes to hard constraints remain unsupported.
 The acquisition/first-solve interval preceding that admission is not covered
 retroactively. Hardware execution, globally valid nonlinear residual bounds,
 and worst-case computation time are not validated by this implementation.
@@ -285,7 +289,60 @@ Metadata therefore reports the conditional recursive-feasibility scope and
 keeps `physicalVehicleGuaranteeEstablished = false` and
 `exactPredictionAssumptionsHold = false`.
 
-## 5. Alternative when finite exit cannot be certified
+## 5. Joint admission at first detection
+
+The September 9, 2026 research assumption is that, when a new target is first
+observed, the augmented joint state belongs to the controller's certifiable
+feasible domain for all retained and new targets. Cases outside that domain
+are outside the research guarantee. This is an explicit environmental/admission
+assumption, not a claim that every traffic encounter is avoidable, nor an
+assumption that every later optimization succeeds.
+
+For this implementation, the domain is defined by the retained affine
+inclusion, hard rows, executed input prefix, remaining intervals and original
+absolute exit deadline, together with the new targets' complete remaining
+collision and terminal-exit rows. It is a conservative inner domain, not the
+nonlinear vehicle's maximal viable set. The assumption does not authorize
+moving an old deadline, dropping a missing old target, changing old motion
+bounds, or classifying a solver failure as physical infeasibility.
+
+Let the old physical rows be `A_old d <= b_old`. At a detection event the
+accepted decision must satisfy both those rows and `A_new d <= b_new`, with
+all already executed inputs fixed exactly. The new rows enclose every remaining
+held interval from detection to the same terminal time. They impose no
+retroactive constraint before detection. No CLF slack appears in these safety
+rows. The safety-margin floor at this information change is zero; the previous
+positive margin need not survive the addition of a new obligation.
+
+`hardEncounterBarrier.advance` first verifies execution and the observations of
+known targets, then `localAdmitNewTargets` appends the new constraints. Old
+matrices, prediction tubes and geometry remain unchanged. The old input plan
+is also independently checked against the **joint** problem: it is an eligible
+witness only if every new row passes. If neither it nor a new LP/SOCP solution
+is verified, the controller raises `jointAdmissionNotCertified` and issues no
+control. This diagnostic alone does not establish that the mathematical joint
+problem is infeasible. In particular, the feasibility assumption is distinct
+from the practical premise that a checked witness is available before actuation.
+
+After a successful event, all joint rows are retained and the same fixed-prefix
+argument in Section 4 applies. Each target has its own integer detection-step
+origin in `targetAdmissionSteps`; later observations cannot renew that origin.
+The version-12 certificate rejects earlier stored-certificate formats.
+
+Thus induction covers any sequence of successful joint admissions **within the
+original complete encounter**. Between information changes, the verified margin
+is preserved or increased. At a new-target event, only nonnegativity is required;
+there is no claim of a common positive-margin monotonicity across different
+constraint sets. Metadata reports `jointAdmissionPerformed`,
+`newlyAdmittedTargetKeys`, and the explicit `newTargetAdmissionAssumption`.
+
+This premise does not establish terminal invariance, post-exit driving, a safe
+transition after an exhausted deadline, or protection before a target's first
+detection. The requested single-path continuing controller still needs the
+terminal construction specified in [the design requirements](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
+The default lookahead path has not been removed by this admission change.
+
+## 6. Terminal continuation required for a single controller
 
 A vehicle following another indefinitely may be safe without reaching (7).
 This mode rejects that admission. A fixed-horizon alternative needs a joint
@@ -303,7 +360,7 @@ Set invariance alone proves safety, not preservation of all positive margin
 levels. Ego rest alone is insufficient against moving targets; the retired
 terminal-set counterexamples in `TERMINAL_CBF_PROOF.md` still apply.
 
-## 6. Sources and validation
+## 7. Sources and validation
 
 Huang, Wang, Margellos and Goulart, *Predictive Control Barrier Functions:
 Bridging model predictive control and control barrier functions*, ECC 2025,
@@ -325,7 +382,7 @@ project derivation, not a theorem attributed to that paper.
 initial overlap, full deadline countdown, early completion, nondecreasing
 margins, finite slew, declared uncertainty, nonzero target jerk, solver-free
 continuation, failed/unsafe reoptimization and CLF-solve failure. It also
-rejects changed sensor ranges, input mismatches, new targets, inconsistent
+rejects changed sensor ranges, input mismatches, uncertified joint admissions, inconsistent
 observations, inflated stored margins, partial certification and unsupported
 delay. Dense exact affine-flow clearance checks use 41 times per held interval
 as a numerical audit; they do not replace the complete-interval certificate.
@@ -338,3 +395,19 @@ passed all 595 tests with no failures or incomplete tests. The targeted
 regression passed 124 tests; the final focused barrier suite passed 22 tests.
 Factory Code Analyzer checks reported zero findings in the seven changed
 MATLAB files. The core controller contains 20 source files, meeting its limit.
+
+September 9, 2026 joint-admission regression: the focused suite passes 30 tests,
+including positive joint admission, simultaneous retention of old targets,
+independent checking of the incumbent after a solver failure, rejection of an
+unsafe new target, distinct forecast origins, repeated admissions through the
+original endpoint, and rejection of deadline renewal. These are declared-model
+unit tests, not new vehicle trials or a proof of continuous driving.
+
+The focused controller/configuration, finite-sensing, target prediction and
+swept-flow regression batch passed 123/123 tests with no incomplete tests.
+After the final fixture preallocation edit, the hard encounter suite passed
+30/30 again. Factory Code Analyzer settings reported zero findings for
+`hardEncounterBarrier.m` and `hardEncounterBarrierTest.m`. The separate
+repository-wide `runtests('tests')` tool request timed out after 300 seconds;
+the task-owned MATLAB execution received an interrupt, and no complete-suite
+result is claimed.

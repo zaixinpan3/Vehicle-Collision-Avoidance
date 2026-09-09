@@ -1,6 +1,6 @@
 # Encounter-scoped predictive CBF, sampled-data CLF, and maneuver optimization
 
-For the implemented version-11 hard predictive barrier with a retained circular
+For the implemented version-12 hard predictive barrier with a retained circular
 perception-exit deadline, see [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md).
 That mode executes an admitted full witness and optionally reoptimizes inside
 its unchanged certificate. The strong nonreturn contracts and fresh-solve-only

@@ -1,6 +1,6 @@
 # Controller runtime and sparse QP implementation
 
-The optional version-11 retained-deadline mode is documented in
+The optional version-12 retained-deadline mode is documented in
 [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). Existing runtime measurements
 below do not qualify its full-horizon certificate or optional reoptimization.
 
