@@ -1,5 +1,10 @@
 # Closing the NRMM estimator and collision-avoidance control loop
 
+Status update (September 8, 2026): the retired rest-terminal implementations
+have been removed. The terminal proof and its nonlinear counterexample are
+consolidated in [TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md). Dated design
+proposals below are not claims about the current online solver.
+
 Current requirement update (September 7, 2026):
 [ENCOUNTER_SCOPED_CBF_CLF.md](ENCOUNTER_SCOPED_CBF_CLF.md) supersedes this
 investigation's universal invariant-terminal requirement. Preserve certified
@@ -21,12 +26,10 @@ integration obligations; it is not the active controller's terminal rule.
 Research date: 2026-09-05. Status: proposed architecture and proof obligations,
 with reproducible diagnostics; not an implemented robust vehicle controller.
 
-Implementation update (2026-09-07):
-[DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md)
-extends the earlier stationary-pose implementation to uncertain terminal
-velocities using passive dissipation in the declared affine model. The finite runtime retains open-loop witnesses and set-membership intersections.
-The broader physical-model, curved-chart, target-motion and low-speed observer
-obligations below remain open; the proposals are not completed components.
+Terminal research update (2026-09-08):
+[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md) consolidates the affine
+invariance derivation and proves why the retired set cannot certify the current
+nonlinear vehicle. Its former utility and rest-tail implementations are removed.
 
 The earlier recommended implementation was a scheduled output-feedback tube
 around the existing sparse SOCP, with a verified braking-to-hold backup and a
@@ -107,9 +110,9 @@ the implementation below.
    validity and realized defects. Substituting the continuous ISS decay rate
    for a digital future transition would leave a proof gap.
 5. **Several dormant uncertainty paths need stronger mathematics.**
-   `ltvBicycleModel.predict` currently maps position radii to Frenet coordinates
-   with sums and leaves the yaw radius unchanged. On a curved road the
-   tangent also changes. Its `Ts*w` disturbance update requires an endpoint
+   The retired implementation examined on September 5 mapped position radii
+   with sums and left the yaw radius unchanged. On a curved road the
+   tangent also changes. Its former `Ts*w` disturbance update required an endpoint
    enclosure interpretation; continuous derivative-error bounds generally
    need transition-weighted integration.
 6. **Environment and timing are part of the certificate.** Domain-only

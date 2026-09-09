@@ -8,6 +8,37 @@ classdef finiteSensingControllerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function liveVelocityBoundsCanBeAdmittedWithoutAnInputTarget(testCase)
+            [ego, cfg, lane] = localUncertainInputs();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyFalse(isfield(stored, "terminalUncertainty"));
+            testCase.verifyGreaterThan(stored.stateErrorBound(4, end), 0);
+            testCase.verifyGreaterThanOrEqual(stored.predictedState(4, end), stored.stateErrorBound(4, end));
+        end
+
+        function finiteAdmissionDoesNotAppendADissipativeTerminalConstraint(testCase)
+            [ego, cfg, lane] = localUncertainInputs();
+            [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
+            testCase.verifyEqual(problem.layout.tailSteps, 0);
+            testCase.verifyEqual(problem.prediction.nodeCount, cfg.controller.horizonSteps+1);
+            testCase.verifyEmpty(problem.qp.equalityBound);
+        end
+
+        function straightPolylineVerticesDoNotInvalidateAnInteriorChart(testCase)
+            [ego, cfg] = localUncertainInputs();
+            lane = [(0:.1:150).', zeros(1501, 1)];
+            [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
+            testCase.verifyTrue(problem.metadata.planCertified);
+        end
+
+        function persistentForcingCanBeEnclosedOverAFiniteCertificate(testCase)
+            [ego, cfg, lane] = localUncertainInputs();
+            cfg.model.plantModelResidualRateBound(4) = .001;
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyGreaterThan(stored.stateErrorBound(4, end), 0);
+        end
         function exactConstantVelocityUpdatesSurviveArithmeticRoundoff(testCase)
             [ego,target,route,cfg] = localFixture();
             target.predictionMotion.jerkBound = [0;0];
@@ -129,4 +160,12 @@ function [ego,target,route,cfg] = localFixture()
     target = rmfield(target,"encounterContract");
     target.predictionMotion = struct("kind","finite-sensing-motion-v1", ...
         "jerkBound",[2;2],"yawAccelerationBound",1);
+end
+
+function [ego, cfg, lane] = localUncertainInputs()
+    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
+    lane = [0, 0; 1000, 0];
+    ego = struct("position", [10; 0], "yawAngle", 0, ...
+        "longitudinalVelocity", 10, "lateralVelocity", 0, "yawRate", 0, ...
+        "stateTime", 0, "controllerStateErrorBound", [.04; .04; .014; .388; .388; .0015]);
 end

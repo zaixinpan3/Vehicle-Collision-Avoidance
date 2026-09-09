@@ -52,9 +52,9 @@ derivatives. Maneuver, control, input smoothness, and switching choices enter
 the optimization. Neither a tracking cost nor a selected separating normal
 replaces these CLF and maneuver requirements.
 
-## Optional rest construction and its limits
+## Examined rest construction and its limits
 
-The optional rest utility uses the same scheduled six-state bicycle,
+The removed rest utility used the same scheduled six-state bicycle,
 held-input affine integration, signed braking-ratio/Fiala force scale, and
 physical input/slip domains. Exact affine flow remains an approximation of
 the physical plant unless a valid residual enclosure is supplied. The current
@@ -64,8 +64,8 @@ runtime and its finite guard are described in
 At zero scheduled speed, arbitrary admitted station, lateral offset, and
 heading with zero velocities are an equilibrium under
 `[0; -bias/brakingRatioAccelerationGain]`. Exact-rest terminal equalities
-or the [dissipative extension](DISSIPATIVE_TERMINAL_CERTIFICATE.md) can certify
-ego behavior under their specific model premises. The braking schedule is an
+or the [dissipative extension](TERMINAL_CBF_PROOF.md) can certify
+ego behavior under their specific model premises. Its former braking schedule was an
 initial optimization template, not a safety proof.
 
 A target row at the final forecast pose alone cannot certify encounter
@@ -73,8 +73,9 @@ discharge. Ego rest or an ego dissipative funnel does not resolve that missing
 obligation. Version 9 instead certifies swept intervals, retains targets after
 publication loss, and requires an explicit nonreturning-halfspace exit.
 
-Rest/dissipation remains an optional construction for a separately certified
-holding regime. Its rejection of persistent forcing is not a universal rule
+Rest/dissipation is a mathematical construction examined in the
+[terminal proof audit](TERMINAL_CBF_PROOF.md); its retired executable paths
+have been removed. Its exclusion of persistent forcing is not a universal rule
 for finite encounter certificates. Bounded nonzero residuals can be admitted
 when a sound finite tube and its discharge/transfer guard pass verification.
 No uncertainty may be zeroed merely to make that verification succeed.

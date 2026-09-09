@@ -108,10 +108,6 @@ function cfg = localDefaults()
         "ltvModelErrorRateBound", zeros(6, 1), ...
         "plantModelResidualRateBound", zeros(6, 1));
 
-    % Parameter of the separate optional rest-schedule utility. Finite
-    % encounter admission neither appends this schedule nor requires rest.
-    cfg.terminal = struct("backupDeceleration", 5.0);
-
     % Road-geometry implementation allowances.
     cfg.road = struct( ...
         "orthonormalTolerance", 1.0e-9, ...
@@ -348,7 +344,7 @@ function localValidate(cfg)
         error("collisionAvoidanceController:invalidConfiguration", ...
             "solver.maxIterations must be a positive integer.");
     end
-    localValidateTerminal(cfg);
+    localValidateVehicleAndTire(cfg);
 end
 
 function localValidateNonnegativeScalar(value, name)
@@ -359,9 +355,7 @@ function localValidateNonnegativeScalar(value, name)
     end
 end
 
-function localValidateTerminal(cfg)
-    localValidateNonnegativeScalar(cfg.terminal.backupDeceleration, ...
-        "terminal.backupDeceleration");
+function localValidateVehicleAndTire(cfg)
     friction = cfg.tire.frictionCoefficient;
     if ~isnumeric(friction) || ~isreal(friction) || ~isvector(friction) ...
             || ~ismember(numel(friction), [1, 2]) ...
@@ -375,9 +369,5 @@ function localValidateTerminal(cfg)
             error("collisionAvoidanceController:invalidConfiguration", ...
                 "vehicle.%s must be positive.", name);
         end
-    end
-    if cfg.terminal.backupDeceleration <= 0.0
-        error("collisionAvoidanceController:invalidConfiguration", ...
-            "The optional rest-schedule backupDeceleration must be positive.");
     end
 end

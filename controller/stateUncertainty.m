@@ -291,24 +291,6 @@ classdef stateUncertainty
             end
         end
 
-        function certificate = terminalRest(prediction)
-        %stateUncertainty.terminalRest Verify a box of stationary poses.
-        % The nominal endpoint has exact zero velocities. Under the unchanged rest
-        % policy, a box with zero velocity radii is invariant if its propagated box
-        % is contained in itself. No tolerance turns a nonzero velocity into rest.
-
-            radius = prediction.egoStateErrorBound(:, end);
-            nextRadius = abs(prediction.stageMatrixA(:, :, end))*radius ...
-                + prediction.stageDisturbanceErrorBound(:, end);
-            certificate = struct("kind", "stationary-pose-box-v1", ...
-                "radius", radius, "nextRadius", nextRadius, ...
-                "stationaryVelocities", all(radius(4:6) == 0), ...
-                "disturbanceFree", all(prediction.stageDisturbanceErrorBound(:, end) == 0), ...
-                "invariant", all(nextRadius <= radius), ...
-                "zeroSpeedSchedule", prediction.scheduleSpeedProfile(end-1) == 0);
-            certificate.accepted = certificate.stationaryVelocities ...
-                && certificate.disturbanceFree && certificate.invariant && certificate.zeroSpeedSchedule;
-        end
     end
 end
 

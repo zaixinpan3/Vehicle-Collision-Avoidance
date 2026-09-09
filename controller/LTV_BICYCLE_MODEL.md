@@ -149,11 +149,6 @@ the stored initial set without silently changing the model. A scheduled speed
 is a linearization parameter, not an assertion that the physical vehicle
 follows that speed exactly.
 
-The separately retained `ltvBicycleModel.predict` and `brakingSchedule`
-utilities support the optional rest/dissipation analysis. They are not called
-by the encounter controller. Their rest endpoint and braking-authority checks
-are specific to that construction.
-
 ## Constraints and uncertainty
 
 Steering, signed braking ratio, slip-angle domains, longitudinal speed,
@@ -172,8 +167,8 @@ spanning a noncollinear polyline reference jump needs a separate jump/reset
 certificate and is currently rejected.
 
 Bounded nonzero forcing and velocity uncertainty can grow over a finite
-certificate. They need not satisfy the optional perpetual-rest restrictions
-in [DISSIPATIVE_TERMINAL_CERTIFICATE.md](DISSIPATIVE_TERMINAL_CERTIFICATE.md).
+certificate. The terminal invariance limitations are derived in
+[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md).
 The physical plant must remain inside the declared affine inclusion over its
 whole tube. Exact affine integration alone does not establish that premise,
 nonlinear stability, or low-speed tire accuracy.
@@ -188,7 +183,7 @@ admitted footprint range. Target constraints remain active through certified
 exit, regardless of current publication.
 
 [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) states the finite-witness
-acceptance and fallback protocol. The certificate covers held intervals of
+acceptance and fail-stop protocol. The certificate covers held intervals of
 the declared inclusion until its guarded exit; physical residual validity,
 route contracts and execution timing remain assumptions.
 
@@ -200,8 +195,6 @@ route contracts and execution timing remain assumptions.
 `clf.brakingRatioWeight` weights the normalized dimensionless input.
 The old acceleration bounds, acceleration weight, longitudinal gain and
 braking force distribution are rejected as unknown configuration fields.
-`terminal.backupDeceleration` is an optional rest-schedule parameter in m/s^2.
-Its braking-authority check runs only when that separate utility is invoked.
 
 `command.longitudinalAcceleration` is a derived gross acceleration
 `gBeta*beta`, not the second control input or net body derivative. Passive

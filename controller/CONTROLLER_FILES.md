@@ -2,8 +2,8 @@
 
 The core control algorithm has an upper limit of **20 source files**. Keep
 related operations together; fewer files are welcome when their responsibilities
-remain clear. The current implementation contains **20 source files**:
-16 MATLAB modules, three native C++ bridges, and one controller configuration.
+remain clear. The current implementation contains **19 source files**:
+15 MATLAB modules, three native C++ bridges, and one controller configuration.
 
 The count includes every source file under `controller/`, including any future
 subdirectories, plus `config/collisionAvoidanceControllerConfig.m`. Tests,
@@ -21,13 +21,12 @@ Do not move controller helpers into those directories to evade the limit.
 | `certifyAvoidancePlan.m` | Independent geometric verification of a plan |
 | `avoidanceSafetyGeometry.m` | Swept geometry, complete row projection and shared nonlinear nominal checks |
 | `rectangleConfigurationDistance.m` | Oriented rectangle configuration distance |
-| `terminalDissipation.m` | Separately validated optional rest-funnel construction |
 | `laneGeometry.m` | Polyline and analytic-arc projection, Frenet poses and chart bounds |
-| `ltvBicycleModel.m` | Held-input stage matrices, full prediction, shared native kernels and initial braking schedule |
+| `ltvBicycleModel.m` | Held-input stage matrices, finite prediction and shared native kernels |
 | `longitudinalRoadLoad.m` | Signed aerodynamic and equivalent rolling forces with their speed derivative |
 | `modifiedFialaTire.m` | Modified Fiala forces, local tire tangents and nominal combined-force rows |
 | `tireSlipRows.m` | Robust slip-angle model-domain rows |
-| `stateUncertainty.m` | Estimator certificates, Frenet boxes, shared held-interval enclosures, intersection and terminal rest |
+| `stateUncertainty.m` | Estimator certificates, Frenet boxes, shared held-interval enclosures, and intersection |
 | `targetPrediction.m` | Finite target inclusion, nominal motion, footprint support and encounter lifecycle |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |

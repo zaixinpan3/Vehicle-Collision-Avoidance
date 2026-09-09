@@ -1,5 +1,10 @@
 # Finite-sensing predictive CBF–CLF controller
 
+The terminal-invariance proof audit, conditional Huang-style value-function
+theorem, and nonlinear counterexample are documented in
+[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md). The retired rest-terminal
+code has been removed; it does not certify this online implementation.
+
 Version 10 implements the policy in [FINITE_SENSING_CONTROLLER.md](FINITE_SENSING_CONTROLLER.md).
 The default certifies the next executed interval and uses a nominal finite
 lookahead for anticipation. This is a conditional sampled execution certificate,

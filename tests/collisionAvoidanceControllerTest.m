@@ -290,15 +290,13 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:noCertifiedContinuation");
         end
 
-        function finiteExitDoesNotRequireTheOptionalRestSchedule(testCase)
+        function finiteExitAllowsPositiveMinimumSpeedAndLimitedBraking(testCase)
             [ego, target, route, cfg] = encounterTestFixture.crossing();
             cfg.actuation.brakingRatioMinimum = -0.05;
             cfg.model.speedMinimum = 1;
             [~, plan, problem] = collisionAvoidanceController(ego, target, route, cfg, []);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyGreaterThanOrEqual(plan(2,:), -0.05);
-            testCase.verifyError(@() ltvBicycleModel.brakingSchedule("steps", cfg), ...
-                "collisionAvoidanceController:invalidRestSchedule");
         end
     end
 end

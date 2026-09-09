@@ -103,7 +103,7 @@ simulation or a convergence proof.
 
 The uncertain-velocity admission gap is now implemented under the declared
 scheduled affine model. See
-[the terminal derivation](../controller/DISSIPATIVE_TERMINAL_CERTIFICATE.md).
+[the terminal derivation](../controller/TERMINAL_CBF_PROOF.md).
 The complete physical NRMM/controller experiment remains **incomplete**.
 The user requires eventual nominal constant-speed cruise; no 9-10 s recovery
 deadline is introduced by this work.
