@@ -30,7 +30,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
     model.perceptionRange = ego.perceptionRange;
     if ~isempty(controllerState)
         [command, predictedInput, planningProblem, certificate] = ...
-            hardEncounterBarrier.advance(controllerState, ego, model, observations, identity, @localCommand);
+            hardEncounterBarrier.advance(controllerState, ego, model, observations, identity, @localCommand, ...
+                @() collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,[]));
         if ~explicitState, previousCertificate = certificate; end
         return;
     end
@@ -42,34 +43,12 @@ function [command, predictedInput, planningProblem, certificate] = ...
     end
     model.encounters = encounters;
     active = ~isempty(encounters);
-    [model.exitSteps, model.exitMargin] = localExitSchedule(model);
     preparationSeconds = toc(timer);
-    prediction = ltvBicycleModel.finitePredict(model, []);
-    predictionSeconds = toc(timer)-preparationSeconds;
-    anchor = localRateLimitedAnchor(reshape(prediction.referencePlan,2,[]),model);
-    phase = tic;
-    try
-        [model,prediction,anchor] = localPlanningWindow(model,prediction,anchor);
-        qp = formulateAvoidanceProblem(model,prediction,anchor);
-    catch exception
-        if any(string(exception.identifier)==["collisionAvoidanceController:roadBoundaryCoverageGap", ...
-                "collisionAvoidanceController:unsupportedReferenceJump"])
-            error("collisionAvoidanceController:noCertifiedContinuation","%s",exception.message);
-        end
-        rethrow(exception);
-    end
-    formulationSeconds = toc(phase);
-    phase = tic;
-    [result,qp] = solveHardCbfClf(qp,cfg);
-    solveSeconds = toc(phase);
-    phase = tic;
-    check = certifyAvoidancePlan(qp,prediction,model,result.decision);
-    verificationSeconds = toc(phase);
-    if ~result.feasible || ~check.accepted
-        error("collisionAvoidanceController:noCertifiedContinuation", ...
-            "The joint hard program supplied no checked witness: %s; %s.", ...
-            result.message,strjoin(check.failedConditions,","));
-    end
+    [model,prediction,qp,result,check,planningTiming] = planCompleteEncounter(model);
+    predictionSeconds = planningTiming.predictionSeconds;
+    formulationSeconds = planningTiming.formulationSeconds;
+    solveSeconds = planningTiming.solveSeconds;
+    verificationSeconds = planningTiming.verificationSeconds;
     phase = tic;
     decision = result.decision;
     source = "checkedOptimization";
@@ -80,7 +59,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     command.actuationTime = model.stateTime;
     command.holdSeconds = model.sampleTime;
     predictedState = reshape(pagemtimes(prediction.egoStateMatrix, predictedInput(:)), 6, [])+prediction.egoStateOffset;
-    certificate = struct("version", 14, "identity", identity, "stateTime", model.stateTime, ...
+    certificate = struct("version", 15, "identity", identity, "stateTime", model.stateTime, ...
         "deadline", model.stateTime+prediction.stageCount*model.sampleTime, ...
         "remainingSteps", prediction.stageCount, "margin", margin, ...
         "plan", predictedInput, "decision", decision, "qp", qp, "prediction", prediction, ...
@@ -102,6 +81,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "predictionSeconds", predictionSeconds, "formulationAndWitnessSeconds", formulationSeconds, ...
         "solveSeconds", solveSeconds, "acceptanceAndCommitSeconds", verificationSeconds+toc(phase), ...
         "diagnosticsSeconds", 0);
+    metadata.planningWindowSteps = cfg.controller.horizonSteps;
+    metadata.certificateSearchAttempts = planningTiming.attempts;
     metadata.solverAlgorithm = "Clarabel predictive CBF-CLF SOCP";
     metadata.setMembershipUpdate = false;
     metadata.certificateCompatible = false;
@@ -113,7 +94,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.commandActuationTime = command.actuationTime;
     metadata.recursiveFeasibilityClaimed = true;
     metadata.exactPredictionAssumptionsHold = false;
-    metadata.tireForceConstraintScope = "nominalScheduledForceWithSeparatePlantResidual";
+    metadata.tireForceConstraintScope = "intrinsicNonlinearFialaSaturationWithSeparatePlantResidual";
     metadata.executedContinuousGenerator = [prediction.continuousA(:,:,1), ...
         prediction.continuousB(:,:,1),prediction.continuousC(:,1)];
     metadata.executedResidualRateBound = prediction.modelErrorRateBound(:,1);
@@ -152,33 +133,6 @@ function model = localFiniteModel(ego, lane, road, cfg)
         "initialFrenetErrorBound", radius, "longitudinalAccelerationBias", ego.longitudinalAccelerationBias, ...
         "previousInput", previousInput, ...
         "requiredMargin", 0);
-end
-
-function [steps, margin] = localExitSchedule(model)
-    steps = repmat(model.horizonSteps, numel(model.encounters), 1);
-    margin = inf;
-    for encounter = model.encounters(:).'
-        if model.stateTime+model.horizonSteps*model.sampleTime > ...
-                encounter.contract.validUntil+128*eps(max(1, abs(encounter.contract.validUntil)))
-            error("collisionAvoidanceController:expiredEncounterContract", ...
-                "The complete encounter must fit within target motion validity.");
-        end
-    end
-end
-
-function anchor = localRateLimitedAnchor(inputs,model)
-% Seed the nonlinear prediction with controls inside the actuator envelope.
-% This initializes optimization only; it is never an executable fallback.
-    cfg = model.cfg;
-    lower = [-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
-    upper = [cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
-    change = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
-    prior = model.previousInput;
-    for stage = 1:size(inputs,2)
-        inputs(:,stage) = min(max(inputs(:,stage),max(lower,prior-change)),min(upper,prior+change));
-        prior = inputs(:,stage);
-    end
-    anchor = inputs(:);
 end
 
 function cfg = localControllerConfiguration(userCfg)
@@ -265,41 +219,4 @@ function command = localCommand(inputPlan, model, prediction,stage)
     command.axleNormalLoad = tire.staticNormalLoad;
     command.tireSideslipAngle = [frontSlipAngle; rearSlipAngle];
     command.frontWheelSteeringAngle = steeringAngle;
-end
-
-function [model, prediction, anchor] = localPlanningWindow(model, prediction, anchor)
-% Require road coverage of the entire retained certificate.
-    cfg = model.cfg;
-    if nargin<3,anchor = prediction.referencePlan;end
-    if isempty(model.road.boundaries),return;end
-    count = prediction.stageCount;
-    [frames,nominal] = laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
-    for index = 1:numel(prediction.cells)
-        tube = prediction.cells(index);
-        frame = frames(index);
-        covered = true;
-        for boundary = model.road.boundaries(:).'
-            direction = boundary.longitudinalDirection;
-            stations = direction.'*frame.tangent*[frame.stationLower,frame.stationUpper];
-            extent = abs(direction.'*frame.lateral)*cfg.model.lateralDomainRadius ...
-                +hypot(cfg.vehicle.length/2,cfg.vehicle.width/2) ...
-                +abs(direction).'*frame.positionErrorBound;
-            range = [min(stations)-extent,max(stations)+extent] ...
-                +direction.'*(frame.origin-boundary.origin);
-            covered = covered && range(1)>=boundary.parameterRange(1) ...
-                && range(2)<=boundary.parameterRange(2);
-        end
-        if ~covered
-            count = tube.stage-1;
-            break;
-        end
-    end
-    if count < prediction.stageCount
-        error("collisionAvoidanceController:roadBoundaryCoverageGap", ...
-            "The complete retained deadline must lie inside certified road coverage.");
-    else
-        prediction.geometryAnchor = anchor;
-        prediction.geometryFrames = frames;
-        prediction.geometryNominal = nominal;
-    end
 end

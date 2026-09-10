@@ -34,8 +34,8 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % Closed-loop period and prediction horizon. Every prediction
-    % stage is one sample, so the plan advances one node per sample.
+    % Closed-loop period and initial planning window. Admission may extend
+    % the complete witness beyond this window; it is not a target exit deadline.
     cfg.controller = struct( ...
         "sampleTime", 0.05, ...
         "horizonSteps", 48, ...
@@ -126,9 +126,12 @@ function cfg = localDefaults()
     % One hard-margin LP followed by a CLF SOCP. The hook receives (phase,
     % problem), with P/q/A/b/cones fields and a [plan; delta] decision.
     % problem.defaultSolver invokes the native sparse conic solver.
+    % certificateSearchTimeLimit limits wall-clock search work, not trajectory
+    % duration; reaching it reports an unresolved search, never infeasibility.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
+        "certificateSearchTimeLimit", 5.0, ...
         "constraintTolerance", 1.0e-7, ...
         "optimalityTolerance", 1.0e-7);
 
@@ -203,6 +206,7 @@ function localValidate(cfg)
     localValidateNonnegativeScalar(cfg.referenceSpeed, "referenceSpeed");
     localValidateNonnegativeScalar(cfg.controller.sampleTime, "controller.sampleTime");
     localValidateNonnegativeScalar(cfg.controller.horizonSteps, "controller.horizonSteps");
+    validateattributes(cfg.solver.certificateSearchTimeLimit,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.model.frontWheelSteeringRateMaximum,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.model.brakingRatioRateMaximum,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.encounter.minimumCells, {'double'}, ...

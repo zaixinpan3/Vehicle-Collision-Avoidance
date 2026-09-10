@@ -10,19 +10,24 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function targetFreeAdmissionUsesTheSameCountdownCertificate(testCase)
+        function targetFreeAdmissionRenewsWithoutClaimingEncounterCompletion(testCase)
             [ego,~,route,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,[]);
             deadline = stored.deadline;
-            for index = 1:cfg.controller.horizonSteps
+            for index = 1:cfg.controller.horizonSteps-1
                 ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
                 ego.perception.completeWithinRange = true;
-                [command,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,stored);
+                [~,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,stored);
                 testCase.verifyEqual(stored.deadline,deadline,AbsTol=0);
                 testCase.verifyEqual(stored.remainingSteps,cfg.controller.horizonSteps-index);
             end
-            testCase.verifyTrue(stored.encounterComplete);
-            testCase.verifyEmpty(command);
+            ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
+            ego.perception.completeWithinRange = true;
+            [command,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,stored);
+            testCase.verifyFalse(stored.encounterComplete);
+            testCase.verifyNotEmpty(command);
+            testCase.verifyGreaterThan(stored.deadline,deadline);
+            testCase.verifyFalse(problem.metadata.recursiveFeasibilityClaimed);
         end
 
         function firstDetectionCanAugmentATargetFreeCertificate(testCase)
@@ -34,7 +39,8 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             [command,~,next,updated] = collisionAvoidanceController(ego,target,route,cfg,stored);
             testCase.verifyNotEmpty(command);
             testCase.verifyTrue(next.metadata.jointAdmissionPerformed);
-            testCase.verifyEqual(updated.deadline,stored.deadline,AbsTol=0);
+            testCase.verifyEqual(updated.admissionTime,ego.stateTime,AbsTol=0);
+            testCase.verifyGreaterThan(updated.deadline,stored.deadline);
             testCase.verifyEqual(numel(updated.encounters),1);
         end
 
@@ -57,7 +63,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             [ego,target,route,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             [ego,target] = localNext(stored,problem.model.lane,target);
-            stored.version = 13;
+            stored.version = 14;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,stored), ...
                 "collisionAvoidanceController:invalidStoredCertificate");
         end
@@ -76,12 +82,13 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.barrierInterpretation, "storedWitnessLowerBound");
         end
 
-        function aSafeShortSegmentWithoutExitIsRejected(testCase)
+        function aSafePrefixIsNotExecutedWhenCompleteWitnessSearchIsUnresolved(testCase)
             [ego, target, route, cfg] = localFixture();
             target.targetVelocityInertial = [8; 0];
             target.targetHeadingInertial = 0;
+            cfg.solver.certificateSearchTimeLimit = 0.01;
             testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, []), ...
-                'collisionAvoidanceController:noCertifiedContinuation');
+                'collisionAvoidanceController:certificateSearchLimit');
         end
 
         function initialOverlapCannotBeRelaxed(testCase)

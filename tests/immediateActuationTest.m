@@ -27,15 +27,15 @@ classdef immediateActuationTest < matlab.unittest.TestCase
                 DeadlineSeconds=.1,EnforceRuntimeDeadline=true), ...
                 "runFiniteBicycleDiagnostic:deadlineExceedsPeriod");
         end
-        function aTargetFreeCertificateEndsWithoutApplyingAnEmptyCommand(testCase)
+        function targetFreeRenewalKeepsApplyingCertifiedImmediateCommands(testCase)
             cfg = collisionAvoidanceControllerConfig(struct("controller", ...
                 struct("horizonSteps",2,"sampleTime",0.1), ...
                 "model",struct("linearizationPolicy","cruise", ...
                     "plantModelResidualRateBound",1e-3*ones(6,1)),"referenceSpeed",10));
             result = runFiniteBicycleDiagnostic(cfg,.4,IncludeTarget=false,PrepareController=false);
             testCase.verifyFalse(result.failure.occurred);
-            testCase.verifyEqual(size(result.input,1),2);
-            testCase.verifyEqual(result.runtime.appliedSourceFrame,[1;2]);
+            testCase.verifyEqual(size(result.input,1),4);
+            testCase.verifyEqual(result.runtime.appliedSourceFrame,(1:4).');
         end
     end
 end

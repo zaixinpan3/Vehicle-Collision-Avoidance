@@ -1,6 +1,6 @@
 # Complete finite-sensing encounter controller
 
-As of September 10, 2026, the only controller is the version-14 hard predictive
+As of September 10, 2026, the only controller is the version-15 hard predictive
 certificate described in [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 All prediction intervals are certified. Cruise and avoidance share one
 continuous-input optimization, with no discrete maneuver or completion-policy
@@ -15,6 +15,12 @@ that construction. Completed encounters return no further command.
 The remaining model notes below describe geometry and physical modeling.
 Dated calibration or runtime measurements predate the single-path cleanup and
 do not validate its timing, full-horizon feasible domain or post-exit behavior.
+
+The configured planning window is not a target exit deadline. Version 15
+searches for a complete witness extending beyond that window where necessary.
+It never executes a terminal-free prefix as an encounter guarantee. Actual
+verified exit ends the encounter; target-free expiry renews the same controller.
+See [FREE_COMPLETION_TIME.md](FREE_COMPLETION_TIME.md).
 
 ## Geometry and vehicle model
 

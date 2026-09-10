@@ -47,7 +47,7 @@ classdef hardEncounterBarrier
         end
 
         function [stored, problem] = admit(stored, problem)
-            stored.version = 14;
+            stored.version = 15;
             stored.admissionTime = stored.stateTime;
             stored.consumedSteps = 0;
             stored.targetAdmissionSteps = zeros(numel(stored.encounters), 1);
@@ -60,7 +60,7 @@ classdef hardEncounterBarrier
             stored.metadata = problem.metadata;
         end
 
-        function [command, inputs, problem, stored] = advance(stored, ego, model, observations, identity, makeCommand)
+        function [command, inputs, problem, stored] = advance(stored, ego, model, observations, identity, makeCommand, readmit)
             timer = tic;
             localValidateStored(stored, identity);
             h = model.sampleTime;
@@ -94,7 +94,22 @@ classdef hardEncounterBarrier
             stored.consumedSteps = consumed;
             stored.stateTime = expectedTime;
             stored.remainingSteps = count-consumed;
-            stored.encounterComplete = exited || consumed == count;
+            stored.encounterComplete = exited;
+            if (isempty(stored.encounters) && (~isempty(newTargets) || consumed==count)) ...
+                    || (exited && ~isempty(newTargets))
+                validationSeconds=toc(timer);
+                [command,inputs,problem,stored]=readmit();
+                problem.metadata.runtime.priorCertificateValidationSeconds=validationSeconds;
+                problem.metadata.runtimeSeconds=toc(timer);
+                problem.metadata.jointAdmissionPerformed=~isempty(newTargets);
+                problem.metadata.newlyAdmittedTargetKeys=string({newTargets.key});
+                stored.metadata=problem.metadata;
+                return;
+            end
+            if consumed==count && ~exited
+                error("collisionAvoidanceController:unverifiedEncounterCompletion", ...
+                    "Exhausting a witness is not evidence that its targets left perception.");
+            end
             source = "retainedCertifiedWitness";
             calls = 0;
             attempted = false;
@@ -186,9 +201,9 @@ function localValidateStored(stored, identity)
     required = ["version", "admissionTime", "consumedSteps", "encounterComplete", ...
         "witnessModel", "qp", "decision", "prediction", "metadata", "identity", "targetAdmissionSteps"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored, required)) ...
-            || stored.version ~= 14 || stored.encounterComplete
+            || stored.version ~= 15 || stored.encounterComplete
         error("collisionAvoidanceController:invalidStoredCertificate", ...
-            "Continuation requires an active version-14 hard encounter certificate.");
+            "Continuation requires an active version-15 hard encounter certificate.");
     end
     if ~isequaln(identity, stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...
@@ -206,6 +221,8 @@ end
 function exited = localCheckTargets(stored, ego, model, observations, consumed)
 % The admission envelope is evaluated at absolute time; it is never renewed.
     exited = ~isempty(stored.encounters);
+    if ~exited,return;end
+    [egoLower,egoUpper]=localExecutedPositionIntersection(stored,ego,consumed);
     for index = 1:numel(stored.encounters)
         encounter = stored.encounters(index);
         targetElapsed = (consumed-stored.targetAdmissionSteps(index))*model.sampleTime;
@@ -232,7 +249,28 @@ function exited = localCheckTargets(stored, ego, model, observations, consumed)
             error("collisionAvoidanceController:inconsistentPerception", ...
                 "Complete perception omitted a target whose retained enclosure remains in range.");
         end
-        exited = exited && distance-positionRadius >= ego.perceptionRange+model.cfg.encounter.perceptionExitBuffer;
+        separation=norm(max([egoLower-center(1:2)-radius(1:2), ...
+            center(1:2)-radius(1:2)-egoUpper,zeros(2,1)],[],2));
+        exited = exited && separation >= ego.perceptionRange+model.cfg.encounter.perceptionExitBuffer;
+    end
+end
+
+function [lower,upper]=localExecutedPositionIntersection(stored,ego,consumed)
+% Both valid enclosures contain the actual executed state. Intersect them so
+% a coarse current measurement cannot erase the already proved terminal exit.
+    prediction=stored.prediction;
+    cellIndex=find([prediction.cells.stage]==consumed,1,'last');
+    frame=stored.qp.geometry.frames(cellIndex);
+    state=prediction.egoStateMatrix(:,:,consumed+1)*stored.decision(stored.qp.layout.planIndex) ...
+        +prediction.egoStateOffset(:,consumed+1);
+    positionMap=[frame.tangent,frame.lateral];
+    center=frame.origin+positionMap*state(1:2);
+    radius=abs(positionMap)*prediction.egoStateErrorBound(1:2,consumed+1)+frame.positionErrorBound;
+    lower=max(center-radius,ego.position-ego.stateErrorBound(1:2));
+    upper=min(center+radius,ego.position+ego.stateErrorBound(1:2));
+    if any(lower>upper)
+        error("collisionAvoidanceController:inconsistentObservation", ...
+            "The current position measurement contradicts the retained world-position enclosure.");
     end
 end
 
@@ -322,13 +360,15 @@ function metadata = localMetadata(metadata, stored, source, calls, attempted)
     metadata.barrierValue = -stored.margin;
     metadata.barrierInterpretation = "storedWitnessLowerBound";
     metadata.horizonSteps = stored.remainingSteps;
+    metadata.planningWindowSteps = stored.identity.configuration.controller.horizonSteps;
+    metadata.certificateExtensionSteps = max(0,stored.remainingSteps-metadata.planningWindowSteps);
     metadata.deadline = stored.deadline;
     metadata.consumedSteps = stored.consumedSteps;
     metadata.encounterComplete = stored.encounterComplete;
     metadata.safetyScope = stored.safetyScope;
     metadata.certifiedDuration = stored.certifiedDuration;
     metadata.lookaheadDuration = stored.certifiedDuration;
-    metadata.recursiveFeasibilityClaimed = true;
+    metadata.recursiveFeasibilityClaimed = ~isempty(stored.encounters);
     metadata.recursiveFeasibilityScope = "conditionalOnDeclaredInclusionExecutionAndJointAdmission";
     metadata.exactPredictionAssumptionsHold = false;
     metadata.physicalVehicleGuaranteeEstablished = false;

@@ -1,7 +1,8 @@
-# Hard predictive barrier with a retained encounter deadline
+# Hard predictive barrier with a selected complete encounter witness
 
 Retained-deadline construction implemented September 8, 2026; joint target
-admission added September 9, 2026. This construction keeps collision, road,
+admission added September 9, 2026; configured-window/exit-time coupling
+removed September 10, 2026 (version 15). This construction keeps collision, road,
 actuator, slew and model-domain constraints hard. The only relaxation
 variables are the existing CLF performance slacks. It establishes recursive
 feasibility and interval safety **conditional on the declared prediction
@@ -47,19 +48,37 @@ still requires a completion-time premise; no asynchronous watchdog is proved.
 There is no partial-horizon, delayed-input, nonreturn-contract, or discrete
 maneuver controller. The sole formulation applies to zero or more targets.
 
-At verified early exit, or at the certified terminal time after execution of
-all admitted intervals, the controller returns `command = []`, `inputs = []`,
+Only after verified target exit does the controller return `command = []`, `inputs = []`,
 and `problem.metadata.encounterComplete = true`. The calling system must handle
 that completion explicitly. No control is certified beyond that endpoint; a
 completed certificate must not be reused as a new encounter admission.
 
-Version-13 certificates retain `qp`, `prediction`, and `decision` in their
+Version-15 certificates retain `qp`, `prediction`, and `decision` in their
 **original admission coordinates**. `consumedSteps` locates the executable
-suffix, `plan` and `predictedState` expose that suffix, and `deadline` stays
-fixed. Likewise `problem.layout` describes the retained full decision while
+suffix, `plan` and `predictedState` expose that suffix, and the witness-selected `deadline` stays
+fixed while its target obligations are active. Likewise `problem.layout` describes the retained full decision while
 `problem.inputPlan` exposes the remaining controls. This representation avoids
 roundoff from repeatedly eliminating columns. It is not a shortened newly
 linearized QP.
+
+
+Version 15 separates three concepts: the configured initial window, the
+possibly longer complete certificate, and the actual observation of exit.
+`planCompleteEncounter` increases candidate length when a terminal-time
+candidate fails but its nonterminal prefix has a checked feasible solution.
+Only a complete solution with certified exit can authorize admission. It
+stops with an unresolved-search diagnostic if its wall-clock computation
+budget expires; this does not add a physical-time constraint or prove
+mathematical infeasibility. The search is a conservative numerical witness
+construction, not a complete free-final-time feasibility oracle.
+
+Before any target is admitted, expiration renews the same target-free
+formulation and first detection starts fresh encounter admission. Target-free
+renewal is outside the requested conditional encounter theorem and is not
+advertised as recursively guaranteed. Forecast descriptors specify bounds
+while the encounter is active; their validity is not fabricated from the
+configured window. Completion uses the minimum distance between the target
+and ego position boxes; exhaustion alone never marks an encounter complete.
 
 ## 2. Exact-model predictive CBF
 
@@ -91,7 +110,10 @@ road, model-domain, input and slew inequalities. Slew is evaluated between
 successive held inputs, with the previous input included in \(z\). Constraints
 that are independent of \(\tau\) enter (1) as constant interval margins.
 
-Choose once, at admission, \(T=t_0+N_0\Delta\). The terminal function includes
+Choose a **finite feasible witness length** \(N_0\) during admission and then
+retain \(T=t_0+N_0\Delta\). It is not fixed by
+`controller.horizonSteps`. That configuration value seeds the numerical
+search; it is neither an upper bound on \(N_0\) nor an exit requirement. The terminal function includes
 safe endpoint constraints and, for every admitted target \(j\),
 
 \[
@@ -323,7 +345,7 @@ from the practical premise that a checked witness is available before actuation.
 After a successful event, all joint rows are retained and the same fixed-prefix
 argument in Section 4 applies. Each target has its own integer detection-step
 origin in `targetAdmissionSteps`; later observations cannot renew that origin.
-The version-14 certificate rejects earlier stored-certificate formats.
+The version-15 certificate rejects earlier stored-certificate formats.
 Version 14 removes the additional axle-force polygon; the remaining hard
 rows and the successor-witness argument are unchanged. Nonlinear Fiala
 saturation is intrinsic to its exact force law, while the affine inclusion
@@ -336,16 +358,19 @@ there is no claim of a common positive-margin monotonicity across different
 constraint sets. Metadata reports `jointAdmissionPerformed`,
 `newlyAdmittedTargetKeys`, and the explicit `newTargetAdmissionAssumption`.
 
-This premise does not establish terminal invariance, post-exit driving, a safe
-transition after an exhausted deadline, or protection before a target's first
-detection. The requested single-path continuing controller still needs the
-terminal construction specified in [the design requirements](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
-The weaker lookahead path and its configuration selectors have been removed.
+The finite-encounter implication does not require post-exit terminal
+invariance. New targets while a previously admitted encounter remains active
+still need joint feasibility with its retained completion commitment. That
+commitment was selected from a feasible complete witness, not imposed by the
+configured window. Previously certified obligations are not silently postponed.
+If all old targets have exited, a newly detected target starts a fresh complete
+admission. See [the version-15 correction](FREE_COMPLETION_TIME.md).
 
-## 6. Terminal continuation required for a single controller
+## 6. Separate indefinite continuation question (outside this requirement)
 
-A vehicle following another indefinitely may be safe without reaching (7).
-This finite-encounter controller rejects that admission. A fixed-horizon alternative needs a joint
+A vehicle following another indefinitely may be safe without reaching (7),
+but does not meet the required eventual exit. A different formulation for
+indefinite post-exit operation would need a joint
 ego–target–actuator terminal set and controller satisfying
 
 \[

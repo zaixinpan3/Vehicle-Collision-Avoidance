@@ -9,7 +9,8 @@ the stated assumptions, continues without collision and with feasible control,
 and ends in finite target exit from perception. Post-exit indefinite driving
 is outside this requirement. Version 14 removes additional tire-force polygons;
 this does not by itself validate nonlinear model-error bounds or fix the
-scenario's road-update and pre-acquisition lifecycle issues.
+scenario's road-update issue. Version 15 separates the initial planning
+window from complete witness length and renews target-free certificates.
 
 The controller has one safety formulation and execution
 contract, without a selectable weaker lookahead policy. Recursive feasibility
@@ -31,14 +32,21 @@ case, and that failure response is not itself a safety guarantee.
 
 ## Implemented admission step
 
-The version-14 hard encounter certificate now appends a new target's swept
+Version 15 selects a complete finite witness, which may extend beyond
+`controller.horizonSteps`; no configured-window exit deadline is imposed.
+Expiry during target-free execution renews the same formulation. First target
+detection starts a fresh complete admission, preserving the measured state and
+previous applied input. Exhaustion alone cannot report target exit.
+
+The active version-15 hard encounter certificate appends a new target's swept
 collision constraints and endpoint exit constraint to the original hard
 program. The old constraints, absolute deadline and executed controls are
 preserved. Admission requires a checked joint decision. The incumbent can be
 reused only after passing all added constraints. Each target retains its own
 detection-step origin for every later prediction and observation check.
 
-The certifiable domain used here includes the remaining original deadline and
+For a new target entering an already active encounter, the joint certifiable
+domain includes the remaining witness-selected completion commitment and
 the stored geometry. It is deliberately narrower than the set of physical
 states admitting some nonlinear maneuver with some different horizon. A
 negative solver result is not proof that either mathematical set is empty.
@@ -78,7 +86,7 @@ unconditional solver completion. Those are different premises.
 
 ## Completion criteria and present status
 
-The old controller branches and selectors are removed. Version 14 uses one
+The old controller branches and selectors are removed. Version 15 uses one
 complete-horizon optimization for zero or more targets, with no discrete
 maneuver selection, delayed-input execution, nominal-only safety suffix or
 nonreturn-route contract. Continuation always attempts the same hard program

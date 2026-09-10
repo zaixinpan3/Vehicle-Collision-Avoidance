@@ -37,8 +37,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         function anUncertifiedTerminalExitCannotBeAccepted(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             target.targetVelocityInertial(:) = 0;
+            cfg.solver.certificateSearchTimeLimit = 0.01;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+                "collisionAvoidanceController:certificateSearchLimit");
         end
 
         function uncertaintyCannotBeRemovedToCertifyExit(testCase)
