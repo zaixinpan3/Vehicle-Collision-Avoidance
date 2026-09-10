@@ -1,5 +1,10 @@
 # Straight encounter validation, September 9, 2026
 
+September 10 follow-up: [the causal diagnosis](../controller/STRAIGHT_SCENE_FEASIBILITY_DIAGNOSIS.md)
+isolates contradictory tire-force rows, disturbance/polygon incompatibility,
+an independently impossible exit deadline, and scenario interface defects.
+The observations below remain the original September 9 results.
+
 The current straight oncoming PassVeh14DOF experiment does **not** run
 successfully. Both the original scene and a direct first-detection scene
 reject the first optimization, before any command reaches the plant.
