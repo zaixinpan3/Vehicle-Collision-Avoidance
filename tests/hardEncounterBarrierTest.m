@@ -47,11 +47,17 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             end
         end
 
+        function removedForcePolygonSettingCannotBeReenabled(testCase)
+            testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
+                struct("model",struct("frictionPolygonSides",12))), ...
+                "collisionAvoidanceController:invalidConfiguration");
+        end
+
         function earlierCertificateVersionsCannotResumeTheController(testCase)
             [ego,target,route,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             [ego,target] = localNext(stored,problem.model.lane,target);
-            stored.version = 12;
+            stored.version = 13;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,stored), ...
                 "collisionAvoidanceController:invalidStoredCertificate");
         end

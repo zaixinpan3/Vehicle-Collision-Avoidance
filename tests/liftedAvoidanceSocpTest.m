@@ -57,18 +57,15 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             oldDifference = localObjective(condensed,second)-localObjective(condensed,first);
             testCase.verifyEqual(newDifference,oldDifference,AbsTol=1e-7);
         end
-        function combinedForcePolygonDoesNotPermitFullBrakingAndCornering(testCase)
-            cfg = collisionAvoidanceControllerConfig();
-            rows = modifiedFialaTire.frictionCirclePolygonRows(0,10,0,cfg);
-            testCase.verifyGreaterThan(max(rows.input*[0.1;0.9]-rows.bound),0);
-            testCase.verifyLessThan(max(rows.input*[0;0.5]-rows.bound),0);
-            tire = modifiedFialaTire.parameters(cfg);
-            sides = cfg.model.frictionPolygonSides;
-            for angle = (0:sides-1)*2*pi/sides+pi/sides
-                input = [sin(angle)*tire.longitudinalForceScale(1)/tire.corneringStiffness(1);cos(angle)];
-                testCase.verifyLessThanOrEqual(max(rows.input(1:sides,:)*input-rows.bound(1:sides)),1e-12);
-            end
+        function completeProgramKeepsSlipAndGeometryWithoutForcePolygons(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            testCase.verifyFalse(any(problem.qp.geometry.label=="combinedTireForce"));
+            testCase.verifyTrue(any(problem.qp.geometry.label=="tireSlip"));
+            testCase.verifyTrue(any(startsWith(problem.qp.geometry.label,"collision:")));
+            testCase.verifyTrue(problem.metadata.planCertified);
         end
+
     end
 end
 

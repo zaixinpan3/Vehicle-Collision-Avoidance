@@ -1,5 +1,12 @@
 # Why the straight scene fails
 
+Historical version-13 diagnosis. On September 10, version 14 removed the
+additional force-polygon constraints. The original executable diagnostic is
+preserved in Git commit `278663c34a4250ad914f69c4d4ff71ba402c05b0` and archive
+evidence EV-0095; it must be run against that source revision. See
+[the removal experiment](../scripts/FORCE_CONSTRAINT_REMOVAL_RESULTS.md) for
+current behavior.
+
 ## Material Passport
 
 - Analysis date: September 10, 2026, America/Chicago.

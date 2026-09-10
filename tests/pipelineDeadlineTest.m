@@ -26,7 +26,7 @@ classdef pipelineDeadlineTest < matlab.unittest.TestCase
             testCase.verifyFalse(report.passed);
             testCase.verifyEmpty(report.joint);
             testCase.verifyEqual(report.controllerOnly.failure.identifier, ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+                "collisionAvoidanceController:runtimeDeadlineExceeded");
             testCase.verifyEqual(report.controllerOnly.controlTime,0);
             testCase.verifyEmpty(report.controllerOnly.command);
         end

@@ -214,7 +214,7 @@ nonnegativity has scale zero. The LP is
 0\le\rho\le\bar\rho,\quad d_{\rm executed}=d_{\rm actual}. \tag{8}
 \]
 
-This normalizes metres, radians, velocities, forces, and dimensionless input
+This normalizes metres, radians, velocities, and dimensionless input
 ratios by one in the corresponding row's units. Scaling changes the max–min
 allocation, never the hard zero-level limits. Collision rows have zero
 coefficients in all CLF-slack columns. Unbounded CLF slacks can be reconstructed
@@ -323,7 +323,11 @@ from the practical premise that a checked witness is available before actuation.
 After a successful event, all joint rows are retained and the same fixed-prefix
 argument in Section 4 applies. Each target has its own integer detection-step
 origin in `targetAdmissionSteps`; later observations cannot renew that origin.
-The version-13 certificate rejects earlier stored-certificate formats.
+The version-14 certificate rejects earlier stored-certificate formats.
+Version 14 removes the additional axle-force polygon; the remaining hard
+rows and the successor-witness argument are unchanged. Nonlinear Fiala
+saturation is intrinsic to its exact force law, while the affine inclusion
+still requires valid residual bounds.
 
 Thus induction covers any sequence of successful joint admissions **within the
 original complete encounter**. Between information changes, the verified margin

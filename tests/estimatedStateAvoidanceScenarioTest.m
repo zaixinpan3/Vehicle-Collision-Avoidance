@@ -227,7 +227,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             localVerifyUncertifiedFullHorizon(testCase,result);
         end
 
-        function straightFullHorizonAdmissionFailureRetainsSensorEvidence( ...
+        function straightAdmissionSucceedsBeforeChangedRoadStopsExecution( ...
                 testCase)
             cfg = localConfiguration(20260728);
             cfg.initialization.targetSpeedPrior = 10.0;
@@ -245,7 +245,13 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
                 ControllerConfiguration=finiteSensingValidationConfig(), ...
                 Plot=false, Report=false);
 
-            localVerifyUncertifiedFullHorizon(testCase,result);
+            testCase.verifyTrue(result.failure.occurred);
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:changedExecutionContract");
+            testCase.verifyEqual(result.metrics.completedControlSteps,1);
+            testCase.verifyEqual(result.failure.time,result.scenario.sampleTime,AbsTol=1e-12);
+            testCase.verifyTrue(result.attempts.metadata{1}.planCertified);
+            testCase.verifyEmpty(result.attempts.targetEstimate{1});
+            testCase.verifyNotEmpty(result.command);
         end
 
         function unseenTargetsDoNotHideAnUncertifiedEgoHorizon(testCase)

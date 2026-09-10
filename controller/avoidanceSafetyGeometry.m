@@ -109,13 +109,6 @@ function geometry = avoidanceSafetyGeometry(model, prediction)
     for cellIndex = 1:numel(groups)
         tube = prediction.cells(cellIndex);
         stateRadius = tube.radius;
-        frictionArguments = {};
-        if isfield(prediction,"tireModels") && ~isempty(prediction.tireModels{tube.stage})
-            frictionArguments = prediction.tireModels(tube.stage);
-        end
-        force = modifiedFialaTire.frictionCirclePolygonRows(prediction.scheduleCurvature(tube.stage), ...
-            prediction.scheduleSpeedProfile(tube.stage),prediction.scheduleBrakingRatio(tube.stage),cfg,frictionArguments{:});
-        friction = struct("state",force.state,"input",force.input,"bound",force.bound);
         frame = frames{cellIndex};
         numericTube = struct("stage",tube.stage,"map",tube.map,"offset",tube.offset, ...
             "localStateMap",tube.localStateMap,"localInputMap",tube.localInputMap, ...
@@ -123,7 +116,6 @@ function geometry = avoidanceSafetyGeometry(model, prediction)
         projectionData{cellIndex} = struct("cfg",numericCfg,"tube",numericTube, ...
             "nominal",nominalCells{cellIndex},"stationRange",[frame.stationLower;frame.stationUpper], ...
             "stateRadius",stateRadius,"scheduleSpeed",prediction.scheduleSpeedProfile(tube.stage), ...
-            "friction",friction, ...
             "geometricRows",allGeometricRows(cellIndex),"planCount",prediction.planCount);
         normals = zeros(2,numel(model.encounters));
         normals(:,activeTargets{cellIndex}) = allGeometricRows(cellIndex).normals;
@@ -136,7 +128,7 @@ function geometry = avoidanceSafetyGeometry(model, prediction)
         projected = avoidanceSafetyGeometry('projectRows',data);
     end
     for cellIndex = 1:numel(groups)
-        names = ["modelDomain";"tireSlip";"combinedTireForce";sourceLabels{cellIndex}];
+        names = ["modelDomain";"tireSlip";sourceLabels{cellIndex}];
         group = projected(cellIndex);
         local = group.local;
         local.nodeLabels = names(local.nodeLabels);
@@ -247,21 +239,13 @@ function result = localProjectedRows(data)
     limits = [limits; repmat([slipLimit; slipLimit], 1, pointCount)];
     safety = [safety; false(4, 1)];
     labels = [labels; 2*ones(4,1)];
-    if ~isempty(data.friction.bound)
-        friction = data.friction;
-        stateRows = [stateRows;friction.state];
-        inputRows = [inputRows;friction.input];
-        limits = [limits;repmat(friction.bound,1,pointCount)];
-        safety = [safety;false(numel(friction.bound),1)];
-        labels = [labels;3*ones(numel(friction.bound),1)];
-    end
     geometricRows = data.geometricRows;
     rowCount = size(geometricRows.state,1);
     stateRows = [stateRows;geometricRows.state];
     inputRows = [inputRows;zeros(rowCount,2)];
     limits = [limits;geometricRows.bound];
     safety = [safety;true(rowCount,1)];
-    labels = [labels;3+geometricRows.source];
+    labels = [labels;2+geometricRows.source];
     pointStateRows = repmat(stateRows,1,1,pointCount);
     pointStartRows = zeros(size(pointStateRows));
     pointInputRows = repmat(inputRows,1,1,pointCount);

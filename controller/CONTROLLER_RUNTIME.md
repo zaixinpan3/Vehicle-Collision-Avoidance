@@ -1,6 +1,6 @@
 # Controller runtime and numerical implementation
 
-The current version-13 controller solves one hard-margin LP followed by a CLF
+The current version-14 controller solves one hard-margin LP followed by a CLF
 SOCP and independently checks every executable decision. All intervals use
 uncertain held-flow certificates. Continuation fixes the executed prefix and
 keeps the original geometry and deadline; a failed replacement retains the

@@ -1,8 +1,15 @@
 # Single-controller recursive-feasibility requirement
 
-Decision and implementation status: September 9, 2026.
+Decision and implementation status: September 10, 2026.
 
 ## Required behavior
+
+The required guarantee starts with successful first encounter admission under
+the stated assumptions, continues without collision and with feasible control,
+and ends in finite target exit from perception. Post-exit indefinite driving
+is outside this requirement. Version 14 removes additional tire-force polygons;
+this does not by itself validate nonlinear model-error bounds or fix the
+scenario's road-update and pre-acquisition lifecycle issues.
 
 The controller has one safety formulation and execution
 contract, without a selectable weaker lookahead policy. Recursive feasibility
@@ -24,7 +31,7 @@ case, and that failure response is not itself a safety guarantee.
 
 ## Implemented admission step
 
-The version-13 hard encounter certificate now appends a new target's swept
+The version-14 hard encounter certificate now appends a new target's swept
 collision constraints and endpoint exit constraint to the original hard
 program. The old constraints, absolute deadline and executed controls are
 preserved. Admission requires a checked joint decision. The incumbent can be
@@ -42,7 +49,7 @@ witness preserves that new margin. No repeated feasibility assumption is used
 between detection events. See `HARD_PREDICTIVE_CBF.md`, Section 5, for the
 implemented argument and diagnostics.
 
-## Remaining terminal obligation
+## Separate post-exit continuation question (outside the requirement)
 
 First-detection feasibility does not supply a successor after the last stored
 input. This is already visible when no new target is detected: the new-target
@@ -71,23 +78,18 @@ unconditional solver completion. Those are different premises.
 
 ## Completion criteria and present status
 
-The old controller branches and selectors are removed. Version 13 uses one
+The old controller branches and selectors are removed. Version 14 uses one
 complete-horizon optimization for zero or more targets, with no discrete
 maneuver selection, delayed-input execution, nominal-only safety suffix or
 nonreturn-route contract. Continuation always attempts the same hard program
 and can execute its independently checked incumbent if replacement fails.
 The first-detection joint-admission assumption remains unchanged.
 
-The broader continuing-driving requirement is still unfinished: no executable
-invariant terminal continuation has been established. At finite completion,
-the controller returns no further input. `physicalVehicleGuaranteeEstablished`
-remains false. Removing branches does not fill that proof gap.
-
-Completing that broader requirement requires a proved terminal continuation
-integrated into the same optimization. Validation must cover operation past
-the original horizon, new-target admission near that endpoint, uncertain
-successors, and solver failure with a complete successor witness. Passing the
-finite-encounter tests alone does not establish those results.
+The finite-encounter argument does not require post-exit terminal invariance.
+At completion the controller returns no further input, and
+`physicalVehicleGuaranteeEstablished` remains false. The physical experiment
+must still establish admission, model inclusion and compatible observations.
+The separate post-exit question above is not an unmet user acceptance criterion.
 
 ## Validation of the branch removal
 

@@ -1,5 +1,5 @@
 classdef straightControllerRecoveryTest < matlab.unittest.TestCase
-    % Full-horizon rejection of the old empirical short-prefix profile.
+    % Short target-free execution with the unchanged empirical residual profile.
     % This test complements, and does not replace, PassVeh14DOF validation.
     properties (TestParameter)
         targetSpeedPrior = struct('matched',10,'overestimated',15);
@@ -13,24 +13,26 @@ classdef straightControllerRecoveryTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function theOldEmpiricalProfileCannotClaimFullHorizonAdmission(testCase,targetSpeedPrior)
+        function estimatedStatesAdmitShortCruiseWithoutForcePolygons(testCase,targetSpeedPrior)
             cfg = localConfiguration();
             estimator = estimatorControllerIntegrationConfig();
             estimator.randomSeed = 20260907;
             estimator.initialization.targetSpeedPrior = targetSpeedPrior;
             estimator.vehicle.targetSpeed = targetSpeedPrior;
             result = runFiniteBicycleDiagnostic(cfg,0.1,EstimatorConfiguration=estimator,PrepareController=false);
-            testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
-            testCase.verifyEqual(result.time,0);
-            testCase.verifyEmpty(result.input);
+            testCase.verifyFalse(result.failure.occurred);
+            testCase.verifyEqual(result.time,[0;0.05;0.1],AbsTol=1e-12);
+            testCase.verifySize(result.input,[2,2]);
+            testCase.verifyTrue(all(cellfun(@(metadata)metadata.planCertified,result.metadata)));
+            testCase.verifyGreaterThanOrEqual(result.lastCertificate.margin,0);
         end
-        function exactObservationsCannotHideAnUncertifiedResidualHorizon(testCase)
+        function exactStatesAdmitShortCruiseWithTheFullResidualHorizon(testCase)
             result = runFiniteBicycleDiagnostic(localConfiguration(),0.1,PrepareController=false);
-            testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
-            testCase.verifyEqual(result.time,0);
-            testCase.verifyEmpty(result.input);
+            testCase.verifyFalse(result.failure.occurred);
+            testCase.verifyEqual(result.time,[0;0.05;0.1],AbsTol=1e-12);
+            testCase.verifySize(result.input,[2,2]);
+            testCase.verifyTrue(all(cellfun(@(metadata)metadata.planCertified,result.metadata)));
+            testCase.verifyGreaterThanOrEqual(result.lastCertificate.margin,0);
         end
     end
 end

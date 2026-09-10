@@ -1,6 +1,6 @@
 # Complete finite-sensing encounter controller
 
-As of September 9, 2026, the only controller is the version-13 hard predictive
+As of September 10, 2026, the only controller is the version-14 hard predictive
 certificate described in [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 All prediction intervals are certified. Cruise and avoidance share one
 continuous-input optimization, with no discrete maneuver or completion-policy
@@ -44,11 +44,13 @@ model anchors and diagnostics. Every online safety interval still uses the
 scheduled inclusion. Its validity for a nonlinear physical plant depends on
 the declared residual bounds, which are not established by linearization alone.
 
-The inner combined-force polygon constrains nominal scheduled axle forces on
-all stages. Tire slip, actuator magnitude and declared slew limits also remain
-hard. Actual saturation and plant mismatch belong to the model residual
-premises. Finite measured residual samples do not prove a global
-continuous-time residual bound.
+The complete nonlinear modified Fiala force law already limits each axle's
+combined force through `eta=sqrt(1-beta^2)`. Version 14 removes the additional
+force polygon from every safety interval and both numerical transcriptions.
+Tire-slip domains, actuator bounds, road/collision geometry and slew limits
+remain hard. The affine prediction does not automatically inherit nonlinear
+saturation; its declared residual must still enclose the nonlinear dynamics.
+No nonlinear or physical enclosure is established merely by removing rows.
 
 ## Numerical implementation
 

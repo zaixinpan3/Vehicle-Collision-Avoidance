@@ -1,9 +1,15 @@
 # One hard predictive CBF–CLF controller
 
-The version-13 implementation uses one hard safety formulation for cruise and
+The version-14 implementation uses one hard safety formulation for cruise and
 avoidance. Every held interval in the admitted horizon includes uncertain
 collision geometry, road boundaries, model-domain, actuator and slew limits.
 The only optimization relaxation belongs to CLF performance.
+
+The nonlinear modified Fiala force law retains its intrinsic combined-force
+saturation. No additional axle-force polygon is imposed on its affine
+approximation. Tire-slip model domains remain hard. Certificate version 14
+rejects earlier witnesses and the removed `model.frictionPolygonSides` option.
+Nonlinear model enclosure remains a separate premise.
 
 The controller first maximizes a nonnegative certified safety margin by LP,
 then minimizes tracking, input effort and CLF relaxation in an SOCP while
@@ -48,4 +54,4 @@ enclosure, or a zero-latency real-time implementation.
 
 See [the proof and runtime contract](HARD_PREDICTIVE_CBF.md),
 [the target interface](TARGET_PREDICTION_CONTRACT.md), and
-[the outstanding terminal obligation](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
+[the encounter scope and implementation status](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).

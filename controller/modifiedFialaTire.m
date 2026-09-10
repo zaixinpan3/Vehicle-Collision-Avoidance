@@ -25,38 +25,6 @@ classdef modifiedFialaTire
                 "constant",force-forceState*state-forceInput*point, ...
                 "force",force,"operatingInput",point,"operatingState",state);
         end
-        function rows = frictionCirclePolygonRows(curvature,speed,brakingRatio,cfg,linearization)
-        % Inner polygon of each axle's normalized combined-force circle.
-            persistent priorKey priorRows
-            key = {curvature,speed,brakingRatio,cfg.vehicle,cfg.tire, ...
-                cfg.model.scheduleSpeedFloor,cfg.model.frictionPolygonSides};
-            if nargin<5 && isequal(key,priorKey), rows = priorRows;return;end
-            sides = cfg.model.frictionPolygonSides;
-            angle = (0:sides-1).'*2*pi/sides;
-            if nargin<5
-                [slope,ratioSlope,intercept] = modifiedFialaTire.linearize(curvature,speed,brakingRatio,cfg);
-            end
-            tire = modifiedFialaTire.parameters(cfg);
-            tireSpeed = max(speed,cfg.model.scheduleSpeedFloor);
-            slipState = [0,0,0,0,1/tireSpeed,cfg.vehicle.lf/tireSpeed; ...
-                0,0,0,0,1/tireSpeed,-cfg.vehicle.lr/tireSpeed];
-            rows = struct("state",zeros(2*sides,6),"input",zeros(2*sides,2),"bound",zeros(2*sides,1));
-            for axle = 1:2
-                selected = (axle-1)*sides+(1:sides);
-                lateral = sin(angle)/tire.longitudinalForceScale(axle);
-                if nargin<5
-                    rows.state(selected,:) = lateral*slope(axle)*slipState(axle,:);
-                    rows.input(selected,:) = [-(axle==1)*lateral*slope(axle),cos(angle)+lateral*ratioSlope(axle)];
-                    rows.bound(selected) = cos(pi/sides)-lateral*intercept(axle);
-                else
-                    rows.state(selected,:) = lateral*linearization.state(axle,:);
-                    rows.input(selected,:) = [zeros(sides,1),cos(angle)]+lateral*linearization.input(axle,:);
-                    rows.bound(selected) = cos(pi/sides)-lateral*linearization.constant(axle);
-                end
-            end
-            if nargin<5, priorKey = key;priorRows = rows;end
-        end
-
         function parameters = parameters(cfg)
             persistent priorKey priorParameters
             key = [cfg.vehicle.m;cfg.vehicle.gravity;cfg.vehicle.lf;cfg.vehicle.lr; ...
