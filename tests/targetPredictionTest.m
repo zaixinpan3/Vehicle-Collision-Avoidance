@@ -7,6 +7,21 @@ classdef targetPredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function zeroJerkCartesianFlowDoesNotRepresentAnExactTurningAnchor(testCase)
+            encounter = struct("center", [0;0;8;0;0;1.6;0;0.2], ...
+                "radius", zeros(8,1), "contract", struct( ...
+                "jerkBound", zeros(2,1), "yawAccelerationBound", 0));
+
+            [cartesian, radius] = targetPrediction.finiteFlow(encounter, 1);
+            curved = targetPrediction.nominalFlow(encounter, 1);
+
+            testCase.verifyEqual(cartesian(1:2), [8;0.8], AbsTol=1e-12);
+            testCase.verifyEqual(curved(1:2), ...
+                [40*sin(0.2);40*(1-cos(0.2))], AbsTol=1e-12);
+            testCase.verifyGreaterThan(norm(cartesian(1:2)-curved(1:2)), 0.05);
+            testCase.verifyLessThan(norm(radius(1:2)), 1e-10);
+        end
+
         function batchedNominalFlowPreservesCurvatureAndTheStop(testCase)
             encounter = struct("center",[0;0;2;0;-2;.2;0;.1], ...
                 "contract",struct("scalarAccelerationMaximum",2,"predictionSampleTime",.05));

@@ -1,120 +1,237 @@
-# Single-controller recursive-feasibility requirement
+# Strict two-vehicle recursive-feasibility requirement
 
-Decision and implementation status: September 10, 2026.
+Decision date: September 11, 2026.
 
-## Required behavior
+This is the current controller research requirement. It supersedes the earlier
+finite-perception-encounter scope. The implementation at baseline commit
+`5ddff0a1fce63b9e66688e43aa6745305883d720` does not yet satisfy it. Its existing
+finite-encounter certificate must not be presented as an indefinite guarantee.
 
-The required guarantee starts with successful first encounter admission under
-the stated assumptions, continues without collision and with feasible control,
-and ends in finite target exit from perception. Post-exit indefinite driving
-is outside this requirement. Version 14 removes additional tire-force polygons;
-this does not by itself validate nonlinear model-error bounds or fix the
-scenario's road-update issue. Version 15 separates the initial planning
-window from complete witness length and renews target-free certificates.
-Version 16 repairs sparse numerical integration without changing that safety
-policy. The exact-Fiala feedback-policy theorem and its remaining implementation
-obligations are in [FEEDBACK_POLICY_CERTIFICATE.md](FEEDBACK_POLICY_CERTIFICATE.md).
+## Scenario and acceptance condition
 
-The controller has one safety formulation and execution
-contract, without a selectable weaker lookahead policy. Recursive feasibility
-must follow from an explicit successor-witness construction rather than an
-assumption that every ordinary online solve remains feasible. Model enclosure,
-sampling, held-input execution and sensor assumptions remain explicit.
+There are exactly two vehicles: the ego and one persistent target. Both full
+states are available at each control sample. The target follows the declared
+prediction exactly. The controller must retain that target irrespective of
+separation distance. Detection range, visibility, first-detection events,
+missing-detection logic and perception exit are outside this problem.
 
-The accepted research assumption is:
+Let `P_N(z_k)` be the controller's hard-constrained planning problem, including
+its terminal continuation condition. The required implication is
 
-> At the first detection of a new target, the augmented joint state, including
-> all retained targets and execution obligations, belongs to the controller's
-> certifiable feasible domain. States outside that domain are outside the
-> research scope.
+\[
+ P_N(z_{k_0})\text{ feasible}
+ \quad\Longrightarrow\quad
+ P_N(z_k)\text{ feasible for every }k\ge k_0.                 \tag{1}
+\]
 
-This assumption concerns the joint problem. Testing only the new target, or
-only the old target set, does not meet it. It does not permit ignoring an
-observed target after joint verification fails. No control is issued in that
-case, and that failure response is not itself a safety guarantee.
+Here the state evolves under the controller's issued, correctly applied inputs.
+The premise is required once, at any admitted frame. It is not an assumption
+that the next solve succeeds, and it is not feasibility of an arbitrary safe
+prefix with no continuation condition. Collision, road, state, input and
+input-rate constraints remain hard. CLF tracking relaxation does not relax
+these conditions. Reference-speed convergence is a separate performance claim.
 
-## Implemented admission step
+The model must also establish collision avoidance throughout each held control
+interval. A sampled-position constraint alone is insufficient. A target that
+moves far away remains part of the deterministic future unless its permanent
+irrelevance is proved; distance at one time cannot discharge it.
 
-Version 15 selects a complete finite witness, which may extend beyond
-`controller.horizonSteps`; no configured-window exit deadline is imposed.
-Expiry during target-free execution renews the same formulation. First target
-detection starts a fresh complete admission, preserving the measured state and
-previous applied input. Exhaustion alone cannot report target exit.
+## State, target prediction and ego execution
 
-The active version-16 hard encounter certificate appends a new target's swept
-collision constraints and endpoint exit constraint to the original hard
-program. The old constraints, absolute deadline and executed controls are
-preserved. Admission requires a checked joint decision. The incumbent can be
-reused only after passing all added constraints. Each target retains its own
-detection-step origin for every later prediction and observation check.
+Use the augmented state
 
-For a new target entering an already active encounter, the joint certifiable
-domain includes the remaining witness-selected completion commitment and
-the stored geometry. It is deliberately narrower than the set of physical
-states admitting some nonlinear maneuver with some different horizon. A
-negative solver result is not proof that either mathematical set is empty.
+\[
+ z_k=(x_{e,k},x_{t,k},u_{k-1},t_k,q),\qquad z_{k+1}=F(z_k,u_k),              \tag{2}
+\]
 
-The new information may reduce the accepted positive margin. The requirement
-at the event is a nonnegative joint margin; afterward the existing successor
-witness preserves that new margin. No repeated feasibility assumption is used
-between detection events. See `HARD_PREDICTIVE_CBF.md`, Section 5, for the
-implemented argument and diagnostics.
+where `q` retains any parameters or phase needed to identify the single target
+trajectory and the fixed physical road. Include additional actuator memory if
+required by the execution model. The existing no-delay held-input interface is
+sufficient only when those commands are actually applied at the sample time.
 
-## Separate post-exit continuation question (outside the requirement)
+One target propagator must define both prediction constraints and target truth.
+It must obey the shift identity
 
-First-detection feasibility does not supply a successor after the last stored
-input. This is already visible when no new target is detected: the new-target
-assumption imposes no condition on that endpoint. The existing perception-exit
-inequality constrains target distance at a finite time; it is not a proof that
-road, model-domain, input and slew constraints remain feasible afterward.
+\[
+ x_{t,k+1}(\tau)=x_{t,k}(\Delta+\tau),\qquad \tau\ge0,                    \tag{3}
+\]
 
-A continuing MPC construction requires a certified terminal continuation. If
-`C_f` is its terminal set and `kappa_f` its feedback witness, the required
-property is that every admissible state in `C_f`, under all declared
-disturbances, stays safe throughout the next held interval and returns to
-`C_f` at its end. The augmented state must retain previous input, target
-obligations and any execution queue. A shifted plan can then append this
-witness. An equivalent complete invariant continuation certificate could serve
-the same role, but a fresh unproved finite-horizon solve cannot.
+for every future time used in the remaining plan and terminal proof. For an
+autonomous state model this is its flow semigroup property. A prescribed
+trajectory may instead be indexed by absolute time. A fresh forecast may not
+change the previously declared future while still claiming exact prediction.
+The all-future target law is needed to establish the terminal continuation;
+perfect knowledge over one finite window alone is insufficient.
 
-The terminal model and constraints must also correspond to the scheduled
-prediction and the actual execution inclusion. The counterexamples in
-`TERMINAL_CBF_PROOF.md` rule out simply restoring the retired affine rest set
-as a nonlinear or persistent-disturbance guarantee. They do not rule out a
-new appropriately designed terminal set.
+In the current code, `targetPrediction.finiteFlow` uses Cartesian constant
+acceleration plus bounded jerk, whereas `targetPrediction.nominalFlow` uses
+constant curvature and tangential acceleration, with a stopping convention.
+Even with zero declared error and derivative bounds, these are different
+trajectories in a turn. The migration must select the intended deterministic
+law and use it consistently. Merely zeroing every bound does not do this.
+For speed 8 m/s, yaw rate 0.2 rad/s and initial acceleration `[0;1.6]` m/s^2,
+the two position predictions differ by 0.053293348807 m after one second.
+The Cartesian zero-bound arithmetic enclosure is below 1e-10 m in this
+example. A turn needs nonzero Cartesian jerk; this is a model-contract
+counterexample, not evidence that a correctly declared jerk enclosure fails.
 
-The accepted first-detection assumption has not been broadened into an
-assumption of terminal feasibility, safe invisible-target behavior, or
-unconditional solver completion. Those are different premises.
+Exact state measurement does not imply exact ego prediction. The proof below
+uses an ego transition that describes the executed ego motion. This can be the
+nonlinear bicycle's exact held flow in an ideal model study. An LTV approximation
+to that nonlinear plant must instead carry a proved residual enclosure and a
+robust successor construction. The new scenario removes observation uncertainty
+and target prediction error; it does not by itself authorize deleting the
+nonlinear ego model, its approximation residuals, or arithmetic reserves.
 
-## Completion criteria and present status
+## Hard MPC and a constructive successor
 
-The old controller branches and selectors are removed. Version 15 uses one
-complete-horizon optimization for zero or more targets, with no discrete
-maneuver selection, delayed-input execution, nominal-only safety suffix or
-nonreturn-route contract. Continuation always attempts the same hard program
-and can execute its independently checked incumbent if replacement fails.
-The first-detection joint-admission assumption remains unchanged.
+Let `C(z,u)` mean that a held interval starting from `z`, under input `u`, meets
+all physical constraints for every intermediate time, including command slew
+relative to the previous input. Choose a jointly safe terminal set `Z_f` and a
+terminal law `kappa_f` satisfying
 
-The finite-encounter argument does not require post-exit terminal invariance.
-At completion the controller returns no further input, and
-`physicalVehicleGuaranteeEstablished` remains false. The physical experiment
-must still establish admission, model inclusion and compatible observations.
-The separate post-exit question above is not an unmet user acceptance criterion.
+\[
+ z\in Z_f\ \Longrightarrow\
+ C(z,\kappa_f(z)),\qquad F(z,\kappa_f(z))\in Z_f.                         \tag{4}
+\]
 
-## Validation of the branch removal
+The clock and target state in (2) allow a time-varying physical terminal set to
+be written as one set in augmented coordinates. In ordinary coordinates the
+condition is `F_k(Z_f(k),kappa_f) subset Z_f(k+1)`.
 
-The complete MATLAB suite ran 593 tests: 592 passed and one retained an
-obsolete expectation of measured wheel output after admission rejection.
-That assertion was changed to require absent plant measurements. Two
-straight-scene tests and two encounter-audit tests were then rerun successfully;
-the latter also validate the corrected current-suffix CLF-slack audit index.
-The resulting verified coverage is 593/593 with no unresolved failures or
-incomplete tests. This is a full run plus four targeted reruns, not a second
-full execution. A preceding focused migration regression passed 96/96 tests.
+The planning problem is
 
-Both complete-interval geometry kernels compiled successfully. Factory Code
-Analyzer checks on 44 changed/new MATLAB files found 16 sparse-index
-performance advisories and no other findings. Old empirical short-prefix
-physical profiles are tested for their actual full-horizon admission rejection;
-those tests do not demonstrate successful physical avoidance or cruise recovery.
+\[
+\begin{aligned}
+ \min_{u_{0:N-1},\delta_{0:N-1}}\;&J(z_k,u,\delta)\\
+ \text{subject to }\;&z_0=z_k,\quad z_{i+1}=F(z_i,u_i),\\
+ &C(z_i,u_i),\quad i=0,\ldots,N-1,\\
+ &z_N\in Z_f,\qquad \delta_i\ge0 .                                  \tag{5}
+\end{aligned}
+\]
+
+Any CLF rows must admit a finite nonnegative slack for every otherwise feasible
+candidate; neither a finite slack cap nor hard performance decrease may remove
+the guaranteed successor. No optimality assumption is needed for feasibility.
+
+**Conditional theorem.** Suppose (2)--(4) hold, physical geometry and limits
+remain consistent, the ego executes the modeled held input, and an admitted
+feasible candidate for (5) is available. Then (1) and interval safety hold under
+any controller that selects feasible candidates for (5).
+
+**Proof.** Let `(u_0,...,u_{N-1})` be the accepted candidate and
+`(z_0,...,z_N)` its states. After executing `u_0`, the measured next state is
+`z_1` by the execution and exact-prediction assumptions. At the next frame use
+
+\[
+ \widetilde u=(u_1,\ldots,u_{N-1},\kappa_f(z_N)).                       \tag{6}
+\]
+
+The first `N-1` intervals are the same physical future intervals as before;
+(3) preserves target motion. Their road, state, collision, actuator and slew
+conditions remain satisfied. The retained previous input in (2) makes the
+first shifted slew condition the old second slew condition. Equation (4)
+certifies the appended interval, its entry slew and the new terminal state.
+Choose finite CLF slacks if needed. Thus (6) is a feasible candidate for the
+next problem. The same argument applies when `N=1`, when the retained prefix
+is empty. Induction proves feasibility at every later frame, and `C` proves
+safety between frames. There is no perception-exit stopping time. QED.
+
+If the ego has nonzero disturbances, replace each open-loop candidate by a
+certified causal policy/tube. Every realized successor information set must
+admit the conditioned tail, and (4) must hold robustly for the same dynamics,
+command memory and terminal policy. Exact target prediction alone does not
+supply this extra proof.
+
+This is the standard invariant-terminal MPC successor argument, specialized
+here to joint vehicle state, absolute target time, held-interval safety and
+slew. See Rawlings, Mayne and Diehl, *Model Predictive Control: Theory,
+Computation, and Design*, 2nd edition, sixth printing, Section 2.3 (control
+invariance and feasible-set recursion) and Section 2.4.5 (time-varying terminal
+conditions), available from the [authors' book page](https://sites.engineering.ucsb.edu/~jbraw/mpc/).
+The source supports the general MPC construction; it is not a proof for this
+repository's current numerical solver or nonlinear plant.
+
+## Terminal safety must include the moving target
+
+An ego-only stopping set is insufficient: an exactly predicted target can
+subsequently hit a stationary ego. A candidate terminal set for the exact,
+undisturbed nonlinear bicycle is the set of **true stationary equilibria**
+whose full footprint is inside the road and remains separated from the target's
+entire future swept footprint. An admissible equilibrium input must balance
+any known longitudinal bias, and terminal entry must obey slew constraints.
+At an exact equilibrium the ego footprint is constant. Shifting the clock
+removes a prefix of the target's already checked future; hence all-future
+separation persists and the same equilibrium input proves (4).
+
+This establishes a sufficient terminal-set definition, not an implemented
+membership algorithm or proof of reachability from every safe state. It may be
+empty for some target futures or roads. The old finite-velocity affine rest
+budget is a different set and retains the nonlinear counterexample documented
+in `TERMINAL_CBF_PROOF.md`. Rounding a small velocity to zero or replacing
+terminal invariance by a small endpoint tolerance does not prove the theorem.
+A larger invariant maneuvering or cruise set is possible but needs its own
+joint safety and model proof.
+
+A simple counterexample explains why the terminal condition is essential.
+Let two longitudinal point vehicles have no controllable change in speed,
+required gap 1 m, one-second sampling, ego speed 2 m/s and stationary target.
+With initial gap 4 m, a one-step prediction is safe throughout, ending at a
+2 m gap. The next one-step problem is infeasible: its gap falls below 1 m
+before the end. Both states and the target future are exact. Initial finite
+horizon feasibility alone therefore does not imply (1).
+
+## Implementation obligations and validation
+
+The current solver preserves a finite admission program and its consumed
+prefix. It has no invariant terminal extension. `completionRows` uses
+`model.perceptionRange`; `validateAdmission` requires complete perception;
+`localCheckTargets` ends the encounter at range exit; the controller returns
+no command afterward. Increasing the range, deleting exit rows, lengthening
+the horizon or attempting a fresh solve cannot supply (4).
+
+The next implementation must replace those range-dependent admission and
+completion semantics with the strict two-state interface, one deterministic
+target propagator, a validated joint terminal continuation and executable
+shift/append logic. Physical road support remains necessary and must not be
+confused with sensor range. A coordinate re-expression of the same road must
+preserve its physical constraints. The 20-source-file core limit remains in
+force; a second finite-sensing controller path is not the requested design.
+
+An online numerical solver can fail even when the mathematical problem is
+feasible. Construct and retain (6) before attempting improvement. Accept a
+replacement only after it passes the same hard conditions. Relinearization,
+new separating planes, changed trust regions or different tube enclosures
+must preserve a representation of the successor; otherwise their newly built
+convex subproblem does not inherit the theorem. A numerical deadline guarantee
+also requires the certified candidate to remain executable while improvement
+runs. The synchronous current solver does not establish that timing property.
+
+Required implementation checks are range-independent admission and commands;
+exactly one persistent target at every sample; deterministic prediction shift
+consistency (including turns and stopping); repeated feasible successors well
+beyond the original horizon; terminal entry and indefinite terminal execution;
+input/slew and full-interval road/collision checks; solver-failure continuation;
+and rejection of changed target dynamics, inconsistent ego execution or
+physically changed constraints. Test runs are evidence of implemented behavior,
+not replacements for (4) or a proof over infinitely many frames.
+
+The present change updates the requirement and reports the existing guarantee
+scope honestly. `recursiveFeasibilityClaimed` retains its finite-encounter
+meaning for current consumers; `recursiveFeasibilityScope` explicitly limits
+it to verified perception exit. `indefiniteRecursiveFeasibilityClaimed` and
+`terminalContinuationCertified` are both false at admission and continuation.
+No range-independent controller, nonlinear terminal membership, complete
+strict-scenario simulation or indefinite implementation guarantee is claimed.
+
+Validation of this requirement audit: `hardEncounterBarrierTest` passes all
+37 tests, including two new admission/retained-continuation scope checks.
+`targetPredictionTest`, `finiteSensingControllerTest` and
+`controllerSourceBudgetTest` pass another 24 tests (61 total, no failures or
+incomplete tests). Factory Code Analyzer reports zero findings in the four
+changed MATLAB files. The full repository suite was not rerun because the
+control equations, constraints and solver behavior are unchanged.
+The one-step counterexample was evaluated as gaps `[4,2,0]` m against a 1 m
+required gap. The turning predictor discrepancy above was evaluated in MATLAB
+and is covered by a regression in `targetPredictionTest`. These results
+validate the identified limitations, not the requested future implementation.

@@ -1,5 +1,12 @@
 # Hard predictive barrier with a selected complete encounter witness
 
+Scope update, September 11, 2026: this document describes the existing finite-encounter
+construction. The current requirement is the range-independent two-vehicle,
+exact-target-prediction problem in [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md),
+including feasibility at every subsequent frame. Statements below that place
+post-exit continuation outside the requirement are superseded. The finite
+implementation and its proof do not yet establish that stronger guarantee.
+
 Retained-deadline construction implemented September 8, 2026; joint target
 admission added September 9, 2026; configured-window/exit-time coupling
 removed September 10, 2026 (version 15). This construction keeps collision, road,

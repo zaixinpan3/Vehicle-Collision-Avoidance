@@ -82,6 +82,32 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.barrierInterpretation, "storedWitnessLowerBound");
         end
 
+        function finiteAdmissionDoesNotClaimAnIndefiniteSuccessor(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyTrue(problem.metadata.recursiveFeasibilityClaimed);
+            testCase.verifyEqual(problem.metadata.recursiveFeasibilityScope, ...
+                "untilVerifiedPerceptionExitForDeclaredInclusion");
+            testCase.verifyFalse(problem.metadata.indefiniteRecursiveFeasibilityClaimed);
+            testCase.verifyFalse(problem.metadata.terminalContinuationCertified);
+            testCase.verifyFalse(stored.metadata.indefiniteRecursiveFeasibilityClaimed);
+        end
+
+        function retainedContinuationKeepsTheFiniteGuaranteeScope(testCase)
+            [ego, target, route, cfg] = localFixture();
+            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
+            [ego, target] = localNext(stored, problem.model.lane, target);
+            cfg.solver.jointFunction = @encounterTestFixture.fail;
+            [command, ~, next] = collisionAvoidanceController(ego, target, route, cfg, stored);
+
+            testCase.verifyNotEmpty(command);
+            testCase.verifyTrue(next.metadata.carriedWitnessFeasible);
+            testCase.verifyFalse(next.metadata.indefiniteRecursiveFeasibilityClaimed);
+            testCase.verifyFalse(next.metadata.terminalContinuationCertified);
+        end
+
         function aSafePrefixIsNotExecutedWhenCompleteWitnessSearchIsUnresolved(testCase)
             [ego, target, route, cfg] = localFixture();
             target.targetVelocityInertial = [8; 0];

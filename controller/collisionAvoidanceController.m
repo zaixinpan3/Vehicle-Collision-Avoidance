@@ -5,6 +5,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
 % Every prediction interval is certified. The retained certificate preserves
 % its absolute deadline and all admitted target obligations. New targets need
 % joint certification. Completed encounters return no further control.
+% This finite-encounter implementation does not yet meet the range-independent
+% indefinite requirement in SINGLE_PATH_RECURSIVE_FEASIBILITY.md.
     persistent previousCertificate
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"

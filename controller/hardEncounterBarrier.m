@@ -441,7 +441,11 @@ function metadata = localMetadata(metadata, stored, source, calls, attempted)
     metadata.certifiedDuration = stored.certifiedDuration;
     metadata.lookaheadDuration = stored.certifiedDuration;
     metadata.recursiveFeasibilityClaimed = ~isempty(stored.encounters);
-    metadata.recursiveFeasibilityScope = "conditionalOnDeclaredInclusionExecutionAndJointAdmission";
+    metadata.recursiveFeasibilityScope = "untilVerifiedPerceptionExitForDeclaredInclusion";
+    % The finite suffix proof does not supply the successor after exhaustion.
+    % SINGLE_PATH_RECURSIVE_FEASIBILITY.md specifies the stronger requirement.
+    metadata.indefiniteRecursiveFeasibilityClaimed = false;
+    metadata.terminalContinuationCertified = false;
     metadata.exactPredictionAssumptionsHold = false;
     metadata.physicalVehicleGuaranteeEstablished = false;
     metadata.newTargetAdmissionAssumption = "jointStateInCertifiableDomainAtFirstDetection";

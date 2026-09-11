@@ -1,5 +1,12 @@
 # Finite-encounter sampled-feedback certificate
 
+Scope update, September 11, 2026: this document describes the existing finite-encounter
+construction. The current requirement is the range-independent two-vehicle,
+exact-target-prediction problem in [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md),
+including feasibility at every subsequent frame. Statements below that place
+post-exit continuation outside the requirement are superseded. The finite
+implementation and its proof do not yet establish that stronger guarantee.
+
 Research derivation, September 10, 2026. The physical-model hypothesis below is
 an explicit project assumption: **the authoritative modified Fiala vehicle
 model is the true model**. This document proves a conditional controller
