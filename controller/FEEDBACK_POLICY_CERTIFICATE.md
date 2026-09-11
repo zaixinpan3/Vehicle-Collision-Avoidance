@@ -366,9 +366,14 @@ nonlinear swept enclosures and a feasible nonlinear initializer.
 
 The conditional implication in Section 5 is proved. A first local nonlinear
 model-inclusion checker and held-cell domain test are now implemented in
-[fialaResidualCertificate](FIALA_INTERVAL_INCLUSION.md). Operative correlated
-feedback tubes over complete samples/encounters, full-information inlets,
-persistent road semantics and a scheduled executor remain to be implemented.
+[fialaResidualCertificate](FIALA_INTERVAL_INCLUSION.md). A subsequent
+[complete sampled-feedback verifier](FIALA_FEEDBACK_SAMPLE.md) now preserves
+shared state/input generators through a full 100 ms held sample, explicitly
+bounds affine error, and checks the command and intersample slew limits.
+Correlated propagation across actuation boundaries and complete encounters,
+full-information inlets, persistent road semantics and a scheduled executor
+remain to be implemented. The one-sample verifier exposes both enclosure
+inflation at larger inlet radii and verification cost above the actuation period.
 The sparse repair and continuous-normal prototype do not
 supply these ingredients automatically. An affine trajectory colliding in
 exact Fiala numerical replay is a falsification of that particular model

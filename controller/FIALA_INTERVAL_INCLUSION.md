@@ -213,6 +213,12 @@ fresh binary and analytic flow checks; merely finding a file is insufficient.
 
 The decided next gates, in order, are:
 
+Implementation update: the complete held-sample part of gate 1 is now
+implemented and proved in [FIALA_FEEDBACK_SAMPLE.md](FIALA_FEEDBACK_SAMPLE.md).
+It generates local nonlinear nominal centers, relinearizes within certified
+domains and retains shared command/state generators. It does not yet generate
+a complete nonlinear avoidance candidate or complete gates 2--4.
+
 1. Generate the candidate nominal motion from true Fiala dynamics and
    relinearize along that candidate. Keep the incumbent unchanged until the
    complete replacement passes. Propagate a complete 100 ms held-feedback
