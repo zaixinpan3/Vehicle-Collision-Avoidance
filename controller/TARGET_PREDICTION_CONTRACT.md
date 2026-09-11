@@ -1,51 +1,40 @@
-# Finite target motion and joint admission
+# Exact target motion in the two-vehicle controller
 
-Scope update, September 11, 2026: this document describes the existing finite-encounter
-construction. The current requirement is the range-independent two-vehicle,
-exact-target-prediction problem in [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md),
-including feasibility at every subsequent frame. Statements below that place
-post-exit continuation outside the requirement are superseded. The finite
-implementation and its proof do not yet establish that stronger guarantee.
+The controller study uses one persistent target with its full current position,
+velocity, acceleration, heading and yaw rate known at every sample. Its exact
+prediction is the Cartesian constant-acceleration flow
 
-Every target uses the same finite motion descriptor:
-
-```matlab
-target.predictionMotion = struct( ...
-    "kind", "finite-sensing-motion-v1", ...
-    "jerkBound", [jx; jy], ...             % componentwise m/s^3
-    "yawAccelerationBound", yawRateRate); % rad/s^2
+```
+p(t+tau)   = p(t) + v(t)*tau + a(t)*tau^2/2
+v(t+tau)   = v(t) + a(t)*tau
+a(t+tau)   = a(t)
+yaw(t+tau) = yaw(t) + yawRate(t)*tau
+yawRate(t+tau) = yawRate(t)
 ```
 
-Stable track identity, position, velocity, acceleration, heading, yaw rate,
-footprint dimensions and current componentwise estimation errors identify the
-initial target set. The declared derivative bounds must cover the complete
-remaining encounter. Observer estimation bounds alone do not establish these
-future-motion premises.
+`targetPrediction.admitExact` accepts this contract without a motion descriptor,
+or with `predictionMotion.kind="exact-motion-v1"`. An old
+`finite-sensing-motion-v1` descriptor is accepted only with zero future bounds;
+it is normalized to the exact all-future contract. Nonzero target estimation,
+jerk or yaw-acceleration bounds are rejected by the exact-study controller.
+Standalone uncertain-prediction utilities remain available for offline research.
 
-`finiteFlow` encloses Cartesian constant-acceleration propagation plus bounded
-jerk and yaw acceleration. Every safety cell uses that full uncertain flow.
-`nominalFlow` supplies a constant-curvature, tangential-acceleration anchor for
-model studies; its optional `scalarAccelerationMaximum` does not tighten the
-uncertain safety enclosure.
+One stable identifier and the same footprint must persist. With only one
+otherwise anonymous target the controller assigns `exactTarget:1`. Missing or
+additional targets are outside the strict scene. A missing target never means
+safe exit. The controller retains the original absolute-time trajectory and
+checks every new state against it, with arithmetic allowance. Measurements do
+not reset the forecast. The flow satisfies the required time-shift identity.
+The terminal certificate uses the target's entire future, not a finite validity
+window, a perception range or a nonreturn assertion.
 
-The controller retains each target's first-detection time and original set.
-Compatible measurements are checked against the retained flow. They cannot
-renew its validity or replace old safety obligations. The independent
-`advance` utility conditions an observation set for prediction studies; it is
-not an alternative controller continuation path.
+The curved `nominalFlow` utility remains an offline/initialization model and is
+not the target truth in this study. In particular, zero jerk bounds do not make
+a Cartesian constant-acceleration predictor equal to a constant-curvature
+predictor. At 8 m/s and yaw rate 0.2 rad/s their positions differ by 0.05329335 m
+after one second in the regression example. A target generator for this study
+must call `finiteFlow` or implement the exact equations above, including
+possible reversal under constant negative Cartesian acceleration.
 
-The accepted research assumption is joint feasibility at first detection,
-including old targets, stored geometry, remaining deadline and executed
-controls. Admission appends the new swept and endpoint constraints to the
-retained program. It requires an independently checked joint witness. An
-uncertified event is outside the declared research domain and produces no
-command; a negative solver status is not proof of mathematical infeasibility.
-
-Admission requires complete timestamped circular perception with a fixed
-positive range. Missing observations cannot silently remove old constraints.
-Verified exit ends the finite encounter; it does not establish nonreturn,
-post-exit vehicle safety or indefinite cruise feasibility. The removed
-`encounterContract` exit-route interface is rejected.
-
-See [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md) for the equations,
-execution premises and successor-witness argument.
+See [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md)
+for the ego plant premise, terminal invariant set and all-future separation.

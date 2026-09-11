@@ -46,7 +46,7 @@ classdef circularCenterlineCruiseScenarioTest < matlab.unittest.TestCase
                 expectedCorneringStiffness, ...
                 RelTol=1.0e-12);
             testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
             testCase.verifyEmpty(result.command);
             testCase.verifyFalse(result.metrics.controllerCompletedScenario);
             testCase.verifyFalse(isfield(result, "diagnostics"));

@@ -13,9 +13,9 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public controller entry, encounter lifecycle and diagnostics |
+| `collisionAvoidanceController.m` | Public exact-state controller entry and diagnostics |
 | `readPlanningInputs.m` | Input normalization and lane/target model construction |
-| `hardEncounterBarrier.m` | Complete-encounter planning (`plan`), retained deadline, exit obligations and certified execution |
+| `hardEncounterBarrier.m` | Invariant-tail admission (`plan`), terminal set/flow and retained certified execution |
 | `formulateAvoidanceProblem.m` | Objective, hard swept constraints and predictive CLF cones |
 | `avoidanceStageQp.m` | Sparse transcription (`build`) and updates using explicit row maps (`updateBounds`) |
 | `solveHardCbfClf.m` | Lexicographic solve (`solve`) and independent plan verification (`certify`) |
@@ -24,7 +24,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `ltvBicycleModel.m` | Held-input prediction, nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
-| `targetPrediction.m` | Target inclusion, nominal motion, footprint support and encounter lifecycle |
+| `targetPrediction.m` | Exact target admission, absolute-time flow, offline uncertainty studies and footprint support |
 | `fialaCertificate.m` | Validated nonlinear residuals (`residual`), held-feedback samples (`sample`), prescribed sequences (`sequence`) and shared constants (`parameters`) |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |
@@ -61,9 +61,10 @@ The removed standalone files have no compatibility wrappers.
 | `certifyFialaFeedbackSequence` | `fialaCertificate.sequence` |
 | `fialaIntervalParameters` | `fialaCertificate.parameters` |
 
-This consolidation changes source organization and call names. The hard
-constraints, independent acceptance checks, explicit affine residual bounds,
-retained deadlines and numerical equations are preserved. In particular,
+The earlier consolidation changed source organization and call names while
+preserving its then-current equations. The subsequent version-17 controller
+replaces finite perception exit with exact-model invariant continuation; see
+[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md). In particular,
 `fialaCertificate.sample` and `.sequence` retain their documented limited
 scope: nonlinear ego-flow certification does not yet establish an integrated
 nonlinear collision/road/target-exit certificate. See

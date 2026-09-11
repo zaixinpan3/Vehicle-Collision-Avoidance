@@ -23,24 +23,7 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
         error("collisionAvoidanceController:invalidInput", ...
             "The complete retained certificate does not support an input-delay queue.");
     end
-    ego.completePerception = false;
-    ego.perceptionRange = NaN;
-    if isstruct(egoState) && isfield(egoState,"perception")
-        perception = egoState.perception;
-        if ~isstruct(perception) || ~isscalar(perception) ...
-                || ~all(isfield(perception,["time","range","completeWithinRange"])) ...
-                || ~isscalar(perception.completeWithinRange) ...
-                || ~islogical(perception.completeWithinRange)
-            error("collisionAvoidanceController:invalidPerception","Malformed current perception scope.");
-        end
-        validateattributes(perception.range,{'double'},{'scalar','positive'});
-        validateattributes(perception.time,{'double'},{'scalar','real','finite'});
-        if ~isfinite(ego.stateTime) || abs(perception.time-ego.stateTime)>128*eps(max(1,abs(ego.stateTime)))
-            error("collisionAvoidanceController:stalePerception","Perception and state timestamps must agree.");
-        end
-        ego.completePerception = perception.completeWithinRange;
-        ego.perceptionRange = perception.range;
-    end
+    % Perception metadata is deliberately outside the exact-state study.
     [lane, road] = localReadLane(laneCenterline, ego, cfg);
     targets = localReadTargets(targetEstimate, ego, cfg);
 end

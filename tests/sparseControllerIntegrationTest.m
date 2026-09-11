@@ -8,21 +8,20 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function largeResidualClfProblemSolvesBothNativeStages(testCase)
+        function finiteSlewProblemSolvesBothNativeStages(testCase)
             [ego,~,route,cfg]=encounterTestFixture.crossing();
-            % Use the diagnosed straight vehicle rather than attaching its
-            % residual allowance to a different, infeasible crossing model.
+            % Exercise explicit actuator slew constraints on the exact plant.
             ego.speed=10;cfg.referenceSpeed=10;
-            cfg.model.lateralDomainRadius=12;cfg.model.linearizationPolicy="trajectory";
+            cfg.controller.stationTrustRadius=20;cfg.model.lateralDomainRadius=12;cfg.model.linearizationPolicy="trajectory";
             cfg.vehicle.m=1181;cfg.vehicle.Iz=2066;cfg.vehicle.lf=1.515;cfg.vehicle.lr=1.504;
             cfg.tire.corneringStiffness=[134958.69931334612;158363.4557764245];
             cfg.tire.frictionCoefficient=[1.1270986189302326;1.1102947429302326];
-            cfg.model.plantModelResidualRateBound=[.2;.06;.02;2.5;5;4];
+            cfg.model.plantModelResidualRateBound=zeros(6,1);
             cfg.model.frontWheelSteeringRateMaximum=.5;
             cfg.model.brakingRatioRateMaximum=2;
             cfg.solver.optimalityTolerance=1e-4;
             statuses=[];cfg.solver.jointFunction=@capture;
-            [~,~,problem]=collisionAvoidanceController(ego,[],route,cfg,[]);
+            [~,~,problem]=collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),route,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(statuses,[1,1]);
             function result=capture(~,program)

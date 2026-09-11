@@ -76,52 +76,29 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(parsed.yaw, 0.2, AbsTol=1e-14);
         end
 
-        function aLargerLiveTargetBoundTightensTheActualSocp(testCase)
+        function targetUncertaintyCannotEnterTheExactStudy(testCase)
             [ego, target, cfg, lane] = localInputs();
             ego = rmfield(ego, "controllerErrorBound");
-            [~, ~, first] = collisionAvoidanceController(ego, target, lane, cfg, []);
-            target.controllerErrorBound.bounds(1:2) = 0.4;
-            [~, ~, second] = collisionAvoidanceController(ego, target, lane, cfg, []);
-            firstRow = find(startsWith(first.qp.geometry.label, "collision:"), 1);
-            secondRow = find(startsWith(second.qp.geometry.label, "collision:"), 1);
-            testCase.verifyLessThan(second.qp.geometry.physicalBound(secondRow), ...
-                first.qp.geometry.physicalBound(firstRow));
-            testCase.verifyTrue(first.metadata.planCertified && second.metadata.planCertified);
-            testCase.verifyGreaterThanOrEqual(second.metadata.solverCallCount,1);
-            testCase.verifyFalse(second.metadata.fallbackUsed);
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,lane,cfg,[]), ...
+                "collisionAvoidanceController:nonexactStudyInput");
         end
 
-        function changingBoundsRequireTheContinuationToBeRechecked(testCase)
-            [ego, target, cfg, lane] = localInputs();
-            ego = rmfield(ego, "controllerErrorBound");
-            [command, ~, first, stored] = collisionAvoidanceController(ego, target, lane, cfg, []);
-            state = stored.predictedState(:, 2);
-            [ego.position, ego.yawAngle] = laneGeometry.fromFrenet(state, first.model.lane);
-            ego.longitudinalVelocity = state(4);
-            ego.lateralVelocity = state(5);
-            ego.yawRate = state(6);
-            ego.heldActuatorInput = command.actuatorInput;
-            ego.stateTime = cfg.controller.sampleTime;
-            ego.perception.time = ego.stateTime;
-            target.stateTime = cfg.controller.sampleTime;
-            target.controllerErrorBound.time = cfg.controller.sampleTime;
-            target.controllerErrorBound.bounds(1:2) = 0.25;
+        function newlyUncertainObservationsCannotInheritAnExactWitness(testCase)
+            [ego,target,lane,cfg] = encounterTestFixture.crossing();
+            [~,~,problem,stored] = collisionAvoidanceController(ego,target,lane,cfg,[]);
+            ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
             target.targetPositionInertial = target.targetPositionInertial ...
                 +cfg.controller.sampleTime*target.targetVelocityInertial;
-            [~, ~, next] = collisionAvoidanceController(ego, target, lane, cfg, stored);
-            testCase.verifyTrue(first.metadata.planCertified && next.metadata.planCertified);
-            testCase.verifyTrue(next.metadata.certificateCompatible);
-            testCase.verifyTrue(next.metadata.carriedWitnessFeasible);
-            testCase.verifyGreaterThanOrEqual(next.metadata.solverCallCount,1);
-            testCase.verifyFalse(next.metadata.fallbackUsed);
+            target.targetPositionInertialErrorBound = [0.01;0.01];
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,lane,cfg,stored), ...
+                "collisionAvoidanceController:nonexactStudyInput");
         end
 
-        function uncertainEgoVelocityIsRetainedInTheFiniteTube(testCase)
-            [ego, ~, cfg, lane] = localInputs();
+        function egoUncertaintyCannotEnterTheExactStudy(testCase)
+            [ego,target,cfg,lane] = localInputs();
             ego.position(1) = 10;
-            [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(problem.prediction.egoStateErrorBound(4, end), 0);
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,lane,cfg,[]), ...
+                "collisionAvoidanceController:nonexactStudyInput");
         end
 
 

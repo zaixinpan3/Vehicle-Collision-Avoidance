@@ -1,16 +1,16 @@
 # Finite-encounter sampled-feedback certificate
 
-Scope update, September 11, 2026: this document describes the existing finite-encounter
-construction. The current requirement is the range-independent two-vehicle,
-exact-target-prediction problem in [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md),
-including feasibility at every subsequent frame. Statements below that place
-post-exit continuation outside the requirement are superseded. The finite
-implementation and its proof do not yet establish that stronger guarantee.
+Scope update, September 11, 2026: the active controller is now the exact
+scheduled-model study in [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md),
+with an invariant terminal continuation. The nonlinear robust-policy analysis
+below remains a separate research derivation. Its finite-perception endpoint
+is not the current acceptance requirement, and its nonlinear premises must not
+be inferred from the new affine exact-plant assumption.
 
 Research derivation, September 10, 2026. The physical-model hypothesis below is
 an explicit project assumption: **the authoritative modified Fiala vehicle
 model is the true model**. This document proves a conditional controller
-construction; it does not label the current affine, open-loop implementation
+construction; it did not label the September 10 affine implementation
 as an implemented nonlinear feedback certifier. The implementation and
 experiment boundary is recorded in `FEEDBACK_SPARSE_EXPERIMENTS.md`.
 

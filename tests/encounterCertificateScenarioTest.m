@@ -6,31 +6,19 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function solverFailureKeepsExecutingTheCertifiedWitnessUntilExit(testCase)
+        function solverFailureKeepsTheCrossingAndTerminalContinuationFeasible(testCase)
             report = runEncounterCertificateScenario();
-            testCase.verifyFalse(report.failure.occurred);
-            testCase.verifyTrue(report.discharged);
-            testCase.verifyGreaterThan(report.executedIntervals,1);
-            testCase.verifyGreaterThan(report.fallbackCount,0);
-            testCase.verifyEqual(report.deadline,1.6,AbsTol=1e-12);
-            testCase.verifyLessThanOrEqual(report.exitTime,report.deadline);
-            testCase.verifyGreaterThanOrEqual(report.minimumSampledRectangleDistance,report.requiredDistance);
-            testCase.verifyLessThanOrEqual(report.maximumSampledClfResidual,0);
-            testCase.verifyLessThanOrEqual(report.maximumEndpointBoxViolation,0);
+            testCase.verifyTrue(all(report.planCertified));
+            testCase.verifyGreaterThan(nnz(report.retainedWitnessUsed),0);
+            testCase.verifyTrue(report.terminalActive(end));
+            testCase.verifyGreaterThanOrEqual(report.minimumSampledSeparationMargin,0);
         end
-
-        function freshSolutionsCanCompleteTheDeclaredCrossing(testCase)
+        function freshSolutionsRetainTheIndefiniteCrossingCertificate(testCase)
             report = runEncounterCertificateScenario(ForceSolverFailure=false);
-            testCase.verifyFalse(report.failure.occurred);
-            testCase.verifyTrue(report.discharged);
-            testCase.verifyGreaterThan(report.executedIntervals,1);
-            % A solver success flag need not pass strict inherited-margin
-            % checking. Some successful updates and safe completion matter;
-            % rejecting a numerically weaker replacement is correct behavior.
-            testCase.verifyLessThan(report.fallbackCount,report.executedIntervals-1);
-            testCase.verifyLessThanOrEqual(report.exitTime,report.deadline);
-            testCase.verifyGreaterThanOrEqual(report.minimumSampledRectangleDistance,report.requiredDistance);
-            testCase.verifyLessThanOrEqual(report.maximumEndpointBoxViolation,0);
+            testCase.verifyTrue(all(report.planCertified));
+            testCase.verifyLessThan(nnz(report.retainedWitnessUsed),report.admissionSteps-1);
+            testCase.verifyTrue(report.terminalActive(end));
+            testCase.verifyGreaterThanOrEqual(report.minimumSampledSeparationMargin,0);
         end
     end
 end

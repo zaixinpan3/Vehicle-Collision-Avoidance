@@ -14,32 +14,6 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
     tangent = [cos(yaw);sin(yaw)];normal = [-tangent(2);tangent(1)];
     speed = cfg.referenceSpeed;
     if isempty(fieldnames(estimatorCfg))
-        probeSeconds = zeros(3,1);certified = false(3,1);failures = strings(3,1);
-        for sample = 1:3
-            sampleTimer = tic;
-            target = struct("trackId","preparation-probe", ...
-                "targetPositionInertial",pose+max(12,speed*cfg.controller.sampleTime*cfg.controller.horizonSteps)*tangent+0.8*normal, ...
-                "targetVelocityInertial",-speed*tangent,"targetAccelerationInertial",zeros(2,1), ...
-                "targetHeadingInertial",yaw+pi,"targetYawRate",0, ...
-                "predictionMotion",struct("kind","finite-sensing-motion-v1", ...
-                "jerkBound",zeros(2,1),"yawAccelerationBound",0,"scalarAccelerationMaximum",0));
-            try
-                [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
-                certified(sample) = problem.metadata.planCertified;
-            catch exception
-                if ~any(string(exception.identifier)==["collisionAvoidanceController:noCertifiedContinuation", ...
-                        "collisionAvoidanceController:invalidUncertaintyChart"])
-                    rethrow(exception);
-                end
-                failures(sample) = string(exception.identifier);
-            end
-            probeSeconds(sample) = toc(sampleTimer);
-        end
-        preparation.elapsedSeconds = toc(timer);
-        preparation.pipelineProbeSeconds = probeSeconds;
-        preparation.pipelineProbeCertified = certified;
-        preparation.pipelineProbeFailures = failures;
-        preparation.scope = "Offline independent empty-target and synthetic target admissions; no commands applied";
         return;
     end
     targetSpeed = max(estimatorCfg.observer.target.domain.speedMinimum, ...
@@ -64,9 +38,7 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
             certified(sample) = problem.metadata.planCertified;
             solverCalls(sample) = problem.metadata.solverCallCount;
         catch exception
-            if ~any(string(exception.identifier)==["collisionAvoidanceController:noCertifiedContinuation", ...
-                    "collisionAvoidanceController:invalidUncertaintyChart", ...
-                    "collisionAvoidanceController:inconsistentObservation"])
+            if ~startsWith(string(exception.identifier),"collisionAvoidanceController:")
                 rethrow(exception);
             end
             failures(sample) = string(exception.identifier);

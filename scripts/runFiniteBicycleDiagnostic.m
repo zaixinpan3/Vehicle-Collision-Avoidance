@@ -15,6 +15,7 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         options.RoadCurvature (1,1) double {mustBeFinite} = 0
         options.InitialFrenetError (5,1) double {mustBeFinite} = zeros(5,1)
         options.IncludeTarget (1,1) logical = true
+        options.FullStateObservation (1,1) logical = false
         options.EnforceModelResidual (1,1) logical = false
     end
     root = fileparts(fileparts(mfilename("fullpath")));
@@ -81,7 +82,8 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
             "perception",struct("time",time,"range",30,"completeWithinRange",true));
         if index>1, ego.heldActuatorInput = inputs(end,:).';end
         target = localTargetTruth(time,[],curve);
-        if ~options.IncludeTarget || norm(target.targetPositionInertial-state(1:2))>30,target = [];end
+        if ~options.IncludeTarget || (~options.FullStateObservation ...
+                && norm(target.targetPositionInertial-state(1:2))>30), target = []; end
         if estimated
             estimatorTimer = tic;
             [estimatorContext,ego,target,~,audit] = nrmmEstimatorControllerAdapter( ...
@@ -137,6 +139,9 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         "lastEgo",ego,"lastTarget",target,"stateOrder",["x","y","yaw","vx","vy","r"], ...
         "plant","nonlinear modified-Fiala bicycle with rotated front forces and passive road load", ...
         "observations","exact current states; target only inside 30 m");
+    if options.FullStateObservation && ~estimated
+        result.observations = "Exact current states with unrestricted target visibility; nonlinear plant diagnostic";
+    end
     result.estimatorEnabled = estimated;
     result.lastAttemptMetadata = lastAttemptMetadata;
     result.computedCommand = computedCommand(1:index);

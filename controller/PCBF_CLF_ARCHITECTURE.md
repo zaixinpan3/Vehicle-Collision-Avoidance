@@ -1,5 +1,11 @@
 # One hard predictive CBF–CLF controller
 
+Current-scope note, September 11, 2026: finite perception is no longer part of
+the controller problem. The active version-17 exact scheduled-model controller
+uses one persistent target and an invariant terminal continuation. This document
+records earlier finite-encounter analysis; current use and guarantees are in
+[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
+
 The version-16 implementation uses one hard safety formulation for cruise and
 avoidance. Every held interval in the admitted horizon includes uncertain
 collision geometry, road boundaries, model-domain, actuator and slew limits.

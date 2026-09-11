@@ -48,7 +48,7 @@ function cfg = localDefaults()
     % normals are separate certificate variables. All cells share the issued
     % held input within a sample. Certificate margins are normalized across
     % the physical hard rows; every predicted interval is certified.
-    cfg.encounter = struct("perceptionExitBuffer", 0.1, ...
+    cfg.encounter = struct( ...
         "minimumCells", 2, "taylorOrder", 6, ...
         "numericalMargin", 1.0e-6, "maximumCarriedMargin", 1.0, ...
         "inputRateWeight", 0.02);
@@ -188,7 +188,6 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
-    validateattributes(cfg.encounter.perceptionExitBuffer, {'double'}, {'scalar', 'real', 'finite', 'positive'});
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0

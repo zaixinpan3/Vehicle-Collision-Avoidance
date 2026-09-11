@@ -1,5 +1,18 @@
 # Scheduled Frenet bicycle and continuation model
 
+## Exact scheduled-plant study (September 11, 2026)
+
+The current online study assumes the retained scheduled affine dynamics are
+the exact ego plant. Its finite approach schedule is followed by an explicitly
+admitted zero-speed terminal schedule with sampled velocity feedback. This is
+a model premise, not a transfer of terminal invariance to the nonlinear Fiala
+plant. State and process-error bounds must be zero for the controller study;
+arithmetic prediction enclosures remain. The terminal set, input slew and
+all-future target proof are in
+[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
+The model derivations and nonlinear comparison utilities below remain useful,
+but statements about the former online finite-perception scope are superseded.
+
 Version 9 uses `ltvBicycleModel.continuousMatrices` with finite swept tubes
 from `ltvBicycleModel.finitePredict`. The governing continuation requirement is
 [certified encounter discharge](ENCOUNTER_SCOPED_CBF_CLF.md).

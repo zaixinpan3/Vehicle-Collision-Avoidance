@@ -33,7 +33,7 @@ function report = benchmarkControllerRuntime(trial, options)
     if options.PrepareController
         preparation = prepareCollisionAvoidanceController( ...
             trial.controllerEgoEstimate{1}, ...
-            trial.perception.roadBoundaryFit{1}.roadGeometry, trial.controllerConfiguration);
+            trial.perception.roadBoundaryFit{1}.roadGeometry, trial.controllerConfiguration,trial.targetEstimate{1});
     end
     for repetition = 1:options.Repetitions
         certificate = [];

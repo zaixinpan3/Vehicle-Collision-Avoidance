@@ -1,5 +1,5 @@
 classdef targetPrediction
-    %targetPrediction Finite-horizon target flow from uncertain initial states.
+    %targetPrediction Exact online motion and offline bounded target propagation.
 
     methods (Static)
         function [offset,slope] = rectangleSupportMajorant(normal,referenceHeading,halfLength,halfWidth,anchor,errorMaximum)
@@ -24,6 +24,38 @@ classdef targetPrediction
             retained = lower<=upper;
             offset = intercept(retained);slope = derivative(retained);
         end
+        function encounter = admitExact(target, time, lane, cfg)
+        % One immutable Cartesian constant-acceleration/constant-yaw-rate flow.
+            errors = [target.positionErrorBound; target.velocityErrorBound; ...
+                target.accelerationErrorBound; target.yawErrorBound; ...
+                target.yawRateErrorBound; target.predictionYawAccelerationErrorBound];
+            if any(errors ~= 0)
+                error("collisionAvoidanceController:nonexactStudyInput", ...
+                    "The exact-state study requires zero target estimation and prediction errors.");
+            end
+            motion = target.predictionMotion;
+            if ~isempty(motion)
+                if ~isstruct(motion) || ~isscalar(motion) || ~isfield(motion,"kind") ...
+                        || ~isscalar(string(motion.kind)) ...
+                        || ~any(string(motion.kind)==["exact-motion-v1","finite-sensing-motion-v1"])
+                    error("collisionAvoidanceController:invalidEncounterContract", ...
+                        "Use the exact Cartesian motion contract.");
+                end
+                for name = ["jerkBound","yawAccelerationBound"]
+                    if isfield(motion,name) && any(motion.(name)~=0,"all")
+                        error("collisionAvoidanceController:nonexactStudyInput", ...
+                            "Exact target motion has zero jerk and yaw-acceleration uncertainty.");
+                    end
+                end
+            end
+            if startsWith(target.key,"anonymousTarget:"), target.key = "exactTarget:1"; end
+            target.predictionMotion = struct("kind","finite-sensing-motion-v1", ...
+                "jerkBound",zeros(2,1),"yawAccelerationBound",0);
+            encounter = targetPrediction.admit(target,time,lane,cfg);
+            encounter.contract.kind = "exact-motion-v1";
+            encounter.contract.validityScope = "allFutureTime";
+        end
+
         function finite = isFiniteSensing(encounter)
             finite = string(encounter.contract.kind) == "finite-sensing-motion-v1";
         end

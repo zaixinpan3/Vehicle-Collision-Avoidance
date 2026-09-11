@@ -43,7 +43,7 @@ classdef oncomingVehicleAvoidanceScenarioTest < matlab.unittest.TestCase
                     result.controllerConfiguration.vehicle.width + 2.0));
             testCase.verifyEmpty(result.attempts.targetEstimate{1});
             testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
             testCase.verifyEqual( ...
                 result.controllerConfiguration.vehicle.length, ...
                 5.0, AbsTol=0.0);
@@ -97,7 +97,7 @@ classdef oncomingVehicleAvoidanceScenarioTest < matlab.unittest.TestCase
             testCase.verifyFalse(any( ...
                 result.perception.targetDetectionAvailable));
             testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
             testCase.verifyFalse(isfield( ...
                 result.avoidance, "passingSpeedSufficient"));
         end

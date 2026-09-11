@@ -22,7 +22,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         -rateMap(selected,:),zeros(nnz(selected),count)];
     physicalBound = [physicalBound;rateLimit(selected)+ratePrior(selected);rateLimit(selected)-ratePrior(selected)];
     safetyRows = [safetyRows;false(2*nnz(selected),1)];
-    [exitMatrix, exitBound] = hardEncounterBarrier.completionRows(model, prediction, geometry);
+    [exitMatrix, exitBound, terminal] = hardEncounterBarrier.completionRows(model, prediction, geometry);
     completionRows = numel(physicalBound)+(1:numel(exitBound)).';
     hardMatrix = [hardMatrix; exitMatrix, zeros(numel(exitBound), count)];
     physicalBound = [physicalBound; exitBound];
@@ -158,6 +158,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         "equalityMatrix", zeros(0, decisionCount), "equalityBound", zeros(0, 1), ...
         "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
         "certifiedInfeasible", any(bound(~any(hardMatrix, 2)) < 0));
+    qp.terminal = terminal;
     % One unit in each hard row's native units normalizes its margin.
     scale = ones(size(bound));
     scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;

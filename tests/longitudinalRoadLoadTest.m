@@ -102,7 +102,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.8);
     ego.stateTime = 0;
     ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
-            [~, ~, second] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
+            [~, ~, second] = collisionAvoidanceController(ego, encounterTestFixture.stationaryTarget(), [0, 0; 2000, 0], cfg, []);
 
             testCase.verifyGreaterThan(norm(first.qp.clf.lyapunovMatrix-second.qp.clf.lyapunovMatrix), 1.0e-10);
             testCase.verifyGreaterThan(second.qp.clf.certificate.operatingInput(2), ...
@@ -125,9 +125,9 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
 end
 
 function [command, problem, cfg] = localProblem(speed)
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4)));
+    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps",16,"sampleTime",0.1,"stationTrustRadius",20)));
     ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
     ego.stateTime = 0;
     ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
-    [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
+    [command, ~, problem] = collisionAvoidanceController(ego, encounterTestFixture.stationaryTarget(), [0, 0; 2000, 0], cfg, []);
 end

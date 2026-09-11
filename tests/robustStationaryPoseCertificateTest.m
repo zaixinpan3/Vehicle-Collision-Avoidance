@@ -7,114 +7,50 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function aPoseBoxIsAdmittedWithoutChangingTheOptimization(testCase)
-            [ego, cfg, lane] = localInputs();
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
-
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyFalse(problem.metadata.exactPredictionAssumptionsHold);
-            testCase.verifyEqual(stored.safetyScope, "completeEncounterForDeclaredInclusion");
-            testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
-            testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, end), zeros(3, 1));
-            testCase.verifyEqual(problem.metadata.solverCallCount, 2);
+        function aPoseBoxCannotBeAdmittedAsAnExactState(testCase)
+            [ego,cfg,lane] = localInputs();
+            testCase.verifyError(@() collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),lane,cfg,[]), ...
+                "collisionAvoidanceController:nonexactStudyInput");
         end
-
-        function aCompatibleNewEstimatePreservesTheOriginalWitnessEnclosure(testCase)
-            [ego, cfg, lane] = localInputs();
-            [command, ~, ~, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            fresh = localNextEgo(ego, stored, command);
-            fresh.position(1) = fresh.position(1)+0.02;
-            fresh.controllerStateErrorBound(1) = 0.03;
-            [~, ~, problem, next] = collisionAvoidanceController(fresh, [], lane, cfg, stored);
-
-            testCase.verifyTrue(problem.metadata.certificateCompatible);
-            testCase.verifyTrue(problem.metadata.carriedWitnessFeasible);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(next.predictedState(1:2,1),stored.predictedState(1:2,2),AbsTol=1e-12);
-            testCase.verifyEqual(next.stateErrorBound(:,1),stored.stateErrorBound(:,2),AbsTol=1e-12);
-            testCase.verifyGreaterThanOrEqual(next.predictedState(:,1)-next.stateErrorBound(:,1), ...
-                stored.predictedState(:,2)-stored.stateErrorBound(:,2)-1e-10);
-            testCase.verifyLessThanOrEqual(next.predictedState(:,1)+next.stateErrorBound(:,1), ...
-                stored.predictedState(:,2)+stored.stateErrorBound(:,2)+1e-10);
+        function tinyVelocityUncertaintyIsStillNonzero(testCase)
+            [ego,cfg,lane] = localInputs();
+            ego.controllerStateErrorBound = [0;0;0;1e-14;0;0];
+            testCase.verifyError(@() collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),lane,cfg,[]), ...
+                "collisionAvoidanceController:nonexactStudyInput");
         end
-
-        function aLargerObservationBoxDoesNotInvalidateAValidPrediction(testCase)
-            [ego, cfg, lane] = localInputs();
-            [command, ~, ~, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            fresh = localNextEgo(ego, stored, command);
-            fresh.controllerStateErrorBound(1:3) = 2*stored.stateErrorBound(1:3, 2);
-            [~, ~, problem, next] = collisionAvoidanceController(fresh, [], lane, cfg, stored);
-
-            testCase.verifyTrue(problem.metadata.certificateCompatible);
-            testCase.verifyEqual(next.stateErrorBound(1:3, 1), stored.stateErrorBound(1:3, 2), AbsTol=1e-12);
-            testCase.verifyLessThanOrEqual(next.stateErrorBound(4:6, 1), stored.stateErrorBound(4:6, 2));
+        function persistentDriftCannotEnterTheExactStudy(testCase)
+            [ego,cfg,lane] = localInputs();
+            ego.controllerStateErrorBound(:) = 0;
+            cfg.model.plantModelResidualRateBound(1) = 0.001;
+            testCase.verifyError(@() collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),lane,cfg,[]), ...
+                "collisionAvoidanceController:nonexactStudyInput");
         end
-
-        function disjointStateContractsDoNotAuthorizeAFallback(testCase)
-            [ego, cfg, lane] = localInputs();
-            [command, ~, ~, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            fresh = localNextEgo(ego, stored, command);
-            fresh.position(1) = fresh.position(1)+1;
-
-            testCase.verifyError(@() collisionAvoidanceController(fresh, [], lane, cfg, stored), ...
-                "collisionAvoidanceController:inconsistentObservation");
-        end
-
-        function velocityUncertaintyCannotBeRoundedIntoAStationarySet(testCase)
-            [ego, cfg, lane] = localInputs();
-            ego.controllerStateErrorBound(4) = 1e-14;
-            [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            testCase.verifyGreaterThan(problem.prediction.egoStateErrorBound(4, end), 0);
-            testCase.verifyTrue(problem.metadata.planCertified);
-        end
-
-        function aStationaryCurvedRoadPoseBoxHasAFiniteEnclosure(testCase)
-            [ego, cfg] = localInputs();
-            cfg.referenceSpeed = 0;
-            [ego, lane] = localCurvedInputs(ego, 0);
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(stored.safetyScope, "completeEncounterForDeclaredInclusion");
-            testCase.verifyGreaterThan(stored.stateErrorBound(1:3, end), zeros(3, 1));
-        end
-
-        function movingCurvedRoadPoseBoxesKeepExactVelocityChannels(testCase)
-            [ego, cfg] = localInputs();
-            [ego, lane] = localCurvedInputs(ego, 5);
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            testCase.verifyGreaterThan(abs(problem.prediction.scheduleCurvature(1)), 0.0);
-            testCase.verifyGreaterThanOrEqual(stored.stateErrorBound(4:6, :), ...
-                zeros(3, problem.prediction.nodeCount));
-            testCase.verifyEqual(stored.safetyScope, "completeEncounterForDeclaredInclusion");
-        end
-
         function aNegativeForcingComponentIsRejectedBeforePropagation(testCase)
-            [ego, cfg, lane] = localInputs();
+            [ego,cfg,lane] = localInputs();
             cfg.model.ltvModelErrorRateBound(2) = -0.01;
-            testCase.verifyError(@() collisionAvoidanceController(ego, [], lane, cfg, []), ...
+            testCase.verifyError(@() collisionAvoidanceController(ego,[],lane,cfg,[]), ...
                 "collisionAvoidanceController:invalidConfiguration");
         end
-
-        function persistentPositionDriftIsRetainedOverTheFiniteCertificate(testCase)
-            [ego, cfg, lane] = localInputs();
-            cfg.model.plantModelResidualRateBound(1) = 0.001;
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(stored.stateErrorBound(1, end), stored.stateErrorBound(1, 1));
-        end
-
         function aClippedProjectionCannotCertifyCartesianUncertainty(testCase)
-            [ego, cfg, lane] = localInputs();
+            [ego,cfg,lane] = localInputs();
             ego.position(1) = 0;
-            testCase.verifyError(@() collisionAvoidanceController(ego, [], lane, cfg, []), ...
+            testCase.verifyError(@() collisionAvoidanceController(ego,[],lane,cfg,[]), ...
                 "collisionAvoidanceController:invalidUncertaintyChart");
         end
-
-        function everyVertexOfABoxSatisfiesItsRobustSlipDomains(testCase)
-            [ego, cfg, lane] = localInputs();
-            [~, ~, problem] = collisionAvoidanceController(ego, [], lane, cfg, []);
-            [worst, robust] = localSlipVertexResiduals(problem.prediction, cfg);
-            testCase.verifyEqual(worst, robust, AbsTol=1e-12);
+        function offlineCurvedPoseBoxesRetainVelocityChannels(testCase)
+            [ego,cfg] = localInputs();
+            [ego,route] = localCurvedInputs(ego,5);
+            [parsed,lane] = readPlanningInputs(ego,[],route,cfg);
+            [radius,valid] = stateUncertainty.toFrenet(parsed.modelState,parsed.stateErrorBound,lane);
+            testCase.verifyTrue(valid);
+            testCase.verifyGreaterThan(radius(1:3),zeros(3,1));
+            testCase.verifyEqual(radius(4:6),zeros(3,1),AbsTol=0);
+        end
+        function everyVertexOfAnOfflineBoxSatisfiesItsRobustSlipDomains(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            [worst,robust] = localSlipVertexResiduals(problem.prediction,cfg);
+            testCase.verifyEqual(worst,robust,AbsTol=1e-12);
         end
     end
 end
@@ -136,19 +72,6 @@ function [ego, cfg, lane] = localInputs()
         "stateTime", 0, "controllerStateErrorBound", [0.1; 0.1; 0.001; 0; 0; 0]);
             ego.stateTime = 0;
             ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
-end
-
-function fresh = localNextEgo(previous, stored, command)
-    state = stored.predictedState(:, 2);
-    fresh = previous;
-    fresh.position = state(1:2);
-    fresh.yawAngle = state(3);
-    fresh.longitudinalVelocity = state(4);
-    fresh.lateralVelocity = state(5);
-    fresh.yawRate = state(6);
-    fresh.stateTime = previous.stateTime+0.05;
-    fresh.perception.time = fresh.stateTime;
-    fresh.heldActuatorInput = command.actuatorInput;
 end
 
 function [worst, robust] = localSlipVertexResiduals(prediction, cfg)

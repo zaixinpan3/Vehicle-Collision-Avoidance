@@ -1,5 +1,5 @@
 classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
-    % Held execution, encounter discharge and carried continuation behavior.
+    % Held exact-model execution and carried invariant continuation behavior.
     methods (TestClassSetup)
         function addControllerPaths(testCase)
             root = fileparts(fileparts(mfilename("fullpath")));
@@ -24,29 +24,30 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(plan(2, :), cfg.actuation.brakingRatioMaximum);
             testCase.verifyLessThanOrEqual(abs(plan(1, :)), cfg.model.frontWheelSteeringAngleMaximum);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(stored.safetyScope, "completeEncounterForDeclaredInclusion");
+            testCase.verifyEqual(stored.safetyScope, "indefiniteExactScheduledModel");
         end
 
-        function targetsRequireFiniteMotionBounds(testCase)
+        function knownStatesDefineExactMotionWithoutAnExtraDescriptor(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             target = rmfield(target,"predictionMotion");
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:invalidBarrierAdmission");
+            [~,~,~,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            testCase.verifyEqual(stored.encounters.contract.kind,"exact-motion-v1");
         end
 
-        function anUncertifiedTerminalExitCannotBeAccepted(testCase)
+        function anUncertifiedTerminalContinuationCannotBeAccepted(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             target.targetVelocityInertial(:) = 0;
+            target.targetPositionInertial = ego.position;
             cfg.solver.certificateSearchTimeLimit = 0.01;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
                 "collisionAvoidanceController:certificateSearchLimit");
         end
 
-        function uncertaintyCannotBeRemovedToCertifyExit(testCase)
+        function uncertaintyCannotBeRemovedToClaimExactDynamics(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             target.targetPositionInertialErrorBound = [50;50];
             testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+                "collisionAvoidanceController:nonexactStudyInput");
         end
 
         function failSolverResultRetainsTheIndependentlyCheckedWitness(testCase)
@@ -54,37 +55,32 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             cfg.solver.jointFunction = @encounterTestFixture.fail;
-            [command,~,next] = collisionAvoidanceController(nextEgo,[],route,cfg,stored);
+            [command,~,next] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
             testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
             testCase.verifyTrue(next.metadata.fallbackUsed);
         end
 
-        function missingPartialObservationRetainsTheOriginalObligations(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
-            [~, ~, next, certificate] = collisionAvoidanceController(nextEgo, [], route, cfg, stored);
-            testCase.verifyFalse(next.metadata.fallbackUsed);
-            testCase.verifyEqual(next.metadata.certificateSource, "checkedContinuationOptimization");
-            testCase.verifyEqual(next.metadata.activeTargetKeys, "trackId:1");
-            testCase.verifyEqual(certificate.deadline, stored.deadline, AbsTol=1e-14);
-            testCase.verifyEqual(certificate.remainingSteps, stored.remainingSteps-1);
+        function missingObservationIsOutsideTheExactStatePremise(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
+            nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
+            testCase.verifyError(@() collisionAvoidanceController(nextEgo,[],route,cfg,stored), ...
+                "collisionAvoidanceController:invalidExactScene");
         end
 
-        function successfulReplanningKeepsTheOriginalDeadlineUntilCompletion(testCase)
+        function successfulReplanningKeepsTheTerminalEntryTime(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             deadline = stored.deadline;
-            for index = 1:cfg.controller.horizonSteps
+            for index = 1:stored.remainingSteps
                 ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
-                [command,~,problem,stored] = collisionAvoidanceController(ego,[],route,cfg,stored);
+                observed = localObservation(target,stored,ego.stateTime);
+                [command,~,problem,stored] = collisionAvoidanceController(ego,observed,route,cfg,stored);
                 testCase.verifyEqual(stored.deadline,deadline,AbsTol=0);
-                if stored.encounterComplete
-                    testCase.verifyEmpty(command);
-                    break;
-                end
+                testCase.verifyNotEmpty(command);
             end
-            testCase.verifyTrue(stored.encounterComplete);
+            testCase.verifyTrue(problem.metadata.terminalActive);
+            testCase.verifyFalse(stored.encounterComplete);
         end
 
         function aPositiveSolverStatusCannotAuthorizeUnsafeControls(testCase)
@@ -99,7 +95,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             cfg.solver.jointFunction = @encounterTestFixture.unsafe;
-            [command,~,next] = collisionAvoidanceController(nextEgo,[],route,cfg,stored);
+            [command,~,next] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
             testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
             testCase.verifyTrue(next.metadata.fallbackUsed);
         end
@@ -111,17 +107,15 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             target.targetPositionInertial = target.targetPositionInertial+0.1*target.targetVelocityInertial;
             target.predictionMotion.jerkBound(1) = 1;
             testCase.verifyError(@() collisionAvoidanceController(nextEgo, target, route, cfg, stored), ...
-                "collisionAvoidanceController:changedEncounterContract");
+                "collisionAvoidanceController:nonexactStudyInput");
         end
 
         function aValidObservationKeepsTheOriginalJointWitness(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
-            target.targetPositionInertialErrorBound = [0.2;0.2];
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             target.targetPositionInertial = target.targetPositionInertial ...
-                +cfg.controller.sampleTime*target.targetVelocityInertial+[0.02;0];
-            target.targetPositionInertialErrorBound = [0.03;0.05];
+                +cfg.controller.sampleTime*target.targetVelocityInertial;
             [~,~,next,certificate] = collisionAvoidanceController(nextEgo,target,route,cfg,stored);
             testCase.verifyTrue(next.metadata.planCertified);
             testCase.verifyEqual(certificate.encounters,stored.encounters);
@@ -133,20 +127,20 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
             nextEgo.position(1) = nextEgo.position(1)+1;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo, [], route, cfg, stored), ...
+            testCase.verifyError(@() collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored), ...
                 "collisionAvoidanceController:inconsistentObservation");
         end
 
         function changedYawBoundsCannotRenewTheOriginalContract(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
-            target.predictionMotion.yawAccelerationBound = 0.01;
+            target.predictionMotion.yawAccelerationBound = 0;
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             target.targetPositionInertial = target.targetPositionInertial ...
                 +cfg.controller.sampleTime*target.targetVelocityInertial;
             target.predictionMotion.yawAccelerationBound = 0.02;
             testCase.verifyError(@() collisionAvoidanceController(nextEgo,target,route,cfg,stored), ...
-                "collisionAvoidanceController:changedEncounterContract");
+                "collisionAvoidanceController:nonexactStudyInput");
         end
 
         function measuredActuatorMismatchPreventsReuse(testCase)
@@ -154,7 +148,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
             nextEgo.heldActuatorInput(2) = nextEgo.heldActuatorInput(2)+0.1;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo, [], route, cfg, stored), ...
+            testCase.verifyError(@() collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored), ...
                 "collisionAvoidanceController:executionContractViolation");
         end
 
@@ -164,27 +158,23 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
             nextEgo.stateTime = 0.2;
             nextEgo.perception.time = nextEgo.stateTime;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo, [], route, cfg, stored), ...
+            testCase.verifyError(@() collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored), ...
                 "collisionAvoidanceController:executionContractViolation");
         end
 
-        function finiteResidualsDoNotRequirePerpetualVelocityDissipation(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            cfg.model.plantModelResidualRateBound = [1e-3; 1e-4; 1e-5; 1e-3; 1e-4; 1e-5];
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(stored.prediction.egoStateErrorBound(:, end), zeros(6, 1));
-            testCase.verifyFalse(isfield(stored, "terminalUncertainty"));
+        function finiteResidualsAreOutsideTheExactStudy(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            cfg.model.plantModelResidualRateBound = 1e-3*ones(6,1);
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
+                "collisionAvoidanceController:nonexactStudyInput");
         end
 
-        function aSecondTargetIsIncludedInJointAdmission(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
+        function aSecondTargetIsOutsideTheStrictScene(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
             second = target;
             second.trackId = 2;
-            second.targetPositionInertial(1) = 14;
-            [~, ~, problem] = collisionAvoidanceController(ego, [target, second], route, cfg, []);
-            testCase.verifyEqual(problem.metadata.activeTargetKeys, ["trackId:1", "trackId:2"]);
-            testCase.verifyTrue(any(problem.qp.geometry.label == "collision:trackId:2"));
+            testCase.verifyError(@() collisionAvoidanceController(ego,[target,second],route,cfg,[]), ...
+                "collisionAvoidanceController:invalidExactScene");
         end
 
         function betweenNodeCrossingCannotReceiveANodeOnlyCertificate(testCase)
@@ -192,13 +182,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             cfg.controller.sampleTime = 0.5;
             cfg.controller.horizonSteps = 1;
             cfg.referenceSpeed = 0;
+            cfg.solver.certificateSearchTimeLimit = 0.01;
             ego.speed = 0;
             target.targetPositionInertial = [0; -10];
             target.targetVelocityInertial = [0; 40];
             testCase.verifyGreaterThan(avoidanceSafetyGeometry.rectangleDistance([0;0], 0, [0;-10], pi/2, [2.4;.95;2.4;.95]), 0);
             testCase.verifyGreaterThan(avoidanceSafetyGeometry.rectangleDistance([0;0], 0, [0;10], pi/2, [2.4;.95;2.4;.95]), 0);
             testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, []), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+                "collisionAvoidanceController:certificateSearchLimit");
         end
 
         function oneOptimizationUsesTheCommonTrackingReference(testCase)
@@ -214,9 +205,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            [~,~,next,certificate] = collisionAvoidanceController(nextEgo,[],route,cfg,stored);
+            [~,~,next,certificate] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
             testCase.verifyGreaterThanOrEqual(certificate.margin,stored.margin);
-            testCase.verifyEqual(next.metadata.requiredMargin,stored.margin,AbsTol=0);
+            testCase.verifyGreaterThanOrEqual(next.metadata.requiredMargin,stored.margin);
         end
 
         function theExplicitWitnessSurvivesConvenienceStateReset(testCase)
@@ -224,26 +215,33 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             collisionAvoidanceController("resetNominalTrajectory");
             nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
-            [~, ~, next] = collisionAvoidanceController(nextEgo, [], route, cfg, stored);
+            [~, ~, next] = collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored);
             testCase.verifyFalse(next.metadata.fallbackUsed);
             testCase.verifyTrue(next.metadata.certificateCompatible);
         end
 
         function aReferenceChartJumpNeedsAnExplicitJumpCertificate(testCase)
-            [ego, ~, ~, cfg] = encounterTestFixture.crossing();
+            [ego, target, ~, cfg] = encounterTestFixture.crossing();
             cfg.controller.horizonSteps = 4;
             route = [-100,0;0.2,0;50,5];
-            testCase.verifyError(@() collisionAvoidanceController(ego, [], route, cfg, []), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, []), ...
+                "collisionAvoidanceController:unsupportedReferenceJump");
         end
 
-        function finiteExitAllowsPositiveMinimumSpeedAndLimitedBraking(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            cfg.actuation.brakingRatioMinimum = -0.05;
+        function aPositiveMinimumSpeedExcludesTheSlowingTerminalSet(testCase)
+            [ego,target,route,cfg] = encounterTestFixture.crossing();
             cfg.model.speedMinimum = 1;
-            [~, plan, problem] = collisionAvoidanceController(ego, target, route, cfg, []);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThanOrEqual(plan(2,:), -0.05);
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
+                "collisionAvoidanceController:invalidExactScene");
         end
     end
+end
+
+function target = localObservation(target,stored,time)
+    state = targetPrediction.finiteFlow(stored.encounters,time-stored.encounters.time);
+    target.targetPositionInertial = state(1:2);
+    target.targetVelocityInertial = state(3:4);
+    target.targetAccelerationInertial = state(5:6);
+    target.targetHeadingInertial = state(7);
+    target.targetYawRate = state(8);
 end

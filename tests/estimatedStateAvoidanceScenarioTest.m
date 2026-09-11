@@ -227,7 +227,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             localVerifyUncertifiedFullHorizon(testCase,result);
         end
 
-        function straightAdmissionSucceedsBeforeChangedRoadStopsExecution( ...
+        function missingTargetStopsBeforePhysicalExecution( ...
                 testCase)
             cfg = localConfiguration(20260728);
             cfg.initialization.targetSpeedPrior = 10.0;
@@ -246,12 +246,12 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
                 Plot=false, Report=false);
 
             testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:changedExecutionContract");
-            testCase.verifyEqual(result.metrics.completedControlSteps,1);
-            testCase.verifyEqual(result.failure.time,result.scenario.sampleTime,AbsTol=1e-12);
-            testCase.verifyTrue(result.attempts.metadata{1}.planCertified);
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
+            testCase.verifyEqual(result.metrics.completedControlSteps,0);
+            testCase.verifyEqual(result.failure.time,0,AbsTol=1e-12);
+            testCase.verifyEmpty(result.attempts.metadata{1});
             testCase.verifyEmpty(result.attempts.targetEstimate{1});
-            testCase.verifyNotEmpty(result.command);
+            testCase.verifyEmpty(result.command);
         end
 
         function unseenTargetsDoNotHideAnUncertifiedEgoHorizon(testCase)
@@ -351,7 +351,8 @@ end
 function localVerifyReportedAdmissionFailure(testCase,result)
     testCase.assertTrue(result.failure.occurred);
     testCase.verifyTrue(any(string(result.failure.identifier) == [ ...
-        "collisionAvoidanceController:noCertifiedContinuation", ...
+        "collisionAvoidanceController:invalidExactScene", ...
+        "collisionAvoidanceController:nonexactStudyInput", ...
         "collisionAvoidanceController:invalidUncertaintyChart", ...
         "collisionAvoidanceController:invalidBarrierAdmission"]));
     testCase.verifyEqual(result.metrics.completedControlSteps,0);
@@ -373,6 +374,6 @@ end
 
 function localVerifyUncertifiedFullHorizon(testCase,result)
     localVerifyReportedAdmissionFailure(testCase,result);
-    testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+    testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
     testCase.verifyEmpty(result.attempts.targetEstimate{1});
 end

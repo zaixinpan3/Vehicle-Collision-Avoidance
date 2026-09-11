@@ -71,7 +71,7 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(residual, 1e-9);
             testCase.verifyLessThanOrEqual(integrated, 1e-9);
             testCase.verifyLessThanOrEqual(derivativeError, 1e-7);
-            testCase.verifyEqual(numel(problem.metadata.clfRelaxation), cfg.controller.horizonSteps);
+            testCase.verifyEqual(numel(problem.metadata.clfRelaxation), problem.prediction.stageCount);
         end
 
         function safetyAcceptanceRejectsInsufficientPredictiveSlack(testCase)
@@ -96,9 +96,10 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
             [problem, cfg] = localProblem(zeros(5, 1));
             model = problem.model;
             model.cfg.clf.decreaseRateFraction = cfg.clf.decreaseRateFraction/2;
-            second = formulateAvoidanceProblem(model, problem.prediction, problem.prediction.referencePlan);
-            testCase.verifyEqual(problem.qp.inequalityMatrix, second.inequalityMatrix, AbsTol=0);
-            testCase.verifyEqual(problem.qp.physicalBound, second.physicalBound, AbsTol=0);
+            first = formulateAvoidanceProblem(problem.model,problem.prediction,problem.inputPlan(:));
+            second = formulateAvoidanceProblem(model, problem.prediction, problem.inputPlan(:));
+            testCase.verifyEqual(first.inequalityMatrix, second.inequalityMatrix, AbsTol=0);
+            testCase.verifyEqual(first.physicalBound, second.physicalBound, AbsTol=0);
             testCase.verifyEqual(problem.qp.clf.lyapunovMatrix, second.clf.lyapunovMatrix, AbsTol=0);
             testCase.verifyEqual(problem.qp.clf.decayRate, 2*second.clf.decayRate, AbsTol=1e-12);
         end
@@ -112,14 +113,13 @@ function [a,b,c] = localCertificateMatrices(certificate,cfg)
 end
 
 function [problem, cfg] = localProblem(referenceRate)
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps", 4), ...
-        "clf", struct("referenceRate", referenceRate), ...
-        "model", struct("plantModelResidualRateBound", [0.001;0.001;0.0001;0.001;0.001;0.0001])));
-    ego = struct("position", [10;0.15], "yaw", 0.005, "speed", 10, ...
+    cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",3,"controller", struct("horizonSteps",8,"sampleTime",0.1,"stationTrustRadius",5), ...
+        "clf", struct("referenceRate", referenceRate)));
+    ego = struct("position", [10;0.15], "yaw", 0.005, "speed", 2, ...
         "stateTime", 2, "perception",struct("time",2,"range",30,"completeWithinRange",true), ...
-        "longitudinalAccelerationBias", 0.3, ...
-        "controllerStateErrorBound", [0.01;0.01;0.001;0.01;0.01;0.001]);
-    [~, ~, problem] = collisionAvoidanceController(ego, [], [0,0;2000,0], cfg, []);
+        "longitudinalAccelerationBias", 0, ...
+        "controllerStateErrorBound", zeros(6,1));
+    [~, ~, problem] = collisionAvoidanceController(ego, encounterTestFixture.stationaryTarget(), [0,0;2000,0], cfg, []);
 end
 
 function [worst, integrated, derivativeError] = localContinuousResiduals(problem, cfg)
@@ -185,7 +185,7 @@ function [qp,result,peak,endpoint] = localConcaveCell()
         "scheduleCurvature",0,"scheduleBrakingRatio",0);
     model = struct("cfg",cfg,"lane",lane,"road",road,"horizonSteps",1,"stateTime",0, ...
         "sampleTime",dt,"referenceSpeed",0,"initialEgoState",x,"encounters",[], ...
-        "previousInput",[0;0], ...
+        "previousInput",[0;0], "initialFrenetErrorBound",zeros(6,1), ...
         "requiredMargin",0,"exitMargin",inf,"longitudinalAccelerationBias",0);
     qp = formulateAvoidanceProblem(model,prediction,zeros(2,1));
     result = solveHardCbfClf.solve(qp,cfg);

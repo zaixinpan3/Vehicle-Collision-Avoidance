@@ -43,8 +43,8 @@ classdef avoidanceSafetyGeometryTest < matlab.unittest.TestCase
             ego = struct("position",[9;0],"yaw",0,"speed",1);
             ego.stateTime = 0;
             ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
-            testCase.verifyError(@() collisionAvoidanceController(ego,[],[0,0;10,0;20,0.2],cfg,[]), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyError(@() collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),[0,0;10,0;20,0.2],cfg,[]), ...
+                "collisionAvoidanceController:unsupportedReferenceJump");
         end
     end
 end

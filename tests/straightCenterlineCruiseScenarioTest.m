@@ -22,7 +22,7 @@ classdef straightCenterlineCruiseScenarioTest < matlab.unittest.TestCase
                 ControllerConfiguration=configuration, ...
                 Plot=false, Report=false);
             testCase.assertTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
 
             testCase.verifyEqual(result.scenario.targetCount, 0);
             testCase.verifyEqual(result.scenario.sampleTime, ...

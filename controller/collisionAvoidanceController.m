@@ -1,12 +1,10 @@
 function [command, predictedInput, planningProblem, certificate] = ...
         collisionAvoidanceController(egoState, targetEstimate, laneCenterline, cfg, controllerState)
-%collisionAvoidanceController Complete hard predictive certificate and sampled CLF.
-% The fourth output is the accepted continuation; supply it at the next sample.
-% Every prediction interval is certified. The retained certificate preserves
-% its absolute deadline and all admitted target obligations. New targets need
-% joint certification. Completed encounters return no further control.
-% This finite-encounter implementation does not yet meet the range-independent
-% indefinite requirement in SINGLE_PATH_RECURSIVE_FEASIBILITY.md.
+%collisionAvoidanceController Exact-state MPC with an invariant continuation.
+% Supply the fourth output at the next sample. One persistent target follows
+% the Cartesian constant-acceleration predictor exactly. The ego executes the
+% retained scheduled affine bicycle, including its declared terminal schedule.
+% No sensing radius or target exit is part of this mathematical plant study.
     persistent previousCertificate
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -28,20 +26,17 @@ function [command, predictedInput, planningProblem, certificate] = ...
     identity = struct("configuration", rmfield(cfg, "solver"), "lane", lane, ...
         "accelerationBias", ego.longitudinalAccelerationBias);
     identity.road = road;
-    identity.perceptionRange = ego.perceptionRange;
-    model.perceptionRange = ego.perceptionRange;
     if ~isempty(controllerState)
         [command, predictedInput, planningProblem, certificate] = ...
-            hardEncounterBarrier.advance(controllerState, ego, model, observations, identity, @localCommand, ...
-                @() collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,[]));
+            hardEncounterBarrier.advance(controllerState, ego, model, observations, identity, @localCommand);
         if ~explicitState, previousCertificate = certificate; end
         return;
     end
-    hardEncounterBarrier.validateAdmission(ego, observations);
+    hardEncounterBarrier.validateAdmission(ego, observations, cfg);
     encounters = struct("key", {}, "contract", {}, "center", {}, "radius", {}, ...
         "time", {}, "halfLength", {}, "halfWidth", {}, "nominalCenter", {});
     for index = 1:numel(observations)
-        encounters(end+1) = targetPrediction.admit(observations(index), model.stateTime, lane, cfg); %#ok<AGROW>
+        encounters(end+1) = targetPrediction.admitExact(observations(index), model.stateTime, lane, cfg); %#ok<AGROW>
     end
     model.encounters = encounters;
     active = ~isempty(encounters);
@@ -61,14 +56,14 @@ function [command, predictedInput, planningProblem, certificate] = ...
     command.actuationTime = model.stateTime;
     command.holdSeconds = model.sampleTime;
     predictedState = reshape(pagemtimes(prediction.egoStateMatrix, predictedInput(:)), 6, [])+prediction.egoStateOffset;
-    certificate = struct("version", 16, "identity", identity, "stateTime", model.stateTime, ...
+    certificate = struct("version", 17, "identity", identity, "stateTime", model.stateTime, ...
         "deadline", model.stateTime+prediction.stageCount*model.sampleTime, ...
         "remainingSteps", prediction.stageCount, "margin", margin, ...
         "plan", predictedInput, "decision", decision, "qp", qp, "prediction", prediction, ...
         "predictedState", predictedState, "appliedInput", predictedInput(:,1), ...
         "scheduledInput",command.actuatorInput, ...
         "stateErrorBound", prediction.egoStateErrorBound, ...
-        "encounters", encounters, "acceptance", check, "safetyScope", "completeEncounterForDeclaredInclusion", ...
+        "encounters", encounters, "acceptance", check, "safetyScope", "indefiniteExactScheduledModel", ...
         "certifiedDuration", prediction.stageCount*model.sampleTime);
     metadata = struct("planCertified", check.accepted, "certificateSource", source, ...
         "fallbackUsed", false, "solverCallCount", result.solverCalls, ...
@@ -95,8 +90,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.inputDelaySeconds = 0;
     metadata.commandActuationTime = command.actuationTime;
     metadata.recursiveFeasibilityClaimed = true;
-    metadata.exactPredictionAssumptionsHold = false;
-    metadata.tireForceConstraintScope = "intrinsicNonlinearFialaSaturationWithSeparatePlantResidual";
+    metadata.exactPredictionAssumptionsHold = true;
+    metadata.tireForceConstraintScope = "exactScheduledAffineBicycleStudy";
     metadata.executedContinuousGenerator = [prediction.continuousA(:,:,1), ...
         prediction.continuousB(:,:,1),prediction.continuousC(:,1)];
     metadata.executedResidualRateBound = prediction.modelErrorRateBound(:,1);
