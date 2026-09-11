@@ -370,10 +370,14 @@ model-inclusion checker and held-cell domain test are now implemented in
 [complete sampled-feedback verifier](FIALA_FEEDBACK_SAMPLE.md) now preserves
 shared state/input generators through a full 100 ms held sample, explicitly
 bounds affine error, and checks the command and intersample slew limits.
-Correlated propagation across actuation boundaries and complete encounters,
-full-information inlets, persistent road semantics and a scheduled executor
-remain to be implemented. The one-sample verifier exposes both enclosure
-inflation at larger inlet radii and verification cost above the actuation period.
+The subsequent [tightening and continuation implementation](FIALA_FEEDBACK_TIGHTENING.md)
+now retains correlated ego/previous-command inlets across actuation boundaries,
+checks true command changes and certifies prescribed 5 s ego policies in the
+reported local domains. Its final measured sample calls fit within 100 ms
+on this host, without a WCET claim. Complete encounter collision/road/exit
+verification, joint target-information inlets, persistent road semantics and
+a scheduled executor remain to be implemented. Larger-radius feasibility
+still depends on enclosure quality and the specified feedback law.
 The sparse repair and continuous-normal prototype do not
 supply these ingredients automatically. An affine trajectory colliding in
 exact Fiala numerical replay is a falsification of that particular model

@@ -1,5 +1,11 @@
 # Complete sampled-and-held nonlinear Fiala inclusion
 
+Implementation update, September 11, 2026: this document records the first
+milestone and its original measurements. The current implementation uses
+[tighter Fiala derivatives, second-order residuals and correlated finite-policy
+continuation](FIALA_FEEDBACK_TIGHTENING.md), with new experiments and proofs.
+The later document supersedes the implementation limitations and timings below.
+
 September 10, 2026. This implements the next gate after
 [local interval residual verification](FIALA_INTERVAL_INCLUSION.md): a complete
 100 ms sample with one feedback evaluation, explicitly bounded affine error,

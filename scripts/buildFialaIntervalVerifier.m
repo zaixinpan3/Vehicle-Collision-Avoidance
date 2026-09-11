@@ -31,6 +31,6 @@ function binary = buildFialaIntervalVerifier(outputDirectory)
     assert(flow(1,1)<=10 && flow(1,2)>=10 && flow(3,1)==0 && flow(3,2)==0);
     % Exercise rejection without relying on a nonlinear integration fixture.
     check=fialaFeedbackSampleMex(point(1:6),point(1:6),point,zeros(2,6),zeros(6,1), ...
-        ones(17,1),[.1;.005;1e-5;100],[1;1],[-1;-1;1;1;0;0]);
+        ones(17,1),[.1;.005;1e-5;100;128;realmax],[1;1],[-1;-1;1;1;0;0],[]);
     assert(~check.accepted && string(check.reason)=="executionBounds");
 end

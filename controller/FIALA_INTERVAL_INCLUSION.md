@@ -1,5 +1,10 @@
 # Verified Fiala residuals: implementation decision and first milestone
 
+Implementation update, September 11, 2026: the following first-milestone
+record retains its original experimental results. The shared tire interval
+kernel and full feedback propagation have since been improved; see
+[the tightening and finite-policy implementation](FIALA_FEEDBACK_TIGHTENING.md).
+
 September 10, 2026. Following the feedback/sparse study, the next implementation
 priority is **sound nonlinear model inclusion before further maneuver or
 runtime optimization**. Modified Fiala is the true model under the project
