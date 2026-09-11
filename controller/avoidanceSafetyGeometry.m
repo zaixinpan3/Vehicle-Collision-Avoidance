@@ -99,6 +99,16 @@ function geometry = avoidanceSafetyGeometry(model, prediction)
     else
         allGeometricRows = avoidanceSafetyGeometry('cellRows',data);
     end
+    if isfield(prediction,"separationNormals")
+        for cellIndex = 1:numel(groups)
+            directions = prediction.separationNormals{cellIndex};
+            validateattributes(directions,{'double'},{'size',[2,numel(model.encounters)],'finite','real'});
+            if any(abs(vecnorm(directions)-1)>1e-10)
+                error("collisionAvoidanceController:invalidSeparationNormal","Separation normals must be unit vectors.");
+            end
+            allGeometricRows(cellIndex) = localCellRows(cellData{cellIndex},directions);
+        end
+    end
     projectionData = cell(numel(groups),1);
     numericCfg = struct("model",struct("lateralDomainRadius",cfg.model.lateralDomainRadius, ...
         "headingDomainRadius",cfg.model.headingDomainRadius,"speedMinimum",cfg.model.speedMinimum, ...
@@ -142,7 +152,7 @@ function geometry = avoidanceSafetyGeometry(model, prediction)
         "frames", vertcat(frames{:}), "normals", {normalGroups},"local",vertcat(localGroups{:}));
 end
 
-function rows = localCellRows(data)
+function rows = localCellRows(data,prescribedNormals)
 % Numeric obstacle/road support construction shared by MATLAB and native code.
     frame = data.frame;origin = frame(1:2);tangent = frame(3:4);lateral = frame(5:6);
     heading = frame(7);positionError = frame(8:9);headingError = frame(10);
@@ -159,8 +169,12 @@ function rows = localCellRows(data)
         target = data.targets(index);
         middle = targetPrediction.finiteFlow(target,data.duration/2);
         centerEgo = origin+[tangent,lateral]*mean(nominal(1:2,:),2);
-        [~,normal] = rectangleConfigurationDistance(centerEgo,heading+mean(nominal(3,:)), ...
-            middle(1:2),middle(7),[halfLength;halfWidth;target.halfLength;target.halfWidth]);
+        if nargin > 1
+            normal = prescribedNormals(:,index);
+        else
+            [~,normal] = rectangleConfigurationDistance(centerEgo,heading+mean(nominal(3,:)), ...
+                middle(1:2),middle(7),[halfLength;halfWidth;target.halfLength;target.halfWidth]);
+        end
         normals(:,index) = normal;
         degree = data.degree;
         positionPolynomial = [target.center(1:2),target.center(3:4),target.center(5:6)/2,zeros(2,degree-2)];

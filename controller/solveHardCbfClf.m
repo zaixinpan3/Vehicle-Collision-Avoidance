@@ -13,19 +13,23 @@ function [result, problem] = localHardMarginSolve(problem, cfg)
 % The checked LP control is retained if the subordinate SOCP fails.
     physical = problem.layout.decisionCount;
     scale = problem.barrier.scale;
-    matrix = [sparse(problem.inequalityMatrix), sparse(scale)];
-    extra = sparse(2, physical+1);
-    extra(:, end) = [1; -1];
-    program = struct("P", sparse(physical+1, physical+1), ...
-        "q", [zeros(physical, 1); -1], "A", [matrix; extra], ...
-        "b", [problem.barrier.baseBound; cfg.encounter.maximumCarriedMargin; -problem.requiredMargin], ...
-        "cones", [0; numel(scale)+2], "physicalDecisionCount", physical+1, ...
-        "inactiveSlackIndex", problem.layout.relaxationIndex);
-    if isfield(problem.stageProgram, "fixedDecisionIndex")
-        program.fixedDecisionIndex = problem.stageProgram.fixedDecisionIndex;
-        program.fixedDecisionValue = problem.stageProgram.fixedDecisionValue;
+    base = problem.stageProgram;
+    rows = [base.rowMap.equality;base.rowMap.inequality];
+    marginScale = [zeros(numel(base.rowMap.equality),1);scale(base.inequalityIndices)];
+    variables = numel(base.q)+1;
+    matrix = [base.A(rows,:),sparse(marginScale)];
+    extra = sparse(2,variables);extra(:,end) = [1;-1];
+    program = struct("P",sparse(variables,variables), ...
+        "q",[zeros(variables-1,1);-1],"A",[matrix;extra], ...
+        "b",[base.b(rows)+problem.requiredMargin*marginScale; ...
+            cfg.encounter.maximumCarriedMargin;-problem.requiredMargin], ...
+        "cones",[numel(base.rowMap.equality);numel(base.rowMap.inequality)+2], ...
+        "physicalDecisionCount",physical,"inactiveSlackIndex",problem.layout.relaxationIndex);
+    if isfield(base,"fixedDecisionIndex")
+        program.fixedDecisionIndex = base.fixedDecisionIndex;
+        program.fixedDecisionValue = base.fixedDecisionValue;
     end
-    auxiliary = struct("layout", struct("decisionCount", physical+1), "stageProgram", program);
+    auxiliary = struct("layout",struct("decisionCount",physical),"stageProgram",program);
     marginSolve = localRunJointProgram(auxiliary, cfg);
     result = localEmptyResult();
     result.solverCalls = 1;
@@ -42,7 +46,7 @@ function [result, problem] = localHardMarginSolve(problem, cfg)
     problem.requiredMargin = max(problem.requiredMargin, 0.99*check.margin);
     problem.inequalityBound = problem.barrier.baseBound-problem.requiredMargin*scale;
     fixedProgram = problem.stageProgram;
-    problem.stageProgram = avoidanceStageQp(problem);
+    problem.stageProgram = updateAvoidanceStageBounds(problem);
     if isfield(fixedProgram, "fixedDecisionIndex")
         problem.stageProgram.fixedDecisionIndex = fixedProgram.fixedDecisionIndex;
         problem.stageProgram.fixedDecisionValue = fixedProgram.fixedDecisionValue;
@@ -136,10 +140,16 @@ function solve = localDefaultSolve(problem, cfg)
     linear = program.q(retained) ...
         +(program.P(retained,fixed)+program.P(fixed,retained).')*value;
     bound = program.b-program.A(:,fixed)*value;
+    % Positive objective scaling preserves minimizers. The lifted CLF
+    % epigraph can otherwise trigger a false native infeasibility report.
+    hessian = program.P(retained,retained);
+    objectiveScale = 1/max([1;abs(linear);abs(nonzeros(hessian))]);
     [nativeDecision, output] = nativeSolver( ...
-        program.P(retained,retained), linear, program.A(:,retained), bound, program.cones, ...
+        objectiveScale*hessian, objectiveScale*linear, program.A(:,retained), bound, program.cones, ...
         [cfg.solver.constraintTolerance, ...
-            cfg.solver.optimalityTolerance, cfg.solver.maxIterations]);
+            cfg.solver.optimalityTolerance*objectiveScale, cfg.solver.maxIterations]);
+    output.objectiveValue = output.objectiveValue/objectiveScale;
+    output.objectiveScale = objectiveScale;
     stageDecision = zeros(numel(program.q),1);stageDecision(retained) = nativeDecision;
     stageDecision(fixed) = value;
     flag = -7;

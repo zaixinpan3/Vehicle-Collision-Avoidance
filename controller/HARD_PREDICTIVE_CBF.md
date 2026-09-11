@@ -345,7 +345,12 @@ from the practical premise that a checked witness is available before actuation.
 After a successful event, all joint rows are retained and the same fixed-prefix
 argument in Section 4 applies. Each target has its own integer detection-step
 origin in `targetAdmissionSteps`; later observations cannot renew that origin.
-The version-15 certificate rejects earlier stored-certificate formats.
+The current version-16 certificate rejects earlier stored-certificate formats.
+Version 16 makes the sparse transcription the only online formulation and
+updates margin bounds through named inequality rows; dynamics equalities are
+unchanged. The controller still retains an open-loop affine-inclusion witness.
+The proposed exact-Fiala sampled-feedback proof is in
+[FEEDBACK_POLICY_CERTIFICATE.md](FEEDBACK_POLICY_CERTIFICATE.md).
 Version 14 removes the additional axle-force polygon; the remaining hard
 rows and the successor-witness argument are unchanged. Nonlinear Fiala
 saturation is intrinsic to its exact force law, while the affine inclusion

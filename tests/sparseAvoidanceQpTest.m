@@ -79,7 +79,7 @@ function problem = localProblem()
     [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
     % Test the physical-decision transcription directly. The separate
     % liftedAvoidanceSocpTest compares it with auxiliary-state programs.
-    problem.qp.stageProgram = avoidanceStageQp(problem.qp);
+    problem.qp.stageProgram = condensedAvoidanceTestOracle(problem.qp);
 end
 
 function [difference, margin] = localConeResiduals(problem)

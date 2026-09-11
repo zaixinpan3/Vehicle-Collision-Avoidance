@@ -63,7 +63,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             [ego,target,route,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             [ego,target] = localNext(stored,problem.model.lane,target);
-            stored.version = 14;
+            stored.version = 15;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,stored), ...
                 "collisionAvoidanceController:invalidStoredCertificate");
         end

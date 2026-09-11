@@ -36,7 +36,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             problem.model.anchorPlan = problem.prediction.referencePlan;
             problem.qp.stageProgram = avoidanceStageQp(problem.qp,problem.prediction,problem.model);
             sparseProgram = problem.qp.stageProgram;
-            condensed = avoidanceStageQp(problem.qp);
+            condensed = condensedAvoidanceTestOracle(problem.qp);
             first = problem.decision;
             second = first;
             second(1:problem.layout.planCount) = second(1:problem.layout.planCount) ...

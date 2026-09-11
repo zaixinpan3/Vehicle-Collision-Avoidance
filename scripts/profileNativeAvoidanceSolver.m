@@ -60,7 +60,9 @@ function result = profileNativeAvoidanceSolver(inputDirectory, outputDirectory)
         if isfield(program,'inactiveSlackIndex'),retained(program.inactiveSlackIndex)=false;end
         assert(~isfield(program,'fixedDecisionIndex'));
         p=program.P(retained,retained);q=program.q(retained);a=program.A(:,retained);b=program.b;
-        options=[cfg.solver.constraintTolerance,cfg.solver.optimalityTolerance,cfg.solver.maxIterations];
+        objectiveScale=1/max([1;abs(q);abs(nonzeros(p))]);
+        p=objectiveScale*p;q=objectiveScale*q;
+        options=[cfg.solver.constraintTolerance,cfg.solver.optimalityTolerance*objectiveScale,cfg.solver.maxIterations];
         for replay=1:6
             timer=tic;
             [point,information]=profileAvoidanceNativeMex(p,q,a,b,program.cones,options);

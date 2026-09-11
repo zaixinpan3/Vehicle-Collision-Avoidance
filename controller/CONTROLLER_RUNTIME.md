@@ -1,12 +1,21 @@
 # Controller runtime and numerical implementation
 
-The current version-15 controller solves one hard-margin LP followed by a CLF
+The current version-16 controller solves one hard-margin LP followed by a CLF
 SOCP and independently checks every executable decision. All intervals use
 uncertain held-flow certificates. Continuation fixes the executed prefix and
 keeps the original geometry and deadline; a failed replacement retains the
 checked incumbent. Numerical MATLAB and generated geometry kernels implement
-the same constraints. The lifted SOCP utility is an equivalent numerical
-transcription used by tests, not a selectable controller policy.
+the same constraints. Both lexicographic stages and all rebuilds use the
+sparse stage-local transcription. Explicit row maps keep dynamics equalities separate from
+margin-dependent inequalities. The condensed program exists only as a test
+oracle; complete physical rows remain in the independent checker. Positive
+objective scaling improves native numerical conditioning without changing
+the hard constraints or the mathematical objective minimizers.
+
+See [the feedback and sparse study](FEEDBACK_SPARSE_EXPERIMENTS.md) for
+current measurements and [the conditional feedback proof](FEEDBACK_POLICY_CERTIFICATE.md).
+The online witness remains open-loop; the feedback proof is a distinct
+proposed construction with explicit implementation obligations.
 
 The build entry `scripts/buildAvoidanceGeometryKernel.m` generates the two
 complete-interval geometry kernels. No nominal-only check kernel is generated.

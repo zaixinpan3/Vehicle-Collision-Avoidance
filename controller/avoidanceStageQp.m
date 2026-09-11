@@ -1,29 +1,21 @@
 function program = avoidanceStageQp(qp,prediction,model)
-%avoidanceStageQp Convert the finite predictive QCQP to sparse Lorentz cones.
-% The native convention is A*z+s=b. The first cone is the (possibly empty)
-% equality cone, the second is the nonnegative cone, and each remaining
-% cone encodes a quadratic upper bound on one CLF control point.
-    if nargin == 3
-        program = localLiftedProgram(qp,prediction,model);
-        return;
+%avoidanceStageQp Build the sole sparse stage-local conic formulation.
+% Rebuilds retain the original prediction coordinates through explicit context.
+    if nargin == 1
+        prediction = qp.stageProgram.context.prediction;
+        model = qp.stageProgram.context.model;
     end
-    constraints = qp.clf.constraints;
-    matrices = cell(numel(constraints), 1);
-    bounds = cell(numel(constraints), 1);
-    for index = 1:numel(constraints)
-        constraint = constraints(index);
-        tMap = -constraint.linear.'*constraint.map;
-        slackIndex = qp.layout.relaxationIndex(constraint.stage);
-        tMap(slackIndex) = tMap(slackIndex)+1;
-        tOffset = -constraint.linear.'*constraint.offset-constraint.constant;
-        matrices{index} = -[tMap; 2*constraint.root*constraint.map; tMap];
-        bounds{index} = [tOffset+1; 2*constraint.root*constraint.offset; tOffset-1];
+    program = localLiftedProgram(qp,prediction,model);
+    program.context = struct("prediction",prediction,"model",model);
+    equalities = program.cones(1);
+    program.rowMap = struct("equality",(1:equalities).', ...
+        "inequality",equalities+(1:numel(program.inequalityIndices)).');
+    program.inequalityOffset = program.b(program.rowMap.inequality) ...
+        -qp.inequalityBound(program.inequalityIndices);
+    if isfield(qp,"stageProgram") && isfield(qp.stageProgram,"fixedDecisionIndex")
+        program.fixedDecisionIndex = qp.stageProgram.fixedDecisionIndex;
+        program.fixedDecisionValue = qp.stageProgram.fixedDecisionValue;
     end
-    program = struct("P", sparse(triu((qp.Hessian+qp.Hessian.')/2)), "q", qp.linear, ...
-        "A", sparse([qp.inequalityMatrix; vertcat(matrices{:})]), ...
-        "b", [qp.inequalityBound; vertcat(bounds{:})], ...
-        "cones", [0; numel(qp.inequalityBound); 10*ones(numel(constraints), 1)], ...
-        "physicalDecisionCount", qp.layout.decisionCount);
 end
 
 function program = localLiftedProgram(qp,prediction,model)
@@ -107,14 +99,18 @@ function program = localLiftedProgram(qp,prediction,model)
             model.previousInput(input),model.sampleTime*rates(input));
     end
     maximum = min(maximum,slewSupport);
+    % A row omitted at admission must remain redundant for every margin
+    % used by either stage, including the maximization LP.
+    strongestBound = qp.barrier.baseBound(1:rowStart) ...
+        -cfg.encounter.maximumCarriedMargin*qp.barrier.scale(1:rowStart);
     error = 64*(qp.layout.planCount+1)^2*eps*(1+abs(geometryMap)*max(abs(lower),abs(upper)) ...
-        +abs(qp.inequalityBound(1:rowStart)));
-    retained = maximum+error>qp.inequalityBound(1:rowStart);
+        +abs(qp.inequalityBound(1:rowStart))+abs(strongestBound));
+    retained = maximum+error>strongestBound;
     if any(lower>upper),retained(:) = true;end
     inequalityIndices = [find(retained);(rowStart+1:numel(hardBound)).'];
     hard = hard(inequalityIndices,:);
     hardBound = hardBound(inequalityIndices);
-    uniqueRows = localUndominatedRows(hard,hardBound);
+    uniqueRows = localUndominatedRows([hard,sparse(qp.barrier.scale(inequalityIndices))],hardBound);
     inequalityIndices = inequalityIndices(uniqueRows);
     hard = hard(uniqueRows,:);hardBound = hardBound(uniqueRows);
     cones = qp.clf.constraints;

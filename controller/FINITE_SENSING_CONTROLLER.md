@@ -1,6 +1,6 @@
 # Complete finite-sensing encounter controller
 
-As of September 10, 2026, the only controller is the version-15 hard predictive
+As of September 10, 2026, the only controller is the version-16 hard predictive
 certificate described in [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 All prediction intervals are certified. Cruise and avoidance share one
 continuous-input optimization, with no discrete maneuver or completion-policy
@@ -60,10 +60,12 @@ No nonlinear or physical enclosure is established merely by removing rows.
 
 ## Numerical implementation
 
-The sole online program uses condensed control and CLF-slack coordinates.
+The sole online program uses sparse cell states, controls and CLF slacks.
+Named row maps preserve dynamics equalities on margin updates and rebuilds.
+Complete original physical constraints remain in the independent checker.
 A hard-margin LP precedes a subordinate CLF SOCP. The independent checker
 charges the immutable numerical reserve and rejects negative hard margins.
-The equivalent lifted SOCP utility remains a numerical comparison, with tests
+The test-only condensed oracle remains a numerical comparison, with tests
 for identical hard decisions, CLF cone values and objective differences; it
 is not an alternate controller configuration.
 

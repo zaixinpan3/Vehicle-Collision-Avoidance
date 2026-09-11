@@ -47,7 +47,7 @@ classdef hardEncounterBarrier
         end
 
         function [stored, problem] = admit(stored, problem)
-            stored.version = 15;
+            stored.version = 16;
             stored.admissionTime = stored.stateTime;
             stored.consumedSteps = 0;
             stored.targetAdmissionSteps = zeros(numel(stored.encounters), 1);
@@ -130,7 +130,7 @@ classdef hardEncounterBarrier
                 qp = stored.qp;
                 qp.requiredMargin = stored.margin;
                 qp.inequalityBound = qp.barrier.baseBound-stored.margin*qp.barrier.scale;
-                qp.stageProgram.b(1:numel(qp.inequalityBound)) = qp.inequalityBound;
+                qp.stageProgram = updateAvoidanceStageBounds(qp);
                 qp.stageProgram.fixedDecisionIndex = (1:2*consumed).';
                 qp.stageProgram.fixedDecisionValue = rootPlan(:, 1:consumed);
                 qp.stageProgram.fixedDecisionValue = qp.stageProgram.fixedDecisionValue(:);
@@ -201,9 +201,9 @@ function localValidateStored(stored, identity)
     required = ["version", "admissionTime", "consumedSteps", "encounterComplete", ...
         "witnessModel", "qp", "decision", "prediction", "metadata", "identity", "targetAdmissionSteps"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored, required)) ...
-            || stored.version ~= 15 || stored.encounterComplete
+            || stored.version ~= 16 || stored.encounterComplete
         error("collisionAvoidanceController:invalidStoredCertificate", ...
-            "Continuation requires an active version-15 hard encounter certificate.");
+            "Continuation requires an active version-16 hard encounter certificate.");
     end
     if ~isequaln(identity, stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...

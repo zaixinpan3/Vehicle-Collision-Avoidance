@@ -1,6 +1,6 @@
 function result = profileForceFreeAdmission(inputDirectory, outputDirectory)
 %profileForceFreeAdmission Measure saved first-admission phases without plant execution.
-% Three warm replay samples and one instrumented profile are observational.
+% Three sequential replay samples and one instrumented profile are observational.
     arguments
         inputDirectory (1,1) string
         outputDirectory (1,1) string
@@ -14,7 +14,7 @@ function result = profileForceFreeAdmission(inputDirectory, outputDirectory)
     target=trial.attempts.targetEstimate{1};
     cfg=trial.controllerConfiguration;
     cfg.solver.jointFunction=@timedSolver;
-    calls=struct('seconds',{},'variables',{},'rows',{},'cones',{},'iterations',{});
+    calls=struct('seconds',{},'variables',{},'rows',{},'cones',{},'iterations',{},'status',{});
     result=struct();
     for replay=1:3
         replayTimer=tic;
@@ -44,6 +44,6 @@ function result = profileForceFreeAdmission(inputDirectory, outputDirectory)
         iterations=NaN;
         if isfield(solve.output,'iterations'),iterations=solve.output.iterations;end
         calls(end+1)=struct('seconds',seconds,'variables',numel(program.q), ...
-            'rows',size(program.A,1),'cones',program.cones,'iterations',iterations);
+            'rows',size(program.A,1),'cones',program.cones,'iterations',iterations,'status',solve.output.status);
     end
 end

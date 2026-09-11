@@ -2,6 +2,14 @@ classdef ltvBicycleModel
     %ltvBicycleModel Held-input bicycle dynamics and finite-horizon prediction.
 
     methods (Static)
+        function derivative = fialaWorldDynamics(state,input,cfg)
+        % Authoritative nonlinear Fiala flow in [px,py,psi,vx,vy,r].
+        % Curvature zero makes the existing Frenet kernel Cartesian exactly.
+        % This method does not add an affine-model or empirical plant residual.
+            parameters = modifiedFialaTire.parameters(cfg);
+            derivative = localNominalFlow(state,input,0,cfg,parameters,0);
+        end
+
         function [states,stateJacobian,inputJacobian] = nominalRollout(model,inputs)
         % Nonlinear anchor prediction; safety uses complete uncertain held tubes.
             cfg = model.cfg;

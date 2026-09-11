@@ -163,7 +163,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
     qp.barrier = struct("baseBound", bound, "scale", scale, ...
         "completionRows", completionRows);
-    qp.stageProgram = avoidanceStageQp(qp);
+    qp.stageProgram = avoidanceStageQp(qp,prediction,model);
 
 end
 

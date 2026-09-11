@@ -11,6 +11,9 @@ is outside this requirement. Version 14 removes additional tire-force polygons;
 this does not by itself validate nonlinear model-error bounds or fix the
 scenario's road-update issue. Version 15 separates the initial planning
 window from complete witness length and renews target-free certificates.
+Version 16 repairs sparse numerical integration without changing that safety
+policy. The exact-Fiala feedback-policy theorem and its remaining implementation
+obligations are in [FEEDBACK_POLICY_CERTIFICATE.md](FEEDBACK_POLICY_CERTIFICATE.md).
 
 The controller has one safety formulation and execution
 contract, without a selectable weaker lookahead policy. Recursive feasibility
@@ -38,7 +41,7 @@ Expiry during target-free execution renews the same formulation. First target
 detection starts a fresh complete admission, preserving the measured state and
 previous applied input. Exhaustion alone cannot report target exit.
 
-The active version-15 hard encounter certificate appends a new target's swept
+The active version-16 hard encounter certificate appends a new target's swept
 collision constraints and endpoint exit constraint to the original hard
 program. The old constraints, absolute deadline and executed controls are
 preserved. Admission requires a checked joint decision. The incumbent can be
