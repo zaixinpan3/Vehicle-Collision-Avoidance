@@ -51,7 +51,7 @@ function result = runRobustVelocityCertificateScenario()
             abs(truth-stored.predictedState(:, 1))-stored.stateErrorBound(:, 1), [], "all"));
         dimensions = [cfg.vehicle.length/2; cfg.vehicle.width/2; 2.4; 0.95];
         for vertex = 1:64
-            distance = rectangleConfigurationDistance(truth(1:2, vertex), truth(3, vertex), ...
+            distance = avoidanceSafetyGeometry.rectangleDistance(truth(1:2, vertex), truth(3, vertex), ...
                 [60; 0], 0, dimensions);
             minClearance = min(minClearance, distance);
         end

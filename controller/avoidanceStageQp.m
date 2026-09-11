@@ -1,20 +1,34 @@
-function program = avoidanceStageQp(qp,prediction,model)
-%avoidanceStageQp Build the sole sparse stage-local conic formulation.
-% Rebuilds retain the original prediction coordinates through explicit context.
-    if nargin == 1
-        prediction = qp.stageProgram.context.prediction;
-        model = qp.stageProgram.context.model;
-    end
-    program = localLiftedProgram(qp,prediction,model);
-    program.context = struct("prediction",prediction,"model",model);
-    equalities = program.cones(1);
-    program.rowMap = struct("equality",(1:equalities).', ...
-        "inequality",equalities+(1:numel(program.inequalityIndices)).');
-    program.inequalityOffset = program.b(program.rowMap.inequality) ...
-        -qp.inequalityBound(program.inequalityIndices);
-    if isfield(qp,"stageProgram") && isfield(qp.stageProgram,"fixedDecisionIndex")
-        program.fixedDecisionIndex = qp.stageProgram.fixedDecisionIndex;
-        program.fixedDecisionValue = qp.stageProgram.fixedDecisionValue;
+classdef avoidanceStageQp
+    %avoidanceStageQp Sparse transcription and named bound updates.
+
+    methods (Static)
+        function program = build(qp,prediction,model)
+        %avoidanceStageQp Build the sole sparse stage-local conic formulation.
+        % Rebuilds retain the original prediction coordinates through explicit context.
+            if nargin == 1
+                prediction = qp.stageProgram.context.prediction;
+                model = qp.stageProgram.context.model;
+            end
+            program = localLiftedProgram(qp,prediction,model);
+            program.context = struct("prediction",prediction,"model",model);
+            equalities = program.cones(1);
+            program.rowMap = struct("equality",(1:equalities).', ...
+                "inequality",equalities+(1:numel(program.inequalityIndices)).');
+            program.inequalityOffset = program.b(program.rowMap.inequality) ...
+                -qp.inequalityBound(program.inequalityIndices);
+            if isfield(qp,"stageProgram") && isfield(qp.stageProgram,"fixedDecisionIndex")
+                program.fixedDecisionIndex = qp.stageProgram.fixedDecisionIndex;
+                program.fixedDecisionValue = qp.stageProgram.fixedDecisionValue;
+            end
+        end
+
+        function program = updateBounds(qp)
+        %avoidanceStageQp.updateBounds Update hard RHS values without touching equalities.
+        % The retained row reduction is valid for the entire carried-margin interval.
+            program = qp.stageProgram;
+            program.b(program.rowMap.inequality) = program.inequalityOffset ...
+                +qp.inequalityBound(program.inequalityIndices);
+        end
     end
 end
 

@@ -17,18 +17,18 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
     methods (Test)
         function roadLoadOpposesMotionAndPreservesRest(testCase, speed)
             cfg = collisionAvoidanceControllerConfig();
-            positive = longitudinalRoadLoad(speed, cfg);
-            negative = longitudinalRoadLoad(-speed, cfg);
+            positive = ltvBicycleModel.roadLoad(speed, cfg);
+            negative = ltvBicycleModel.roadLoad(-speed, cfg);
 
             testCase.verifyGreaterThanOrEqual(positive*speed, 0.0);
             testCase.verifyEqual(negative, -positive, AbsTol=1.0e-12);
-            testCase.verifyEqual(longitudinalRoadLoad(0, cfg), 0.0, AbsTol=0.0);
+            testCase.verifyEqual(ltvBicycleModel.roadLoad(0, cfg), 0.0, AbsTol=0.0);
         end
 
         function aerodynamicForceHasThePhysicalQuadraticScaling(testCase)
             cfg = collisionAvoidanceControllerConfig();
-            [~, ~, first] = longitudinalRoadLoad(10, cfg);
-            [~, ~, second] = longitudinalRoadLoad(20, cfg);
+            [~, ~, first] = ltvBicycleModel.roadLoad(10, cfg);
+            [~, ~, second] = ltvBicycleModel.roadLoad(20, cfg);
 
             testCase.verifyEqual(first.aerodynamicForce, ...
                 0.5*cfg.roadLoad.airDensity*cfg.roadLoad.dragCoefficient ...
@@ -41,9 +41,9 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             cfg = collisionAvoidanceControllerConfig(struct("roadLoad", struct( ...
                 "rollingSpeedCoefficient", 1.0e-4, "rollingQuarticCoefficient", 1.0e-8)));
             step = 1.0e-6;
-            [~, slope] = longitudinalRoadLoad(speed, cfg);
-            finiteDifference = (longitudinalRoadLoad(speed+step, cfg) ...
-                - longitudinalRoadLoad(speed-step, cfg))/(2*step);
+            [~, slope] = ltvBicycleModel.roadLoad(speed, cfg);
+            finiteDifference = (ltvBicycleModel.roadLoad(speed+step, cfg) ...
+                - ltvBicycleModel.roadLoad(speed-step, cfg))/(2*step);
 
             testCase.verifyEqual(slope, finiteDifference, AbsTol=1.0e-5);
         end
@@ -52,7 +52,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             cfg = collisionAvoidanceControllerConfig();
             initial = [0; 0; 0; 15; 0; 0];
             [stateMatrix, inputMatrix, affine] = ltvBicycleModel.stageMatrices(0, 15, 0.05, cfg);
-            balance = longitudinalRoadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
+            balance = ltvBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
             coasting = stateMatrix*initial+affine;
             cruise = coasting+inputMatrix*[0; balance];
 
@@ -83,7 +83,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
 
         function theCruiseEquilibriumAccountsForPassiveForces(testCase)
             [~, problem, cfg] = localProblem(15);
-            requiredInput = longitudinalRoadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
+            requiredInput = ltvBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
 
             testCase.verifyEqual(problem.qp.clf.certificate.operatingInput, [0;requiredInput], AbsTol=1.0e-12);
             testCase.verifyGreaterThan(requiredInput, 0.0);

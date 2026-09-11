@@ -111,7 +111,7 @@ and M_i(tau)=Phi_i(tau)+Gamma_i(tau) K_i. Variation of constants gives
 Here w_i(s) is the time-varying nonlinear residual in (1). Formula (3)
 is exact before enclosure. In general M_i(tau) differs from
 exp((A_i+B_i K_i)tau). For x_dot=u, K=-1 and h=1, these transitions are
-respectively zero and exp(-1). `sampledFeedbackTransition` implements (3)
+respectively zero and exp(-1). `stateUncertainty.sampledFeedbackTransition` implements (3)
 in floating point for design and testing, not validated interval arithmetic.
 
 For any support direction a, a sound bound on the last integral is
@@ -366,7 +366,7 @@ nonlinear swept enclosures and a feasible nonlinear initializer.
 
 The conditional implication in Section 5 is proved. A first local nonlinear
 model-inclusion checker and held-cell domain test are now implemented in
-[fialaResidualCertificate](FIALA_INTERVAL_INCLUSION.md). A subsequent
+[fialaCertificate.residual](FIALA_INTERVAL_INCLUSION.md). A subsequent
 [complete sampled-feedback verifier](FIALA_FEEDBACK_SAMPLE.md) now preserves
 shared state/input generators through a full 100 ms held sample, explicitly
 bounds affine error, and checks the command and intersample slew limits.

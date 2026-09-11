@@ -14,7 +14,7 @@ function summary = evaluateFialaFeedbackSample(outputDirectory)
     addpath(nativeDirectory);
     cfg=collisionAvoidanceControllerConfig(struct('controller',struct('sampleTime',.1)));
     state=[0;0;0;10;0;0];
-    trim=longitudinalRoadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg);
+    trim=ltvBicycleModel.roadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg);
     gain=[0,-.3,-1,0,-.03,-.03;-.2,0,0,-.3,0,0];
     steering=[0,.04,-.04,0,.04,-.04,0,.04,-.04,0];
     radii=[repmat(1e-4,1,3),repmat(1e-3,1,3),repmat(1e-2,1,3),1e-4];
@@ -25,7 +25,7 @@ function summary = evaluateFialaFeedbackSample(outputDirectory)
         input=[steering(index);trim];
         inletRadius=radii(index);measurementRadius=inletRadius/10;
         timer=tic;
-        certificate=certifyFialaFeedbackSample(state-inletRadius,state+inletRadius, ...
+        certificate=fialaCertificate.sample(state-inletRadius,state+inletRadius, ...
             [state;input],gain,measurementRadius*ones(6,1),input,cfg, ...
             maximumCellDuration=maximumCellDuration(index));
         elapsed=toc(timer);

@@ -23,33 +23,33 @@ classdef fialaResidualCertificateTest < matlab.unittest.TestCase
         end
         function shrinkingDomainReducesTangentResidualQuadratically(testCase)
             [cfg,center,radius,a,b,c]=localFixture("trim");
-            large=fialaResidualCertificate(center-radius,center+radius,a,b,c,cfg);
-            small=fialaResidualCertificate(center-radius/2,center+radius/2,a,b,c,cfg);
+            large=fialaCertificate.residual(center-radius,center+radius,a,b,c,cfg);
+            small=fialaCertificate.residual(center-radius/2,center+radius/2,a,b,c,cfg);
             testCase.verifyLessThan(max(small.residualRateBound),.35*max(large.residualRateBound));
         end
         function exactYawKinematicRowHasZeroAffineRemainder(testCase)
             [cfg,center,radius,a,b,c]=localFixture("trim");
-            certificate=fialaResidualCertificate(center-radius,center+radius,a,b,c,cfg);
+            certificate=fialaCertificate.residual(center-radius,center+radius,a,b,c,cfg);
             testCase.verifyEqual(certificate.residual(3,:),[0,0]);
         end
         function tireRatioEndpointIsRejected(testCase)
             [cfg,center,radius,a,b,c]=localFixture("trim");upper=center+radius;upper(8)=1;
-            testCase.verifyError(@()fialaResidualCertificate(center-radius,upper,a,b,c,cfg), ...
+            testCase.verifyError(@()fialaCertificate.residual(center-radius,upper,a,b,c,cfg), ...
                 'collisionAvoidanceController:invalidFialaInterval');
         end
         function speedFloorIntersectionIsRejected(testCase)
             [cfg,center,radius,a,b,c]=localFixture("trim");lower=center-radius;lower(4)=cfg.model.scheduleSpeedFloor;
-            testCase.verifyError(@()fialaResidualCertificate(lower,center+radius,a,b,c,cfg), ...
+            testCase.verifyError(@()fialaCertificate.residual(lower,center+radius,a,b,c,cfg), ...
                 'collisionAvoidanceController:invalidFialaInterval');
         end
         function actualSlipOutsideRegularChartIsRejected(testCase)
             [cfg,center,radius,a,b,c]=localFixture("trim");upper=center+radius;upper(7)=1.6;
-            testCase.verifyError(@()fialaResidualCertificate(center-radius,upper,a,b,c,cfg), ...
+            testCase.verifyError(@()fialaCertificate.residual(center-radius,upper,a,b,c,cfg), ...
                 'collisionAvoidanceController:invalidFialaInterval');
         end
         function arithmeticOverflowCannotReturnACertificate(testCase)
             [cfg,center,radius,a,b,c]=localFixture("trim");upper=center+radius;upper(4)=realmax;
-            testCase.verifyError(@()fialaResidualCertificate(center-radius,upper,a,b,c,cfg), ...
+            testCase.verifyError(@()fialaCertificate.residual(center-radius,upper,a,b,c,cfg), ...
                 'collisionAvoidanceController:invalidFialaInterval');
         end
         function heldFeedbackCellEstablishesItsOwnDomainContainment(testCase)
@@ -72,7 +72,7 @@ end
 
 function [cfg,center,radius,a,b,c]=localFixture(kind)
     cfg=collisionAvoidanceControllerConfig();state=[0;0;0;10;0;0];
-    input=[0;longitudinalRoadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg)];
+    input=[0;ltvBicycleModel.roadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg)];
     switch kind
         case "adhesion",input(1)=.04;
         case "switch"
@@ -87,7 +87,7 @@ end
 
 function [certificate,residuals]=localResidualSamples(kind)
     [cfg,center,radius,a,b,c]=localFixture(kind);
-    certificate=fialaResidualCertificate(center-radius,center+radius,a,b,c,cfg);
+    certificate=fialaCertificate.residual(center-radius,center+radius,a,b,c,cfg);
     corners=2*double(dec2bin(0:255,8).'-'0')-1;
     interior=sin((1:8).'*(1:400)*sqrt(2));points=center+radius.*[corners,interior];
     residuals=zeros(6,size(points,2));
@@ -103,5 +103,5 @@ function certificate=localFeedbackCell(duration,narrowInput)
     feedback=struct('inletLower',center(1:6)-1e-4,'inletUpper',center(1:6)+1e-4, ...
         'nominal',center,'gain',[0,-.3,-1,0,-.03,-.03;-.2,0,0,-.3,0,0], ...
         'measurementRadius',1e-5*ones(6,1),'duration',duration);
-    certificate=fialaResidualCertificate(center-radius,center+radius,a,b,c,cfg,feedback);
+    certificate=fialaCertificate.residual(center-radius,center+radius,a,b,c,cfg,feedback);
 end

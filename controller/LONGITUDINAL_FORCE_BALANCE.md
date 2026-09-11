@@ -25,7 +25,7 @@ adapter field. Subtracting aerodynamic force from total contact force gives
 the same net force as subtracting both road loads from actuator force.
 `command.longitudinalAcceleration = gBeta*beta` remains a derived diagnostic.
 
-`longitudinalRoadLoad.m` implements
+`ltvBicycleModel.roadLoad` implements
 
 \[
 F_{\mathrm{aero}}=\tfrac12\rho_{\mathrm{air}} C_d A_f v_x|v_x|,\qquad

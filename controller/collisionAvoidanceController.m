@@ -44,7 +44,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     model.encounters = encounters;
     active = ~isempty(encounters);
     preparationSeconds = toc(timer);
-    [model,prediction,qp,result,check,planningTiming] = planCompleteEncounter(model);
+    [model,prediction,qp,result,check,planningTiming] = hardEncounterBarrier.plan(model);
     predictionSeconds = planningTiming.predictionSeconds;
     formulationSeconds = planningTiming.formulationSeconds;
     solveSeconds = planningTiming.solveSeconds;
@@ -187,7 +187,7 @@ function command = localCommand(inputPlan, model, prediction,stage)
     axleLateralForce = tireSlope.*[frontSlipAngle; rearSlipAngle] ...
         +ratioSlope*brakingRatio+tireIntercept;
     axleLongitudinalForce = modifiedFialaTire.longitudinalForce(brakingRatio, cfg);
-    [roadForce, ~, roadComponents] = longitudinalRoadLoad(state(4), cfg);
+    [roadForce, ~, roadComponents] = ltvBicycleModel.roadLoad(state(4), cfg);
     netLongitudinalAcceleration = longitudinalAcceleration ...
         - roadForce/cfg.vehicle.m+model.longitudinalAccelerationBias;
     axleRollingResistance = roadComponents.rollingResistanceForce ...

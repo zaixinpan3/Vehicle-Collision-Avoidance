@@ -51,7 +51,7 @@ function report = runEncounterCertificateScenario(options)
                 +problem.qp.clf.decayRate*(error.'*p*error)-problem.metadata.clfRelaxation(1);
             maximumClfResidual = max(maximumClfResidual, residual);
             [position, yaw] = laneGeometry.fromFrenet(trueState, problem.model.lane);
-            distance = rectangleConfigurationDistance(position, yaw, [15;-4+32*time], pi/2, [2.4;.95;2.4;.95]);
+            distance = avoidanceSafetyGeometry.rectangleDistance(position, yaw, [15;-4+32*time], pi/2, [2.4;.95;2.4;.95]);
             minimumDistance = min(minimumDistance, distance);
             trueState = transition(1:6,1:6)*trueState+transition(1:6,7:12)*(b*input+c+forcing);
         end

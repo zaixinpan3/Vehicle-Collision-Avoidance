@@ -45,7 +45,7 @@ function result = evaluateCertifiedPrefixCost(inputDirectory,outputDirectory)
             samples(replay)=toc(timer);statuses(replay)=info.status;
             expanded=zeros(numel(p.q),1);expanded(keep)=x;expanded(fixed)=fixedValue;
             decision=expanded(1:qp.layout.decisionCount);decision=localRepair(qp,decision,cfg);
-            check=certifyAvoidancePlan(qp,problem.prediction,problem.model,decision);
+            check=solveHardCbfClf.certify(qp,problem.prediction,problem.model,decision);
             accepted(replay)=any(info.status==[1,4]) && check.accepted;
         end
         entry=struct('method',methods(method),'nativeRows',size(matrix,1),'nativeVariables',nnz(keep), ...

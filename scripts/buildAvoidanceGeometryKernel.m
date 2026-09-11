@@ -9,7 +9,7 @@ function information = buildAvoidanceGeometryKernel()
     file = fopen(wrapper,"w");
     assert(file>=0,"buildAvoidanceGeometryKernel:writeFailed","Cannot create generated adapter.");
     cleanup = onCleanup(@() fclose(file));
-    fprintf(file,"function rows = avoidanceCellRowsKernel(data)\nrows = avoidanceSafetyGeometry('cellRows',data);\nend\n");
+    fprintf(file,"function rows = avoidanceCellRowsKernel(data)\nrows = avoidanceSafetyGeometry.cellRows(data);\nend\n");
     clear cleanup;
     target = struct("center",zeros(8,1),"radius",zeros(8,1), ...
         "contract",struct("jerkBound",zeros(2,1),"yawAccelerationBound",0), ...
@@ -31,7 +31,7 @@ function information = buildAvoidanceGeometryKernel()
     file = fopen(wrapper,"w");
     assert(file>=0,"buildAvoidanceGeometryKernel:writeFailed","Cannot create generated adapter.");
     cleanup = onCleanup(@() fclose(file));
-    fprintf(file,"function rows = avoidanceProjectedRowsKernel(data)\nrows = avoidanceSafetyGeometry('projectRows',data);\nend\n");
+    fprintf(file,"function rows = avoidanceProjectedRowsKernel(data)\nrows = avoidanceSafetyGeometry.projectRows(data);\nend\n");
     clear cleanup;
     clear avoidanceProjectedRowsKernelMex;
     codegen("-config",settings,wrapper,"-args",{localProjectionType()}, ...

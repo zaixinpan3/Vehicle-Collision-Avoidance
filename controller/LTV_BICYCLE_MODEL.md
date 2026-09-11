@@ -42,7 +42,7 @@ predicted pose can depend on the new input. The straight-road longitudinal
 flow includes passive road-load damping and its affine intercept. The former
 constant-acceleration position formula applies only when road load is zero.
 
-`longitudinalRoadLoad` supplies the signed aerodynamic and equivalent rolling
+`ltvBicycleModel.roadLoad` supplies the signed aerodynamic and equivalent rolling
 forces and their speed derivative. See [LONGITUDINAL_FORCE_BALANCE.md](LONGITUDINAL_FORCE_BALANCE.md)
 for the physical input contract, parameter extraction, and approximation limits.
 

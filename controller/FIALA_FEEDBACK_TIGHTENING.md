@@ -195,10 +195,10 @@ of wider final enclosures. Reduction is performed only at actual sample
 boundaries, so it does not mutate the held-command representation inside a
 sample.
 
-`certifyFialaFeedbackSample(...,inlet=previousCertificate)` checks that the
+`fialaCertificate.sample(...,inlet=previousCertificate)` checks that the
 previous sample was completely accepted and that its true-model parameters
 match. Its correlated endpoint supersedes the supplied box/prior-input point.
-`certifyFialaFeedbackSequence` constructs a finite prescribed policy from a
+`fialaCertificate.sequence` constructs a finite prescribed policy from a
 nominal input sequence and gain. Each new reference center comes from the
 previous nominal endpoint. It stores the actual nominal/gain/noise contract
 for numerical execution. It performs no target avoidance optimization.

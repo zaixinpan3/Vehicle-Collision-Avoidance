@@ -195,8 +195,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             ego.speed = 0;
             target.targetPositionInertial = [0; -10];
             target.targetVelocityInertial = [0; 40];
-            testCase.verifyGreaterThan(rectangleConfigurationDistance([0;0], 0, [0;-10], pi/2, [2.4;.95;2.4;.95]), 0);
-            testCase.verifyGreaterThan(rectangleConfigurationDistance([0;0], 0, [0;10], pi/2, [2.4;.95;2.4;.95]), 0);
+            testCase.verifyGreaterThan(avoidanceSafetyGeometry.rectangleDistance([0;0], 0, [0;-10], pi/2, [2.4;.95;2.4;.95]), 0);
+            testCase.verifyGreaterThan(avoidanceSafetyGeometry.rectangleDistance([0;0], 0, [0;10], pi/2, [2.4;.95;2.4;.95]), 0);
             testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, []), ...
                 "collisionAvoidanceController:noCertifiedContinuation");
         end

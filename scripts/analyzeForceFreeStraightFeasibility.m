@@ -224,7 +224,7 @@ function [matrix,bound] = localLateralTailRows(model,prediction,frames)
             'settings',[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.model.headingDomainRadius; ...
                 cfg.model.lateralDomainRadius;cfg.collision.clearanceMargin], ...
             'duration',tube.duration,'degree',cfg.encounter.taylorOrder+1);
-        rows=avoidanceSafetyGeometry('cellRows',data);
+        rows=avoidanceSafetyGeometry.cellRows(data);
         % Project the newly chosen geometric support using the original maps.
         values=zeros(size(rows.state,1)*size(tube.offset,2),prediction.planCount);
         limits=zeros(size(values,1),1);

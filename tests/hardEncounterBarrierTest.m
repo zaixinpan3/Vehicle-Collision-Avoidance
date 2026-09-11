@@ -499,7 +499,7 @@ function minimum = localDenseClearance(stored, lane, cfg)
             value = expm(tau*generator)*[x; stored.plan(:, stage); 1];
             [position, heading] = laneGeometry.fromFrenet(value(1:6), lane);
             target = targetPrediction.finiteFlow(stored.encounters, (stage-1)*h+tau);
-            distance = rectangleConfigurationDistance(position, heading, target(1:2), target(7), ...
+            distance = avoidanceSafetyGeometry.rectangleDistance(position, heading, target(1:2), target(7), ...
                 [cfg.vehicle.length/2; cfg.vehicle.width/2; stored.encounters.halfLength; stored.encounters.halfWidth]);
             minimum = min(minimum, distance-cfg.collision.clearanceMargin);
         end

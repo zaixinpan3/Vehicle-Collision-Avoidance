@@ -9,7 +9,7 @@ function margin = rectangleSeparationMargin( ...
 % Positions are N-by-2, yaws N-by-1, dimensions scalar.
 %
 % This is the scenario-acceptance geometry, deliberately independent of
-% the controller's own rectangleConfigurationDistance so that acceptance
+% the controller's own avoidanceSafetyGeometry.rectangleDistance so that acceptance
 % checks do not certify the controller with its own code.
 
     sampleCount = size(egoPosition, 1);

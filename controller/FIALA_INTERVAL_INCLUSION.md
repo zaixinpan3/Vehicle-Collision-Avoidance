@@ -18,7 +18,7 @@ or real-time safety executor. The existing online controller is unchanged.
 
 ## 1. Implemented interface and mathematical meaning
 
-`fialaResidualCertificate(lower,upper,A,B,c,cfg)` receives explicit bounds on
+`fialaCertificate.residual(lower,upper,A,B,c,cfg)` receives explicit bounds on
 
     y = [p_x,p_y,psi,v_x,v_y,r,delta,beta].
 

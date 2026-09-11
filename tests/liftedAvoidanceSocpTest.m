@@ -14,7 +14,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             cfg.model.brakingRatioRateMaximum = 2;
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
             problem.model.anchorPlan = problem.prediction.referencePlan;
-            problem.qp.stageProgram = avoidanceStageQp(problem.qp,problem.prediction,problem.model);
+            problem.qp.stageProgram = avoidanceStageQp.build(problem.qp,problem.prediction,problem.model);
             discrepancy = localClfScreeningError(problem,cfg);
             testCase.verifyLessThanOrEqual(discrepancy,1e-8);
             testCase.verifyLessThanOrEqual(numel(problem.qp.stageProgram.clfConstraintIndices),numel(problem.qp.clf.constraints));
@@ -34,7 +34,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             cfg.model.frontWheelSteeringRateMaximum = 1;
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
             problem.model.anchorPlan = problem.prediction.referencePlan;
-            problem.qp.stageProgram = avoidanceStageQp(problem.qp,problem.prediction,problem.model);
+            problem.qp.stageProgram = avoidanceStageQp.build(problem.qp,problem.prediction,problem.model);
             sparseProgram = problem.qp.stageProgram;
             condensed = condensedAvoidanceTestOracle(problem.qp);
             first = problem.decision;

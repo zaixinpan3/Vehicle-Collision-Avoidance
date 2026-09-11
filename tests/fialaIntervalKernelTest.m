@@ -37,7 +37,7 @@ function [bounds,values,products]=localDifferentials(steering)
     cfg=collisionAvoidanceControllerConfig();
     center=[0;0;0;10;0;0;steering;.1];
     direction=[0;.02;.03;.1;-.2;.15;.03;.02];radius=.02*abs(direction);
-    [first,second,products]=fialaIntervalKernelMex(center-radius,center+radius,direction,fialaIntervalParameters(cfg));
+    [first,second,products]=fialaIntervalKernelMex(center-radius,center+radius,direction,fialaCertificate.parameters(cfg));
     points=center+.5*radius.*cos((1:8).'*(1:32)*sqrt(2));step=1e-3;
     middle=ltvBicycleModel.fialaWorldDynamics(points(1:6,:),points(7:8,:),cfg);
     plus=points+step*direction;minus=points-step*direction;

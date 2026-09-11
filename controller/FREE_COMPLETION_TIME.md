@@ -16,7 +16,7 @@ of the user's safety requirement.
 
 ## One complete-witness controller
 
-`planCompleteEncounter` starts from the configured planning window. If a
+`hardEncounterBarrier.plan` starts from the configured planning window. If a
 candidate fails its terminal exit requirement but its nonterminal constraints
 have a checked feasible solution, admission constructs one more complete
 prediction interval and solves again. Every successful admission includes

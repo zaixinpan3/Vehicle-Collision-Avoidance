@@ -64,7 +64,7 @@ linearized QP.
 
 Version 15 separates three concepts: the configured initial window, the
 possibly longer complete certificate, and the actual observation of exit.
-`planCompleteEncounter` increases candidate length when a terminal-time
+`hardEncounterBarrier.plan` increases candidate length when a terminal-time
 candidate fails but its nonterminal prefix has a checked feasible solution.
 Only a complete solution with certified exit can authorize admission. It
 stops with an unresolved-search diagnostic if its wall-clock computation

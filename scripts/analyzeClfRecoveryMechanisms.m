@@ -182,7 +182,7 @@ function probe = localProbe(problem, model, sample)
                 decision(end) = max(0, clf.lieDerivativeDrift ...
                     + clf.lieDerivativeInput*decision(1:2)+clf.decayRate*clf.initialValue);
             end
-            check = certifyAvoidancePlan(qp, prediction, model, decision);
+            check = solveHardCbfClf.certify(qp, prediction, model, decision);
             alternative.certified = check.accepted;
             alternative.input = decision(1:2);
             alternative.lateralDerivative = lateralDrift+lateralInput*decision(1:2);

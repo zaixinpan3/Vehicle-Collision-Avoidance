@@ -7,13 +7,13 @@ function result = evaluateFialaSampledFeedback(outputDirectory)
     root=fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'));
     cfg=collisionAvoidanceControllerConfig();h=.1;count=60;speed=10;
-    beta=longitudinalRoadLoad(speed,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg);
+    beta=ltvBicycleModel.roadLoad(speed,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg);
     nominal=[0;0;0;speed;0;0];input=[0;beta];
     point=struct('state',nominal,'input',input);
     [a,b]=ltvBicycleModel.continuousMatrices(0,speed,cfg,beta,0,point);
-    [~,~,ad,bd]=sampledFeedbackTransition(a,b,zeros(2,6),h);
+    [~,~,ad,bd]=stateUncertainty.sampledFeedbackTransition(a,b,zeros(2,6),h);
     [lqrGain,p]=dlqr(ad,bd,diag([1,4,4,1,.1,.1]),diag([20,20]));gain=-lqrGain;
-    transition=sampledFeedbackTransition(a,b,gain,h);
+    transition=stateUncertainty.sampledFeedbackTransition(a,b,gain,h);
     rho=sqrt(max(real(eig(transition.'*p*transition,p))));
     initialError=[.01;-.01;.001;.005;-.001;.001];
     histories=zeros(6,count+1,2);inputs=zeros(2,count,2);norms=zeros(count+1,2);

@@ -5,7 +5,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     planCount = prediction.planCount;
     decisionCount = planCount+count;
     model.anchorPlan = anchorPlan;
-    geometry = avoidanceSafetyGeometry(model, prediction);
+    geometry = avoidanceSafetyGeometry.build(model, prediction);
     lowerInput = repmat([-cfg.model.frontWheelSteeringAngleMaximum; cfg.actuation.brakingRatioMinimum], count, 1);
     upperInput = repmat([cfg.model.frontWheelSteeringAngleMaximum; cfg.actuation.brakingRatioMaximum], count, 1);
     hardMatrix = [geometry.matrix, zeros(size(geometry.matrix, 1), count); ...
@@ -163,7 +163,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
     qp.barrier = struct("baseBound", bound, "scale", scale, ...
         "completionRows", completionRows);
-    qp.stageProgram = avoidanceStageQp(qp,prediction,model);
+    qp.stageProgram = avoidanceStageQp.build(qp,prediction,model);
 
 end
 

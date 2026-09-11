@@ -11,7 +11,7 @@ function summary = evaluateFialaFeedbackSequence(outputDirectory)
     buildFialaIntervalVerifier(nativeDirectory);addpath(nativeDirectory);
     cfg=collisionAvoidanceControllerConfig(struct('controller',struct('sampleTime',.1)));
     state=[0;0;0;10;0;0];
-    trim=longitudinalRoadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg);
+    trim=ltvBicycleModel.roadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg);
     originalGain=[0,-.3,-1,0,-.03,-.03;-.2,0,0,-.3,0,0];
     radii=[.001,.005,.001,.01,.01];steering=[0,0,.04,0,0];
     gainFactors=[1,1,1,.25,1];budgets=[Inf,Inf,Inf,Inf,.08];
@@ -19,7 +19,7 @@ function summary = evaluateFialaFeedbackSequence(outputDirectory)
     for index=1:numel(radii)
         inputs=repmat([0;trim],1,50);inputs(1,1:3)=steering(index);
         gain=originalGain;gain(1,:)=gainFactors(index)*gain(1,:);
-        sequence=certifyFialaFeedbackSequence(state-radii(index),state+radii(index),state, ...
+        sequence=fialaCertificate.sequence(state-radii(index),state+radii(index),state, ...
             inputs,gain,radii(index)/10*ones(6,1),inputs(:,1),cfg, ...
             maximumComputationTimePerSample=budgets(index));
         sequences{index}=sequence;

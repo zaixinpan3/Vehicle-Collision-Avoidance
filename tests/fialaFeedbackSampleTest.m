@@ -37,7 +37,7 @@ classdef fialaFeedbackSampleTest < matlab.unittest.TestCase
         end
         function coarseProposalIsRefinedWithoutResamplingFeedback(testCase)
             [state,input,gain,cfg]=localFixture(0);
-            certificate=certifyFialaFeedbackSample(state-1e-4,state+1e-4,[state;input],gain, ...
+            certificate=fialaCertificate.sample(state-1e-4,state+1e-4,[state;input],gain, ...
                 1e-5*ones(6,1),input,cfg,maximumCellDuration=.1);
             testCase.verifyTrue(certificate.accepted);
             testCase.verifyGreaterThan(certificate.rejectedCells,0);
@@ -45,7 +45,7 @@ classdef fialaFeedbackSampleTest < matlab.unittest.TestCase
         end
         function exhaustedBudgetCannotCertifyAPartialSample(testCase)
             [state,input,gain,cfg]=localFixture(0);
-            certificate=certifyFialaFeedbackSample(state-1e-4,state+1e-4,[state;input],gain, ...
+            certificate=fialaCertificate.sample(state-1e-4,state+1e-4,[state;input],gain, ...
                 1e-5*ones(6,1),input,cfg,maximumCells=1);
             testCase.verifyFalse(certificate.accepted);
             testCase.verifyEqual(string(certificate.reason),"cellBudget");
@@ -53,7 +53,7 @@ classdef fialaFeedbackSampleTest < matlab.unittest.TestCase
         end
         function heldInputViolatingSlewIsRejectedBeforePropagation(testCase)
             [state,input,gain,cfg]=localFixture(0);cfg.model.frontWheelSteeringRateMaximum=.001;
-            certificate=certifyFialaFeedbackSample(state-1e-4,state+1e-4,[state;input],gain, ...
+            certificate=fialaCertificate.sample(state-1e-4,state+1e-4,[state;input],gain, ...
                 1e-5*ones(6,1),input,cfg);
             testCase.verifyFalse(certificate.accepted);
             testCase.verifyEqual(string(certificate.reason),"executionBounds");
@@ -61,14 +61,14 @@ classdef fialaFeedbackSampleTest < matlab.unittest.TestCase
         end
         function heldInputViolatingActuatorLimitIsRejected(testCase)
             [state,input,gain,cfg]=localFixture(0);cfg.model.frontWheelSteeringAngleMaximum=1e-5;
-            certificate=certifyFialaFeedbackSample(state-1e-4,state+1e-4,[state;input],gain, ...
+            certificate=fialaCertificate.sample(state-1e-4,state+1e-4,[state;input],gain, ...
                 1e-5*ones(6,1),input,cfg);
             testCase.verifyFalse(certificate.accepted);
             testCase.verifyEqual(string(certificate.reason),"executionBounds");
         end
         function largerInletCompletesTheOriginalSample(testCase,steering)
             [state,input,gain,cfg]=localFixture(steering);
-            certificate=certifyFialaFeedbackSample(state-.01,state+.01,[state;input],gain, ...
+            certificate=fialaCertificate.sample(state-.01,state+.01,[state;input],gain, ...
                 .001*ones(6,1),input,cfg);
             testCase.verifyTrue(certificate.accepted);
             testCase.verifyEqual(certificate.verifiedThrough,.1);
@@ -83,24 +83,24 @@ classdef fialaFeedbackSampleTest < matlab.unittest.TestCase
         end
         function repeatedFeedbackKeepsALargerTubeBounded(testCase)
             [state,input,gain,cfg]=localFixture(0);
-            sequence=certifyFialaFeedbackSequence(state-.005,state+.005,state,repmat(input,1,20), ...
+            sequence=fialaCertificate.sequence(state-.005,state+.005,state,repmat(input,1,20), ...
                 gain,.0005*ones(6,1),input,cfg);
             testCase.verifyTrue(sequence.accepted);
             testCase.verifyLessThan(diff(sequence.samples{end}.endpoint(2,:)),.04);
         end
         function failedSampleCannotSeedAContinuation(testCase)
             [state,input,gain,cfg]=localFixture(0);inlet=localCertificate();inlet.accepted=false;
-            testCase.verifyError(@()certifyFialaFeedbackSample(state,state,[state;input],gain, ...
+            testCase.verifyError(@()fialaCertificate.sample(state,state,[state;input],gain, ...
                 zeros(6,1),input,cfg,inlet=inlet),'collisionAvoidanceController:invalidFeedbackInlet');
         end
         function changedModelCannotReuseACorrelatedInlet(testCase)
             [state,input,gain,cfg]=localFixture(0);inlet=localCertificate();cfg.vehicle.m=cfg.vehicle.m+1;
-            testCase.verifyError(@()certifyFialaFeedbackSample(state,state,[state;input],gain, ...
+            testCase.verifyError(@()fialaCertificate.sample(state,state,[state;input],gain, ...
                 zeros(6,1),input,cfg,inlet=inlet),'collisionAvoidanceController:changedFeedbackModel');
         end
         function expiredComputationBudgetCannotAcceptAPrefix(testCase)
             [state,input,gain,cfg]=localFixture(0);
-            certificate=certifyFialaFeedbackSample(state,state,[state;input],gain,zeros(6,1), ...
+            certificate=fialaCertificate.sample(state,state,[state;input],gain,zeros(6,1), ...
                 input,cfg,maximumComputationTime=realmin);
             testCase.verifyFalse(certificate.accepted);
             testCase.verifyEqual(string(certificate.reason),"timeBudget");
@@ -121,7 +121,7 @@ end
 function [sequence,violation]=localSequenceReplay(steering)
     [state,input,gain,cfg]=localFixture(steering);
     inputs=repmat(input,1,20);inputs(1,4:end)=0;
-    sequence=certifyFialaFeedbackSequence(state-.001,state+.001,state,inputs,gain, ...
+    sequence=fialaCertificate.sequence(state-.001,state+.001,state,inputs,gain, ...
         .0001*ones(6,1),input,cfg);
     points=state+.001*cos((1:6).'*(1:32)*sqrt(2));previous=input;violation=0;
     for sample=1:numel(sequence.samples)
@@ -152,19 +152,19 @@ end
 function [state,input,gain,cfg]=localFixture(steering)
     cfg=collisionAvoidanceControllerConfig(struct('controller',struct('sampleTime',.1)));
     state=[0;0;0;10;0;0];
-    input=[steering;longitudinalRoadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg)];
+    input=[steering;ltvBicycleModel.roadLoad(10,cfg)/cfg.vehicle.m/modifiedFialaTire.accelerationGain(cfg)];
     gain=[0,-.3,-1,0,-.03,-.03;-.2,0,0,-.3,0,0];
 end
 
 function certificate=localCertificate()
     [state,input,gain,cfg]=localFixture(0);
-    certificate=certifyFialaFeedbackSample(state-1e-4,state+1e-4,[state;input],gain, ...
+    certificate=fialaCertificate.sample(state-1e-4,state+1e-4,[state;input],gain, ...
         1e-5*ones(6,1),input,cfg);
 end
 
 function [certificate,violations]=localReplay(steering)
     [state,input,gain,cfg]=localFixture(steering);
-    certificate=certifyFialaFeedbackSample(state-1e-4,state+1e-4,[state;input],gain, ...
+    certificate=fialaCertificate.sample(state-1e-4,state+1e-4,[state;input],gain, ...
         1e-5*ones(6,1),input,cfg);
     phases=cos((1:12).'*(1:32)*sqrt(2));
     points=state+1e-4*phases(1:6,:);noise=1e-5*phases(7:12,:);

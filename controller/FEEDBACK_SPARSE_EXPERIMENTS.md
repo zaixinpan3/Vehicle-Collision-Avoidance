@@ -32,7 +32,7 @@ The old three-argument `avoidanceStageQp` implemented a sparse lift, but the
 actual initial and rebuilt paths used its condensed one-argument alternative.
 The hard-margin LP also used the complete condensed matrix. These paths now
 share sparse cell states, controls and CLF slacks. A retained context supports
-consistent rebuilding after joint admission. `updateAvoidanceStageBounds`
+consistent rebuilding after joint admission. `avoidanceStageQp.updateBounds`
 updates only mapped inequalities; it never overwrites dynamics equalities.
 
 Redundancy screening is valid over the complete carried-margin range, and
@@ -80,7 +80,7 @@ costs after fixing sparse integration.
 
 ## Continuous direction refinement on the diagnosed oncoming encounter
 
-`optimizeSeparationNormals` solves a five-variable support SOCP per cell and
+`avoidanceSafetyGeometry.optimizeNormals` solves a five-variable support SOCP per cell and
 target, using synchronous Bernstein positions, rectangle corner differences,
 and conservative heading-error disks. Its unit-normal output is only a
 proposal. `avoidanceSafetyGeometry` can rebuild all hard swept rows with those
@@ -111,7 +111,7 @@ exact-Fiala certificate without validated nonlinear propagation.
 
 ## Held feedback under the exact-Fiala assumption
 
-`sampledFeedbackTransition` uses exp(A h)+Gamma(h)K. Tests distinguish it
+`stateUncertainty.sampledFeedbackTransition` uses exp(A h)+Gamma(h)K. Tests distinguish it
 from continuously updated feedback and verify direct held-input integration.
 `evaluateFialaSampledFeedback` designs a six-state sampled LQR about a straight
 10 m/s trim, with a fixed positive metric. Both trials start with error

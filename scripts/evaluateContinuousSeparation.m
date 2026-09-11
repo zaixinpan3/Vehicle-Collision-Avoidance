@@ -19,7 +19,7 @@ function result = evaluateContinuousSeparation(inputDirectory,diagnosisDirectory
         context.controllerRoadGeometry.boundaries(k).parameterRange=[-200;200];
     end
     [qp,prediction,model]=localRebuild(context,cfg);cfg=model.cfg;
-    [baseline,~]=solveHardCbfClf(qp,cfg);
+    [baseline,~]=solveHardCbfClf.solve(qp,cfg);
     plan=d.result.anchorStudy(2).inputPlan(:);
     result=struct('scope',"geometry trial on affine inclusion; nonlinear Fiala replay checked separately", ...
         'initialization',"saved feasible affine plan from prior zero-residual extended-road diagnostic", ...
@@ -28,7 +28,7 @@ function result = evaluateContinuousSeparation(inputDirectory,diagnosisDirectory
     stored=[];
     for iteration=1:3
         timer=tic;
-        [normals,normalInfo]=optimizeSeparationNormals(model,prediction,plan);
+        [normals,normalInfo]=avoidanceSafetyGeometry.optimizeNormals(model,prediction,plan);
         prediction.separationNormals=normals;
         % Preserve the original station charts while updating the support probe.
         model.anchorPlan=plan;prediction.geometryAnchor=plan;
@@ -38,8 +38,8 @@ function result = evaluateContinuousSeparation(inputDirectory,diagnosisDirectory
             prediction.geometryNominal{k}=reshape(pagemtimes(tube.map,plan),6,[])+tube.offset;
         end
         candidate=formulateAvoidanceProblem(model,prediction,plan);
-        [solve,candidate]=solveHardCbfClf(candidate,cfg);
-        check=certifyAvoidancePlan(candidate,prediction,model,solve.decision);
+        [solve,candidate]=solveHardCbfClf.solve(candidate,cfg);
+        check=solveHardCbfClf.certify(candidate,prediction,model,solve.decision);
         result.iterations(iteration).seconds=toc(timer);
         result.iterations(iteration).accepted=solve.feasible && check.accepted;
         result.iterations(iteration).margin=check.margin;
@@ -68,7 +68,7 @@ function result=localFialaReplay(model,plan)
         for j=1:100
             time=(k-1)*model.sampleTime+(j-1)*h;
             target=targetPrediction.finiteFlow(model.encounters(1),time);
-            minimum=min(minimum,rectangleConfigurationDistance(state(1:2),state(3),target(1:2),target(7), ...
+            minimum=min(minimum,avoidanceSafetyGeometry.rectangleDistance(state(1:2),state(3),target(1:2),target(7), ...
                 [cfg.vehicle.length/2;cfg.vehicle.width/2;model.encounters(1).halfLength;model.encounters(1).halfWidth])-cfg.collision.clearanceMargin);
             flow=@(x)ltvBicycleModel.fialaWorldDynamics(x,plan(:,k),cfg);
             k1=flow(state);k2=flow(state+h*k1/2);k3=flow(state+h*k2/2);k4=flow(state+h*k3);

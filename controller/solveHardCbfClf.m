@@ -1,11 +1,66 @@
-function [result,problem] = solveHardCbfClf(problem, cfg)
-    result = localEmptyResult();
-    if problem.certifiedInfeasible
-        result.message = "A constant hard constraint is infeasible.";
-        result.exitFlag = -2;
-        return;
+classdef solveHardCbfClf
+    %solveHardCbfClf Lexicographic solve and independent plan verification.
+
+    methods (Static)
+        function [result,problem] = solve(problem, cfg)
+            result = localEmptyResult();
+            if problem.certifiedInfeasible
+                result.message = "A constant hard constraint is infeasible.";
+                result.exitFlag = -2;
+                return;
+            end
+            [result, problem] = localHardMarginSolve(problem, cfg);
+        end
+
+        function check = certify(qp, ~, model, decision)
+        % Acceptance never converts a negative physical margin into a certificate.
+            check = struct("accepted", false, "failedConditions", "decision", ...
+                "hardRowViolation", inf, "clfViolation", inf, "margin", -inf, ...
+                "sweptClearanceMargin", -inf, "exitMargin", qp.exitMargin);
+            if ~isnumeric(decision) || ~isreal(decision) || ~isvector(decision) ...
+                    || numel(decision) ~= qp.layout.decisionCount || any(~isfinite(decision))
+                return;
+            end
+            decision = decision(:);
+            if isfield(qp.stageProgram, "fixedDecisionIndex") ...
+                    && ~isequal(decision(qp.stageProgram.fixedDecisionIndex), qp.stageProgram.fixedDecisionValue)
+                check.failedConditions = "executedPrefix";
+                return;
+            end
+            operations = numel(decision)+2;
+            gamma = operations*eps/(1-operations*eps);
+            evaluationAllowance = gamma*(abs(qp.physicalBound)+abs(qp.inequalityMatrix)*abs(decision));
+            margins = qp.physicalBound-qp.inequalityMatrix*decision-evaluationAllowance;
+            check.hardRowViolation = max([0; -margins]);
+            allowance = model.cfg.encounter.numericalMargin;
+            check.sweptClearanceMargin = min([inf; margins(qp.safetyRows)])-allowance;
+            % The same immutable reserve is charged at admission and every reuse.
+            % Evaluate with the original matrices: shifting adds no rounding debt.
+            evaluationAllowance = gamma*(abs(qp.barrier.baseBound)+abs(qp.inequalityMatrix)*abs(decision));
+            certifiedMargins = qp.barrier.baseBound-qp.inequalityMatrix*decision-evaluationAllowance;
+            selected = qp.barrier.scale > 0;
+            check.margin = min([model.cfg.encounter.maximumCarriedMargin; ...
+                certifiedMargins(selected)./qp.barrier.scale(selected)]);
+            check.exitMargin = min([inf; margins(qp.barrier.completionRows)]);
+            check.hardRowViolation = max([check.hardRowViolation; -certifiedMargins]);
+            check.clfViolation = -inf;
+            for index = 1:numel(qp.clf.constraints)
+                constraint = qp.clf.constraints(index);
+                value = constraint.map*decision+constraint.offset;
+                residual = norm(constraint.root*value)^2+constraint.linear.'*value+constraint.constant;
+                residual = residual+16*(numel(decision)+64)*eps*( ...
+                    norm(abs(constraint.root)*abs(value))^2+abs(constraint.linear).'*abs(value)+abs(constraint.constant));
+                check.clfViolation = max(check.clfViolation, ...
+                    residual-decision(qp.layout.relaxationIndex(constraint.stage)));
+            end
+            conditions = [all(isfinite(margins)), check.hardRowViolation == 0, ...
+                isfinite(check.clfViolation) && check.clfViolation <= 0, ...
+                check.margin >= qp.requiredMargin, ~qp.certifiedInfeasible];
+            names = ["finitePrediction", "hardRows", "sampledDataClf", "continuationMargin", "finiteProblem"];
+            check.failedConditions = names(~conditions);
+            check.accepted = all(conditions);
+        end
     end
-    [result, problem] = localHardMarginSolve(problem, cfg);
 end
 
 function [result, problem] = localHardMarginSolve(problem, cfg)
@@ -38,7 +93,7 @@ function [result, problem] = localHardMarginSolve(problem, cfg)
     if ~marginSolve.feasible, return; end
     candidate = localRepairClf(problem, marginSolve.decision(1:physical), cfg);
     model = struct("cfg", cfg);
-    check = certifyAvoidancePlan(problem, [], model, candidate);
+    check = solveHardCbfClf.certify(problem, [], model, candidate);
     if ~check.accepted, return; end
     result = localCertifiedResult(problem, candidate, marginSolve, 1);
     % Give the performance solve an interior target without spending the
@@ -46,7 +101,7 @@ function [result, problem] = localHardMarginSolve(problem, cfg)
     problem.requiredMargin = max(problem.requiredMargin, 0.99*check.margin);
     problem.inequalityBound = problem.barrier.baseBound-problem.requiredMargin*scale;
     fixedProgram = problem.stageProgram;
-    problem.stageProgram = updateAvoidanceStageBounds(problem);
+    problem.stageProgram = avoidanceStageQp.updateBounds(problem);
     if isfield(fixedProgram, "fixedDecisionIndex")
         problem.stageProgram.fixedDecisionIndex = fixedProgram.fixedDecisionIndex;
         problem.stageProgram.fixedDecisionValue = fixedProgram.fixedDecisionValue;
@@ -55,7 +110,7 @@ function [result, problem] = localHardMarginSolve(problem, cfg)
     result.solverCalls = 2;
     if ~solve.feasible, return; end
     decision = localRepairClf(problem, solve.decision, cfg);
-    check = certifyAvoidancePlan(problem, [], model, decision);
+    check = solveHardCbfClf.certify(problem, [], model, decision);
     if check.accepted
         result = localCertifiedResult(problem, decision, solve, 2);
     end

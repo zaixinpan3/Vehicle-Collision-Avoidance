@@ -23,7 +23,7 @@ recursive feasibility across samples, or a real-time execution guarantee.
 ## 1. Interface and execution contract
 
 ```matlab
-certificate=certifyFialaFeedbackSample(lower,upper,[z;v],K, ...
+certificate=fialaCertificate.sample(lower,upper,[z;v],K, ...
     measurementRadius,previousInput,cfg);
 ```
 

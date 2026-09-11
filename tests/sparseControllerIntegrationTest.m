@@ -46,7 +46,7 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
             [~,~,problem]=collisionAvoidanceController(ego,target,route,cfg,[]);
             qp=problem.qp;prior=qp.stageProgram;
             qp.inequalityBound=qp.barrier.baseBound-.25*qp.barrier.scale;
-            updated=updateAvoidanceStageBounds(qp);
+            updated=avoidanceStageQp.updateBounds(qp);
             testCase.verifyEqual(updated.b(prior.rowMap.equality),prior.b(prior.rowMap.equality),AbsTol=0);
             testCase.verifyEqual(updated.b(prior.rowMap.inequality), ...
                 prior.inequalityOffset+qp.inequalityBound(prior.inequalityIndices),AbsTol=0);
@@ -55,13 +55,13 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
             [ego,target,route,cfg]=encounterTestFixture.crossing();
             [~,~,problem]=collisionAvoidanceController(ego,target,route,cfg,[]);
             model=problem.qp.stageProgram.context.model;prediction=problem.prediction;plan=problem.inputPlan(:);
-            [normals,information]=optimizeSeparationNormals(model,prediction,plan);
+            [normals,information]=avoidanceSafetyGeometry.optimizeNormals(model,prediction,plan);
             testCase.verifyTrue(all(isfinite(information.proposalMargins),'all'));
             testCase.verifyEqual(vecnorm(cat(2,normals{:})),ones(1,numel(normals)),AbsTol=1e-12);
             prediction.separationNormals=normals;
             qp=formulateAvoidanceProblem(model,prediction,model.anchorPlan);
-            [solve,qp]=solveHardCbfClf(qp,cfg);
-            check=certifyAvoidancePlan(qp,prediction,model,solve.decision);
+            [solve,qp]=solveHardCbfClf.solve(qp,cfg);
+            check=solveHardCbfClf.certify(qp,prediction,model,solve.decision);
             testCase.verifyTrue(solve.feasible && check.accepted);
             testCase.verifyEqual(qp.geometry.normals,normals);
         end

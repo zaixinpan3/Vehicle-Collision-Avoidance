@@ -2,6 +2,83 @@ classdef ltvBicycleModel
     %ltvBicycleModel Held-input bicycle dynamics and finite-horizon prediction.
 
     methods (Static)
+        function [force, slope, components] = roadLoad(speed, cfg)
+        %ltvBicycleModel.roadLoad Signed passive road load and its speed derivative.
+        % Flat road, still air, and a quasi-static equivalent rolling force are
+        % assumed. Positive force opposes forward travel. The smooth rolling sign
+        % preserves rest without applying a constant backward force at zero speed.
+        % Polynomial rolling coefficients have units 1, s/m, and (s/m)^4.
+        % Wheel slip, wheel inertia, camber, and dynamic normal-load effects are
+        % residual dynamics, not reproduced by this reduced road-load model.
+
+            roadLoad = cfg.roadLoad;
+            magnitude = abs(speed);
+            direction = tanh(speed/roadLoad.rollingTransitionSpeed);
+            rollingCoefficient = roadLoad.rollingCoefficient ...
+                + roadLoad.rollingSpeedCoefficient*magnitude ...
+                + roadLoad.rollingQuarticCoefficient*magnitude.^4;
+            aerodynamicFactor = 0.5*roadLoad.airDensity ...
+                * roadLoad.dragCoefficient*roadLoad.frontalArea;
+            aerodynamic = aerodynamicFactor*speed.*magnitude;
+            rollingScale = cfg.vehicle.m*cfg.vehicle.gravity;
+            rolling = rollingScale*rollingCoefficient.*direction;
+            force = aerodynamic+rolling;
+            if nargout > 1
+                slope = 2*aerodynamicFactor*magnitude ...
+                    + rollingScale*((roadLoad.rollingSpeedCoefficient ...
+                        + 4*roadLoad.rollingQuarticCoefficient*magnitude.^3) ...
+                        .*sign(speed).*direction ...
+                        + rollingCoefficient.*(1-direction.^2)/roadLoad.rollingTransitionSpeed);
+            end
+            if nargout > 2
+                components = struct("aerodynamicForce", aerodynamic, ...
+                    "rollingResistanceForce", rolling);
+            end
+        end
+
+        function [matrix, offset, stageRows, stageOffset] = slipRows(prediction, model)
+        %ltvBicycleModel.slipRows Hard slip-angle model domains, without axle friction limits.
+        % Coefficients act on [s,d,ePsi,vx,vy,r,deltaF,beta]. Each robust row charges
+        % the support of the same state box used by prediction and geometry.
+            cfg = model.cfg;
+            limit = double(cfg.model.slipAngleMaximum(:));
+            if isscalar(limit)
+                limit = repmat(limit, 2, 1);
+            end
+            if numel(limit) ~= 2 || ~isreal(limit) || any(~isfinite(limit)) ...
+                    || any(limit <= 0.0) || any(limit >= pi/2)
+                error("collisionAvoidanceController:invalidConfiguration", ...
+                    "model.slipAngleMaximum must contain positive limits below pi/2.");
+            end
+            stageCount = prediction.stageCount;
+            controlCount = size(prediction.egoStateMatrix, 2);
+            stageRows = zeros(4, 8, stageCount);
+            stageOffset = -ones(4, stageCount);
+            speed = max(prediction.scheduleSpeedProfile(1:stageCount), cfg.model.scheduleSpeedFloor);
+            inverseSpeed = reshape(1.0./speed, 1, 1, []);
+            signs = [1.0; -1.0; 1.0; -1.0]./repelem(limit, 2);
+            stageRows(:, 5, :) = signs.*inverseSpeed;
+            stageRows(:, 6, :) = signs.*[cfg.vehicle.lf; cfg.vehicle.lf; ...
+                -cfg.vehicle.lr; -cfg.vehicle.lr].*inverseSpeed;
+            stageRows(1:2, 7, :) = -signs(1:2).*ones(1, 1, stageCount);
+            if isfield(prediction, "egoStateErrorBound")
+                support = pagemtimes(abs(stageRows(:, 1:6, :)), ...
+                    reshape(prediction.egoStateErrorBound(:, 1:stageCount), 6, 1, []));
+                stageOffset = stageOffset+reshape(support, 4, stageCount);
+            end
+            mapped = pagemtimes(stageRows(:, 1:6, :), ...
+                prediction.egoStateMatrix(:, :, 1:stageCount));
+            for stageIdx = 1:stageCount
+                inputRange = 2*stageIdx-1:2*stageIdx;
+                mapped(:, inputRange, stageIdx) = mapped(:, inputRange, stageIdx) ...
+                    + stageRows(:, 7:8, stageIdx);
+            end
+            matrix = reshape(permute(mapped, [1, 3, 2]), [], controlCount);
+            mappedOffset = pagemtimes(stageRows(:, 1:6, :), ...
+                reshape(prediction.egoStateOffset(:, 1:stageCount), 6, 1, []));
+            offset = reshape(reshape(mappedOffset, 4, [])+stageOffset, [], 1);
+        end
+
         function derivative = fialaWorldDynamics(state,input,cfg)
         % Authoritative nonlinear Fiala flow in [px,py,psi,vx,vy,r].
         % Curvature zero makes the existing Frenet kernel Cartesian exactly.
@@ -87,7 +164,7 @@ classdef ltvBicycleModel
                 % Exact straight equilibrium: lateral forces vanish and
                 % longitudinal tire force balances the passive road load.
                 state = [0;0;0;speed;0;0];
-                ratio = (longitudinalRoadLoad(speed,cfg)/cfg.vehicle.m-accelerationBias) ...
+                ratio = (ltvBicycleModel.roadLoad(speed,cfg)/cfg.vehicle.m-accelerationBias) ...
                     /modifiedFialaTire.accelerationGain(cfg);
                 input = [0;ratio];
                 return;
@@ -154,7 +231,7 @@ classdef ltvBicycleModel
                 speed = model.initialEgoState(4);
                 station = model.initialEgoState(1)+(0:count)*h*speed;
                 curvature = arrayfun(@(value) laneGeometry.curvature(value, model.lane), station);
-                ratio = (longitudinalRoadLoad(speed, cfg)/cfg.vehicle.m ...
+                ratio = (ltvBicycleModel.roadLoad(speed, cfg)/cfg.vehicle.m ...
                     -model.longitudinalAccelerationBias)/modifiedFialaTire.accelerationGain(cfg);
                 schedule = struct("speedProfile", repmat(speed, 1, count+1), ...
                     "station", station, "curvature", curvature, ...
@@ -372,7 +449,7 @@ classdef ltvBicycleModel
             lr = cfg.vehicle.lr;
             inputGain = modifiedFialaTire.accelerationGain(cfg);
             if isempty(betaBar)
-                betaBar = (longitudinalRoadLoad(vBar, cfg)/mass-accelerationBias)/inputGain;
+                betaBar = (ltvBicycleModel.roadLoad(vBar, cfg)/mass-accelerationBias)/inputGain;
                 betaBar = min(max(betaBar, -1.0+sqrt(eps)), 1.0-sqrt(eps));
             end
             [tireSlope, ratioSlope, tireIntercept] = ...
@@ -398,7 +475,7 @@ classdef ltvBicycleModel
             continuousA(3, 2) = -kappa^2*vBar;
             % Linearize passive road load at the scheduled speed, retaining
             % both its slope and affine intercept in the held-input flow.
-            [roadForce, roadSlope] = longitudinalRoadLoad(vBar, cfg);
+            [roadForce, roadSlope] = ltvBicycleModel.roadLoad(vBar, cfg);
             continuousA(4, 4) = -roadSlope/mass;
             continuousA(4, 5) = rBar;
             continuousB(4, 2) = inputGain;
@@ -465,7 +542,7 @@ function [a,b,c,tire] = localOperatingPointMatrices(curvature,state,input,cfg,bi
     rear = [parameters.longitudinalForceScale(2)*beta;tire.force(2)];
     rearState = [zeros(1,6);tire.state(2,:)];
     rearInput = [0,parameters.longitudinalForceScale(2);tire.input(2,:)];
-    [roadForce,roadSlope] = longitudinalRoadLoad(vx,cfg);
+    [roadForce,roadSlope] = ltvBicycleModel.roadLoad(vx,cfg);
     flow(4:6) = [(front(1)+rear(1)-roadForce)/mass+vy*yawRate+bias; ...
         (front(2)+rear(2))/mass-vx*yawRate; ...
         (cfg.vehicle.lf*front(2)-cfg.vehicle.lr*rear(2))/cfg.vehicle.Iz];
@@ -494,7 +571,7 @@ function derivative = localNominalFlow(state,input,curvature,cfg,parameters,bias
     frontY = fx(1,:).*sin(delta)+fy(1,:).*cos(delta);
     stationRate = (vx.*cos(state(3,:))-vy.*sin(state(3,:)))./(1-curvature*state(2,:));
     derivative = [stationRate;vx.*sin(state(3,:))+vy.*cos(state(3,:));r-curvature*stationRate; ...
-        (frontX+fx(2,:)-longitudinalRoadLoad(vx,cfg))/cfg.vehicle.m+vy.*r+bias; ...
+        (frontX+fx(2,:)-ltvBicycleModel.roadLoad(vx,cfg))/cfg.vehicle.m+vy.*r+bias; ...
         (frontY+fy(2,:))/cfg.vehicle.m-vx.*r; ...
         (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2,:))/cfg.vehicle.Iz];
 end

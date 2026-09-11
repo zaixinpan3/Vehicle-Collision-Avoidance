@@ -78,7 +78,7 @@ classdef continuousTimeClfTest < matlab.unittest.TestCase
             [problem, ~] = localProblem(zeros(5, 1));
             decision = problem.decision;
             decision(problem.layout.relaxationIndex) = 0;
-            rejected = certifyAvoidancePlan(problem.qp, problem.prediction, problem.model, decision);
+            rejected = solveHardCbfClf.certify(problem.qp, problem.prediction, problem.model, decision);
             testCase.verifyFalse(rejected.accepted);
             testCase.verifyTrue(any(rejected.failedConditions == "sampledDataClf"));
             testCase.verifyEqual(rejected.hardRowViolation, 0);
@@ -188,7 +188,7 @@ function [qp,result,peak,endpoint] = localConcaveCell()
         "previousInput",[0;0], ...
         "requiredMargin",0,"exitMargin",inf,"longitudinalAccelerationBias",0);
     qp = formulateAvoidanceProblem(model,prediction,zeros(2,1));
-    result = solveHardCbfClf(qp,cfg);
+    result = solveHardCbfClf.solve(qp,cfg);
     time = linspace(0,dt,2001);
     velocity = 1-0.5*exp(-10*time);
     residual = qp.clf.lyapunovMatrix(3,3)*(2*velocity.*(10-10*velocity)+qp.clf.decayRate*velocity.^2);

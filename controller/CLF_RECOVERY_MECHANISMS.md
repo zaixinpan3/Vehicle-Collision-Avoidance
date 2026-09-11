@@ -27,7 +27,7 @@ configuration, and sequential certificate memory. All 400 applied inputs
 must match exactly. At 7.2, 8.0, 9.0, 9.7, 9.75, and 9.8 s, the script probes
 alternative plans while holding the measured state and original convex
 safety domain fixed. Feasible alternatives undergo the production
-`certifyAvoidancePlan` checks, including rectangle clearance and terminal rest.
+`solveHardCbfClf.certify` checks, including rectangle clearance and terminal rest.
 The counterfactuals are never sent to the plant or propagated as new
 closed-loop measurements.
 

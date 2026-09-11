@@ -30,7 +30,7 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
                 "scheduleSpeed",10, ...
                 "geometricRows",geometric,"planCount",4);
             data = repmat(data,2,1);data(2).stateRadius = 2*data(2).stateRadius;
-            expected = avoidanceSafetyGeometry('projectRows',data);
+            expected = avoidanceSafetyGeometry.projectRows(data);
             actual = avoidanceProjectedRowsKernelMex(data);
             testCase.verifyEqual(actual,expected,AbsTol=1e-10);
         end
@@ -49,7 +49,7 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
                 "settings",[2.5;1;0.4;8;0.25],"duration",0.05,"degree",7);
             data = repmat(data,2,1);
             data(2).nominal(1,:) = 33;
-            expected = avoidanceSafetyGeometry('cellRows',data);
+            expected = avoidanceSafetyGeometry.cellRows(data);
             actual = avoidanceCellRowsKernelMex(data);
             testCase.verifyEqual(actual,expected,AbsTol=1e-10);
         end
