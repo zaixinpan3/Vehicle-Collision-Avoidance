@@ -364,10 +364,12 @@ noncontractive bounds can be substituted when adequate. No numerical radius
 for the diagnosed oncoming maneuver is claimed without validated derivatives,
 nonlinear swept enclosures and a feasible nonlinear initializer.
 
-The conditional implication in Section 5 is proved. Its missing implementation
-ingredients remain local validated nonlinear bounds, operative correlated
-feedback tubes, full-information inlets, persistent road semantics, and a
-scheduled executor. The sparse repair and continuous-normal prototype do not
+The conditional implication in Section 5 is proved. A first local nonlinear
+model-inclusion checker and held-cell domain test are now implemented in
+[fialaResidualCertificate](FIALA_INTERVAL_INCLUSION.md). Operative correlated
+feedback tubes over complete samples/encounters, full-information inlets,
+persistent road semantics and a scheduled executor remain to be implemented.
+The sparse repair and continuous-normal prototype do not
 supply these ingredients automatically. An affine trajectory colliding in
 exact Fiala numerical replay is a falsification of that particular model
 transfer, even when every original affine certificate row passes.
