@@ -7,16 +7,21 @@ classdef robustStationaryPoseCertificateTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function aPoseBoxCannotBeAdmittedAsAnExactState(testCase)
+        function aPoseBoxIsAdmittedWithItsFrenetRadius(testCase)
             [ego,cfg,lane] = localInputs();
-            testCase.verifyError(@() collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),lane,cfg,[]), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+            [~,~,problem] = collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),lane,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(problem.metadata.initialErrorBound(1:3),[0.1;0.1;0.001],AbsTol=1e-12);
+            testCase.verifyEqual(problem.metadata.pcbfValue,0);
         end
-        function tinyVelocityUncertaintyIsStillNonzero(testCase)
+        function aTinyVelocityBoxIsCarriedRatherThanRounded(testCase)
             [ego,cfg,lane] = localInputs();
             ego.controllerStateErrorBound = [0;0;0;1e-14;0;0];
-            testCase.verifyError(@() collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),lane,cfg,[]), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+            [~,~,problem,stored] = collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),lane,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(problem.metadata.initialErrorBound(4),1e-14,AbsTol=0);
+            testCase.verifyTrue(stored.qp.terminal.errorBudgetFinite);
+            testCase.verifyGreaterThan(stored.prediction.initialErrorBound(4,end),0);
         end
         function persistentDriftCannotEnterTheExactStudy(testCase)
             [ego,cfg,lane] = localInputs();

@@ -27,6 +27,19 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyLessThan(fresh.positionErrorBound, initial.positionErrorBound);
         end
 
+        function aSpeedBoxMeetingTheDomainIsReadAndAnEmptyIntersectionIsRejected(testCase)
+            % A vehicle at rest measured with speed error publishes a box
+            % straddling zero; the reader admits the box, not only its centre.
+            [ego, target, cfg, lane] = localInputs();
+            ego.longitudinalVelocity = -0.02;
+            ego.controllerErrorBound.bounds(4) = 0.05;
+            parsed = readPlanningInputs(ego, target, lane, cfg);
+            testCase.verifyEqual(parsed.modelState(4), -0.02);
+            ego.controllerErrorBound.bounds(4) = 0.01;
+            testCase.verifyError(@() readPlanningInputs(ego, target, lane, cfg), ...
+                "collisionAvoidanceController:invalidInput");
+        end
+
         function staleBoundsAreRejected(testCase)
             [ego, target, cfg, lane] = localInputs();
             target.controllerErrorBound.time = target.stateTime-0.05;
@@ -76,29 +89,34 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(parsed.yaw, 0.2, AbsTol=1e-14);
         end
 
-        function targetUncertaintyCannotEnterTheExactStudy(testCase)
+        function egoAndTargetCertificateBoxesAreAdmittedAndCarried(testCase)
             [ego, target, cfg, lane] = localInputs();
-            ego = rmfield(ego, "controllerErrorBound");
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,lane,cfg,[]), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+            [~,~,problem,stored] = collisionAvoidanceController(ego,target,lane,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(problem.metadata.initialErrorBound(4:6), ego.controllerErrorBound.bounds(4:6), AbsTol=0);
+            testCase.verifyEqual(problem.metadata.targetErrorBound(1:2), [0.2;0.2], AbsTol=0);
+            testCase.verifyEqual(stored.encounters.radius(1:2), [0.2;0.2], AbsTol=0);
         end
 
-        function newlyUncertainObservationsCannotInheritAnExactWitness(testCase)
+        function aNewlyUncertainObservationIsConditionedByTheExactCarriedFlow(testCase)
             [ego,target,lane,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,lane,cfg,[]);
             ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
             target.targetPositionInertial = target.targetPositionInertial ...
                 +cfg.controller.sampleTime*target.targetVelocityInertial;
             target.targetPositionInertialErrorBound = [0.01;0.01];
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,lane,cfg,stored), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+            [~,~,next,certificate] = collisionAvoidanceController(ego,target,lane,cfg,stored);
+            testCase.verifyTrue(next.metadata.planCertified);
+            testCase.verifyTrue(next.metadata.candidateVerified);
+            testCase.verifyLessThan(max(certificate.encounters.radius(1:2)),1e-9);
         end
 
-        function egoUncertaintyCannotEnterTheExactStudy(testCase)
+        function anEgoBoxIsAdmittedWithItsFrenetRadius(testCase)
             [ego,target,cfg,lane] = localInputs();
             ego.position(1) = 10;
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,lane,cfg,[]), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+            [~,~,problem] = collisionAvoidanceController(ego,target,lane,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(problem.metadata.initialErrorBound(1:2),[0.1;0.1],AbsTol=1e-12);
         end
 
 

@@ -13,6 +13,9 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         zeros(count, planCount), -eye(count)];
     physicalBound = [geometry.physicalBound; upperInput; -lowerInput; zeros(count, 1)];
     safetyRows = [geometry.safety; false(2*planCount+count, 1)];
+    % Stage of every relaxable row: the value function accumulates one
+    % violation per stage over its collision and road rows.
+    rowStage = [geometry.stage; zeros(2*planCount+count, 1)];
     rateLimit = model.sampleTime*repmat([cfg.model.frontWheelSteeringRateMaximum; ...
         cfg.model.brakingRatioRateMaximum],count,1);
     rateMap = eye(planCount)-diag(ones(planCount-2,1),-2);
@@ -22,15 +25,27 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         -rateMap(selected,:),zeros(nnz(selected),count)];
     physicalBound = [physicalBound;rateLimit(selected)+ratePrior(selected);rateLimit(selected)-ratePrior(selected)];
     safetyRows = [safetyRows;false(2*nnz(selected),1)];
+    rowStage = [rowStage;zeros(2*nnz(selected),1)];
     [exitMatrix, exitBound, terminal] = hardEncounterBarrier.completionRows(model, prediction, geometry);
     completionRows = numel(physicalBound)+(1:numel(exitBound)).';
     hardMatrix = [hardMatrix; exitMatrix, zeros(numel(exitBound), count)];
     physicalBound = [physicalBound; exitBound];
-    safetyRows = [safetyRows; true(numel(exitBound), 1)];
+    % The terminal set is hard: Huang et al.'s relaxation never touches it.
+    safetyRows = [safetyRows; false(numel(exitBound), 1)];
+    rowStage = [rowStage; zeros(numel(exitBound), 1)];
     % Leave room for strict independent acceptance at an active constraint.
     % Acceptance charges one reserve; solving with two does not spend that
     % same allowance on both solver termination and certificate arithmetic.
-    reserve = 2*cfg.encounter.numericalMargin*double(any(hardMatrix ~= 0, 2));
+    % The solver's feasibility tolerance is relative to the program's
+    % dominant magnitude, so its absolute error is shared by every row. The
+    % solve-time reserve is therefore the larger of a row-scaled numerical
+    % margin and the solver tolerance times that dominant magnitude;
+    % verification keeps the physical rows and an eps-level allowance.
+    inputReach = [repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+        max(abs([cfg.actuation.brakingRatioMinimum, cfg.actuation.brakingRatioMaximum]))], count, 1); zeros(count, 1)];
+    rowScale = 1+abs(physicalBound)+abs(hardMatrix)*inputReach;
+    reserve = 2*max(cfg.encounter.numericalMargin*rowScale, cfg.solver.constraintTolerance*max(rowScale)) ...
+        .*double(any(hardMatrix ~= 0, 2));
     reserve(size(geometry.matrix,1)+2*planCount+(1:count)) = 0;
     bound = physicalBound-model.requiredMargin*double(safetyRows)-reserve;
     hessian = zeros(decisionCount);
@@ -153,11 +168,11 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         "layout", layout, "geometry", geometry, "clf", clf, ...
         "Hessian", hessian, "linear", linear, "constant", constant, ...
         "inequalityMatrix", hardMatrix, "inequalityBound", bound, ...
-        "physicalBound", physicalBound, "safetyRows", safetyRows, ...
+        "physicalBound", physicalBound, "safetyRows", safetyRows, "rowStage", rowStage, ...
         "requiredMargin", model.requiredMargin, "exitMargin", model.exitMargin, ...
         "equalityMatrix", zeros(0, decisionCount), "equalityBound", zeros(0, 1), ...
         "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
-        "certifiedInfeasible", any(bound(~any(hardMatrix, 2)) < 0));
+        "certifiedInfeasible", any(bound(~any(hardMatrix, 2) & ~safetyRows) < 0));
     qp.terminal = terminal;
     % One unit in each hard row's native units normalizes its margin.
     scale = ones(size(bound));

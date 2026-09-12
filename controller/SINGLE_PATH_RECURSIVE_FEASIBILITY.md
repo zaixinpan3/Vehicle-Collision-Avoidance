@@ -1,6 +1,14 @@
 # Rolling MPC and the role of the terminal certificate
 
-Certificate version 18, September 11, 2026.
+Certificate version 18, September 11, 2026, with the version-19 resolution of
+September 12, 2026 noted where it applies. The unresolved shift-compatibility
+condition recorded below is closed by the carried-witness construction of
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md): the shifted plan is
+verified with its own carried stage generators, charts, normals and terminal
+rows on conditioned information sets, so refreshed fresh problems no longer
+enter the recursive argument. The terminal derivation in this document is the
+nominal half of that construction; the estimation-error half is Section 3 of
+the new document.
 
 ## Execution contract
 
@@ -43,11 +51,15 @@ Initial admission starts with a constant-speed prediction seed. Successor
 calls initialize performance with the previous controls shifted by one hold
 and the last optimized input repeated. Separately, the shifted controls plus
 one terminal braking action form a **safety proof candidate**. Its physical
-feasibility is checked in the refreshed prediction and recorded. This
-candidate is never dispatched. The prediction length is not shortened. If this convex initialization fails, a constant-speed and
-then a slowing seed are tried before extending the horizon. Every selected
-plan must be solved and checked anew. These are optimization initializations,
-not input targets or executable fallback policies.
+feasibility is checked in the refreshed prediction and recorded; when the
+fresh solve fails or does not improve on it, this verified candidate is the
+command (see `INFORMATION_STATE_PCBF.md`). The prediction length is not
+shortened. The shifted and the constant-speed seeds are both solved at each
+horizon and the verified plan with the smaller `(value, objective)` pair is
+kept, because the CLF majorant is exact only at its own seed; a slowing seed
+is tried only when neither verifies, before extending the horizon. Every
+selected plan must be solved and checked anew. These are optimization
+initializations, not input targets.
 Terminal chart radius is `stationTrustRadius + M(1,:)*q`, including the verified
 longitudinal stopping budget. Geometry is recomputed and bounded over that
 larger chart; road and target constraints are not removed.
@@ -98,23 +110,19 @@ CLF relaxation and from its diagnostic negative feasible margin. On an
 already feasible hard-safe trajectory, zero safety relaxation is enough;
 maximizing extra clearance is not a condition of that shift argument.
 
-**Unresolved applicability condition.** Current replanning refreshes scheduled
-bicycle matrices, local station charts, separating planes and the terminal
-region. The old shifted plan need not belong to that refreshed convex problem.
-The stopping invariant set alone does not remove this gap. This implementation
-therefore sets both recursive-feasibility claim flags to false. It retains the
-terminal construction and checks every newly accepted plan, but does not claim
-that repeated successful solves prove a global PCBF or that a next solve must
-exist. Restoring such a theorem requires a shift-compatible fixed/robust plant
-formulation and an admissible terminal/geometry family; treating the model
-schedule as an extra physical control input would change the plant assumption
-and is not done here.
-
-This limitation is deliberate and material: removing an actual fallback is a
-runtime correction, not by itself a completed recursive-feasibility proof.
-An accepted frame certifies its first hold and a hypothetical invariant
-continuation under its own declared prediction. If a later solve fails, the
-simulation stops without asserting safety for unexecuted future time.
+**Applicability condition (resolved in version 19).** Fresh replanning
+refreshes scheduled bicycle matrices, local station charts, separating planes
+and the terminal region, and the old shifted plan need not belong to that
+refreshed convex problem. Version 19 therefore does not ask it to: the shifted
+plan is verified against the *carried* data of the plan it came from, whose
+rows are monotone under box inclusion, and the fresh problem may only replace
+that verified witness with a verified plan of no larger safety value. Both
+recursive-feasibility claim flags are now true under the declared premises
+(declared affine stage plant, exact target law, bounded estimation boxes,
+conditioned information sets); see the theorem in
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md). If a fresh solve fails
+at a continuation frame, the carried witness is executed; only a premise
+failure ends control.
 
 ## Terminal dynamics and invariant set
 
@@ -183,8 +191,12 @@ Terminal input/slip bounds follow from the chosen velocity box. Between
 successive terminal commands the braking change is at most
 `(k_b/g_beta)(1-rho)q_x`, already included in the box construction. Thus (5)
 and every physical terminal obligation persist through every held interval.
-The feedback uses the current measured velocity; replaying a rounded nominal
-terminal center with open-loop braking is not this construction.
+In version 19 the feedback acts on the predicted nominal velocity; the
+estimation error then evolves open loop and receives its own symmetric budget
+`R_err` from the unbraked comparison matrix, which requires passive road-load
+damping whenever the terminal velocity box is not a point. The two budgets
+add by linearity, and `R_nom <= R_err` makes membership monotone under box
+inclusion (INFORMATION_STATE_PCBF.md, Propositions 1 and 2).
 
 This proves invariance for the **hypothetical zero-speed scheduled terminal
 model**. It does not prove invariance for the refreshed cruise-scheduled model
@@ -225,9 +237,9 @@ and `deadline` is its moving endpoint, not a terminal handoff time. The full
 original-prefix bookkeeping and analytic command-dispatch branch are removed.
 `certifiedDuration=Inf` refers only to the hypothetical prefix-plus-tail
 witness. `commandCertifiedDuration` is one sample. A valid execution transition
-sets `certificateCompatible`. `carriedWitnessFeasible` separately reports whether
-the shifted safety candidate passes the refreshed problem; it is an observed
-single-step check, not an infinite recursive-feasibility theorem.
+sets `certificateCompatible`. `candidateVerified` (formerly `carriedWitnessFeasible`) reports that the
+shifted plan passed verification with its carried data; by the version-19
+theorem this is true at every continuation frame under the declared premises.
 
 `runExactStateRecursiveFeasibilityScenario` audits each exact first hold at
 11 independent geometry samples, logs the moving horizon, separates completed

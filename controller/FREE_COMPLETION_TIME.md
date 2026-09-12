@@ -1,24 +1,26 @@
 # Moving prediction horizon without terminal handoff
 
-Version 18, September 11, 2026. Each call starts a complete prediction at the
-current sample. The configured horizon seeds a search that may extend until
-all held intervals and the invariant terminal condition are certified.
-A search timeout means no plan was certified within the budget; it neither
-proves global infeasibility nor authorizes a partial prefix.
+Version 19, September 12, 2026. Each call starts a complete fresh prediction
+at the current sample and, at continuation frames, first verifies the
+previous plan shifted by one stage with its carried data. The configured
+horizon seeds the fresh search, which may extend until all held intervals
+and the terminal rows are verified. A search timeout means no fresh plan was
+verified within the budget; at a continuation frame the carried witness is
+then executed, at admission the frame reports `certificateSearchLimit`.
 
-`remainingSteps` is the length of the new plan. `deadline` is its predicted
-endpoint, not a wall-clock requirement to enter the stopping set. No
-already-executed decision variables are retained in the next optimization.
-The analytic terminal policy remains only in the mathematical witness.
-A failed performance solve raises an error even when a former witness exists.
+`remainingSteps` is the number of optimized stages in the accepted plan. It
+equals the fresh prediction length after an accepted fresh solve and
+decreases by one whenever the carried witness is executed instead. When it
+reaches zero the carried witness is the analytic terminal law on the
+predicted nominal, and `terminalActive` is true. `deadline` is the accepted
+prediction's endpoint, not a wall-clock requirement.
 
-`freeCompletionTimeTest` checks cruise beyond the first prediction horizon,
-a moving endpoint, no terminal takeover and explicit failure termination.
-`verifyFreeCompletionTime` saves these two independent scenarios. The complete
-straight-road driver saves partial results on failure and logs all frame times.
-The same target remains observed and constrained after passage.
+`freeCompletionTimeTest` checks cruise beyond the first prediction horizon, a
+moving endpoint, no terminal takeover while fresh solves succeed, and the
+carried-witness execution down to the terminal law under repeated fresh
+failures. `verifyFreeCompletionTime` saves these independent scenarios. The
+straight-road driver saves partial results on failure and logs all frame
+times. The same target remains observed and constrained after passage.
 
-A fresh horizon alone does not prove recursive feasibility when models and
-convex geometry are rebuilt. The current claim flags are false; terminal
-invariance and the missing shift-inclusion premises are explained in
-[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
+The recursive-feasibility proof and its premises are in
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md).

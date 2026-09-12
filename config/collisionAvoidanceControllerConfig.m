@@ -128,12 +128,19 @@ function cfg = localDefaults()
     % problem.defaultSolver invokes the native sparse conic solver.
     % certificateSearchTimeLimit limits wall-clock search work, not trajectory
     % duration; reaching it reports an unresolved search, never infeasibility.
+    % constraintTolerance is the native solver's relative feasibility
+    % tolerance; the solve-time row reserve scales with it and the program's
+    % dominant magnitude so that solver error cannot cross a physical row.
+    % lexicographicTieTolerance bounds, in metres of accumulated predicted
+    % violation, how far the performance stage may exceed the value-stage
+    % optimum when that optimum is positive; a zero optimum is kept exactly.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
         "certificateSearchTimeLimit", 5.0, ...
-        "constraintTolerance", 1.0e-7, ...
-        "optimalityTolerance", 1.0e-7);
+        "constraintTolerance", 1.0e-8, ...
+        "optimalityTolerance", 1.0e-7, ...
+        "lexicographicTieTolerance", 1.0e-6);
 
     % Fallback target rectangle when an estimate publishes no extent.
     cfg.target = struct( ...
@@ -206,6 +213,7 @@ function localValidate(cfg)
     localValidateNonnegativeScalar(cfg.controller.sampleTime, "controller.sampleTime");
     localValidateNonnegativeScalar(cfg.controller.horizonSteps, "controller.horizonSteps");
     validateattributes(cfg.solver.certificateSearchTimeLimit,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.solver.lexicographicTieTolerance,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.model.frontWheelSteeringRateMaximum,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.model.brakingRatioRateMaximum,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.encounter.minimumCells, {'double'}, ...

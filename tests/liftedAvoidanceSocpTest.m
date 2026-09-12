@@ -49,7 +49,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
                 residual = sparseProgram.A*decision-sparseProgram.b;
                 expected = condensed.A*decision(1:sparseProgram.physicalDecisionCount)-condensed.b;
                 testCase.verifyEqual(residual(1:equalities),zeros(equalities,1),AbsTol=1e-9);
-                hard = sparseProgram.cones(2);
+                hard = numel(sparseProgram.inequalityIndices);
                 testCase.verifyEqual(residual(equalities+(1:hard)),expected(sparseProgram.inequalityIndices),AbsTol=1e-8);
                 testCase.verifyLessThanOrEqual(localClfEncodingError(sparseProgram,decision,problem.qp),1e-6);
             end

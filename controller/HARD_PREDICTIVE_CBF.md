@@ -1,9 +1,12 @@
-# Hard predictive safety with a prediction-only terminal witness
+# Hard predictive safety with a carried recursive witness
 
-The version-18 controller solves a complete rolling problem at every sample.
-It applies only the first optimized input. The stopping terminal set remains
-hard; its feedback is a mathematical continuation witness and has no runtime
-command-dispatch path. A failed or uncertified solve ends control explicitly.
+The version-19 controller solves a complete rolling problem at every sample
+and applies only the first input of the plan it accepts. Before any fresh
+optimization, it verifies the previous plan shifted by one stage, with that
+plan's own carried prediction data, on the conditioned ego and target
+information sets. The theorem that makes this a recursive-feasibility
+guarantee, its premises and its proof are in
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md).
 
 ```matlab
 certificate = [];
@@ -11,32 +14,41 @@ certificate = [];
     collisionAvoidanceController(ego, target, road, cfg, certificate);
 ```
 
-Supply exact timestamped ego and target states, one persistent target, and the
-previously issued `heldActuatorInput`. The old first-hold transition and
-original absolute-time target law are validated before rebuilding. Perception
-exit and nonlinear-plant guarantees are outside this experiment.
+Supply timestamped ego and target estimates with their error boxes
+(`controllerStateErrorBound` or estimator certificates; target position,
+velocity, acceleration, yaw and yaw-rate bounds), one persistent target, and
+the previously issued `heldActuatorInput`. The executed first hold, the
+exact target law and the box intersections are validated before anything is
+rebuilt. Nonlinear-plant and perception guarantees are outside this study.
 
-The feasibility phase finds a hard-safe interior. The CLF SOCP optimizes
-tracking, squared CLF relaxation and effort relative to the certificate
-operating input, using only a small numerical interior. Extra feasible margin
-is diagnostic and does not override cruise. The independent verifier accepts
-no negative physical margin and cannot repair safety with CLF slack.
+The value LP minimizes the accumulated per-stage violation of the collision
+and road rows with every other row hard; the CLF SOCP optimizes tracking,
+squared CLF relaxation and effort within that value. The independent verifier
+recomputes the violation from the physical rows and accepts no violated hard
+row. A fresh plan replaces the carried witness only when it is verified and
+its value does not exceed the witness's value.
 
 | Field | Meaning |
 | --- | --- |
-| `planCertified` | The current finite prediction and hypothetical tail were checked |
-| `terminalContinuationCertified` | The predicted endpoint satisfies the stopping certificate |
-| `terminalPolicyRole` | `predictionWitnessOnly` |
-| `terminalActive`, `fallbackUsed` | Always false |
-| `remainingSteps`, `deadline` | Fresh horizon length and moving prediction endpoint |
-| `certifiedDuration` | Infinite hypothetical continuation under that plan's scheduled models |
-| `commandCertifiedDuration` | One first hold |
-| `recursiveFeasibilityClaimed`, `indefiniteRecursiveFeasibilityClaimed` | False: refreshed models and geometry lack a general shift-inclusion proof |
+| `planCertified` | The accepted plan passed independent verification (hard rows, CLF cones, terminal rows) |
+| `pcbfValue` | Verified accumulated safety violation of the accepted plan; the reported PCBF value |
+| `stageViolation` | Its per-stage terms; `stageViolation(1)` is the executed-stage violation |
+| `certificateSource` | `checkedOptimization` (fresh plan accepted) or `carriedWitness` (shifted previous plan executed) |
+| `candidateVerified`, `candidateValue` | The carried witness was verified at this frame, and its value |
+| `pcbfDescentResidual` | `V(k+1) − (V(k) − stageViolation(1)(k))`; nonpositive by the theorem when `V(k)=0` |
+| `lexicographicTieResidual` | Verified value minus the value-stage optimum of the accepted fresh plan |
+| `freshSolveFailure` | Why the fresh plan was not accepted, if it was not |
+| `terminalActive` | The terminal law on the predicted nominal is the issued command (no optimized stage remained) |
+| `terminalPolicyRole` | `carriedWitnessTail` |
+| `fallbackUsed` | Always false: the carried witness is the program's own feasible solution |
+| `initialErrorBound`, `targetErrorBound` | The conditioned ego (Frenet) and target boxes used by this frame |
+| `recursiveFeasibilityClaimed`, `indefiniteRecursiveFeasibilityClaimed` | True under the declared premises (`recursiveFeasibilityScope`) |
 | `physicalVehicleGuaranteeEstablished` | False |
-| `barrierValue` | Negative feasible-margin diagnostic, not the globally optimized Huang PCBF |
 
-The terminal invariant-set derivation, precise shift conditions and unresolved
-proof applicability are in
-[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
-Finite successful experiments do not replace those conditions or a 100 ms
-execution-time qualification.
+Errors that end control are premise failures, not controller decisions:
+`inconsistentObservation` (a measurement box misses the predicted box),
+`carriedWitnessRejected` (the carried witness failed verification, which the
+theorem excludes under its premises), `unboundedTargetSupport` (no terminal
+halfspace separates the ego from the target's entire future),
+`executionContractViolation`, `changedExecutionContract`, and, at admission
+only, `noCertifiedContinuation` or `certificateSearchLimit`.

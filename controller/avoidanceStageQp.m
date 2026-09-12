@@ -12,8 +12,11 @@ classdef avoidanceStageQp
             program = localLiftedProgram(qp,prediction,model);
             program.context = struct("prediction",prediction,"model",model);
             equalities = program.cones(1);
+            mapped = numel(program.inequalityIndices);
             program.rowMap = struct("equality",(1:equalities).', ...
-                "inequality",equalities+(1:numel(program.inequalityIndices)).');
+                "inequality",equalities+(1:mapped).', ...
+                "violation",equalities+mapped+(1:program.violationCount).', ...
+                "budget",equalities+mapped+program.violationCount+1);
             program.inequalityOffset = program.b(program.rowMap.inequality) ...
                 -qp.inequalityBound(program.inequalityIndices);
 
@@ -36,8 +39,13 @@ function program = localLiftedProgram(qp,prediction,model)
     count = prediction.stageCount;
     cells = prediction.cells;
     cellCount = numel(cells);
-    total = physicalCount+6*(cellCount+1);
-    stateIndex = reshape(physicalCount+(1:6*(cellCount+1)),6,[]);
+    stateCount = 6*(cellCount+1);
+    % One nonnegative safety violation per stage follows the auxiliary
+    % states. It relaxes only collision and road rows; every other row,
+    % including the terminal set, remains hard.
+    violationIndex = physicalCount+stateCount+(1:count);
+    total = physicalCount+stateCount+count;
+    stateIndex = reshape(physicalCount+(1:stateCount),6,[]);
     % Auxiliary states are deviations from the current anchor. Absolute
     % route station can be hundreds of metres while active clearances are
     % micrometres; leaving that translation in equality right-hand sides
@@ -62,10 +70,12 @@ function program = localLiftedProgram(qp,prediction,model)
             +tube.localStateMap(:,:,end)*stateCenter(:,index)-stateCenter(:,index+1);
         geometry = qp.geometry.local(index);
         rowCount = numel(geometry.bound);
-        block = spalloc(rowCount,total,8*rowCount);
+        block = spalloc(rowCount,total,9*rowCount);
         block(:,stateIndex(:,index)) = geometry.stateMatrix;
         block(:,inputIndex) = geometry.inputMatrix;
         selected = rowStart+(1:rowCount);
+        relaxed = qp.safetyRows(selected);
+        block(relaxed,violationIndex(tube.stage)) = -1;
         localBounds{index} = geometry.bound-geometry.stateMatrix*stateCenter(:,index) ...
             +qp.inequalityBound(selected)-qp.geometry.physicalBound(selected);
         if size(geometry.nodeStateRows,3)>1
@@ -80,6 +90,7 @@ function program = localLiftedProgram(qp,prediction,model)
             block(endpointRows,stateIndex(:,index)) = endpointStart;
             block(endpointRows,stateIndex(:,index+1)) = endpointState;
             block(endpointRows,inputIndex) = endpointInput;
+            block(endpointRows(relaxed(endpointRows)),violationIndex(tube.stage)) = -1;
             localBounds{index}(endpointRows) = geometry.bound(endpointRows) ...
                 +endpointState*tube.localOffset(:,end) ...
                 -endpointState*stateCenter(:,index+1)-endpointStart*stateCenter(:,index) ...
@@ -124,6 +135,12 @@ function program = localLiftedProgram(qp,prediction,model)
     uniqueRows = localUndominatedRows([hard,sparse(qp.barrier.scale(inequalityIndices))],hardBound);
     inequalityIndices = inequalityIndices(uniqueRows);
     hard = hard(uniqueRows,:);hardBound = hardBound(uniqueRows);
+    % Nonnegative violations and their lexicographic budget row. The budget
+    % is set by the performance stage to the value-stage optimum.
+    nonnegative = sparse(1:count,violationIndex,-1,count,total);
+    budget = sparse(ones(1,count),violationIndex,1,1,total);
+    hard = [hard;nonnegative;budget];
+    hardBound = [hardBound;zeros(count,1);0];
     cones = qp.clf.constraints;
     coneRows = cell(numel(cones),1);
     coneBounds = cell(numel(cones),1);
@@ -207,6 +224,7 @@ function program = localLiftedProgram(qp,prediction,model)
         "cones",[size(dynamics,1);numel(hardBound);coneDimensions], ...
         "physicalDecisionCount",physicalCount,"stateIndex",stateIndex,"stateCenter",stateCenter, ...
         "inequalityIndices",inequalityIndices, ...
+        "violationIndex",violationIndex,"violationCount",count, ...
         "clfConstraintIndices",coneIndices, ...
         "inactiveSlackIndex",zeros(1, 0));
 end

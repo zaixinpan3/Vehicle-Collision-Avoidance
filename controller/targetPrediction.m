@@ -26,12 +26,12 @@ classdef targetPrediction
         end
         function encounter = admitExact(target, time, lane, cfg)
         % One immutable Cartesian constant-acceleration/constant-yaw-rate flow.
-            errors = [target.positionErrorBound; target.velocityErrorBound; ...
-                target.accelerationErrorBound; target.yawErrorBound; ...
-                target.yawRateErrorBound; target.predictionYawAccelerationErrorBound];
-            if any(errors ~= 0)
+        % Current-state estimation boxes are admitted and carried as sets;
+        % future-motion uncertainty is not part of the exact law.
+            future = [target.predictionAccelerationErrorBound(:); target.predictionYawAccelerationErrorBound];
+            if any(future ~= 0)
                 error("collisionAvoidanceController:nonexactStudyInput", ...
-                    "The exact-state study requires zero target estimation and prediction errors.");
+                    "The exact target law admits current-state boxes only; future motion bounds must be zero.");
             end
             motion = target.predictionMotion;
             if ~isempty(motion)
@@ -54,6 +54,33 @@ classdef targetPrediction
             encounter = targetPrediction.admit(target,time,lane,cfg);
             encounter.contract.kind = "exact-motion-v1";
             encounter.contract.validityScope = "allFutureTime";
+        end
+
+        function next = conditionExact(carried, duration, measured)
+        %conditionExact Intersect the carried exact flow with a new measurement box.
+        % The true target state lies in the propagated carried box and in the
+        % measurement box, so the interval hull of their intersection contains
+        % it and stays inside the propagated box. An empty intersection
+        % contradicts the exact motion premise or the measurement contract.
+            [center, radius] = targetPrediction.finiteFlow(carried, duration);
+            measuredCenter = measured.center;
+            measuredCenter(7) = center(7)+atan2(sin(measuredCenter(7)-center(7)), ...
+                cos(measuredCenter(7)-center(7)));
+            allowance = 256*eps*(1+abs(center)+abs(measuredCenter)+radius+measured.radius);
+            lower = max(center-radius, measuredCenter-measured.radius);
+            upper = min(center+radius, measuredCenter+measured.radius);
+            if any(lower > upper+allowance)
+                error("collisionAvoidanceController:inconsistentObservation", ...
+                    "The target measurement box does not intersect its exact predicted flow.");
+            end
+            middle = (lower+upper)/2;
+            lower = min(lower, middle);
+            upper = max(upper, middle);
+            next = carried;
+            next.center = middle;
+            next.radius = (upper-lower)/2;
+            next.time = carried.time+duration;
+            next.nominalCenter = next.center;
         end
 
         function finite = isFiniteSensing(encounter)
@@ -113,11 +140,15 @@ classdef targetPrediction
                 r(5:6)+jerk*duration; r(7)+r(8)*duration+yawAcceleration*(duration.^2/2); ...
                 r(8)+yawAcceleration*duration];
             % Charge arithmetic in the prediction, rather than accepting an
-            % empty measurement intersection with a physical tolerance.
+            % empty measurement intersection with a physical tolerance. Only
+            % terms that were actually summed are charged: an exactly copied
+            % zero acceleration or yaw rate carries no rounding, and an
+            % artificial positive acceleration radius would make the
+            % all-future terminal support unbounded.
             arithmetic = [abs(x(1:2))+abs(x(3:4))*duration+abs(x(5:6))*(duration.^2/2); ...
                 abs(x(3:4))+abs(x(5:6))*duration;repmat(abs(x(5:6)),1,numel(duration)); ...
                 abs(x(7))+abs(x(8))*duration;repmat(abs(x(8)),1,numel(duration))];
-            radius = radius+64*eps*(1+arithmetic+radius);
+            radius = radius+64*eps*(arithmetic+radius);
         end
 
         function [center, jerk, yawAcceleration] = nominalFlow(encounter, duration)

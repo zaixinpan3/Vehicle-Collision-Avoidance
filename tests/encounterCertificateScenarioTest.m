@@ -6,13 +6,13 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function solverFailureEndsTheScenarioWithoutFallback(testCase)
+        function solverFailureExecutesTheVerifiedCarriedWitness(testCase)
             report = runEncounterCertificateScenario(ForceSolverFailure=true);
-            testCase.verifyFalse(report.completed);
-            testCase.verifyEqual(report.executedHolds,1);
-            testCase.verifyEqual(report.failureIdentifier,"collisionAvoidanceController:noCertifiedContinuation");
-            testCase.verifyFalse(any(report.retainedWitnessUsed));
-            testCase.verifyTrue(all(isnan(report.input(:,end))));
+            testCase.verifyTrue(report.completed);
+            testCase.verifyTrue(report.passed);
+            testCase.verifyTrue(all(report.retainedWitnessUsed(2:end)));
+            testCase.verifyFalse(any(isnan(report.input(:))));
+            testCase.verifyEqual(report.pcbfValue,zeros(size(report.pcbfValue)));
         end
         function freshSolutionsContinueBeyondTheFirstPredictionEnd(testCase)
             report = runEncounterCertificateScenario();

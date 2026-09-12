@@ -13,18 +13,18 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public exact-state controller entry and diagnostics |
+| `collisionAvoidanceController.m` | Public information-state controller entry, carried-witness acceptance rule and diagnostics |
 | `readPlanningInputs.m` | Input normalization and lane/target model construction |
-| `hardEncounterBarrier.m` | Invariant-tail admission (`plan`), terminal set/flow and first-hold transition validation |
-| `formulateAvoidanceProblem.m` | Objective, hard swept constraints and predictive CLF cones |
-| `avoidanceStageQp.m` | Sparse transcription (`build`) and updates using explicit row maps (`updateBounds`) |
-| `solveHardCbfClf.m` | Hard-safety feasibility and CLF solve (`solve`) and independent plan verification (`certify`) |
+| `hardEncounterBarrier.m` | Fresh search (`plan`), box conditioning and carried-witness assembly (`validateTransition`), witness verification (`verifyCandidate`), robust terminal set (`completionRows`, `terminalMembership`), carried data (`carriedData`) |
+| `formulateAvoidanceProblem.m` | Objective, swept safety rows with stage labels, hard domain/terminal rows and predictive CLF cones |
+| `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
+| `solveHardCbfClf.m` | Safety-value LP and CLF SOCP (`solve`), independent verification and value function (`certify`, `certifyInputs`) |
 | `avoidanceSafetyGeometry.m` | Swept separation (`build`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input prediction, nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
-| `targetPrediction.m` | Exact target admission, absolute-time flow, offline uncertainty studies and footprint support |
+| `targetPrediction.m` | Exact target admission with current-state boxes (`admitExact`), box conditioning (`conditionExact`), absolute-time flow, offline uncertainty studies and footprint support |
 | `fialaCertificate.m` | Validated nonlinear residuals (`residual`), held-feedback samples (`sample`), prescribed sequences (`sequence`) and shared constants (`parameters`) |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |
@@ -62,9 +62,10 @@ The removed standalone files have no compatibility wrappers.
 | `fialaIntervalParameters` | `fialaCertificate.parameters` |
 
 The earlier consolidation changed source organization and call names while
-preserving its then-current equations. The current version-18 controller
-uses exact-state rolling prediction with a prediction-only invariant continuation; see
-[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md). In particular,
+preserving its then-current equations. The current version-19 controller
+carries the accepted plan's own prediction data as a recursive-feasibility
+witness on conditioned information sets; see
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md). In particular,
 `fialaCertificate.sample` and `.sequence` retain their documented limited
 scope: nonlinear ego-flow certification does not yet establish an integrated
 nonlinear collision/road/target-exit certificate. See

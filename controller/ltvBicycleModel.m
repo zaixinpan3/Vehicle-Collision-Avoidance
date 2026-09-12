@@ -237,9 +237,20 @@ classdef ltvBicycleModel
                     "station", station, "curvature", curvature, ...
                     "brakingRatio", repmat(min(max(ratio, -1+sqrt(eps)), 1-sqrt(eps)), 1, count));
             end
+            % Carried stage generators are reused verbatim: a witness is verified
+            % with the data it was accepted with, never with a relinearization.
+            prescribed = isfield(model,"prescribedStages") && ~isempty(model.prescribedStages);
+            if prescribed && numel(model.prescribedStages)~=count
+                error("collisionAvoidanceController:invalidStoredCertificate", ...
+                    "Prescribed stage generators must match the prediction length.");
+            end
             reference = zeros(2,count);
             referenceStates = zeros(6,count);
-            for stage = 1:count
+            nonlinearAnchor = [];
+            if prescribed
+                reference(2,:) = [model.prescribedStages.brakingRatio];
+            end
+            for stage = 1:count*double(~prescribed)
                 if stage>1 && schedule.speedProfile(stage)==schedule.speedProfile(stage-1) ...
                         && schedule.curvature(stage)==schedule.curvature(stage-1)
                     reference(:,stage) = reference(:,stage-1);
@@ -251,8 +262,7 @@ classdef ltvBicycleModel
                 [referenceStates(:,stage),reference(:,stage)] = ltvBicycleModel.cruiseEquilibrium( ...
                     schedule.curvature(stage),stageCfg,model.longitudinalAccelerationBias);
             end
-            nonlinearAnchor = [];
-            if string(cfg.model.linearizationPolicy)~="cruise"
+            if ~prescribed && string(cfg.model.linearizationPolicy)~="cruise"
                 anchorInputs = reference;
                 if isfield(model,"linearizationInputs") && ~isempty(model.linearizationInputs)
                     retained = min(count,size(model.linearizationInputs,2));
@@ -279,7 +289,6 @@ classdef ltvBicycleModel
             prediction.domainErrorBound(:,1) = model.initialFrenetErrorBound;
             prediction.initialErrorBound = zeros(6,count+1);
             prediction.initialErrorBound(:,1) = model.initialFrenetErrorBound;
-            initialGenerators = diag(model.initialFrenetErrorBound);
             % Preserve signed correlations across future linear maps.
             % Reboxing at every step turns a damped coupled model into a
             % growing comparison system and consumes the clearance reserve.
@@ -318,11 +327,23 @@ classdef ltvBicycleModel
             tireModels = cell(count,1);
             priorOperatingPoint = [];
             for stage = 1:count
-                changed = stage==1 || schedule.curvature(stage)~=schedule.curvature(stage-1) ...
+                if prescribed
+                    given = model.prescribedStages(stage);
+                    a = given.continuousA;b = given.continuousB;c = given.continuousC;
+                    tireModel = given.tireModel;
+                    processReserve = stateUncertainty.heldDisturbance(a,baseRate,h);
+                    rate = baseRate;
+                    exact = expm(h*[a,b,c;zeros(3,9)]);
+                    executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound+processReserve;
+                    prediction.scheduleSpeedProfile(stage) = given.speed;
+                    prediction.scheduleBrakingRatio(stage) = given.brakingRatio;
+                    prediction.scheduleCurvature(stage) = given.curvature;
+                end
+                changed = ~prescribed && (stage==1 || schedule.curvature(stage)~=schedule.curvature(stage-1) ...
                     || schedule.speedProfile(stage)~=schedule.speedProfile(stage-1) ...
-                    || schedule.brakingRatio(stage)~=schedule.brakingRatio(stage-1);
+                    || schedule.brakingRatio(stage)~=schedule.brakingRatio(stage-1));
                 operatingPoint = [];
-                if any(string(cfg.model.linearizationPolicy)==["trajectory","currentState"])
+                if ~prescribed && any(string(cfg.model.linearizationPolicy)==["trajectory","currentState"])
                     stateBar = referenceStates(:,stage);
                     stateBar(1) = schedule.station(stage);
                     inputBar = reference(:,stage);
@@ -357,8 +378,11 @@ classdef ltvBicycleModel
                 tireModels{stage} = tireModel;
                 prediction.modelErrorRateBound(:,stage) = rate;
                 prediction.executionReserve(:,stage) = executionReserve;
-                initialGenerators = exact(1:6,1:6)*initialGenerators;
-                prediction.initialErrorBound(:,stage+1) = sum(abs(initialGenerators),2);
+                % Node boxes follow the interval hull of each exact stage
+                % transition. A signed-generator chain would be tighter but is
+                % not monotone when a later frame conditions and re-boxes an
+                % intermediate node (INFORMATION_STATE_PCBF.md, Lemma 1).
+                prediction.initialErrorBound(:,stage+1) = abs(exact(1:6,1:6))*prediction.initialErrorBound(:,stage);
                 domainGenerators = [exact(1:6,1:6)*domainGenerators,diag(processReserve)];
                 prediction.domainErrorBound(:,stage+1) = sum(abs(domainGenerators),2);
                 prediction.continuousA(:, :, stage) = a;

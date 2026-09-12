@@ -171,17 +171,36 @@ function [result,initial] = localIndependentConicSolve(~, program)
     initial = program.defaultSolver();
     % Hold the same first-stage margin while independently solving performance.
     if nnz(program.P)==0, result = initial; return; end
-    hessian = program.P+triu(program.P,1).';
-    options = optimoptions("fmincon", "Display", "off", "Algorithm", "sqp", ...
-        "ConstraintTolerance", 1e-9, "OptimalityTolerance", 1e-8, "MaxIterations", 100, ...
-        "StepTolerance",1e-12,"SpecifyObjectiveGradient",true,"SpecifyConstraintGradient",true);
+    % SeDuMi through YALMIP is an interior-point conic solver independent of
+    % the native Clarabel bridge; it handles the sparse rows and the Lorentz
+    % cones of the lifted program at their full size.
+    localAddConicSolverPaths();
+    z = sdpvar(numel(program.q),1);
     equalities = 1:program.cones(1);
     rows = program.cones(1)+(1:program.cones(2));
-    [decision, ~, exitFlag, output] = fmincon(@(z) localQuadraticCost(z,hessian,program.q), ...
-        initial.decision, full(program.A(rows,:)), program.b(rows), ...
-        full(program.A(equalities,:)),program.b(equalities),[],[], ...
-        @(z) localCones(program,z), options);
-    result = struct("decision",decision,"exitFlag",exitFlag,"output",output);
+    constraints = [program.A(equalities,:)*z == program.b(equalities); ...
+        program.A(rows,:)*z <= program.b(rows)];
+    dimensions = program.cones(3:end);
+    offset = sum(program.cones(1:2));
+    starts = offset+[0;cumsum(dimensions(1:end-1))];
+    for dimension = unique(dimensions).'
+        selected = dimensions==dimension;
+        columns = starts(selected).'+(1:dimension).';
+        slack = reshape(program.b(columns(:))-program.A(columns(:),:)*z,dimension,[]);
+        constraints = [constraints; cone(slack)]; %#ok<AGROW>
+    end
+    hessian = program.P+triu(program.P,1).';
+    objective = 0.5*z.'*hessian*z+program.q.'*z;
+    diagnostics = optimize(constraints,objective, ...
+        sdpsettings('solver','sedumi','verbose',0,'sedumi.eps',1e-10,'cachesolvers',1));
+    result = struct("decision",value(z),"exitFlag",double(diagnostics.problem==0)*2-1,"output",diagnostics);
+end
+
+function localAddConicSolverPaths()
+    if ~isempty(which("optimize")) && ~isempty(which("sedumi")), return; end
+    solverRoot = fullfile(fileparts(fileparts(mfilename("fullpath"))),"solver");
+    addpath(genpath(fullfile(solverRoot,"YALMIP")));
+    addpath(fullfile(solverRoot,"sedumi"));
 end
 
 function [value,gradient] = localQuadraticCost(decision,hessian,linear)

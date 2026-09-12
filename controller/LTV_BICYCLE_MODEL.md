@@ -1,16 +1,19 @@
 # Scheduled Frenet bicycle and continuation model
 
-## Exact scheduled-plant study (September 11, 2026)
+## Declared scheduled-plant study (September 12, 2026)
 
-The current online experiment executes the first held interval of each newly
-published scheduled affine prediction exactly. Future schedules are refreshed
-when replanning. The zero-speed terminal schedule and sampled velocity feedback
-are hypothetical certificate dynamics; they are never an actual handoff mode.
-State and process errors are zero; arithmetic prediction enclosures remain.
-This does not transfer terminal invariance to a refreshed model or a nonlinear
-Fiala plant. The terminal derivation and outstanding shift-compatibility
-condition are in
-[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
+The current online experiment executes the first held interval of each
+accepted plan's scheduled affine prediction exactly from the true state, while
+the controller receives estimates with bounded error boxes. Fresh schedules
+are refreshed when replanning, but the accepted plan's stage generators are
+carried and reused verbatim to verify its shifted successor
+(`model.prescribedStages` in `finitePredict`). The zero-speed terminal
+schedule and the sampled feedback on the predicted nominal velocity are
+hypothetical certificate dynamics until no optimized stage remains. Process
+errors are zero; estimation-error boxes are propagated and conditioned. This
+does not transfer terminal invariance to a nonlinear Fiala plant. The terminal
+derivation and the recursive-feasibility theorem are in
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md).
 The model derivations and nonlinear comparison utilities below remain useful,
 but statements about the former online finite-perception scope are superseded.
 

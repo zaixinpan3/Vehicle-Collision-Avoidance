@@ -15,9 +15,21 @@ yawRate(t+tau) = yawRate(t)
 `targetPrediction.admitExact` accepts this contract without a motion descriptor,
 or with `predictionMotion.kind="exact-motion-v1"`. An old
 `finite-sensing-motion-v1` descriptor is accepted only with zero future bounds;
-it is normalized to the exact all-future contract. Nonzero target estimation,
-jerk or yaw-acceleration bounds are rejected by the exact-study controller.
-Standalone uncertain-prediction utilities remain available for offline research.
+it is normalized to the exact all-future contract. Current-state estimation
+boxes (position, velocity, acceleration, yaw, yaw rate) are admitted and
+carried as sets; future-motion bounds (`predictionAccelerationErrorBound`,
+`predictionYawAccelerationErrorBound`, jerk or yaw-acceleration contracts)
+are rejected because the law itself is exact. At every continuation frame
+`targetPrediction.conditionExact` intersects the carried box propagated by
+one period with the new measurement box; the result is a subset of the
+propagated box and contains the true state. Standalone uncertain-prediction
+utilities remain available for offline research.
+
+With the exact law, a nonzero velocity or acceleration box makes the target's
+all-future support unbounded along every direction on which the box is not
+strictly receding, so no terminal halfspace exists (`unboundedTargetSupport`).
+Position and yaw boxes are covered without restriction; see
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md), Section 6.
 
 One stable identifier and the same footprint must persist. With only one
 otherwise anonymous target the controller assigns `exactTarget:1`. Missing or
@@ -36,5 +48,5 @@ after one second in the regression example. A target generator for this study
 must call `finiteFlow` or implement the exact equations above, including
 possible reversal under constant negative Cartesian acceleration.
 
-See [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md)
-for the ego plant premise, terminal invariant set and all-future separation.
+See [INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md) for the ego
+plant premise, the robust terminal set and the all-future box separation.

@@ -16,12 +16,17 @@ classdef freeCompletionTimeTest < matlab.unittest.TestCase
             testCase.verifyFalse(any(result.terminalActive));
             testCase.verifyLessThan(max(abs(result.state(4,:)-8)),0.02);
         end
-        function aFailedOptimizationEndsBeforeAnyTerminalTakeover(testCase)
-            result = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",FailAfterAdmission=true);
-            testCase.verifyFalse(result.passed);
-            testCase.verifyEqual(result.executedHolds,1);
-            testCase.verifyFalse(any(result.terminalActive));
-            testCase.verifyFalse(any(result.retainedWitnessUsed));
+        function aFailedOptimizationExecutesTheCarriedWitnessDownToTheTerminalLaw(testCase)
+            result = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",FailAfterAdmission=true,SampleCount=24);
+            testCase.verifyTrue(result.completed);
+            testCase.verifyTrue(result.passed);
+            testCase.verifyTrue(all(result.candidateExecuted(2:end)));
+            testCase.verifyTrue(all(result.candidateVerified(2:end)));
+            testCase.verifyEqual(result.optimizedStages(1:result.admissionSteps+1),result.admissionSteps:-1:0);
+            testCase.verifyTrue(all(result.terminalActive(result.admissionSteps+2:end)));
+            testCase.verifyFalse(any(result.terminalActive(1:result.admissionSteps)));
+            testCase.verifyLessThan(result.state(4,end),result.state(4,1));
+            testCase.verifyGreaterThanOrEqual(result.minimumSampledSeparationMargin,0);
         end
     end
 end
