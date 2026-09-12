@@ -1,5 +1,5 @@
 classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
-    % Held exact-model execution and carried invariant continuation behavior.
+    % Held exact-model execution and rolling prediction certificate behavior.
     methods (TestClassSetup)
         function addControllerPaths(testCase)
             root = fileparts(fileparts(mfilename("fullpath")));
@@ -24,7 +24,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(plan(2, :), cfg.actuation.brakingRatioMaximum);
             testCase.verifyLessThanOrEqual(abs(plan(1, :)), cfg.model.frontWheelSteeringAngleMaximum);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(stored.safetyScope, "indefiniteExactScheduledModel");
+            testCase.verifyEqual(stored.safetyScope, "certifiedPredictionWithHypotheticalInvariantTail");
         end
 
         function knownStatesDefineExactMotionWithoutAnExtraDescriptor(testCase)
@@ -50,14 +50,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:nonexactStudyInput");
         end
 
-        function failSolverResultRetainsTheIndependentlyCheckedWitness(testCase)
+        function aFailedSolveStopsWithoutReplayingTheWitness(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             cfg.solver.jointFunction = @encounterTestFixture.fail;
-            [command,~,next] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
-            testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
-            testCase.verifyTrue(next.metadata.fallbackUsed);
+            testCase.verifyError(@() collisionAvoidanceController(nextEgo, ...
+                localObservation(target,stored,nextEgo.stateTime),route,cfg,stored), ...
+                "collisionAvoidanceController:noCertifiedContinuation");
         end
 
         function missingObservationIsOutsideTheExactStatePremise(testCase)
@@ -68,18 +68,20 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:invalidExactScene");
         end
 
-        function successfulReplanningKeepsTheTerminalEntryTime(testCase)
+        function successfulReplanningMovesThePredictionEndBeyondTheOriginalDeadline(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             deadline = stored.deadline;
-            for index = 1:stored.remainingSteps
+            for index = 1:stored.remainingSteps+2
                 ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
                 observed = localObservation(target,stored,ego.stateTime);
                 [command,~,problem,stored] = collisionAvoidanceController(ego,observed,route,cfg,stored);
-                testCase.verifyEqual(stored.deadline,deadline,AbsTol=0);
+                testCase.verifyGreaterThan(stored.deadline,deadline);
+                testCase.verifyGreaterThanOrEqual(stored.remainingSteps,cfg.controller.horizonSteps);
+                deadline = stored.deadline;
                 testCase.verifyNotEmpty(command);
             end
-            testCase.verifyTrue(problem.metadata.terminalActive);
+            testCase.verifyFalse(problem.metadata.terminalActive);
             testCase.verifyFalse(stored.encounterComplete);
         end
 
@@ -90,14 +92,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:noCertifiedContinuation");
         end
 
-        function unsafeSolverResultRetainsTheIndependentlyCheckedWitness(testCase)
+        function anUnsafeSolveStopsWithoutReplayingTheWitness(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             cfg.solver.jointFunction = @encounterTestFixture.unsafe;
-            [command,~,next] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
-            testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
-            testCase.verifyTrue(next.metadata.fallbackUsed);
+            testCase.verifyError(@() collisionAvoidanceController(nextEgo, ...
+                localObservation(target,stored,nextEgo.stateTime),route,cfg,stored), ...
+                "collisionAvoidanceController:noCertifiedContinuation");
         end
 
         function aChangedMotionContractCannotInheritTheWitness(testCase)
@@ -110,7 +112,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:nonexactStudyInput");
         end
 
-        function aValidObservationKeepsTheOriginalJointWitness(testCase)
+        function aValidObservationPreservesTheOriginalTargetLawWhileRefreshingTheProblem(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
@@ -118,8 +120,9 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 +cfg.controller.sampleTime*target.targetVelocityInertial;
             [~,~,next,certificate] = collisionAvoidanceController(nextEgo,target,route,cfg,stored);
             testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyEqual(certificate.encounters,stored.encounters);
-            testCase.verifyGreaterThanOrEqual(certificate.margin,stored.margin);
+            testCase.verifyEqual(certificate.originalEncounter,stored.originalEncounter);
+            testCase.verifyEqual(next.model.stateTime,nextEgo.stateTime);
+            testCase.verifyGreaterThanOrEqual(certificate.margin,0);
         end
 
         function inconsistentObservationsInvalidateTheExecutionAssumptions(testCase)
@@ -201,13 +204,13 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(problem.metadata.solverCallCount, 0);
         end
 
-        function continuationCannotDecreaseTheVerifiedCarriedMargin(testCase)
+        function freshOptimizationPreservesHardSafetyWithoutLockingSurplusMargin(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             [~,~,next,certificate] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
-            testCase.verifyGreaterThanOrEqual(certificate.margin,stored.margin);
-            testCase.verifyGreaterThanOrEqual(next.metadata.requiredMargin,stored.margin);
+            testCase.verifyGreaterThanOrEqual(certificate.margin,0);
+            testCase.verifyEqual(next.metadata.requiredMargin,0);
         end
 
         function theExplicitWitnessSurvivesConvenienceStateReset(testCase)

@@ -1,16 +1,18 @@
 classdef hardEncounterBarrier
-    %hardEncounterBarrier Exact scheduled-model MPC with an invariant tail.
-    % The admitted finite schedule is followed by the zero-speed scheduled
-    % bicycle and its sampled braking law. Both are part of the exact plant
-    % assumption; no nonlinear Fiala model-transfer claim is made.
+    %hardEncounterBarrier Rolling MPC with a prediction-only terminal witness.
+    % Terminal feedback certifies a hypothetical continuation; it is never
+    % dispatched as an executable controller.
 
     methods (Static)
         function [model,prediction,qp,result,check,timing] = plan(model)
             cfg = model.cfg;
             timing = struct("predictionSeconds",0,"formulationSeconds",0, ...
-                "solveSeconds",0,"verificationSeconds",0,"attempts",0);
+                "solveSeconds",0,"verificationSeconds",0,"attempts",0, ...
+                "shiftedCandidateChecked",false,"shiftedCandidateAccepted",false);
             calls = 0;
             searchTimer = tic;
+            seedKind = 1;
+            seedCount = 2+double(isfield(model,"initializationPlan"));
             while true
                 if timing.attempts>0 && toc(searchTimer)>=cfg.solver.certificateSearchTimeLimit
                     error("collisionAvoidanceController:certificateSearchLimit", ...
@@ -20,13 +22,23 @@ classdef hardEncounterBarrier
                 model.exitSteps = zeros(numel(model.encounters),1);
                 model.exitMargin = inf;
                 phase = tic;
-                [schedule,anchor] = localApproachSchedule(model);
+                [schedule,anchor] = localPredictionSchedule(model,seedKind);
                 model.linearizationInputs = reshape(anchor,2,[]);
                 prediction = ltvBicycleModel.finitePredict(model,schedule);
                 timing.predictionSeconds = timing.predictionSeconds+toc(phase);
                 phase = tic;
                 qp = formulateAvoidanceProblem(model,prediction,anchor);
                 timing.formulationSeconds = timing.formulationSeconds+toc(phase);
+                phase = tic;
+                timing.shiftedCandidateChecked = isfield(model,"shiftedSafetyCandidate") ...
+                    && size(model.shiftedSafetyCandidate,2)==prediction.stageCount;
+                timing.shiftedCandidateAccepted = false;
+                if timing.shiftedCandidateChecked
+                    shiftedCheck = solveHardCbfClf.certifyInputs( ...
+                        qp,prediction,model,model.shiftedSafetyCandidate);
+                    timing.shiftedCandidateAccepted = shiftedCheck.accepted;
+                end
+                timing.verificationSeconds = timing.verificationSeconds+toc(phase);
                 phase = tic;
                 [result,qp] = solveHardCbfClf.solve(qp,cfg);
                 calls = calls+result.solverCalls;
@@ -43,8 +55,15 @@ classdef hardEncounterBarrier
                 end
                 % Only a complete terminal certificate can authorize control.
                 % Extension searches a larger admission domain; no prefix-only
-                % decision is executed and no repeated admission is assumed.
-                model.horizonSteps = model.horizonSteps+1;
+                % decision is executed.
+                % Initialization is not an executed fallback. Try a slowing
+                % geometry seed before extending an unsuccessful horizon.
+                if seedKind==seedCount
+                    model.horizonSteps = model.horizonSteps+1;
+                    seedKind = 1;
+                else
+                    seedKind = seedKind+1;
+                end
             end
         end
 
@@ -78,10 +97,14 @@ classdef hardEncounterBarrier
             finalOffset = prediction.egoStateOffset(:,end);
             finalRadius = prediction.egoStateErrorBound(:,end);
             anchor = finalOffset+finalMap*model.anchorPlan;
-            frame = laneGeometry.frameBounds(model.lane,anchor(1), ...
-                cfg.controller.stationTrustRadius,cfg.model.lateralDomainRadius);
             curvature = laneGeometry.curvature(anchor(1),model.lane);
             terminal = localTerminalDynamics(model,curvature);
+            % Include the certified stopping excursion in the terminal chart.
+            % A local linearization radius is not a required stopping position.
+            terminalRadius = cfg.controller.stationTrustRadius ...
+                +terminal.poseExcursion(1,:)*terminal.velocityLimit;
+            frame = laneGeometry.frameBounds(model.lane,anchor(1), ...
+                terminalRadius,cfg.model.lateralDomainRadius);
             data = struct("frame",[frame.origin;frame.tangent;frame.lateral;frame.heading; ...
                 frame.positionErrorBound;frame.headingErrorBound;frame.stationLower;frame.stationUpper], ...
                 "nominal",anchor,"targets",struct([]),"boundaries",model.road.boundaries, ...
@@ -118,12 +141,26 @@ classdef hardEncounterBarrier
                 normals(:,index) = normal;
                 futureSupports(index) = support;
             end
-            % Ap + |A| M |v| <= b is invariant for the terminal comparison
+            % Ap + R |v| <= b is invariant for the terminal comparison
             % dynamics. Enumerate signs to obtain ordinary hard linear rows.
             signs = 2*double(dec2bin(0:7,3)-'0')-1;
             poseCount = size(poseRows,1);
+            % Longitudinal velocity is nonnegative. A lower station bound
+            % therefore needs no fictitious backward stopping budget.
+            projectedFlow = poseRows*terminal.continuousA(1:3,4:6);
+            growth = [max(projectedFlow(:,1),0),abs(projectedFlow(:,2:3))];
+            budget = growth/(-terminal.comparison);
+            budget = budget+4096*eps*(1+norm(budget,inf)) ...
+                *ones(poseCount,1)*(ones(1,3)/(-terminal.comparison));
+            residual = budget*terminal.comparison+growth;
+            allowance = 128*eps*(abs(budget)*abs(terminal.comparison)+abs(growth));
+            if any(budget<0,"all") || any(residual+allowance>0,"all")
+                error("collisionAvoidanceController:invalidTerminalModel", ...
+                    "The directional terminal excursion failed verification.");
+            end
+            terminal.poseBudget = budget;
             rows = [repelem(poseRows,8,1), ...
-                repelem(abs(poseRows)*terminal.poseExcursion,8,1).*repmat(signs,poseCount,1)];
+                repelem(budget,8,1).*repmat(signs,poseCount,1)];
             limits = repelem(poseBound,8);
             % Both signs of velocity and the nonnegative longitudinal domain.
             rows = [rows;zeros(6,3),[eye(3);-eye(3)];0,0,0,-1,0,0];
@@ -151,140 +188,60 @@ classdef hardEncounterBarrier
         end
 
         function [stored,problem] = admit(stored,problem)
-            stored.version = 17;
-            stored.admissionTime = stored.stateTime;
-            stored.consumedSteps = 0;
+            stored.version = 18;
             stored.encounterComplete = false;
             stored.witnessModel = problem.model;
-            stored.safetyScope = "indefiniteExactScheduledModel";
+            stored.safetyScope = "certifiedPredictionWithHypotheticalInvariantTail";
             stored.certifiedDuration = inf;
             stored.metadata = localMetadata(problem.metadata,stored,"checkedOptimization", ...
-                problem.metadata.solverCallCount,false);
+                problem.metadata.solverCallCount,true);
             problem.metadata = stored.metadata;
         end
 
-        function [command,inputs,problem,stored] = advance(stored,ego,model,observations,identity,makeCommand)
-            timer = tic;
+        function [original,initialization,safetyCandidate] = validateTransition(stored,ego,model,observations,identity)
+        % Check the executed first hold before discarding the old prediction.
             hardEncounterBarrier.validateAdmission(ego,observations,model.cfg);
             localValidateStored(stored,identity);
-            h = model.sampleTime;
-            consumed = stored.consumedSteps+1;
-            count = stored.prediction.stageCount;
-            expectedTime = stored.admissionTime+consumed*h;
-            if ~isfinite(model.stateTime) || abs(model.stateTime-expectedTime)>128*eps(max(1,abs(expectedTime))) ...
+            expectedTime = stored.stateTime+model.sampleTime;
+            if abs(model.stateTime-expectedTime)>128*eps(max(1,abs(expectedTime))) ...
                     || ~isequal(ego.heldActuatorInput,stored.appliedInput)
                 error("collisionAvoidanceController:executionContractViolation", ...
-                    "Continuation requires the scheduled sample and the previously issued input.");
+                    "Replanning requires the next sample and the previously issued input.");
             end
-            rootPlan = reshape(stored.decision(stored.qp.layout.planIndex),2,[]);
-            if stored.consumedSteps<count
-                expectedInput = rootPlan(:,stored.consumedSteps+1);
-                planCompatible = isequal(stored.plan,rootPlan(:,stored.consumedSteps+1:end));
-            else
-                expectedInput = stored.qp.terminal.input+stored.qp.terminal.feedback*stored.predictedState(:,1);
-                planCompatible = isequal(stored.plan(:,1),expectedInput);
-            end
-            if ~isequal(stored.appliedInput,expectedInput) || ~planCompatible
+            plan = reshape(stored.decision(stored.qp.layout.planIndex),2,[]);
+            if ~isequal(stored.plan,plan) || ~isequal(stored.appliedInput,plan(:,1))
                 error("collisionAvoidanceController:invalidStoredCertificate","The issued input witness changed.");
             end
             check = solveHardCbfClf.certify(stored.qp,stored.prediction,stored.witnessModel,stored.decision);
             if ~check.accepted || ~isequal(check.margin,stored.margin)
-                error("collisionAvoidanceController:invalidStoredCertificate","The complete witness failed verification.");
+                error("collisionAvoidanceController:invalidStoredCertificate","The previous witness failed verification.");
             end
-            [predicted,radius] = localExpectedState(stored,rootPlan,consumed);
+            predicted = stored.prediction.egoStateMatrix(:,:,2)*plan(:)+stored.prediction.egoStateOffset(:,2);
+            radius = stored.prediction.egoStateErrorBound(:,2);
             allowance = 256*eps*(1+abs(predicted)+abs(model.initialEgoState));
             if any(abs(model.initialEgoState-predicted)>radius+allowance)
                 error("collisionAvoidanceController:inconsistentObservation", ...
-                    "The ego state contradicts the retained exact scheduled dynamics.");
+                    "The ego state contradicts the previously published first hold.");
             end
+            endpoint = stored.prediction.egoStateMatrix(:,:,end)*plan(:)+stored.prediction.egoStateOffset(:,end);
+            terminalInput = stored.qp.terminal.input+stored.qp.terminal.feedback*endpoint;
+            safetyCandidate = [plan(:,2:end),terminalInput];
+            % Performance convexification must not inherit a compulsory
+            % brake from the hypothetical safety continuation.
+            initialization = [plan(:,2:end),plan(:,end)];
             measured = targetPrediction.admitExact(observations,model.stateTime,model.lane,model.cfg);
-            original = stored.encounters;
+            original = stored.originalEncounter;
             if measured.key~=original.key || measured.halfLength~=original.halfLength ...
                     || measured.halfWidth~=original.halfWidth
                 error("collisionAvoidanceController:changedEncounterContract", ...
                     "The same target and footprint must persist at every frame.");
             end
-            [targetCenter,targetRadius] = targetPrediction.finiteFlow(original,expectedTime-original.time);
-            measured.center(7) = targetCenter(7)+atan2(sin(measured.center(7)-targetCenter(7)), ...
-                cos(measured.center(7)-targetCenter(7)));
-            if any(abs(measured.center-targetCenter)>targetRadius+256*eps*(1+abs(targetCenter)))
+            [center,radius] = targetPrediction.finiteFlow(original,expectedTime-original.time);
+            measured.center(7) = center(7)+atan2(sin(measured.center(7)-center(7)),cos(measured.center(7)-center(7)));
+            if any(abs(measured.center-center)>radius+256*eps*(1+abs(center)))
                 error("collisionAvoidanceController:inconsistentObservation", ...
                     "The target must follow its original absolute-time prediction exactly.");
             end
-            stored.consumedSteps = consumed;
-            stored.stateTime = expectedTime;
-            source = "invariantTerminalContinuation";
-            attempted = false;
-            calls = 0;
-            if consumed<count
-                qp = stored.qp;
-                qp.requiredMargin = stored.margin;
-                qp.inequalityBound = qp.barrier.baseBound-stored.margin*qp.barrier.scale;
-                qp.stageProgram = avoidanceStageQp.updateBounds(qp);
-                qp.stageProgram.fixedDecisionIndex = (1:2*consumed).';
-                qp.stageProgram.fixedDecisionValue = reshape(rootPlan(:,1:consumed),[],1);
-                attempted = true;
-                [result,candidateQp] = solveHardCbfClf.solve(qp,model.cfg);
-                calls = result.solverCalls;
-                candidate = solveHardCbfClf.certify(candidateQp,stored.prediction,stored.witnessModel,result.decision);
-                source = "retainedCertifiedWitness";
-                if result.feasible && candidate.accepted && candidate.margin>=stored.margin
-                    stored.decision = result.decision;
-                    qp = candidateQp;
-                    check = candidate;
-                    source = "checkedContinuationOptimization";
-                end
-                stored.qp = qp;
-                rootPlan = reshape(stored.decision(stored.qp.layout.planIndex),2,[]);
-                states = reshape(pagemtimes(stored.prediction.egoStateMatrix,rootPlan(:)),6,[]) ...
-                    +stored.prediction.egoStateOffset;
-                stored.predictedState = states(:,consumed+1:end);
-                stored.stateErrorBound = stored.prediction.egoStateErrorBound(:,consumed+1:end);
-                inputs = rootPlan(:,consumed+1:end);
-                command = makeCommand(rootPlan,stored.witnessModel,stored.prediction,consumed+1);
-                generator = [stored.prediction.continuousA(:,:,consumed+1), ...
-                    stored.prediction.continuousB(:,:,consumed+1),stored.prediction.continuousC(:,consumed+1)];
-            else
-                terminal = stored.qp.terminal;
-                % Use the exact measured state in the terminal feedback law.
-                % Open-loop replay of a rounded terminal center would not
-                % preserve the invariant set indefinitely.
-                value = terminal.stateRows*model.initialEgoState;
-                arithmetic = 32*eps*(abs(terminal.stateRows)*abs(model.initialEgoState)+abs(terminal.stateBound));
-                if any(value+arithmetic>terminal.stateBound)
-                    error("collisionAvoidanceController:inconsistentObservation", ...
-                        "The measured state is outside the retained invariant terminal set.");
-                end
-                steps = 0:model.cfg.controller.horizonSteps;
-                stored.predictedState = hardEncounterBarrier.terminalFlow(terminal,model.initialEgoState,steps);
-                inputs = terminal.input+terminal.feedback*stored.predictedState(:,1:end-1);
-                stored.stateErrorBound = zeros(size(stored.predictedState));
-                commandPrediction = struct("egoStateMatrix",zeros(6,2,1), ...
-                    "egoStateOffset",stored.predictedState(:,1),"scheduleSpeedProfile",0, ...
-                    "scheduleCurvature",terminal.curvature,"scheduleBrakingRatio",terminal.input(2));
-                command = makeCommand(inputs(:,1),stored.witnessModel,commandPrediction,1);
-                generator = [terminal.continuousA,terminal.continuousB,terminal.continuousC];
-            end
-            stored.remainingSteps = max(0,count-consumed);
-            stored.margin = check.margin;
-            stored.acceptance = check;
-            stored.plan = inputs;
-            stored.appliedInput = inputs(:,1);
-            stored.scheduledInput = inputs(:,1);
-            command.measurementTime = expectedTime;
-            command.actuationTime = expectedTime;
-            command.holdSeconds = h;
-            metadata = localMetadata(stored.metadata,stored,source,calls,attempted);
-            metadata.executedContinuousGenerator = generator;
-            metadata.executedResidualRateBound = zeros(6,1);
-            metadata.runtimeSeconds = toc(timer);
-            metadata.runtime = struct("continuationSeconds",metadata.runtimeSeconds);
-            stored.metadata = metadata;
-            model.encounters = stored.encounters;
-            problem = struct("problemClass",stored.qp.problemClass,"qp",stored.qp, ...
-                "layout",stored.qp.layout,"prediction",stored.prediction,"model",model, ...
-                "decision",stored.decision,"plan",rootPlan(:),"inputPlan",inputs, ...
-                "tailPlan",inputs(:,[]),"metadata",metadata);
         end
 
         function states = terminalFlow(terminal,initial,steps)
@@ -407,10 +364,15 @@ function support = localFutureSupport(center,normal,duration)
     support = support+256*eps*(1+abs(support)+norm(center(1:2)));
 end
 
-function [schedule,anchor] = localApproachSchedule(model)
+function [schedule,anchor] = localPredictionSchedule(model,seedKind)
     cfg = model.cfg;
     count = model.horizonSteps;
-    speed = linspace(model.initialEgoState(4),min(0.25,model.initialEgoState(4)),count+1);
+    speed = repmat(model.initialEgoState(4),1,count+1);
+    shifted = isfield(model,"initializationPlan");
+    brakingSeed = seedKind==2+double(shifted);
+    if brakingSeed
+        speed = linspace(speed(1),min(0.25,speed(1)),count+1);
+    end
     station = model.initialEgoState(1)+[0,cumsum(model.sampleTime*(speed(1:end-1)+speed(2:end))/2)];
     curvature = arrayfun(@(s) laneGeometry.curvature(s,model.lane),station);
     inputs = zeros(2,count);
@@ -425,6 +387,9 @@ function [schedule,anchor] = localApproachSchedule(model)
         stageCfg.referenceSpeed = speed(stage);
         [~,input] = ltvBicycleModel.cruiseEquilibrium(curvature(stage),stageCfg,model.longitudinalAccelerationBias);
         input(2) = input(2)+(speed(stage+1)-speed(stage))/(model.sampleTime*modifiedFialaTire.accelerationGain(cfg));
+        if shifted && seedKind==1
+            input = model.initializationPlan(:,min(stage,size(model.initializationPlan,2)));
+        end
         inputs(:,stage) = min(max(input,max(lower,prior-change)),min(upper,prior+change));
         prior = inputs(:,stage);
     end
@@ -433,54 +398,44 @@ function [schedule,anchor] = localApproachSchedule(model)
 end
 
 function localValidateStored(stored,identity)
-    required = ["version","admissionTime","consumedSteps","witnessModel","qp", ...
-        "decision","prediction","metadata","identity","encounters"];
+    required = ["version","stateTime","appliedInput","plan","margin","witnessModel","qp", ...
+        "decision","prediction","metadata","identity","encounters","originalEncounter"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored,required)) ...
-            || stored.version~=17 || ~isfield(stored.qp,"terminal")
-        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-17 exact-model invariant certificate.");
+            || stored.version~=18 || ~isfield(stored.qp,"terminal")
+        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-18 rolling prediction certificate.");
     end
     if ~isequaln(identity,stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...
             "The retained exact plant, road, route and physical limits must be unchanged.");
-    end
-    validateattributes(stored.consumedSteps,{'double'},{'scalar','integer','nonnegative'});
-end
-
-function [state,radius] = localExpectedState(stored,inputs,consumed)
-    count = stored.prediction.stageCount;
-    if consumed<=count
-        state = stored.prediction.egoStateMatrix(:,:,consumed+1)*inputs(:)+stored.prediction.egoStateOffset(:,consumed+1);
-        radius = stored.prediction.egoStateErrorBound(:,consumed+1);
-    else
-        state = stored.predictedState(:,2);
-        radius = stored.stateErrorBound(:,2);
     end
 end
 
 function metadata = localMetadata(metadata,stored,source,calls,attempted)
     metadata.certificateSource = source;
     metadata.solverCallCount = calls;
-    metadata.fallbackUsed = attempted && source=="retainedCertifiedWitness";
-    metadata.carriedWitnessFeasible = stored.consumedSteps>0;
-    metadata.certificateCompatible = stored.consumedSteps>0;
+    metadata.fallbackUsed = false;
+    metadata.optimizationAttempted = attempted;
+    metadata.carriedWitnessFeasible = false;
+    metadata.certificateCompatible = false;
     metadata.carriedMargin = stored.margin;
     metadata.requiredMargin = stored.qp.requiredMargin;
     metadata.barrierValue = -stored.margin;
-    metadata.barrierInterpretation = "storedWitnessLowerBound";
+    metadata.barrierInterpretation = "verifiedPhysicalMarginDiagnostic";
     metadata.horizonSteps = stored.remainingSteps;
     metadata.planningWindowSteps = stored.identity.configuration.controller.horizonSteps;
     metadata.certificateExtensionSteps = max(0,stored.prediction.stageCount-metadata.planningWindowSteps);
     metadata.deadline = stored.deadline;
-    metadata.consumedSteps = stored.consumedSteps;
     metadata.encounterComplete = false;
     metadata.safetyScope = stored.safetyScope;
     metadata.certifiedDuration = inf;
+    metadata.commandCertifiedDuration = stored.witnessModel.sampleTime;
     metadata.lookaheadDuration = stored.remainingSteps*stored.witnessModel.sampleTime;
-    metadata.recursiveFeasibilityClaimed = true;
-    metadata.recursiveFeasibilityScope = "indefiniteForExactRetainedScheduleAndInvariantTail";
-    metadata.indefiniteRecursiveFeasibilityClaimed = true;
+    metadata.recursiveFeasibilityClaimed = false;
+    metadata.recursiveFeasibilityScope = "requiresShiftCompatibilityAfterModelAndGeometryRefresh";
+    metadata.indefiniteRecursiveFeasibilityClaimed = false;
     metadata.terminalContinuationCertified = true;
-    metadata.terminalActive = stored.consumedSteps>=stored.prediction.stageCount;
+    metadata.terminalActive = false;
+    metadata.terminalPolicyRole = "predictionWitnessOnly";
     metadata.exactPredictionAssumptionsHold = true;
     metadata.physicalVehicleGuaranteeEstablished = false;
     metadata.jointAdmissionPerformed = false;
@@ -488,7 +443,7 @@ function metadata = localMetadata(metadata,stored,source,calls,attempted)
     metadata.planCertified = true;
     metadata.acceptance = stored.acceptance;
     metadata.hardRowViolation = stored.acceptance.hardRowViolation;
-    metadata.clfRelaxation = stored.decision(stored.qp.layout.relaxationIndex(min(stored.consumedSteps+1,numel(stored.qp.layout.relaxationIndex)+1):end));
+    metadata.clfRelaxation = stored.decision(stored.qp.layout.relaxationIndex);
     metadata.activeTargetKeys = string({stored.encounters.key});
     metadata.dischargedTargetKeys = strings(1,0);
     metadata.commandActuationTime = stored.stateTime;

@@ -1,30 +1,24 @@
-# Finite approach time and infinite certified continuation
+# Moving prediction horizon without terminal handoff
 
-Version 17, September 11, 2026. The configured horizon is an initial search
-window for reaching an invariant terminal set. It is not a perception-exit
-deadline and it does not limit how long the controller can keep operating.
+Version 18, September 11, 2026. Each call starts a complete prediction at the
+current sample. The configured horizon seeds a search that may extend until
+all held intervals and the invariant terminal condition are certified.
+A search timeout means no plan was certified within the budget; it neither
+proves global infeasibility nor authorizes a partial prefix.
 
-`hardEncounterBarrier.plan` may extend the finite approach until all held
-intervals and the invariant terminal condition are certified. A search timeout
-reports an unresolved numerical search. It neither proves mathematical
-infeasibility nor authorizes execution of a partial prefix.
+`remainingSteps` is the length of the new plan. `deadline` is its predicted
+endpoint, not a wall-clock requirement to enter the stopping set. No
+already-executed decision variables are retained in the next optimization.
+The analytic terminal policy remains only in the mathematical witness.
+A failed performance solve raises an error even when a former witness exists.
 
-After admission, the terminal-entry time stays fixed. The executed prefix is
-fixed in the retained optimization; the unexecuted suffix plus the invariant
-terminal policy remains a feasible candidate. The controller can improve that
-candidate under the same dynamics and constraints. If optimization fails, the
-candidate remains available. At terminal entry the sampled analytic policy
-continues indefinitely and a control preview is returned at every frame.
+`freeCompletionTimeTest` checks cruise beyond the first prediction horizon,
+a moving endpoint, no terminal takeover and explicit failure termination.
+`verifyFreeCompletionTime` saves these two independent scenarios. The complete
+straight-road driver saves partial results on failure and logs all frame times.
+The same target remains observed and constrained after passage.
 
-`remainingSteps` is the number of finite prefix intervals still unexecuted.
-It reaches zero without exhausting the safety certificate. `deadline` is the
-terminal-entry timestamp; `certifiedDuration=Inf` includes the invariant
-suffix. `encounterComplete` never becomes true because of target distance.
-The same target remains observable and constrained at every frame.
-
-The new `freeCompletionTimeTest` checks independent exact-model runs beyond
-five original horizons, target passage without controller termination,
-extended admission, repeated solver failure and optimization with terminal
-continuation. The script is `scripts/runExactStateRecursiveFeasibilityScenario.m`.
-The proof and exact scheduled-plant qualification are in
+A fresh horizon alone does not prove recursive feasibility when models and
+convex geometry are rebuilt. The current claim flags are false; terminal
+invariance and the missing shift-inclusion premises are explained in
 [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).

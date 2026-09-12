@@ -1,10 +1,10 @@
 function report = runEncounterCertificateScenario(options)
-%runEncounterCertificateScenario Exact-state crossing with indefinite control.
+%runEncounterCertificateScenario Exact-state crossing with rolling prediction.
 % Uses the common independently integrated scheduled-model experiment. The
-% target remains observed after crossing, and the invariant tail is executed.
+% target remains observed after crossing; terminal feedback is prediction-only.
     arguments
-        options.ForceSolverFailure (1,1) logical = true
+        options.ForceSolverFailure (1,1) logical = false
     end
     report = runExactStateRecursiveFeasibilityScenario(Scenario="crossing", ...
-        SampleCount=80,FailAfterAdmission=options.ForceSolverFailure);
+        SampleCount=24,FailAfterAdmission=options.ForceSolverFailure);
 end

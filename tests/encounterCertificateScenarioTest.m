@@ -6,19 +6,21 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function solverFailureKeepsTheCrossingAndTerminalContinuationFeasible(testCase)
-            report = runEncounterCertificateScenario();
-            testCase.verifyTrue(all(report.planCertified));
-            testCase.verifyGreaterThan(nnz(report.retainedWitnessUsed),0);
-            testCase.verifyTrue(report.terminalActive(end));
-            testCase.verifyGreaterThanOrEqual(report.minimumSampledSeparationMargin,0);
+        function solverFailureEndsTheScenarioWithoutFallback(testCase)
+            report = runEncounterCertificateScenario(ForceSolverFailure=true);
+            testCase.verifyFalse(report.completed);
+            testCase.verifyEqual(report.executedHolds,1);
+            testCase.verifyEqual(report.failureIdentifier,"collisionAvoidanceController:noCertifiedContinuation");
+            testCase.verifyFalse(any(report.retainedWitnessUsed));
+            testCase.verifyTrue(all(isnan(report.input(:,end))));
         end
-        function freshSolutionsRetainTheIndefiniteCrossingCertificate(testCase)
-            report = runEncounterCertificateScenario(ForceSolverFailure=false);
-            testCase.verifyTrue(all(report.planCertified));
-            testCase.verifyLessThan(nnz(report.retainedWitnessUsed),report.admissionSteps-1);
-            testCase.verifyTrue(report.terminalActive(end));
-            testCase.verifyGreaterThanOrEqual(report.minimumSampledSeparationMargin,0);
+        function freshSolutionsContinueBeyondTheFirstPredictionEnd(testCase)
+            report = runEncounterCertificateScenario();
+            testCase.verifyTrue(report.passed);
+            testCase.verifyFalse(any(report.retainedWitnessUsed));
+            testCase.verifyFalse(any(report.terminalActive));
+            testCase.verifyGreaterThan(report.executedHolds,report.admissionSteps);
+            testCase.verifyLessThan(abs(report.finalCruiseError(3)),0.02);
         end
     end
 end

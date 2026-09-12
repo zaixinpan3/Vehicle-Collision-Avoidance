@@ -55,7 +55,7 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             testCase.verifyFalse(isfield(problem.qp.clf.certificate, "sampledFeedbackGain"));
         end
 
-        function safetyPrioritizesTheInvariantTailEvenWithoutPassiveRoadLoad(testCase)
+        function anAvailableStoppingCertificateDoesNotForceCruiseToBrake(testCase)
             cfg = localConfiguration();
             cfg.roadLoad.dragCoefficient = 0.0;
             cfg.roadLoad.rollingCoefficient = 0.0;
@@ -65,14 +65,14 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
             [command, ~, problem] = collisionAvoidanceController(ego, encounterTestFixture.stationaryTarget(), [0, 0; 2000, 0], cfg, []);
 
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThan(command.brakingRatio,0);
+            testCase.verifyLessThan(abs(command.brakingRatio),0.005);
             testCase.verifyGreaterThan(problem.qp.terminal.longitudinalRatio,0);
             testCase.verifyLessThan(problem.qp.terminal.longitudinalRatio,1);
-            testCase.verifyGreaterThan(problem.metadata.clfValueProfile(2),0);
-            testCase.verifyGreaterThan(max(problem.metadata.clfRelaxation),0);
+            testCase.verifyLessThan(problem.metadata.clfValueProfile(2),1e-4);
+            testCase.verifyLessThan(max(problem.metadata.clfRelaxation),0.01);
         end
 
-        function nearCruiseStatesRetainASafeSlowingContinuation(testCase, nearCruiseSpeed)
+        function nearCruiseStatesMoveTowardTheCruiseSpeed(testCase, nearCruiseSpeed)
             cfg = localConfiguration();
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", nearCruiseSpeed);
             ego.stateTime = 0;
@@ -82,7 +82,8 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
                 *command.bodyLongitudinalVelocityDerivative;
 
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThan(command.bodyLongitudinalVelocityDerivative,0);
+            testCase.verifyGreaterThan((cfg.referenceSpeed-nearCruiseSpeed) ...
+                *command.bodyLongitudinalVelocityDerivative,0);
             testCase.verifyGreaterThan(nextSpeed,0);
             testCase.verifyEqual(problem.qp.clf.referenceStart(3),cfg.referenceSpeed,AbsTol=0);
         end

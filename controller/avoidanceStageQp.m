@@ -16,10 +16,7 @@ classdef avoidanceStageQp
                 "inequality",equalities+(1:numel(program.inequalityIndices)).');
             program.inequalityOffset = program.b(program.rowMap.inequality) ...
                 -qp.inequalityBound(program.inequalityIndices);
-            if isfield(qp,"stageProgram") && isfield(qp.stageProgram,"fixedDecisionIndex")
-                program.fixedDecisionIndex = qp.stageProgram.fixedDecisionIndex;
-                program.fixedDecisionValue = qp.stageProgram.fixedDecisionValue;
-            end
+
         end
 
         function program = updateBounds(qp)

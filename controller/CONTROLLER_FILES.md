@@ -15,10 +15,10 @@ Do not move controller helpers into those directories to evade the limit.
 | --- | --- |
 | `collisionAvoidanceController.m` | Public exact-state controller entry and diagnostics |
 | `readPlanningInputs.m` | Input normalization and lane/target model construction |
-| `hardEncounterBarrier.m` | Invariant-tail admission (`plan`), terminal set/flow and retained certified execution |
+| `hardEncounterBarrier.m` | Invariant-tail admission (`plan`), terminal set/flow and first-hold transition validation |
 | `formulateAvoidanceProblem.m` | Objective, hard swept constraints and predictive CLF cones |
 | `avoidanceStageQp.m` | Sparse transcription (`build`) and updates using explicit row maps (`updateBounds`) |
-| `solveHardCbfClf.m` | Lexicographic solve (`solve`) and independent plan verification (`certify`) |
+| `solveHardCbfClf.m` | Hard-safety feasibility and CLF solve (`solve`) and independent plan verification (`certify`) |
 | `avoidanceSafetyGeometry.m` | Swept separation (`build`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input prediction, nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
@@ -62,8 +62,8 @@ The removed standalone files have no compatibility wrappers.
 | `fialaIntervalParameters` | `fialaCertificate.parameters` |
 
 The earlier consolidation changed source organization and call names while
-preserving its then-current equations. The subsequent version-17 controller
-replaces finite perception exit with exact-model invariant continuation; see
+preserving its then-current equations. The current version-18 controller
+uses exact-state rolling prediction with a prediction-only invariant continuation; see
 [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md). In particular,
 `fialaCertificate.sample` and `.sequence` retain their documented limited
 scope: nonlinear ego-flow certification does not yet establish an integrated

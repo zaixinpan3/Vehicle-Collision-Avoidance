@@ -1,84 +1,120 @@
-# Exact two-vehicle recursive feasibility
+# Rolling MPC and the role of the terminal certificate
 
-Implemented September 11, 2026, certificate version 17. The user explicitly
-confirmed that the ego follows the controller's prediction dynamics exactly
-for this study. This replaces the finite-perception-encounter requirement.
+Certificate version 18, September 11, 2026.
 
-## Plant and scope of the guarantee
+## Execution contract
 
-There are exactly two vehicles. Their full states are available at every
-scheduled sample. The same target is present throughout the study and follows
-one immutable Cartesian constant-acceleration, constant-yaw-rate trajectory.
-The public controller does not read perception range, visibility or detection
-completeness. A distant target is never discharged and control never ends
-because the target passes the ego.
+Every call starts a complete prediction from the current measured state,
+solves the hard-safety and CLF problem, verifies the returned input sequence,
+and issues **only its first held input**. At the next sample the previous
+first-hold dynamics, input and target law are checked before a new problem is
+built. A finite horizon never counts down to an actual terminal-controller
+handoff. Numerical failure raises an error; no retained input or terminal
+feedback is silently executed. Failure does not establish global infeasibility.
 
-The **mathematical ego plant is the admitted scheduled affine bicycle**. The
-finite approach uses the matrices returned by `ltvBicycleModel.finitePredict`.
-At its admitted terminal-entry time it uses the zero-scheduled-speed bicycle
-matrices and sampled terminal feedback defined below. This terminal schedule
-is an explicit part of the admitted exact plant; it is not a proof that
-changing a linearization changes the physics of a nonlinear vehicle.
-The stage schedule, terminal generator, road geometry and limits are retained.
-An online improvement changes inputs within that schedule, not the dynamics.
+The study still has exactly one persistent, fully observed target following
+its original constant Cartesian acceleration and constant yaw rate. Ego and
+target uncertainties are zero. The simulation executes each published affine
+first-hold generator exactly. The original target law and clock remain
+immutable; refreshing its current prediction origin does not change its motion.
+This is an exact **per-frame scheduled-model experiment**, not a fixed
+nonlinear vehicle validation.
 
-The augmented state includes the ego state, original target trajectory and
-clock, previous applied input, retained schedule and terminal-entry counter.
-Initial ego/target error bounds and ego process-residual bounds must be zero.
-Arithmetic enclosures in the finite prediction are retained. The terminal
-implementation currently requires zero independent acceleration bias. Passive
-road resistance is retained, including the case of zero passive damping.
+## Why the former execution stopped
 
-Under this exact-plant/execution premise, fixed physical geometry and limits,
-and one accepted complete initial certificate, the controller supplies a
-feasible hard-safe continuation at every subsequent frame. The finite prefix
-has certified continuous held-interval road, footprint, state, input and slew
-constraints; the infinite suffix has an invariant-set proof. This is a
-conditional mathematical-model guarantee. It does not establish nonlinear
-Fiala vehicle safety, disturbance robustness or a computation-time deadline.
-A failure to find the first certificate is not proof of global infeasibility.
+The removed `advance` implementation fixed the initial horizon endpoint,
+locked executed inputs in the initial QP and optimized only its shrinking
+suffix. When that suffix ended, it dispatched terminal feedback indefinitely.
+That architecture constructed a safe stopping execution, rather than rolling
+MPC with a stopping certificate. Deleting only its last branch was insufficient:
 
-## One admission problem and its successor
+1. An always-decreasing speed seed placed local station constraints around a
+   stopping trajectory even when cruise was feasible.
+2. The terminal station chart had the ordinary local modeling radius, without
+   room for the stopping excursion already present in the invariant-set proof.
+3. Using the appended terminal braking input as the CLF convexification anchor
+   can propagate an artificial braking preference backward through successive
+   horizons. The safety candidate and performance initialization are separate.
+4. Maximizing surplus safety margin and retaining 99 percent of it subordinated
+   cruise to an additional clearance objective. A failed performance solve
+   could expose the arbitrary LP feasibility point as the actual command.
 
-Admission finds a finite sequence and an invariant terminal continuation:
+Initial admission starts with a constant-speed prediction seed. Successor
+calls initialize performance with the previous controls shifted by one hold
+and the last optimized input repeated. Separately, the shifted controls plus
+one terminal braking action form a **safety proof candidate**. Its physical
+feasibility is checked in the refreshed prediction and recorded. This
+candidate is never dispatched. The prediction length is not shortened. If this convex initialization fails, a constant-speed and
+then a slowing seed are tried before extending the horizon. Every selected
+plan must be solved and checked anew. These are optimization initializations,
+not input targets or executable fallback policies.
+Terminal chart radius is `stationTrustRadius + M(1,:)*q`, including the verified
+longitudinal stopping budget. Geometry is recomputed and bounded over that
+larger chart; road and target constraints are not removed.
+
+The feasibility LP searches for a hard-safe interior. The performance SOCP
+uses only a small numerical interior, capped at ten configured numerical
+margins and half the available LP margin, rather than preserving 99 percent
+of the maximized surplus. Independent acceptance still requires all physical
+rows and the zero hard-safety level. The numerical buffer is used only for solving; acceptance uses independently
+enclosed physical margins, so a negative buffer residual cannot be confused
+with a physical violation. No negative physical margin is accepted.
+CLF slacks remain nonnegative and squared;
+input effort remains centered on the CLF/LQR certificate operating input.
+The LP point cannot replace a failed or uncertified performance solution.
+
+## What the shift proof requires
+
+For a fixed prediction law, hard held-interval constraints and terminal family,
+let an accepted plan at sample k be
 
 \[
- x_{i+1}=A_i^d x_i+B_i^d u_i+c_i^d,\quad
- C_i(x_i,u_i,u_{i-1}),\quad x_N\in X_f.                 \tag{1}
+(x_{0|k},\ldots,x_{N|k}),\qquad
+(u_{0|k},\ldots,u_{N-1|k}),\qquad x_{N|k}\in X_f(t_k+Nh).
 \]
 
-Each `C_i` includes every held-interval hard constraint. Only the CLF performance
-rows have unrestricted nonnegative relaxation. `controller.horizonSteps` seeds
-the search; candidate length may increase until a complete certificate is
-found or the numerical search budget expires. No safe prefix alone is accepted.
-The finite search seed uses decreasing scheduled speed to approach the terminal
-domain. Its braking anchor stays inside `|beta|<=0.95` to avoid singular Fiala
-derivatives at saturation; the optimization retains the configured actuator
-limits. A reference used for initialization is not an executable control.
+After applying only `u_(0|k)`, the **proof candidate** is
 
-After an accepted input executes, the remaining old inputs and the same
-terminal policy form a feasible successor. A replacement solve fixes all
-executed inputs and must preserve the original hard constraints and certified
-margin. Failure or rejection of the replacement leaves the existing feasible
-witness available. No global optimality premise is needed. At terminal entry,
-the measured state supplies terminal feedback and a finite preview of that
-infinite continuation is returned on every call; a new numerical optimization
-is unnecessary to establish existence of a feasible continuation.
+\[
+\hat{\mathbf u}_{k+1}
+=(u_{1|k},\ldots,u_{N-1|k},\kappa_f(x_{N|k})).
+\]
 
-The stored QP remains in admission coordinates. Its finite prefix gets shorter,
-but its invariant suffix never expires. After prefix exhaustion, its complete
-certificate is still retained and the current measured state is checked in the
-same terminal set. `inputPlan` then exposes a fresh preview of the analytic
-terminal controls. `remainingSteps` counts finite prefix intervals, not the
-number of safe commands remaining. `deadline` denotes terminal entry, not
-perception exit. `certifiedDuration=Inf` includes the invariant suffix.
+It establishes recursive feasibility if (i) the successor state equals the
+predicted first successor, (ii) every retained stage has the same dynamics
+and physical constraints, (iii) terminal invariance and entry slew hold for
+the appended hold, and (iv) the next optimization admits that same candidate,
+including its terminal region and separating geometry. Finite CLF slacks can
+be assigned to the candidate; they cannot relax safety constraints. The new
+optimizer may choose a different first input with better cruise performance.
+There is no requirement to execute `kappa_f` when the original horizon ends.
 
-Equivalently, a fixed-length feasible preview can always be shifted and
-extended by one terminal input. The terminal inputs satisfy all hard rows and
-can be assigned finite CLF slacks. Feasibility at an admitted frame therefore
-implies feasibility of a complete continuation at every later frame. The first
-feasible candidate must satisfy (1), not merely collision constraints over an
-arbitrary finite window without a terminal condition.
+Huang, Wang, Margellos and Goulart, *Predictive Control Barrier Functions:
+Bridging model predictive control and control barrier functions*, 2025,
+[Section III, Lemmas III.1 and III.5, equations (10)–(11)](https://arxiv.org/html/2502.08400v2),
+use such a shifted candidate to establish the safe-MPC feasibility/value
+argument. Their nonnegative safety-slack value is distinct from this code's
+CLF relaxation and from its diagnostic negative feasible margin. On an
+already feasible hard-safe trajectory, zero safety relaxation is enough;
+maximizing extra clearance is not a condition of that shift argument.
+
+**Unresolved applicability condition.** Current replanning refreshes scheduled
+bicycle matrices, local station charts, separating planes and the terminal
+region. The old shifted plan need not belong to that refreshed convex problem.
+The stopping invariant set alone does not remove this gap. This implementation
+therefore sets both recursive-feasibility claim flags to false. It retains the
+terminal construction and checks every newly accepted plan, but does not claim
+that repeated successful solves prove a global PCBF or that a next solve must
+exist. Restoring such a theorem requires a shift-compatible fixed/robust plant
+formulation and an admissible terminal/geometry family; treating the model
+schedule as an extra physical control input would change the plant assumption
+and is not done here.
+
+This limitation is deliberate and material: removing an actual fallback is a
+runtime correction, not by itself a completed recursive-feasibility proof.
+An accepted frame certifies its first hold and a hypothetical invariant
+continuation under its own declared prediction. If a later solve fails, the
+simulation stops without asserting safety for unexecuted future time.
 
 ## Terminal dynamics and invariant set
 
@@ -122,10 +158,17 @@ braking-rate limits. The finite program separately constrains the slew from
 the last prefix input to the first terminal input, including endpoint
 arithmetic uncertainty.
 
+The implementation tightens this symmetric comparison using `vx>=0`. For each
+pose row, set `g_j = [max((A G)_(j,1),0), abs((A G)_(j,2:3))]` and construct a
+nonnegative row budget `R_j` satisfying `R_j C + g_j <= 0`, with a checked
+arithmetic reserve. A lower station row consequently has no fictitious
+backward longitudinal excursion. The symmetric `M` remains a valid bound
+used to size the terminal chart.
+
 For fixed pose halfspaces `Ap<=b`, the terminal set is
 
 \[
- X_f=\{(p,v):v_x\ge0,\ |v|\le q,\ Ap+|A|M|v|\le b\}.       \tag{5}
+ X_f=\{(p,v):v_x\ge0,\ |v|\le q,\ Ap+R|v|\le b\}.       \tag{5}
 \]
 
 The pose rows include the station chart, lateral and heading domains, full
@@ -134,8 +177,8 @@ eight velocity signs makes (5) a finite set of linear hard constraints on the
 predicted terminal state. The initial endpoint enclosure must lie in this set.
 
 **Invariance.** Comparison gives `D+|v|<=C|v|`, so `|v|<=q` persists. For every
-pose row, the upper Dini derivative of `A_j p+|A_j|M|v|` is at most
-`|A_j|(|G|+MC)|v|<=0`. The scalar held-flow formula preserves `vx>=0`.
+pose row, the upper Dini derivative of `A_j p+R_j|v|` is at most
+`(g_j+R_j C)|v|<=0`. The scalar held-flow formula preserves `vx>=0`.
 Terminal input/slip bounds follow from the chosen velocity box. Between
 successive terminal commands the braking change is at most
 `(k_b/g_beta)(1-rho)q_x`, already included in the box construction. Thus (5)
@@ -143,15 +186,10 @@ and every physical terminal obligation persist through every held interval.
 The feedback uses the current measured velocity; replaying a rounded nominal
 terminal center with open-loop braking is not this construction.
 
-This proves the suffix step. Finite induction through the remaining admitted
-prefix, followed by terminal invariance, establishes the required implication
-for all subsequent frames. The construction is an instance of the invariant
-terminal MPC successor argument described by Rawlings, Mayne and Diehl,
-*Model Predictive Control: Theory, Computation, and Design*, second edition,
-Sections 2.3 and 2.4.5, available from the
-[authors' book page](https://sites.engineering.ucsb.edu/~jbraw/mpc/).
-The model-specific comparison and target support arguments here are project
-analysis, not a theorem about this repository imported from that source.
+This proves invariance for the **hypothetical zero-speed scheduled terminal
+model**. It does not prove invariance for the refreshed cruise-scheduled model
+or for the nonlinear physical vehicle. The policy is used to establish
+existence of a continuation; it is never dispatched by the public controller.
 
 ## Target safety for all future time
 
@@ -179,62 +217,27 @@ reversal under the exact acceleration law. It does not depend on sensing range
 or an assertion that a stopped ego alone is safe. Road rows cover the entire
 terminal station/lateral/heading chart, including the full ego footprint.
 
-## Implementation, validation and limits
+## Diagnostics and validation
 
-`hardEncounterBarrier` owns complete admission, invariant rows, retained-prefix
-execution and terminal feedback/flow. `formulateAvoidanceProblem` includes the
-terminal and entry-slew rows as hard constraints. `targetPrediction.admitExact`
-validates the strict motion contract. `readPlanningInputs` ignores perception
-metadata, and `perceptionExitBuffer` is removed from controller configuration.
-The public controller rejects missing/additional targets, nonzero ego/target
-error premises, changed target motion and incompatible execution.
+`terminalPolicyRole` is `predictionWitnessOnly`; `terminalActive` and
+`fallbackUsed` are always false. `remainingSteps` is the fresh prediction length
+and `deadline` is its moving endpoint, not a terminal handoff time. The full
+original-prefix bookkeeping and analytic command-dispatch branch are removed.
+`certifiedDuration=Inf` refers only to the hypothetical prefix-plus-tail
+witness. `commandCertifiedDuration` is one sample. A valid execution transition
+sets `certificateCompatible`. `carriedWitnessFeasible` separately reports whether
+the shifted safety candidate passes the refreshed problem; it is an observed
+single-step check, not an infinite recursive-feasibility theorem.
 
-`runExactStateRecursiveFeasibilityScenario` propagates each published continuous
-generator independently with matrix exponentials and audits 11 intermediate
-samples per interval for rectangle separation and road margins. The September
-11 runs used a 0.1 s period, ego speed 8 m/s, 16-step initial search window,
-4.8 by 1.9 m rectangles, straight road boundaries at `y=+/-5 m`, and 0.25 m
-required clearance. Every optimization after admission was forced to fail.
-There is no randomness.
+`runExactStateRecursiveFeasibilityScenario` audits each exact first hold at
+11 independent geometry samples, logs the moving horizon, separates completed
+runs from failed calls, and saves partial results before returning on failure.
+Timing covers input assembly and the entire controller; diagnostic runs
+continue after 100 ms misses and therefore do not establish real-time control.
+See [the rolling experiment report](../scripts/ROLLING_TERMINAL_RESULTS_20260911.md)
+for actual results and remaining cruise, feasibility and timing limitations.
 
-| Target initial position and velocity | Certified commands over 12 s | Terminal-entry step | Minimum additional separation (m) | Minimum additional road margin (m) |
-| --- | --- | --- | --- | --- |
-| Stationary: `(15,0)`, `(0,0)` | 121/121 | 16 | 2.81566051 | 3.80000000 |
-| Oncoming: `(60,0)`, `(-8,0)` | 121/121 | 21 | 0.05674081 | 0.27414418 |
-| Crossing: `(15,-4)`, `(0,32)` | 121/121 | 16 | 9.46157516 | 3.80000000 |
-
-Positions are meters and velocities are meters per second. Margins in the table
-are above the required 0.25 m clearance. Additional regressions cover finite
-actuator slew, zero passive damping, rotating and accelerating target motion,
-and optimizer-enabled continuation. These finite tests support implementation
-behavior; the infinite claim rests on the conditional proof.
-
-Reproduce from the repository root:
-
-```matlab
-addpath('scripts');
-for scenario = ["stationary", "oncoming", "crossing"]
-    report = runExactStateRecursiveFeasibilityScenario(Scenario=scenario, ...
-        SampleCount=120, FailAfterAdmission=true);
-    assert(report.passed);
-end
-results = runtests('tests');
-assertSuccess(results);
-```
-
-Final validation: all 625 repository tests passed with zero failed or incomplete
-cases. Factory Code Analyzer found zero issues in 36 changed MATLAB files. An
-additional independent integration/coordinate-roundtrip check on a 100 m radius
-arc, initial ego speed 2 m/s and distant stationary target returned 121 certified
-commands with post-admission solver failure; this extra check used the reference
-curve and no road-boundary constraints.
-
-The core still has 20 source files. Nonlinear Fiala inclusion/feedback research
-remains available as separate analysis; it is not a second online controller
-mode. The old affine-rest nonlinear counterexample remains valid: the present
-proof explicitly assumes the scheduled affine plant, including terminal
-schedule (2), instead of transferring that rest set to nonlinear dynamics.
-Safety has priority over the cruise objective: admission can command slowing
-even near the reference speed, and terminal feedback converges toward rest.
-No physical-vehicle, robust-disturbance, global admission-completeness,
-reference-speed convergence or worst-case execution-time guarantee is claimed.
+Research checks were performed inline: scope review rejected deleting the
+terminal constraint; synthesis review identified model/geometry refresh as a
+missing shift premise; final review separates finite-run evidence, terminal
+invariance, infinite closed-loop claims and deadline qualification.

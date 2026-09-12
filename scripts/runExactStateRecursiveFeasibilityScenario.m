@@ -5,7 +5,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     arguments
         options.Scenario (1,1) string {mustBeMember(options.Scenario,["stationary","oncoming","crossing"])} = "stationary"
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 120
-        options.FailAfterAdmission (1,1) logical = true
+        options.FailAfterAdmission (1,1) logical = false
         options.OutputDirectory (1,1) string = ""
         options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
     end
@@ -36,7 +36,17 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     boundaries(2).coefficients(3) = 5;
     boundaries(2).safeSideSign = -1;
     road = struct("centerline",[-100,0;2000,0],"boundaries",boundaries);
-    [command,~,problem,certificate] = collisionAvoidanceController(ego,target,road,cfg,[]);
+    try
+        [command,~,problem,certificate] = collisionAvoidanceController(ego,target,road,cfg,[]);
+    catch exception
+        report = struct("scenario",options.Scenario,"configuration",cfg, ...
+            "passed",false,"completed",false,"failureIdentifier",string(exception.identifier), ...
+            "failureMessage",string(exception.message),"executedHolds",0, ...
+            "sampleCount",options.SampleCount,"failureTime",0,"runtimeQualified",false, ...
+            "admissionSeconds",toc(frameTimer));
+        localSave(report,options);
+        return;
+    end
     frameSeconds = zeros(1,options.SampleCount+1);
     frameSeconds(1) = toc(frameTimer);
     admissionSteps = certificate.prediction.stageCount;
@@ -51,6 +61,15 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     certified = true(1,options.SampleCount+1);
     terminalActive = false(size(certified));
     retained = false(size(certified));
+    shiftedCandidateFeasible = false(size(certified));
+    horizonSteps = zeros(size(certified));
+    horizonSteps(1) = certificate.remainingSteps;
+    predictionEndTime = zeros(size(certified));
+    predictionEndTime(1) = certificate.deadline;
+    phaseSeconds = zeros(4,numel(certified));
+    phaseSeconds(:,1) = localPhases(problem.metadata.runtime);
+    failureIdentifier = "";
+    failureMessage = "";
     minimumSeparation = inf;
     minimumRoadMargin = inf;
     maximumSlewViolation = 0;
@@ -85,26 +104,65 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         target.targetHeadingInertial = targetState(7);
         target.targetYawRate = targetState(8);
         previous = command.actuatorInput;
-        [command,~,problem,certificate] = collisionAvoidanceController(ego,target,road,cfg,certificate);
+        states(:,sample+1) = x;
+        try
+            [command,~,problem,certificate] = collisionAvoidanceController(ego,target,road,cfg,certificate);
+        catch exception
+            frameSeconds(sample+1) = toc(frameTimer);
+            certified(sample+1) = false;
+            inputs(:,sample+1) = NaN;
+            failureIdentifier = string(exception.identifier);
+            failureMessage = string(exception.message);
+            break;
+        end
+        horizonSteps(sample+1) = certificate.remainingSteps;
+        predictionEndTime(sample+1) = certificate.deadline;
+        phaseSeconds(:,sample+1) = localPhases(problem.metadata.runtime);
         frameSeconds(sample+1) = toc(frameTimer);
         states(:,sample+1) = x;
         inputs(:,sample+1) = command.actuatorInput;
         certified(sample+1) = problem.metadata.planCertified;
         terminalActive(sample+1) = problem.metadata.terminalActive;
         retained(sample+1) = problem.metadata.fallbackUsed;
+        shiftedCandidateFeasible(sample+1) = problem.metadata.carriedWitnessFeasible;
         limit = cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
         maximumSlewViolation = max([maximumSlewViolation;abs(command.actuatorInput-previous)-limit]);
+        if mod(sample,25)==0
+            fprintf('%s progress: %d/%d holds, speed %.6g m/s, horizon %d, last frame %.3f s\n', ...
+                options.Scenario,sample,options.SampleCount,x(4),certificate.remainingSteps,frameSeconds(sample+1));
+            if strlength(options.OutputDirectory)>0
+                if ~isfolder(options.OutputDirectory), mkdir(options.OutputDirectory); end
+                progress = struct("executedHolds",sample,"state",states(:,1:sample+1), ...
+                    "frameSeconds",frameSeconds(1:sample+1),"horizonSteps",horizonSteps(1:sample+1), ...
+                    "minimumSeparation",minimumSeparation,"minimumRoadMargin",minimumRoadMargin);
+                save(fullfile(options.OutputDirectory,options.Scenario+"-progress.mat"),"progress");
+            end
+        end
     end
+    issued = 1:sample+1;
+    frameSeconds = frameSeconds(issued);
+    states = states(:,issued); inputs = inputs(:,issued);
+    certified = certified(issued); terminalActive = terminalActive(issued); retained = retained(issued);
     report = struct("scenario",options.Scenario,"configuration",originalCfg, ...
-        "sampleCount",options.SampleCount,"time",(0:options.SampleCount)*cfg.controller.sampleTime, ...
+        "sampleCount",options.SampleCount,"time",(0:sample)*cfg.controller.sampleTime, ...
         "state",states,"input",inputs,"admissionSteps",admissionSteps,"admissionMargin",admissionMargin, ...
         "planCertified",certified,"terminalActive",terminalActive,"retainedWitnessUsed",retained, ...
         "minimumSampledSeparationMargin",minimumSeparation,"minimumSampledRoadMargin",minimumRoadMargin, ...
         "maximumSlewViolation",maximumSlewViolation,"terminal",terminal, ...
         "finalTargetDistance",norm(ego.position-target.targetPositionInertial), ...
         "solverFailureInjected",options.FailAfterAdmission, ...
-        "scope","Exact retained scheduled affine plant with invariant terminal schedule; no nonlinear-vehicle claim");
-    report.passed = all(certified) && any(terminalActive) && minimumSeparation>=0 ...
+        "scope","Each executed hold follows its published affine predictor; terminal feedback is prediction-only; no global recursive-feasibility or nonlinear-vehicle claim");
+    report.completed = strlength(failureIdentifier)==0;
+    report.failureIdentifier = failureIdentifier;
+    report.failureMessage = failureMessage;
+    report.executedHolds = sample;
+    report.horizonSteps = horizonSteps(issued);
+    report.shiftedCandidateFeasible = shiftedCandidateFeasible(issued);
+    report.predictionEndTime = predictionEndTime(issued);
+    report.phaseSeconds = phaseSeconds(:,issued);
+    report.phaseNames = ["prediction","formulation","solve","acceptance"];
+    report.finalCruiseError = states(2:6,end)-[0;0;cfg.referenceSpeed;0;0];
+    report.passed = report.completed && all(certified) && ~any(terminalActive) && ~any(retained) && minimumSeparation>=0 ...
         && minimumRoadMargin>=0 && maximumSlewViolation<=0;
     report.runtime = struct("frameSeconds",frameSeconds, ...
         "deadlineSeconds",options.DeadlineSeconds, ...
@@ -114,17 +172,27 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         "deadlineMet",all(frameSeconds<=options.DeadlineSeconds), ...
         "scope","Input assembly and controller calls; excludes plant integration and geometry audit; diagnostic execution continues after deadline misses");
     report.runtimeQualified = report.passed && report.runtime.deadlineMet;
-    if strlength(options.OutputDirectory)>0
-        if ~isfolder(options.OutputDirectory), mkdir(options.OutputDirectory); end
-        save(fullfile(options.OutputDirectory,options.Scenario+"-exact-state.mat"),"report");
-        file = fopen(fullfile(options.OutputDirectory,options.Scenario+"-exact-state.json"),'w');
-        cleanup = onCleanup(@() fclose(file));
-        fprintf(file,'%s\n',jsonencode(report,PrettyPrint=true));
-    end
-    fprintf('%s: %d/%d certified commands; terminal entry %d; separation %.6g m; road %.6g m\n', ...
-        options.Scenario,nnz(certified),numel(certified),admissionSteps,minimumSeparation,minimumRoadMargin);
+    localSave(report,options);
+    fprintf('%s: %d/%d certified commands; %d executed holds; separation %.6g m; road %.6g m; final speed %.6g m/s\n', ...
+        options.Scenario,nnz(certified),numel(certified),sample,minimumSeparation,minimumRoadMargin,states(4,end));
+    if ~report.completed, fprintf('Control failed: %s\n',failureMessage); end
+
 end
 
 function result = localFailedSolve(~,~)
     result = struct("decision",[],"exitFlag",-999,"output",struct());
+end
+
+function values = localPhases(runtime)
+    values = [runtime.predictionSeconds;runtime.formulationAndWitnessSeconds; ...
+        runtime.solveSeconds;runtime.acceptanceAndCommitSeconds];
+end
+
+function localSave(report,options)
+    if strlength(options.OutputDirectory)==0, return; end
+    if ~isfolder(options.OutputDirectory), mkdir(options.OutputDirectory); end
+    save(fullfile(options.OutputDirectory,options.Scenario+"-exact-state.mat"),"report");
+    file = fopen(fullfile(options.OutputDirectory,options.Scenario+"-exact-state.json"),'w');
+    cleanup = onCleanup(@() fclose(file));
+    fprintf(file,'%s\n',jsonencode(report,PrettyPrint=true));
 end

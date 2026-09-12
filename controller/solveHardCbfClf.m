@@ -1,5 +1,5 @@
 classdef solveHardCbfClf
-    %solveHardCbfClf Lexicographic solve and independent plan verification.
+    %solveHardCbfClf Hard-safety feasibility, CLF optimization and verification.
 
     methods (Static)
         function [result,problem] = solve(problem, cfg)
@@ -12,6 +12,14 @@ classdef solveHardCbfClf
             [result, problem] = localHardMarginSolve(problem, cfg);
         end
 
+        function check = certifyInputs(qp,prediction,model,inputs)
+        % Evaluate a mathematical input candidate in the refreshed problem.
+            decision = zeros(qp.layout.decisionCount,1);
+            decision(qp.layout.planIndex) = inputs(:);
+            decision = localRepairClf(qp,decision,model.cfg);
+            check = solveHardCbfClf.certify(qp,prediction,model,decision);
+        end
+
         function check = certify(qp, ~, model, decision)
         % Acceptance never converts a negative physical margin into a certificate.
             check = struct("accepted", false, "failedConditions", "decision", ...
@@ -22,11 +30,6 @@ classdef solveHardCbfClf
                 return;
             end
             decision = decision(:);
-            if isfield(qp.stageProgram, "fixedDecisionIndex") ...
-                    && ~isequal(decision(qp.stageProgram.fixedDecisionIndex), qp.stageProgram.fixedDecisionValue)
-                check.failedConditions = "executedPrefix";
-                return;
-            end
             operations = numel(decision)+2;
             gamma = operations*eps/(1-operations*eps);
             evaluationAllowance = gamma*(abs(qp.physicalBound)+abs(qp.inequalityMatrix)*abs(decision));
@@ -34,15 +37,13 @@ classdef solveHardCbfClf
             check.hardRowViolation = max([0; -margins]);
             allowance = model.cfg.encounter.numericalMargin;
             check.sweptClearanceMargin = min([inf; margins(qp.safetyRows)])-allowance;
-            % The same immutable reserve is charged at admission and every reuse.
-            % Evaluate with the original matrices: shifting adds no rounding debt.
-            evaluationAllowance = gamma*(abs(qp.barrier.baseBound)+abs(qp.inequalityMatrix)*abs(decision));
-            certifiedMargins = qp.barrier.baseBound-qp.inequalityMatrix*decision-evaluationAllowance;
+            % Solver buffers are not additional physical obligations. Use
+            % independently enclosed physical margins for acceptance and
+            % keep every physical row hard, including the terminal rows.
             selected = qp.barrier.scale > 0;
             check.margin = min([model.cfg.encounter.maximumCarriedMargin; ...
-                certifiedMargins(selected)./qp.barrier.scale(selected)]);
+                margins(selected)./qp.barrier.scale(selected)]);
             check.exitMargin = min([inf; margins(qp.barrier.completionRows)]);
-            check.hardRowViolation = max([check.hardRowViolation; -certifiedMargins]);
             check.clfViolation = -inf;
             for index = 1:numel(qp.clf.constraints)
                 constraint = qp.clf.constraints(index);
@@ -64,8 +65,8 @@ classdef solveHardCbfClf
 end
 
 function [result, problem] = localHardMarginSolve(problem, cfg)
-% Maximize a nonnegative tightening of every physical hard row, then track.
-% The checked LP control is retained if the subordinate SOCP fails.
+% Find an interior hard-safe witness, then optimize the CLF performance cost.
+% The LP is a feasibility phase; it cannot supply the executable command.
     physical = problem.layout.decisionCount;
     scale = problem.barrier.scale;
     base = problem.stageProgram;
@@ -80,10 +81,6 @@ function [result, problem] = localHardMarginSolve(problem, cfg)
             cfg.encounter.maximumCarriedMargin;-problem.requiredMargin], ...
         "cones",[numel(base.rowMap.equality);numel(base.rowMap.inequality)+2], ...
         "physicalDecisionCount",physical,"inactiveSlackIndex",problem.layout.relaxationIndex);
-    if isfield(base,"fixedDecisionIndex")
-        program.fixedDecisionIndex = base.fixedDecisionIndex;
-        program.fixedDecisionValue = base.fixedDecisionValue;
-    end
     auxiliary = struct("layout",struct("decisionCount",physical),"stageProgram",program);
     marginSolve = localRunJointProgram(auxiliary, cfg);
     result = localEmptyResult();
@@ -95,24 +92,30 @@ function [result, problem] = localHardMarginSolve(problem, cfg)
     model = struct("cfg", cfg);
     check = solveHardCbfClf.certify(problem, [], model, candidate);
     if ~check.accepted, return; end
-    result = localCertifiedResult(problem, candidate, marginSolve, 1);
-    % Give the performance solve an interior target without spending the
-    % inherited certificate margin. This remains a lower bound, not H_N.
-    problem.requiredMargin = max(problem.requiredMargin, 0.99*check.margin);
-    problem.inequalityBound = problem.barrier.baseBound-problem.requiredMargin*scale;
-    fixedProgram = problem.stageProgram;
+    % Reserve a small numerical interior, not the maximized surplus margin.
+    % Hard safety is already certified at the zero level. Surplus margin is
+    % diagnostic, not a second motion objective that overrides the CLF.
+    selected = scale>0;
+    available = min((problem.barrier.baseBound(selected) ...
+        -problem.inequalityMatrix(selected,:)*candidate)./scale(selected));
+    interiorMargin = max(problem.requiredMargin, ...
+        min(10*cfg.encounter.numericalMargin,0.5*max(0,available)));
+    problem.inequalityBound = problem.barrier.baseBound-interiorMargin*scale;
     problem.stageProgram = avoidanceStageQp.updateBounds(problem);
-    if isfield(fixedProgram, "fixedDecisionIndex")
-        problem.stageProgram.fixedDecisionIndex = fixedProgram.fixedDecisionIndex;
-        problem.stageProgram.fixedDecisionValue = fixedProgram.fixedDecisionValue;
-    end
     solve = localRunJointProgram(problem, cfg);
+    result = localEmptyResult();
     result.solverCalls = 2;
+    result.exitFlag = solve.exitFlag;
+    result.message = "performance: "+solve.message;
     if ~solve.feasible, return; end
     decision = localRepairClf(problem, solve.decision, cfg);
     check = solveHardCbfClf.certify(problem, [], model, decision);
+    result.decision = decision;
     if check.accepted
         result = localCertifiedResult(problem, decision, solve, 2);
+    else
+        result.message = result.message+"; "+strjoin(check.failedConditions,",") ...
+            +"; hard violation "+check.hardRowViolation+"; margin "+check.margin;
     end
 end
 
@@ -140,7 +143,7 @@ function result = localCertifiedResult(problem, decision, solve, calls)
     result.iterations = localIterationCount(solve.output);
     result.objectiveValue = localJointValue(problem, decision);
     result.clfValue = decision(problem.layout.relaxationIndex);
-    result.algorithm = "hard predictive margin LP and CLF SOCP";
+    result.algorithm = "hard predictive feasibility LP and CLF SOCP";
 end
 
 function solve = localRunJointProgram(problem, cfg)
@@ -187,14 +190,8 @@ function solve = localDefaultSolve(problem, cfg)
     program = problem.stageProgram;
     retained = true(numel(program.q),1);
     if isfield(program,"inactiveSlackIndex"),retained(program.inactiveSlackIndex) = false;end
-    fixed = zeros(0,1);value = zeros(0,1);
-    if isfield(program,"fixedDecisionIndex")
-        fixed = program.fixedDecisionIndex;value = program.fixedDecisionValue;
-        retained(fixed) = false;
-    end
-    linear = program.q(retained) ...
-        +(program.P(retained,fixed)+program.P(fixed,retained).')*value;
-    bound = program.b-program.A(:,fixed)*value;
+    linear = program.q(retained);
+    bound = program.b;
     % Positive objective scaling preserves minimizers. The lifted CLF
     % epigraph can otherwise trigger a false native infeasibility report.
     hessian = program.P(retained,retained);
@@ -206,7 +203,6 @@ function solve = localDefaultSolve(problem, cfg)
     output.objectiveValue = output.objectiveValue/objectiveScale;
     output.objectiveScale = objectiveScale;
     stageDecision = zeros(numel(program.q),1);stageDecision(retained) = nativeDecision;
-    stageDecision(fixed) = value;
     flag = -7;
     switch output.status
         case 1

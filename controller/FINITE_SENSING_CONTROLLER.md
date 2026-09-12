@@ -1,7 +1,7 @@
 # Complete finite-sensing encounter controller
 
 Current-scope note, September 11, 2026: finite perception is no longer part of
-the controller problem. The active version-17 exact scheduled-model controller
+the controller problem. The active version-18 exact scheduled-model controller
 uses one persistent target and an invariant terminal continuation. This document
 records earlier finite-encounter analysis; current use and guarantees are in
 [SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
