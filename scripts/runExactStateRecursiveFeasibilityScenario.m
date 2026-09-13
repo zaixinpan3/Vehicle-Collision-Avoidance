@@ -15,11 +15,12 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.EgoErrorBound (6,1) double {mustBeNonnegative,mustBeFinite} = zeros(6,1)
         options.TargetErrorBound (8,1) double {mustBeNonnegative,mustBeFinite} = zeros(8,1)
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260912
+        options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 2
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8, ...
-        "controller",struct("sampleTime",0.1,"horizonSteps",16), ...
+        "controller",struct("sampleTime",0.1,"horizonSteps",16,"minimumHorizonSteps",options.MinimumHorizonSteps), ...
         "model",struct("lateralDomainRadius",4), ...
         "solver",struct("certificateSearchTimeLimit",30,"frameDeadlineSeconds",options.DeadlineSeconds)));
     stream = RandStream("mt19937ar",Seed=options.Seed);
@@ -66,9 +67,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     count = options.SampleCount+1;
     frameSeconds = zeros(1,count);
     frameSeconds(1) = toc(frameTimer);
-    admissionSteps = certificate.prediction.stageCount;
+    admissionSteps = certificate.horizonSteps;
     admissionMargin = certificate.margin;
-    terminal = certificate.qp.terminal;
+    terminal = certificate.terminal;
     states = zeros(6,count);
     states(:,1) = x;
     inputs = zeros(2,count);
@@ -87,7 +88,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     optimizedStages = zeros(1,count);
     optimizedStages(1) = certificate.remainingSteps;
     horizonSteps = zeros(1,count);
-    horizonSteps(1) = certificate.prediction.stageCount;
+    horizonSteps(1) = certificate.horizonSteps;
     predictionEndTime = zeros(1,count);
     predictionEndTime(1) = certificate.deadline;
     egoRadius = zeros(6,count);
@@ -149,7 +150,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         stageZeroViolation(sample+1) = localFirst(metadata.stageViolation);
         descentResidual(sample+1) = metadata.pcbfDescentResidual;
         optimizedStages(sample+1) = certificate.remainingSteps;
-        horizonSteps(sample+1) = certificate.prediction.stageCount;
+        horizonSteps(sample+1) = certificate.horizonSteps;
         predictionEndTime(sample+1) = certificate.deadline;
         egoRadius(:,sample+1) = metadata.initialErrorBound;
         targetRadius(:,sample+1) = metadata.targetErrorBound;

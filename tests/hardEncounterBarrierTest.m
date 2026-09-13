@@ -20,7 +20,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyFalse(problem.metadata.physicalVehicleGuaranteeEstablished);
             testCase.verifyEqual(problem.metadata.certificateSource,"checkedOptimization");
             testCase.verifyEqual(problem.metadata.pcbfValue,0);
-            testCase.verifyEqual(stored.version,19);
+            testCase.verifyEqual(stored.version,20);
             testCase.verifyEqual(stored.certifiedDuration,inf);
             testCase.verifyEqual(numel(stored.stages),stored.remainingSteps);
             testCase.verifyEqual(numel(stored.cellFrames),numel(stored.prediction.cells));
@@ -347,6 +347,41 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:frameDeadline"));
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.pcbfValue,0);
+        end
+
+        function transferredAndRebuiltWitnessesIssueTheSameCommands(testCase)
+            % With the fresh solver failing, every command is the carried
+            % tail. The inclusion transfer must issue exactly what the
+            % rebuilt verification issues, down to the terminal law.
+            [ego,target,road,cfg] = localFixture();
+            cfg.controller.horizonSteps = 6;
+            commands = cell(1,2);
+            values = cell(1,2);
+            methods = cell(1,2);
+            modes = ["shiftedRows","rebuilt"];
+            for mode = 1:2
+                cfg.solver.witnessVerification = modes(mode);
+                cfg.solver.jointFunction = [];
+                [~,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
+                cfg.solver.jointFunction = @(~,~) struct("decision",[],"exitFlag",-2,"output",struct());
+                issued = zeros(2,9); issuedValue = zeros(1,9); method = strings(1,9);
+                for step = 1:9
+                    egoNext = encounterTestFixture.nextEgo(stored,problem.model.lane);
+                    [command,~,problem,stored] = collisionAvoidanceController(egoNext,target,road,cfg,stored);
+                    issued(:,step) = command.actuatorInput;
+                    issuedValue(step) = problem.metadata.pcbfValue;
+                    method(step) = problem.metadata.verificationMethod;
+                    testCase.verifyEqual(problem.metadata.certificateSource,"carriedWitness");
+                    testCase.verifyTrue(problem.metadata.planCertified);
+                end
+                commands{mode} = issued; values{mode} = issuedValue; methods{mode} = method;
+            end
+            testCase.verifyEqual(commands{1},commands{2},AbsTol=1e-12);
+            testCase.verifyEqual(values{1},values{2},AbsTol=1e-12);
+            testCase.verifyEqual(methods{1}(1:5),repmat("inclusionTransfer",1,5));
+            testCase.verifyEqual(methods{2}(1:5),repmat("carriedEnclosureRows",1,5));
+            testCase.verifyEqual(methods{1}(6:9),repmat("terminalInvariance",1,4));
+            testCase.verifyEqual(methods{2}(6:9),repmat("terminalInvariance",1,4));
         end
 
         function aFrameDeadlineKeepsAVerifiedFirstAttempt(testCase)

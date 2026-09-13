@@ -213,3 +213,22 @@ remaining cruise budget is roughly one third solve, one third
 formulation and tubes, one third witness rebuild; the next steps in order
 are the inclusion-based witness transfer (3.2 in full), a sound cell rule
 derived from the kernel's own remainder, and native row builders.
+
+## 7. Status after the second round (2026-09-12, later the same day)
+
+Target set by the user: median frame under 0.1 s with the guarantee intact.
+
+| Item | Done | Mechanism |
+| --- | --- | --- |
+| 3.2 witness transfer | yes | `consumedStages` bookkeeping on the certificate, inclusion check, stored verification carried over (`transferCandidate`); terminal frames from `terminalStep` without tubes or rows |
+| 3.4 / 3.6 condensed solve | yes | tiers on the 48 physical unknowns centred at the seed, rotated-cone CLF majorant, seed-feasibility shortcut, proximal QP for stage A, row generation with vector slicing |
+| 3.6 CLF sampling | yes | one sample per hold at its end (`clf.samplePoints = "stageNodes"`) |
+| 3.7 horizon floor | yes | `controller.minimumHorizonSteps = 2` |
+| deadline gating | yes | no attempt starts unless the frame's longest attempt fits before the deadline; search failures returned with timing |
+| kernels | yes | `solver/bicycle` placed on the path by the controller (the campaigns of the morning ran the interpreted fallbacks) |
+| trims | yes | rest dynamics memoised by curvature; no row-reordering copies |
+| 3.5 cell rule, 3.8 native row builders | no | as before |
+
+Smoke measurements before the campaign (60 holds, noisy boxes, deadline 0.1 s):
+oncoming median 0.067 s, stationary 0.072 s, forced fresh failure 0.047 s.
+The campaign record for this round holds the seven-trial numbers.

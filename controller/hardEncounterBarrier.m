@@ -8,29 +8,30 @@ classdef hardEncounterBarrier
     % when no optimized stage remains in the carried plan.
 
     methods (Static)
-        function [model,prediction,qp,result,check,timing] = plan(model)
+        function [model,prediction,qp,result,check,timing,failure] = plan(model)
             % Fresh search. Every seed is a convexification anchor only: the CLF
             % majorant is exact at its anchor and grows quadratically away from
             % it, so a verified plan from one seed is not the tie-break optimum
-            % of another. The shifted seed is solved first; the equilibrium seed
-            % is solved as well whenever the shifted plan's tail decelerates
-            % below the current speed (the lock-in signature), and the verified
-            % plan with the smaller (value, objective) pair is kept. The slowing
-            % seed is a rescue tried only when nothing verifies. The horizon is
-            % scaled with speed; the carried witness keeps its own length, so a
-            % shorter fresh horizon never weakens the guarantee. The frame
-            % deadline stops the search before any further solve; the caller
-            % then commits the verified carried witness.
+            % of another. The shifted seed is solved first unless the previous
+            % accepted plan's tail decelerated, in which case the equilibrium
+            % seed goes first; the second of the pair runs only when the first
+            % plan's tail decelerates below the current speed (the lock-in
+            % signature), and the verified plan with the smaller (value,
+            % objective) pair is kept. The slowing seed is a rescue tried only
+            % when nothing verifies. The horizon is scaled with speed; the
+            % carried witness keeps its own length, so a shorter fresh horizon
+            % never weakens the guarantee. With a witness available, no attempt
+            % starts unless it can finish before the frame deadline, judged by
+            % the longest attempt of this frame; the first attempt always runs.
+            % Failures are returned, not thrown, so their timing is reported.
             cfg = model.cfg;
             timing = struct("predictionSeconds",0,"formulationSeconds",0, ...
                 "solveSeconds",0,"verificationSeconds",0,"attempts",0,"deadlineHit",false);
+            failure = "";
+            prediction = [];qp = [];result = [];check = [];
             calls = 0;
             searchTimer = tic;
             shifted = isfield(model,"initializationPlan");
-            % Seed kinds: 1 shifted initialization (when carried), then the
-            % constant-speed equilibrium, last the slowing rescue. When the
-            % previous accepted plan's tail decelerated, the equilibrium seed
-            % goes first so that the lock-in is broken within one attempt.
             if shifted
                 seeds = [1,2,3];
                 if isfield(model,"preferEquilibriumSeed") && model.preferEquilibriumSeed
@@ -42,26 +43,30 @@ classdef hardEncounterBarrier
             lastOutcome = "no attempt";
             best = [];
             slot = 1;
+            attemptSeconds = 0;
+            deadlineGuarded = isfield(model,"frameTimer");
             speedRatio = min(1,max(0,model.initialEgoState(4)/max(model.referenceSpeed,eps)));
             model.horizonSteps = max(min(cfg.controller.minimumHorizonSteps,cfg.controller.horizonSteps), ...
                 min(cfg.controller.horizonSteps,ceil(cfg.controller.horizonSteps*speedRatio)));
             while true
                 if timing.attempts>0 && isempty(best) && toc(searchTimer)>=cfg.solver.certificateSearchTimeLimit
-                    error("collisionAvoidanceController:certificateSearchLimit", ...
-                        "The search budget expired without a verified plan after %d attempts (last: %s); " ...
-                        + "infeasibility is not established.",timing.attempts,lastOutcome);
+                    failure = sprintf("collisionAvoidanceController:certificateSearchLimit: The search budget " ...
+                        + "expired without a verified plan after %d attempts (last: %s); infeasibility is not established.", ...
+                        timing.attempts,lastOutcome);
+                    return;
                 end
-                if timing.attempts>0 && isfield(model,"frameTimer") ...
-                        && toc(model.frameTimer)>=cfg.solver.frameDeadlineSeconds
+                if timing.attempts>0 && deadlineGuarded ...
+                        && toc(model.frameTimer)+attemptSeconds>=cfg.solver.frameDeadlineSeconds
                     timing.deadlineHit = true;
                     if isempty(best)
-                        error("collisionAvoidanceController:frameDeadline", ...
-                            "The frame deadline of %.3g s passed after %d attempts (last: %s); " ...
-                            + "the carried witness is the command.",cfg.solver.frameDeadlineSeconds, ...
-                            timing.attempts,lastOutcome);
+                        failure = sprintf("collisionAvoidanceController:frameDeadline: The frame deadline of %.3g s " ...
+                            + "leaves no room for another attempt after %d (last: %s); the carried witness is the command.", ...
+                            cfg.solver.frameDeadlineSeconds,timing.attempts,lastOutcome);
+                        return;
                     end
                     break;
                 end
+                attemptTimer = tic;
                 timing.attempts = timing.attempts+1;
                 seedKind = seeds(slot);
                 trial = model;
@@ -82,6 +87,7 @@ classdef hardEncounterBarrier
                 phase = tic;
                 trialCheck = solveHardCbfClf.certify(trialQp,trialPrediction,trial,trialResult.decision);
                 timing.verificationSeconds = timing.verificationSeconds+toc(phase);
+                attemptSeconds = max(attemptSeconds,toc(attemptTimer));
                 deceleratingTail = false;
                 if trialResult.feasible && trialCheck.accepted
                     objective = 0.5*trialResult.decision.'*trialQp.Hessian*trialResult.decision ...
@@ -97,7 +103,8 @@ classdef hardEncounterBarrier
                         && model.initialEgoState(4)<model.referenceSpeed;
                 else
                     if ~ismember(trialResult.exitFlag,[-2,0,-7])
-                        localReject(trialResult,trialCheck,trialQp);
+                        failure = localRejectMessage(trialResult,trialCheck,trialQp);
+                        return;
                     end
                     lastOutcome = trialResult.message+"; "+strjoin(trialCheck.failedConditions,",");
                 end
@@ -114,7 +121,7 @@ classdef hardEncounterBarrier
                 model.horizonSteps = model.horizonSteps+1;
                 slot = 1;
             end
-            timing.deadlineHit = timing.deadlineHit || (isfield(model,"frameTimer") ...
+            timing.deadlineHit = timing.deadlineHit || (deadlineGuarded ...
                 && toc(model.frameTimer)>=cfg.solver.frameDeadlineSeconds);
             model = best.model;
             prediction = best.prediction;
@@ -182,7 +189,7 @@ classdef hardEncounterBarrier
         end
 
         function [stored,problem] = admit(stored,problem)
-            stored.version = 19;
+            stored.version = 20;
             stored.encounterComplete = false;
             stored.witnessModel = problem.model;
             stored.safetyScope = "verifiedPredictionWithInvariantTerminalTail";
@@ -193,7 +200,10 @@ classdef hardEncounterBarrier
 
         function [model,candidate,initialization,original] = validateTransition(stored,ego,model,observations,identity)
         % Check the executed first hold, condition both information sets and
-        % assemble the carried witness before any fresh problem is built.
+        % assemble the carried witness before any fresh problem is built. The
+        % stored certificate describes an accepted plan of N stages of which
+        % consumedStages have already been executed; the carried witness is
+        % its remaining tail closed by the terminal law.
             cfg = model.cfg;
             hardEncounterBarrier.validateAdmission(ego,observations,cfg);
             localValidateStored(stored,identity);
@@ -204,10 +214,17 @@ classdef hardEncounterBarrier
                     "Replanning requires the next sample and the previously issued input.");
             end
             plan = stored.plan;
-            if ~isequal(stored.appliedInput,plan(:,1)) || size(plan,2)~=max(1,stored.remainingSteps)
+            consumed = stored.consumedStages;
+            stageCount = size(plan,2);
+            % horizonSteps counts the optimized stages of the stored plan (zero
+            % for a terminal-law certificate, whose single column is the law's
+            % input); remainingSteps counts those not yet consumed.
+            if consumed+1>stageCount || ~isequal(stored.appliedInput,plan(:,consumed+1)) ...
+                    || stored.remainingSteps~=stored.horizonSteps-consumed
                 error("collisionAvoidanceController:invalidStoredCertificate","The issued input witness changed.");
             end
-            if stored.remainingSteps>0
+            rebuilt = string(cfg.solver.witnessVerification)=="rebuilt";
+            if rebuilt && stored.remainingSteps>0
                 check = solveHardCbfClf.certify(stored.qp,stored.prediction,stored.witnessModel,stored.decision);
                 if ~check.accepted || ~isequal(check.value,stored.value) ...
                         || ~isequal(reshape(stored.decision(stored.qp.layout.planIndex),2,[]),plan)
@@ -216,6 +233,8 @@ classdef hardEncounterBarrier
             end
             % Ego conditioning: the true state lies in the published successor
             % box and in the measurement box, so it lies in their intersection.
+            % The certificate publishes its node boxes from the current frame
+            % on, so column 2 is always the successor of the executed hold.
             predictedCenter = stored.predictedState(:,2);
             predictedRadius = stored.stateErrorBound(:,2);
             [model.initialEgoState,model.initialFrenetErrorBound] = localConditionBox( ...
@@ -226,6 +245,17 @@ classdef hardEncounterBarrier
             [model.initialEgoState(4),model.initialFrenetErrorBound(4)] = localDomainBox( ...
                 model.initialEgoState(4),model.initialFrenetErrorBound(4), ...
                 cfg.model.speedMinimum,cfg.model.speedMaximum);
+            % Inclusion of the conditioned box in the published successor box
+            % is what transfers the stored verification (Lemma 1); it holds
+            % by construction and is checked to eps-level allowance.
+            difference = model.initialEgoState-predictedCenter;
+            difference(3) = atan2(sin(difference(3)),cos(difference(3)));
+            inclusionMargin = min(predictedRadius-abs(difference)-model.initialFrenetErrorBound);
+            allowance = 1024*eps*(1+max(abs(predictedCenter))+max(predictedRadius));
+            if inclusionMargin<-allowance
+                error("collisionAvoidanceController:inconsistentObservation", ...
+                    "The conditioned ego box is not inside the published successor box.");
+            end
             % Target conditioning against the carried exact flow.
             measured = targetPrediction.admitExact(observations,model.stateTime,model.lane,cfg);
             original = stored.originalEncounter;
@@ -235,23 +265,68 @@ classdef hardEncounterBarrier
                     "The same target and footprint must persist at every frame.");
             end
             model.encounters = targetPrediction.conditionExact(stored.encounters,model.sampleTime,measured);
-            % The carried witness: the shifted plan with its own data.
-            keep = stored.cellStage>=2;
-            carriedValue = 0;
-            if ~isempty(stored.stageViolation)
-                carriedValue = max(0,stored.value-stored.stageViolation(1));
-            end
-            candidate = struct("stages",stored.stages(min(2,end+1):end),"inputs",plan(:,2:end), ...
+            % The carried witness: the remaining tail with its own data.
+            keep = stored.cellStage>=consumed+2;
+            carriedValue = max(0,stored.value-sum(stored.stageViolation(1:min(end,consumed+1))));
+            tailViolation = stored.stageViolation(min(consumed+2,end+1):end);
+            candidate = struct("stages",stored.stages(min(consumed+2,end+1):end),"inputs",plan(:,consumed+2:end), ...
                 "frames",stored.cellFrames(keep),"normals",{stored.cellNormals(keep)}, ...
                 "terminal",stored.terminal,"carriedValue",carriedValue, ...
-                "previousValue",stored.value,"previousFirstViolation",localFirst(stored.stageViolation));
+                "previousValue",stored.value,"previousFirstViolation",localFirst(stored.stageViolation(consumed+1:end)), ...
+                "consumed",consumed,"tailViolation",tailViolation,"storedAcceptance",stored.acceptance, ...
+                "inclusionMargin",inclusionMargin,"rebuilt",rebuilt);
             initialization = zeros(2,0);
             if isfield(stored,"tailDecelerating"), model.preferEquilibriumSeed = stored.tailDecelerating; end
             if stored.remainingSteps>0
                 % Performance convexification must not inherit a compulsory
                 % brake from the hypothetical terminal continuation.
-                initialization = [plan(:,2:end),plan(:,end)];
+                initialization = [plan(:,consumed+2:end),plan(:,end)];
             end
+        end
+
+        function candidate = transferCandidate(model,candidate)
+        % Carry the stored verification to the conditioned box. Every carried
+        % row is a monotone function of the box (Lemma 1) and the stored plan
+        % was verified on a box containing the conditioned one, so the tail
+        % remains a verified plan; only the terminal membership of a
+        % zero-stage tail is re-evaluated (Proposition 2).
+            timer = tic;
+            stageCount = numel(candidate.stages);
+            if stageCount==0
+                [accepted,margins] = hardEncounterBarrier.terminalMembership(candidate.terminal, ...
+                    model.initialEgoState,model.initialFrenetErrorBound);
+                candidate.check = struct("accepted",accepted,"failedConditions",strings(1,0), ...
+                    "hardRowViolation",max([0;-margins]),"clfViolation",-inf,"margin",min(margins), ...
+                    "sweptClearanceMargin",min(margins),"exitMargin",min(margins), ...
+                    "value",0,"stageViolation",0,"terminalMargins",margins,"violatedHardRows",zeros(0,1));
+                if ~accepted, candidate.check.failedConditions = "terminalMembership"; end
+                candidate.verificationMethod = "terminalInvariance";
+            else
+                stored = candidate.storedAcceptance;
+                candidate.check = struct("accepted",true,"failedConditions",strings(1,0), ...
+                    "hardRowViolation",0,"clfViolation",stored.clfViolation,"margin",stored.margin, ...
+                    "sweptClearanceMargin",stored.sweptClearanceMargin,"exitMargin",stored.exitMargin, ...
+                    "value",candidate.carriedValue,"stageViolation",candidate.tailViolation, ...
+                    "violatedHardRows",zeros(0,1),"inclusionMargin",candidate.inclusionMargin);
+                candidate.verificationMethod = "inclusionTransfer";
+            end
+            candidate.optimizedStages = stageCount;
+            candidate.seconds = toc(timer);
+        end
+
+        function step = terminalStep(terminal,center,radius,sampleTime)
+        % One hold of the sampled terminal law from a node box: the exact
+        % held-input flow of the declared rest model, its successor box as the
+        % interval hull, and the affine generator that is executed.
+            input = terminal.input+terminal.feedback*center;
+            generator = [terminal.continuousA,terminal.continuousB,terminal.continuousC];
+            exact = expm(sampleTime*[generator;zeros(3,9)]);
+            step = struct("input",input,"generator",generator, ...
+                "successor",exact(1:6,:)*[center;input;1], ...
+                "successorRadius",abs(exact(1:6,1:6))*radius, ...
+                "stage",struct("continuousA",terminal.continuousA,"continuousB",terminal.continuousB, ...
+                    "continuousC",terminal.continuousC,"speed",0,"curvature",terminal.curvature, ...
+                    "brakingRatio",input(2),"tireModel",terminal.tireModel));
         end
 
         function candidate = verifyCandidate(model,candidate)
@@ -564,6 +639,15 @@ function budget = localBudget(growth,comparison)
 end
 
 function terminal = localTerminalDynamics(model,curvature)
+% The rest dynamics depend on the configuration, the hold and the curvature
+% only; the last result is reused while those are unchanged.
+    persistent memoKey memoTerminal
+    key = struct("curvature",curvature,"sampleTime",model.sampleTime, ...
+        "bias",model.longitudinalAccelerationBias,"cfg",rmfield(model.cfg,"solver"));
+    if ~isempty(memoKey) && isequaln(key,memoKey)
+        terminal = memoTerminal;
+        return;
+    end
     cfg = model.cfg;
     h = model.sampleTime;
     gain = modifiedFialaTire.accelerationGain(cfg);
@@ -638,6 +722,8 @@ function terminal = localTerminalDynamics(model,curvature)
         "errorBudgetFinite",errorHurwitz,"poseExcursion",excursion,"errorExcursion",errorExcursion, ...
         "velocityLimit",velocityLimit,"curvature",curvature, ...
         "feedbackArgument","predictedNominalVelocity");
+    memoKey = key;
+    memoTerminal = terminal;
 end
 
 function [direction,hurwitz] = localComparisonDirection(comparison)
@@ -767,10 +853,11 @@ end
 function localValidateStored(stored,identity)
     required = ["version","stateTime","appliedInput","plan","value","stageViolation","witnessModel","qp", ...
         "decision","prediction","predictedState","stateErrorBound","metadata","identity","encounters", ...
-        "originalEncounter","stages","cellStage","cellFrames","cellNormals","terminal","remainingSteps"];
+        "originalEncounter","stages","cellStage","cellFrames","cellNormals","terminal","remainingSteps", ...
+        "consumedStages","acceptance","horizonSteps"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored,required)) ...
-            || stored.version~=19 || ~isfield(stored.terminal,"errorRows")
-        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-19 carried-witness certificate.");
+            || stored.version~=20 || ~isfield(stored.terminal,"errorRows")
+        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-20 carried-witness certificate.");
     end
     if ~isequaln(identity,stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...
@@ -781,14 +868,14 @@ end
 function metadata = localMetadata(metadata,stored)
     metadata.fallbackUsed = false;
     metadata.carriedMargin = stored.margin;
-    metadata.requiredMargin = stored.qp.requiredMargin;
+    metadata.requiredMargin = stored.witnessModel.requiredMargin;
     metadata.pcbfValue = stored.value;
     metadata.stageViolation = stored.stageViolation;
     metadata.barrierValue = stored.value;
     metadata.barrierInterpretation = "verifiedAccumulatedSafetyViolation";
     metadata.horizonSteps = stored.remainingSteps;
     metadata.planningWindowSteps = stored.identity.configuration.controller.horizonSteps;
-    metadata.certificateExtensionSteps = max(0,stored.prediction.stageCount-metadata.planningWindowSteps);
+    metadata.certificateExtensionSteps = max(0,stored.horizonSteps-metadata.planningWindowSteps);
     metadata.deadline = stored.deadline;
     metadata.encounterComplete = false;
     metadata.safetyScope = stored.safetyScope;
@@ -812,12 +899,13 @@ function metadata = localMetadata(metadata,stored)
     metadata.commandActuationTime = stored.stateTime;
 end
 
-function localReject(result,check,qp)
+function message = localRejectMessage(result,check,qp)
+% Identifier-prefixed description of a hard solver failure.
     detail = "";
     if isfield(check,"violatedHardRows") && ~isempty(check.violatedHardRows)
         names = solveHardCbfClf.rowNames(qp);
         detail = "; violated hard rows: "+strjoin(unique(names(check.violatedHardRows)).',",");
     end
-    error("collisionAvoidanceController:noCertifiedContinuation", ...
-        "No verified plan was obtained: %s; %s%s.",result.message,strjoin(check.failedConditions,","),detail);
+    message = sprintf("collisionAvoidanceController:noCertifiedContinuation: No verified plan was obtained: %s; %s%s.", ...
+        result.message,strjoin(check.failedConditions,","),detail);
 end

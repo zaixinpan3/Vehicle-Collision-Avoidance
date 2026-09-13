@@ -9,7 +9,7 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
     end
     methods (Test)
         function finiteSlewProblemSolvesBothNativeStages(testCase)
-            [ego,~,route,cfg]=encounterTestFixture.crossing();
+            [ego,~,route,cfg]=encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             % Exercise explicit actuator slew constraints on the exact plant.
             ego.speed=10;cfg.referenceSpeed=10;
             cfg.controller.stationTrustRadius=20;cfg.model.lateralDomainRadius=12;cfg.model.linearizationPolicy="trajectory";
@@ -29,7 +29,7 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
             end
         end
         function bothLexicographicStagesRetainDynamicsEqualities(testCase)
-            [ego,target,route,cfg]=encounterTestFixture.crossing();
+            [ego,target,route,cfg]=encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             equalityCounts=[];cfg.solver.jointFunction=@capture;
             [~,~,problem]=collisionAvoidanceController(ego,target,route,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
@@ -41,7 +41,7 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
             end
         end
         function changingMarginPreservesEveryDynamicsEquality(testCase)
-            [ego,target,route,cfg]=encounterTestFixture.crossing();
+            [ego,target,route,cfg]=encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             [~,~,problem]=collisionAvoidanceController(ego,target,route,cfg,[]);
             qp=problem.qp;prior=qp.stageProgram;
             qp.inequalityBound=qp.barrier.baseBound-.25*qp.barrier.scale;
@@ -51,7 +51,7 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
                 prior.inequalityOffset+qp.inequalityBound(prior.inequalityIndices),AbsTol=0);
         end
         function continuousNormalProposalsNeedCompleteCertification(testCase)
-            [ego,target,route,cfg]=encounterTestFixture.crossing();
+            [ego,target,route,cfg]=encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             [~,~,problem]=collisionAvoidanceController(ego,target,route,cfg,[]);
             model=problem.qp.stageProgram.context.model;prediction=problem.prediction;plan=problem.inputPlan(:);
             [normals,information]=avoidanceSafetyGeometry.optimizeNormals(model,prediction,plan);
@@ -65,7 +65,7 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
             testCase.verifyEqual(qp.geometry.normals,normals);
         end
         function invalidNormalCannotBecomeAnExecutableCertificate(testCase)
-            [ego,target,route,cfg]=encounterTestFixture.crossing();
+            [ego,target,route,cfg]=encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             [~,~,problem]=collisionAvoidanceController(ego,target,route,cfg,[]);
             prediction=problem.prediction;
             prediction.separationNormals=repmat({[0;0]},numel(prediction.cells),1);

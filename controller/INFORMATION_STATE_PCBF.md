@@ -358,6 +358,36 @@ controller reports as `pcbfDescentResidual`.
   because the braked nominal decays faster than the open-loop error radius;
   plans resting exactly on that row then lost terminal membership one hold
   later. The box's own sign is covered by the symmetric error budget.
+- **Witness transfer (implemented).** The certificate stores the accepted
+  plan with a `consumedStages` counter and publishes its node boxes from
+  the current frame on. A continuation frame conditions the box, checks its
+  inclusion in the published successor box to eps-level allowance, and
+  takes the stored verification over unchanged (Lemma 1): the carried
+  witness costs no tube or row rebuild (`solver.witnessVerification =
+  "shiftedRows"`; `"rebuilt"` recomputes everything and is used by the
+  regression test that checks both modes issue identical commands). When no
+  optimized stage remains, the frame evaluates the terminal membership of
+  the conditioned box (Proposition 2), issues the sampled braking law, and
+  publishes the exact successor box of the rest model.
+- **Condensed programs.** The tiers are solved on the physical unknowns
+  only, centred at the seed plan, with the verification rows as the
+  program's rows and the same rotated-cone majorant for the CLF tier
+  (`solver.programForm = "condensed"`; the lifted cell-state form remains
+  available and a test checks both return the same value and plan). Stage A
+  is answered without a solve when the seed satisfies every row, and by a
+  proximal QP (closest zero-violation point to the seed) otherwise.
+- **CLF sampling at hold ends.** The sampled-data decrease is imposed and
+  verified once per hold, at its end (`clf.samplePoints = "stageNodes"`),
+  which is the sampled-data notion of the control period; the earlier
+  per-cell and per-control-point samplings remain available.
+- **Attempts and the deadline.** With a witness available, a further
+  attempt starts only if the longest attempt of the frame fits before the
+  deadline; the first attempt always runs. Failures of the fresh search are
+  returned with their timing rather than thrown.
+- **Native kernels.** The generated tube, linearization and row kernels in
+  `solver/bicycle` are put on the path by the controller; without them the
+  interpreted implementations compute the same enclosures several times
+  more slowly.
 - **Rest measured with error.** A stopped ego measured with speed error
   `±ρ_v` publishes a box straddling `v = 0`. The input contract admits any
   box that meets the model domain; on continuation frames the conditioned
@@ -405,9 +435,10 @@ controller reports as `pcbfDescentResidual`.
 | Ego box conditioning | `hardEncounterBarrier.validateTransition` → `localConditionBox` |
 | Target box conditioning | `targetPrediction.conditionExact` |
 | Carried data | `hardEncounterBarrier.carriedData`; certificate fields `stages`, `cellStage`, `cellFrames`, `cellNormals`, `terminal` |
-| Candidate verification | `hardEncounterBarrier.verifyCandidate` (prescribed stages via `ltvBicycleModel.finitePredict`, prescribed charts/normals via `avoidanceSafetyGeometry.build`, prescribed terminal via `completionRows`) |
+| Candidate verification | `hardEncounterBarrier.transferCandidate` (inclusion transfer of the stored verification; terminal membership for a zero-stage tail); `hardEncounterBarrier.verifyCandidate` (full rebuild, `solver.witnessVerification = "rebuilt"`) |
+| Terminal-law frame | `hardEncounterBarrier.terminalStep` (exact rest-model hold, successor box, executed generator) |
 | Terminal set | `localTerminalSet`, `localTerminalDynamics`, `localBudget`, `localAdmissibleNormal`, `localFutureSupport`; membership `hardEncounterBarrier.terminalMembership` |
-| Value LP / CLF SOCP | `solveHardCbfClf.solve`; violation columns in `avoidanceStageQp` (`violationIndex`, `rowMap.violation`, `rowMap.budget`) |
+| Feasibility, value LP, CLF SOCP | `solveHardCbfClf.solve`: condensed tiers with row generation (`localCondensedLexicographicSolve`, `localGeneratedSolve`); the lifted cell-state form in `avoidanceStageQp` for `solver.programForm = "lifted"` |
 | Verification and value | `solveHardCbfClf.certify` (`value`, `stageViolation`, `hardRowViolation`) |
 | Acceptance rule | `collisionAvoidanceController` (`certificateSource`, `pcbfValue`, `candidateValue`, `pcbfDescentResidual`, `lexicographicTieResidual`, `freshSolveFailure`) |
 

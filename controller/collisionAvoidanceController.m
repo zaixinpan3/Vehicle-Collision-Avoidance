@@ -52,7 +52,11 @@ function [command, predictedInput, planningProblem, certificate] = ...
     preparationSeconds = toc(timer);
     witnessSeconds = 0;
     if ~isempty(candidate)
-        candidate = hardEncounterBarrier.verifyCandidate(model,candidate);
+        if candidate.rebuilt
+            candidate = hardEncounterBarrier.verifyCandidate(model,candidate);
+        else
+            candidate = hardEncounterBarrier.transferCandidate(model,candidate);
+        end
         witnessSeconds = candidate.seconds;
         if ~candidate.check.accepted
             detail = "";
@@ -68,15 +72,21 @@ function [command, predictedInput, planningProblem, certificate] = ...
         end
     end
     fresh = [];
-    freshFailure = "";
     planningTiming = struct("predictionSeconds",0,"formulationSeconds",0, ...
         "solveSeconds",0,"verificationSeconds",0,"attempts",0,"deadlineHit",false);
     % The frame deadline applies only when a verified witness can take over.
     if ~isempty(candidate), model.frameTimer = timer; end
     try
-        [freshModel,freshPrediction,freshQp,freshResult,freshCheck,planningTiming] = hardEncounterBarrier.plan(model);
-        fresh = struct("model",freshModel,"prediction",freshPrediction,"qp",freshQp, ...
-            "result",freshResult,"check",freshCheck);
+        [freshModel,freshPrediction,freshQp,freshResult,freshCheck,planningTiming,freshFailure] = ...
+            hardEncounterBarrier.plan(model);
+        if strlength(freshFailure)==0
+            fresh = struct("model",freshModel,"prediction",freshPrediction,"qp",freshQp, ...
+                "result",freshResult,"check",freshCheck);
+        elseif isempty(candidate)
+            % Without a verified witness a failed search ends control.
+            separator = strfind(freshFailure,": ");
+            error(extractBefore(freshFailure,separator(1)),"%s",extractAfter(freshFailure,separator(1)+1));
+        end
     catch exception
         if isempty(candidate) || ~startsWith(string(exception.identifier),"collisionAvoidanceController:")
             rethrow(exception);
@@ -93,61 +103,45 @@ function [command, predictedInput, planningProblem, certificate] = ...
             fresh = [];
         end
     end
-    if isempty(fresh)
-        source = "carriedWitness";
-        model = candidate.model;
-        prediction = candidate.prediction;
-        qp = candidate.qp;
-        check = candidate.check;
-        decision = candidate.decision;
-        solverCalls = 0;
-        optimizedStages = candidate.optimizedStages;
-        tieResidual = 0;
-    else
-        source = "checkedOptimization";
-        model = fresh.model;
-        prediction = fresh.prediction;
-        qp = fresh.qp;
-        check = fresh.check;
-        decision = fresh.result.decision;
-        solverCalls = fresh.result.solverCalls;
-        optimizedStages = prediction.stageCount;
-        tieResidual = fresh.result.lexicographicTieResidual;
-    end
+    h = model.sampleTime;
     phase = tic;
-    predictedInput = reshape(decision(qp.layout.planIndex), 2, []);
-    command = localCommand(predictedInput, model, prediction, 1);
+    if ~isempty(fresh)
+        source = "checkedOptimization";
+        frame = localFreshFrame(fresh,fresh.model,identity,encounters,originalEncounter);
+        solverCalls = fresh.result.solverCalls;
+        tieResidual = fresh.result.lexicographicTieResidual;
+    else
+        source = "carriedWitness";
+        solverCalls = 0;
+        tieResidual = 0;
+        if candidate.rebuilt
+            rebuilt = struct("model",candidate.model,"prediction",candidate.prediction,"qp",candidate.qp, ...
+                "result",struct("decision",candidate.decision),"check",candidate.check);
+            frame = localFreshFrame(rebuilt,candidate.model,identity,encounters,originalEncounter);
+            frame.certificate.source = source;
+        elseif candidate.optimizedStages>0
+            frame = localTransferredFrame(controllerState,candidate,model,encounters);
+        else
+            frame = localTerminalFrame(controllerState,candidate,model,identity,encounters,originalEncounter);
+        end
+    end
+    certificate = frame.certificate;
+    certificate.source = source;
+    command = frame.command;
     command.measurementTime = model.stateTime;
     command.actuationTime = model.stateTime;
-    command.holdSeconds = model.sampleTime;
-    % Published successor nodes follow the exact held-input stage flows, the
-    % declared plant, with the interval hull of the initial box as radius.
-    % Conditioning against them keeps every later node box inside the
-    % accepted plan's node boxes (INFORMATION_STATE_PCBF.md, Lemma 1).
-    predictedState = localExactNodes(model, prediction, predictedInput);
-    carried = hardEncounterBarrier.carriedData(prediction,qp,optimizedStages);
+    command.holdSeconds = h;
+    predictedInput = frame.predictedInput;
+    check = frame.check;
+    optimizedStages = frame.optimizedStages;
     terminalActive = optimizedStages==0;
-    certificate = struct("version", 19, "identity", identity, "stateTime", model.stateTime, ...
-        "deadline", model.stateTime+prediction.stageCount*model.sampleTime, ...
-        "remainingSteps", optimizedStages, "margin", check.margin, ...
-        "value", check.value, "stageViolation", check.stageViolation, ...
-        "plan", predictedInput, "decision", decision, "qp", qp, "prediction", prediction, ...
-        "predictedState", predictedState, "stateErrorBound", prediction.initialErrorBound, ...
-        "appliedInput", predictedInput(:,1), "scheduledInput", command.actuatorInput, ...
-        "encounters", encounters, "originalEncounter", originalEncounter, "acceptance", check, ...
-        "safetyScope", "verifiedPredictionWithInvariantTerminalTail", ...
-        "certifiedDuration", prediction.stageCount*model.sampleTime, ...
-        "stages", carried.stages, "cellStage", carried.cellStage, "cellFrames", carried.cellFrames, ...
-        "cellNormals", {carried.cellNormals}, "terminal", carried.terminal, "source", source, ...
-        "tailDecelerating", predictedState(4,end)<model.initialEgoState(4)-0.25 ...
-            && model.initialEgoState(4)<model.referenceSpeed);
     metadata = struct("planCertified", check.accepted, "certificateSource", source, ...
         "fallbackUsed", false, "solverCallCount", solverCalls, ...
         "carriedMargin", check.margin, "requiredMargin", model.requiredMargin, ...
-        "horizonSteps", prediction.stageCount, "tailSteps", 0, "deadline", certificate.deadline, ...
+        "horizonSteps", optimizedStages, "tailSteps", 0, "deadline", certificate.deadline, ...
         "activeTargetKeys", string({encounters.key}), ...
         "dischargedTargetKeys", strings(1,0), ...
-        "clfRelaxation", decision(qp.layout.relaxationIndex), "clfDecayRate", qp.clf.decayRate, ...
+        "clfRelaxation", frame.clfRelaxation, "clfDecayRate", frame.clfDecayRate, ...
         "collisionDiscretization", "sweptBernsteinCells", "acceptance", check, ...
         "hasTarget", true, "postSolveCertificationPerformed", true, "runtimeSeconds", toc(timer));
     metadata.runtime = struct("inputPreparationSeconds", preparationSeconds, ...
@@ -188,27 +182,25 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.targetErrorBound = encounters.radius;
     metadata.safetyScope = certificate.safetyScope;
     metadata.certifiedDuration = certificate.certifiedDuration;
-    metadata.lookaheadDuration = prediction.stageCount*model.sampleTime;
+    metadata.lookaheadDuration = optimizedStages*h;
     metadata.inputDelaySeconds = 0;
     metadata.commandActuationTime = command.actuationTime;
     metadata.exactPredictionAssumptionsHold = true;
     metadata.tireForceConstraintScope = "declaredScheduledAffineBicycleStudy";
-    metadata.executedContinuousGenerator = [prediction.continuousA(:,:,1), ...
-        prediction.continuousB(:,:,1),prediction.continuousC(:,1)];
-    metadata.executedResidualRateBound = prediction.modelErrorRateBound(:,1);
-    trackingError = predictedState(2:6, :)-qp.clf.referenceStart ...
-        -qp.clf.referenceRate*((0:prediction.stageCount)*model.sampleTime);
-    metadata.clfValueProfile = sum(trackingError.*(qp.clf.lyapunovMatrix*trackingError), 1);
-    metadata.clfInitialValue = metadata.clfValueProfile(1);
-    metadata.clfOperatingCurvature = qp.clf.certificate.operatingCurvature;
-    metadata.clfOperatingInput = qp.clf.certificate.operatingInput;
+    metadata.executedContinuousGenerator = frame.executedGenerator;
+    metadata.executedResidualRateBound = frame.executedResidualRateBound;
+    metadata.clfValueProfile = frame.clfValueProfile;
+    metadata.clfInitialValue = frame.clfValueProfile(1);
+    metadata.clfOperatingCurvature = frame.clfOperatingCurvature;
+    metadata.clfOperatingInput = frame.clfOperatingInput;
     metadata.clfMetricChanged = false;
     metadata.clfReferenceSwitchValue = 0;
-    metadata.jointObjectiveValue = 0.5*decision.'*qp.Hessian*decision+qp.linear.'*decision+qp.constant;
-    metadata.clfRelaxationCost = model.sampleTime*cfg.clf.relaxationWeight*sum(metadata.clfRelaxation.^2);
+    metadata.jointObjectiveValue = frame.jointObjectiveValue;
+    metadata.clfRelaxationCost = h*cfg.clf.relaxationWeight*sum(metadata.clfRelaxation.^2);
     metadata.hardRowViolation = check.hardRowViolation;
-    planningProblem = struct("problemClass", qp.problemClass, "qp", qp, "layout", qp.layout, ...
-        "prediction", prediction, "model", model, "decision", decision, "plan", predictedInput(:), ...
+    planningProblem = struct("problemClass", "encounterPredictiveCbfClfSocp", "qp", frame.qp, ...
+        "layout", frame.layout, "prediction", frame.prediction, "model", frame.model, ...
+        "decision", frame.decision, "plan", predictedInput(:), ...
         "inputPlan", predictedInput, "tailPlan", zeros(2, 0), "metadata", metadata);
     [certificate, planningProblem] = hardEncounterBarrier.admit(certificate, planningProblem);
     certificate.metadata = planningProblem.metadata;
@@ -263,22 +255,165 @@ function cfg = localControllerConfiguration(userCfg)
 end
 
 function localAddConfigurationPath()
-    if exist("collisionAvoidanceControllerConfig", "file") == 2
+    if exist("collisionAvoidanceControllerConfig", "file") ~= 2
+        repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
+        configurationRoot = fullfile(repositoryRoot, "config");
+        if isfolder(configurationRoot)
+            addpath(configurationRoot);
+        end
+    end
+    localAddKernelPath();
+end
+
+function localAddKernelPath()
+% The generated tube, linearization and row kernels live beside the conic
+% solver bridge. Without them every prediction and row falls back to the
+% interpreted implementations, which compute the same enclosures slowly.
+    if exist("bicycleHeldIntervalKernelMex", "file") == 3 ...
+            && exist("avoidanceCellRowsKernelMex", "file") == 3
         return;
     end
     repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
-    configurationRoot = fullfile(repositoryRoot, "config");
-    if isfolder(configurationRoot)
-        addpath(configurationRoot);
+    kernelRoot = fullfile(repositoryRoot, "solver", "bicycle");
+    if isfolder(kernelRoot)
+        addpath(kernelRoot);
     end
 end
 
-function command = localCommand(inputPlan, model, prediction,stage)
-    firstInput = inputPlan(:,stage);
+function frame = localFreshFrame(fresh,model,identity,encounters,originalEncounter)
+% Certificate and outputs of a plan verified in full at this frame (a fresh
+% plan, or a rebuilt carried witness): consumedStages is zero.
+    prediction = fresh.prediction;
+    qp = fresh.qp;
+    decision = fresh.result.decision;
+    check = fresh.check;
+    predictedInput = reshape(decision(qp.layout.planIndex),2,[]);
+    optimizedStages = prediction.stageCount;
+    state = model.initialEgoState;
+    command = localCommand(predictedInput(:,1),state,prediction.scheduleSpeedProfile(1), ...
+        prediction.scheduleCurvature(1),prediction.scheduleBrakingRatio(1),model);
+    % Published successor nodes follow the exact held-input stage flows, the
+    % declared plant, with the interval hull of the initial box as radius.
+    % Conditioning against them keeps every later node box inside the
+    % accepted plan's node boxes (INFORMATION_STATE_PCBF.md, Lemma 1).
+    predictedState = localExactNodes(model,prediction,predictedInput);
+    carried = hardEncounterBarrier.carriedData(prediction,qp,optimizedStages);
+    certificate = struct("version",20,"identity",identity,"stateTime",model.stateTime, ...
+        "deadline",model.stateTime+optimizedStages*model.sampleTime, ...
+        "remainingSteps",optimizedStages,"consumedStages",0,"horizonSteps",optimizedStages, ...
+        "margin",check.margin, ...
+        "value",check.value,"stageViolation",check.stageViolation, ...
+        "plan",predictedInput,"decision",decision,"qp",qp,"prediction",prediction, ...
+        "predictedState",predictedState,"stateErrorBound",prediction.initialErrorBound, ...
+        "appliedInput",predictedInput(:,1),"scheduledInput",command.actuatorInput, ...
+        "encounters",encounters,"originalEncounter",originalEncounter,"acceptance",check, ...
+        "safetyScope","verifiedPredictionWithInvariantTerminalTail", ...
+        "certifiedDuration",optimizedStages*model.sampleTime, ...
+        "stages",carried.stages,"cellStage",carried.cellStage,"cellFrames",carried.cellFrames, ...
+        "cellNormals",{carried.cellNormals},"terminal",carried.terminal,"source","checkedOptimization", ...
+        "tailDecelerating",predictedState(4,end)<model.initialEgoState(4)-0.25 ...
+            && model.initialEgoState(4)<model.referenceSpeed);
+    frame = localFrameOutputs(certificate,command,predictedInput,check,optimizedStages, ...
+        qp,prediction,decision,predictedState,1,model);
+end
+
+function frame = localTransferredFrame(stored,candidate,model,encounters)
+% Certificate and outputs when the carried tail of the stored plan is the
+% command: the stored data are kept, one more stage is consumed.
+    stage = candidate.consumed+2;
+    plan = stored.plan;
+    prediction = stored.prediction;
+    qp = stored.qp;
+    state = prediction.egoStateMatrix(:,:,stage)*plan(:)+prediction.egoStateOffset(:,stage);
+    command = localCommand(plan(:,stage),state,prediction.scheduleSpeedProfile(stage), ...
+        prediction.scheduleCurvature(stage),prediction.scheduleBrakingRatio(stage),model);
+    predictedInput = plan(:,stage:end);
+    certificate = stored;
+    certificate.stateTime = model.stateTime;
+    certificate.consumedStages = candidate.consumed+1;
+    certificate.remainingSteps = size(plan,2)-certificate.consumedStages;
+    % Node boxes are published from this frame on: column 2 is the successor.
+    certificate.predictedState = stored.predictedState(:,2:end);
+    certificate.stateErrorBound = stored.stateErrorBound(:,2:end);
+    certificate.appliedInput = plan(:,stage);
+    certificate.scheduledInput = command.actuatorInput;
+    certificate.encounters = encounters;
+    certificate.acceptance = candidate.check;
+    certificate.margin = candidate.check.margin;
+    frame = localFrameOutputs(certificate,command,predictedInput,candidate.check,candidate.optimizedStages, ...
+        qp,prediction,stored.decision,certificate.predictedState,stage,model);
+end
+
+function frame = localTerminalFrame(stored,candidate,model,identity,encounters,originalEncounter)
+% Certificate and outputs when no optimized stage remains: the sampled
+% terminal law from the conditioned box, verified by terminal membership.
+    terminal = candidate.terminal;
+    center = model.initialEgoState;
+    radius = model.initialFrenetErrorBound;
+    step = hardEncounterBarrier.terminalStep(terminal,center,radius,model.sampleTime);
+    command = localCommand(step.input,center,0,terminal.curvature,step.input(2),model);
+    check = candidate.check;
+    emptyFrames = stored.cellFrames(zeros(0,1));
+    certificate = struct("version",20,"identity",identity,"stateTime",model.stateTime, ...
+        "deadline",model.stateTime+model.sampleTime,"remainingSteps",0,"consumedStages",0, ...
+        "horizonSteps",0,"margin",check.margin,"value",0,"stageViolation",0, ...
+        "plan",step.input,"decision",[step.input;0],"qp",[],"prediction",[], ...
+        "predictedState",[center,step.successor],"stateErrorBound",[radius,step.successorRadius], ...
+        "appliedInput",step.input,"scheduledInput",command.actuatorInput, ...
+        "encounters",encounters,"originalEncounter",originalEncounter,"acceptance",check, ...
+        "safetyScope","verifiedPredictionWithInvariantTerminalTail", ...
+        "certifiedDuration",model.sampleTime, ...
+        "stages",repmat(step.stage,0,1),"cellStage",zeros(0,1),"cellFrames",emptyFrames, ...
+        "cellNormals",{cell(0,1)},"terminal",terminal,"source","carriedWitness","tailDecelerating",false);
+    frame = localFrameOutputs(certificate,command,step.input,check,0,[],[],[step.input;0], ...
+        [center,step.successor],1,model);
+    frame.executedGenerator = step.generator;
+end
+
+function frame = localFrameOutputs(certificate,command,predictedInput,check,optimizedStages, ...
+        qp,prediction,decision,nodes,stage,model)
+% Common outputs. nodes holds the plan's node states from the current frame
+% on; stage indexes the stored (unshifted) prediction and decision. Metadata
+% that describe a solved program are NaN when the frame executed the
+% terminal law, which solves none.
+    frame = struct("certificate",certificate,"command",command,"predictedInput",predictedInput, ...
+        "check",check,"optimizedStages",optimizedStages,"qp",qp,"prediction",prediction,"decision",decision);
+    % The reported model is the one the frame's rows were built on. Frames
+    % without a solved program report the conditioned model with the exit
+    % fields every consumer of a planning model expects.
+    frame.model = model;
+    if ~isfield(frame.model,"exitSteps"), frame.model.exitSteps = zeros(numel(model.encounters),1); end
+    if ~isfield(frame.model,"exitMargin"), frame.model.exitMargin = inf; end
+    frame.layout = [];
+    frame.clfRelaxation = zeros(0,1);
+    frame.clfDecayRate = NaN;
+    frame.clfValueProfile = NaN;
+    frame.clfOperatingCurvature = NaN;
+    frame.clfOperatingInput = NaN(2,1);
+    frame.jointObjectiveValue = NaN;
+    frame.executedGenerator = zeros(6,9);
+    frame.executedResidualRateBound = zeros(6,1);
+    if ~isempty(qp)
+        frame.layout = qp.layout;
+        frame.clfRelaxation = decision(qp.layout.relaxationIndex(stage:end));
+        frame.clfDecayRate = qp.clf.decayRate;
+        trackingError = nodes(2:6,:)-qp.clf.referenceStart ...
+            -qp.clf.referenceRate*((0:size(nodes,2)-1)*model.sampleTime);
+        frame.clfValueProfile = sum(trackingError.*(qp.clf.lyapunovMatrix*trackingError),1);
+        frame.clfOperatingCurvature = qp.clf.certificate.operatingCurvature;
+        frame.clfOperatingInput = qp.clf.certificate.operatingInput;
+        frame.jointObjectiveValue = 0.5*decision.'*qp.Hessian*decision+qp.linear.'*decision+qp.constant;
+        frame.executedGenerator = [prediction.continuousA(:,:,stage), ...
+            prediction.continuousB(:,:,stage),prediction.continuousC(:,stage)];
+        frame.executedResidualRateBound = prediction.modelErrorRateBound(:,stage);
+    end
+end
+
+function command = localCommand(firstInput, state, scheduleSpeed, scheduleCurvature, scheduleBrakingRatio, model)
+% Derived quantities of one held input at a nominal state under the stage's
+% scheduled tire tangent; the actuator input is the held input itself.
     cfg = model.cfg;
-    state = prediction.egoStateMatrix(:,:,stage)*inputPlan(:)+prediction.egoStateOffset(:,stage);
-    forceScheduleSpeed = max(prediction.scheduleSpeedProfile(stage), ...
-        cfg.model.scheduleSpeedFloor);
+    forceScheduleSpeed = max(scheduleSpeed, cfg.model.scheduleSpeedFloor);
     tire = modifiedFialaTire.parameters(cfg);
     steeringAngle = firstInput(1);
     brakingRatio = firstInput(2);
@@ -289,8 +424,7 @@ function command = localCommand(inputPlan, model, prediction,stage)
     rearSlipAngle = (state(5)-cfg.vehicle.lr*state(6)) ...
         / forceScheduleSpeed;
     [tireSlope, ratioSlope, tireIntercept] = modifiedFialaTire.linearize( ...
-        prediction.scheduleCurvature(stage), prediction.scheduleSpeedProfile(stage), ...
-        prediction.scheduleBrakingRatio(stage), cfg);
+        scheduleCurvature, scheduleSpeed, scheduleBrakingRatio, cfg);
     axleLateralForce = tireSlope.*[frontSlipAngle; rearSlipAngle] ...
         +ratioSlope*brakingRatio+tireIntercept;
     axleLongitudinalForce = modifiedFialaTire.longitudinalForce(brakingRatio, cfg);

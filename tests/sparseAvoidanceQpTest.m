@@ -71,7 +71,7 @@ classdef sparseAvoidanceQpTest < matlab.unittest.TestCase
 end
 
 function problem = localProblem()
-    [ego, target, centerline, cfg] = encounterTestFixture.crossing();
+    [ego, target, centerline, cfg] = encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
     boundary = struct("origin", [0;0], "longitudinalDirection", [1;0], ...
         "lateralDirection", [0;1], "coefficients", [0,0,6], ...
         "parameterRange", [-200,3000], "safeSideSign", -1, "boundaryId", "left");

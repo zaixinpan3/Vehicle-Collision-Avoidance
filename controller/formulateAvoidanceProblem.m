@@ -122,7 +122,20 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         % at the two ends of the cell (its sample instants) or at every
         % Bernstein control point (which implies the whole cell by convexity).
         sampled = 1:points;
-        if string(cfg.clf.samplePoints)=="endpoints", sampled = unique([1, points]); end
+        switch string(cfg.clf.samplePoints)
+            case "endpoints"
+                sampled = unique([1, points]);
+            case "stageNodes"
+                % One sample per hold, at its end: the last point of the
+                % stage's last cell. Earlier cells of the stage carry none.
+                lastOfStage = cellIndex==numel(certifiedCells) || certifiedCells(cellIndex+1).stage~=stage;
+                sampled = points(lastOfStage);
+        end
+        if isempty(sampled)
+            cellConstraints{cellIndex} = repmat(struct("map",[],"offset",[],"root",[],"linear",[], ...
+                "constant",[],"stage",[],"cellIndex",[],"pointIndex",[]),0,1);
+            continue;
+        end
         seedState = mean(reshape(pagemtimes(tube.map, anchorPlan), 6, [])+tube.offset, 2);
         seedTime = mean(tube.time);
         anchor = [seedState(2:6)-referenceStart-cfg.clf.referenceRate*seedTime; ...
@@ -180,16 +193,18 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
         "certifiedInfeasible", any(bound(~any(hardMatrix, 2) & ~safetyRows) < 0));
     qp.terminal = terminal;
+    qp.anchorPlan = anchorPlan(:);
     % One unit in each hard row's native units normalizes its margin.
     scale = ones(size(bound));
     scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
     qp.barrier = struct("baseBound", bound, "scale", scale, ...
         "completionRows", completionRows);
-    % Verification of a prescribed plan needs only the condensed rows; the
-    % sparse lifted program is built for programs that are solved.
-    if isfield(model,"verificationOnly") && model.verificationOnly
-        qp.stageProgram = [];
-    else
+    % The condensed rows above are the program. The sparse cell-state
+    % program is built only for the lifted form, and never for a
+    % verification-only formulation.
+    qp.stageProgram = [];
+    if string(cfg.solver.programForm)=="lifted" ...
+            && ~(isfield(model,"verificationOnly") && model.verificationOnly)
         qp.stageProgram = avoidanceStageQp.build(qp,prediction,model);
     end
 

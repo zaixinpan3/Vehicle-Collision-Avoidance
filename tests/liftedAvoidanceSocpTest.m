@@ -9,7 +9,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
     end
     methods (Test)
         function screenedConesPreserveTheRequiredClfSlack(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            [ego,target,route,cfg] = encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             cfg.model.frontWheelSteeringRateMaximum = 0.5;
             cfg.model.brakingRatioRateMaximum = 2;
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
@@ -20,7 +20,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(numel(problem.qp.stageProgram.clfConstraintIndices),numel(problem.qp.clf.constraints));
         end
         function routeStationOriginDoesNotChangeTheAvoidanceInput(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            [ego,target,route,cfg] = encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             [near,~,nearProblem] = collisionAvoidanceController(ego,target,route,cfg,[]);
             route(1,1) = route(1,1)-10000;
             [far,~,farProblem] = collisionAvoidanceController(ego,target,route,cfg,[]);
@@ -29,7 +29,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             testCase.verifyEqual(far.actuatorInput,near.actuatorInput,AbsTol=1e-5);
         end
         function sparseAndCondensedProgramsDescribeTheSameDecisions(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            [ego,target,route,cfg] = encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             cfg.referenceSpeed = 10;
             cfg.model.frontWheelSteeringRateMaximum = 1;
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
@@ -57,6 +57,23 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             oldDifference = localObjective(condensed,second)-localObjective(condensed,first);
             testCase.verifyEqual(newDifference,oldDifference,AbsTol=1e-7);
         end
+        function condensedAndLiftedFormsAgreeOnValueAndPlan(testCase)
+            % The condensed program on the physical unknowns is the lifted
+            % cell-state program with its auxiliary states eliminated; both
+            % must return the same verified value and the same plan.
+            [ego,target,road,cfg] = encounterTestFixture.crossing();
+            ego = rmfield(ego,"perception");
+            target = rmfield(target,"predictionMotion");
+            cfg.solver.programForm = "lifted";
+            [~,~,lifted] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            cfg.solver.programForm = "condensed";
+            [~,~,condensed] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(condensed.metadata.pcbfValue,lifted.metadata.pcbfValue);
+            testCase.verifyEqual(condensed.inputPlan,lifted.inputPlan,AbsTol=1e-5);
+            testCase.verifyEqual(condensed.metadata.jointObjectiveValue, ...
+                lifted.metadata.jointObjectiveValue,RelTol=1e-5,AbsTol=1e-8);
+        end
+
         function rowGenerationReproducesTheCompleteProgramOptimum(testCase)
             % A working-set solve that violates no omitted row solves the
             % complete program; the plan and its verified value agree.
@@ -74,7 +91,7 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
         end
 
         function completeProgramKeepsSlipAndGeometryWithoutForcePolygons(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
+            [ego,target,route,cfg] = encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);
             testCase.verifyFalse(any(problem.qp.geometry.label=="combinedTireForce"));
             testCase.verifyTrue(any(problem.qp.geometry.label=="tireSlip"));
