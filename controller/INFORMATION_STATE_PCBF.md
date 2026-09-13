@@ -15,6 +15,11 @@ assumptions Batkovic, Gupta, Zanon and Falcone (arXiv:2305.03312, Assumptions
 predictions that are *consistent* over time, and a *safe terminal set* whose
 members are safe against the other road user for all future time.
 
+The proposed alternative in [FINITE_ENCOUNTER_TERMINAL_DESIGN.md](FINITE_ENCOUNTER_TERMINAL_DESIGN.md)
+uses a finite terminal tube and a guarded target-free handover. Its conditional
+proof and entry limitations are documented separately; it is not the terminal
+construction executed by the current controller.
+
 ## 1. Premises
 
 The theorem below holds under exactly these premises. None is inferred from
