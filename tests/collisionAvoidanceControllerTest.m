@@ -119,14 +119,16 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.metadata.hardRowViolation,0);
         end
 
-        function aChangedMotionContractCannotInheritTheWitness(testCase)
+        function largerJerkBoundsRequireFreshAdmission(testCase)
             [ego, target, route, cfg] = encounterTestFixture.crossing();
             [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
             nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
             target.targetPositionInertial = target.targetPositionInertial+0.1*target.targetVelocityInertial;
             target.predictionMotion.jerkBound(1) = 1;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo, target, route, cfg, stored), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+            [~,~,next] = collisionAvoidanceController(nextEgo,target,route,cfg,stored);
+            testCase.verifyTrue(next.metadata.planCertified);
+            testCase.verifyTrue(next.metadata.motionBoundsIncreased);
+            testCase.verifyFalse(next.metadata.candidateVerified);
         end
 
         function aValidObservationPreservesTheOriginalTargetLawWhileRefreshingTheProblem(testCase)
@@ -151,7 +153,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:inconsistentObservation");
         end
 
-        function changedYawBoundsCannotRenewTheOriginalContract(testCase)
+        function largerYawBoundsRequireFreshAdmission(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             target.predictionMotion.yawAccelerationBound = 0;
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
@@ -159,8 +161,10 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             target.targetPositionInertial = target.targetPositionInertial ...
                 +cfg.controller.sampleTime*target.targetVelocityInertial;
             target.predictionMotion.yawAccelerationBound = 0.02;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo,target,route,cfg,stored), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+            [~,~,next] = collisionAvoidanceController(nextEgo,target,route,cfg,stored);
+            testCase.verifyTrue(next.metadata.planCertified);
+            testCase.verifyTrue(next.metadata.motionBoundsIncreased);
+            testCase.verifyFalse(next.metadata.candidateVerified);
         end
 
         function measuredActuatorMismatchPreventsReuse(testCase)

@@ -1,5 +1,5 @@
 classdef targetPrediction
-    %targetPrediction Exact online motion and offline bounded target propagation.
+    %targetPrediction Bounded online target motion and footprint propagation.
 
     methods (Static)
         function [offset,slope] = rectangleSupportMajorant(normal,referenceHeading,halfLength,halfWidth,anchor,errorMaximum)
@@ -24,48 +24,46 @@ classdef targetPrediction
             retained = lower<=upper;
             offset = intercept(retained);slope = derivative(retained);
         end
-        function encounter = admitExact(target, time, lane, cfg)
-        % One immutable Cartesian constant-acceleration/constant-yaw-rate flow.
-        % Current-state estimation boxes are admitted and carried as sets;
-        % future-motion uncertainty is not part of the exact law.
+        function encounter = admitOnline(target, time, lane, cfg)
+        % Admit a nominal Cartesian flow with bounded jerk and yaw acceleration.
+        % Nonzero motion bounds tighten reachable sets, not input eligibility.
             if isempty(target)
                 encounter = struct("key",{},"radius",{},"contract",{});
                 return;
             end
-            future = [target.predictionAccelerationErrorBound(:); target.predictionYawAccelerationErrorBound];
-            if any(future ~= 0)
-                error("collisionAvoidanceController:nonexactStudyInput", ...
-                    "The exact target law admits current-state boxes only; future motion bounds must be zero.");
-            end
             motion = target.predictionMotion;
-            if ~isempty(motion)
+            if isempty(motion)
+                motion = struct("kind","finite-sensing-motion-v1", ...
+                    "jerkBound",zeros(2,1), ...
+                    "yawAccelerationBound",target.predictionYawAccelerationErrorBound);
+            else
                 if ~isstruct(motion) || ~isscalar(motion) || ~isfield(motion,"kind") ...
                         || ~isscalar(string(motion.kind)) ...
                         || ~any(string(motion.kind)==["exact-motion-v1","finite-sensing-motion-v1"])
                     error("collisionAvoidanceController:invalidEncounterContract", ...
-                        "Use the exact Cartesian motion contract.");
+                        "Use identified Cartesian motion bounds.");
                 end
-                for name = ["jerkBound","yawAccelerationBound"]
-                    if isfield(motion,name) && any(motion.(name)~=0,"all")
-                        error("collisionAvoidanceController:nonexactStudyInput", ...
-                            "Exact target motion has zero jerk and yaw-acceleration uncertainty.");
-                    end
+                if string(motion.kind)=="exact-motion-v1"
+                    if ~isfield(motion,"jerkBound"), motion.jerkBound = zeros(2,1); end
+                    if ~isfield(motion,"yawAccelerationBound"), motion.yawAccelerationBound = 0; end
+                    motion.kind = "finite-sensing-motion-v1";
                 end
             end
-            if startsWith(target.key,"anonymousTarget:"), target.key = "exactTarget:1"; end
-            target.predictionMotion = struct("kind","finite-sensing-motion-v1", ...
-                "jerkBound",zeros(2,1),"yawAccelerationBound",0);
+            if startsWith(target.key,"anonymousTarget:"), target.key = "singleTarget:1"; end
+            target.predictionMotion = motion;
             encounter = targetPrediction.admit(target,time,lane,cfg);
-            encounter.contract.kind = "exact-motion-v1";
-            encounter.contract.validityScope = "allFutureTime";
+            if ~any(encounter.contract.jerkBound) && encounter.contract.yawAccelerationBound==0
+                encounter.contract.kind = "exact-motion-v1";
+                encounter.contract.validityScope = "allFutureTime";
+            end
         end
 
-        function next = conditionExact(carried, duration, measured)
-        %conditionExact Intersect the carried exact flow with a new measurement box.
+        function next = condition(carried, duration, measured)
+        %condition Intersect the bounded reachable box with a new measurement.
         % The true target state lies in the propagated carried box and in the
         % measurement box, so the interval hull of their intersection contains
         % it and stays inside the propagated box. An empty intersection
-        % contradicts the exact motion premise or the measurement contract.
+        % contradicts the declared motion bound or measurement contract.
             [center, radius] = targetPrediction.finiteFlow(carried, duration);
             measuredCenter = measured.center;
             measuredCenter(7) = center(7)+atan2(sin(measuredCenter(7)-center(7)), ...
@@ -75,7 +73,7 @@ classdef targetPrediction
             upper = min(center+radius, measuredCenter+measured.radius);
             if any(lower > upper+allowance)
                 error("collisionAvoidanceController:inconsistentObservation", ...
-                    "The target measurement box does not intersect its exact predicted flow.");
+                    "The target measurement box does not intersect its bounded reachable set.");
             end
             middle = (lower+upper)/2;
             lower = min(lower, middle);

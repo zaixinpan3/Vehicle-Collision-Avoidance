@@ -24,7 +24,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `ltvBicycleModel.m` | Held-input prediction, nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
-| `targetPrediction.m` | Exact target admission with current-state boxes (`admitExact`), box conditioning (`conditionExact`), absolute-time flow, offline uncertainty studies and footprint support |
+| `targetPrediction.m` | Bounded target admission (`admitOnline`), reachable-box conditioning (`condition`), absolute-time flow, offline uncertainty studies and footprint support |
 | `fialaCertificate.m` | Validated nonlinear residuals (`residual`), held-feedback samples (`sample`), prescribed sequences (`sequence`) and shared constants (`parameters`) |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |

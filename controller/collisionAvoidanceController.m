@@ -4,8 +4,8 @@ function [command, predictedInput, planningProblem, certificate] = ...
 % Supply the fourth output at the next sample. Ego and target estimates carry
 % bounded error boxes. Zero visible targets retain road-constrained CLF cruise.
 % Visible-target transitions require fresh admission. A visible target follows
-% the Cartesian constant-acceleration
-% law exactly; the ego executes the accepted plan's first-stage affine
+% a Cartesian nominal flow with declared jerk and yaw-acceleration bounds;
+% the ego executes the accepted plan's first-stage affine
 % generator. Every continuation frame conditions both boxes, verifies the
 % shifted previous plan with its own carried data, and lets a fresh
 % optimization replace it only with a verified plan of no larger safety
@@ -33,6 +33,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     identity.road = road;
     candidate = [];
     model.targetSetChanged = false;
+    model.motionBoundsIncreased = false;
     if ~isempty(controllerState)
         [model,candidate,initialization,originalEncounter] = hardEncounterBarrier.validateTransition( ...
             controllerState,ego,model,observations,identity);
@@ -48,7 +49,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
                 "The admitted ego speed centre must lie in the model domain.");
         end
         hardEncounterBarrier.validateAdmission(ego, observations, cfg);
-        model.encounters = targetPrediction.admitExact(observations, model.stateTime, lane, cfg);
+        model.encounters = targetPrediction.admitOnline(observations, model.stateTime, lane, cfg);
         originalEncounter = model.encounters;
     end
     encounters = model.encounters;
@@ -185,11 +186,12 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.targetErrorBound = zeros(8,0);
     if ~isempty(encounters), metadata.targetErrorBound = encounters.radius; end
     metadata.targetSetChanged = model.targetSetChanged;
+    metadata.motionBoundsIncreased = model.motionBoundsIncreased;
     metadata.newlyAdmittedTargetKeys = strings(1,0);
     if isempty(controllerState) || model.targetSetChanged
         metadata.newlyAdmittedTargetKeys = metadata.activeTargetKeys;
     end
-    metadata.jointAdmissionPerformed = ~isempty(metadata.newlyAdmittedTargetKeys);
+    metadata.jointAdmissionPerformed = ~isempty(metadata.newlyAdmittedTargetKeys) || model.motionBoundsIncreased;
     if model.targetSetChanged && isempty(encounters)
         metadata.dischargedTargetKeys = string({controllerState.encounters.key});
     end
@@ -198,7 +200,9 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.lookaheadDuration = optimizedStages*h;
     metadata.inputDelaySeconds = 0;
     metadata.commandActuationTime = command.actuationTime;
-    metadata.exactPredictionAssumptionsHold = true;
+    metadata.exactPredictionAssumptionsHold = all(arrayfun(@(target) ...
+        ~any(target.contract.jerkBound) && target.contract.yawAccelerationBound==0,encounters));
+    metadata.targetMotionBounds = {encounters.contract};
     metadata.tireForceConstraintScope = "declaredScheduledAffineBicycleStudy";
     metadata.executedContinuousGenerator = frame.executedGenerator;
     metadata.executedResidualRateBound = frame.executedResidualRateBound;

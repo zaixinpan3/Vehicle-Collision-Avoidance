@@ -118,8 +118,9 @@ plan is verified against the *carried* data of the plan it came from, whose
 rows are monotone under box inclusion, and the fresh problem may only replace
 that verified witness with a verified plan of no larger safety value. Both
 recursive-feasibility claim flags are now true under the declared premises
-(declared affine stage plant, exact target law, bounded estimation boxes,
-conditioned information sets); see the theorem in
+(declared affine stage plant, bounded target law with a valid invariant
+terminal certificate, bounded estimation boxes, conditioned information sets);
+see the current theorem and bounded-motion extension in
 [INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md). If a fresh solve fails
 at a continuation frame, the carried witness is executed; only a premise
 failure ends control.

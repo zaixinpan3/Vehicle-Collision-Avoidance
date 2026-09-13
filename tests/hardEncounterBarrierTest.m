@@ -88,12 +88,14 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 exact.qp.terminal.futureTargetSupports+0.1*abs(exact.qp.terminal.targetNormals(1))-1e-9);
         end
 
-        function uncertainFutureMotionCannotBeCalledExact(testCase)
-            [ego,target,road,cfg] = localFixture();
+        function uncertainFutureMotionCanReceiveABoundedCertificate(testCase)
+            [ego,target,road,cfg] = encounterTestFixture.crossing();
             target.predictionMotion = struct('kind','finite-sensing-motion-v1', ...
                 'jerkBound',[0.1;0],'yawAccelerationBound',0);
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:nonexactStudyInput');
+            [~,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyFalse(problem.metadata.exactPredictionAssumptionsHold);
+            testCase.verifyEqual(stored.encounters.contract.jerkBound,[0.1;0],AbsTol=0);
         end
 
         function aFailedFreshSolveExecutesTheCarriedWitness(testCase)

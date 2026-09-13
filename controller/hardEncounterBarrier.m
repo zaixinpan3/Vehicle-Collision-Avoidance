@@ -149,11 +149,9 @@ classdef hardEncounterBarrier
 
         function [matrix,bound,terminal] = completionRows(model,prediction,~)
             cfg = model.cfg;
-            if any(cfg.model.ltvModelErrorRateBound~=0) || any(cfg.model.plantModelResidualRateBound~=0) ...
-                    || any(arrayfun(@(target) any(target.contract.jerkBound~=0) ...
-                        || target.contract.yawAccelerationBound~=0,model.encounters))
+            if any(cfg.model.ltvModelErrorRateBound~=0) || any(cfg.model.plantModelResidualRateBound~=0)
                 error("collisionAvoidanceController:nonexactStudyInput", ...
-                    "The invariant terminal construction requires exact stage models and an exact target law.");
+                    "The invariant terminal construction requires zero ego process residuals.");
             end
             % The terminal node is evaluated through the exact held-input stage
             % transitions, not the Bernstein tubes: an exact initial state then
@@ -256,8 +254,8 @@ classdef hardEncounterBarrier
                 error("collisionAvoidanceController:inconsistentObservation", ...
                     "The conditioned ego box is not inside the published successor box.");
             end
-            % Target conditioning against the carried exact flow.
-            measured = targetPrediction.admitExact(observations,model.stateTime,model.lane,cfg);
+            % Target conditioning against the carried bounded reachable set.
+            measured = targetPrediction.admitOnline(observations,model.stateTime,model.lane,cfg);
             original = stored.originalEncounter;
             model.targetSetChanged = isempty(measured)~=isempty(stored.encounters);
             if model.targetSetChanged
@@ -280,7 +278,19 @@ classdef hardEncounterBarrier
             end
             model.encounters = measured;
             if ~isempty(measured)
-                model.encounters = targetPrediction.conditionExact(stored.encounters,model.sampleTime,measured);
+                model.encounters = targetPrediction.condition(stored.encounters,model.sampleTime,measured);
+                model.motionBoundsIncreased = any(measured.contract.jerkBound>stored.encounters.contract.jerkBound) ...
+                    || measured.contract.yawAccelerationBound>stored.encounters.contract.yawAccelerationBound;
+                if model.motionBoundsIncreased
+                    % The completed hold must satisfy its original bounds,
+                    % as checked above. Enlarged future bounds define a new
+                    % problem, so solve it without using the old witness.
+                    model.encounters.contract = measured.contract;
+                    original = model.encounters;
+                    candidate = [];
+                    initialization = zeros(2,0);
+                    return;
+                end
             end
             % The carried witness: the remaining tail with its own data.
             keep = stored.cellStage>=consumed+2;
@@ -575,9 +585,9 @@ function terminal = localTerminalSet(model,prediction,anchor)
         [center,radius] = targetPrediction.finiteFlow(target,duration);
         egoPosition = frame.origin+[frame.tangent,frame.lateral]*anchor(1:2);
         displacement = egoPosition-center(1:2);
-        [normal,support] = localAdmissibleNormal(displacement,center,radius,frame,egoPosition);
+        [normal,support] = localAdmissibleNormal(displacement,center,radius,frame,egoPosition,target.contract.jerkBound);
         normalNorm = norm(normal)+64*eps*(1+norm(normal));
-        if center(8)~=0 || radius(8)~=0
+        if center(8)~=0 || radius(8)~=0 || target.contract.yawAccelerationBound>0
             bodySupport = hypot(target.halfLength,target.halfWidth)*normalNorm;
         else
             bodySupport = targetPrediction.rectangleSupport(target.halfLength,target.halfWidth, ...
@@ -764,18 +774,23 @@ function excursion = localExcursion(growth,comparison)
     end
 end
 
-function [normal,support] = localAdmissibleNormal(displacement,center,radius,frame,egoPosition)
+function [normal,support] = localAdmissibleNormal(displacement,center,radius,frame,egoPosition,jerkBound)
 % Choose a terminal separating normal whose all-future box support is finite.
 % Candidates are the displacement-based proposal and the chart axes; among
 % the admissible ones, keep the largest current clearance along the normal.
     proposal = localFutureNormal(displacement,center,frame.lateral);
     candidates = [proposal,frame.lateral,-frame.lateral,frame.tangent,-frame.tangent];
+    if any(jerkBound)
+        % Cartesian box disturbances may leave a coordinate projection exact,
+        % including on a road whose chart axes do not share that direction.
+        candidates = [candidates,eye(2),-eye(2)];
+    end
     best = -inf;
     normal = proposal;
     support = inf;
     for index = 1:size(candidates,2)
         direction = candidates(:,index)/norm(candidates(:,index));
-        value = localFutureSupport(center,radius,direction);
+        value = localFutureSupport(center,radius,direction,jerkBound);
         if ~isfinite(value), continue; end
         clearance = direction.'*egoPosition-value;
         if clearance>best
@@ -786,8 +801,9 @@ function [normal,support] = localAdmissibleNormal(displacement,center,radius,fra
     end
     if ~isfinite(support)
         error("collisionAvoidanceController:unboundedTargetSupport", ...
-            "No terminal halfspace separates the ego from the target's entire future: its " ...
-            + "velocity or acceleration box is not receding along any admissible direction.");
+            "The current invariant-halfspace terminal certificate has unbounded target support " ...
+            + "in every candidate direction under the supplied motion bounds. " ...
+            + "This does not establish finite-encounter avoidance infeasibility.");
     end
 end
 
@@ -813,10 +829,16 @@ function normal = localFutureNormal(displacement,center,lateral)
     end
 end
 
-function support = localFutureSupport(center,radius,normal)
+function support = localFutureSupport(center,radius,normal,jerkBound)
 % Supremum over all future time of the box's directional position support.
 % Upper coefficients enclose every member of the box; a derivative sign is
 % never inferred by rounding a small positive value to zero.
+    % A positive cubic coefficient dominates every receding quadratic. Only
+    % an exactly zero projected jerk permits a finite all-future halfspace.
+    if abs(normal).'*jerkBound>0
+        support = inf;
+        return;
+    end
     initialPosition = dot(normal,center(1:2))+abs(normal).'*radius(1:2);
     velocity = dot(normal,center(3:4))+abs(normal).'*radius(3:4);
     acceleration = 0.5*(dot(normal,center(5:6))+abs(normal).'*radius(5:6));
@@ -900,11 +922,10 @@ function metadata = localMetadata(metadata,stored)
     metadata.commandCertifiedDuration = stored.witnessModel.sampleTime;
     metadata.lookaheadDuration = stored.remainingSteps*stored.witnessModel.sampleTime;
     metadata.recursiveFeasibilityClaimed = true;
-    metadata.recursiveFeasibilityScope = "fixedActiveTargetSet;declaredAffineStagePlant;exactTargetLaw;boundedEstimationError;conditionedInformationSets";
+    metadata.recursiveFeasibilityScope = "fixedActiveTargetSet;fixedTargetMotionBounds;declaredAffineStagePlant;boundedTargetMotion;boundedEstimationError;conditionedInformationSets";
     metadata.indefiniteRecursiveFeasibilityClaimed = true;
     metadata.terminalContinuationCertified = true;
     metadata.terminalPolicyRole = "carriedWitnessTail";
-    metadata.exactPredictionAssumptionsHold = true;
     metadata.physicalVehicleGuaranteeEstablished = false;
     metadata.planCertified = true;
     metadata.acceptance = stored.acceptance;

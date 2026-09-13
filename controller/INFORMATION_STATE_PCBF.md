@@ -1,6 +1,6 @@
 # Information-state predictive control barrier function for the two-vehicle study
 
-Certificate version 20; lifecycle extension September 13, 2026. This document defines the executed
+Certificate version 20; lifecycle and bounded-motion extensions September 13, 2026. This document defines the executed
 safe-MPC problem, its carried recursive-feasibility witness, and the value
 function that the controller reports as its predictive control barrier
 function (PCBF). It replaces the "shift-compatibility gap" of version 18 in
@@ -29,16 +29,19 @@ the others, and each is checked or declared at the interface named.
   receives an ego estimate with a componentwise error box (`controllerStateErrorBound`
   or an `ego-state-v1` certificate) and a target estimate with a componentwise
   box on position, velocity, acceleration, yaw and yaw rate. The true states
-  lie in those boxes. Only *current-state* boxes are admitted; future-motion
-  bounds (`predictionAccelerationErrorBound`, `predictionYawAccelerationErrorBound`,
-  jerk or yaw-acceleration contracts) are rejected by `targetPrediction.admitExact`.
-- **P3 (exact target law).** The target's true motion is the Cartesian
-  constant-acceleration/constant-yaw-rate flow
-  `p(t+τ)=p+vτ+aτ²/2, v(t+τ)=v+aτ, a, ψ(t+τ)=ψ+ωτ, ω` from its true current
-  state. Under P2 the current state is uncertain inside a box; the *law* is
-  not. (Section 7 explains why a nonzero velocity or acceleration box makes
-  the terminal set empty for a moving target, and what the demonstrations
-  therefore use.)
+  lie in those boxes. Nonzero future-motion bounds are admitted by
+  `targetPrediction.admitOnline` and retained in the reachable sets.
+- **P3 (bounded target law).** While the same target remains active, its true
+  motion satisfies `p_dot=v, v_dot=a, |a_dot|<=J`,
+  `psi_dot=omega, |omega_dot|<=H`, with fixed componentwise bounds `J>=0`
+  and `H>=0`. The Cartesian constant-acceleration/constant-yaw-rate flow is
+  the nominal center, not a requirement that the true trajectory equal it.
+  Zero bounds recover the exact law. New measurements condition the carried
+  reachable set. A reported smaller bound remains covered by the retained
+  bound; increasing it requires a fresh certificate. The completed hold is still
+  conditioned using its original bound; it cannot be retroactively excused
+  by a larger future bound. Section 4
+  explains the additional restrictions of the invariant terminal halfspace.
 - **P4 (declared ego plant).** Over each held interval `[t_k, t_k+h)` the true
   ego Frenet state obeys `ẋ = A x + B u_k + c` with `(A,B,c)` the first-stage
   continuous generator of the plan accepted at frame `k`
@@ -86,15 +89,19 @@ used by an explicit no-target scene without a perception record.
 and an empty 8-by-0 target-bound matrix expose this behavior. A switch has no
 `candidateVerified` witness and reports `pcbfDescentResidual=NaN`: values for
 different target sets are not compared as if they were one function.
-`recursiveFeasibilityScope` explicitly includes `fixedActiveTargetSet`.
+`recursiveFeasibilityScope` explicitly includes `fixedActiveTargetSet` and
+`fixedTargetMotionBounds`. A future-bound enlargement reports
+`motionBoundsIncreased=true`, requires fresh admission after the original
+hold/measurement checks, and likewise has no cross-contract descent comparison.
+A failed fresh admission cannot execute the old smaller-bound witness.
 There is no unconditional safety claim for unseen objects, late detection,
 or switching before a fresh feasible certificate exists.
 
-This engineering extension does not remove P3/P4. The existing physical
-pipeline's nonzero process residual and the NRMM output's broad future-motion
-bounds still require compatible model/target contracts. In particular, current
-target acceleration uncertainty can still prevent an all-future terminal
-halfspace even for a constant true target. No error radius is suppressed.
+The physical pipeline's nonzero ego process residual remains outside P4.
+The NRMM output's broad target bounds are now admitted, but can still prevent
+the all-future terminal halfspace even for a constant true target. No error
+radius is suppressed. Failure of this sufficient terminal construction does
+not prove infeasibility of finite-encounter collision avoidance.
 
 ## 2. Objects
 
@@ -114,10 +121,24 @@ failed); otherwise `x(t_{k+1}) ∈ X_{k+1} ⊆ ⟨x̄_{1|k}, r_{1|k}⟩`.
 
 **Target information set.** `Z_0` is the admitted measurement box. At a
 continuation frame, `Z_{k+1} = hull( Φ_h(Z_k) ∩ ⟨ẑ_{k+1}, ρ̂_{k+1}⟩ )`
-(`targetPrediction.conditionExact`), where `Φ_τ` is the exact flow of P3 and
-`Φ_h(Z_k)` is its interval hull (`targetPrediction.finiteFlow`: the flow is
-affine in `(p,v,a)` and in `(ψ,ω)`, so the hull is `⟨Φ_h(z̄), |DΦ_h| ρ⟩` plus a
-rounding allowance charged only to components that were actually summed).
+(`targetPrediction.condition`), where `Φ_τ` denotes the bounded reachable-box
+operator of P3 (`targetPrediction.finiteFlow`). Its center is the nominal
+Cartesian flow. Its radii are
+
+    rho_p(t) = rho_p + t*rho_v + t^2*rho_a/2 + t^3*J/6,
+    rho_v(t) = rho_v + t*rho_a + t^2*J/2,
+    rho_a(t) = rho_a + t*J,
+    rho_psi(t) = rho_psi + t*rho_omega + t^2*H/2,
+    rho_omega(t) = rho_omega + t*H.
+
+The nonnegative transition matrix `M(t)` and disturbance term `q(t)` obey
+`M(t+h)=M(t)M(h)` and `q(t+h)=M(t)q(h)+q(t)`. Thus the box operator is monotone
+and satisfies the semigroup identity in exact arithmetic, even though it
+discards correlations of the actual reachable set. Floating-point reserves
+are handled separately as in Section 6. An empty measurement intersection
+contradicts the supplied bounds; deviation from the nominal center alone does
+not. Bounds on actual jerk must include the nominal turning motion's jerk
+if a constant-curvature trajectory is used to generate truth.
 
 **Plan and data.** A plan is an open-loop input sequence `u_0,…,u_{m−1}`
 together with its *data* `D`: per stage `j` the generator `(A_j,B_j,c_j)`, the
@@ -192,7 +213,7 @@ of the full footprint over the chart, and, per target, the separating row
 `−n^⊤(origin + [t,l] p_{1:2}) + slope·e_ψ ≤ n^⊤ origin − S_n − h_T − h_E − …`
 with `S_n` the all-future box support of Section 4, `h_T` the target
 rectangle support over its yaw box (its circumradius if the yaw-rate box is
-not `{0}`) and `h_E` the concave ego support majorant anchored at the terminal
+not `{0}` or `H>0`) and `h_E` the concave ego support majorant anchored at the terminal
 heading. With `G = A_T(1:3,4:6)`, the directional growth `g_j = [max((A_jG)_1,0), |(A_jG)_{2:3}|]`
 (valid because the nominal `v̄_x` never becomes negative) and the symmetric
 growth `|A_j G|`, `localBudget` computes nonnegative row budgets
@@ -252,19 +273,32 @@ the enclosure computed from `X_{k+1}` is contained in the corresponding box
 computed from `⟨x̄_{1|k}, r_{1|k}⟩`, because `p_{ℓq}` is affine in `x̄` and
 `ρ_{ℓq}` is nondecreasing and affine-dominated in `r` (Section 2); (ii) for
 the target, `Φ_τ(Z_{k+1}) ⊆ Φ_{τ+h}(Z_k)` as boxes, because `Z_{k+1} ⊆ Φ_h(Z_k)`
-and the flow is affine; (iii) every halfspace row satisfied by a box is
+and the bounded box operator is monotone and has the semigroup identity of
+Section 2; (iii) every halfspace row satisfied by a box is
 satisfied by any sub-box, and the violation `max(0, a·p̄ + |a|ρ − b)` is
 nonincreasing under inclusion.
 
 **Lemma 2 (all-future support).** For a unit normal `n` and a target box
 `Z = ⟨z̄, ρ⟩`, define upper coefficients `P = n·p̄ + |n|·ρ_p`, `V = n·v̄ + |n|·ρ_v`,
-`A = ½(n·ā + |n|·ρ_a)`. Then `S_n(Z) := sup_{τ ≥ 0, z ∈ Z} n·p_z(τ) ≤ sup_{τ≥0}(P + Vτ + Aτ²)`,
-which equals `P` if `A ≤ 0, V ≤ 0`; `P − V²/(4A)` if `A < 0 < V`; and `+∞`
-otherwise (`localFutureSupport`). Moreover `S_n(Φ_h(Z_{k+1})) ≤ S_n(Z_k)` for
+`A = ½(n·ā + |n|·ρ_a)` and `C=|n|·J/6`. The upper all-future directional
+support, over the initial box and every admissible disturbance, is
+`S_n(Z)=sup_{τ>=0}(P+Vτ+Aτ²+Cτ³)` before numerical reserves.
+For `C>0` it is infinite regardless of the quadratic term. For `C=0` it
+equals `P` if `A<=0, V<=0`; `P-V²/(4A)` if `A<0<V`; and infinity otherwise
+(`localFutureSupport`). No small positive coefficient is rounded to zero.
+Moreover `S_n(Z_{k+1}) <= S_n(Z_k)` for
 `Z_{k+1} ⊆ Φ_h(Z_k)` (a supremum over a subset of trajectories and times).
 `localAdmissibleNormal` selects, among the displacement-based proposal and the
-chart axes, a normal with finite support and the largest current clearance;
-if none exists the frame reports `unboundedTargetSupport`.
+chart axes (also Cartesian axes for nonzero jerk), a normal with finite
+support and the largest current clearance. If none exists the frame reports
+`unboundedTargetSupport`: this terminal family did not certify the state.
+It does not prove that all finite-horizon avoidance controls are infeasible.
+Nonzero jerk orthogonal to a separating normal is compatible with this
+certificate. Positive bounds in both Cartesian axes make every nonzero
+normal's cubic coefficient positive. This is a structural conservatism of
+the current terminal construction; it is not a physical requirement that
+every target be predicted over infinite time. The visibility lifecycle
+still releases a target on confirmed departure.
 
 ## 5. The theorem
 
@@ -457,16 +491,16 @@ controller reports as `pcbfDescentResidual`.
 - **Normals and charts** are choices; carrying them is what makes the
   candidate's rows identical functions of the box. Fresh solves may choose
   differently, which is why their plan must be verified independently.
-- **Target law with boxes.** With `a = 0` exactly and `ρ_v ≠ 0`, or with
-  `ρ_a ≠ 0`, Lemma 2 gives `S_n = +∞` for every normal on which the box is not
-  strictly receding: an infinitesimal admitted drift integrated over infinite
-  time is unbounded, so no stopped ego position is safe forever. This is not
-  a weakness of the arithmetic; it is what "the target may move at any
-  velocity inside the box, forever" means. The demonstrations therefore use
-  boxes on the target's position and yaw (and on all six ego states) and
-  treat the target's velocity, acceleration and yaw rate as exactly known,
-  which is the reading of P3 under which the encounter has a safe terminal
-  set at all. Position-only target uncertainty is fully covered.
+- **Target law with boxes.** Section 4 gives the directional conditions on
+  velocity, acceleration and jerk. Arbitrarily small uncertainty can destroy
+  this particular all-future halfspace certificate; it does not follow that
+  a collision-free finite encounter is impossible. Earlier demonstration
+  runs used position/yaw uncertainty and exact motion derivatives. The
+  bounded-motion extension also admits nonzero jerk where a separating
+  direction has zero projected jerk, and nonzero yaw acceleration through
+  the enclosing circle. General two-axis jerk, including the current NRMM
+  contract, still needs a different terminal construction. No unconditional
+  robust feasibility claim is made for it.
 - **Not proven.** Physical (nonlinear Fiala) plant containment; any
   real-time property; behaviour after a `carriedWitnessRejected` or
   `inconsistentObservation` report, which ends control.
@@ -476,7 +510,7 @@ controller reports as `pcbfDescentResidual`.
 | Object | Location |
 | --- | --- |
 | Ego box conditioning | `hardEncounterBarrier.validateTransition` → `localConditionBox` |
-| Target box conditioning | `targetPrediction.conditionExact` |
+| Target box conditioning | `targetPrediction.condition` |
 | Carried data | `hardEncounterBarrier.carriedData`; certificate fields `stages`, `cellStage`, `cellFrames`, `cellNormals`, `terminal` |
 | Candidate verification | `hardEncounterBarrier.transferCandidate` (inclusion transfer of the stored verification; terminal membership for a zero-stage tail); `hardEncounterBarrier.verifyCandidate` (full rebuild, `solver.witnessVerification = "rebuilt"`) |
 | Terminal-law frame | `hardEncounterBarrier.terminalStep` (exact rest-model hold, successor box, executed generator) |
@@ -487,7 +521,7 @@ controller reports as `pcbfDescentResidual`.
 
 Reported flags: `recursiveFeasibilityClaimed = true` and
 `indefiniteRecursiveFeasibilityClaimed = true` with
-`recursiveFeasibilityScope = "declaredAffineStagePlant;exactTargetLaw;boundedEstimationError;conditionedInformationSets"`;
+`recursiveFeasibilityScope = "fixedActiveTargetSet;fixedTargetMotionBounds;declaredAffineStagePlant;boundedTargetMotion;boundedEstimationError;conditionedInformationSets"`;
 `physicalVehicleGuaranteeEstablished = false`; `terminalActive` is true only
 when the terminal law is the issued command (no optimized stage remains);
 `fallbackUsed` is always false — the carried witness is the program's own

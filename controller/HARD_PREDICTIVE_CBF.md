@@ -1,6 +1,6 @@
 # Hard predictive safety with a carried recursive witness
 
-The version-19 controller solves a complete rolling problem at every sample
+The version-20 controller solves a complete rolling problem at every sample
 and applies only the first input of the plan it accepts. Before any fresh
 optimization, it verifies the previous plan shifted by one stage, with that
 plan's own carried prediction data, on the conditioned ego and target
@@ -16,10 +16,12 @@ certificate = [];
 
 Supply timestamped ego and target estimates with their error boxes
 (`controllerStateErrorBound` or estimator certificates; target position,
-velocity, acceleration, yaw and yaw-rate bounds), one persistent target, and
+velocity, acceleration, yaw and yaw-rate bounds), zero or one visible target, and
 the previously issued `heldActuatorInput`. The executed first hold, the
-exact target law and the box intersections are validated before anything is
-rebuilt. Nonlinear-plant and perception guarantees are outside this study.
+bounded target-motion contract and the box intersections are validated before
+anything is rebuilt. Target identity persists within each active encounter;
+visibility switches require fresh admission. Nonlinear-plant and perception
+guarantees are outside this study.
 
 The value LP minimizes the accumulated per-stage violation of the collision
 and road rows with every other row hard; the CLF SOCP optimizes tracking,
@@ -27,6 +29,11 @@ squared CLF relaxation and effort within that value. The independent verifier
 recomputes the violation from the physical rows and accepts no violated hard
 row. A fresh plan replaces the carried witness only when it is verified and
 its value does not exceed the witness's value.
+
+`planCertified=true` alone does not establish collision/road safety: those
+rows have safety slack. The zero-value guarantee requires `pcbfValue=0`.
+A positive initial value can be a verified feasible program decision while
+allowing safety-row violations during recovery.
 
 | Field | Meaning |
 | --- | --- |
@@ -45,10 +52,11 @@ its value does not exceed the witness's value.
 | `recursiveFeasibilityClaimed`, `indefiniteRecursiveFeasibilityClaimed` | True under the declared premises (`recursiveFeasibilityScope`) |
 | `physicalVehicleGuaranteeEstablished` | False |
 
-Errors that end control are premise failures, not controller decisions:
+Errors distinguish premise failures from certificate-construction failures:
 `inconsistentObservation` (a measurement box misses the predicted box),
 `carriedWitnessRejected` (the carried witness failed verification, which the
-theorem excludes under its premises), `unboundedTargetSupport` (no terminal
-halfspace separates the ego from the target's entire future),
+theorem excludes under its premises), `unboundedTargetSupport` (the current
+all-future terminal halfspace family cannot certify the supplied reachable
+sets; this does not prove finite-encounter avoidance infeasible),
 `executionContractViolation`, `changedExecutionContract`, and, at admission
 only, `noCertifiedContinuation` or `certificateSearchLimit`.
