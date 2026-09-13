@@ -39,7 +39,6 @@ function summary = verifyInformationStatePcbf(outputDirectory,options)
             FailAfterAdmission=true,EgoErrorBound=options.EgoErrorBound,TargetErrorBound=options.TargetErrorBound, ...
             Seed=options.Seed,OutputDirectory=fullfile(outputDirectory,"crossing-forced-failure"));
         summary(end+1) = localRow("crossing","noisyForcedFreshFailure",report);
-        summary(end).terminalLawFrames = nnz(report.terminalActive);
     end
     % A partial rerun replaces the matching rows of an earlier summary and
     % keeps the others, so the saved summary always covers every trial run.
@@ -80,5 +79,8 @@ function row = localRow(scene,estimation,report)
         row.maximumFrameSeconds = max(report.runtime.frameSeconds);
         row.medianWitnessSeconds = median(report.witnessSeconds(2:end));
     end
-    row.terminalLawFrames = 0;
+    row.terminalLawFrames = NaN;
+    if isfield(report,"terminalActive")
+        row.terminalLawFrames = nnz(report.terminalActive);
+    end
 end

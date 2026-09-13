@@ -23,11 +23,20 @@ Original results: `~/.cache/collisionAvoidance/realtime2-pcbf-20260912`
 | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | oncoming | exact | 300 | True | 0 | 0 | 0 | 0.4612 | 0.7545 | 8 | 0 |
 | oncoming | noisy | 300 | True | 0 | 0 | 0 | 0.6558 | 0.6454 | 8 | 0 |
-| stationary | exact | 300 | True | 287 | 0 | 0 | 6.401e-06 | 3.8 | 2.8451e-20 | 0 |
-| stationary | noisy | 300 | True | 249 | 0 | 0 | 0.001291 | 3.778 | -7.7783e-06 | 0 |
+| stationary | exact | 300 | True | 287 | 0 | 0 | 6.401e-06 | 3.8 | 2.8451e-20 | 276 |
+| stationary | noisy | 300 | True | 249 | 0 | 0 | 0.001291 | 3.778 | -7.7783e-06 | 217 |
 | crossing | exact | 300 | True | 0 | 0 | 0 | 9.27 | 3.8 | 8 | 0 |
 | crossing | noisy | 300 | True | 0 | 0 | 0 | 9.268 | 3.792 | 8 | 0 |
 | crossing | forced fresh failure (noisy) | 40 | True | 40 | 0 | 0 | 9.268 | 3.796 | 0.45193 | 25 |
+
+Correction recorded September 13, 2026: the ordinary-trial summary builder
+previously hard-coded `terminalLawFrames = 0`. The original per-frame JSON
+traces in `stationary-exact` and `stationary-noisy` under the output directory
+above contain 276 and 217 true `terminalActive` entries, respectively. Those
+two table cells are corrected from the original traces; the archived earlier
+report remains an original historical record. The forced-failure count was
+computed separately and was unaffected. The independent rerun and summary
+regression are recorded in `STRAIGHT_RERUN_RESULTS_20260913.md`.
 
 Frame times, before (round one, commit 4719cecf) and now:
 
