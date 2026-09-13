@@ -118,6 +118,11 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         positive = quadratic+curvature*eye(8);
         factor = chol((positive+positive.')/2);
         points = size(tube.offset, 2);
+        % The sampled-data decrease is imposed where the configuration says:
+        % at the two ends of the cell (its sample instants) or at every
+        % Bernstein control point (which implies the whole cell by convexity).
+        sampled = 1:points;
+        if string(cfg.clf.samplePoints)=="endpoints", sampled = unique([1, points]); end
         seedState = mean(reshape(pagemtimes(tube.map, anchorPlan), 6, [])+tube.offset, 2);
         seedTime = mean(tube.time);
         anchor = [seedState(2:6)-referenceStart-cfg.clf.referenceRate*seedTime; ...
@@ -126,8 +131,9 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         % reanchored bounds at individual control points would not justify
         % the convex-hull argument for an indefinite CLF residual.
         affine = baseLinear-2*curvature*anchor;
-        constraints = cell(points, 1);
-        for point = 1:points
+        constraints = cell(numel(sampled), 1);
+        for slot = 1:numel(sampled)
+            point = sampled(slot);
             map = zeros(8, decisionCount);
             map(1:5, 1:planCount) = tube.map(2:6, :, point);
             map(6:7, 2*stage-1:2*stage) = eye(2);
@@ -145,7 +151,7 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
             end
             root = sqrt(1+ratio)*factor;
             additive = curvature*(anchor.'*anchor)+disturbanceCost+expansion+abs(affine).'*stateErrorBound;
-            constraints{point} = struct("map", map, "offset", offset, "root", root, ...
+            constraints{slot} = struct("map", map, "offset", offset, "root", root, ...
                 "linear", affine, "constant", additive, "stage", stage,"cellIndex",cellIndex,"pointIndex",point);
         end
         cellConstraints{cellIndex} = vertcat(constraints{:});
@@ -179,7 +185,13 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
     qp.barrier = struct("baseBound", bound, "scale", scale, ...
         "completionRows", completionRows);
-    qp.stageProgram = avoidanceStageQp.build(qp,prediction,model);
+    % Verification of a prescribed plan needs only the condensed rows; the
+    % sparse lifted program is built for programs that are solved.
+    if isfield(model,"verificationOnly") && model.verificationOnly
+        qp.stageProgram = [];
+    else
+        qp.stageProgram = avoidanceStageQp.build(qp,prediction,model);
+    end
 
 end
 

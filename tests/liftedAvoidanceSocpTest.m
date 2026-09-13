@@ -57,6 +57,22 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             oldDifference = localObjective(condensed,second)-localObjective(condensed,first);
             testCase.verifyEqual(newDifference,oldDifference,AbsTol=1e-7);
         end
+        function rowGenerationReproducesTheCompleteProgramOptimum(testCase)
+            % A working-set solve that violates no omitted row solves the
+            % complete program; the plan and its verified value agree.
+            [ego,target,road,cfg] = encounterTestFixture.crossing();
+            ego = rmfield(ego,"perception");
+            target = rmfield(target,"predictionMotion");
+            cfg.solver.rowGeneration = false;
+            [~,~,complete] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            cfg.solver.rowGeneration = true;
+            [~,~,generated] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(generated.metadata.pcbfValue,complete.metadata.pcbfValue);
+            testCase.verifyEqual(generated.inputPlan,complete.inputPlan,AbsTol=1e-5);
+            testCase.verifyEqual(generated.metadata.jointObjectiveValue, ...
+                complete.metadata.jointObjectiveValue,RelTol=1e-6,AbsTol=1e-8);
+        end
+
         function completeProgramKeepsSlipAndGeometryWithoutForcePolygons(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem] = collisionAvoidanceController(ego,target,route,cfg,[]);

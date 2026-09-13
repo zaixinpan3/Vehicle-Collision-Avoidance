@@ -12,27 +12,58 @@ classdef hardEncounterBarrier
             % Fresh search. Every seed is a convexification anchor only: the CLF
             % majorant is exact at its anchor and grows quadratically away from
             % it, so a verified plan from one seed is not the tie-break optimum
-            % of another. The shifted and equilibrium seeds are therefore both
-            % solved at each horizon and the verified plan with the smaller
-            % (value, objective) pair is kept; the slowing seed is a rescue
-            % tried only when neither verifies.
+            % of another. The shifted seed is solved first; the equilibrium seed
+            % is solved as well whenever the shifted plan's tail decelerates
+            % below the current speed (the lock-in signature), and the verified
+            % plan with the smaller (value, objective) pair is kept. The slowing
+            % seed is a rescue tried only when nothing verifies. The horizon is
+            % scaled with speed; the carried witness keeps its own length, so a
+            % shorter fresh horizon never weakens the guarantee. The frame
+            % deadline stops the search before any further solve; the caller
+            % then commits the verified carried witness.
             cfg = model.cfg;
             timing = struct("predictionSeconds",0,"formulationSeconds",0, ...
-                "solveSeconds",0,"verificationSeconds",0,"attempts",0);
+                "solveSeconds",0,"verificationSeconds",0,"attempts",0,"deadlineHit",false);
             calls = 0;
             searchTimer = tic;
             shifted = isfield(model,"initializationPlan");
-            seedCount = 2+double(shifted);
+            % Seed kinds: 1 shifted initialization (when carried), then the
+            % constant-speed equilibrium, last the slowing rescue. When the
+            % previous accepted plan's tail decelerated, the equilibrium seed
+            % goes first so that the lock-in is broken within one attempt.
+            if shifted
+                seeds = [1,2,3];
+                if isfield(model,"preferEquilibriumSeed") && model.preferEquilibriumSeed
+                    seeds = [2,1,3];
+                end
+            else
+                seeds = [1,2];
+            end
             lastOutcome = "no attempt";
             best = [];
-            seedKind = 1;
+            slot = 1;
+            speedRatio = min(1,max(0,model.initialEgoState(4)/max(model.referenceSpeed,eps)));
+            model.horizonSteps = max(min(cfg.controller.minimumHorizonSteps,cfg.controller.horizonSteps), ...
+                min(cfg.controller.horizonSteps,ceil(cfg.controller.horizonSteps*speedRatio)));
             while true
                 if timing.attempts>0 && isempty(best) && toc(searchTimer)>=cfg.solver.certificateSearchTimeLimit
                     error("collisionAvoidanceController:certificateSearchLimit", ...
                         "The search budget expired without a verified plan after %d attempts (last: %s); " ...
                         + "infeasibility is not established.",timing.attempts,lastOutcome);
                 end
+                if timing.attempts>0 && isfield(model,"frameTimer") ...
+                        && toc(model.frameTimer)>=cfg.solver.frameDeadlineSeconds
+                    timing.deadlineHit = true;
+                    if isempty(best)
+                        error("collisionAvoidanceController:frameDeadline", ...
+                            "The frame deadline of %.3g s passed after %d attempts (last: %s); " ...
+                            + "the carried witness is the command.",cfg.solver.frameDeadlineSeconds, ...
+                            timing.attempts,lastOutcome);
+                    end
+                    break;
+                end
                 timing.attempts = timing.attempts+1;
+                seedKind = seeds(slot);
                 trial = model;
                 trial.exitSteps = zeros(numel(model.encounters),1);
                 trial.exitMargin = inf;
@@ -51,6 +82,7 @@ classdef hardEncounterBarrier
                 phase = tic;
                 trialCheck = solveHardCbfClf.certify(trialQp,trialPrediction,trial,trialResult.decision);
                 timing.verificationSeconds = timing.verificationSeconds+toc(phase);
+                deceleratingTail = false;
                 if trialResult.feasible && trialCheck.accepted
                     objective = 0.5*trialResult.decision.'*trialQp.Hessian*trialResult.decision ...
                         +trialQp.linear.'*trialResult.decision+trialQp.constant;
@@ -59,33 +91,37 @@ classdef hardEncounterBarrier
                         best = struct("model",trial,"prediction",trialPrediction,"qp",trialQp, ...
                             "result",trialResult,"check",trialCheck,"key",key);
                     end
+                    plan = trialResult.decision(trialQp.layout.planIndex);
+                    node = trialPrediction.egoStateOffset(:,end)+trialPrediction.egoStateMatrix(:,:,end)*plan;
+                    deceleratingTail = node(4)<model.initialEgoState(4)-0.25 ...
+                        && model.initialEgoState(4)<model.referenceSpeed;
                 else
                     if ~ismember(trialResult.exitFlag,[-2,0,-7])
                         localReject(trialResult,trialCheck,trialQp);
                     end
                     lastOutcome = trialResult.message+"; "+strjoin(trialCheck.failedConditions,",");
                 end
-                % The rescue seed (slowing geometry) runs only when no verified
-                % plan exists at this horizon; a verified plan never waits for it.
-                rescueSeed = seedKind+1==seedCount;
-                if seedKind<seedCount && ~(rescueSeed && ~isempty(best))
-                    seedKind = seedKind+1;
+                nextIsRescue = slot+1==numel(seeds);
+                secondOfPair = shifted && slot==1;
+                if slot<numel(seeds) && ~(nextIsRescue && ~isempty(best)) ...
+                        && ~(secondOfPair && ~isempty(best) && ~deceleratingTail)
+                    slot = slot+1;
                     continue;
                 end
-                if ~isempty(best)
-                    model = best.model;
-                    prediction = best.prediction;
-                    qp = best.qp;
-                    result = best.result;
-                    result.solverCalls = calls;
-                    check = best.check;
-                    return;
-                end
+                if ~isempty(best), break; end
                 % Only a complete verified plan can authorize control. Extension
                 % searches a larger admission domain; no prefix is executed.
                 model.horizonSteps = model.horizonSteps+1;
-                seedKind = 1;
+                slot = 1;
             end
+            timing.deadlineHit = timing.deadlineHit || (isfield(model,"frameTimer") ...
+                && toc(model.frameTimer)>=cfg.solver.frameDeadlineSeconds);
+            model = best.model;
+            prediction = best.prediction;
+            qp = best.qp;
+            result = best.result;
+            result.solverCalls = calls;
+            check = best.check;
         end
 
         function validateAdmission(ego, observations, cfg)
@@ -210,6 +246,7 @@ classdef hardEncounterBarrier
                 "terminal",stored.terminal,"carriedValue",carriedValue, ...
                 "previousValue",stored.value,"previousFirstViolation",localFirst(stored.stageViolation));
             initialization = zeros(2,0);
+            if isfield(stored,"tailDecelerating"), model.preferEquilibriumSeed = stored.tailDecelerating; end
             if stored.remainingSteps>0
                 % Performance convexification must not inherit a compulsory
                 % brake from the hypothetical terminal continuation.
@@ -244,7 +281,9 @@ classdef hardEncounterBarrier
                 candidate.verificationMethod = "carriedEnclosureRows";
             end
             carried.anchorPlan = inputs(:);
+            carried.verificationOnly = true;
             qp = formulateAvoidanceProblem(carried,prediction,inputs(:));
+            carried = rmfield(carried,"verificationOnly");
             [rowCheck,decision] = solveHardCbfClf.certifyInputs(qp,prediction,carried,inputs);
             if isempty(check)
                 check = rowCheck;
@@ -489,11 +528,14 @@ function terminal = localTerminalSet(model,prediction,anchor)
     limits = repelem(poseBound,8);
     errorRows = [repelem(abs(poseRows),8,1),repelem(errorBudget,8,1)];
     % Both signs of the velocity box and the nonnegative nominal speed.
-    % The nominal longitudinal speed stays nonnegative by its braking law;
-    % charging its radius keeps this row monotone under box inclusion too.
+    % The nominal longitudinal speed stays nonnegative by its braking law
+    % (v+ = rho*v), so this row is invariant without any box term; it must
+    % not charge the radius, because the braked nominal decays faster than
+    % the open-loop error radius and "nominal minus radius" is therefore not
+    % invariant. The box's own sign is covered by the symmetric error budget.
     rows = [rows;zeros(6,3),[eye(3);-eye(3)];0,0,0,-1,0,0];
     limits = [limits;terminal.velocityLimit;terminal.velocityLimit;0];
-    errorRows = [errorRows;zeros(6,3),[eye(3);eye(3)];0,0,0,1,0,0];
+    errorRows = [errorRows;zeros(6,3),[eye(3);eye(3)];zeros(1,6)];
     terminal.poseBudget = budget;
     terminal.poseErrorBudget = errorBudget;
     terminal.stateRows = rows;

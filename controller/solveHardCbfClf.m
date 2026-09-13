@@ -114,7 +114,8 @@ function [result, problem] = localLexicographicSolve(problem, cfg)
             cfg.encounter.maximumCarriedMargin;-problem.requiredMargin], ...
         "cones",[numel(base.rowMap.equality);numel(rows)-numel(base.rowMap.equality)+2], ...
         "physicalDecisionCount",physical, ...
-        "inactiveSlackIndex",[problem.layout.relaxationIndex(:).',base.violationIndex(:).']);
+        "inactiveSlackIndex",[problem.layout.relaxationIndex(:).',base.violationIndex(:).'], ...
+        "generatedRowCount",numel(base.rowMap.inequality),"anchorPoint",[base.anchorPoint;0]);
     auxiliary = struct("layout",struct("decisionCount",physical),"stageProgram",marginProgram);
     marginSolve = localRunJointProgram(auxiliary, cfg);
     result.solverCalls = 1;
@@ -146,7 +147,8 @@ function [result, problem] = localLexicographicSolve(problem, cfg)
         valueProgram = struct("P",sparse(numel(base.q),numel(base.q)),"q",linear, ...
             "A",base.A(rows,:),"b",base.b(rows), ...
             "cones",[numel(base.rowMap.equality);numel(rows)-numel(base.rowMap.equality)], ...
-            "physicalDecisionCount",physical,"inactiveSlackIndex",problem.layout.relaxationIndex);
+            "physicalDecisionCount",physical,"inactiveSlackIndex",problem.layout.relaxationIndex, ...
+            "generatedRowCount",numel(base.rowMap.inequality),"anchorPoint",base.anchorPoint);
         auxiliary = struct("layout",struct("decisionCount",physical),"stageProgram",valueProgram);
         valueSolve = localRunJointProgram(auxiliary, cfg);
         result.solverCalls = 2;
@@ -171,6 +173,13 @@ function [result, problem] = localLexicographicSolve(problem, cfg)
     problem.stageProgram = avoidanceStageQp.updateBounds(problem);
     problem.stageProgram.inactiveSlackIndex = inactive;
     problem.stageProgram.b(base.rowMap.budget) = budget;
+    % The value-stage point seeds the performance stage's working set.
+    if isfield(marginSolve,"fullDecision") && numel(marginSolve.fullDecision)>=numel(base.q)
+        problem.stageProgram.referencePoint = marginSolve.fullDecision(1:numel(base.q));
+    end
+    if exist("valueSolve","var") && numel(valueSolve.fullDecision)==numel(base.q)
+        problem.stageProgram.referencePoint = valueSolve.fullDecision;
+    end
     solve = localRunJointProgram(problem, cfg);
     calls = result.solverCalls+1;
     result.solverCalls = calls;
@@ -210,6 +219,7 @@ function result = localCertifiedResult(problem, decision, solve, calls, valueOpt
     result.message = solve.message;
     result.solverCalls = calls;
     result.iterations = localIterationCount(solve.output);
+    result.output = solve.output;
     result.objectiveValue = localJointValue(problem, decision);
     result.clfValue = decision(problem.layout.relaxationIndex);
     result.valueStageOptimum = valueOptimum;
@@ -222,7 +232,12 @@ function solve = localRunJointProgram(problem, cfg)
     hook = cfg.solver.jointFunction;
     try
         if isempty(hook)
-            solve = localDefaultSolve(problem, cfg);
+            if cfg.solver.rowGeneration && isfield(problem.stageProgram,"generatedRowCount") ...
+                    && problem.stageProgram.generatedRowCount>0
+                solve = localGeneratedSolve(problem, cfg);
+            else
+                solve = localDefaultSolve(problem, cfg);
+            end
         else
             % The hook solves the same reduced conic program as the native
             % path: inactive columns are removed together with the rows they
@@ -251,6 +266,72 @@ function solve = localRunJointProgram(problem, cfg)
         solve.decision = solve.decision(1:problem.layout.decisionCount);
     end
     solve = localNormalizeSolve(solve, problem.layout.decisionCount, numel(problem.stageProgram.q));
+end
+
+function solve = localGeneratedSolve(problem, cfg)
+% Row generation: solve on a working set of the hard rows, check every
+% omitted row at the solution, add the violated ones and repeat. A solution
+% of the relaxed program that violates no omitted row solves the full
+% program; an infeasible relaxed program proves the full one infeasible.
+% The accepted plan is verified on all physical rows afterwards regardless.
+    program = problem.stageProgram;
+    equalities = program.cones(1);
+    nonnegative = program.cones(2);
+    generated = program.generatedRowCount;
+    eligible = equalities+(1:generated).';
+    essential = equalities+(generated+1:nonnegative).';
+    conic = (equalities+nonnegative+1:size(program.A,1)).';
+    variables = numel(program.q);
+    reference = zeros(variables,1);
+    if isfield(program,"referencePoint") && numel(program.referencePoint)==variables
+        reference = program.referencePoint(:);
+    elseif isfield(program,"anchorPoint")
+        reference(1:min(variables,numel(program.anchorPoint))) = program.anchorPoint(1:min(variables,numel(program.anchorPoint)));
+    end
+    eligibleMatrix = program.A(eligible,:);
+    eligibleBound = program.b(eligible);
+    slack = eligibleBound-eligibleMatrix*reference;
+    seedCount = min(generated,max(100,4*program.physicalDecisionCount));
+    [~,order] = sort(slack,"ascend");
+    working = false(generated,1);
+    working(order(1:seedCount)) = true;
+    working(slack<=0) = true;
+    rounds = 0;
+    maximumRounds = 6;
+    while rounds<maximumRounds
+        rounds = rounds+1;
+        rows = [(1:equalities).';eligible(working);essential;conic];
+        sub = problem;
+        sub.stageProgram = program;
+        sub.stageProgram.A = program.A(rows,:);
+        sub.stageProgram.b = program.b(rows);
+        sub.stageProgram.cones = [equalities;nnz(working)+numel(essential);program.cones(3:end)];
+        solve = localDefaultSolve(sub, cfg);
+        solve.output.rowGenerationRounds = rounds;
+        solve.output.workingRowCount = nnz(working);
+        if any(solve.exitFlag==[-2,-3])
+            % Infeasible or unbounded on a row subset is conclusive for the
+            % complete program.
+            return;
+        end
+        if ~any(solve.exitFlag==[1,2]) || numel(solve.decision)~=variables || any(~isfinite(solve.decision))
+            % Only a cleanly solved subset can certify the omitted rows;
+            % anything else is decided by the complete program.
+            break;
+        end
+        point = solve.decision;
+        residual = eligibleMatrix*point-eligibleBound;
+        tolerance = 10*cfg.solver.constraintTolerance*(1+abs(eligibleBound)+abs(eligibleMatrix)*abs(point));
+        violated = ~working & residual>tolerance;
+        if ~any(violated)
+            return;
+        end
+        working(violated) = true;
+    end
+    % The working set did not settle: fall back to the complete program.
+    solve = localDefaultSolve(problem, cfg);
+    solve.output.rowGenerationRounds = rounds+1;
+    solve.output.workingRowCount = generated;
 end
 
 function [reduced,retained] = localReducedProgram(program)

@@ -327,6 +327,37 @@ controller reports as `pcbfDescentResidual`.
   the performance interior. Only when it is infeasible does the value LP
   minimize `Σξ`; Stage B then receives that optimum plus `τ` as its budget.
   With a zero optimum the violation columns stay fixed at zero.
+- **Frame deadline.** The search for a fresh plan runs at least one
+  attempt; after that, once `solver.frameDeadlineSeconds` has elapsed since
+  the frame started, no further solve begins and the verified carried
+  witness is the command (`freshSolveFailure = "…frameDeadline…"`). The
+  deadline never applies at admission, where no witness exists. This is the
+  anytime property of the design: safety needs only verification (a sparse
+  product and the terminal membership), never the solve.
+- **Speed-scaled fresh horizon.** The fresh plan uses
+  `N = max(N_min, ceil(N_cfg · v/v_ref))` stages; the carried witness keeps
+  its own length. Any horizon is admissible for the guarantee because
+  acceptance compares verified values only. Near rest the fresh program is
+  a fraction of its cruise size.
+- **Row generation.** Every conic solve runs on a working set of its hard
+  rows (the rows tightest at the value-stage point or the anchor, about
+  four rows per unknown), checks every omitted row at the solution, adds
+  the violated ones and repeats; a subset solution violating no omitted row
+  solves the complete program, and an infeasible subset proves the
+  complete program infeasible. Any unclean subset status falls back to the
+  complete program. The accepted plan is verified on all physical rows
+  regardless (`solver.rowGeneration`).
+- **CLF sampling.** The sampled-data CLF decrease is imposed and verified
+  at the two ends of every tube cell (`clf.samplePoints = "endpoints"`);
+  the control-point variant remains available. The CLF is a performance
+  tier and does not enter the safety claim.
+- **Terminal nonnegative-speed row.** (T2) bounds the *nominal* speed,
+  `v̄_x ≥ 0`, which the braking law preserves exactly (`v̄⁺ = ρ v̄`); this
+  row charges no box radius. The implementation originally charged the
+  velocity radius to that row, and "nominal minus radius" is not invariant
+  because the braked nominal decays faster than the open-loop error radius;
+  plans resting exactly on that row then lost terminal membership one hold
+  later. The box's own sign is covered by the symmetric error budget.
 - **Rest measured with error.** A stopped ego measured with speed error
   `±ρ_v` publishes a box straddling `v = 0`. The input contract admits any
   box that meets the model domain; on continuation frames the conditioned

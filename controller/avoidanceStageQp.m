@@ -35,6 +35,8 @@ end
 function program = localLiftedProgram(qp,prediction,model)
 %localLiftedProgram Sparse cell-state realization of the same finite SOCP.
 % The independent checker still evaluates the condensed physical decisions.
+% Every sparse block is assembled from triplet lists in one call; indexed
+% assignment into large sparse matrices was the dominant formulation cost.
     physicalCount = qp.layout.decisionCount;
     count = prediction.stageCount;
     cells = prediction.cells;
@@ -52,10 +54,10 @@ function program = localLiftedProgram(qp,prediction,model)
     % needlessly degrades the solver's relative feasibility scaling.
     stateCenter = zeros(6,cellCount+1);
     stateCenter(:,1) = model.initialEgoState;
-    dynamics = spalloc(6*(cellCount+1),total,60*cellCount+6);
-    dynamics(1:6,stateIndex(:,1)) = speye(6);
     dynamicsBound = zeros(6*(cellCount+1),1);
-    localRows = cell(cellCount,1);
+    dynamicsRow = cell(cellCount+1,1);dynamicsCol = cell(cellCount+1,1);dynamicsVal = cell(cellCount+1,1);
+    dynamicsRow{1} = (1:6).';dynamicsCol{1} = stateIndex(:,1);dynamicsVal{1} = ones(6,1);
+    blockRow = cell(cellCount,1);blockCol = cell(cellCount,1);blockVal = cell(cellCount,1);
     localBounds = cell(cellCount,1);
     rowStart = 0;
     for index = 1:cellCount
@@ -63,21 +65,23 @@ function program = localLiftedProgram(qp,prediction,model)
         stateCenter(:,index+1) = tube.endMap*model.anchorPlan+tube.endOffset;
         inputIndex = 2*tube.stage-1:2*tube.stage;
         rows = 6*index+(1:6);
-        dynamics(rows,stateIndex(:,index+1)) = speye(6);
-        dynamics(rows,stateIndex(:,index)) = -tube.localStateMap(:,:,end);
-        dynamics(rows,inputIndex) = -tube.localInputMap(:,:,end);
+        stateMap = tube.localStateMap(:,:,end);
+        inputMap = tube.localInputMap(:,:,end);
+        [rr,cc] = ndgrid(rows,stateIndex(:,index));
+        [ir,ic] = ndgrid(rows,inputIndex);
+        dynamicsRow{index+1} = [rows.';rr(:);ir(:)];
+        dynamicsCol{index+1} = [stateIndex(:,index+1);cc(:);ic(:)];
+        dynamicsVal{index+1} = [ones(6,1);-stateMap(:);-inputMap(:)];
         dynamicsBound(rows) = tube.localOffset(:,end) ...
-            +tube.localStateMap(:,:,end)*stateCenter(:,index)-stateCenter(:,index+1);
+            +stateMap*stateCenter(:,index)-stateCenter(:,index+1);
         geometry = qp.geometry.local(index);
         rowCount = numel(geometry.bound);
-        block = spalloc(rowCount,total,9*rowCount);
-        block(:,stateIndex(:,index)) = geometry.stateMatrix;
-        block(:,inputIndex) = geometry.inputMatrix;
         selected = rowStart+(1:rowCount);
         relaxed = qp.safetyRows(selected);
-        block(relaxed,violationIndex(tube.stage)) = -1;
         localBounds{index} = geometry.bound-geometry.stateMatrix*stateCenter(:,index) ...
             +qp.inequalityBound(selected)-qp.geometry.physicalBound(selected);
+        normalRows = (1:rowCount).';
+        endpointRows = zeros(0,1);
         if size(geometry.nodeStateRows,3)>1
             % Use the existing endpoint state directly. Substituting its
             % dynamics into every endpoint inequality unnecessarily makes
@@ -85,21 +89,39 @@ function program = localLiftedProgram(qp,prediction,model)
             endpointState = geometry.nodeStateRows(:,:,end);
             endpointStart = geometry.nodeStartStateRows(:,:,end);
             endpointInput = geometry.nodeInputRows(:,:,end);
-            endpointRows = rowCount-size(endpointState,1)+(1:size(endpointState,1));
-            block(endpointRows,:) = 0;
-            block(endpointRows,stateIndex(:,index)) = endpointStart;
-            block(endpointRows,stateIndex(:,index+1)) = endpointState;
-            block(endpointRows,inputIndex) = endpointInput;
-            block(endpointRows(relaxed(endpointRows)),violationIndex(tube.stage)) = -1;
+            endpointRows = (rowCount-size(endpointState,1)+(1:size(endpointState,1))).';
+            normalRows = (1:rowCount-numel(endpointRows)).';
             localBounds{index}(endpointRows) = geometry.bound(endpointRows) ...
                 +endpointState*tube.localOffset(:,end) ...
                 -endpointState*stateCenter(:,index+1)-endpointStart*stateCenter(:,index) ...
                 +qp.inequalityBound(selected(endpointRows))-qp.geometry.physicalBound(selected(endpointRows));
         end
-        localRows{index} = block;
+        globalRows = rowStart+(1:rowCount).';
+        stateBlock = geometry.stateMatrix(normalRows,:);
+        inputBlock = geometry.inputMatrix(normalRows,:);
+        [nr,nc] = ndgrid(globalRows(normalRows),stateIndex(:,index));
+        [mr,mc] = ndgrid(globalRows(normalRows),inputIndex);
+        rowList = cell(6,1);colList = cell(6,1);valList = cell(6,1);
+        rowList{1} = nr(:);colList{1} = nc(:);valList{1} = stateBlock(:);
+        rowList{2} = mr(:);colList{2} = mc(:);valList{2} = inputBlock(:);
+        if ~isempty(endpointRows)
+            [er,ec] = ndgrid(globalRows(endpointRows),stateIndex(:,index));
+            [fr,fc] = ndgrid(globalRows(endpointRows),stateIndex(:,index+1));
+            [gr,gc] = ndgrid(globalRows(endpointRows),inputIndex);
+            rowList{3} = er(:);colList{3} = ec(:);valList{3} = endpointStart(:);
+            rowList{4} = fr(:);colList{4} = fc(:);valList{4} = endpointState(:);
+            rowList{5} = gr(:);colList{5} = gc(:);valList{5} = endpointInput(:);
+        end
+        relaxedRows = globalRows(relaxed);
+        rowList{6} = relaxedRows;
+        colList{6} = repmat(violationIndex(tube.stage),numel(relaxedRows),1);
+        valList{6} = -ones(numel(relaxedRows),1);
+        blockRow{index} = vertcat(rowList{:});blockCol{index} = vertcat(colList{:});blockVal{index} = vertcat(valList{:});
         rowStart = rowStart+rowCount;
     end
-    hard = [vertcat(localRows{:}); ...
+    dynamics = sparse(vertcat(dynamicsRow{:}),vertcat(dynamicsCol{:}),vertcat(dynamicsVal{:}),6*(cellCount+1),total);
+    localMatrix = sparse(vertcat(blockRow{:}),vertcat(blockCol{:}),vertcat(blockVal{:}),rowStart,total);
+    hard = [localMatrix; ...
         sparse(qp.inequalityMatrix(rowStart+1:end,:)),sparse(size(qp.inequalityMatrix,1)-rowStart,total-physicalCount)];
     hardBound = [vertcat(localBounds{:});qp.inequalityBound(rowStart+1:end)];
     % Input and slew rows below remain explicit. Their reachable box can
@@ -142,12 +164,14 @@ function program = localLiftedProgram(qp,prediction,model)
     hard = [hard;nonnegative;budget];
     hardBound = [hardBound;zeros(count,1);0];
     cones = qp.clf.constraints;
-    coneRows = cell(numel(cones),1);
-    coneBounds = cell(numel(cones),1);
-    coneDimensions = 10*ones(numel(cones),1);
-    quadratics = zeros(6,numel(cones));
-    firstInterval = false(numel(cones),1);
-    for index = 1:numel(cones)
+    coneCount = numel(cones);
+    coneRow = cell(coneCount,1);coneCol = cell(coneCount,1);coneVal = cell(coneCount,1);
+    coneBounds = cell(coneCount,1);
+    coneDimensions = 10*ones(coneCount,1);
+    quadratics = zeros(6,coneCount);
+    firstInterval = false(coneCount,1);
+    relaxationIndex = qp.layout.relaxationIndex;
+    for index = 1:coneCount
         constraint = cones(index);
         tube = cells(constraint.cellIndex);
         if tube.stage==1
@@ -165,33 +189,54 @@ function program = localLiftedProgram(qp,prediction,model)
             hessian = weightedMap.'*weightedMap;
             quadratics(:,index) = [hessian(1,1);2*hessian(1,2);hessian(2,2);affine.';constant];
             firstInterval(index) = true;
-            tMap = sparse(1,total);tMap(1:2) = -affine;
-            tMap(qp.layout.relaxationIndex(1)) = 1;
-            square = sparse(2,total);square(:,1:2) = 2*root;
-            coneRows{index} = -[tMap;square;tMap];
+            % Rows (local 1..4): -tMap, -square, -tMap with
+            % tMap = [-affine at 1:2, +1 at relaxation(1)], square = 2*root at 1:2.
+            square = 2*root;
+            coneRow{index} = [1;1;1;2;2;3;3;4;4;4];
+            coneCol{index} = [1;2;relaxationIndex(1);1;2;1;2;1;2;relaxationIndex(1)];
+            coneVal{index} = [affine(1);affine(2);-1;-square(1,1);-square(1,2);-square(2,1);-square(2,2); ...
+                affine(1);affine(2);-1];
             coneBounds{index} = [1-constant;zeros(2,1);-1-constant];
             coneDimensions(index) = 4;
             continue;
         end
         point = constraint.pointIndex;
         inputIndex = 2*tube.stage-1:2*tube.stage;
-        map = sparse(8,total);
-        map(1:5,stateIndex(:,constraint.cellIndex)) = tube.localStateMap(2:6,:,point);
-        map(1:5,inputIndex) = tube.localInputMap(2:6,:,point);
-        map(6:7,inputIndex) = eye(2);
+        stateColumns = stateIndex(:,constraint.cellIndex);
+        localState = tube.localStateMap(2:6,:,point);
+        localInput = tube.localInputMap(2:6,:,point);
         errorOffset = tube.localOffset(2:6,point) ...
-            +tube.localStateMap(2:6,:,point)*stateCenter(:,constraint.cellIndex)-qp.clf.referenceStart ...
+            +localState*stateCenter(:,constraint.cellIndex)-qp.clf.referenceStart ...
             -qp.clf.referenceRate*tube.time(point);
         offset = [errorOffset;zeros(2,1);constraint.offset(8)];
-        tMap = -constraint.linear.'*map;
-        tMap(qp.layout.relaxationIndex(tube.stage)) = tMap(qp.layout.relaxationIndex(tube.stage))+1;
+        % map (8 x total): rows 1:5 = [localState at states, localInput at
+        % inputs], rows 6:7 = identity at inputs, row 8 = 0.
+        linearState = constraint.linear(1:5).'*localState;
+        linearInput = constraint.linear(1:5).'*localInput+constraint.linear(6:7).';
+        squareState = 2*constraint.root(:,1:5)*localState;
+        squareInput = 2*constraint.root(:,1:5)*localInput+2*constraint.root(:,6:7);
+        % Rows: 1 = -tMap, 2:9 = -2*root*map, 10 = -tMap, where
+        % tMap = -linear'*map + e_relaxation(stage).
+        [sr,sc] = ndgrid((2:9).',stateColumns);
+        [ir,ic] = ndgrid((2:9).',inputIndex);
+        coneRow{index} = [ones(6,1);ones(2,1);1;sr(:);ir(:);10*ones(6,1);10*ones(2,1);10];
+        coneCol{index} = [stateColumns;inputIndex.';relaxationIndex(tube.stage); ...
+            sc(:);ic(:);stateColumns;inputIndex.';relaxationIndex(tube.stage)];
+        coneVal{index} = [linearState.';linearInput.';-1;-squareState(:);-squareInput(:); ...
+            linearState.';linearInput.';-1];
         tOffset = -constraint.linear.'*offset-constraint.constant;
-        coneRows{index} = -[tMap;2*constraint.root*map;tMap];
         coneBounds{index} = [tOffset+1;2*constraint.root*offset;tOffset-1];
     end
     coneIndices = localUndominatedClf(quadratics,firstInterval,lower(1:2),upper(1:2));
-    coneRows = coneRows(coneIndices);coneBounds = coneBounds(coneIndices);
     coneDimensions = coneDimensions(coneIndices);
+    coneBounds = coneBounds(coneIndices);
+    offsets = [0;cumsum(coneDimensions(1:end-1))];
+    coneRowsAll = cell(numel(coneIndices),1);
+    for slot = 1:numel(coneIndices)
+        coneRowsAll{slot} = coneRow{coneIndices(slot)}+offsets(slot);
+    end
+    coneMatrix = sparse(vertcat(coneRowsAll{:}),vertcat(coneCol{coneIndices}),vertcat(coneVal{coneIndices}), ...
+        sum(coneDimensions),total);
     cfg = model.cfg;
     h = model.sampleTime;
     planCount = qp.layout.planCount;
@@ -218,15 +263,20 @@ function program = localLiftedProgram(qp,prediction,model)
         hessian(rows,rows) = 2*h*weight;
         linear(rows) = 2*h*weight*(stateCenter(2:6,index)-reference);
     end
+    % The anchor plan with zero state deviation and zero slacks is the
+    % reference point from which row generation seeds its working set.
+    anchorPoint = zeros(total,1);
+    anchorPoint(1:planCount) = model.anchorPlan;
     program = struct("P",triu(hessian),"q",linear, ...
-        "A",[dynamics;hard;vertcat(coneRows{:})], ...
+        "A",[dynamics;hard;coneMatrix], ...
         "b",[dynamicsBound;hardBound;vertcat(coneBounds{:})], ...
         "cones",[size(dynamics,1);numel(hardBound);coneDimensions], ...
         "physicalDecisionCount",physicalCount,"stateIndex",stateIndex,"stateCenter",stateCenter, ...
         "inequalityIndices",inequalityIndices, ...
         "violationIndex",violationIndex,"violationCount",count, ...
         "clfConstraintIndices",coneIndices, ...
-        "inactiveSlackIndex",zeros(1, 0));
+        "inactiveSlackIndex",zeros(1, 0), ...
+        "generatedRowCount",numel(inequalityIndices),"anchorPoint",anchorPoint);
 end
 
 function retained = localUndominatedRows(matrix,bound)

@@ -1,11 +1,12 @@
 # Real-time plan for the information-state PCBF controller
 
-September 12, 2026. This note records where the time goes in the current
-controller (certificate version 19, commit `e83df709`), why, and a staged
+September 12, 2026. This note records where the time went in the
+controller at commit `e83df709` (certificate version 19), why, and a staged
 redesign that keeps the recursive-feasibility argument of
 [`INFORMATION_STATE_PCBF.md`](INFORMATION_STATE_PCBF.md) intact while
-bringing a frame under the 100 ms hold. Nothing in this note is
-implemented; every number is a measurement of the current code.
+bringing a frame toward the 100 ms hold. Sections 1 to 5 are the analysis
+as written before any change; section 6 records what was then
+implemented and measured.
 
 ## 1. Where the time goes
 
@@ -182,3 +183,33 @@ campaign of `scripts/verifyInformationStatePcbf.m` remains the regression
 gate; the real-time claim is made only when the median and maximum frame
 times of all seven trials are under the hold, on the target hardware,
 with the deadline of 3.1 armed.
+
+## 6. Status after the first implementation round (2026-09-12)
+
+Implemented, in the order of section 5:
+
+| Item | Done | Mechanism |
+| --- | --- | --- |
+| 3.1 deadline and witness | yes | `solver.frameDeadlineSeconds`; after the first attempt, no further solve starts past the deadline and the verified carried witness is the command; never applies at admission |
+| 3.2 cheap witness check | partly | the witness formulation no longer builds the lifted program (`verificationOnly`); the tube and row rebuild remains |
+| 3.3 margin-LP skip | no | the carried witness is not a feasible point of the fresh program's rows (different cells and normals), so its value cannot answer the fresh margin LP |
+| 3.4 row generation | yes | working set of about four rows per unknown seeded at the value-stage point, violated rows added, unclean subset status falls back to the complete program (`solver.rowGeneration`) |
+| 3.5 row aggregation and cell rule | no | the tube kernel requires `‖A‖∞·dt < 1`; a looser cell rule inflates the Taylor tail by `1/(1 − gain)` against a drift bound that includes the lane length, so it was not changed |
+| 3.6 CLF tier | partly | decrease imposed at cell endpoints (`clf.samplePoints`), cones divided by four; the equilibrium seed is solved only when the shifted plan's tail decelerates below the current speed |
+| 3.7 speed-dependent horizon | yes | `N = max(N_min, ceil(N_cfg·v/v_ref))`, `controller.minimumHorizonSteps = 4`; the witness keeps its own length |
+| 3.8 native builders | partly | the lifted program is assembled from triplet lists (identical matrices, 2.4× faster at cruise, 6× near rest); Taylor factorials are cumulative products |
+
+Two defects surfaced and were fixed on the way. The terminal row
+`v̄_x − r_v ≥ 0` is not invariant under the braking law (the braked nominal
+decays faster than the open-loop radius), so plans resting on it lost
+membership one hold later; the row now bounds the nominal only, as (T2)
+states. And the search limit of 30 s was reachable at rest when the model
+domain floor made the first stage infeasible; the deadline bounds that to
+one attempt.
+
+Measured on the seven-trial campaign (`scripts/REAL_TIME_PCBF_RESULTS_20260912.md`
+holds the table): see that record for the per-trial frame times. The
+remaining cruise budget is roughly one third solve, one third
+formulation and tubes, one third witness rebuild; the next steps in order
+are the inclusion-based witness transfer (3.2 in full), a sound cell rule
+derived from the kernel's own remainder, and native row builders.

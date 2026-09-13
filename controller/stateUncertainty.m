@@ -62,11 +62,13 @@ classdef stateUncertainty
             numericalPolynomial = zeros(sizeState,degree+1);
             numericalPolynomial(:,1) = numericalRadius;
             powerA = eye(sizeState);
+            powerFactorial = 1;
             for powerIndex = 1:order
+                powerFactorial = powerFactorial*powerIndex;
                 radiusPolynomial(:, powerIndex+1) = ...
-                    abs(powerA*a)*radius/factorial(powerIndex) ...
-                    + abs(powerA)*rate/factorial(powerIndex);
-                numericalPolynomial(:,powerIndex+1) = abs(powerA*a)*numericalRadius/factorial(powerIndex);
+                    abs(powerA*a)*radius/powerFactorial ...
+                    + abs(powerA)*rate/powerFactorial;
+                numericalPolynomial(:,powerIndex+1) = abs(powerA*a)*numericalRadius/powerFactorial;
                 powerA = powerA*a;
             end
             driftBound = abs(a)*stateLimit+abs(b)*inputLimit+abs(c);
@@ -111,11 +113,13 @@ classdef stateUncertainty
             numericalProcess = numericalPolynomial;
             numericalProcess(:,1) = 0;
             powerA = eye(sizeState);
+            powerFactorial = 1;
             for powerIndex = 1:order
+                powerFactorial = powerFactorial*powerIndex;
                 process(:, powerIndex+1) = process(:, powerIndex+1) ...
-                    - abs(powerA*a)*radius/factorial(powerIndex);
+                    - abs(powerA*a)*radius/powerFactorial;
                 numericalProcess(:,powerIndex+1) = numericalProcess(:,powerIndex+1) ...
-                    -abs(powerA*a)*numericalRadius/factorial(powerIndex);
+                    -abs(powerA*a)*numericalRadius/powerFactorial;
                 powerA = powerA*a;
             end
             tubeEndRadius = abs(transition)*radius+max(0, process*transform(end, :).');

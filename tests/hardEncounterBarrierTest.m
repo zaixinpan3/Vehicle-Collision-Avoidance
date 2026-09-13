@@ -330,6 +330,56 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(margin,-1e-10);
         end
 
+        function aFrameDeadlineCommitsTheCarriedWitnessWhenTheFirstAttemptFails(testCase)
+            % The deadline never applies at admission and never skips the
+            % first attempt; once that attempt fails past the deadline, the
+            % verified carried witness is the command.
+            [ego,target,road,cfg] = localFixture();
+            [~,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            cfg.solver.frameDeadlineSeconds = 1e-6;
+            % An infeasibility report keeps the search alive so that the
+            % deadline, not a hard solver failure, ends it.
+            cfg.solver.jointFunction = @(~,~) struct("decision",[],"exitFlag",-2,"output",struct());
+            ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
+            [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,stored);
+            testCase.verifyEqual(problem.metadata.certificateSource,"carriedWitness");
+            testCase.verifyTrue(startsWith(problem.metadata.freshSolveFailure, ...
+                "collisionAvoidanceController:frameDeadline"));
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyEqual(problem.metadata.pcbfValue,0);
+        end
+
+        function aFrameDeadlineKeepsAVerifiedFirstAttempt(testCase)
+            [ego,target,road,cfg] = localFixture();
+            [~,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            cfg.solver.frameDeadlineSeconds = 1e-6;
+            ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
+            [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,stored);
+            testCase.verifyEqual(problem.metadata.certificateSource,"checkedOptimization");
+            testCase.verifyEqual(problem.metadata.certificateSearchAttempts,1);
+            testCase.verifyTrue(problem.metadata.frameDeadlineHit);
+        end
+
+        function theFreshHorizonScalesWithSpeedWhileTheWitnessKeepsItsLength(testCase)
+            [ego,target,road,cfg] = localFixture();
+            ego.speed = 2;
+            [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            expected = max(cfg.controller.minimumHorizonSteps, ...
+                ceil(cfg.controller.horizonSteps*2/cfg.referenceSpeed));
+            testCase.verifyEqual(problem.metadata.horizonSteps,expected);
+            testCase.verifyLessThan(problem.metadata.horizonSteps,cfg.controller.horizonSteps);
+        end
+
+        function clfSamplingAtControlPointsRemainsAvailable(testCase)
+            [ego,target,road,cfg] = localFixture();
+            cfg.clf.samplePoints = "controlPoints";
+            [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            cfg.clf.samplePoints = "midpoints";
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                "collisionAvoidanceController:invalidConfiguration");
+        end
+
         function admissionNeedsAnInDomainSpeedCentreEvenWhenTheBoxMeetsTheDomain(testCase)
             % Only continuation frames carry a successor box to condition
             % against; admission therefore rejects a negative measured centre.
