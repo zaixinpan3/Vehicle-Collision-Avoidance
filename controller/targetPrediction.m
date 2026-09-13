@@ -28,6 +28,10 @@ classdef targetPrediction
         % One immutable Cartesian constant-acceleration/constant-yaw-rate flow.
         % Current-state estimation boxes are admitted and carried as sets;
         % future-motion uncertainty is not part of the exact law.
+            if isempty(target)
+                encounter = struct("key",{},"radius",{},"contract",{});
+                return;
+            end
             future = [target.predictionAccelerationErrorBound(:); target.predictionYawAccelerationErrorBound];
             if any(future ~= 0)
                 error("collisionAvoidanceController:nonexactStudyInput", ...

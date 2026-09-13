@@ -132,9 +132,9 @@ classdef hardEncounterBarrier
         end
 
         function validateAdmission(ego, observations, cfg)
-            if ~isfinite(ego.stateTime) || numel(observations)~=1
+            if ~isfinite(ego.stateTime) || numel(observations)>1
                 error("collisionAvoidanceController:invalidExactScene", ...
-                    "The study requires a timestamp and exactly one persistent target at every frame.");
+                    "The study requires a timestamp and supports at most one visible target.");
             end
             if any(cfg.model.ltvModelErrorRateBound~=0) ...
                     || any(cfg.model.plantModelResidualRateBound~=0)
@@ -259,12 +259,29 @@ classdef hardEncounterBarrier
             % Target conditioning against the carried exact flow.
             measured = targetPrediction.admitExact(observations,model.stateTime,model.lane,cfg);
             original = stored.originalEncounter;
-            if measured.key~=original.key || measured.halfLength~=original.halfLength ...
-                    || measured.halfWidth~=original.halfWidth
+            model.targetSetChanged = isempty(measured)~=isempty(stored.encounters);
+            if model.targetSetChanged
+                if isempty(measured)
+                    localRequireCompleteObservation(ego,model.stateTime);
+                end
+                % A different set of vehicle constraints defines a new value
+                % function. Keep the execution/ego checks above, but require
+                % fresh admission; the old witness cannot authorize a command.
+                model.encounters = measured;
+                original = measured;
+                candidate = [];
+                initialization = zeros(2,0);
+                return;
+            end
+            if ~isempty(measured) && (measured.key~=original.key || measured.halfLength~=original.halfLength ...
+                    || measured.halfWidth~=original.halfWidth)
                 error("collisionAvoidanceController:changedEncounterContract", ...
                     "The same target and footprint must persist at every frame.");
             end
-            model.encounters = targetPrediction.conditionExact(stored.encounters,model.sampleTime,measured);
+            model.encounters = measured;
+            if ~isempty(measured)
+                model.encounters = targetPrediction.conditionExact(stored.encounters,model.sampleTime,measured);
+            end
             % The carried witness: the remaining tail with its own data.
             keep = stored.cellStage>=consumed+2;
             carriedValue = max(0,stored.value-sum(stored.stageViolation(1:min(end,consumed+1))));
@@ -883,19 +900,16 @@ function metadata = localMetadata(metadata,stored)
     metadata.commandCertifiedDuration = stored.witnessModel.sampleTime;
     metadata.lookaheadDuration = stored.remainingSteps*stored.witnessModel.sampleTime;
     metadata.recursiveFeasibilityClaimed = true;
-    metadata.recursiveFeasibilityScope = "declaredAffineStagePlant;exactTargetLaw;boundedEstimationError;conditionedInformationSets";
+    metadata.recursiveFeasibilityScope = "fixedActiveTargetSet;declaredAffineStagePlant;exactTargetLaw;boundedEstimationError;conditionedInformationSets";
     metadata.indefiniteRecursiveFeasibilityClaimed = true;
     metadata.terminalContinuationCertified = true;
     metadata.terminalPolicyRole = "carriedWitnessTail";
     metadata.exactPredictionAssumptionsHold = true;
     metadata.physicalVehicleGuaranteeEstablished = false;
-    metadata.jointAdmissionPerformed = false;
-    metadata.newlyAdmittedTargetKeys = strings(1,0);
     metadata.planCertified = true;
     metadata.acceptance = stored.acceptance;
     metadata.hardRowViolation = stored.acceptance.hardRowViolation;
     metadata.activeTargetKeys = string({stored.encounters.key});
-    metadata.dischargedTargetKeys = strings(1,0);
     metadata.commandActuationTime = stored.stateTime;
 end
 
@@ -908,4 +922,23 @@ function message = localRejectMessage(result,check,qp)
     end
     message = sprintf("collisionAvoidanceController:noCertifiedContinuation: No verified plan was obtained: %s; %s%s.", ...
         result.message,strjoin(check.failedConditions,","),detail);
+end
+
+function localRequireCompleteObservation(ego,time)
+% Absence is departure only under the caller's current no-missed-detection
+% sensor contract. A missing sample or a stale visibility flag is insufficient.
+    p = ego.perception;
+    valid = isstruct(p) && isscalar(p) ...
+        && all(isfield(p,["time","range","completeWithinRange"]));
+    if valid
+        valid = isnumeric(p.time) && isscalar(p.time) && isfinite(p.time) ...
+            && abs(p.time-time)<=128*eps(max(1,abs(time))) ...
+            && isnumeric(p.range) && isscalar(p.range) && isfinite(p.range) && p.range>0 ...
+            && islogical(p.completeWithinRange) && isscalar(p.completeWithinRange) ...
+            && p.completeWithinRange;
+    end
+    if ~valid
+        error("collisionAvoidanceController:unconfirmedTargetDeparture", ...
+            "Dropping a tracked target requires a current complete-within-range sensor declaration.");
+    end
 end

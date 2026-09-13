@@ -13,8 +13,8 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public information-state controller entry, carried-witness acceptance rule and diagnostics |
-| `readPlanningInputs.m` | Input normalization and lane/target model construction |
+| `collisionAvoidanceController.m` | Public zero/one-visible-target controller entry, fresh admission on visibility changes, carried-witness acceptance rule and diagnostics |
+| `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
 | `hardEncounterBarrier.m` | Fresh search (`plan`), box conditioning and carried-witness assembly (`validateTransition`), witness transfer by inclusion (`transferCandidate`) or full re-verification (`verifyCandidate`), terminal-law frames (`terminalStep`), robust terminal set (`completionRows`, `terminalMembership`), carried data (`carriedData`) |
 | `formulateAvoidanceProblem.m` | Objective, swept safety rows with stage labels, hard domain/terminal rows and predictive CLF cones |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |

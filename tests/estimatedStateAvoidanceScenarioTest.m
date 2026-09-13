@@ -227,7 +227,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             localVerifyUncertifiedFullHorizon(testCase,result);
         end
 
-        function missingTargetStopsBeforePhysicalExecution( ...
+        function modelResidualsStopBeforePhysicalExecution( ...
                 testCase)
             cfg = localConfiguration(20260728);
             cfg.initialization.targetSpeedPrior = 10.0;
@@ -246,7 +246,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
                 Plot=false, Report=false);
 
             testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:nonexactStudyInput");
             testCase.verifyEqual(result.metrics.completedControlSteps,0);
             testCase.verifyEqual(result.failure.time,0,AbsTol=1e-12);
             testCase.verifyEmpty(result.attempts.metadata{1});
@@ -374,6 +374,6 @@ end
 
 function localVerifyUncertifiedFullHorizon(testCase,result)
     localVerifyReportedAdmissionFailure(testCase,result);
-    testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
+    testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:nonexactStudyInput");
     testCase.verifyEmpty(result.attempts.targetEstimate{1});
 end

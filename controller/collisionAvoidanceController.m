@@ -2,7 +2,9 @@ function [command, predictedInput, planningProblem, certificate] = ...
         collisionAvoidanceController(egoState, targetEstimate, laneCenterline, cfg, controllerState)
 %collisionAvoidanceController Information-state safe MPC with a carried recursive witness.
 % Supply the fourth output at the next sample. Ego and target estimates carry
-% bounded error boxes. The target follows the Cartesian constant-acceleration
+% bounded error boxes. Zero visible targets retain road-constrained CLF cruise.
+% Visible-target transitions require fresh admission. A visible target follows
+% the Cartesian constant-acceleration
 % law exactly; the ego executes the accepted plan's first-stage affine
 % generator. Every continuation frame conditions both boxes, verifies the
 % shifted previous plan with its own carried data, and lets a fresh
@@ -30,6 +32,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "accelerationBias", ego.longitudinalAccelerationBias);
     identity.road = road;
     candidate = [];
+    model.targetSetChanged = false;
     if ~isempty(controllerState)
         [model,candidate,initialization,originalEncounter] = hardEncounterBarrier.validateTransition( ...
             controllerState,ego,model,observations,identity);
@@ -143,7 +146,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "dischargedTargetKeys", strings(1,0), ...
         "clfRelaxation", frame.clfRelaxation, "clfDecayRate", frame.clfDecayRate, ...
         "collisionDiscretization", "sweptBernsteinCells", "acceptance", check, ...
-        "hasTarget", true, "postSolveCertificationPerformed", true, "runtimeSeconds", toc(timer));
+        "hasTarget", ~isempty(encounters), "postSolveCertificationPerformed", true, "runtimeSeconds", toc(timer));
     metadata.runtime = struct("inputPreparationSeconds", preparationSeconds, ...
         "carriedWitnessSeconds", witnessSeconds, ...
         "predictionSeconds", planningTiming.predictionSeconds, ...
@@ -179,7 +182,17 @@ function [command, predictedInput, planningProblem, certificate] = ...
         end
     end
     metadata.initialErrorBound = model.initialFrenetErrorBound;
-    metadata.targetErrorBound = encounters.radius;
+    metadata.targetErrorBound = zeros(8,0);
+    if ~isempty(encounters), metadata.targetErrorBound = encounters.radius; end
+    metadata.targetSetChanged = model.targetSetChanged;
+    metadata.newlyAdmittedTargetKeys = strings(1,0);
+    if isempty(controllerState) || model.targetSetChanged
+        metadata.newlyAdmittedTargetKeys = metadata.activeTargetKeys;
+    end
+    metadata.jointAdmissionPerformed = ~isempty(metadata.newlyAdmittedTargetKeys);
+    if model.targetSetChanged && isempty(encounters)
+        metadata.dischargedTargetKeys = string({controllerState.encounters.key});
+    end
     metadata.safetyScope = certificate.safetyScope;
     metadata.certifiedDuration = certificate.certifiedDuration;
     metadata.lookaheadDuration = optimizedStages*h;

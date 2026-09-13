@@ -20,7 +20,7 @@ classdef straightControllerRecoveryTest < matlab.unittest.TestCase
             estimator.vehicle.targetSpeed = targetSpeedPrior;
             result = runFiniteBicycleDiagnostic(cfg,0.1,EstimatorConfiguration=estimator,PrepareController=false);
             testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:nonexactStudyInput");
             testCase.verifyEqual(result.time,0,AbsTol=0);
             testCase.verifyEmpty(result.input);
             testCase.verifyEmpty(result.metadata);
@@ -29,7 +29,7 @@ classdef straightControllerRecoveryTest < matlab.unittest.TestCase
         function finiteVisibilityAndResidualsDoNotAcquireTheExactGuarantee(testCase)
             result = runFiniteBicycleDiagnostic(localConfiguration(),0.1,PrepareController=false);
             testCase.verifyTrue(result.failure.occurred);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:invalidExactScene");
+            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:nonexactStudyInput");
             testCase.verifyEqual(result.time,0,AbsTol=0);
             testCase.verifyEmpty(result.input);
             testCase.verifyEmpty(result.metadata);

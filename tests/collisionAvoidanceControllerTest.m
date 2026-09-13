@@ -75,12 +75,12 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyFalse(next.metadata.fallbackUsed);
         end
 
-        function missingObservationIsOutsideTheExactStatePremise(testCase)
+        function missingObservationRequiresACompleteSensorDeclaration(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             testCase.verifyError(@() collisionAvoidanceController(nextEgo,[],route,cfg,stored), ...
-                "collisionAvoidanceController:invalidExactScene");
+                "collisionAvoidanceController:unconfirmedTargetDeparture");
         end
 
         function successfulReplanningMovesThePredictionEndBeyondTheOriginalDeadline(testCase)

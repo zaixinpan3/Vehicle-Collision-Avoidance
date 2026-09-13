@@ -53,10 +53,12 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(other,inputs,AbsTol=1e-12);
         end
 
-        function oneTargetIsRequiredEvenWhenItIsFarAway(testCase)
+        function noTargetStillProducesACertifiedCruiseCommand(testCase)
             [ego,~,road,cfg] = localFixture();
-            testCase.verifyError(@() collisionAvoidanceController(ego,[],road,cfg,[]), ...
-                'collisionAvoidanceController:invalidExactScene');
+            [command,~,problem] = collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyNotEmpty(command);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyFalse(problem.metadata.hasTarget);
         end
 
         function theStrictSceneRejectsAdditionalTargets(testCase)
@@ -227,10 +229,10 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:changedEncounterContract');
         end
 
-        function aTargetCannotDisappearAtAnyDistance(testCase)
+        function aTargetCannotDisappearWithoutCurrentCompletePerception(testCase)
             [ego,~,road,cfg,stored] = localContinuation();
             testCase.verifyError(@() collisionAvoidanceController(ego,[],road,cfg,stored), ...
-                'collisionAvoidanceController:invalidExactScene');
+                'collisionAvoidanceController:unconfirmedTargetDeparture');
         end
 
         function changedTargetMotionInvalidatesTheExactPremise(testCase)

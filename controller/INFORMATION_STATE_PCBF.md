@@ -1,6 +1,6 @@
 # Information-state predictive control barrier function for the two-vehicle study
 
-Certificate version 19, September 12, 2026. This document defines the executed
+Certificate version 20; lifecycle extension September 13, 2026. This document defines the executed
 safe-MPC problem, its carried recursive-feasibility witness, and the value
 function that the controller reports as its predictive control barrier
 function (PCBF). It replaces the "shift-compatibility gap" of version 18 in
@@ -20,9 +20,11 @@ members are safe against the other road user for all future time.
 The theorem below holds under exactly these premises. None is inferred from
 the others, and each is checked or declared at the interface named.
 
-- **P1 (two vehicles).** One ego vehicle and one persistent target with a
-  stable identity and a fixed rectangular footprint. Checked by
-  `hardEncounterBarrier.validateAdmission` and `validateTransition`.
+- **P1 (fixed active target set).** One ego vehicle and either zero or one
+  visible target. Within an active encounter, target identity and rectangular
+  footprint are fixed. Checked by `hardEncounterBarrier.validateAdmission`
+  and `validateTransition`. The recursive theorem applies on each interval
+  with the same active target set; transitions require fresh admission below.
 - **P2 (bounded estimation error).** At each frame `k` the controller
   receives an ego estimate with a componentwise error box (`controllerStateErrorBound`
   or an `ego-state-v1` certificate) and a target estimate with a componentwise
@@ -52,6 +54,47 @@ the others, and each is checked or declared at the interface named.
 
 Nothing here is a claim about a nonlinear Fiala vehicle, a perception
 pipeline, or a real-time budget.
+
+## Visible-target lifecycle
+
+No target means an empty encounter array, not a virtual remote vehicle or an
+alternative controller. The same optimization retains the road rows, physical
+limits, input objective, sampled CLF constraints and road/pose terminal set.
+There are no vehicle collision rows or target terminal halfspaces in this
+case. The safety value may still measure road violations; it is not forced
+to zero merely because no vehicle is visible. The fixed-set shifted-plan
+argument applies with the target-indexed conditions vacuous.
+
+For a zero-to-one or one-to-zero target transition, the implementation first
+validates the previous executed input, sample time, model/road identity and
+ego-box conditioning. It then builds a fresh certificate for the new active
+set. No old witness can command the vehicle if that admission fails. In
+particular, the no-target plan does not certify safety relative to a newly
+observed obstacle. Target-key replacement while a target remains present is
+still rejected, and multiple simultaneous targets remain unsupported.
+
+Removing a previously tracked target requires the caller's current perception
+record to declare `completeWithinRange=true`, a finite positive range and a
+matching timestamp. Under the synthetic sensor's no-missed-detection contract,
+an empty published list means there is no target inside that range. Missing
+or stale data without that declaration stops control. This relies on truthful
+sensor completeness; the controller does not infer an unobserved target's
+position or prove sensor reliability. A fresh zero-target admission may be
+used by an explicit no-target scene without a perception record.
+
+`targetSetChanged`, `newlyAdmittedTargetKeys`, `dischargedTargetKeys`, `hasTarget`
+and an empty 8-by-0 target-bound matrix expose this behavior. A switch has no
+`candidateVerified` witness and reports `pcbfDescentResidual=NaN`: values for
+different target sets are not compared as if they were one function.
+`recursiveFeasibilityScope` explicitly includes `fixedActiveTargetSet`.
+There is no unconditional safety claim for unseen objects, late detection,
+or switching before a fresh feasible certificate exists.
+
+This engineering extension does not remove P3/P4. The existing physical
+pipeline's nonzero process residual and the NRMM output's broad future-motion
+bounds still require compatible model/target contracts. In particular, current
+target acceleration uncertainty can still prevent an all-future terminal
+halfspace even for a constant true target. No error radius is suppressed.
 
 ## 2. Objects
 

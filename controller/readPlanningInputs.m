@@ -23,7 +23,10 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
         error("collisionAvoidanceController:invalidInput", ...
             "The complete retained certificate does not support an input-delay queue.");
     end
-    % Perception metadata is deliberately outside the exact-state study.
+    % Only target departure uses this sensor declaration. Geometry and
+    % same-target prediction do not depend on changing sensor metadata.
+    ego.perception = [];
+    if isfield(egoState,"perception"), ego.perception = egoState.perception; end
     [lane, road] = localReadLane(laneCenterline, ego, cfg);
     targets = localReadTargets(targetEstimate, ego, cfg);
 end
