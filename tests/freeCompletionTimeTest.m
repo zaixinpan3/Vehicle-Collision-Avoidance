@@ -1,5 +1,5 @@
 classdef freeCompletionTimeTest < matlab.unittest.TestCase
-    % The terminal horizon is a moving certificate, not an execution deadline.
+    % Active encounter deadlines persist; free-mode road planning may roll.
     methods (TestClassSetup)
         function addPaths(testCase)
             root = fileparts(fileparts(mfilename('fullpath')));
@@ -11,8 +11,9 @@ classdef freeCompletionTimeTest < matlab.unittest.TestCase
             result = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",SampleCount=24);
             testCase.verifyTrue(result.passed);
             testCase.verifyGreaterThan(result.executedHolds,result.admissionSteps);
-            testCase.verifyGreaterThan(diff(result.predictionEndTime),zeros(1,result.executedHolds));
-            testCase.verifyGreaterThanOrEqual(result.horizonSteps,result.configuration.controller.horizonSteps);
+            activeDeadlines = result.exitDeadline(isfinite(result.exitDeadline));
+            testCase.verifyLessThanOrEqual(diff(activeDeadlines),1e-12);
+            testCase.verifyTrue(any(result.releaseConfirmed));
             testCase.verifyFalse(any(result.terminalActive));
             testCase.verifyLessThan(max(abs(result.state(4,:)-8)),0.02);
         end

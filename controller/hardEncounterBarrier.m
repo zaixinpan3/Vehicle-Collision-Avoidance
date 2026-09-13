@@ -8,6 +8,106 @@ classdef hardEncounterBarrier
     % when no optimized stage remains in the carried plan.
 
     methods (Static)
+        function confirmation = admitConfirmation(ego,model)
+            hardEncounterBarrier.confirmationObservation(ego,model.stateTime,[],true);
+            range = ego.perception.range;
+            target = model.encounters;
+            minimum = hypot(model.cfg.vehicle.length,model.cfg.vehicle.width)/2 ...
+                +hypot(target.halfLength,target.halfWidth)+model.cfg.collision.clearanceMargin;
+            if range<=minimum
+                error("collisionAvoidanceController:invalidConfirmationRegion", ...
+                    "The confirmation range must exceed both body radii plus collision clearance.");
+            end
+            confirmation = struct("range",range,"reference","egoReferencePoint", ...
+                "exitGeometry","entireTargetFootprint","confirmationDelay",0, ...
+                "observationContract","currentCompleteObservationAtConfirmationSample");
+        end
+
+        function valid = confirmationObservation(ego,time,confirmation,required)
+            p = ego.perception;
+            valid = isstruct(p) && isscalar(p) ...
+                && all(isfield(p,["time","range","completeWithinRange"]));
+            if valid
+                valid = isnumeric(p.time) && isscalar(p.time) && isfinite(p.time) ...
+                    && abs(p.time-time)<=128*eps(max(1,abs(time))) ...
+                    && isnumeric(p.range) && isscalar(p.range) && isfinite(p.range) && p.range>0 ...
+                    && islogical(p.completeWithinRange) && isscalar(p.completeWithinRange) ...
+                    && p.completeWithinRange;
+            end
+            if valid && ~isempty(confirmation) && p.range~=confirmation.range
+                error("collisionAvoidanceController:changedConfirmationRegion", ...
+                    "The current scan and the carried finite exit must use the same range.");
+            end
+            if required && ~valid
+                error("collisionAvoidanceController:unconfirmedTargetDeparture", ...
+                    "Finite encounter admission or release requires a current complete-within-range observation.");
+            end
+        end
+
+        function outside = observedExterior(model,target,completion)
+            z = model.initialEgoState;
+            rho = model.initialFrenetErrorBound;
+            frame = laneGeometry.frameBounds(model.lane,z(1), ...
+                max(model.cfg.controller.stationTrustRadius,rho(1)),model.cfg.model.lateralDomainRadius);
+            direction = localExitDirection(target.center,frame,z);
+            if nargin>2
+                % At the certified final node, its carried chart/direction
+                % preserve the proven exterior row under box conditioning.
+                % A new direction need not be better for anisotropic boxes.
+                frame = completion.frame;
+                direction = completion.direction;
+            end
+            [row,bound] = localExitRow(model,target,target.center,target.radius,rho,frame,direction);
+            allowance = 32*eps*(abs(bound)+abs(row)*abs(z));
+            outside = row*z+allowance<=bound;
+        end
+
+        function requirePossibleAbsence(model,carried)
+        % A complete scan is a set-valued observation too. An absent object
+        % cannot be reconciled with a reachable reference box wholly inside
+        % the declared region. Partial intersection needs no favorable reset.
+            [center,radius] = targetPrediction.finiteFlow(carried,model.sampleTime);
+            z = model.initialEgoState;
+            rho = model.initialFrenetErrorBound;
+            frame = laneGeometry.frameBounds(model.lane,z(1), ...
+                max(model.cfg.controller.stationTrustRadius,rho(1)),model.cfg.model.lateralDomainRadius);
+            map = [frame.tangent,frame.lateral];
+            delta = center(1:2)-frame.origin-map*z(1:2);
+            positionRadius = radius(1:2)+abs(map)*rho(1:2)+frame.positionErrorBound;
+            upper = norm(delta)+norm(positionRadius);
+            upper = upper+256*eps*(1+upper+norm(center(1:2))+norm(frame.origin));
+            if upper<model.confirmation.range
+                error("collisionAvoidanceController:inconsistentObservation", ...
+                    "The complete scan reports absence while the carried target set is wholly inside its range.");
+            end
+        end
+
+        function [matrix,bound,completion] = finiteCompletionRows(model,prediction,finalMap,finalOffset,frame)
+            matrix = zeros(0,prediction.planCount);
+            bound = zeros(0,1);
+            deadline = model.stateTime+prediction.stageCount*model.sampleTime;
+            completion = struct("active",false,"deadline",NaN,"direction",zeros(2,0), ...
+                "frame",frame,"stateRow",zeros(0,6),"stateBound",zeros(0,1));
+            if isempty(model.encounters), return; end
+            if ~isfield(model,"confirmation") || isempty(model.confirmation)
+                error("collisionAvoidanceController:missingConfirmationContract", ...
+                    "A finite exit certificate requires the declared confirmation region.");
+            end
+            target = model.encounters;
+            [center,radius] = targetPrediction.finiteFlow(target,prediction.stageCount*model.sampleTime);
+            anchor = finalOffset+finalMap*model.anchorPlan;
+            direction = localExitDirection(center,frame,anchor);
+            if isfield(model,"prescribedCompletion") && model.prescribedCompletion.active
+                direction = model.prescribedCompletion.direction;
+                frame = model.prescribedCompletion.frame;
+            end
+            [row,limit] = localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
+            matrix = row*finalMap;
+            bound = limit-row*finalOffset;
+            completion = struct("active",true,"deadline",deadline,"direction",direction, ...
+                "frame",frame,"stateRow",row,"stateBound",limit);
+        end
+
         function [model,prediction,qp,result,check,timing,failure] = plan(model)
             % Fresh search. Every seed is a convexification anchor only: the CLF
             % majorant is exact at its anchor and grows quadratically away from
@@ -48,6 +148,16 @@ classdef hardEncounterBarrier
             speedRatio = min(1,max(0,model.initialEgoState(4)/max(model.referenceSpeed,eps)));
             model.horizonSteps = max(min(cfg.controller.minimumHorizonSteps,cfg.controller.horizonSteps), ...
                 min(cfg.controller.horizonSteps,ceil(cfg.controller.horizonSteps*speedRatio)));
+            maximumSteps = inf;
+            if ~isempty(model.encounters) && isfield(model,"exitDeadline")
+                maximumSteps = round((model.exitDeadline-model.stateTime)/model.sampleTime);
+                model.horizonSteps = min(model.horizonSteps,maximumSteps);
+                if maximumSteps<1
+                    failure = "collisionAvoidanceController:unconfirmedEncounterExit: " ...
+                        +"The finite encounter deadline has no confirmed release.";
+                    return;
+                end
+            end
             while true
                 if timing.attempts>0 && isempty(best) && toc(searchTimer)>=cfg.solver.certificateSearchTimeLimit
                     failure = sprintf("collisionAvoidanceController:certificateSearchLimit: The search budget " ...
@@ -116,6 +226,11 @@ classdef hardEncounterBarrier
                     continue;
                 end
                 if ~isempty(best), break; end
+                if model.horizonSteps>=maximumSteps
+                    failure = "collisionAvoidanceController:noCertifiedContinuation: " ...
+                        +"No fresh zero-violation finite completion was verified within the carried exit deadline.";
+                    return;
+                end
                 % Only a complete verified plan can authorize control. Extension
                 % searches a larger admission domain; no prefix is executed.
                 model.horizonSteps = model.horizonSteps+1;
@@ -147,7 +262,7 @@ classdef hardEncounterBarrier
             end
         end
 
-        function [matrix,bound,terminal] = completionRows(model,prediction,~)
+        function [matrix,bound,terminal,completion] = completionRows(model,prediction,~)
             cfg = model.cfg;
             if any(cfg.model.ltvModelErrorRateBound~=0) || any(cfg.model.plantModelResidualRateBound~=0)
                 error("collisionAvoidanceController:nonexactStudyInput", ...
@@ -184,14 +299,21 @@ classdef hardEncounterBarrier
             changeOffset = terminal.input+terminal.feedback*finalOffset;
             matrix = [matrix;changeMap(selected,:);-changeMap(selected,:)];
             bound = [bound;rate(selected)-changeOffset(selected);rate(selected)+changeOffset(selected)];
+            [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
+                model,prediction,finalMap,finalOffset,terminal.frame);
+            matrix = [matrix;exitMatrix];
+            bound = [bound;exitBound];
         end
 
         function [stored,problem] = admit(stored,problem)
-            stored.version = 20;
-            stored.encounterComplete = false;
+            stored.version = 21;
+            stored.encounterComplete = isempty(stored.encounters);
             stored.witnessModel = problem.model;
-            stored.safetyScope = "verifiedPredictionWithInvariantTerminalTail";
+            stored.safetyScope = "finiteConfirmedEncounterThenInvariantRoadTail";
             stored.certifiedDuration = inf;
+            if ~isempty(stored.encounters)
+                stored.certifiedDuration = stored.completion.deadline-stored.stateTime;
+            end
             stored.metadata = localMetadata(problem.metadata,stored);
             problem.metadata = stored.metadata;
         end
@@ -220,6 +342,13 @@ classdef hardEncounterBarrier
             if consumed+1>stageCount || ~isequal(stored.appliedInput,plan(:,consumed+1)) ...
                     || stored.remainingSteps~=stored.horizonSteps-consumed
                 error("collisionAvoidanceController:invalidStoredCertificate","The issued input witness changed.");
+            end
+            if stored.remainingSteps>0 && (~isequal( ...
+                    reshape(stored.decision(stored.qp.layout.planIndex),2,[]),plan) ...
+                    || ~isequaln(stored.terminal,stored.qp.terminal) ...
+                    || (~isempty(stored.encounters) && ~isequaln(stored.completion,stored.qp.completion)))
+                error("collisionAvoidanceController:invalidStoredCertificate", ...
+                    "The carried controls or completion data differ from the verified decision.");
             end
             rebuilt = string(cfg.solver.witnessVerification)=="rebuilt";
             if rebuilt && stored.remainingSteps>0
@@ -257,19 +386,31 @@ classdef hardEncounterBarrier
             % Target conditioning against the carried bounded reachable set.
             measured = targetPrediction.admitOnline(observations,model.stateTime,model.lane,cfg);
             original = stored.originalEncounter;
-            model.targetSetChanged = isempty(measured)~=isempty(stored.encounters);
-            if model.targetSetChanged
-                if isempty(measured)
-                    localRequireCompleteObservation(ego,model.stateTime);
+            model.confirmation = stored.confirmation;
+            if isempty(stored.encounters) && ~isempty(measured)
+                % New obligations need fresh admission. An observed exterior
+                % object can be discharged immediately using its current box.
+                model.encounters = measured;
+                model.confirmation = hardEncounterBarrier.admitConfirmation(ego,model);
+                if hardEncounterBarrier.observedExterior(model,measured)
+                    measured = measured([]);
                 end
-                % A different set of vehicle constraints defines a new value
-                % function. Keep the execution/ego checks above, but require
-                % fresh admission; the old witness cannot authorize a command.
+            end
+            model.targetSetChanged = isempty(measured)~=isempty(stored.encounters);
+            if model.targetSetChanged && ~isempty(measured)
                 model.encounters = measured;
                 original = measured;
                 candidate = [];
                 initialization = zeros(2,0);
                 return;
+            end
+            observationContract = model.confirmation;
+            if isempty(stored.encounters), observationContract = []; end
+            observationValid = hardEncounterBarrier.confirmationObservation( ...
+                ego,model.stateTime,observationContract, ...
+                isempty(measured) && ~isempty(stored.encounters));
+            if isempty(measured) && ~isempty(stored.encounters)
+                hardEncounterBarrier.requirePossibleAbsence(model,stored.encounters);
             end
             if ~isempty(measured) && (measured.key~=original.key || measured.halfLength~=original.halfLength ...
                     || measured.halfWidth~=original.halfWidth)
@@ -281,15 +422,38 @@ classdef hardEncounterBarrier
                 model.encounters = targetPrediction.condition(stored.encounters,model.sampleTime,measured);
                 model.motionBoundsIncreased = any(measured.contract.jerkBound>stored.encounters.contract.jerkBound) ...
                     || measured.contract.yawAccelerationBound>stored.encounters.contract.yawAccelerationBound;
-                if model.motionBoundsIncreased
-                    % The completed hold must satisfy its original bounds,
-                    % as checked above. Enlarged future bounds define a new
-                    % problem, so solve it without using the old witness.
-                    model.encounters.contract = measured.contract;
-                    original = model.encounters;
-                    candidate = [];
-                    initialization = zeros(2,0);
-                    return;
+            end
+            if ~isempty(stored.encounters)
+                atDeadline = model.stateTime>=stored.completion.deadline ...
+                    -128*eps(max(1,abs(stored.completion.deadline)));
+                exterior = false;
+                if ~isempty(model.encounters) && observationValid
+                    if atDeadline
+                        exterior = hardEncounterBarrier.observedExterior(model,model.encounters,stored.completion);
+                    else
+                        exterior = hardEncounterBarrier.observedExterior(model,model.encounters);
+                    end
+                end
+                if exterior
+                    model.encounters = model.encounters([]);
+                end
+                model.targetSetChanged = isempty(model.encounters);
+                if ~isempty(model.encounters)
+                    if model.motionBoundsIncreased
+                        % Past motion was conditioned against the old bounds.
+                        % New active obligations need fresh admission; a
+                        % confirmed departure needs only the road witness.
+                        model.encounters.contract = measured.contract;
+                        original = model.encounters;
+                        candidate = [];
+                        initialization = zeros(2,0);
+                        return;
+                    end
+                    model.exitDeadline = stored.completion.deadline;
+                    if atDeadline
+                        error("collisionAvoidanceController:unconfirmedEncounterExit", ...
+                            "The certified exit deadline requires current confirmed departure before road-only control.");
+                    end
                 end
             end
             % The carried witness: the remaining tail with its own data.
@@ -298,10 +462,15 @@ classdef hardEncounterBarrier
             tailViolation = stored.stageViolation(min(consumed+2,end+1):end);
             candidate = struct("stages",stored.stages(min(consumed+2,end+1):end),"inputs",plan(:,consumed+2:end), ...
                 "frames",stored.cellFrames(keep),"normals",{stored.cellNormals(keep)}, ...
-                "terminal",stored.terminal,"carriedValue",carriedValue, ...
+                "terminal",stored.terminal,"completion",stored.completion,"carriedValue",carriedValue, ...
                 "previousValue",stored.value,"previousFirstViolation",localFirst(stored.stageViolation(consumed+1:end)), ...
                 "consumed",consumed,"tailViolation",tailViolation,"storedAcceptance",stored.acceptance, ...
+                "terminalCenter",predictedCenter,"terminalRadius",predictedRadius, ...
                 "inclusionMargin",inclusionMargin,"rebuilt",rebuilt);
+            if isempty(model.encounters)
+                candidate.completion.active = false;
+                candidate.normals = repmat({zeros(2,0)},numel(candidate.frames),1);
+            end
             initialization = zeros(2,0);
             if isfield(stored,"tailDecelerating"), model.preferEquilibriumSeed = stored.tailDecelerating; end
             if stored.remainingSteps>0
@@ -311,7 +480,7 @@ classdef hardEncounterBarrier
             end
         end
 
-        function candidate = transferCandidate(model,candidate)
+        function candidate = transferCandidate(~,candidate)
         % Carry the stored verification to the conditioned box. Every carried
         % row is a monotone function of the box (Lemma 1) and the stored plan
         % was verified on a box containing the conditioned one, so the tail
@@ -321,7 +490,7 @@ classdef hardEncounterBarrier
             stageCount = numel(candidate.stages);
             if stageCount==0
                 [accepted,margins] = hardEncounterBarrier.terminalMembership(candidate.terminal, ...
-                    model.initialEgoState,model.initialFrenetErrorBound);
+                    candidate.terminalCenter,candidate.terminalRadius);
                 candidate.check = struct("accepted",accepted,"failedConditions",strings(1,0), ...
                     "hardRowViolation",max([0;-margins]),"clfViolation",-inf,"margin",min(margins), ...
                     "sweptClearanceMargin",min(margins),"exitMargin",min(margins), ...
@@ -338,6 +507,9 @@ classdef hardEncounterBarrier
                 candidate.verificationMethod = "inclusionTransfer";
             end
             candidate.optimizedStages = stageCount;
+            candidate.check.candidateAccepted = candidate.check.accepted;
+            candidate.check.safetyCertified = candidate.check.accepted && candidate.check.value==0;
+            candidate.check.accepted = candidate.check.safetyCertified;
             candidate.seconds = toc(timer);
         end
 
@@ -358,52 +530,45 @@ classdef hardEncounterBarrier
 
         function candidate = verifyCandidate(model,candidate)
         % Verify the shifted plan with its carried data on the conditioned set.
+            if isempty(candidate.stages)
+                % The invariant terminal law is verified by membership in
+                % both modes. Expanding its stiff rest generator into a fresh
+                % Taylor tube adds no premise to that analytic certificate.
+                candidate = hardEncounterBarrier.transferCandidate(model,candidate);
+                return;
+            end
             timer = tic;
             stageCount = numel(candidate.stages);
             carried = model;
             carried.prescribedTerminal = candidate.terminal;
+            carried.prescribedCompletion = candidate.completion;
             carried.exitSteps = zeros(numel(model.encounters),1);
             carried.exitMargin = inf;
-            if stageCount==0
-                [carried,prediction,inputs,check] = localTerminalOnlyPlan(carried,candidate.terminal);
-                candidate.verificationMethod = "terminalInvariance";
-            else
-                carried.horizonSteps = stageCount;
-                carried.prescribedStages = candidate.stages;
-                carried.linearizationInputs = candidate.inputs;
-                inputs = candidate.inputs;
-                schedule = localPrescribedSchedule(candidate.stages);
-                prediction = ltvBicycleModel.finitePredict(carried,schedule);
-                if numel(prediction.cells)~=numel(candidate.frames)
-                    error("collisionAvoidanceController:invalidStoredCertificate", ...
-                        "The carried cell charts do not match the carried stage models.");
-                end
-                prediction = localPrescribeGeometry(prediction,inputs(:),candidate.frames,candidate.normals,[]);
-                check = [];
-                candidate.verificationMethod = "carriedEnclosureRows";
+            carried.horizonSteps = stageCount;
+            carried.prescribedStages = candidate.stages;
+            carried.linearizationInputs = candidate.inputs;
+            inputs = candidate.inputs;
+            schedule = localPrescribedSchedule(candidate.stages);
+            prediction = ltvBicycleModel.finitePredict(carried,schedule);
+            if numel(prediction.cells)~=numel(candidate.frames)
+                error("collisionAvoidanceController:invalidStoredCertificate", ...
+                    "The carried cell charts do not match the carried stage models.");
             end
+            prediction = localPrescribeGeometry(prediction,inputs(:),candidate.frames,candidate.normals);
+            candidate.verificationMethod = "carriedEnclosureRows";
             carried.anchorPlan = inputs(:);
             carried.verificationOnly = true;
             qp = formulateAvoidanceProblem(carried,prediction,inputs(:));
             carried = rmfield(carried,"verificationOnly");
-            [rowCheck,decision] = solveHardCbfClf.certifyInputs(qp,prediction,carried,inputs);
-            if isempty(check)
-                check = rowCheck;
-            else
-                % Acceptance is the node-zero terminal membership; the one-stage
-                % rows are reported for diagnostics and use the same majorants.
-                check.rowsAccepted = rowCheck.accepted;
-                check.rowFailedConditions = rowCheck.failedConditions;
-                check.clfViolation = rowCheck.clfViolation;
-                check.margin = rowCheck.margin;
-                check.exitMargin = rowCheck.exitMargin;
-                check.sweptClearanceMargin = rowCheck.sweptClearanceMargin;
-            end
+            [check,decision] = solveHardCbfClf.certifyInputs(qp,prediction,carried,inputs);
             candidate.model = carried;
             candidate.prediction = prediction;
             candidate.qp = qp;
             candidate.decision = decision;
             candidate.inputs = inputs;
+            check.candidateAccepted = check.accepted;
+            check.safetyCertified = check.accepted && check.value==0;
+            check.accepted = check.safetyCertified;
             candidate.check = check;
             candidate.optimizedStages = stageCount;
             candidate.seconds = toc(timer);
@@ -512,7 +677,7 @@ function schedule = localPrescribedSchedule(stages)
         "curvature",[curvature,curvature(end)],"brakingRatio",[stages.brakingRatio]);
 end
 
-function prediction = localPrescribeGeometry(prediction,anchor,frames,normals,headingOverride)
+function prediction = localPrescribeGeometry(prediction,anchor,frames,normals)
 % Reuse carried charts and normals; nominals come from the new tubes.
     prediction.geometryAnchor = anchor;
     prediction.geometryFrames = frames;
@@ -520,45 +685,15 @@ function prediction = localPrescribeGeometry(prediction,anchor,frames,normals,he
     for index = 1:numel(prediction.cells)
         tube = prediction.cells(index);
         values = reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
-        if ~isempty(headingOverride)
-            % Anchor the heading majorant where the terminal rows anchored it,
-            % so the one-stage rows are implied by the terminal membership.
-            values(3,:) = headingOverride;
-        end
         nominal{index} = values;
     end
     prediction.geometryNominal = nominal;
     prediction.separationNormals = normals;
 end
 
-function [carried,prediction,inputs,check] = localTerminalOnlyPlan(carried,terminal)
-% No optimized stage remains: the terminal law itself is the verified plan.
-    center = carried.initialEgoState;
-    radius = carried.initialFrenetErrorBound;
-    [accepted,margins] = hardEncounterBarrier.terminalMembership(terminal,center,radius);
-    inputs = terminal.input+terminal.feedback*center;
-    stage = struct("continuousA",terminal.continuousA,"continuousB",terminal.continuousB, ...
-        "continuousC",terminal.continuousC,"speed",0,"curvature",terminal.curvature, ...
-        "brakingRatio",inputs(2),"tireModel",terminal.tireModel);
-    carried.horizonSteps = 1;
-    carried.prescribedStages = stage;
-    carried.linearizationInputs = inputs;
-    prediction = ltvBicycleModel.finitePredict(carried,localPrescribedSchedule(stage));
-    frame = terminal.frame;
-    frame.referenceHeadingErrorBound = frame.headingErrorBound;
-    frames = repmat(frame,numel(prediction.cells),1);
-    normals = repmat({terminal.targetNormals},numel(prediction.cells),1);
-    prediction = localPrescribeGeometry(prediction,inputs(:),frames,normals,terminal.anchorHeading);
-    check = struct("accepted",accepted,"failedConditions",strings(1,0), ...
-        "hardRowViolation",max([0;-margins]),"clfViolation",-inf,"margin",min(margins), ...
-        "sweptClearanceMargin",min(margins),"exitMargin",min(margins), ...
-        "value",0,"stageViolation",0,"terminalMargins",margins);
-    if ~accepted, check.failedConditions = "terminalMembership"; end
-end
-
-function terminal = localTerminalSet(model,prediction,anchor)
+function terminal = localTerminalSet(model,~,anchor)
 % Robust terminal set: pose rows with nominal and open-loop error budgets,
-% velocity box, nonnegative nominal speed and all-future target separation.
+% velocity box and nonnegative nominal speed, independent of every target.
     cfg = model.cfg;
     curvature = laneGeometry.curvature(anchor(1),model.lane);
     terminal = localTerminalDynamics(model,curvature);
@@ -577,33 +712,6 @@ function terminal = localTerminalSet(model,prediction,anchor)
     poseRows = [eye(3);-eye(3);roadRows.state(:,1:3)];
     poseBound = [frame.stationUpper;cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius; ...
         -frame.stationLower;cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius;roadRows.bound];
-    duration = prediction.stageCount*model.sampleTime;
-    normals = zeros(2,numel(model.encounters));
-    futureSupports = zeros(numel(model.encounters),1);
-    for index = 1:numel(model.encounters)
-        target = model.encounters(index);
-        [center,radius] = targetPrediction.finiteFlow(target,duration);
-        egoPosition = frame.origin+[frame.tangent,frame.lateral]*anchor(1:2);
-        displacement = egoPosition-center(1:2);
-        [normal,support] = localAdmissibleNormal(displacement,center,radius,frame,egoPosition,target.contract.jerkBound);
-        normalNorm = norm(normal)+64*eps*(1+norm(normal));
-        if center(8)~=0 || radius(8)~=0 || target.contract.yawAccelerationBound>0
-            bodySupport = hypot(target.halfLength,target.halfWidth)*normalNorm;
-        else
-            bodySupport = targetPrediction.rectangleSupport(target.halfLength,target.halfWidth, ...
-                normal,center(7),radius(7));
-        end
-        [egoSupport,headingSlope] = targetPrediction.rectangleSupportMajorant( ...
-            normal,frame.heading,cfg.vehicle.length/2,cfg.vehicle.width/2, ...
-            anchor(3),cfg.model.headingDomainRadius+frame.headingErrorBound);
-        poseRows = [poseRows;repmat(-normal.'*[frame.tangent,frame.lateral],numel(egoSupport),1),headingSlope]; %#ok<AGROW>
-        collisionLimit = normal.'*frame.origin-support-bodySupport-egoSupport ...
-            -cfg.collision.clearanceMargin*normalNorm-abs(normal).'*frame.positionErrorBound ...
-            -abs(headingSlope)*frame.headingErrorBound;
-        poseBound = [poseBound;collisionLimit]; %#ok<AGROW>
-        normals(:,index) = normal;
-        futureSupports(index) = support;
-    end
     % A p + R |v| <= b is invariant for the terminal comparison dynamics.
     % Enumerate signs of the nominal velocity to obtain ordinary linear rows.
     signs = 2*double(dec2bin(0:7,3)-'0')-1;
@@ -648,8 +756,9 @@ function terminal = localTerminalSet(model,prediction,anchor)
     terminal.frame = frame;
     terminal.anchorHeading = anchor(3);
     terminal.anchorState = anchor;
-    terminal.targetNormals = normals;
-    terminal.futureTargetSupports = futureSupports;
+    terminal.targetNormals = zeros(2,0);
+    terminal.futureTargetSupports = zeros(0,1);
+    terminal.targetIndependent = true;
 end
 
 function budget = localBudget(growth,comparison)
@@ -774,88 +883,6 @@ function excursion = localExcursion(growth,comparison)
     end
 end
 
-function [normal,support] = localAdmissibleNormal(displacement,center,radius,frame,egoPosition,jerkBound)
-% Choose a terminal separating normal whose all-future box support is finite.
-% Candidates are the displacement-based proposal and the chart axes; among
-% the admissible ones, keep the largest current clearance along the normal.
-    proposal = localFutureNormal(displacement,center,frame.lateral);
-    candidates = [proposal,frame.lateral,-frame.lateral,frame.tangent,-frame.tangent];
-    if any(jerkBound)
-        % Cartesian box disturbances may leave a coordinate projection exact,
-        % including on a road whose chart axes do not share that direction.
-        candidates = [candidates,eye(2),-eye(2)];
-    end
-    best = -inf;
-    normal = proposal;
-    support = inf;
-    for index = 1:size(candidates,2)
-        direction = candidates(:,index)/norm(candidates(:,index));
-        value = localFutureSupport(center,radius,direction,jerkBound);
-        if ~isfinite(value), continue; end
-        clearance = direction.'*egoPosition-value;
-        if clearance>best
-            best = clearance;
-            normal = direction;
-            support = value;
-        end
-    end
-    if ~isfinite(support)
-        error("collisionAvoidanceController:unboundedTargetSupport", ...
-            "The current invariant-halfspace terminal certificate has unbounded target support " ...
-            + "in every candidate direction under the supplied motion bounds. " ...
-            + "This does not establish finite-encounter avoidance infeasibility.");
-    end
-end
-
-function normal = localFutureNormal(displacement,center,lateral)
-    normal = displacement;
-    direction = center(5:6);
-    if ~any(direction), direction = center(3:4); end
-    if any(direction) && dot(normal,direction)>0
-        normal = normal-direction*(dot(normal,direction)/dot(direction,direction));
-    end
-    if norm(normal)<1e-10*(1+norm(displacement))
-        if any(direction)
-            normal = [-direction(2);direction(1)];
-            if dot(normal,lateral)<0, normal = -normal; end
-        else
-            normal = lateral;
-        end
-    end
-    normal = normal/norm(normal);
-    if any(direction) && dot(normal,direction)>=-1e-10*norm(direction)
-        normal = normal-1e-9*direction/norm(direction);
-        normal = normal/norm(normal);
-    end
-end
-
-function support = localFutureSupport(center,radius,normal,jerkBound)
-% Supremum over all future time of the box's directional position support.
-% Upper coefficients enclose every member of the box; a derivative sign is
-% never inferred by rounding a small positive value to zero.
-    % A positive cubic coefficient dominates every receding quadratic. Only
-    % an exactly zero projected jerk permits a finite all-future halfspace.
-    if abs(normal).'*jerkBound>0
-        support = inf;
-        return;
-    end
-    initialPosition = dot(normal,center(1:2))+abs(normal).'*radius(1:2);
-    velocity = dot(normal,center(3:4))+abs(normal).'*radius(3:4);
-    acceleration = 0.5*(dot(normal,center(5:6))+abs(normal).'*radius(5:6));
-    errorAcceleration = 128*eps*(sum(abs(normal.*center(5:6)))/2+abs(normal).'*radius(5:6));
-    errorVelocity = 128*eps*(sum(abs(normal.*center(3:4)))+abs(normal).'*radius(3:4));
-    errorPosition = 128*eps*(sum(abs(normal.*center(1:2)))+abs(normal).'*radius(1:2));
-    velocity = velocity+errorVelocity;
-    acceleration = acceleration+errorAcceleration;
-    support = initialPosition+errorPosition;
-    if acceleration>0 || (acceleration==0 && velocity>0)
-        support = inf;
-    elseif acceleration<0 && velocity>0
-        support = support-velocity^2/(4*acceleration);
-    end
-    support = support+256*eps*(1+abs(support)+norm(center(1:2)));
-end
-
 function [schedule,anchor] = localPredictionSchedule(model,seedKind)
     cfg = model.cfg;
     count = model.horizonSteps;
@@ -893,10 +920,10 @@ function localValidateStored(stored,identity)
     required = ["version","stateTime","appliedInput","plan","value","stageViolation","witnessModel","qp", ...
         "decision","prediction","predictedState","stateErrorBound","metadata","identity","encounters", ...
         "originalEncounter","stages","cellStage","cellFrames","cellNormals","terminal","remainingSteps", ...
-        "consumedStages","acceptance","horizonSteps"];
+        "consumedStages","acceptance","horizonSteps","completion","confirmation"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored,required)) ...
-            || stored.version~=20 || ~isfield(stored.terminal,"errorRows")
-        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-20 carried-witness certificate.");
+            || stored.version~=21 || ~isfield(stored.terminal,"errorRows")
+        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-21 finite-completion certificate.");
     end
     if ~isequaln(identity,stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...
@@ -916,18 +943,25 @@ function metadata = localMetadata(metadata,stored)
     metadata.planningWindowSteps = stored.identity.configuration.controller.horizonSteps;
     metadata.certificateExtensionSteps = max(0,stored.horizonSteps-metadata.planningWindowSteps);
     metadata.deadline = stored.deadline;
-    metadata.encounterComplete = false;
+    metadata.encounterComplete = stored.encounterComplete;
+    metadata.confirmedRelease = ~isempty(metadata.dischargedTargetKeys);
+    metadata.roadTailCertified = stored.terminal.targetIndependent;
+    metadata.targetCertifiedUntil = NaN;
+    if ~isempty(stored.encounters), metadata.targetCertifiedUntil = stored.completion.deadline; end
+    metadata.confirmationContract = stored.confirmation;
     metadata.safetyScope = stored.safetyScope;
-    metadata.certifiedDuration = inf;
+    metadata.certifiedDuration = stored.certifiedDuration;
     metadata.commandCertifiedDuration = stored.witnessModel.sampleTime;
     metadata.lookaheadDuration = stored.remainingSteps*stored.witnessModel.sampleTime;
     metadata.recursiveFeasibilityClaimed = true;
-    metadata.recursiveFeasibilityScope = "fixedActiveTargetSet;fixedTargetMotionBounds;declaredAffineStagePlant;boundedTargetMotion;boundedEstimationError;conditionedInformationSets";
-    metadata.indefiniteRecursiveFeasibilityClaimed = true;
+    metadata.recursiveFeasibilityScope = "admittedEncounterUntilConfirmedExit;fixedOrSmallerMotionBounds;declaredAffineStagePlant;conditionedInformationSets;currentConfirmationObservation";
+    metadata.indefiniteRecursiveFeasibilityClaimed = isempty(stored.encounters);
     metadata.terminalContinuationCertified = true;
     metadata.terminalPolicyRole = "carriedWitnessTail";
     metadata.physicalVehicleGuaranteeEstablished = false;
-    metadata.planCertified = true;
+    metadata.planCertified = stored.acceptance.safetyCertified;
+    metadata.safetyCertified = stored.acceptance.safetyCertified;
+    metadata.candidateAccepted = stored.acceptance.candidateAccepted;
     metadata.acceptance = stored.acceptance;
     metadata.hardRowViolation = stored.acceptance.hardRowViolation;
     metadata.activeTargetKeys = string({stored.encounters.key});
@@ -945,21 +979,22 @@ function message = localRejectMessage(result,check,qp)
         result.message,strjoin(check.failedConditions,","),detail);
 end
 
-function localRequireCompleteObservation(ego,time)
-% Absence is departure only under the caller's current no-missed-detection
-% sensor contract. A missing sample or a stale visibility flag is insufficient.
-    p = ego.perception;
-    valid = isstruct(p) && isscalar(p) ...
-        && all(isfield(p,["time","range","completeWithinRange"]));
-    if valid
-        valid = isnumeric(p.time) && isscalar(p.time) && isfinite(p.time) ...
-            && abs(p.time-time)<=128*eps(max(1,abs(time))) ...
-            && isnumeric(p.range) && isscalar(p.range) && isfinite(p.range) && p.range>0 ...
-            && islogical(p.completeWithinRange) && isscalar(p.completeWithinRange) ...
-            && p.completeWithinRange;
-    end
-    if ~valid
-        error("collisionAvoidanceController:unconfirmedTargetDeparture", ...
-            "Dropping a tracked target requires a current complete-within-range sensor declaration.");
-    end
+function direction = localExitDirection(center,frame,anchor)
+    direction = center(1:2)-frame.origin-[frame.tangent,frame.lateral]*anchor(1:2);
+    if norm(direction)<sqrt(eps), direction = frame.lateral; end
+    direction = direction/norm(direction);
+end
+
+function [row,bound] = localExitRow(model,target,center,radius,egoRadius,frame,direction)
+% Directional exterior membership is a convex inner approximation of the
+% complement of the range ball. Charge both boxes, chart error and the entire
+% target body. Norm scaling keeps the implication valid after normalization.
+    row = [direction.'*[frame.tangent,frame.lateral],zeros(1,4)];
+    body = targetPrediction.rectangleSupport(target.halfLength,target.halfWidth, ...
+        -direction,center(7),radius(7))*norm(direction);
+    distance = model.confirmation.range+model.cfg.encounter.numericalMargin;
+    bound = direction.'*(center(1:2)-frame.origin)-abs(direction).'*radius(1:2) ...
+        -abs(row)*egoRadius-abs(direction).'*frame.positionErrorBound ...
+        -body-distance*norm(direction);
+    bound = bound-256*eps*(1+abs(bound)+abs(direction).'*(abs(center(1:2))+abs(frame.origin)));
 end

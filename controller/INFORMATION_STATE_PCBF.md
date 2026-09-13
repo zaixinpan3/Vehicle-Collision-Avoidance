@@ -1,539 +1,224 @@
-# Information-state predictive control barrier function for the two-vehicle study
+# Information-state safe MPC with finite encounter completion
 
-Certificate version 20; lifecycle and bounded-motion extensions September 13, 2026. This document defines the executed
-safe-MPC problem, its carried recursive-feasibility witness, and the value
-function that the controller reports as its predictive control barrier
-function (PCBF). It replaces the "shift-compatibility gap" of version 18 in
-[SINGLE_PATH_RECURSIVE_FEASIBILITY.md](SINGLE_PATH_RECURSIVE_FEASIBILITY.md)
-with a construction in which the shifted plan is verified, at every frame,
-with the very data it was accepted with, on information sets that can only
-shrink. The argument is the shifted-candidate/value-function argument of
-Huang, Wang, Margellos and Goulart (ECC 2025, Section III, Lemmas III.1 and
-III.5, equations (10)–(11), Theorem 4), combined with the two structural
-assumptions Batkovic, Gupta, Zanon and Falcone (arXiv:2305.03312, Assumptions
-4 and 5, Proposition 1) isolate for driving among other road users:
-predictions that are *consistent* over time, and a *safe terminal set* whose
-members are safe against the other road user for all future time.
+Certificate version 21, September 13, 2026. The controller now carries a
+finite, independently verified encounter witness followed by a
+**target-independent road terminal controller**. Its executable safety value
+is exactly zero. Positive safety-value solutions remain solver diagnostics;
+they cannot authorize a command. The finite reach-avoid derivation and global
+entry limitations are developed in
+[FINITE_ENCOUNTER_TERMINAL_DESIGN.md](FINITE_ENCOUNTER_TERMINAL_DESIGN.md).
 
-The proposed alternative in [FINITE_ENCOUNTER_TERMINAL_DESIGN.md](FINITE_ENCOUNTER_TERMINAL_DESIGN.md)
-uses a finite terminal tube and a guarded target-free handover. Its conditional
-proof and entry limitations are documented separately; it is not the terminal
-construction executed by the current controller.
+## Executed specification and premises
 
-## 1. Premises
+The target-specific obligation is rectangle separation, including configured
+clearance, during an admitted active encounter. Only a sound current
+observation discharges that obligation. Road, chart, model-domain, actuator
+and slew obligations remain after discharge.
 
-The theorem below holds under exactly these premises. None is inferred from
-the others, and each is checked or declared at the interface named.
+The implemented certificate uses `N=L=M`: every finite held interval has
+swept collision and road rows, the final node has robust geometric exit rows,
+and that same node belongs to the road-only terminal set. Ego velocity need
+not be zero there. Early confirmed release retains the remaining road-safe
+inputs. A separately optimized road-only tail with `L<M` is not implemented.
 
-- **P1 (fixed active target set).** One ego vehicle and either zero or one
-  visible target. Within an active encounter, target identity and rectangular
-  footprint are fixed. Checked by `hardEncounterBarrier.validateAdmission`
-  and `validateTransition`. The recursive theorem applies on each interval
-  with the same active target set; transitions require fresh admission below.
-- **P2 (bounded estimation error).** At each frame `k` the controller
-  receives an ego estimate with a componentwise error box (`controllerStateErrorBound`
-  or an `ego-state-v1` certificate) and a target estimate with a componentwise
-  box on position, velocity, acceleration, yaw and yaw rate. The true states
-  lie in those boxes. Nonzero future-motion bounds are admitted by
-  `targetPrediction.admitOnline` and retained in the reachable sets.
-- **P3 (bounded target law).** While the same target remains active, its true
-  motion satisfies `p_dot=v, v_dot=a, |a_dot|<=J`,
-  `psi_dot=omega, |omega_dot|<=H`, with fixed componentwise bounds `J>=0`
-  and `H>=0`. The Cartesian constant-acceleration/constant-yaw-rate flow is
-  the nominal center, not a requirement that the true trajectory equal it.
-  Zero bounds recover the exact law. New measurements condition the carried
-  reachable set. A reported smaller bound remains covered by the retained
-  bound; increasing it requires a fresh certificate. The completed hold is still
-  conditioned using its original bound; it cannot be retroactively excused
-  by a larger future bound. Section 4
-  explains the additional restrictions of the invariant terminal halfspace.
-- **P4 (declared ego plant).** Over each held interval `[t_k, t_k+h)` the true
-  ego Frenet state obeys `ẋ = A x + B u_k + c` with `(A,B,c)` the first-stage
-  continuous generator of the plan accepted at frame `k`
-  (`metadata.executedContinuousGenerator`) and `u_k` the issued input, with
-  zero process residual (`ltvModelErrorRateBound`, `plantModelResidualRateBound`
-  both zero; checked). This is the same declared scheduled-affine plant the
-  version-17/18 exact study executed; the difference is that it is now applied
-  to a set of states.
-- **P5 (execution contract).** Frames arrive every `h` seconds with the
-  previously issued input held and reported; road, route, lane and
-  configuration are unchanged (`identity` equality). Arithmetic is exact
-  except where a reserve is explicitly charged (Section 6).
+The conditional guarantee requires:
 
-Nothing here is a claim about a nonlinear Fiala vehicle, a perception
-pipeline, or a real-time budget.
+- One ego and zero or one admitted target. An active target's identity and
+  footprint are fixed. New targets and enlarged future motion bounds require
+  fresh admission; an old witness does not certify these new obligations.
+- Current ego and target error boxes contain the true states. Ego and target
+  measurements are intersected with the previously published reachable sets.
+  Empty intersections invalidate the assumptions and stop control.
+- Each held ego interval executes exactly the issued input and the declared
+  affine generator `xdot=A*x+B*u+c`. Ego process residual bounds are zero.
+  Road geometry, physical configuration, sample spacing and reported previous
+  input agree with the stored execution contract.
+- While active, the target follows `pdot=v`, `vdot=a`, `abs(adot)<=J`,
+  `psidot=omega`, `abs(omegadot)<=H`. `J` and `H` are fixed or smaller on
+  continuation. Zero derivative bounds do not extend model validity beyond
+  the active encounter.
+- The circular confirmation region is centered at the ego reference point,
+  with the radius supplied in `ego.perception.range`. A truthful, current
+  complete observation is available at the planned confirmation sample.
+  The implementation supports zero confirmation delay. Missing confirmation
+  at the deadline invalidates the completion premise; elapsed time alone
+  never releases the target.
+- The retained sampled road terminal model, comparison contraction and
+  invariant-domain premises hold. These are the existing declared rest-model
+  assumptions, not a validated nonlinear vehicle inclusion.
 
-## Visible-target lifecycle
+These are not claims of nonlinear vehicle safety, sensing reliability,
+feasibility of arbitrary encounters, or real-time execution.
 
-No target means an empty encounter array, not a virtual remote vehicle or an
-alternative controller. The same optimization retains the road rows, physical
-limits, input objective, sampled CLF constraints and road/pose terminal set.
-There are no vehicle collision rows or target terminal halfspaces in this
-case. The safety value may still measure road violations; it is not forced
-to zero merely because no vehicle is visible. The fixed-set shifted-plan
-argument applies with the target-indexed conditions vacuous.
+## Finite propagation and swept safety
 
-For a zero-to-one or one-to-zero target transition, the implementation first
-validates the previous executed input, sample time, model/road identity and
-ego-box conditioning. It then builds a fresh certificate for the new active
-set. No old witness can command the vehicle if that admission fails. In
-particular, the no-target plan does not certify safety relative to a newly
-observed obstacle. Target-key replacement while a target remains present is
-still rejected, and multiple simultaneous targets remain unsupported.
+The ego endpoint is computed by the exact held affine exponential. If the
+current box is `z +/- rho`, its successor center is
+`Phi*z+Gamma*u+eta`, with radius `abs(Phi)*rho`. The carried witness retains
+its own generators, controls, charts, cell normals and published node boxes.
+It does not replace those generators with a fresh linearization and assume
+that the resulting enclosure is nested.
 
-Removing a previously tracked target requires the caller's current perception
-record to declare `completeWithinRange=true`, a finite positive range and a
-matching timestamp. Under the synthetic sensor's no-missed-detection contract,
-an empty published list means there is no target inside that range. Missing
-or stale data without that declaration stops control. This relies on truthful
-sensor completeness; the controller does not infer an unobserved target's
-position or prove sensor reliability. A fresh zero-target admission may be
-used by an explicit no-target scene without a perception record.
+Target centers use constant Cartesian acceleration; target position radii
+are
 
-`targetSetChanged`, `newlyAdmittedTargetKeys`, `dischargedTargetKeys`, `hasTarget`
-and an empty 8-by-0 target-bound matrix expose this behavior. A switch has no
-`candidateVerified` witness and reports `pcbfDescentResidual=NaN`: values for
-different target sets are not compared as if they were one function.
-`recursiveFeasibilityScope` explicitly includes `fixedActiveTargetSet` and
-`fixedTargetMotionBounds`. A future-bound enlargement reports
-`motionBoundsIncreased=true`, requires fresh admission after the original
-hold/measurement checks, and likewise has no cross-contract descent comparison.
-A failed fresh admission cannot execute the old smaller-bound witness.
-There is no unconditional safety claim for unseen objects, late detection,
-or switching before a fresh feasible certificate exists.
+    rp(t) = rp(0) + rv(0)*t + ra(0)*t^2/2 + J*t^3/6.
 
-The physical pipeline's nonzero ego process residual remains outside P4.
-The NRMM output's broad target bounds are now admitted, but can still prevent
-the all-future terminal halfspace even for a constant true target. No error
-radius is suppressed. Failure of this sufficient terminal construction does
-not prove infeasibility of finite-encounter collision avoidance.
+Velocity, acceleration and yaw bounds are propagated by the corresponding
+integrals. They remain finite at every finite prediction time, including
+when both jerk components are positive. No cap or anticipated observer reset
+is applied. `nominalFlow` provides curved optimization anchors only;
+`finiteFlow` is the safety model.
 
-## 2. Objects
+For each swept cell, a separating normal and rectangle support majorants
+produce affine inequalities at every Bernstein point. Nonnegative Bernstein
+basis weights summing to one imply the inequality throughout the cell.
+Taylor remainders, propagated uncertainty, yaw/footprint bounds and chart
+errors are included before acceptance. Collision constraints cover **all**
+finite cells, including the final hold ending at confirmation. Road and
+model-domain rows likewise cover the complete finite witness.
 
-**Boxes.** `⟨x̄, r⟩ := {x : |x − x̄| ≤ r}` (componentwise). `⟨x̄', r'⟩ ⊆ ⟨x̄, r⟩`
-holds iff `|x̄' − x̄| ≤ r − r'` componentwise.
+## Convex finite exit
 
-**Ego information set.** At admission, `X_0 = toFrenet(⟨x̂_0, r̂_0⟩)`
-(`stateUncertainty.toFrenet`, which requires one invertible projection chart).
-At a continuation frame, with the previous plan's predicted successor box
-`⟨x̄_{1|k}, r_{1|k}⟩` and the new measurement box `⟨x̂_{k+1}, r̂_{k+1}⟩`,
+For final chart `pE=o+L*z+epsilon`, fixed exit direction `m`, ego radius
+`rho`, target center `pT`, and target position radius `rp`, impose
 
-    X_{k+1} = hull( ⟨x̄_{1|k}, r_{1|k}⟩ ∩ toFrenet(⟨x̂_{k+1}, r̂_{k+1}⟩) ),
+    m' * L * z <= m' * (pT-o)
+                   - abs(m)' * rp - abs(m'*L) * rho
+                   - abs(m)' * chartPositionError
+                   - targetRectangleSupport(-m)
+                   - (range + exitReserve) * norm(m).
 
-computed by `localConditionBox` in `hardEncounterBarrier.validateTransition`.
-An empty intersection is reported as `inconsistentObservation` (a premise
-failed); otherwise `x(t_{k+1}) ∈ X_{k+1} ⊆ ⟨x̄_{1|k}, r_{1|k}⟩`.
+The target support is maximized over its complete final yaw interval. Thus
+the **entire target footprint**, rather than just its nominal center, lies
+outside the declared range ball. Chart validity follows from the same road
+terminal chart constraints. The norm factor makes the exterior implication
+valid even with floating-point normalization. Independent arithmetic reserves
+are subtracted as well.
 
-**Target information set.** `Z_0` is the admitted measurement box. At a
-continuation frame, `Z_{k+1} = hull( Φ_h(Z_k) ∩ ⟨ẑ_{k+1}, ρ̂_{k+1}⟩ )`
-(`targetPrediction.condition`), where `Φ_τ` denotes the bounded reachable-box
-operator of P3 (`targetPrediction.finiteFlow`). Its center is the nominal
-Cartesian flow. Its radii are
+This affine directional condition is a conservative inner approximation of
+the nonconvex exterior of a ball. The final anchor proposes the direction;
+different seeds can propose different directions. A carried rebuild keeps
+the original exit direction and chart. All exit rows are hard in both
+lexicographic optimization stages. Only verified finite completions admit
+control; a search failure does not establish physical collision inevitability
+or global infeasibility.
 
-    rho_p(t) = rho_p + t*rho_v + t^2*rho_a/2 + t^3*J/6,
-    rho_v(t) = rho_v + t*rho_a + t^2*J/2,
-    rho_a(t) = rho_a + t*J,
-    rho_psi(t) = rho_psi + t*rho_omega + t^2*H/2,
-    rho_omega(t) = rho_omega + t*H.
+At admission the declared range must exceed both body circumradii plus
+collision clearance. This makes a complete absence observation compatible
+with the local collision region. A complete scan reporting absence while
+the carried target reference box is wholly inside that range is rejected
+as inconsistent.
 
-The nonnegative transition matrix `M(t)` and disturbance term `q(t)` obey
-`M(t+h)=M(t)M(h)` and `q(t+h)=M(t)q(h)+q(t)`. Thus the box operator is monotone
-and satisfies the semigroup identity in exact arithmetic, even though it
-discards correlations of the actual reachable set. Floating-point reserves
-are handled separately as in Section 6. An empty measurement intersection
-contradicts the supplied bounds; deviation from the nominal center alone does
-not. Bounds on actual jerk must include the nominal turning motion's jerk
-if a constant-curvature trajectory is used to generate truth.
+## Observation release and deadlines
 
-**Plan and data.** A plan is an open-loop input sequence `u_0,…,u_{m−1}`
-together with its *data* `D`: per stage `j` the generator `(A_j,B_j,c_j)`, the
-schedule scalars used by the slip rows, and per certification cell the lane
-chart (`frame`) and the separating normal per target; plus the terminal data
-`T` of Section 3. `hardEncounterBarrier.carriedData` extracts `D` from an
-accepted plan; the certificate carries it.
+A current complete scan requires matching `perception.time`, a positive
+finite `range`, and logical `completeWithinRange=true`. Active certificates
+require exactly the same range as their carried confirmation contract.
+An active target is discharged by either:
 
-**Enclosure.** Given `X = ⟨x̄, r⟩`, a plan and its data, `ltvBicycleModel.finitePredict`
-(with `model.prescribedStages` when the data are carried) produces, for every
-cell `ℓ` and Bernstein control point `q`, a box `⟨p_{ℓq}(x̄,u), ρ_{ℓq}(r)⟩`
-that contains the held-input affine flow of every `x ∈ X`
-(`stateUncertainty.flowTube`). `p_{ℓq}` is affine in `x̄` and `u`; `ρ_{ℓq}`
-is `R_{ℓq} r + ρ⁰_{ℓq}` with `R_{ℓq} ≥ 0` (Taylor remainder and tail terms are
-nondecreasing in `r`). Separately, the *node* boxes are the exact held-input
-stage flows: centers `x̄_{j+1} = Φ_j x̄_j + Γ_j u_j + γ_j` with
-`(Φ_j,Γ_j,γ_j) = expm(h[A_j B_j c_j; 0])` and radii `r_{j+1} = |Φ_j| r_j`
-(`prediction.initialErrorBound`, the interval-hull chain). The published
-successor box, the conditioning of Section 2 and the terminal node of
-Section 3 all use these exact nodes, never the tube endpoints. A
-signed-generator chain would be tighter at the terminal node but is not
-monotone once a later frame re-boxes an intermediate node, which is why the
-hull chain is the published one.
+1. Current complete absence consistent with its carried reachable set; or
+2. A current target observation, conditioned against that reachable set,
+   whose whole footprint is robustly exterior to the region.
 
-**Rows.** Every constraint is a halfspace on a control point:
-`a_ρ·p_{ℓq} + |a_ρ|·ρ_{ℓq} ≤ b_ρ`. Hard rows: input bounds, slew, model
-domain (station chart, lateral, heading, velocity box, slip), terminal rows.
-Safety rows (relaxable): oriented-rectangle separation along the cell normal
-with the target box at the cell time, and road containment. `formulateAvoidanceProblem`
-labels rows by `safetyRows` and `rowStage`.
+Prediction, nominal range crossing and a timer never trigger release.
+Absent or stale confirmation cannot authorize road-only terminal execution.
+A previously discharged, currently observed exterior object creates no new
+inside-region obligation; an inside or uncertain returning object needs
+fresh admission. This does not prove safety across re-entry or detection
+latency.
 
-**Value.** For a decision, `solveHardCbfClf.certify` computes the per-stage
-violation `ξ_j = max(0, max_{safety rows of stage j}(a·p + |a|ρ − b))` on the
-physical rows and reports `V = Σ_j ξ_j`, the exact-arithmetic evaluation of
-Huang et al.'s objective with an `ℓ∞`-per-stage slack (their footnote 2).
-A decision is *verified* iff every hard row holds (with the rounding
-allowance), every CLF cone holds with its slack, and `V` is finite. Verified
-does not mean safe; `V = 0` means no predicted violation.
+Admission searches finite horizons by extending a candidate after exhausted
+seeds, subject to the search work budget. During an active encounter a fresh
+horizon is capped at the stored absolute exit deadline. One remaining hold
+is supported. A replacement cannot move that deadline later. A failed fresh
+solve leaves the independently verified carried suffix available. After
+release the road-only problem can replan with its usual rolling horizon.
 
-## 3. Robust terminal set
+## Road-only invariant terminal set
 
-Fix the terminal curvature `κ_T` (lane curvature at the plan's terminal
-anchor station). `localTerminalDynamics` builds the zero-speed scheduled
-generator `ẋ = A_T x + B_T u + c_T` with `A_T(:,1:3)=0`, longitudinal row
-`v̇_x = −a v_x + g β` (`a ≥ 0` the linearized road-load damping), lateral block
-`F_ℓ`, and the rest input `u_f = (0, β_0)` with `c_T + B_T u_f = 0`.
+Write `x=(q,v)`, where `q=(s,d,ePsi)` and `v=(vx,vy,r)`. For the retained
+sampled rest law, the nominal velocity has a Hurwitz Metzler comparison `C`.
+A separate open-loop error comparison `Ce` bounds the velocity uncertainty.
+An uncertain terminal velocity requires finite passive error excursion.
 
-**Terminal law (sampled, on the predicted nominal).** With period `h`,
-`k_b = e^{−ah}(1−e^{−h})/φ_h` (`φ_h = (1−e^{−ah})/a`, or `h` if `a=0`),
+For each road or chart pose row `a*q<=b`, let `g` bound the positive pose
+growth and set `R=g/(-C)`. Nonnegative nominal longitudinal speed permits
+using `max((a*D)(1),0)` for the longitudinal term. The other terms use
+absolute values. For the error budget use `Re=abs(a*D)/(-Ce)`. Verified
+nonnegative budgets with numerical reserve satisfy `R*C+g<=0`.
 
-    u_k = u_f + K x̄_k,   K = −(k_b/g) e_{v_x}^⊤,
+    a*qbar + R*abs(vbar) + abs(a)*rho_q + Re*rho_v <= b
 
-where `x̄_k` is the *predicted nominal* at that sample, never the estimate.
-Under P4 the true state is `x = x̄ + e`; the nominal obeys the sampled closed
-loop (`v̄_{x,k+1} = ρ v̄_{x,k}`, `ρ = e^{−(a+1)h} ∈ (0,1)`, `v̄_x(t) ≥ 0` inside
-each hold) and, by linearity, the error obeys the *open-loop* generator
-`ė = A_T e` with no input.
+is invariant under the declared comparison assumptions. Enumerating nominal
+velocity signs gives the linear rows `Af*z+Ef*rho<=bf`. Velocity-domain,
+terminal-input and first-terminal-input slew constraints are retained. There
+are **no target rows or infinite-time target support calculations** in this
+set. Its controller may reduce speed after handoff; cruise remains a soft
+CLF performance objective.
 
-**Comparison systems.** Let `C_err` be the Metzler comparison matrix of the
-velocity block of `A_T` (its diagonal kept, off-diagonal entries in absolute
-value) and `C_nom = C_err − k_b e_1 e_1^⊤`. `C_nom ≤ C_err` componentwise.
-`localComparisonDirection` certifies a Hurwitz Metzler matrix by a positive
-`q` with `C q < 0`; `q` is taken from `C_err` when it is Hurwitz (this needs
-`a > 0`), otherwise from `C_nom` and then only a zero velocity box may be
-carried (`errorBudgetFinite=false`, checked in `completionRows`). The
-velocity box is `Q = {|v| ≤ q}` after `q` is scaled to the speed, lateral
-velocity, yaw-rate, slip, braking-ratio and braking-slew limits.
+The terminal input uses the carried nominal and its certified box. In
+particular, conditioning a new measurement does not silently recenter that
+nominal and change the verified transition from the last planned input.
 
-**Pose rows and budgets.** The pose rows `A p ≤ b` (`localTerminalSet`) are
-the terminal station chart, the lateral and heading domains, road containment
-of the full footprint over the chart, and, per target, the separating row
-`−n^⊤(origin + [t,l] p_{1:2}) + slope·e_ψ ≤ n^⊤ origin − S_n − h_T − h_E − …`
-with `S_n` the all-future box support of Section 4, `h_T` the target
-rectangle support over its yaw box (its circumradius if the yaw-rate box is
-not `{0}` or `H>0`) and `h_E` the concave ego support majorant anchored at the terminal
-heading. With `G = A_T(1:3,4:6)`, the directional growth `g_j = [max((A_jG)_1,0), |(A_jG)_{2:3}|]`
-(valid because the nominal `v̄_x` never becomes negative) and the symmetric
-growth `|A_j G|`, `localBudget` computes nonnegative row budgets
+## Independent acceptance and recursive argument
 
-    R_nom,j C_nom + g_j ≤ 0,      R_err,j C_err + |A_j G| ≤ 0,      R_nom,j ≤ R_err,j,
+The verifier evaluates physical rows with an arithmetic allowance charged
+against their margins. For stage `i`, `xi_i` is the nonnegative maximum
+collision/road row violation, and `S=sum(xi_i)`. It reports:
 
-with checked floating-point reserves; the last inequality is verified and
-required (Proposition 2 uses it; it follows mathematically because `−C_nom ≥ −C_err`
-are M-matrices).
+- `candidateAccepted`: finite decision, hard domain/exit/road-terminal rows
+  and relaxed CLF checks passed;
+- `safetyCertified`: those checks passed **and `S==0`**;
+- `accepted`: an alias for `safetyCertified` used by execution.
 
-**Membership.** A node box `⟨x̄, r⟩` with `x̄ = (p̄, v̄)`, `r = (r_p, r_v)` is in
-`X_f` iff, for all rows `j` and all sign vectors `σ ∈ {−1,1}^3`,
+Numerical solve reserves provide space for solver error. Neither solver
+feasibility tolerances nor the lexicographic tie tolerance permit positive
+physical safety violation. The CLF remains soft and convex. Only
+`clf.samplePoints="controlPoints"` enforces a common majorant at every
+Bernstein point and supports an all-time cell dissipation interpretation;
+endpoints or stage nodes support their stated sample checks only.
 
-    A_j p̄ + R_nom,j (σ ⊙ v̄) + |A_j| r_p + R_err,j r_v ≤ b_j,          (T1)
-    ±v̄_i + r_{v,i} ≤ q_i  (i = 1,2,3),      v̄_x ≥ 0.                  (T2)
+For a zero-value admitted witness, the swept rows certify its first hold.
+The next conditioned ego and target sets are subsets of the carried
+successor enclosures. With the same controls and generators, reachable sets
+are monotone under inclusion, so the stored suffix still covers all valid
+successors. `transferCandidate` reuses that verification;
+`verifyCandidate` rebuilds with the carried data and independently checks it.
+A fresh solve can replace this witness only after zero-value verification
+and without extending its active exit deadline.
 
-`terminal.stateRows/stateBound` hold the enumerated `(T1)–(T2)` rows on the
-nominal and `terminal.errorRows` the coefficients of `r`; `completionRows`
-maps them onto the plan's final node, and adds the entry-slew rows of the
-first terminal input (a deterministic function of the nominal, so no box
-enters them).
+If a current observation releases the target early, removing its constraints
+preserves the road-safe suffix and terminal set. Otherwise the finite exit
+row and the confirmation premise imply release at the fixed deadline. The
+road terminal law then preserves the permanent obligations. Induction gives
+swept collision safety during the admitted active encounter and road
+continuation afterward, conditional on the stated premises.
 
-**Proposition 1 (robust invariance and all-time safety).** Let `⟨x̄_0, r_0⟩ ∈ X_f`
-and let the ego obey P4 with the terminal generator and the sampled law
-above. Then for every `x_0 ∈ ⟨x̄_0, r_0⟩` and every `t ≥ 0`: `A p(t) ≤ b`,
-`|v(t)| ≤ q`, and at every later sample the pair (nominal, comparison-propagated
-radius) is again in `X_f`.
+For the same remaining witness and unchanged obligations, dropping the first
+stage yields `S_next <= S_current-xi_0`; at the executable level both values
+are exactly zero. A positive diagnostic value or locally selected normals
+do not establish an exact global PCBF value function. No indefinite old-target
+model or invariant target halfspace enters this proof.
 
-*Proof.* Write `x(t) = x̄(t) + e(t)`. For the nominal, `N_j(t) := A_j p̄(t) + R_nom,j |v̄(t)|`
-has `D⁺N_j ≤ (g_j + R_nom,j C_nom)|v̄| ≤ 0` (the argument of
-SINGLE_PATH_RECURSIVE_FEASIBILITY.md, using `D⁺|v̄| ≤ C_nom|v̄|` inside every
-hold and `v̄_x ≥ 0`). For the error, `E_j(t) := A_j e_p(t) + R_err,j |e_v(t)|`
-has `D⁺E_j ≤ |A_j G||e_v| + R_err,j C_err |e_v| ≤ 0` because `D⁺|e_v| ≤ C_err|e_v|`
-for the open-loop generator. Hence `A_j p(t) = A_j p̄(t) + A_j e_p(t) ≤ N_j(t) + E_j(t)
-≤ N_j(0) + E_j(0) ≤ A_j p̄_0 + R_nom,j |v̄_0| + |A_j| r_{p,0} + R_err,j r_{v,0} ≤ b_j`
-by (T1). The scaled level `max_i |v_i|/q_i` of `v̄` and of `e_v` are each
-nonincreasing (`C_nom q < 0` and `C_err q < 0`), so `|v(t)| ≤ |v̄(t)| + |e_v(t)|`
-stays inside `Q` by (T2). Nonincrease of `N_j`, `E_j` and of both levels gives
-membership at later samples. ∎
+## Runtime metadata and implementation
 
-**Proposition 2 (monotonicity under box inclusion).** If `⟨x̄, r⟩ ∈ X_f` and
-`⟨x̄', r'⟩ ⊆ ⟨x̄, r⟩`, then `⟨x̄', r'⟩ ∈ X_f`.
+`targetCertifiedUntil` and `certifiedDuration` are finite while a target is
+active. `confirmedRelease`, `encounterComplete`, `roadTailCertified`, and
+`confirmationContract` report separate obligations. After release the target
+validity field is `NaN`; the road continuation duration may be infinite.
+`indefiniteRecursiveFeasibilityClaimed` applies only to the target-free road
+problem. `physicalVehicleGuaranteeEstablished` remains false.
 
-*Proof.* From `|x̄' − x̄| ≤ r − r'`: `A_j p̄' ≤ A_j p̄ + |A_j|(r_p − r'_p)` and
-`|v̄'| ≤ |v̄| + (r_v − r'_v)`. Then the left side of (T1) for the primed box is
-at most `A_j p̄ + |A_j| r_p + R_nom,j |v̄| + R_err,j r_v − (R_err,j − R_nom,j)(r_v − r'_v) ≤ b_j`,
-using `R_nom,j ≤ R_err,j` and `r_v ≥ r'_v`. (T2) follows the same way. ∎
+`hardEncounterBarrier` owns finite completion and observation guards alongside
+road terminal construction and witness transfer. `targetPrediction` retains
+finite bounded motion and conditioning. `formulateAvoidanceProblem` appends
+hard exit and road terminal rows. `solveHardCbfClf` distinguishes numerical
+candidates from executable certificates; `collisionAvoidanceController`
+checks and publishes the carried state.
 
-## 4. Two monotonicity lemmas
-
-**Lemma 1 (interval hulls of affine maps are monotone).** For any matrix `M`,
-vector `m`, and boxes `⟨x̄', r'⟩ ⊆ ⟨x̄, r⟩`: `⟨M x̄' + m, |M| r'⟩ ⊆ ⟨M x̄ + m, |M| r⟩`.
-*Proof.* `|M x̄' − M x̄| ≤ |M||x̄' − x̄| ≤ |M|(r − r')`. ∎
-
-Consequences used below: (i) for fixed cell data, every control-point box of
-the enclosure computed from `X_{k+1}` is contained in the corresponding box
-computed from `⟨x̄_{1|k}, r_{1|k}⟩`, because `p_{ℓq}` is affine in `x̄` and
-`ρ_{ℓq}` is nondecreasing and affine-dominated in `r` (Section 2); (ii) for
-the target, `Φ_τ(Z_{k+1}) ⊆ Φ_{τ+h}(Z_k)` as boxes, because `Z_{k+1} ⊆ Φ_h(Z_k)`
-and the bounded box operator is monotone and has the semigroup identity of
-Section 2; (iii) every halfspace row satisfied by a box is
-satisfied by any sub-box, and the violation `max(0, a·p̄ + |a|ρ − b)` is
-nonincreasing under inclusion.
-
-**Lemma 2 (all-future support).** For a unit normal `n` and a target box
-`Z = ⟨z̄, ρ⟩`, define upper coefficients `P = n·p̄ + |n|·ρ_p`, `V = n·v̄ + |n|·ρ_v`,
-`A = ½(n·ā + |n|·ρ_a)` and `C=|n|·J/6`. The upper all-future directional
-support, over the initial box and every admissible disturbance, is
-`S_n(Z)=sup_{τ>=0}(P+Vτ+Aτ²+Cτ³)` before numerical reserves.
-For `C>0` it is infinite regardless of the quadratic term. For `C=0` it
-equals `P` if `A<=0, V<=0`; `P-V²/(4A)` if `A<0<V`; and infinity otherwise
-(`localFutureSupport`). No small positive coefficient is rounded to zero.
-Moreover `S_n(Z_{k+1}) <= S_n(Z_k)` for
-`Z_{k+1} ⊆ Φ_h(Z_k)` (a supremum over a subset of trajectories and times).
-`localAdmissibleNormal` selects, among the displacement-based proposal and the
-chart axes (also Cartesian axes for nonzero jerk), a normal with finite
-support and the largest current clearance. If none exists the frame reports
-`unboundedTargetSupport`: this terminal family did not certify the state.
-It does not prove that all finite-horizon avoidance controls are infeasible.
-Nonzero jerk orthogonal to a separating normal is compatible with this
-certificate. Positive bounds in both Cartesian axes make every nonzero
-normal's cubic coefficient positive. This is a structural conservatism of
-the current terminal construction; it is not a physical requirement that
-every target be predicted over infinite time. The visibility lifecycle
-still releases a target on confirmed departure.
-
-## 5. The theorem
-
-Per frame the controller (in `collisionAvoidanceController`) does the following.
-
-1. Conditions `X_k` and `Z_k` (Section 2).
-2. If a certificate is carried: forms the **candidate** — the previous
-   accepted plan without its first input, `(u_{1|k−1},…,u_{m−1|k−1})`, with the
-   carried data of stages `2..m` and the carried terminal data `T_{k−1}` — and
-   verifies it on `(X_k, Z_k)` (`hardEncounterBarrier.verifyCandidate`).
-   With `m − 1 = 0` optimized stages left, the candidate is the terminal law
-   itself and verification is the node-zero membership test
-   `hardEncounterBarrier.terminalMembership(T_{k−1}, x̄_k, r_k)`.
-3. Solves a **fresh** problem (fresh linearization along the shifted plan,
-   fresh charts and normals, fresh terminal data): value LP, then CLF SOCP
-   within the value optimum (`solveHardCbfClf.solve`), and verifies the
-   result with its own data.
-4. **Accepts** the fresh plan iff it is verified and its value does not exceed
-   the candidate's value (exactly when the candidate's value is zero; within
-   `solver.lexicographicTieTolerance` otherwise). Otherwise the candidate is
-   the accepted plan. The first input of the accepted plan is issued; the
-   accepted plan and its data are carried.
-
-**Theorem (recursive feasibility and PCBF descent).** Under P1–P5, if the
-plan accepted at frame `k` is verified (with value `V_k` and first-stage
-violation `ξ_{0,k}`), then at frame `k+1` the candidate is verified with
-value at most `V_k − ξ_{0,k}`. Consequently a verified plan exists at every
-subsequent frame, the accepted values satisfy
-
-    V_{k+1} ≤ V_k − ξ_{0,k} ≤ V_k          (exactly whenever V_k = 0),
-
-the set `{V = 0}` is invariant, and on it every executed hold is free of
-predicted collision and road violation over the whole held interval.
-
-*Proof.* (a) *Successor containment.* By P4 and P5 the true state at `t_{k+1}`
-is the affine flow of a member of `X_k` under `u_{0|k}`, hence lies in the
-verified successor box `⟨x̄_{1|k}, r_{1|k}⟩` of the accepted enclosure; by P2 it
-lies in the measurement box; so `X_{k+1}` contains it and
-`X_{k+1} ⊆ ⟨x̄_{1|k}, r_{1|k}⟩`. Likewise `Z_{k+1} ⊆ Φ_h(Z_k)` by P3 and P2.
-(b) *Carried stages.* The candidate's stage `j` is the accepted plan's stage
-`j+1` with the same generator, chart, normal and input. Its enclosure from
-`X_{k+1}` is contained cell by cell in the accepted enclosure from
-`⟨x̄_{1|k}, r_{1|k}⟩` (Lemma 1(i)), and its target boxes are contained in the
-accepted ones at the same absolute times (Lemma 1(ii)). Every hard row of
-those stages therefore holds, and each stage violation is at most the
-accepted one (Lemma 1(iii)): `ξ_{j|k+1} ≤ ξ_{j+1|k}`. The input, slew and
-CLF-slack rows involve only the carried inputs and the previously issued
-input, which are unchanged (the CLF slacks are recomputed by `certifyInputs`
-and never relax a hard row). (c) *Terminal node.* The candidate's final node
-`m−1` is the accepted plan's node `m`, whose box was in `X_f(T_{k−1})`; the
-new node box is a sub-box of it (Lemma 1(i)), hence in `X_f` (Proposition 2).
-The carried terminal rows use `S_n` computed from the accepted terminal time;
-by Lemma 2 they dominate the rows the new terminal time would require. Thus
-the candidate is verified with `V ≤ Σ_{j≥1} ξ_{j|k} = V_k − ξ_{0,k}`.
-(d) *Terminal-only candidate.* With no optimized stage left, membership of
-`X_k` in `X_f(T_{k−1})` holds by Proposition 1 applied at the previous frame
-and Proposition 2 applied to the conditioned box; the issued input is the
-terminal law on the nominal `x̄_k`, and Proposition 1 gives safety for all
-future time, in particular over the next hold, and membership again at
-`t_{k+1}`. (e) *Acceptance.* The accepted plan is either the candidate or a
-verified fresh plan with no larger value, so the inequality holds for the
-accepted values; by induction a verified plan exists at every frame. When
-`V_k = 0` the acceptance rule is exact, so `V_{k+1} = 0`; a zero value means
-every safety row holds on every Bernstein control point of every cell, and
-the control-point boxes enclose the complete held-input flow of every member
-of the information set, which gives the continuous-time statement. ∎
-
-**Remarks.** (i) The theorem is the executable form of Huang et al.'s Lemma
-III.1 and inequality (11) with the information set as the state and the
-verified value of the accepted plan as the barrier: `h(X_k) := V_k` satisfies
-`h(X_{k+1}) − h(X_k) ≤ −ξ_{0,k} ≤ 0` along the closed loop, with zero
-sublevel set the verified-safe boxes. It is not a claim to have computed the
-exact optimum over all plans; the value is an attained upper bound that
-decreases as required. (ii) Batkovic et al.'s Assumption 4 is Lemma 1(ii)
-and (iii) with conditioning; their Assumption 5 is Proposition 1 with the
-all-future support of Lemma 2 playing the role of "the a-priori unknown
-constraint can never be active in the safe set". (iii) The recovery statement
-of Huang et al. (Lemma III.5, `ξ_{0,k} → 0`) follows with an exact tie-break;
-with the positive `lexicographicTieTolerance` `τ`, the descent in the
-positive-value regime is `V_{k+1} ≤ V_k − ξ_{0,k} + τ`, which is what the
-controller reports as `pcbfDescentResidual`.
-
-## 6. What is numerical, and what the reserves cover
-
-- **Rounding.** Every verified row is evaluated with the allowance
-  `γ(|b| + |A||x|)`, `γ = n·eps/(1 − n·eps)`. Fresh solves tighten every hard
-  row at solve time by `2·max(numericalMargin·rowScale, constraintTolerance·programScale)`,
-  where `rowScale = 1 + |b| + |a|·(input reach)` and `programScale` is its
-  maximum over the program: the native solver's feasibility tolerance is
-  relative to the program's dominant magnitude, so its absolute error is
-  shared by every row, including small ones such as the terminal velocity
-  box. The performance stage keeps a further interior of at most
-  `10·numericalMargin`, never more than half the margin LP point's margin.
-  Accepted fresh plans therefore satisfy the physical rows with margin; the
-  carried re-evaluation can lose only rounding-level amounts (the `flowTube`
-  arithmetic term depends on the magnitude of the nominal, which is not
-  monotone at the `eps` level). A carried witness that nevertheless fails
-  verification is reported as `carriedWitnessRejected`; it is a premise or
-  arithmetic failure, not a controller decision.
-- **Solver tolerance and the value decision.** Stage A first solves the
-  margin LP with every violation fixed at zero; it is feasible exactly when
-  a zero-violation plan exists on the tightened rows, and its point supplies
-  the performance interior. Only when it is infeasible does the value LP
-  minimize `Σξ`; Stage B then receives that optimum plus `τ` as its budget.
-  With a zero optimum the violation columns stay fixed at zero.
-- **Frame deadline.** The search for a fresh plan runs at least one
-  attempt; after that, once `solver.frameDeadlineSeconds` has elapsed since
-  the frame started, no further solve begins and the verified carried
-  witness is the command (`freshSolveFailure = "…frameDeadline…"`). The
-  deadline never applies at admission, where no witness exists. This is the
-  anytime property of the design: safety needs only verification (a sparse
-  product and the terminal membership), never the solve.
-- **Speed-scaled fresh horizon.** The fresh plan uses
-  `N = max(N_min, ceil(N_cfg · v/v_ref))` stages; the carried witness keeps
-  its own length. Any horizon is admissible for the guarantee because
-  acceptance compares verified values only. Near rest the fresh program is
-  a fraction of its cruise size.
-- **Row generation.** Every conic solve runs on a working set of its hard
-  rows (the rows tightest at the value-stage point or the anchor, about
-  four rows per unknown), checks every omitted row at the solution, adds
-  the violated ones and repeats; a subset solution violating no omitted row
-  solves the complete program, and an infeasible subset proves the
-  complete program infeasible. Any unclean subset status falls back to the
-  complete program. The accepted plan is verified on all physical rows
-  regardless (`solver.rowGeneration`).
-- **CLF sampling.** The sampled-data CLF decrease is imposed and verified
-  at the two ends of every tube cell (`clf.samplePoints = "endpoints"`);
-  the control-point variant remains available. The CLF is a performance
-  tier and does not enter the safety claim.
-- **Terminal nonnegative-speed row.** (T2) bounds the *nominal* speed,
-  `v̄_x ≥ 0`, which the braking law preserves exactly (`v̄⁺ = ρ v̄`); this
-  row charges no box radius. The implementation originally charged the
-  velocity radius to that row, and "nominal minus radius" is not invariant
-  because the braked nominal decays faster than the open-loop error radius;
-  plans resting exactly on that row then lost terminal membership one hold
-  later. The box's own sign is covered by the symmetric error budget.
-- **Witness transfer (implemented).** The certificate stores the accepted
-  plan with a `consumedStages` counter and publishes its node boxes from
-  the current frame on. A continuation frame conditions the box, checks its
-  inclusion in the published successor box to eps-level allowance, and
-  takes the stored verification over unchanged (Lemma 1): the carried
-  witness costs no tube or row rebuild (`solver.witnessVerification =
-  "shiftedRows"`; `"rebuilt"` recomputes everything and is used by the
-  regression test that checks both modes issue identical commands). When no
-  optimized stage remains, the frame evaluates the terminal membership of
-  the conditioned box (Proposition 2), issues the sampled braking law, and
-  publishes the exact successor box of the rest model.
-- **Condensed programs.** The tiers are solved on the physical unknowns
-  only, centred at the seed plan, with the verification rows as the
-  program's rows and the same rotated-cone majorant for the CLF tier
-  (`solver.programForm = "condensed"`; the lifted cell-state form remains
-  available and a test checks both return the same value and plan). Stage A
-  is answered without a solve when the seed satisfies every row, and by a
-  proximal QP (closest zero-violation point to the seed) otherwise.
-- **CLF sampling at hold ends.** The sampled-data decrease is imposed and
-  verified once per hold, at its end (`clf.samplePoints = "stageNodes"`),
-  which is the sampled-data notion of the control period; the earlier
-  per-cell and per-control-point samplings remain available.
-- **Attempts and the deadline.** With a witness available, a further
-  attempt starts only if the longest attempt of the frame fits before the
-  deadline; the first attempt always runs. Failures of the fresh search are
-  returned with their timing rather than thrown.
-- **Native kernels.** The generated tube, linearization and row kernels in
-  `solver/bicycle` are put on the path by the controller; without them the
-  interpreted implementations compute the same enclosures several times
-  more slowly.
-- **Rest measured with error.** A stopped ego measured with speed error
-  `±ρ_v` publishes a box straddling `v = 0`. The input contract admits any
-  box that meets the model domain; on continuation frames the conditioned
-  box is the intersection of the successor box, the measurement box and the
-  domain `[v_min, v_max]` (the plant lies in the domain by premise, and
-  intersecting with a fixed set is monotone under inclusion), so the centre
-  never leaves the domain. Admission, which has no carried box, requires
-  the measured centre itself to lie in the domain. Before this rule the
-  noisy stationary trial ended at hold 41 with an `invalidInput` report
-  when the true speed had fallen below the measurement radius.
-- **Seeds are anchors, not policies.** The CLF rows of the performance
-  SOCP are a convex majorant of an indefinite quadratic: the concave part is
-  linearised at the seed plan, so the majorant is exact at that seed and
-  grows with `curvature·|Δ|²` away from it. A verified plan obtained from one
-  seed is therefore not the tie-break optimum obtainable from another, and a
-  braking tail inherited through the shifted seed would reproduce itself
-  frame after frame (observed in the noisy oncoming trial before this rule:
-  the ego settled at 2.7 m/s with every frame certified at value zero). The
-  fresh search now solves both the shifted seed and the constant-speed
-  equilibrium seed at each horizon and keeps the verified plan with the
-  lexicographically smaller `(value, objective)` pair; the slowing seed is a
-  rescue tried only when neither verifies. Every seed's plan is solved and
-  verified in full; none is executed unverified.
-- **Normals and charts** are choices; carrying them is what makes the
-  candidate's rows identical functions of the box. Fresh solves may choose
-  differently, which is why their plan must be verified independently.
-- **Target law with boxes.** Section 4 gives the directional conditions on
-  velocity, acceleration and jerk. Arbitrarily small uncertainty can destroy
-  this particular all-future halfspace certificate; it does not follow that
-  a collision-free finite encounter is impossible. Earlier demonstration
-  runs used position/yaw uncertainty and exact motion derivatives. The
-  bounded-motion extension also admits nonzero jerk where a separating
-  direction has zero projected jerk, and nonzero yaw acceleration through
-  the enclosing circle. General two-axis jerk, including the current NRMM
-  contract, still needs a different terminal construction. No unconditional
-  robust feasibility claim is made for it.
-- **Not proven.** Physical (nonlinear Fiala) plant containment; any
-  real-time property; behaviour after a `carriedWitnessRejected` or
-  `inconsistentObservation` report, which ends control.
-
-## 7. Implementation map
-
-| Object | Location |
-| --- | --- |
-| Ego box conditioning | `hardEncounterBarrier.validateTransition` → `localConditionBox` |
-| Target box conditioning | `targetPrediction.condition` |
-| Carried data | `hardEncounterBarrier.carriedData`; certificate fields `stages`, `cellStage`, `cellFrames`, `cellNormals`, `terminal` |
-| Candidate verification | `hardEncounterBarrier.transferCandidate` (inclusion transfer of the stored verification; terminal membership for a zero-stage tail); `hardEncounterBarrier.verifyCandidate` (full rebuild, `solver.witnessVerification = "rebuilt"`) |
-| Terminal-law frame | `hardEncounterBarrier.terminalStep` (exact rest-model hold, successor box, executed generator) |
-| Terminal set | `localTerminalSet`, `localTerminalDynamics`, `localBudget`, `localAdmissibleNormal`, `localFutureSupport`; membership `hardEncounterBarrier.terminalMembership` |
-| Feasibility, value LP, CLF SOCP | `solveHardCbfClf.solve`: condensed tiers with row generation (`localCondensedLexicographicSolve`, `localGeneratedSolve`); the lifted cell-state form in `avoidanceStageQp` for `solver.programForm = "lifted"` |
-| Verification and value | `solveHardCbfClf.certify` (`value`, `stageViolation`, `hardRowViolation`) |
-| Acceptance rule | `collisionAvoidanceController` (`certificateSource`, `pcbfValue`, `candidateValue`, `pcbfDescentResidual`, `lexicographicTieResidual`, `freshSolveFailure`) |
-
-Reported flags: `recursiveFeasibilityClaimed = true` and
-`indefiniteRecursiveFeasibilityClaimed = true` with
-`recursiveFeasibilityScope = "fixedActiveTargetSet;fixedTargetMotionBounds;declaredAffineStagePlant;boundedTargetMotion;boundedEstimationError;conditionedInformationSets"`;
-`physicalVehicleGuaranteeEstablished = false`; `terminalActive` is true only
-when the terminal law is the issued command (no optimized stage remains);
-`fallbackUsed` is always false — the carried witness is the program's own
-feasible solution, not an external default.
-
-## 8. Validation
-
-See [the results record](../scripts/INFORMATION_STATE_PCBF_RESULTS_20260912.md)
-for the scenario runs (exact and noisy estimates, forced fresh-solve
-failure) and the regression suite outcome.
+See `tests/finiteEncounterCompletionTest.m` and
+[scripts/FINITE_COMPLETION_RESULTS_20260913.md](../scripts/FINITE_COMPLETION_RESULTS_20260913.md)
+for actual implementation checks and their limits. Earlier timing and
+all-future-terminal experiment records describe their identified source
+versions and are not evidence of the new controller's feasibility.

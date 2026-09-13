@@ -63,11 +63,12 @@ classdef boundedTargetMotionTest < matlab.unittest.TestCase
             testCase.verifyTrue(p.metadata.candidateVerified);
             testCase.verifyEqual(next.encounters.contract.jerkBound,c.encounters.contract.jerkBound,AbsTol=0);
         end
-        function tinyTwoAxisJerkIsATerminalLimitationRatherThanAnExactInputRule(testCase)
+        function tinyTwoAxisJerkDoesNotBlockFiniteCompletion(testCase)
             [ego,target,road,cfg] = localFixture();
             target.predictionMotion.jerkBound = [1e-12;1e-12];
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:unboundedTargetSupport');
+            [~,~,p] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(p.metadata.safetyCertified);
+            testCase.verifyTrue(isfinite(p.metadata.targetCertifiedUntil));
         end
         function boundedFlowContainsIndependentChangingMotion(testCase)
             [ego,target,road,cfg] = localFixture();

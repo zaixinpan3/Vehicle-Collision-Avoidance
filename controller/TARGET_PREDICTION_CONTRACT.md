@@ -28,7 +28,8 @@ Without a motion descriptor, jerk defaults to zero and the parsed
 in the initial acceleration radius; it is not a substitute for a jerk bound.
 An `exact-motion-v1` descriptor is normalized through the same validator,
 retaining any supplied derivative bounds instead of discarding them. Zero
-derivative bounds retain the exact-motion metadata for existing studies.
+derivative bounds retain `validityScope="whileEncounterActive"`; numerical
+equality to zero never implies an all-future modeling commitment.
 
 At each continuation frame `targetPrediction.condition` intersects the
 carried reachable box with the new measurement box, with wrapped heading.
@@ -46,24 +47,24 @@ anonymous target receives `singleTarget:1`. Zero visible targets and verified
 departure use the lifecycle in [INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md):
 the same optimization retains road, model, actuator and CLF constraints.
 
-## Terminal scope and remaining limitation
+## Finite completion scope
 
-The current invariant stopping terminal set requires a separating halfspace
-whose target position support is finite over all future times. For normal
-`n`, the bound is a cubic with leading coefficient `abs(n)'*J/6`. Any positive
-coefficient makes that support infinite. Thus nonzero jerk orthogonal to a
-safe normal can be certified, whereas a strictly positive two-axis jerk box
-cannot be certified by this terminal family. Existing velocity/acceleration
-boxes can also prevent a finite support. Nonzero `H` is covered by the
-target rectangle's circumcircle in the terminal set, including when the
-current yaw-rate box is exactly zero.
+Version 21 verifies the complete finite collision tube and robust exterior
+membership at its confirmation time, followed by a target-independent road
+terminal controller. Both Cartesian jerk bounds may be positive. No
+all-future target support is computed. The entire final target footprint
+must be outside the region declared in `ego.perception.range`, with target,
+ego and chart uncertainty included. No future measurement shrinkage is
+assumed. A current valid observation is required to release the target;
+missing confirmation at the deadline stops control. The existing road-safe
+suffix survives confirmed removal even when fresh optimization fails.
 
-`unboundedTargetSupport` means this sufficient terminal construction failed;
-it does not mean a nonlinear/finite-encounter avoidance problem was solved
-and proved infeasible. No target bound is reduced to force admission. A
-finite-encounter terminal certificate consistent with perception departure
-remains needed for general NRMM motion bounds. Removing this support check
-without replacing its proof would not preserve the recursive PCBF claim.
+A finite certificate can still fail because of uncertainty, geometry, input
+limits, chosen normal or search limits. Such failure does not establish that
+finite collision avoidance is impossible. Larger future bounds require
+fresh admission; no radius is suppressed to force it. Re-entry is a new
+encounter and requires a new verified certificate. Global detection and
+entry feasibility and nonlinear plant inclusion remain separate obligations.
 
 The `nominalFlow` utility supplies constant-curvature/tangential-acceleration
 anchors. For an actual curved target, `J` must cover its Cartesian jerk,

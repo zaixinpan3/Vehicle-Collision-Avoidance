@@ -13,9 +13,9 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public zero/one-visible-target controller entry, fresh admission on visibility changes, carried-witness acceptance rule and diagnostics |
+| `collisionAvoidanceController.m` | Public zero/one-visible-target controller entry, fresh admission for new obligations and retained road witnesses on release, carried-witness acceptance rule and diagnostics |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
-| `hardEncounterBarrier.m` | Fresh search (`plan`), box conditioning and carried-witness assembly (`validateTransition`), witness transfer by inclusion (`transferCandidate`) or full re-verification (`verifyCandidate`), terminal-law frames (`terminalStep`), robust terminal set (`completionRows`, `terminalMembership`), carried data (`carriedData`) |
+| `hardEncounterBarrier.m` | Fresh search (`plan`), box conditioning and carried-witness assembly (`validateTransition`), witness transfer by inclusion (`transferCandidate`) or full re-verification (`verifyCandidate`), terminal-law frames (`terminalStep`), finite exit and confirmation guards (`finiteCompletionRows`, `confirmationObservation`), road terminal set (`completionRows`, `terminalMembership`), carried data (`carriedData`) |
 | `formulateAvoidanceProblem.m` | Objective, swept safety rows with stage labels, hard domain/terminal rows and predictive CLF cones |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
 | `solveHardCbfClf.m` | Safety-value LP and CLF SOCP (`solve`), independent verification and value function (`certify`, `certifyInputs`) |
@@ -62,7 +62,7 @@ The removed standalone files have no compatibility wrappers.
 | `fialaIntervalParameters` | `fialaCertificate.parameters` |
 
 The earlier consolidation changed source organization and call names while
-preserving its then-current equations. The current version-19 controller
+preserving its then-current equations. The current version-21 controller
 carries the accepted plan's own prediction data as a recursive-feasibility
 witness on conditioned information sets; see
 [INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md). In particular,

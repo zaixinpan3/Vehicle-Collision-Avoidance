@@ -29,6 +29,10 @@ classdef encounterTestFixture
                 "lateralVelocity", state(5), "yawRate", state(6), ...
                 "stateTime", stored.stateTime+stored.identity.configuration.controller.sampleTime, ...
                 "heldActuatorInput", stored.appliedInput);
+            if isfield(stored,"confirmation") && ~isempty(stored.confirmation)
+                ego.perception = struct("time",ego.stateTime,"range",stored.confirmation.range, ...
+                    "completeWithinRange",true);
+            end
         end
 
         function result = fail(~, ~)

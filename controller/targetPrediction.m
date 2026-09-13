@@ -52,10 +52,6 @@ classdef targetPrediction
             if startsWith(target.key,"anonymousTarget:"), target.key = "singleTarget:1"; end
             target.predictionMotion = motion;
             encounter = targetPrediction.admit(target,time,lane,cfg);
-            if ~any(encounter.contract.jerkBound) && encounter.contract.yawAccelerationBound==0
-                encounter.contract.kind = "exact-motion-v1";
-                encounter.contract.validityScope = "allFutureTime";
-            end
         end
 
         function next = condition(carried, duration, measured)
@@ -143,10 +139,8 @@ classdef targetPrediction
                 r(8)+yawAcceleration*duration];
             % Charge arithmetic in the prediction, rather than accepting an
             % empty measurement intersection with a physical tolerance. Only
-            % terms that were actually summed are charged: an exactly copied
-            % zero acceleration or yaw rate carries no rounding, and an
-            % artificial positive acceleration radius would make the
-            % all-future terminal support unbounded.
+            % terms that were actually summed are charged: exactly copied
+            % acceleration or yaw-rate constants need no integration reserve.
             arithmetic = [abs(x(1:2))+abs(x(3:4))*duration+abs(x(5:6))*(duration.^2/2); ...
                 abs(x(3:4))+abs(x(5:6))*duration;repmat(abs(x(5:6)),1,numel(duration)); ...
                 abs(x(7))+abs(x(8))*duration;repmat(abs(x(8)),1,numel(duration))];

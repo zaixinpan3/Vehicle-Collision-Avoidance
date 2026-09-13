@@ -1,31 +1,22 @@
 # Controller runtime and numerical implementation
 
-The current version-16 controller solves one hard-margin LP followed by a CLF
-SOCP and independently checks every executable decision. All intervals use
-uncertain held-flow certificates. Continuation fixes the executed prefix and
-keeps the original geometry and deadline; a failed replacement retains the
-checked incumbent. Numerical MATLAB and generated geometry kernels implement
-the same constraints. Both lexicographic stages and all rebuilds use the
-sparse stage-local transcription. Explicit row maps keep dynamics equalities separate from
-margin-dependent inequalities. The condensed program exists only as a test
-oracle; complete physical rows remain in the independent checker. Positive
-objective scaling improves native numerical conditioning without changing
-the hard constraints or the mathematical objective minimizers.
+Version 21 uses a finite encounter witness, current observation confirmation,
+a non-postponable active exit deadline, and a target-independent road terminal
+law. Only zero physical collision/road violation can authorize execution.
+The condensed and sparse lifted conic forms retain their independent physical
+row checker, swept held-flow geometry and soft CLF objective.
 
-See [the feedback and sparse study](FEEDBACK_SPARSE_EXPERIMENTS.md) for
-current measurements and [the conditional feedback proof](FEEDBACK_POLICY_CERTIFICATE.md).
-The online witness remains open-loop; the feedback proof is a distinct
-proposed construction with explicit implementation obligations.
-
-The build entry `scripts/buildAvoidanceGeometryKernel.m` generates the two
-complete-interval geometry kernels. No nominal-only check kernel is generated.
-Old compiled artifacts are outside the tracked project and must not be used
-as evidence for the current source.
+See [the executed certificate](INFORMATION_STATE_PCBF.md) and
+[its validation record](../scripts/FINITE_COMPLETION_RESULTS_20260913.md).
+The complete stored suffix remains available when fresh solving fails, and
+confirmed target removal preserves its road obligations. Both witness modes
+use analytic road terminal membership after their optimized holds are consumed.
+The current core source budget remains 20; no native kernel regeneration is
+required by the finite completion change.
 
 The declared input is immediate and held over the sample interval. Solver and
 pipeline timing measurements do not prove physical zero-latency execution.
-See [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md) for scope. All dated
-measurements below are historical engineering records of preceding code;
+The dated sections below describe their identified earlier source versions;
 they are not current timing or certification claims.
 
 ## Quadratic input and relaxation objective (2026-09-06)

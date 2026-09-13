@@ -14,18 +14,18 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             [command,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyNotEmpty(command);
             testCase.verifyTrue(problem.metadata.recursiveFeasibilityClaimed);
-            testCase.verifyTrue(problem.metadata.indefiniteRecursiveFeasibilityClaimed);
+            testCase.verifyFalse(problem.metadata.indefiniteRecursiveFeasibilityClaimed);
             testCase.verifyEqual(problem.metadata.terminalPolicyRole,"carriedWitnessTail");
             testCase.verifyTrue(problem.metadata.terminalContinuationCertified);
             testCase.verifyFalse(problem.metadata.physicalVehicleGuaranteeEstablished);
             testCase.verifyEqual(problem.metadata.certificateSource,"checkedOptimization");
             testCase.verifyEqual(problem.metadata.pcbfValue,0);
-            testCase.verifyEqual(stored.version,20);
-            testCase.verifyEqual(stored.certifiedDuration,inf);
+            testCase.verifyEqual(stored.version,21);
+            testCase.verifyEqual(stored.certifiedDuration,stored.remainingSteps*cfg.controller.sampleTime,AbsTol=1e-12);
             testCase.verifyEqual(numel(stored.stages),stored.remainingSteps);
             testCase.verifyEqual(numel(stored.cellFrames),numel(stored.prediction.cells));
             testCase.verifyGreaterThan(stored.acceptance.exitMargin,0);
-            testCase.verifyEqual(stored.encounters.contract.validityScope,"allFutureTime");
+            testCase.verifyEqual(stored.encounters.contract.validityScope,"whileEncounterActive");
         end
 
         function aFailedPerformanceSolveCannotDispatchTheFeasibilityLp(testCase)
@@ -44,13 +44,11 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.commandCertifiedDuration,cfg.controller.sampleTime);
         end
 
-        function perceptionMetadataCannotChangeThePlan(testCase)
+        function finiteAdmissionRequiresACurrentConfirmationDeclaration(testCase)
             [ego,target,road,cfg] = localFixture();
-            [first,inputs] = collisionAvoidanceController(ego,target,road,cfg,[]);
             ego.perception = struct('range',NaN,'time',-100,'completeWithinRange',false);
-            [second,other] = collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyEqual(second.actuatorInput,first.actuatorInput,AbsTol=1e-12);
-            testCase.verifyEqual(other,inputs,AbsTol=1e-12);
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:unconfirmedTargetDeparture');
         end
 
         function noTargetStillProducesACertifiedCruiseCommand(testCase)
@@ -76,16 +74,16 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:nonexactStudyInput');
         end
 
-        function aTargetPositionBoxIsAdmittedAndTightensTheTerminalSupport(testCase)
+        function aTargetPositionBoxIsAdmittedWithoutChangingRoadInvariance(testCase)
             [ego,target,road,cfg] = localFixture();
             [~,~,~,exact] = collisionAvoidanceController(ego,target,road,cfg,[]);
             target.targetPositionInertialErrorBound = [0.1;0];
             [~,~,problem,boxed] = collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(boxed.encounters.radius(1),0.1,AbsTol=0);
-            testCase.verifyEqual(boxed.qp.terminal.targetNormals,exact.qp.terminal.targetNormals,AbsTol=1e-9);
-            testCase.verifyGreaterThanOrEqual(boxed.qp.terminal.futureTargetSupports, ...
-                exact.qp.terminal.futureTargetSupports+0.1*abs(exact.qp.terminal.targetNormals(1))-1e-9);
+            testCase.verifyTrue(boxed.qp.terminal.targetIndependent);
+            testCase.verifyEqual(boxed.qp.terminal.stateRows,exact.qp.terminal.stateRows,AbsTol=1e-9);
+            testCase.verifyGreaterThan(boxed.acceptance.exitMargin,0);
         end
 
         function uncertainFutureMotionCanReceiveABoundedCertificate(testCase)
@@ -144,7 +142,6 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
 
         function theCarriedWitnessIsVerifiedAtEveryNoisyFrame(testCase)
             [ego,target,road,cfg] = encounterTestFixture.crossing();
-            ego = rmfield(ego,'perception');
             target = rmfield(target,'predictionMotion');
             bound = [0.05;0.05;0.005;0.05;0.02;0.005];
             ego.controllerStateErrorBound = bound;
@@ -156,7 +153,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             truthTarget = stored.originalEncounter;
             truthTarget.radius(:) = 0;
             h = cfg.controller.sampleTime;
-            for step = 1:8
+            for step = 1:6
                 generator = [problem.metadata.executedContinuousGenerator;zeros(3,9)];
                 value = expm(h*generator)*[truth;command.actuatorInput;1];
                 truth = value(1:6);
@@ -165,6 +162,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 ego = struct('position',position+noise(1:2),'yaw',heading+noise(3),'speed',truth(4)+noise(4), ...
                     'lateralVelocity',truth(5)+noise(5),'yawRate',truth(6)+noise(6),'stateTime',step*h, ...
                     'heldActuatorInput',command.actuatorInput,'controllerStateErrorBound',bound);
+                ego.perception = struct('time',ego.stateTime,'range',16,'completeWithinRange',true);
                 state = targetPrediction.finiteFlow(truthTarget,ego.stateTime-truthTarget.time);
                 target.targetPositionInertial = state(1:2)+[0.1;0.1].*(2*rand(stream,2,1)-1);
                 target.targetVelocityInertial = state(3:4);
@@ -212,16 +210,11 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(worst,-1e-9);
         end
 
-        function aPositiveValueFunctionReportsPredictedViolation(testCase)
+        function aPositiveSafetyValueDoesNotAuthorizeExecution(testCase)
             [ego,target,road,cfg] = encounterTestFixture.crossing();
-            target = rmfield(target,'predictionMotion');
             target.targetPositionInertial = [2;-1];
-            [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(problem.metadata.pcbfValue,0);
-            testCase.verifyGreaterThan(problem.metadata.stageViolation(1),0);
-            testCase.verifyEqual(problem.metadata.hardRowViolation,0);
-            testCase.verifyEqual(problem.metadata.barrierInterpretation,"verifiedAccumulatedSafetyViolation");
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:noCertifiedContinuation');
         end
 
         function targetIdentityCannotChangeBetweenFrames(testCase)
@@ -233,6 +226,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
 
         function aTargetCannotDisappearWithoutCurrentCompletePerception(testCase)
             [ego,~,road,cfg,stored] = localContinuation();
+            ego = rmfield(ego,'perception');
             testCase.verifyError(@() collisionAvoidanceController(ego,[],road,cfg,stored), ...
                 'collisionAvoidanceController:unconfirmedTargetDeparture');
         end
@@ -363,6 +357,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             values = cell(1,2);
             methods = cell(1,2);
             modes = ["shiftedRows","rebuilt"];
+            cfg.solver.frameDeadlineSeconds = 0.1;
             for mode = 1:2
                 cfg.solver.witnessVerification = modes(mode);
                 cfg.solver.jointFunction = [];
@@ -459,30 +454,28 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidTerminalModel');
         end
 
-        function anAcceleratingTargetIsCheckedBeyondTheTerminalTime(testCase)
+        function anAcceleratingTargetUsesAFiniteExitAndRoadOnlyTerminalSet(testCase)
             [ego,target,road,cfg] = localFixture();
             target.targetPositionInertial = [-20;0];
             target.targetVelocityInertial = [2;0];
             target.targetAccelerationInertial = [-1;0];
             [~,~,~,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
-            normal = stored.qp.terminal.targetNormals;
-            projectedMaximum = normal.'*[-18;0];
-            testCase.verifyGreaterThanOrEqual(stored.qp.terminal.futureTargetSupports,projectedMaximum);
-            testCase.verifyLessThan(stored.qp.terminal.futureTargetSupports-projectedMaximum,1e-8);
+            testCase.verifyTrue(stored.completion.active);
+            testCase.verifyTrue(isfinite(stored.completion.deadline));
+            testCase.verifyEmpty(stored.terminal.futureTargetSupports);
         end
 
-        function aTargetVelocityBoxMakesTheAllFutureSupportUnbounded(testCase)
+        function aTargetVelocityBoxAllowsFiniteCompletion(testCase)
             [ego,target,road,cfg] = localFixture();
             target.targetVelocityInertialErrorBound = [0.01;0.01];
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:unboundedTargetSupport');
+            [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.safetyCertified);
         end
     end
 end
 
 function [ego,target,road,cfg] = localFixture()
     [ego,target,road,cfg] = encounterTestFixture.crossing();
-    ego = rmfield(ego,'perception');
     target = rmfield(target,'predictionMotion');
     target.targetPositionInertial = [1000;1000];
     target.targetVelocityInertial = [0;0];

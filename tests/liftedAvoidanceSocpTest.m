@@ -62,7 +62,6 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             % cell-state program with its auxiliary states eliminated; both
             % must return the same verified value and the same plan.
             [ego,target,road,cfg] = encounterTestFixture.crossing();
-            ego = rmfield(ego,"perception");
             target = rmfield(target,"predictionMotion");
             cfg.solver.programForm = "lifted";
             [~,~,lifted] = collisionAvoidanceController(ego,target,road,cfg,[]);
@@ -78,7 +77,6 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             % A working-set solve that violates no omitted row solves the
             % complete program; the plan and its verified value agree.
             [ego,target,road,cfg] = encounterTestFixture.crossing();
-            ego = rmfield(ego,"perception");
             target = rmfield(target,"predictionMotion");
             cfg.solver.rowGeneration = false;
             [~,~,complete] = collisionAvoidanceController(ego,target,road,cfg,[]);

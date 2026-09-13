@@ -1,9 +1,12 @@
 # Finite-encounter terminal certificates with recursive feasibility
 
-September 13, 2026. **Design proposal and conditional derivation; not an
-implemented controller or a completed vehicle validation.** The deployed
-controller still uses the invariant stopping halfspace documented in
-[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md).
+September 13, 2026. The finite open-loop witness is now implemented in
+certificate version 21 with `N=L=M`, current observation confirmation,
+non-postponable active deadlines, zero physical safety violation, and a
+road-only invariant terminal controller. The general policy-predecessor
+construction and separate `L<M` tail below remain design extensions.
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md) specifies the executed
+algorithm; the results record identifies the validations actually run.
 
 ## Design decision and scope
 
@@ -247,9 +250,8 @@ has zero safety violation, the same suffix argument gives
     V_(k+1) <= V_k - xi_(0,k)
 
 for a feasible optimum, or for an accepted certificate value bounded by the
-suffix value. Positive numerical tie tolerances require the same explicit
-allowance as the current controller; zero-value safety cannot admit a
-positive tolerance leak. At guarded completion the supplied free-mode
+suffix value. Positive diagnostic values never authorize execution in version 21;
+zero-value safety cannot admit a positive tolerance leak. At guarded completion the supplied free-mode
 witness has zero safety value. This is a value-descent/zero-sublevel invariance
 argument on the augmented information/certificate state. Calling the result
 a continuous classical CBF additionally requires the appropriate value
@@ -291,9 +293,8 @@ to leave and return. Arbitrary admissible target motions can also include
 unavoidable collisions when ego actuation or road space is insufficient.
 No choice of terminal-set notation removes this limitation.
 
-For the current project, the justified next step is the finite witness and
-guarded handover for a single admitted straight-road encounter, with
-explicit entry-feasibility checks. A general `D_ready`, nonemptiness for
+The implemented scope is the finite witness and guarded handover for a
+single admitted encounter. New-obligation admission is explicitly checked. A general `D_ready`, nonemptiness for
 actual NRMM boxes, nonlinear-plant containment and 100 ms execution remain
 open obligations, not completed results.
 
@@ -318,5 +319,5 @@ arithmetic and finite exhaustive checks; it does not run a vehicle:
 
 These checks support the algebra and expose omitted premises. They neither
 compute a terminal set for the bicycle model nor prove the new construction
-nonempty for the saved joint experiment. The live controller, observer and
-configuration remain unchanged by this design note.
+nonempty for the saved joint experiment. Those exact checks remain design-level fixtures. The later MATLAB implementation
+is described in INFORMATION_STATE_PCBF.md and its own results record.

@@ -41,10 +41,11 @@ classdef solveHardCbfClf
         end
 
         function check = certify(qp, ~, model, decision)
-        % Acceptance keeps every non-safety row hard and reports the verified
-        % per-stage safety violation; its sum is the value function.
+        % Numerical candidates keep non-safety rows hard. Executable acceptance
+        % additionally requires exactly zero accumulated physical violation.
             stages = qp.layout.horizonSteps;
-            check = struct("accepted", false, "failedConditions", "decision", ...
+            check = struct("accepted", false, "candidateAccepted",false,"safetyCertified",false, ...
+                "failedConditions", "decision", ...
                 "hardRowViolation", inf, "clfViolation", inf, "margin", -inf, ...
                 "sweptClearanceMargin", -inf, "exitMargin", qp.exitMargin, ...
                 "value", inf, "stageViolation", inf(stages,1), "violatedHardRows", zeros(0,1));
@@ -91,7 +92,12 @@ classdef solveHardCbfClf
                 isfinite(check.value), ~qp.certifiedInfeasible];
             names = ["finitePrediction", "hardRows", "sampledDataClf", "finiteValue", "finiteProblem"];
             check.failedConditions = names(~conditions);
-            check.accepted = all(conditions);
+            check.candidateAccepted = all(conditions);
+            check.safetyCertified = check.candidateAccepted && check.value==0;
+            check.accepted = check.safetyCertified;
+            if check.candidateAccepted && ~check.safetyCertified
+                check.failedConditions(end+1) = "positiveSafetyViolation";
+            end
         end
     end
 end
@@ -129,7 +135,7 @@ function [result, problem] = localLexicographicSolve(problem, cfg)
         valueOptimum = 0;
         candidate = localRepairClf(problem, marginSolve.decision, cfg);
         check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.accepted || check.value > 0
+        if ~check.candidateAccepted || check.value > 0
             result.message = result.message+"; "+strjoin(check.failedConditions,",");
             return;
         end
@@ -162,7 +168,7 @@ function [result, problem] = localLexicographicSolve(problem, cfg)
         valueOptimum = sum(max(0, valueSolve.fullDecision(base.violationIndex)));
         candidate = localRepairClf(problem, valueSolve.decision, cfg);
         check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.accepted
+        if ~check.candidateAccepted
             result.message = result.message+"; "+strjoin(check.failedConditions,",");
             return;
         end
@@ -193,7 +199,7 @@ function [result, problem] = localLexicographicSolve(problem, cfg)
     decision = localRepairClf(problem, solve.decision, cfg);
     check = solveHardCbfClf.certify(problem, [], model, decision);
     result.decision = decision;
-    if check.accepted
+    if check.candidateAccepted
         result = localCertifiedResult(problem, decision, solve, calls, valueOptimum, check);
     else
         result.message = result.message+"; "+strjoin(check.failedConditions,",") ...
@@ -266,7 +272,7 @@ function [result, problem] = localCondensedLexicographicSolve(problem, cfg)
         valueOptimum = 0;
         candidate = localRepairClf(problem, anchor+marginSolve.decision(1:n), cfg);
         check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.accepted || check.value > 0
+        if ~check.candidateAccepted || check.value > 0
             result.message = result.message+"; "+strjoin(check.failedConditions,",");
             return;
         end
@@ -299,7 +305,7 @@ function [result, problem] = localCondensedLexicographicSolve(problem, cfg)
         valueOptimum = sum(max(0, valueSolve.fullDecision(n+(1:count))));
         candidate = localRepairClf(problem, anchor+valueSolve.decision(1:n), cfg);
         check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.accepted
+        if ~check.candidateAccepted
             result.message = result.message+"; "+strjoin(check.failedConditions,",");
             return;
         end
@@ -354,7 +360,7 @@ function [result, problem] = localCondensedLexicographicSolve(problem, cfg)
     decision = localRepairClf(problem, anchor+solve.decision(1:n), cfg);
     check = solveHardCbfClf.certify(problem, [], model, decision);
     result.decision = decision;
-    if check.accepted
+    if check.candidateAccepted
         result = localCertifiedResult(problem, decision, solve, calls, valueOptimum, check);
         result.algorithm = "condensed safety-value LP and CLF SOCP";
         result.programDiagnostics = diagnostics;

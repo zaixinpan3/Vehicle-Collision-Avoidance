@@ -43,20 +43,20 @@ classdef visibleTargetLifecycleTest < matlab.unittest.TestCase
             testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,c), ...
                 'collisionAvoidanceController:noCertifiedContinuation');
         end
-        function departureRemovesTheTargetFromANewCruiseCertificate(testCase)
+        function departureRetainsTheVerifiedRoadContinuation(testCase)
             [ego,~,road,cfg,c] = localContinuation(true);
-            ego.perception = struct('time',ego.stateTime,'range',10,'completeWithinRange',true);
+            ego.perception = struct('time',ego.stateTime,'range',16,'completeWithinRange',true);
             [~,~,p,next] = collisionAvoidanceController(ego,[],road,cfg,c);
             testCase.verifyFalse(p.metadata.hasTarget);
             testCase.verifyTrue(p.metadata.targetSetChanged);
             testCase.verifyEmpty(next.encounters);
             testCase.verifyEqual(p.metadata.dischargedTargetKeys,string({c.encounters.key}));
-            testCase.verifyFalse(p.metadata.candidateVerified);
+            testCase.verifyTrue(p.metadata.candidateVerified);
             testCase.verifyTrue(p.metadata.planCertified);
         end
         function aStaleVisibilityDeclarationCannotReleaseATarget(testCase)
             [ego,~,road,cfg,c] = localContinuation(true);
-            ego.perception = struct('time',0,'range',10,'completeWithinRange',true);
+            ego.perception = struct('time',0,'range',16,'completeWithinRange',true);
             testCase.verifyError(@() collisionAvoidanceController(ego,[],road,cfg,c), ...
                 'collisionAvoidanceController:unconfirmedTargetDeparture');
         end
@@ -77,9 +77,11 @@ end
 
 function [ego,target,road,cfg,c] = localContinuation(hasTarget)
     [ego,target,road,cfg] = encounterTestFixture.crossing();
+    if hasTarget, target.targetVelocityInertial = [0;300]; end
     initial = target;
     if ~hasTarget, initial = []; end
     [~,~,p,c] = collisionAvoidanceController(ego,initial,road,cfg,[]);
     ego = encounterTestFixture.nextEgo(c,p.model.lane);
+    ego.perception = struct('time',ego.stateTime,'range',16,'completeWithinRange',true);
     target.targetPositionInertial = target.targetPositionInertial+cfg.controller.sampleTime*target.targetVelocityInertial;
 end
