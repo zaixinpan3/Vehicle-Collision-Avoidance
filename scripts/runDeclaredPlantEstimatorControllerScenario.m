@@ -5,11 +5,14 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
 % accepted first-hold affine generator is integrated independently by expm.
 % This diagnostic measures overruns while waiting for computation; it does
 % not simulate delayed actuation or establish nonlinear-vehicle safety.
+% UseEstimator=false supplies exact states with the same physical range gate
+% for a controller-only comparison; it does not run or reset the observer.
     arguments
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
         options.TargetInitialDistance (1,1) double {mustBePositive} = 100
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260913
         options.OutputDirectory (1,1) string = ""
+        options.UseEstimator (1,1) logical = true
     end
     root = fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'estimator'),fullfile(root,'solver','nrmm'));
@@ -25,7 +28,11 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
     estimator.observer.runtime.integrationStepMaximum = estimator.observer.runtime.samplePeriod;
     targetFunction = @(t,~) localTarget(t,options.TargetInitialDistance);
     truth = [0;0;0;10;0;0];
-    [context,initialization] = nrmmEstimatorControllerAdapter('initialize',estimator,localTruth(truth),targetFunction);
+    if options.UseEstimator
+        [context,initialization] = nrmmEstimatorControllerAdapter('initialize',estimator,localTruth(truth),targetFunction);
+    else
+        initialization = struct('scope',"Exact-state controller comparison; no observer initialization");
+    end
     boundary = struct('origin',[0;0],'longitudinalDirection',[1;0],'lateralDirection',[0;1], ...
         'coefficients',[0;0;-5],'parameterRange',[-100;2000],'safeSideSign',1);
     boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
@@ -43,8 +50,22 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         states(:,k) = truth;
         frameTimer = tic;
         phase = tic;
-        [context,ego,targets,~,audit] = nrmmEstimatorControllerAdapter('sample',context,time(k), ...
-            localTruth(truth),targetFunction(time(k),[]));
+        if options.UseEstimator
+            [context,ego,targets,~,audit] = nrmmEstimatorControllerAdapter('sample',context,time(k), ...
+                localTruth(truth),targetFunction(time(k),[]));
+        else
+            ego = localTruth(truth);
+            ego.stateTime = time(k);
+            ego.perception = struct('time',time(k),'range',estimator.sensor.radar.rangeMaximum, ...
+                'completeWithinRange',true);
+            targets = targetFunction(time(k),[]);
+            targets.trackId = 1;
+            targets.targetHeadingInertial = targets.targetYawInertial;
+            if norm(targets.targetPositionInertial-truth(1:2))>estimator.sensor.radar.rangeMaximum
+                targets = [];
+            end
+            audit = struct('truthEnclosure',struct());
+        end
         observerSeconds(k) = toc(phase);
         if ~isempty(command), ego.heldActuatorInput = command.actuatorInput; end
         egoEstimates{k}=ego;targetEstimates{k}=targets;audits{k}=audit.truthEnclosure;
@@ -77,7 +98,8 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         end
         truth=[position;heading;flowed(4:6)];executedHolds=executedHolds+1;
         if mod(k,25)==0
-            fprintf('Joint declared plant: %d holds, speed %.6f, target %d, frame %.3f s\n',k,truth(4),published(k),frameSeconds(k));
+            fprintf('Declared plant (estimator=%d): %d holds, speed %.6f, target %d, frame %.3f s\n', ...
+                options.UseEstimator,k,truth(4),published(k),frameSeconds(k));
         end
     end
     kept=1:k;
@@ -89,6 +111,9 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         'minimumRoadMargin',minimumRoadMargin,'minimumSeparationMargin',minimumSeparationMargin, ...
         'configuration',cfg,'estimatorConfiguration',estimator,'options',options, ...
         'scope',"Actual NRMM bounds, declared affine ego plant, fixed road; computation delay measured but not applied");
+    if ~options.UseEstimator
+        report.scope = "Exact states with a current 30 m range gate; declared affine ego plant; computation delay measured but not applied";
+    end
     if strlength(options.OutputDirectory)>0
         if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
         save(fullfile(options.OutputDirectory,'joint-declared-plant.mat'),'report','initialization','-v7.3');
