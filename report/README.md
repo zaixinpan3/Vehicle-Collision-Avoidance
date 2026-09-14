@@ -4,12 +4,13 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest implementation and validation: [Sampled backup CBF and hard cruise CLF, September 14, 2026](SAMPLED_BACKUP_CBF_CLF_RESULTS_20260914.md).
 
-Latest independent rerun: [Version-22 straight scenes and 90 s cruise recovery](CONTROLLER_V22_RERUN_20260914.md).
+Latest independent rerun: [Version-23 straight scenes, 90 s cruise recovery and first-admission timing](CONTROLLER_V23_RERUN_20260914.md).
 
 Each report states its experiment date and scope. Earlier results describe the revision tested at that time.
 
 | Report | File |
 | --- | --- |
+| Independent version-23 straight scenes, hard cruise dissipation and runtime audit | [CONTROLLER_V23_RERUN_20260914.md](CONTROLLER_V23_RERUN_20260914.md) |
 | Sampled backup CBF, hard cruise CLF, and runtime validation | [SAMPLED_BACKUP_CBF_CLF_RESULTS_20260914.md](SAMPLED_BACKUP_CBF_CLF_RESULTS_20260914.md) |
 | Independent version-22 straight scenes and 90 s recovery audit | [CONTROLLER_V22_RERUN_20260914.md](CONTROLLER_V22_RERUN_20260914.md) |
 | Terminal-speed, passing-search and work-budget repairs | [CONTROLLER_REPAIR_RESULTS_20260914.md](CONTROLLER_REPAIR_RESULTS_20260914.md) |
