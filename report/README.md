@@ -4,10 +4,13 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest implementation: [Controller repair and validation, September 14, 2026](CONTROLLER_REPAIR_RESULTS_20260914.md).
 
+Latest independent rerun: [Version-22 straight scenes and 90 s cruise recovery](CONTROLLER_V22_RERUN_20260914.md).
+
 Each report states its experiment date and scope. Earlier results describe the revision tested at that time.
 
 | Report | File |
 | --- | --- |
+| Independent version-22 straight scenes and 90 s recovery audit | [CONTROLLER_V22_RERUN_20260914.md](CONTROLLER_V22_RERUN_20260914.md) |
 | Terminal-speed, passing-search and work-budget repairs | [CONTROLLER_REPAIR_RESULTS_20260914.md](CONTROLLER_REPAIR_RESULTS_20260914.md) |
 | Exact-state experiment: terminal-domain defect and remaining controller problems | [EXACT_STATE_CONTROLLER_AUDIT_20260914.md](EXACT_STATE_CONTROLLER_AUDIT_20260914.md) |
 | Straight-scene rerun after finite encounter completion | [ALGORITHM_RERUN_RESULTS_20260914.md](ALGORITHM_RERUN_RESULTS_20260914.md) |
