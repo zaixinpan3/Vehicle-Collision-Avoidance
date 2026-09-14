@@ -368,7 +368,7 @@ station radius 0.01 m and longitudinal-velocity radius 0.001 m/s. It runs five
 updates for an initially safe speed and an initially constraint-violating speed.
 The latter is a mathematical safety-recovery example, not an executable vehicle
 trial. No random seed or measurement noise is used. No runtime qualification is
-claimed. See [the audit results](../scripts/TERMINAL_CBF_PROOF_RESULTS.md) for measured results.
+claimed. See [the audit results](../report/TERMINAL_CBF_PROOF_RESULTS.md) for measured results.
 
 ## 8. Adversarial review and research decision
 

@@ -2,7 +2,7 @@
 
 Analysis date: September 10, 2026. Source: certificate version 14, commit
 `3c3f7cfa4366e6bfd475b6416da7f0c17b388cfb`. Inputs are the actual outputs of
-[the force-constraint removal experiment](../scripts/FORCE_CONSTRAINT_REMOVAL_RESULTS.md),
+[the force-constraint removal experiment](../report/FORCE_CONSTRAINT_REMOVAL_RESULTS.md),
 preserved in EV-0099. This investigation changes no online controller,
 configuration, plant, safety acceptance rule or physical uncertainty bound.
 

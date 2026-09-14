@@ -21,7 +21,7 @@ state, and smaller disturbance certificates under the comparison conditions in
 Section 8. They are not claims of uniformly better estimation trajectories.
 All continuous-time error bounds apply throughout time. The separate sampled
 realization and its hold-error assumptions are described in
-[NRMM_IMPLEMENTATION_NOTES.md](../scripts/NRMM_IMPLEMENTATION_NOTES.md).
+[NRMM_IMPLEMENTATION_NOTES.md](../report/NRMM_IMPLEMENTATION_NOTES.md).
 
 ## 1. Retained model and covariant chain
 

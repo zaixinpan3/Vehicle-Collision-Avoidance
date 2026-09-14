@@ -247,7 +247,7 @@ theorem this is true at every continuation frame under the declared premises.
 runs from failed calls, and saves partial results before returning on failure.
 Timing covers input assembly and the entire controller; diagnostic runs
 continue after 100 ms misses and therefore do not establish real-time control.
-See [the rolling experiment report](../scripts/ROLLING_TERMINAL_RESULTS_20260911.md)
+See [the rolling experiment report](../report/ROLLING_TERMINAL_RESULTS_20260911.md)
 for actual results and remaining cruise, feasibility and timing limitations.
 
 Research checks were performed inline: scope review rejected deleting the

@@ -218,7 +218,7 @@ candidates from executable certificates; `collisionAvoidanceController`
 checks and publishes the carried state.
 
 See `tests/finiteEncounterCompletionTest.m` and
-[scripts/FINITE_COMPLETION_RESULTS_20260913.md](../scripts/FINITE_COMPLETION_RESULTS_20260913.md)
+[report/FINITE_COMPLETION_RESULTS_20260913.md](../report/FINITE_COMPLETION_RESULTS_20260913.md)
 for actual implementation checks and their limits. Earlier timing and
 all-future-terminal experiment records describe their identified source
 versions and are not evidence of the new controller's feasibility.

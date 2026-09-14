@@ -35,7 +35,7 @@ function varargout = onlineNrmmTrackingRuntime(action, varargin)
 % targetEstimates(i).relativePositionErrorBound is the conditional Euclidean
 % position radius in the ego body frame; invalid bounds publish Inf. The
 % accompanying metadata states its time, assumptions and numerical scope.
-% See scripts/NRMM_IMPLEMENTATION_NOTES.md Section 5 for the position enclosure
+% See report/NRMM_IMPLEMENTATION_NOTES.md Section 5 for the position enclosure
 % and its floating-point and future-prediction limitations.
 
     action = lower(string(action));

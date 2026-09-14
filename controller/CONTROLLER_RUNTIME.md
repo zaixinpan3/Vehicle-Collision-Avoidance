@@ -7,7 +7,7 @@ The condensed and sparse lifted conic forms retain their independent physical
 row checker, swept held-flow geometry and soft CLF objective.
 
 See [the executed certificate](INFORMATION_STATE_PCBF.md) and
-[its validation record](../scripts/FINITE_COMPLETION_RESULTS_20260913.md).
+[its validation record](../report/FINITE_COMPLETION_RESULTS_20260913.md).
 The complete stored suffix remains available when fresh solving fails, and
 confirmed target removal preserves its road obligations. Both witness modes
 use analytic road terminal membership after their optimized holds are consumed.

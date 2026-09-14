@@ -5,7 +5,7 @@ with no 9-10 s settling deadline. The window-based recovery failure language in
 this historical report reflects the retired experiment evaluator. The discrete
 LQR input target added here was already removed by `2ab7879`; no such target
 remains in the current controller. See the
-[recovery-objective and rollback audit](../scripts/CONTROLLER_DESIGN_EXPERIMENTS.md).
+[recovery-objective and rollback audit](../report/CONTROLLER_DESIGN_EXPERIMENTS.md).
 
 This report records experiments and diagnostics from before the modified Fiala
 tire revision. Its linear-tire and friction-limit results describe that earlier

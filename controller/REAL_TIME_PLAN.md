@@ -207,7 +207,7 @@ states. And the search limit of 30 s was reachable at rest when the model
 domain floor made the first stage infeasible; the deadline bounds that to
 one attempt.
 
-Measured on the seven-trial campaign (`scripts/REAL_TIME_PCBF_RESULTS_20260912.md`
+Measured on the seven-trial campaign (`report/REAL_TIME_PCBF_RESULTS_20260912.md`
 holds the table): see that record for the per-trial frame times. The
 remaining cruise budget is roughly one third solve, one third
 formulation and tubes, one third witness rebuild; the next steps in order

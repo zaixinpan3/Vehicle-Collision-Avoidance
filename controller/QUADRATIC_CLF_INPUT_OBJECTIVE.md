@@ -56,7 +56,7 @@ CLF constraints do not bound that jump. No common Lyapunov function or global
 convergence proof for arbitrary curvature variation is claimed. Finite
 squared slack also permits a tracking/dissipation tradeoff. Current measured
 curve results and their precise plant/timing scope are documented
-[separately](../scripts/CURVED_CONTROLLER_RESULTS.md).
+[separately](../report/CURVED_CONTROLLER_RESULTS.md).
 
 ## Historical straight-certificate validation (September 8, 2026)
 
