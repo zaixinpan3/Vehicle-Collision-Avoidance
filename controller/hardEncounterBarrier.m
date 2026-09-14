@@ -8,6 +8,63 @@ classdef hardEncounterBarrier
     % when no optimized stage remains in the carried plan.
 
     methods (Static)
+        function terminal = roadTerminal(model,anchor)
+            terminal = localTerminalSet(model,[],anchor);
+        end
+
+        function terminal = roadTerminalDynamics(model,curvature)
+            terminal = localTerminalDynamics(model,curvature);
+        end
+
+        function [check,prediction,terminal,completion] = verifyFixed(model,inputs,stage)
+        % A fixed candidate needs no dense horizon transcription or solver.
+            validateattributes(inputs,{'double'},{'2d','nrows',2,'nonempty','real','finite'});
+            if any(model.cfg.model.ltvModelErrorRateBound) || any(model.cfg.model.plantModelResidualRateBound)
+                error('collisionAvoidanceController:nonexactStudyInput', ...
+                    'Fixed-continuation certification requires the declared zero-residual affine plant.');
+            end
+            model.anchorPlan = zeros(2,1);
+            prediction = ltvBicycleModel.fixedPredict(model,inputs,stage);
+            geometry = avoidanceSafetyGeometry.build(model,prediction);
+            [minimumGeometry,geometryIndex] = min(geometry.physicalBound);
+            final = prediction.fixedStates(:,end);
+            radius = prediction.initialErrorBound(:,end);
+            terminal = hardEncounterBarrier.roadTerminal(model,final);
+            [terminalAccepted,terminalMargins] = hardEncounterBarrier.terminalMembership(terminal,final,radius);
+            finalPrediction = struct('stageCount',size(inputs,2),'planCount',2,'initialErrorBound',prediction.initialErrorBound);
+            [~,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
+                model,finalPrediction,zeros(6,2),final,terminal.frame);
+            if completion.active
+                exitBound=exitBound-32*eps*(abs(completion.stateBound)+abs(completion.stateRow)*abs(final));
+            end
+            cfg = model.cfg;
+            lower = [-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+            upper = [cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+            rates = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+            terminalInput = terminal.input+terminal.feedback*final+terminal.radiusFeedback*radius;
+            inputMargins = [inputs-lower;upper-inputs];
+            rateMargins = rates-abs(diff([model.previousInput,inputs,terminalInput],1,2));
+            margins = [geometry.physicalBound;terminalMargins;exitBound;inputMargins(:);rateMargins(:)];
+            reserve = cfg.encounter.numericalMargin;
+            safetyMargins = geometry.physicalBound(geometry.safety);
+            stageViolation = accumarray(geometry.stage(geometry.safety),max(0,reserve-safetyMargins), ...
+                [size(inputs,2),1],@max,0);
+            value = sum(stageViolation);
+            hardMargin = min([inf;geometry.physicalBound(~geometry.safety);terminalMargins;exitBound;inputMargins(:);rateMargins(:)]);
+            finite=all(isfinite([geometry.physicalBound;terminalMargins;exitBound;inputMargins(:)])) ...
+                && ~any(isnan(rateMargins),'all') && all(isfinite(prediction.fixedStates),'all');
+            accepted = terminalAccepted && finite && hardMargin>=0 && value==0;
+            check = struct('accepted',accepted,'candidateAccepted',accepted,'safetyCertified',accepted, ...
+                'value',value,'stageViolation',stageViolation,'margin',min(margins), ...
+                'hardRowViolation',max(0,-hardMargin),'clfViolation',0, ...
+                'sweptClearanceMargin',min([inf;safetyMargins]),'exitMargin',min([inf;exitBound]), ...
+                'failedConditions',strings(1,0));
+            check.minimumGeometryMargin=minimumGeometry;
+            check.minimumGeometryRow=geometry.label(geometryIndex);
+            check.minimumGeometryStage=geometry.stage(geometryIndex);
+            if ~accepted,check.failedConditions="fixedContinuation";end
+        end
+
         function confirmation = admitConfirmation(ego,model)
             hardEncounterBarrier.confirmationObservation(ego,model.stateTime,[],true);
             range = ego.perception.range;
@@ -404,7 +461,11 @@ classdef hardEncounterBarrier
                     || stored.remainingSteps~=stored.horizonSteps-consumed
                 error("collisionAvoidanceController:invalidStoredCertificate","The issued input witness changed.");
             end
-            if stored.remainingSteps>0 && (~isequal( ...
+            fixed = isfield(stored,"kind") && stored.kind=="fixedBackup";
+            if fixed && ~isequal(stored.decision,plan(:))
+                error("collisionAvoidanceController:invalidStoredCertificate","The fixed input witness changed.");
+            end
+            if ~fixed && stored.remainingSteps>0 && (~isequal( ...
                     reshape(stored.decision(stored.qp.layout.planIndex),2,[]),plan) ...
                     || ~isequaln(stored.terminal,stored.qp.terminal) ...
                     || (~isempty(stored.encounters) && ~isequaln(stored.completion,stored.qp.completion)))
@@ -412,7 +473,13 @@ classdef hardEncounterBarrier
                     "The carried controls or completion data differ from the verified decision.");
             end
             rebuilt = string(cfg.solver.witnessVerification)=="rebuilt";
-            if rebuilt && stored.remainingSteps>0
+            if rebuilt && fixed && stored.remainingSteps>0
+                previous = hardEncounterBarrier.verifyFixed(stored.witnessModel,plan,stored.fixedStage);
+                if ~previous.accepted
+                    error("collisionAvoidanceController:invalidStoredCertificate","The fixed witness failed verification.");
+                end
+                rebuilt = false;
+            elseif rebuilt && stored.remainingSteps>0
                 check = solveHardCbfClf.certify(stored.qp,stored.prediction,stored.witnessModel,stored.decision);
                 if ~check.accepted || ~isequal(check.value,stored.value) ...
                         || ~isequal(reshape(stored.decision(stored.qp.layout.planIndex),2,[]),plan)
@@ -768,7 +835,11 @@ function terminal = localTerminalSet(model,~,anchor)
     % Include the certified stopping excursion of nominal plus error in the
     % chart. A local linearization radius is not a required stopping position.
     excursion = max(terminal.poseExcursion(1,:),terminal.errorExcursion(1,:));
-    terminalRadius = cfg.controller.stationTrustRadius+excursion*terminal.velocityLimit;
+    % Chart size is a proposal; the invariant pose rows themselves enforce
+    % its boundaries. Using the entire velocity domain here can demand road
+    % data far behind the car even for a modest entry speed.
+    terminalRadius = cfg.controller.stationTrustRadius+excursion*min( ...
+        terminal.velocityLimit,abs(anchor(4:6))+model.initialFrenetErrorBound(4:6));
     frame = laneGeometry.frameBounds(model.lane,anchor(1),terminalRadius,cfg.model.lateralDomainRadius);
     data = struct("frame",[frame.origin;frame.tangent;frame.lateral;frame.heading; ...
         frame.positionErrorBound;frame.headingErrorBound;frame.stationLower;frame.stationUpper], ...
@@ -864,12 +935,17 @@ function terminal = localTerminalDynamics(model,curvature)
     damping = -a(4,4);
     if damping==0, phi = h; else, phi = -expm1(-damping*h)/damping; end
     brakeGain = exp(-damping*h)*(-expm1(-h))/phi;
+    % A fixed one-per-second brake unnecessarily excludes ordinary cruise
+    % speeds when the acceleration gain is small. Reduce the gain so the
+    % same invariant law covers the configured speed domain. The excursion
+    % budget below grows with the longer stop, preserving road coverage.
+    brakeGain = min(brakeGain,.98*(input(2)-cfg.actuation.brakingRatioMinimum)*gain/cfg.model.speedMaximum);
     feedback = zeros(2,6);
     feedback(2,4) = -brakeGain/gain;
     radiusFeedback = -feedback;
     flow = expm(h*[a,b;zeros(2,8)]);
     step = flow(1:6,1:6)+flow(1:6,7:8)*feedback;
-    rho = exp(-(damping+1)*h);
+    rho = exp(-damping*h)-brakeGain*phi;
     % Open-loop error comparison and its braked nominal counterpart.
     errorComparison = abs(a(4:6,4:6));
     errorComparison(1:4:end) = diag(a(4:6,4:6));
@@ -1027,8 +1103,11 @@ function localValidateStored(stored,identity)
         "consumedStages","acceptance","horizonSteps","completion","confirmation", ...
         "lastAttemptSeconds","lastAttemptStages"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored,required)) ...
-            || stored.version~=22 || ~isfield(stored.terminal,"radiusFeedback")
-        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-22 finite-completion certificate.");
+            || ~any(stored.version==[22,23]) || ~isfield(stored.terminal,"radiusFeedback")
+        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-22 or version-23 finite-completion certificate.");
+    end
+    if stored.version==23 && (~isfield(stored,"kind") || stored.kind~="fixedBackup")
+        error("collisionAvoidanceController:invalidStoredCertificate","Invalid fixed-backup witness.");
     end
     if ~isequaln(identity,stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...

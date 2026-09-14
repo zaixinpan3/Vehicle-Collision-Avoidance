@@ -25,7 +25,8 @@ classdef controllerRepairTest < matlab.unittest.TestCase
 
         function longUncertainBackupRetainsTruthAndNonnegativeSpeed(testCase,errorBound)
             report = runExactStateRecursiveFeasibilityScenario(Scenario='crossing', ...
-                SampleCount=300,Seed=20260914,FailAfterAdmission=true,EgoErrorBound=errorBound);
+                SampleCount=300,Seed=20260914,FailAfterAdmission=true,EgoErrorBound=errorBound, ...
+                ExecutionPolicy="predictive");
             testCase.verifyTrue(report.completed,report.failureMessage);
             testCase.verifyTrue(report.passed);
             testCase.verifyTrue(report.modelDomainHeld);

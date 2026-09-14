@@ -2,6 +2,117 @@ classdef ltvBicycleModel
     %ltvBicycleModel Held-input bicycle dynamics and finite-horizon prediction.
 
     methods (Static)
+        function certificate = sampledCruise(model)
+        % Common discrete-time CLF for the frozen-curvature declared plant.
+            persistent key saved
+            cfg = model.cfg;
+            curvature = laneGeometry.curvature(model.initialEgoState(1),model.lane);
+            current = struct('configuration',rmfield(cfg,'solver'),'curvature',curvature, ...
+                'bias',model.longitudinalAccelerationBias);
+            if ~isempty(key) && isequaln(key,current),certificate=saved;return;end
+            [state,input] = ltvBicycleModel.cruiseEquilibrium(curvature,cfg,model.longitudinalAccelerationBias);
+            [a,b,c,tire] = ltvBicycleModel.continuousMatrices(curvature,cfg.referenceSpeed,cfg,[], ...
+                model.longitudinalAccelerationBias,struct('state',state,'input',input));
+            flow = expm(model.sampleTime*[a,b,c;zeros(3,9)]);
+            scales = [cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+                cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+            [gain,p] = dlqr(flow(2:6,2:6),flow(2:6,7:8),diag(1./scales.^2), ...
+                diag([10*cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight]));
+            p = p/norm(p,inf);
+            closed = flow(2:6,2:6)-flow(2:6,7:8)*gain;
+            contraction = max(real(eig(closed.'*p*closed,p)));
+            allowance = 4096*eps*(1+norm(closed,'fro')^2)*cond(p);
+            contraction = contraction+allowance;
+            if ~isfinite(contraction) || contraction>=1 || contraction<0 ...
+                    || min(real(eig(p)))<=0 || any(a(2:6,1)~=0) ...
+                    || norm(a(2:6,:)*state+b(2:6,:)*input+c(2:6),inf)>1e-9
+                error('collisionAvoidanceController:invalidCruiseCertificate', ...
+                    'The sampled cruise generator must have an equilibrium and a contracting error map.');
+            end
+            stage = struct('continuousA',a,'continuousB',b,'continuousC',c,'tireModel',tire, ...
+                'speed',state(4),'brakingRatio',input(2),'curvature',curvature);
+            certificate = struct('state',state,'input',input,'gain',gain,'matrix',p, ...
+                'transition',flow,'closedLoop',closed,'contraction',contraction,'stage',stage, ...
+                'decayPerHold',cfg.clf.decreaseRateFraction*(1-contraction));
+            key=current;saved=certificate;
+        end
+
+        function prediction = fixedPredict(model, inputs, stage)
+        % Linear-size swept verification of a prescribed held-input sequence.
+        % Each cell has only its own two input columns. Geometry substitutes
+        % the actual stage input before assembling the physical margins.
+            persistent templateKey templateTubes savedTransition transitionKey
+            cfg = model.cfg;
+            count = size(inputs,2);
+            h = model.sampleTime;
+            a = stage.continuousA; b = stage.continuousB; c = stage.continuousC;
+            currentTransitionKey = {a,b,c,h};
+            if isempty(transitionKey) || ~isequal(transitionKey,currentTransitionKey)
+                savedTransition = expm(h*[a,b,c;zeros(3,9)]);
+                transitionKey = currentTransitionKey;
+            end
+            transition = savedTransition;
+            state = model.initialEgoState;
+            radius = model.initialFrenetErrorBound;
+            nodes = zeros(6,count+1); radii = nodes;
+            nodes(:,1) = state; radii(:,1) = radius;
+            cells = cell(count,1);
+            % The geometric-series remainder requires norm(A)*dt < 1.
+            cellCount = max(cfg.encounter.minimumCells,ceil(norm(a,inf)*h/0.9));
+            stateLimit = [model.lane.segmentStation(end)+model.lane.segmentLength(end); ...
+                cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius; ...
+                cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
+            inputLimit = [cfg.model.frontWheelSteeringAngleMaximum; ...
+                max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))];
+            for index = 1:count
+                state = transition(1:6,:)*[state;inputs(:,index);1];
+                radius = abs(transition(1:6,1:6))*radius;
+                nodes(:,index+1) = state; radii(:,index+1) = radius;
+            end
+            % Initial-state columns let one template cover every held stage.
+            % Its arithmetic allowance uses the full declared state domain;
+            % the common radius encloses every stage's starting information box.
+            radiusCap = max(radii(:,1:count),[],2);
+            currentTemplateKey = {a,b,c,h,cfg.encounter.taylorOrder, ...
+                stateLimit,inputLimit,radiusCap,cellCount};
+            if isempty(templateKey) || ~isequal(templateKey,currentTemplateKey)
+                augmentedB = [zeros(6),b];
+                initialMap = [eye(6),zeros(6,2)];
+                augmentedLimit = [stateLimit;inputLimit];
+                if exist("bicycleHeldIntervalKernelMex","file")==3
+                    templateTubes = bicycleHeldIntervalKernelMex(a,augmentedB,c,initialMap,zeros(6,1),radiusCap, ...
+                        zeros(6,1),h,cfg.encounter.taylorOrder,stateLimit,augmentedLimit,zeros(6,1),cellCount);
+                else
+                    templateTubes = stateUncertainty.heldInterval(a,augmentedB,c,initialMap,zeros(6,1),radiusCap, ...
+                        zeros(6,1),h,cfg.encounter.taylorOrder,stateLimit,augmentedLimit,zeros(6,1),cellCount);
+                end
+                templateKey = currentTemplateKey;
+            end
+            for index = 1:count
+                stageCells = cell(cellCount,1);
+                for indexCell = 1:cellCount
+                    tube = templateTubes(indexCell);
+                    tube.offset = tube.offset+reshape(pagemtimes(tube.map(:,1:6,:),nodes(:,index)),6,[]);
+                    tube.map = tube.map(:,7:8,:);
+                    tube.endOffset = tube.endOffset+tube.endMap(:,1:6)*nodes(:,index);
+                    tube.endMap = tube.endMap(:,7:8);
+                    tube.localInputMap = tube.localInputMap(:,7:8,:);
+                    tube.stage = index;
+                    tube.start = (index-1)*h+(indexCell-1)*h/cellCount;
+                    tube.duration = h/cellCount;
+                    tube.time = tube.start+(0:cfg.encounter.taylorOrder+1)*tube.duration/(cfg.encounter.taylorOrder+1);
+                    stageCells{indexCell} = tube;
+                end
+                cells{index} = vertcat(stageCells{:});
+            end
+            prediction = struct("stageCount",count,"nodeCount",count+1,"planCount",2, ...
+                "fixedInputs",inputs,"fixedStates",nodes,"initialErrorBound",radii, ...
+                "scheduleSpeedProfile",repmat(stage.speed,1,count+1), ...
+                "scheduleCurvature",repmat(stage.curvature,1,count+1), ...
+                "scheduleBrakingRatio",repmat(stage.brakingRatio,1,count), ...
+                "cells",vertcat(cells{:}),"stage",stage);
+        end
+
         function [force, slope, components] = roadLoad(speed, cfg)
         %ltvBicycleModel.roadLoad Signed passive road load and its speed derivative.
         % Flat road, still air, and a quasi-static equivalent rolling force are

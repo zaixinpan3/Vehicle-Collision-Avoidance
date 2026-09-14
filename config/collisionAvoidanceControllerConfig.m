@@ -39,10 +39,14 @@ function cfg = localDefaults()
     % minimumHorizonSteps floors the speed-scaled fresh horizon
     % ceil(horizonSteps*speed/referenceSpeed); the carried witness keeps its
     % own length, so a shorter fresh horizon never weakens the guarantee.
+    % executionPolicy "backup" uses bounded fixed-continuation verification
+    % and a hard sampled cruise CLF without an online solver. "predictive"
+    % retains the SOCP search. "auto" chooses backup for a finite frame budget.
     cfg.controller = struct( ...
         "sampleTime", 0.05, ...
         "horizonSteps", 48, ...
         "minimumHorizonSteps", 2, ...
+        "executionPolicy", "auto", ...
         "stationTrustRadius", 2.0);
 
     % Geometric clearance in metres, certified throughout every held interval.
@@ -147,7 +151,8 @@ function cfg = localDefaults()
     % check before the first attempt and pass remaining time to the native
     % solver. The carried witness supplies control when work expires (inf
     % disables). Initial admission uses certificateSearchTimeLimit instead;
-    % neither option is a hard bound on complete MATLAB frames.
+    % neither option is a hard bound on complete MATLAB frames. With auto
+    % executionPolicy, a finite frame budget selects the fixed-backup policy.
     % rowGeneration solves every
     % conic program on a working set of its hard rows and adds violated
     % rows until none remain; the accepted plan is still verified on all
@@ -223,6 +228,11 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    if ~isscalar(string(cfg.controller.executionPolicy)) ...
+            || ~any(string(cfg.controller.executionPolicy)==["auto","predictive","backup"])
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "controller.executionPolicy must be auto, predictive or backup.");
+    end
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0

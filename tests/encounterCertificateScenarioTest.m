@@ -7,7 +7,7 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
     end
     methods (Test)
         function solverFailureExecutesTheVerifiedCarriedWitness(testCase)
-            report = runEncounterCertificateScenario(ForceSolverFailure=true);
+            report = runEncounterCertificateScenario(ForceSolverFailure=true,ExecutionPolicy="predictive");
             testCase.verifyTrue(report.completed);
             testCase.verifyTrue(report.passed);
             testCase.verifyTrue(all(report.retainedWitnessUsed(2:end)));

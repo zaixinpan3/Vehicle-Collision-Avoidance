@@ -18,7 +18,8 @@ classdef freeCompletionTimeTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(abs(result.state(4,:)-8)),0.02);
         end
         function aFailedOptimizationExecutesTheCarriedWitnessDownToTheTerminalLaw(testCase)
-            result = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",FailAfterAdmission=true,SampleCount=24);
+            result = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",FailAfterAdmission=true, ...
+                SampleCount=24,ExecutionPolicy="predictive");
             testCase.verifyTrue(result.completed);
             testCase.verifyTrue(result.passed);
             testCase.verifyTrue(all(result.candidateExecuted(2:end)));

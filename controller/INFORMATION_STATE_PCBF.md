@@ -1,6 +1,8 @@
 # Information-state safe MPC with finite encounter completion
 
-Certificate version 22, September 14, 2026. The controller carries a
+Predictive-policy certificate format 22, September 14, 2026. The bounded-work
+backup policy uses format 23 and a hard sampled cruising CLF; see
+[SAMPLED_BACKUP_CBF_CLF.md](SAMPLED_BACKUP_CBF_CLF.md). The controller carries a
 finite, independently verified encounter witness followed by a
 **target-independent road terminal controller**. Its executable safety value
 is exactly zero. Positive safety-value solutions remain solver diagnostics;
@@ -149,13 +151,16 @@ Write `x=(q,v)`, where `q=(s,d,ePsi)` and `v=(vx,vy,r)`. Let `d0>=0` be
 longitudinal passive damping, `gBeta>0` the acceleration gain, and `h` the
 hold duration. With `phi(t)=(1-exp(-d0*t))/d0` (or `t` when `d0=0`), set
 
-    b0 = exp(-d0*h)*(1-exp(-h))/phi(h),
+    b0 = min(exp(-d0*h)*(1-exp(-h))/phi(h),
+             .98*(uf_beta-beta_min)*gBeta/v_max),
     l_k = z_vx,k - rho_vx,k >= 0,
-    beta_k = -b0*l_k/gBeta.
+    beta_k = uf_beta-b0*l_k/gBeta.
 
 The held input acts on the **certified lower speed endpoint**. Its trajectory
 is `l(t)=(exp(-d0*t)-b0*phi(t))*l_k`, which remains nonnegative throughout
-the hold, and `l_(k+1)=exp(-(d0+1)*h)*l_k`. The box radius decays as
+the hold, and `l_(k+1)=(exp(-d0*h)-b0*phi(h))*l_k`. The gain cap covers
+ordinary cruise speeds by increasing the certified stopping excursion.
+The box radius decays as
 `exp(-d0*t)*rho_vx,k`. Braking the center alone fails this property because
 the radius can decay more slowly than the center and the true speed can
 become negative. The endpoint calculation uses the proven nonnegative lower

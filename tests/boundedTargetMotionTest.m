@@ -82,7 +82,8 @@ classdef boundedTargetMotionTest < matlab.unittest.TestCase
         end
         function forcedFreshFailurePreservesSafetyThroughTheTerminalTail(testCase)
             report = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",SampleCount=22, ...
-                FailAfterAdmission=true,TargetJerkAmplitude=[0.1;0],TargetYawAccelerationAmplitude=0.05);
+                FailAfterAdmission=true,TargetJerkAmplitude=[0.1;0],TargetYawAccelerationAmplitude=0.05, ...
+                ExecutionPolicy="predictive");
             testCase.verifyTrue(report.completed);
             testCase.verifyTrue(report.allCandidatesVerified);
             testCase.verifyGreaterThan(nnz(report.terminalActive),0);

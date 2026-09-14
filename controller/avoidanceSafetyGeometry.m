@@ -51,7 +51,19 @@ classdef avoidanceSafetyGeometry
             cachedFrames = isfield(prediction,"geometryAnchor") ...
                 && isequal(prediction.geometryAnchor,model.anchorPlan);
             if ~cachedFrames
-                [computedFrames,computedNominal] = laneGeometry.sweptCellFrames(model,prediction.cells,model.anchorPlan);
+                if isfield(prediction,"fixedInputs")
+                    anchorCells = prediction.cells;
+                    for index = 1:numel(anchorCells)
+                        tube = anchorCells(index);
+                        input = prediction.fixedInputs(:,tube.stage);
+                        anchorCells(index).offset = tube.offset+reshape( ...
+                            reshape(permute(tube.map,[1,3,2]),[],2)*input,6,[]);
+                        anchorCells(index).map(:) = 0;
+                    end
+                    [computedFrames,computedNominal] = laneGeometry.sweptCellFrames(model,anchorCells,zeros(2,1));
+                else
+                    [computedFrames,computedNominal] = laneGeometry.sweptCellFrames(model,prediction.cells,model.anchorPlan);
+                end
             end
             nominalCells = cell(numel(groups),1);
             cellData = cell(numel(groups),1);
@@ -129,6 +141,7 @@ classdef avoidanceSafetyGeometry
                 numericTube = struct("stage",tube.stage,"map",tube.map,"offset",tube.offset, ...
                     "localStateMap",tube.localStateMap,"localInputMap",tube.localInputMap, ...
                     "localOffset",tube.localOffset,"numericalRadius",tube.numericalRadius);
+                if isfield(prediction,"fixedInputs"), numericTube.stage = 1; end
                 projectionData{cellIndex} = struct("cfg",numericCfg,"tube",numericTube, ...
                     "nominal",nominalCells{cellIndex},"stationRange",[frame.stationLower;frame.stationUpper], ...
                     "stateRadius",stateRadius,"scheduleSpeed",prediction.scheduleSpeedProfile(tube.stage), ...
@@ -146,6 +159,14 @@ classdef avoidanceSafetyGeometry
             for cellIndex = 1:numel(groups)
                 names = ["modelDomain";"tireSlip";sourceLabels{cellIndex}];
                 group = projected(cellIndex);
+                if isfield(prediction,"fixedInputs")
+                    stage = prediction.cells(cellIndex).stage;
+                    input=prediction.fixedInputs(:,stage);
+                    allowance=8*eps*(abs(group.physicalBound)+abs(group.matrix)*abs(input));
+                    group.physicalBound = group.physicalBound-group.matrix*input-allowance;
+                    group.matrix = zeros(size(group.matrix,1),0);
+                    group.stage(:) = stage;
+                end
                 local = group.local;
                 local.nodeLabels = names(local.nodeLabels);
                 localGroups{cellIndex} = local;

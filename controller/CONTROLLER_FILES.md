@@ -3,6 +3,9 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
+Format 23 adds bounded fixed-continuation verification and sampled cruise
+CLF control inside these existing modules; it adds no core source files.
+See [the algorithm and guarantees](SAMPLED_BACKUP_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
 The count includes every source file under `controller/`, including future
@@ -21,7 +24,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `solveHardCbfClf.m` | Safety-value LP and CLF SOCP (`solve`), independent verification and value function (`certify`, `certifyInputs`) |
 | `avoidanceSafetyGeometry.m` | Swept separation (`build`), passing-side proposals (`passingNormals`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
-| `ltvBicycleModel.m` | Held-input prediction, nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
+| `ltvBicycleModel.m` | Held-input prediction, fixed-sequence swept verification (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
 | `targetPrediction.m` | Bounded target admission (`admitOnline`), reachable-box conditioning (`condition`), absolute-time flow, offline uncertainty studies and footprint support |
