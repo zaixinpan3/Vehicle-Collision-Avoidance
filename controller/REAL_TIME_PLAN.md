@@ -8,6 +8,13 @@ bringing a frame toward the 100 ms hold. Sections 1 to 5 are the analysis
 as written before any change; section 6 records what was then
 implemented and measured.
 
+September 14 update: version 22 checks the budget before the first fresh
+attempt, screens expensive horizons using observed costs, and passes the
+remaining time to the native solver. Initial admission retains a separate
+search budget. This does not impose a hard bound on complete MATLAB frames;
+see the current [repair results](../report/CONTROLLER_REPAIR_RESULTS_20260914.md).
+The measurements and implementation table below describe September 12.
+
 ## 1. Where the time goes
 
 Measured on the 2026-09-12 campaign (straight road, 8 m/s cruise, 16-stage

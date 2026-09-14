@@ -19,7 +19,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `formulateAvoidanceProblem.m` | Objective, swept safety rows with stage labels, hard domain/terminal rows and predictive CLF cones |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
 | `solveHardCbfClf.m` | Safety-value LP and CLF SOCP (`solve`), independent verification and value function (`certify`, `certifyInputs`) |
-| `avoidanceSafetyGeometry.m` | Swept separation (`build`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
+| `avoidanceSafetyGeometry.m` | Swept separation (`build`), passing-side proposals (`passingNormals`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input prediction, nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
@@ -62,7 +62,7 @@ The removed standalone files have no compatibility wrappers.
 | `fialaIntervalParameters` | `fialaCertificate.parameters` |
 
 The earlier consolidation changed source organization and call names while
-preserving its then-current equations. The current version-21 controller
+preserving its then-current equations. The current version-22 controller
 carries the accepted plan's own prediction data as a recursive-feasibility
 witness on conditioned information sets; see
 [INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md). In particular,
@@ -77,6 +77,10 @@ the session before running. Regenerate the MATLAB Coder kernels with
 and binaries remain under `solver/` and are excluded from source control.
 When changing native lane geometry paths, `clear laneGeometry` releases both
 retained geometry backend handles.
+
+The version-22 solver budget requires rebuilding the native conic bridge with
+`addpath('scripts'); buildAvoidanceSocpSolver;`. Its optional fourth options
+entry supplies Clarabel's time limit; the three-entry interface remains valid.
 
 ## Verification
 

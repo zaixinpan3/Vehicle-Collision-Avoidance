@@ -2,12 +2,13 @@
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest audit: [Exact-state controller problems, September 14, 2026](EXACT_STATE_CONTROLLER_AUDIT_20260914.md).
+Latest implementation: [Controller repair and validation, September 14, 2026](CONTROLLER_REPAIR_RESULTS_20260914.md).
 
 Each report states its experiment date and scope. Earlier results describe the revision tested at that time.
 
 | Report | File |
 | --- | --- |
+| Terminal-speed, passing-search and work-budget repairs | [CONTROLLER_REPAIR_RESULTS_20260914.md](CONTROLLER_REPAIR_RESULTS_20260914.md) |
 | Exact-state experiment: terminal-domain defect and remaining controller problems | [EXACT_STATE_CONTROLLER_AUDIT_20260914.md](EXACT_STATE_CONTROLLER_AUDIT_20260914.md) |
 | Straight-scene rerun after finite encounter completion | [ALGORITHM_RERUN_RESULTS_20260914.md](ALGORITHM_RERUN_RESULTS_20260914.md) |
 | Bounded target motion: admission fix and terminal limitations | [BOUNDED_TARGET_MOTION_RESULTS_20260913.md](BOUNDED_TARGET_MOTION_RESULTS_20260913.md) |

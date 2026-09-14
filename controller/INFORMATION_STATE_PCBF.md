@@ -1,6 +1,6 @@
 # Information-state safe MPC with finite encounter completion
 
-Certificate version 21, September 13, 2026. The controller now carries a
+Certificate version 22, September 14, 2026. The controller carries a
 finite, independently verified encounter witness followed by a
 **target-independent road terminal controller**. Its executable safety value
 is exactly zero. Positive safety-value solutions remain solver diagnostics;
@@ -97,8 +97,10 @@ valid even with floating-point normalization. Independent arithmetic reserves
 are subtracted as well.
 
 This affine directional condition is a conservative inner approximation of
-the nonconvex exterior of a ball. The final anchor proposes the direction;
-different seeds can propose different directions. A carried rebuild keeps
+the nonconvex exterior of a ball. For a predicted close approach, admission
+proposes an exit direction along relative motion, so an observed approaching
+exterior target must pass before a position observation can release it. Other
+encounters use the final anchor's relative direction. A carried rebuild keeps
 the original exit direction and chart. All exit rows are hard in both
 lexicographic optimization stages. Only verified finite completions admit
 control; a search failure does not establish physical collision inevitability
@@ -123,13 +125,19 @@ An active target is discharged by either:
 
 Prediction, nominal range crossing and a timer never trigger release.
 Absent or stale confirmation cannot authorize road-only terminal execution.
-A previously discharged, currently observed exterior object creates no new
-inside-region obligation; an inside or uncertain returning object needs
-fresh admission. This does not prove safety across re-entry or detection
-latency.
+A previously discharged exterior object can need fresh admission when its
+current velocity predicts an approach. Other robustly exterior observations
+create no new inside-region obligation. Complete absence still follows the
+stated scan contract; this does not prove safety across re-entry, temporary
+loss of an exterior track, or detection latency.
 
-Admission searches finite horizons by extending a candidate after exhausted
-seeds, subject to the search work budget. During an active encounter a fresh
+Admission estimates an initial horizon from relative motion and the required
+departure side. This is a search proposal only: finite exit must still be
+verified. Smooth left/right offset paths propose consistent cell normals,
+while every held-input stage retains the same swept verification. A positive
+safety-value diagnostic or an approximate solver result that fails verification
+can try another proposal. The timed search extends the horizon after exhausted
+seeds; it reserves time for alternative normal families. During an active encounter a fresh
 horizon is capped at the stored absolute exit deadline. One remaining hold
 is supported. A replacement cannot move that deadline later. A failed fresh
 solve leaves the independently verified carried suffix available. After
@@ -137,16 +145,39 @@ release the road-only problem can replan with its usual rolling horizon.
 
 ## Road-only invariant terminal set
 
-Write `x=(q,v)`, where `q=(s,d,ePsi)` and `v=(vx,vy,r)`. For the retained
-sampled rest law, the nominal velocity has a Hurwitz Metzler comparison `C`.
-A separate open-loop error comparison `Ce` bounds the velocity uncertainty.
-An uncertain terminal velocity requires finite passive error excursion.
+Write `x=(q,v)`, where `q=(s,d,ePsi)` and `v=(vx,vy,r)`. Let `d0>=0` be
+longitudinal passive damping, `gBeta>0` the acceleration gain, and `h` the
+hold duration. With `phi(t)=(1-exp(-d0*t))/d0` (or `t` when `d0=0`), set
+
+    b0 = exp(-d0*h)*(1-exp(-h))/phi(h),
+    l_k = z_vx,k - rho_vx,k >= 0,
+    beta_k = -b0*l_k/gBeta.
+
+The held input acts on the **certified lower speed endpoint**. Its trajectory
+is `l(t)=(exp(-d0*t)-b0*phi(t))*l_k`, which remains nonnegative throughout
+the hold, and `l_(k+1)=exp(-(d0+1)*h)*l_k`. The box radius decays as
+`exp(-d0*t)*rho_vx,k`. Braking the center alone fails this property because
+the radius can decay more slowly than the center and the true speed can
+become negative. The endpoint calculation uses the proven nonnegative lower
+endpoint to enclose roundoff at rest; no negative lower endpoint is admitted.
+
+For the retained rest model, the open-loop velocity-error comparison is the
+Metzler matrix `Ce`. The nominal comparison is `C=Ce-B`, with
+`B=diag(b0,0,0)`. Throughout each hold,
+
+    d|vbar|/dt <= C*|vbar| + B*rho_v,
+    d rho_v/dt <= Ce*rho_v.
+
+An uncertain terminal velocity requires a Hurwitz `Ce`, hence finite passive
+error excursion. Exact-state terminal operation may use a contracting `C`
+with zero error even when the passive longitudinal damping is zero.
 
 For each road or chart pose row `a*q<=b`, let `g` bound the positive pose
 growth and set `R=g/(-C)`. Nonnegative nominal longitudinal speed permits
 using `max((a*D)(1),0)` for the longitudinal term. The other terms use
-absolute values. For the error budget use `Re=abs(a*D)/(-Ce)`. Verified
-nonnegative budgets with numerical reserve satisfy `R*C+g<=0`.
+absolute values. The radius-dependent input requires the coupled error budget
+`Re=(abs(a*D)+R*B)/(-Ce)`. Verified nonnegative budgets with arithmetic reserves
+satisfy `R*C+g<=0` and `Re*Ce+abs(a*D)+R*B<=0`. Their derivatives show that
 
     a*qbar + R*abs(vbar) + abs(a)*rho_q + Re*rho_v <= b
 
@@ -156,6 +187,12 @@ terminal-input and first-terminal-input slew constraints are retained. There
 are **no target rows or infinite-time target support calculations** in this
 set. Its controller may reduce speed after handoff; cruise remains a soft
 CLF performance objective.
+
+The input is stored as `uf+K*z+Kr*rho`, where `Kr=-K` in the longitudinal
+brake channel. Both contributions enter the first-terminal-input slew rows.
+The upper speed endpoint contracts under passive damping; velocity and tire
+slip limits use a verified invariant comparison box. The lower endpoint
+contracts by a fixed factor, which also bounds subsequent input changes.
 
 The terminal input uses the carried nominal and its certified box. In
 particular, conditioning a new measurement does not silently recenter that
@@ -217,7 +254,24 @@ hard exit and road terminal rows. `solveHardCbfClf` distinguishes numerical
 candidates from executable certificates; `collisionAvoidanceController`
 checks and publishes the carried state.
 
-See `tests/finiteEncounterCompletionTest.m` and
+Before fresh work, the planner checks the frame budget, including the first
+attempt. The maximum observed attempt cost screens long horizons. Native
+Clarabel receives the remaining program time via an optional fourth options
+entry; all omitted-row checks and independent verification still apply to
+any returned decision. An expired frame uses the carried witness. Initial
+admission instead uses `certificateSearchTimeLimit` and cannot execute until
+it obtains a complete witness. Native time limits do not bound MATLAB
+formulation, factorization setup, verification, or operating-system delays;
+this is not a hard 100 ms execution guarantee.
+
+`runExactStateRecursiveFeasibilityScenario` independently samples the true
+state domains and checks true ego/target containment in the published boxes.
+Its pass criterion cannot be satisfied by controller certification flags
+alone. Descent and carried-candidate checks restart for a new admission.
+
+See `tests/controllerRepairTest.m`,
+[report/CONTROLLER_REPAIR_RESULTS_20260914.md](../report/CONTROLLER_REPAIR_RESULTS_20260914.md),
+`tests/finiteEncounterCompletionTest.m` and
 [report/FINITE_COMPLETION_RESULTS_20260913.md](../report/FINITE_COMPLETION_RESULTS_20260913.md)
 for actual implementation checks and their limits. Earlier timing and
 all-future-terminal experiment records describe their identified source

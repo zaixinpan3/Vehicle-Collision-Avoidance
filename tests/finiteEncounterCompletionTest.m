@@ -87,7 +87,8 @@ classdef finiteEncounterCompletionTest < matlab.unittest.TestCase
             testCase.verifyTrue(p.metadata.safetyCertified);
             testCase.verifyEmpty(next.encounters);
             testCase.verifyEqual(command.actuatorInput, ...
-                c.terminal.input+c.terminal.feedback*c.predictedState(:,2),AbsTol=1e-12);
+                c.terminal.input+c.terminal.feedback*c.predictedState(:,2) ...
+                +c.terminal.radiusFeedback*c.stateErrorBound(:,2),AbsTol=1e-12);
         end
 
         function anUnconfirmedFiniteAdmissionIsRejected(testCase)

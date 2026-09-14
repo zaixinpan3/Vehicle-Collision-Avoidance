@@ -143,9 +143,12 @@ function cfg = localDefaults()
     % lexicographicTieTolerance bounds, in metres of accumulated predicted
     % violation, how far the performance stage may exceed the value-stage
     % optimum when that optimum is positive; a zero optimum is kept exactly.
-    % frameDeadlineSeconds bounds the fresh search from the frame start:
-    % once exceeded, no further solve starts and the verified carried
-    % witness is the command (inf disables). rowGeneration solves every
+    % frameDeadlineSeconds budgets fresh work when a witness is available:
+    % check before the first attempt and pass remaining time to the native
+    % solver. The carried witness supplies control when work expires (inf
+    % disables). Initial admission uses certificateSearchTimeLimit instead;
+    % neither option is a hard bound on complete MATLAB frames.
+    % rowGeneration solves every
     % conic program on a working set of its hard rows and adds violated
     % rows until none remain; the accepted plan is still verified on all
     % rows. witnessVerification selects how the carried witness is checked:

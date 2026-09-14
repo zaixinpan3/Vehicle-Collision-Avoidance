@@ -20,7 +20,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyFalse(problem.metadata.physicalVehicleGuaranteeEstablished);
             testCase.verifyEqual(problem.metadata.certificateSource,"checkedOptimization");
             testCase.verifyEqual(problem.metadata.pcbfValue,0);
-            testCase.verifyEqual(stored.version,21);
+            testCase.verifyEqual(stored.version,22);
             testCase.verifyEqual(stored.certifiedDuration,stored.remainingSteps*cfg.controller.sampleTime,AbsTol=1e-12);
             testCase.verifyEqual(numel(stored.stages),stored.remainingSteps);
             testCase.verifyEqual(numel(stored.cellFrames),numel(stored.prediction.cells));
@@ -288,7 +288,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(terminal.poseExcursion*terminal.comparison ...
                 +abs(terminal.continuousA(1:3,4:6)),1e-12*ones(3));
             testCase.verifyLessThanOrEqual(terminal.errorExcursion*terminal.errorComparison ...
-                +abs(terminal.continuousA(1:3,4:6)),1e-12*ones(3));
+                +abs(terminal.continuousA(1:3,4:6))+terminal.poseExcursion*terminal.errorInputCoupling,1e-12*ones(3));
             testCase.verifyGreaterThan(terminal.longitudinalRatio,0);
             testCase.verifyLessThan(terminal.longitudinalRatio,1);
         end
@@ -383,14 +383,14 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(methods{2}(6:9),repmat("terminalInvariance",1,4));
         end
 
-        function aFrameDeadlineKeepsAVerifiedFirstAttempt(testCase)
+        function anExpiredFrameRetainsTheVerifiedWitnessWithoutAnAttempt(testCase)
             [ego,target,road,cfg] = localFixture();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
             cfg.solver.frameDeadlineSeconds = 1e-6;
             ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
             [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,stored);
-            testCase.verifyEqual(problem.metadata.certificateSource,"checkedOptimization");
-            testCase.verifyEqual(problem.metadata.certificateSearchAttempts,1);
+            testCase.verifyEqual(problem.metadata.certificateSource,"carriedWitness");
+            testCase.verifyEqual(problem.metadata.certificateSearchAttempts,0);
             testCase.verifyTrue(problem.metadata.frameDeadlineHit);
         end
 
@@ -531,7 +531,7 @@ function [error,minimumMargin] = localTerminalAudit(stored)
 end
 
 function worst = localRobustTerminalAudit(terminal,center,radius)
-% True state = nominal + error; the law acts on the nominal only. Check the
+% True state = nominal + error; the law uses the certified speed interval. Check the
 % physical pose rows and the velocity box on the true state at eleven points
 % of every hold for sixty holds from every vertex of the terminal box.
     generator = [terminal.continuousA,terminal.continuousB,terminal.continuousC;zeros(3,9)];
@@ -541,17 +541,20 @@ function worst = localRobustTerminalAudit(terminal,center,radius)
     worst = inf;
     for vertex = 1:size(signs,1)
         nominal = center;
+        uncertainty = radius;
         state = center+signs(vertex,:).'.*radius;
         for step = 1:60
-            input = terminal.input+terminal.feedback*nominal;
+            stepData = hardEncounterBarrier.terminalStep(terminal,nominal,uncertainty,terminal.sampleTime);
+            input = stepData.input;
             for index = 1:numel(flows)
                 value = flows{index}*[state;input;1];
                 pose = terminal.poseBound-terminal.poseRows*value(1:3);
                 velocity = terminal.velocityLimit-abs(value(4:6));
-                worst = min([worst;pose;velocity]);
+                worst = min([worst;pose;velocity;value(4)]);
             end
             state = value(1:6);
-            nominal = flows{end}(1:6,:)*[nominal;input;1];
+            nominal = stepData.successor;
+            uncertainty = stepData.successorRadius;
         end
     end
 end

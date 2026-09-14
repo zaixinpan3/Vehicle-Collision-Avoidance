@@ -158,6 +158,27 @@ classdef avoidanceSafetyGeometry
                 "frames", vertcat(frames{:}), "normals", {normalGroups},"local",vertcat(localGroups{:}));
         end
 
+        function normals = passingNormals(model,prediction,anchor,side)
+        % Consistent passing-side proposals; only full swept checking admits them.
+            cfg = model.cfg;
+            target = model.encounters;
+            offset = min(0.75*cfg.model.lateralDomainRadius, ...
+                cfg.vehicle.width/2+target.halfWidth+cfg.collision.clearanceMargin+0.85);
+            normals = cell(numel(prediction.cells),1);
+            for index = 1:numel(prediction.cells)
+                tube = prediction.cells(index);
+                time = tube.start+tube.duration/2;
+                state = mean(reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset,2);
+                blend = (1-cos(pi*min(1,time/0.8)))/2;
+                state(2) = (1-blend)*model.initialEgoState(2)+blend*side*offset;
+                [position,heading] = laneGeometry.fromFrenet(state,model.lane);
+                center = targetPrediction.finiteFlow(target,time);
+                [~,normals{index}] = avoidanceSafetyGeometry.rectangleDistance( ...
+                    position,heading,center(1:2),center(7), ...
+                    [cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth]);
+            end
+        end
+
         function [normals,information] = optimizeNormals(model,prediction,plan)
         %avoidanceSafetyGeometry.optimizeNormals Continuous maximum-margin cell-normal proposals.
         % A small SOCP separates synchronous relative Bernstein footprint enclosures.

@@ -1,9 +1,10 @@
 # Finite-encounter terminal certificates with recursive feasibility
 
-September 13, 2026. The finite open-loop witness is now implemented in
-certificate version 21 with `N=L=M`, current observation confirmation,
+Updated September 14, 2026. The finite open-loop witness is implemented in
+certificate version 22 with `N=L=M`, current observation confirmation,
 non-postponable active deadlines, zero physical safety violation, and a
-road-only invariant terminal controller. The general policy-predecessor
+road-only invariant terminal controller using the lower speed endpoint and
+coupled nominal/error excursion budgets. The general policy-predecessor
 construction and separate `L<M` tail below remain design extensions.
 [INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md) specifies the executed
 algorithm; the results record identifies the validations actually run.
@@ -250,7 +251,7 @@ has zero safety violation, the same suffix argument gives
     V_(k+1) <= V_k - xi_(0,k)
 
 for a feasible optimum, or for an accepted certificate value bounded by the
-suffix value. Positive diagnostic values never authorize execution in version 21;
+suffix value. Positive diagnostic values never authorize execution in version 22;
 zero-value safety cannot admit a positive tolerance leak. At guarded completion the supplied free-mode
 witness has zero safety value. This is a value-descent/zero-sublevel invariance
 argument on the augmented information/certificate state. Calling the result

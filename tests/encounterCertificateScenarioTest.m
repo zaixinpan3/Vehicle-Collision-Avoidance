@@ -15,7 +15,7 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
             testCase.verifyEqual(report.pcbfValue,zeros(size(report.pcbfValue)));
         end
         function freshSolutionsContinueBeyondTheFirstPredictionEnd(testCase)
-            report = runEncounterCertificateScenario();
+            report = runEncounterCertificateScenario(DeadlineSeconds=inf);
             testCase.verifyTrue(report.passed);
             testCase.verifyFalse(any(report.retainedWitnessUsed));
             testCase.verifyFalse(any(report.terminalActive));

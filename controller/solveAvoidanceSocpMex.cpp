@@ -52,10 +52,13 @@ void mexFunction(int outputs, mxArray* result[], int inputs, const mxArray* argu
     const mwSize coneCount = mxGetNumberOfElements(argument[4]);
     require(coneCount >= 2, "Cone sizes must specify zero and nonnegative cones first.");
     const auto dimensions = vector(argument[4], coneCount);
-    const auto options = vector(argument[5], 3);
+    const mwSize optionCount = mxGetNumberOfElements(argument[5]);
+    require(optionCount == 3 || optionCount == 4, "Use tolerances, iterations and an optional time limit.");
+    const auto options = vector(argument[5], optionCount);
     require(options[0] > 0 && options[1] > 0 && options[2] >= 1
         && options[2] == std::floor(options[2])
         && options[2] <= std::numeric_limits<uint32_t>::max(), "Invalid solver tolerances or iteration limit.");
+    require(optionCount == 3 || options[3] >= 0, "The solver time limit must be nonnegative.");
 
     // Validate before allocating C++ resources: mexErrMsg does not unwind them.
     double total = 0;
@@ -79,6 +82,7 @@ void mexFunction(int outputs, mxArray* result[], int inputs, const mxArray* argu
     auto settings = clarabel_DefaultSettings_default();
     settings.verbose = false;
     settings.max_iter = static_cast<uint32_t>(options[2]);
+    if (optionCount == 4) settings.time_limit = options[3];
     settings.tol_feas = options[0];
     settings.tol_infeas_abs = options[0];
     settings.tol_infeas_rel = options[0];

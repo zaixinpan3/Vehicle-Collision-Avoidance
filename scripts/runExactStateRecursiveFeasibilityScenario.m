@@ -66,7 +66,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
             "failureMessage",string(exception.message),"executedHolds",0, ...
             "sampleCount",options.SampleCount,"failureTime",0,"runtimeQualified",false, ...
             "admissionSeconds",toc(frameTimer),"egoErrorBound",egoBound,"targetErrorBound",targetBound, ...
-            "targetMotion",truthTarget);
+            "targetMotion",truthTarget,"seed",options.Seed, ...
+            "confirmationRange",options.ConfirmationRange,"solverFailureInjected",options.FailAfterAdmission);
         localSave(report,options);
         return;
     end
@@ -108,6 +109,12 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     egoRadius(:,1) = problem.metadata.initialErrorBound;
     targetRadius = zeros(8,count);
     targetRadius(:,1) = problem.metadata.targetErrorBound;
+    egoContainment = nan(1,count);
+    targetContainment = nan(1,count);
+    [egoContainment(1),targetContainment(1)] = localContainment(x, ...
+        localTargetTruth(truthTarget,0),problem,certificate);
+    admissionFrame = false(1,count);
+    admissionFrame(1) = true;
     witnessSeconds = zeros(1,count);
     phaseSeconds = zeros(4,count);
     phaseSeconds(:,1) = localPhases(problem.metadata.runtime);
@@ -115,6 +122,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     failureMessage = "";
     minimumSeparation = inf;
     minimumRoadMargin = inf;
+    minimumDomainMargin = inf;
+    minimumSpeed = x(4);
     maximumSlewViolation = 0;
     originalCfg = cfg;
     if options.FailAfterAdmission, cfg.solver.jointFunction = @localFailedSolve; end
@@ -133,6 +142,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
             minimumSeparation = min(minimumSeparation,separation-cfg.collision.clearanceMargin);
             lateralSupport = cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
             minimumRoadMargin = min(minimumRoadMargin,5-abs(position(2))-lateralSupport-cfg.collision.clearanceMargin);
+            minimumSpeed = min(minimumSpeed,value(4));
+            minimumDomainMargin = min(minimumDomainMargin,localDomainMargin(value(1:6),cfg));
         end
         x = value(1:6);
         time = sample*h;
@@ -140,6 +151,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         ego = localEgoMeasurement(x,time,command.actuatorInput,egoBound,stream,lane);
         ego.perception = struct("time",time,"range",options.ConfirmationRange,"completeWithinRange",true);
         target = localTargetMeasurement(truthTarget,time,targetBound,stream);
+        priorSuccessorMargin = min(certificate.stateErrorBound(:,2)-abs(x-certificate.predictedState(:,2)));
         previous = command.actuatorInput;
         states(:,sample+1) = x;
         try
@@ -168,6 +180,10 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         predictionEndTime(sample+1) = certificate.deadline;
         exitDeadline(sample+1) = metadata.targetCertifiedUntil;
         releaseConfirmed(sample+1) = metadata.confirmedRelease;
+        admissionFrame(sample+1) = metadata.jointAdmissionPerformed;
+        [egoContainment(sample+1),targetContainment(sample+1)] = localContainment( ...
+            x,localTargetTruth(truthTarget,time),problem,certificate);
+        egoContainment(sample+1) = min(egoContainment(sample+1),priorSuccessorMargin);
         egoRadius(:,sample+1) = metadata.initialErrorBound;
         if metadata.hasTarget, targetRadius(:,sample+1) = metadata.targetErrorBound; end
         witnessSeconds(sample+1) = metadata.candidateSeconds;
@@ -203,6 +219,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         "optimizedStages",optimizedStages(issued),"egoErrorRadius",egoRadius(:,issued), ...
         "targetErrorRadius",targetRadius(:,issued),"witnessSeconds",witnessSeconds(issued), ...
         "minimumSampledSeparationMargin",minimumSeparation,"minimumSampledRoadMargin",minimumRoadMargin, ...
+        "minimumSampledModelDomainMargin",minimumDomainMargin,"minimumSampledSpeed",minimumSpeed, ...
+        "egoContainmentMargin",egoContainment(issued),"targetContainmentMargin",targetContainment(issued), ...
+        "admissionFrame",admissionFrame(issued), ...
         "maximumSlewViolation",maximumSlewViolation,"terminal",terminal, ...
         "finalTargetDistance",norm(ego.position-target.targetPositionInertial), ...
         "solverFailureInjected",options.FailAfterAdmission, ...
@@ -219,15 +238,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     report.phaseSeconds = phaseSeconds(:,issued);
     report.phaseNames = ["prediction","formulation","solve","acceptance"];
     report.finalCruiseError = states(2:6,end)-[0;0;cfg.referenceSpeed;0;0];
-    tolerance = originalCfg.solver.lexicographicTieTolerance;
-    report.allCandidatesVerified = report.completed && all(candidateVerified(2:sample+1));
-    report.descentHolds = all(descentResidual(2:sample+1)<=tolerance+1e-12);
-    report.maximumDescentResidual = max([-inf,descentResidual(2:sample+1)]);
-    % A carried-witness command is a verified plan of the same program, so it
-    % does not fail the trial; the count is reported.
-    report.passed = report.completed && all(certified) ...
-        && report.allCandidatesVerified && report.descentHolds && minimumSeparation>=0 ...
-        && minimumRoadMargin>=0 && maximumSlewViolation<=0;
+    assessment = assessExactStateSafety(report);
+    fields = fieldnames(assessment);
+    for index = 1:numel(fields), report.(fields{index}) = assessment.(fields{index}); end
     report.runtime = struct("frameSeconds",frameSeconds, ...
         "deadlineSeconds",options.DeadlineSeconds, ...
         "admissionSeconds",frameSeconds(1), ...
@@ -241,6 +254,29 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.Scenario,nnz(certified),numel(certified),sample,nnz(candidateExecuted), ...
         max(pcbfValue(issued)),minimumSeparation,minimumRoadMargin,states(4,end));
     if ~report.completed, fprintf('Control failed: %s\n',failureMessage); end
+end
+
+function margin = localDomainMargin(state,cfg)
+% Independent physical state-domain audit, separate from plan certification.
+    lower = [-cfg.model.lateralDomainRadius;-cfg.model.headingDomainRadius; ...
+        cfg.model.speedMinimum;-cfg.model.lateralVelocityMaximum;-cfg.model.yawRateMaximum];
+    upper = [cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius; ...
+        cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
+    margin = min([state(2:6)-lower;upper-state(2:6)]);
+end
+
+function [egoMargin,targetMargin] = localContainment(state,target,problem,certificate)
+% Check both the conditioned information state and the executed witness box.
+    difference = state-problem.model.initialEgoState;
+    difference(3) = atan2(sin(difference(3)),cos(difference(3)));
+    egoMargin = min([problem.model.initialFrenetErrorBound-abs(difference); ...
+        certificate.stateErrorBound(:,1)-abs(state-certificate.predictedState(:,1))]);
+    targetMargin = inf;
+    if ~isempty(certificate.encounters)
+        difference = target-certificate.encounters.center;
+        difference(7) = atan2(sin(difference(7)),cos(difference(7)));
+        targetMargin = min(certificate.encounters.radius-abs(difference));
+    end
 end
 
 function ego = localEgoMeasurement(x,time,heldInput,bound,stream,lane)

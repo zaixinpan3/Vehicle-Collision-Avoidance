@@ -91,6 +91,7 @@ classdef cruiseRecoveryTest < matlab.unittest.TestCase
         function quadraticObjectiveMatchesAnIndependentSolver(testCase, speed)
             cfg = localConfiguration();
             ego = struct("position",[0;0],"yawAngle",0,"speed",speed,"stateTime",0);
+            ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
             compared = false;
             cfg.solver.jointFunction = @compare;
             [~,~,problem] = collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(), ...

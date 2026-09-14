@@ -8,7 +8,7 @@ classdef freeCompletionTimeTest < matlab.unittest.TestCase
     end
     methods (Test)
         function cruisingContinuesPastTheOriginalPredictionHorizon(testCase)
-            result = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",SampleCount=24);
+            result = runExactStateRecursiveFeasibilityScenario(Scenario="crossing",SampleCount=24,DeadlineSeconds=inf);
             testCase.verifyTrue(result.passed);
             testCase.verifyGreaterThan(result.executedHolds,result.admissionSteps);
             activeDeadlines = result.exitDeadline(isfinite(result.exitDeadline));

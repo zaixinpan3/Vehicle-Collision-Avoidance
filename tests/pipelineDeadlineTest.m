@@ -11,7 +11,7 @@ classdef pipelineDeadlineTest < matlab.unittest.TestCase
         function anExpiredFrameNeverAdvancesThePlant(testCase)
             cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8,"controller",struct("horizonSteps",24,"sampleTime",0.1)));
             trial = runFiniteBicycleDiagnostic(cfg,.1,PrepareController=false,FullStateObservation=true, ...
-                DeadlineSeconds=1e-12,EnforceRuntimeDeadline=true);
+                IncludeTarget=false,DeadlineSeconds=1e-12,EnforceRuntimeDeadline=true);
             testCase.verifyTrue(trial.failure.occurred);
             testCase.verifyEqual(trial.failure.identifier,"collisionAvoidanceController:runtimeDeadlineExceeded");
             testCase.verifyEqual(trial.time,0);

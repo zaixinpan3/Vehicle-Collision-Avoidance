@@ -114,6 +114,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
         function anEgoBoxIsAdmittedWithItsFrenetRadius(testCase)
             [ego,target,cfg,lane] = localInputs();
             ego.position(1) = 10;
+            target.targetPositionInertial(1) = target.targetPositionInertial(1)+10;
             [~,~,problem] = collisionAvoidanceController(ego,target,lane,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.initialErrorBound(1:2),[0.1;0.1],AbsTol=1e-12);

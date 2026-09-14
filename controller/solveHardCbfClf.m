@@ -579,10 +579,21 @@ function solve = localDefaultSolve(problem, cfg)
     % epigraph can otherwise trigger a false native infeasibility report.
     hessian = sparse(program.P(retained,retained));
     objectiveScale = 1/max([1;abs(linear);abs(nonzeros(hessian))]);
+    options = [cfg.solver.constraintTolerance, ...
+        cfg.solver.optimalityTolerance*objectiveScale,cfg.solver.maxIterations];
+    if isfield(cfg.solver,"workTimer") && isfinite(cfg.solver.workTimeLimit)
+        remaining = cfg.solver.workTimeLimit-toc(cfg.solver.workTimer);
+        if remaining<=0
+            solve = localEmptySolve();
+            solve.exitFlag = 0;
+            solve.output = struct("message","The program work deadline expired before the native solve.");
+            return;
+        end
+        options(4) = remaining;
+    end
     [nativeDecision, output] = nativeSolver( ...
         objectiveScale*hessian, objectiveScale*linear, sparse(program.A(:,retained)), bound, program.cones, ...
-        [cfg.solver.constraintTolerance, ...
-            cfg.solver.optimalityTolerance*objectiveScale, cfg.solver.maxIterations]);
+        options);
     output.objectiveValue = output.objectiveValue/objectiveScale;
     output.objectiveScale = objectiveScale;
     stageDecision = zeros(numel(program.q),1);stageDecision(retained) = nativeDecision;

@@ -21,6 +21,10 @@ classdef hardEncounterBarrier
             confirmation = struct("range",range,"reference","egoReferencePoint", ...
                 "exitGeometry","entireTargetFootprint","confirmationDelay",0, ...
                 "observationContract","currentCompleteObservationAtConfirmationSample");
+            [direction,steps,passing] = localEncounterProposal(model,range);
+            confirmation.exitDirection = direction;
+            confirmation.searchHorizonSteps = steps;
+            confirmation.passingRequired = passing;
         end
 
         function valid = confirmationObservation(ego,time,confirmation,required)
@@ -50,6 +54,9 @@ classdef hardEncounterBarrier
             frame = laneGeometry.frameBounds(model.lane,z(1), ...
                 max(model.cfg.controller.stationTrustRadius,rho(1)),model.cfg.model.lateralDomainRadius);
             direction = localExitDirection(target.center,frame,z);
+            if ~isempty(model.confirmation.exitDirection)
+                direction = model.confirmation.exitDirection;
+            end
             if nargin>2
                 % At the certified final node, its carried chart/direction
                 % preserve the proven exterior row under box conditioning.
@@ -97,6 +104,9 @@ classdef hardEncounterBarrier
             [center,radius] = targetPrediction.finiteFlow(target,prediction.stageCount*model.sampleTime);
             anchor = finalOffset+finalMap*model.anchorPlan;
             direction = localExitDirection(center,frame,anchor);
+            if ~isempty(model.confirmation.exitDirection)
+                direction = model.confirmation.exitDirection;
+            end
             if isfield(model,"prescribedCompletion") && model.prescribedCompletion.active
                 direction = model.prescribedCompletion.direction;
                 frame = model.prescribedCompletion.frame;
@@ -121,12 +131,15 @@ classdef hardEncounterBarrier
             % when nothing verifies. The horizon is scaled with speed; the
             % carried witness keeps its own length, so a shorter fresh horizon
             % never weakens the guarantee. With a witness available, no attempt
-            % starts unless it can finish before the frame deadline, judged by
-            % the longest attempt of this frame; the first attempt always runs.
+            % starts after the work deadline. Observed costs screen long
+            % attempts, and the native solver receives the remaining budget.
+            % Initial admission has its own search budget and no executable
+            % prefix until a complete witness has been verified.
             % Failures are returned, not thrown, so their timing is reported.
             cfg = model.cfg;
             timing = struct("predictionSeconds",0,"formulationSeconds",0, ...
-                "solveSeconds",0,"verificationSeconds",0,"attempts",0,"deadlineHit",false);
+                "solveSeconds",0,"verificationSeconds",0,"attempts",0,"deadlineHit",false, ...
+                "maximumAttemptSeconds",0,"lastAttemptStages",0);
             failure = "";
             prediction = [];qp = [];result = [];check = [];
             calls = 0;
@@ -138,7 +151,10 @@ classdef hardEncounterBarrier
                     seeds = [2,1,3];
                 end
             else
-                seeds = [1,2];
+                seeds = [1,4,5,2];
+                if ~isempty(model.encounters) && model.confirmation.passingRequired
+                    seeds = [4,5,1,2];
+                end
             end
             lastOutcome = "no attempt";
             best = [];
@@ -148,6 +164,18 @@ classdef hardEncounterBarrier
             speedRatio = min(1,max(0,model.initialEgoState(4)/max(model.referenceSpeed,eps)));
             model.horizonSteps = max(min(cfg.controller.minimumHorizonSteps,cfg.controller.horizonSteps), ...
                 min(cfg.controller.horizonSteps,ceil(cfg.controller.horizonSteps*speedRatio)));
+            if ~isempty(model.encounters)
+                model.horizonSteps = max(model.horizonSteps,model.confirmation.searchHorizonSteps);
+                [position,heading] = laneGeometry.fromFrenet(model.initialEgoState,model.lane);
+                target = model.encounters;
+                distance = avoidanceSafetyGeometry.rectangleDistance(position,heading,target.center(1:2),target.center(7), ...
+                    [cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth]);
+                if distance<cfg.collision.clearanceMargin
+                    failure = "collisionAvoidanceController:noCertifiedContinuation: " ...
+                        +"The admitted state box contains an already unsafe nominal footprint pair.";
+                    return;
+                end
+            end
             maximumSteps = inf;
             if ~isempty(model.encounters) && isfield(model,"exitDeadline")
                 maximumSteps = round((model.exitDeadline-model.stateTime)/model.sampleTime);
@@ -165,8 +193,13 @@ classdef hardEncounterBarrier
                         timing.attempts,lastOutcome);
                     return;
                 end
-                if timing.attempts>0 && deadlineGuarded ...
-                        && toc(model.frameTimer)+attemptSeconds>=cfg.solver.frameDeadlineSeconds
+                estimate = attemptSeconds;
+                if isfield(model,"previousAttemptSeconds") && model.horizonSteps>cfg.controller.horizonSteps
+                    estimate = max(estimate,model.previousAttemptSeconds* ...
+                        (model.horizonSteps/model.previousAttemptStages)^2);
+                end
+                if deadlineGuarded && toc(model.frameTimer)+estimate ...
+                        +min(0.02,0.2*cfg.solver.frameDeadlineSeconds)>=cfg.solver.frameDeadlineSeconds
                     timing.deadlineHit = true;
                     if isempty(best)
                         failure = sprintf("collisionAvoidanceController:frameDeadline: The frame deadline of %.3g s " ...
@@ -186,18 +219,42 @@ classdef hardEncounterBarrier
                 [schedule,anchor] = localPredictionSchedule(trial,seedKind);
                 trial.linearizationInputs = reshape(anchor,2,[]);
                 trialPrediction = ltvBicycleModel.finitePredict(trial,schedule);
+                if ~isempty(trial.encounters) && ismember(seedKind,[4,5])
+                    trialPrediction.separationNormals = avoidanceSafetyGeometry.passingNormals( ...
+                        trial,trialPrediction,anchor,2*double(seedKind==5)-1);
+                end
                 timing.predictionSeconds = timing.predictionSeconds+toc(phase);
                 phase = tic;
                 trialQp = formulateAvoidanceProblem(trial,trialPrediction,anchor);
                 timing.formulationSeconds = timing.formulationSeconds+toc(phase);
                 phase = tic;
-                [trialResult,trialQp] = solveHardCbfClf.solve(trialQp,cfg);
+                solveCfg = cfg;
+                solveCfg.solver.workTimer = searchTimer;
+                solveCfg.solver.workTimeLimit = cfg.solver.certificateSearchTimeLimit;
+                if ~shifted && isfinite(cfg.solver.certificateSearchTimeLimit)
+                    % Reserve search time for the other normal families. A
+                    % difficult convexification must not consume every trial.
+                    elapsed = toc(searchTimer);
+                    remaining = max(0,cfg.solver.certificateSearchTimeLimit-elapsed);
+                    solveCfg.solver.workTimeLimit = elapsed+remaining/(numel(seeds)-slot+1);
+                end
+                if deadlineGuarded
+                    solveCfg.solver.workTimer = model.frameTimer;
+                    solveCfg.solver.workTimeLimit = cfg.solver.frameDeadlineSeconds ...
+                        -min(0.02,0.2*cfg.solver.frameDeadlineSeconds);
+                end
+                [trialResult,trialQp] = solveHardCbfClf.solve(trialQp,solveCfg);
                 calls = calls+trialResult.solverCalls;
                 timing.solveSeconds = timing.solveSeconds+toc(phase);
                 phase = tic;
                 trialCheck = solveHardCbfClf.certify(trialQp,trialPrediction,trial,trialResult.decision);
                 timing.verificationSeconds = timing.verificationSeconds+toc(phase);
-                attemptSeconds = max(attemptSeconds,toc(attemptTimer));
+                elapsed = toc(attemptTimer);
+                if elapsed>=attemptSeconds
+                    timing.lastAttemptStages = model.horizonSteps;
+                end
+                attemptSeconds = max(attemptSeconds,elapsed);
+                timing.maximumAttemptSeconds = attemptSeconds;
                 deceleratingTail = false;
                 if trialResult.feasible && trialCheck.accepted
                     objective = 0.5*trialResult.decision.'*trialQp.Hessian*trialResult.decision ...
@@ -212,12 +269,14 @@ classdef hardEncounterBarrier
                     deceleratingTail = node(4)<model.initialEgoState(4)-0.25 ...
                         && model.initialEgoState(4)<model.referenceSpeed;
                 else
-                    if ~ismember(trialResult.exitFlag,[-2,0,-7])
+                    diagnosticValue = trialCheck.candidateAccepted && trialCheck.value>0;
+                    if ~ismember(trialResult.exitFlag,[-2,0,2,-7]) && ~diagnosticValue
                         failure = localRejectMessage(trialResult,trialCheck,trialQp);
                         return;
                     end
                     lastOutcome = trialResult.message+"; "+strjoin(trialCheck.failedConditions,",");
                 end
+                if ~shifted && ~isempty(best), break; end
                 nextIsRescue = slot+1==numel(seeds);
                 secondOfPair = shifted && slot==1;
                 if slot<numel(seeds) && ~(nextIsRescue && ~isempty(best)) ...
@@ -233,7 +292,8 @@ classdef hardEncounterBarrier
                 end
                 % Only a complete verified plan can authorize control. Extension
                 % searches a larger admission domain; no prefix is executed.
-                model.horizonSteps = model.horizonSteps+1;
+                model.horizonSteps = min(maximumSteps, ...
+                    model.horizonSteps+max(1,ceil(0.2*model.horizonSteps)));
                 slot = 1;
             end
             timing.deadlineHit = timing.deadlineHit || (deadlineGuarded ...
@@ -290,13 +350,14 @@ classdef hardEncounterBarrier
             % the error rows, which include the open-loop future excursion.
             bound = terminal.stateBound-rows*finalOffset-terminal.errorRows*finalRadius;
             % The first terminal input must satisfy slew relative to u_(N-1). The
-            % law acts on the predicted nominal, so no box enters this bound.
+            % law acts on the predicted lower speed endpoint, so the fixed
+            % propagated radius contributes to this affine bound.
             rate = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
             selected = isfinite(rate);
             lastInput = zeros(2,prediction.planCount);
             lastInput(:,end-1:end) = eye(2);
             changeMap = terminal.feedback*finalMap-lastInput;
-            changeOffset = terminal.input+terminal.feedback*finalOffset;
+            changeOffset = terminal.input+terminal.feedback*finalOffset+terminal.radiusFeedback*finalRadius;
             matrix = [matrix;changeMap(selected,:);-changeMap(selected,:)];
             bound = [bound;rate(selected)-changeOffset(selected);rate(selected)+changeOffset(selected)];
             [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
@@ -306,7 +367,7 @@ classdef hardEncounterBarrier
         end
 
         function [stored,problem] = admit(stored,problem)
-            stored.version = 21;
+            stored.version = 22;
             stored.encounterComplete = isempty(stored.encounters);
             stored.witnessModel = problem.model;
             stored.safetyScope = "finiteConfirmedEncounterThenInvariantRoadTail";
@@ -517,7 +578,9 @@ classdef hardEncounterBarrier
         % One hold of the sampled terminal law from a node box: the exact
         % held-input flow of the declared rest model, its successor box as the
         % interval hull, and the affine generator that is executed.
-            input = terminal.input+terminal.feedback*center;
+            % Brake the smallest possible speed. The lower endpoint obeys
+            % l+ = rho*l >= 0; the upper endpoint includes passive error decay.
+            input = terminal.input+terminal.feedback*center+terminal.radiusFeedback*radius;
             generator = [terminal.continuousA,terminal.continuousB,terminal.continuousC];
             exact = expm(sampleTime*[generator;zeros(3,9)]);
             step = struct("input",input,"generator",generator, ...
@@ -526,6 +589,9 @@ classdef hardEncounterBarrier
                 "stage",struct("continuousA",terminal.continuousA,"continuousB",terminal.continuousB, ...
                     "continuousC",terminal.continuousC,"speed",0,"curvature",terminal.curvature, ...
                     "brakingRatio",input(2),"tireModel",terminal.tireModel));
+            % Analytic nonnegativity permits clipping roundoff below zero in
+            % this successor interval; the upper endpoint is only enlarged.
+            step.successor(4) = max(step.successor(4),step.successorRadius(4));
         end
 
         function candidate = verifyCandidate(model,candidate)
@@ -617,6 +683,9 @@ classdef hardEncounterBarrier
             allowance = gamma*(abs(terminal.stateBound)+abs(terminal.stateRows)*abs(center) ...
                 +abs(terminal.errorRows)*abs(radius));
             margins = terminal.stateBound-terminal.stateRows*center-terminal.errorRows*radius-allowance;
+            % Exact ordering of the stored floating-point endpoints needs no
+            % dot-product allowance. Subtraction near rest is exact (Sterbenz).
+            margins(end) = center(4)-radius(4);
             accepted = all(isfinite(margins)) && all(margins>=0);
         end
     end
@@ -692,8 +761,7 @@ function prediction = localPrescribeGeometry(prediction,anchor,frames,normals)
 end
 
 function terminal = localTerminalSet(model,~,anchor)
-% Robust terminal set: pose rows with nominal and open-loop error budgets,
-% velocity box and nonnegative nominal speed, independent of every target.
+% Robust road terminal set for braking from the lower speed endpoint.
     cfg = model.cfg;
     curvature = laneGeometry.curvature(anchor(1),model.lane);
     terminal = localTerminalDynamics(model,curvature);
@@ -725,7 +793,7 @@ function terminal = localTerminalSet(model,~,anchor)
     % dominates the nominal budget, which keeps membership monotone under
     % box inclusion.
     if terminal.errorBudgetFinite
-        errorBudget = localBudget(abs(projectedFlow),terminal.errorComparison);
+        errorBudget = localBudget(abs(projectedFlow)+budget*terminal.errorInputCoupling,terminal.errorComparison);
         if any(errorBudget<budget-1024*eps*(1+abs(budget)),"all")
             error("collisionAvoidanceController:invalidTerminalModel", ...
                 "The open-loop error budget must dominate the nominal budget.");
@@ -737,15 +805,11 @@ function terminal = localTerminalSet(model,~,anchor)
     rows = [repelem(poseRows,8,1),repelem(budget,8,1).*repmat(signs,poseCount,1)];
     limits = repelem(poseBound,8);
     errorRows = [repelem(abs(poseRows),8,1),repelem(errorBudget,8,1)];
-    % Both signs of the velocity box and the nonnegative nominal speed.
-    % The nominal longitudinal speed stays nonnegative by its braking law
-    % (v+ = rho*v), so this row is invariant without any box term; it must
-    % not charge the radius, because the braked nominal decays faster than
-    % the open-loop error radius and "nominal minus radius" is therefore not
-    % invariant. The box's own sign is covered by the symmetric error budget.
+    % Both signs of the velocity box and its nonnegative lower speed endpoint.
+    % Radius feedback makes this last row invariant: l+ = rho*l.
     rows = [rows;zeros(6,3),[eye(3);-eye(3)];0,0,0,-1,0,0];
     limits = [limits;terminal.velocityLimit;terminal.velocityLimit;0];
-    errorRows = [errorRows;zeros(6,3),[eye(3);eye(3)];zeros(1,6)];
+    errorRows = [errorRows;zeros(6,3),[eye(3);eye(3)];0,0,0,1,0,0];
     terminal.poseBudget = budget;
     terminal.poseErrorBudget = errorBudget;
     terminal.stateRows = rows;
@@ -802,6 +866,7 @@ function terminal = localTerminalDynamics(model,curvature)
     brakeGain = exp(-damping*h)*(-expm1(-h))/phi;
     feedback = zeros(2,6);
     feedback(2,4) = -brakeGain/gain;
+    radiusFeedback = -feedback;
     flow = expm(h*[a,b;zeros(2,8)]);
     step = flow(1:6,1:6)+flow(1:6,7:8)*feedback;
     rho = exp(-(damping+1)*h);
@@ -810,6 +875,8 @@ function terminal = localTerminalDynamics(model,curvature)
     errorComparison(1:4:end) = diag(a(4:6,4:6));
     comparison = errorComparison;
     comparison(1,1) = comparison(1,1)-brakeGain;
+    errorInputCoupling = zeros(3);
+    errorInputCoupling(1,1) = brakeGain;
     [errorDirection,errorHurwitz] = localComparisonDirection(errorComparison);
     if errorHurwitz
         direction = errorDirection;
@@ -824,7 +891,7 @@ function terminal = localTerminalDynamics(model,curvature)
     end
     excursion = localExcursion(abs(a(1:3,4:6)),comparison);
     if errorHurwitz
-        errorExcursion = localExcursion(abs(a(1:3,4:6)),errorComparison);
+        errorExcursion = localExcursion(abs(a(1:3,4:6))+excursion*errorInputCoupling,errorComparison);
     else
         errorExcursion = excursion;
     end
@@ -853,11 +920,11 @@ function terminal = localTerminalDynamics(model,curvature)
         error("collisionAvoidanceController:invalidTerminalModel","The scaled terminal velocity box is not contracting.");
     end
     terminal = struct("continuousA",a,"continuousB",b,"continuousC",c,"tireModel",tireModel, ...
-        "input",input,"feedback",feedback,"stepMatrix",step,"sampleTime",h, ...
+        "input",input,"feedback",feedback,"radiusFeedback",radiusFeedback,"stepMatrix",step,"sampleTime",h, ...
         "longitudinalRatio",rho,"comparison",comparison,"errorComparison",errorComparison, ...
         "errorBudgetFinite",errorHurwitz,"poseExcursion",excursion,"errorExcursion",errorExcursion, ...
         "velocityLimit",velocityLimit,"curvature",curvature, ...
-        "feedbackArgument","predictedNominalVelocity");
+        "errorInputCoupling",errorInputCoupling,"feedbackArgument","certifiedLowerSpeedEndpoint");
     memoKey = key;
     memoTerminal = terminal;
 end
@@ -881,6 +948,43 @@ function excursion = localExcursion(growth,comparison)
     if any(residual+residualReserve>0,"all")
         error("collisionAvoidanceController:invalidTerminalModel","The excursion comparison failed numerical verification.");
     end
+end
+
+function [direction,steps,passing] = localEncounterProposal(model,range)
+% Propose the departure side and a useful initial horizon for a known approach.
+% These are search choices; finite exit and swept rows remain the certificate.
+    cfg = model.cfg;
+    direction = zeros(2,0);
+    steps = cfg.controller.minimumHorizonSteps;
+    passing = false;
+    [position,heading] = laneGeometry.fromFrenet(model.initialEgoState,model.lane);
+    frame = laneGeometry.frameBounds(model.lane,model.initialEgoState(1), ...
+        cfg.controller.stationTrustRadius,cfg.model.lateralDomainRadius);
+    target = model.encounters;
+    relative = target.center(1:2)-position;
+    egoVelocity = [cos(heading),-sin(heading);sin(heading),cos(heading)]*model.initialEgoState(4:5);
+    velocity = target.center(3:4)-egoVelocity;
+    if norm(relative)<=range
+        velocity = target.center(3:4)-frame.tangent*max(model.initialEgoState(4),model.referenceSpeed);
+    end
+    speed = norm(velocity);
+    if speed<1e-6 || relative.'*velocity>=0, return; end
+    closestTime = -relative.'*velocity/speed^2;
+    miss = norm(relative+closestTime*velocity);
+    [~,radius] = targetPrediction.finiteFlow(target,closestTime);
+    body = hypot(cfg.vehicle.length,cfg.vehicle.width)/2+hypot(target.halfLength,target.halfWidth) ...
+        +cfg.collision.clearanceMargin;
+    uncertainty = norm(radius(1:2))+norm(model.initialFrenetErrorBound(1:2));
+    passing = miss<=body+uncertainty;
+    approachesRegion = norm(relative)>range && miss<=range+hypot(target.halfLength,target.halfWidth)+uncertainty;
+    if ~passing && ~approachesRegion, return; end
+    direction = velocity/speed;
+    duration = (range+hypot(target.halfLength,target.halfWidth)-direction.'*relative)/speed+0.5;
+    block = max(1,ceil(cfg.controller.horizonSteps/2));
+    % Bound the initial allocation only. The timed search may extend it;
+    % exhausting work never authorizes release or an uncertified prefix.
+    steps = min(4*cfg.controller.horizonSteps, ...
+        max(steps,block*ceil(duration/(model.sampleTime*block))));
 end
 
 function [schedule,anchor] = localPredictionSchedule(model,seedKind)
@@ -920,10 +1024,11 @@ function localValidateStored(stored,identity)
     required = ["version","stateTime","appliedInput","plan","value","stageViolation","witnessModel","qp", ...
         "decision","prediction","predictedState","stateErrorBound","metadata","identity","encounters", ...
         "originalEncounter","stages","cellStage","cellFrames","cellNormals","terminal","remainingSteps", ...
-        "consumedStages","acceptance","horizonSteps","completion","confirmation"];
+        "consumedStages","acceptance","horizonSteps","completion","confirmation", ...
+        "lastAttemptSeconds","lastAttemptStages"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored,required)) ...
-            || stored.version~=21 || ~isfield(stored.terminal,"errorRows")
-        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-21 finite-completion certificate.");
+            || stored.version~=22 || ~isfield(stored.terminal,"radiusFeedback")
+        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-22 finite-completion certificate.");
     end
     if ~isequaln(identity,stored.identity)
         error("collisionAvoidanceController:changedExecutionContract", ...
