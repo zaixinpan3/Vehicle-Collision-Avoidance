@@ -3,9 +3,8 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-Format 24 adds two-variable hard-constrained continuation and sampled cruise
-CLF optimization inside these existing modules; it adds no core source files.
-See [the algorithm and guarantees](SAMPLED_BACKUP_CBF_CLF.md).
+Format 25 replaces the online search and backup paths with one two-input SOCP.
+See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
 The count includes every source file under `controller/`, including future
@@ -16,12 +15,12 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public zero/one-visible-target controller entry, fresh admission for new obligations and retained road witnesses on release, carried-witness acceptance rule and diagnostics |
+| `collisionAvoidanceController.m` | Public target-array entry; one solve per hold, applied-input memory, error on any failed solve |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
-| `hardEncounterBarrier.m` | Fresh search (`plan`), box conditioning and carried-witness assembly (`validateTransition`), witness transfer by inclusion (`transferCandidate`) and offline audits (`verifyCandidate`), terminal-law frames (`terminalStep`), finite exit and confirmation guards (`finiteCompletionRows`, `confirmationObservation`), road terminal set (`completionRows`, `terminalMembership`), carried data (`carriedData`) |
-| `formulateAvoidanceProblem.m` | Objective, swept safety rows with stage labels, hard domain/terminal rows and predictive CLF cones |
+| `hardEncounterBarrier.m` | Sampled obstacle barrier and swept intersample rows (`rows`) |
+| `formulateAvoidanceProblem.m` | Two-input objective, permanent swept safety constraints, obstacle rows and one hard sampled CLF cone |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
-| `solveHardCbfClf.m` | Hard-constrained SOCP (`solve`, `constrained`), solver-status admission and offline audits (`certify`, `certifyInputs`) |
+| `solveHardCbfClf.m` | Single hard SOCP (`constrained`), pre-solve row compaction and strict solver-status handling |
 | `avoidanceSafetyGeometry.m` | Swept separation (`build`), passing-side proposals (`passingNormals`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
@@ -37,79 +36,19 @@ Do not move controller helpers into those directories to evade the limit.
 | `fialaFeedbackSampleMex.cpp` | Native correlated sampled-feedback flow verifier |
 | `../config/collisionAvoidanceControllerConfig.m` | Controller defaults, merging and validation |
 
-## Consolidated interfaces
+## Current interfaces and scope
 
-The public `collisionAvoidanceController` signature is unchanged. Supporting
-operations use named static methods; their local helpers remain in the owning
-file. Repository callers and native build adapters use the interfaces below.
-The removed standalone files have no compatibility wrappers.
+The public controller signature is unchanged. Its fourth output is applied-input
+memory, format 25, and contains no plan or terminal controller. The online path
+calls `formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained` exactly
+once. Removed terminal, checker and carried-witness methods have no wrappers.
 
-| Former interface | Current interface |
-| --- | --- |
-| `planCompleteEncounter` | `hardEncounterBarrier.plan` |
-| `avoidanceStageQp(...)` | `avoidanceStageQp.build(...)` |
-| `updateAvoidanceStageBounds` | `avoidanceStageQp.updateBounds` |
-| `solveHardCbfClf(...)` | `solveHardCbfClf.solve(...)` |
-| `certifyAvoidancePlan` | `solveHardCbfClf.certify` |
-| `avoidanceSafetyGeometry(model,prediction)` | `avoidanceSafetyGeometry.build(model,prediction)` |
-| `avoidanceSafetyGeometry('cellRows',data)` | `avoidanceSafetyGeometry.cellRows(data)` |
-| `avoidanceSafetyGeometry('projectRows',data)` | `avoidanceSafetyGeometry.projectRows(data)` |
-| `optimizeSeparationNormals` | `avoidanceSafetyGeometry.optimizeNormals` |
-| `rectangleConfigurationDistance` | `avoidanceSafetyGeometry.rectangleDistance` |
-| `longitudinalRoadLoad` | `ltvBicycleModel.roadLoad` |
-| `tireSlipRows` | `ltvBicycleModel.slipRows` |
-| `sampledFeedbackTransition` | `stateUncertainty.sampledFeedbackTransition` |
-| `fialaResidualCertificate` | `fialaCertificate.residual` |
-| `certifyFialaFeedbackSample` | `fialaCertificate.sample` |
-| `certifyFialaFeedbackSequence` | `fialaCertificate.sequence` |
-| `fialaIntervalParameters` | `fialaCertificate.parameters` |
+`avoidanceStageQp` and the general model/geometry kernels remain standalone
+research transcription and model utilities; they are not alternate execution
+paths. Nonlinear Fiala enclosure tools retain their separate model-study scope.
+The current online guarantee is the declared zero-residual affine plant only.
 
-The earlier consolidation changed source organization and call names while
-preserving its then-current equations. The current version-22 controller
-carries the accepted plan's own prediction data as a recursive-feasibility
-witness on conditioned information sets; see
-[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md). In particular,
-`fialaCertificate.sample` and `.sequence` retain their documented limited
-scope: nonlinear ego-flow certification does not yet establish an integrated
-nonlinear collision/road/target-exit certificate. See
-[Fiala feedback tightening](FIALA_FEEDBACK_TIGHTENING.md).
-
-After updating an existing MATLAB session, clear the changed modules or restart
-the session before running. Regenerate the MATLAB Coder kernels with
-`buildAvoidanceGeometryKernel` and `buildBicycleNominalKernel`; generated adapters
-and binaries remain under `solver/` and are excluded from source control.
-When changing native lane geometry paths, `clear laneGeometry` releases both
-retained geometry backend handles.
-
-The version-22 solver budget requires rebuilding the native conic bridge with
-`addpath('scripts'); buildAvoidanceSocpSolver;`. Its optional fourth options
-entry supplies Clarabel's time limit; the three-entry interface remains valid.
-
-## Verification
-
-`tests/controllerSourceBudgetTest.m` enforces the recursive source count. The
-2026-09-11 consolidation passed all 650 repository tests with no failed or
-incomplete cases. All five geometry/prediction MEX kernels regenerated
-successfully. Factory Code Analyzer checked 42 changed MATLAB files and
-introduced no new findings; 23 existing suggestions matched the original
-sources. Source comparison also verified the relocated bodies and migrated
-callers after the declared interface substitutions.
-
-Run all behavior regressions from the repository root:
-
-```matlab
-results = runtests('tests');
-assertSuccess(results);
-```
-
-The source inventory can also be checked directly:
-
-```matlab
-sources = [dir(fullfile('controller', '**', '*.m')); ...
-    dir(fullfile('controller', '**', '*.cpp')); ...
-    dir(fullfile('controller', '**', '*.c')); ...
-    dir(fullfile('controller', '**', '*.h')); ...
-    dir(fullfile('controller', '**', '*.hpp')); ...
-    dir(fullfile('config', 'collisionAvoidanceControllerConfig.m'))];
-assert(numel(sources) <= 20, 'Core controller exceeds its source-file budget.');
-```
+Clear changed MATLAB functions/classes after updating a live session. Native
+kernels remain under the excluded `solver/` tree and do not need regeneration
+for this MATLAB orchestration change. `controllerSourceBudgetTest` enforces the
+20-source upper limit.

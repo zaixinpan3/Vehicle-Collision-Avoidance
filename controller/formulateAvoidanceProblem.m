@@ -1,298 +1,58 @@
-function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
-% One convex hard-safety SOCP with one robust dissipation slack per sample.
+function [program,prediction,clf] = formulateAvoidanceProblem(model)
+%formulateAvoidanceProblem One held-input SOCP, with hard safety and CLF rows.
+% No terminal set, tail, CLF slack, or alternative control formulation.
     cfg = model.cfg;
-    count = prediction.stageCount;
-    planCount = prediction.planCount;
-    decisionCount = planCount+count;
-    model.anchorPlan = anchorPlan;
-    geometry = avoidanceSafetyGeometry.build(model, prediction);
-    lowerInput = repmat([-cfg.model.frontWheelSteeringAngleMaximum; cfg.actuation.brakingRatioMinimum], count, 1);
-    upperInput = repmat([cfg.model.frontWheelSteeringAngleMaximum; cfg.actuation.brakingRatioMaximum], count, 1);
-    hardMatrix = [geometry.matrix, zeros(size(geometry.matrix, 1), count); ...
-        eye(planCount), zeros(planCount, count); -eye(planCount), zeros(planCount, count); ...
-        zeros(count, planCount), -eye(count)];
-    physicalBound = [geometry.physicalBound; upperInput; -lowerInput; zeros(count, 1)];
-    safetyRows = [geometry.safety; false(2*planCount+count, 1)];
-    % Stage labels support offline physical safety-value audits. Every row
-    % is hard in the online optimization.
-    rowStage = [geometry.stage; zeros(2*planCount+count, 1)];
-    rateLimit = model.sampleTime*repmat([cfg.model.frontWheelSteeringRateMaximum; ...
-        cfg.model.brakingRatioRateMaximum],count,1);
-    rateMap = eye(planCount)-diag(ones(planCount-2,1),-2);
-    ratePrior = [model.previousInput;zeros(planCount-2,1)];
-    selected = isfinite(rateLimit);
-    hardMatrix = [hardMatrix;rateMap(selected,:),zeros(nnz(selected),count); ...
-        -rateMap(selected,:),zeros(nnz(selected),count)];
-    physicalBound = [physicalBound;rateLimit(selected)+ratePrior(selected);rateLimit(selected)-ratePrior(selected)];
-    safetyRows = [safetyRows;false(2*nnz(selected),1)];
-    rowStage = [rowStage;zeros(2*nnz(selected),1)];
-    [exitMatrix, exitBound, terminal, completion] = hardEncounterBarrier.completionRows(model, prediction, geometry);
-    completionRows = numel(physicalBound)+(1:numel(exitBound)).';
-    hardMatrix = [hardMatrix; exitMatrix, zeros(numel(exitBound), count)];
-    physicalBound = [physicalBound; exitBound];
-    % The terminal set and every finite physical safety row are hard.
-    safetyRows = [safetyRows; false(numel(exitBound), 1)];
-    rowStage = [rowStage; zeros(numel(exitBound), 1)];
-    % Tighten before solving to reserve room for numerical feasibility error.
-    % Safety is conditional on solver error being covered by these reserves;
-    % no independent runtime certificate is evaluated after solving.
-    inputReach = [repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
-        max(abs([cfg.actuation.brakingRatioMinimum, cfg.actuation.brakingRatioMaximum]))], count, 1); zeros(count, 1)];
-    rowScale = 1+abs(physicalBound)+abs(hardMatrix)*inputReach;
-    reserve = 2*max(cfg.encounter.numericalMargin*rowScale, cfg.solver.constraintTolerance*max(rowScale)) ...
-        .*double(any(hardMatrix ~= 0, 2));
-    reserve(size(geometry.matrix,1)+2*planCount+(1:count)) = 0;
-    bound = physicalBound-model.requiredMargin*double(safetyRows)-reserve;
-    hessian = zeros(decisionCount);
-    linear = zeros(decisionCount, 1);
-    constant = 0;
-    certificate = localClfCertificate(model);
-    if certificate.operatingState(4)==cfg.referenceSpeed
-        equilibriumState = certificate.operatingState;
-    else
-        equilibriumState = ltvBicycleModel.cruiseEquilibrium( ...
-            certificate.operatingCurvature,cfg,model.longitudinalAccelerationBias);
-    end
-    referenceStart = equilibriumState(2:6)+cfg.clf.referenceOffset ...
-        +cfg.clf.referenceRate*(model.stateTime-cfg.clf.referenceEpoch);
-    clockScale = double(any(cfg.clf.referenceRate));
-    scales = [cfg.clf.lateralPositionErrorScale; cfg.clf.headingErrorScale; cfg.clf.speedErrorScale; ...
-        cfg.clf.lateralVelocityErrorScale; cfg.clf.yawRateErrorScale];
-    % Stack state costs once. The slack columns are identically zero in
-    % every state map and need not enter the repeated dense products.
-    stateMap = reshape(permute(prediction.egoStateMatrix(2:6,:,1:count),[1,3,2]),[],planCount);
-    stateOffset = prediction.egoStateOffset(2:6,1:count)-referenceStart ...
-        -cfg.clf.referenceRate*((0:count-1)*model.sampleTime);
-    weightedMap = stateMap./repmat(scales,count,1);
-    weightedOffset = stateOffset(:)./repmat(scales,count,1);
-    hessian(1:planCount,1:planCount) = 2*model.sampleTime*(weightedMap.'*weightedMap);
-    linear(1:planCount) = 2*model.sampleTime*weightedMap.'*weightedOffset;
-    constant = constant+model.sampleTime*(weightedOffset.'*weightedOffset);
-    inputWeight = repmat([cfg.clf.frontWheelSteeringAngleWeight; cfg.clf.brakingRatioWeight], count, 1);
-    hessian(1:planCount, 1:planCount) = hessian(1:planCount, 1:planCount)+2*model.sampleTime*diag(inputWeight);
-    % Center input effort at the same operating input used for Riccati
-    % synthesis. Prediction seeds and scheduled equilibria are not targets.
-    operatingInput = repmat(certificate.operatingInput,count,1);
-    linear(1:planCount) = linear(1:planCount)-2*model.sampleTime*inputWeight.*operatingInput;
-    constant = constant+model.sampleTime*sum(inputWeight.*operatingInput.^2);
-    difference = eye(planCount)-diag(ones(planCount-2, 1), -2);
-    prior = [model.previousInput; zeros(planCount-2, 1)];
-    smoothWeight = cfg.encounter.inputRateWeight/model.sampleTime;
-    hessian(1:planCount, 1:planCount) = hessian(1:planCount, 1:planCount)+2*smoothWeight*(difference.'*difference);
-    linear(1:planCount) = linear(1:planCount)-2*smoothWeight*difference.'*prior;
-    constant = constant+smoothWeight*(prior.'*prior);
-    hessian(planCount+1:end, planCount+1:end) = 2*model.sampleTime*cfg.clf.relaxationWeight*eye(count);
-    scale = norm(certificate.lyapunovMatrix, inf);
-    certificate.lyapunovMatrix = certificate.lyapunovMatrix/scale;
-    certificate.decreaseMatrix = certificate.decreaseMatrix/scale;
-    p = certificate.lyapunovMatrix;
-    rate = cfg.clf.decreaseRateFraction*certificate.certifiedDecreaseRate;
-    residual = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
-    if isfield(prediction,"modelErrorRateBound")
-        residual = max(prediction.modelErrorRateBound,[],2);
-    end
-    disturbance = residual(2:6);
-    youngRate = 0.1;
-    disturbanceCost = disturbance.'*abs(p)*disturbance/youngRate;
-    certifiedCells = prediction.cells;
-    cellConstraints = cell(numel(certifiedCells), 1);
-    for cellIndex = 1:numel(certifiedCells)
-        tube = certifiedCells(cellIndex);
-        stage = tube.stage;
-        a = prediction.continuousA(2:6, 2:6, stage);
-        b = prediction.continuousB(2:6, :, stage);
-        c = prediction.continuousC(2:6, stage);
-        quadratic = zeros(8);
-        quadratic(1:5, 1:5) = a.'*p+p*a+(rate+youngRate)*p;
-        quadratic(1:5, 6:7) = p*b;
-        quadratic(6:7, 1:5) = b.'*p;
-        quadratic(1:5, 8) = p*a*cfg.clf.referenceRate;
-        quadratic(8, 1:5) = cfg.clf.referenceRate.'*a.'*p;
-        baseLinear = [2*p*(a*referenceStart+c-cfg.clf.referenceRate); zeros(3, 1)];
-        curvature = norm(quadratic, inf)+1;
-        positive = quadratic+curvature*eye(8);
-        factor = chol((positive+positive.')/2);
-        points = size(tube.offset, 2);
-        % The sampled-data decrease is imposed where the configuration says:
-        % at the two ends of the cell (its sample instants) or at every
-        % Bernstein control point (which implies the whole cell by convexity).
-        sampled = 1:points;
-        switch string(cfg.clf.samplePoints)
-            case "endpoints"
-                sampled = unique([1, points]);
-            case "stageNodes"
-                % One sample per hold, at its end: the last point of the
-                % stage's last cell. Earlier cells of the stage carry none.
-                lastOfStage = cellIndex==numel(certifiedCells) || certifiedCells(cellIndex+1).stage~=stage;
-                sampled = points(lastOfStage);
-        end
-        if isempty(sampled)
-            cellConstraints{cellIndex} = repmat(struct("map",[],"offset",[],"root",[],"linear",[], ...
-                "constant",[],"stage",[],"cellIndex",[],"pointIndex",[]),0,1);
-            continue;
-        end
-        seedState = mean(reshape(pagemtimes(tube.map, anchorPlan), 6, [])+tube.offset, 2);
-        seedTime = mean(tube.time);
-        anchor = [seedState(2:6)-referenceStart-cfg.clf.referenceRate*seedTime; ...
-            anchorPlan(2*stage-1:2*stage); clockScale*seedTime];
-        % A single convex majorant must cover the entire cell. Independently
-        % reanchored bounds at individual control points would not justify
-        % the convex-hull argument for an indefinite CLF residual.
-        affine = baseLinear-2*curvature*anchor;
-        constraints = cell(numel(sampled), 1);
-        for slot = 1:numel(sampled)
-            point = sampled(slot);
-            map = zeros(8, decisionCount);
-            map(1:5, 1:planCount) = tube.map(2:6, :, point);
-            map(6:7, 2*stage-1:2*stage) = eye(2);
-            offset = [tube.offset(2:6, point)-referenceStart-cfg.clf.referenceRate*tube.time(point); ...
-                zeros(2, 1); clockScale*tube.time(point)];
-            % A constant reference has no clock term in its residual. Set
-            % that unused coordinate to zero to avoid artificial CLF slack.
-            stateErrorBound = [tube.radius(2:6, point); zeros(3, 1)];
-            errorQuadratic = stateErrorBound.'*abs(positive)*stateErrorBound;
-            expansion = 0;
-            ratio = 0;
-            if errorQuadratic > 0
-                ratio = max(1e-6, min(0.2, sqrt(errorQuadratic/max(1e-12, anchor.'*positive*anchor))));
-                expansion = (1+1/ratio)*errorQuadratic;
-            end
-            root = sqrt(1+ratio)*factor;
-            additive = curvature*(anchor.'*anchor)+disturbanceCost+expansion+abs(affine).'*stateErrorBound;
-            constraints{slot} = struct("map", map, "offset", offset, "root", root, ...
-                "linear", affine, "constant", additive, "stage", stage,"cellIndex",cellIndex,"pointIndex",point);
-        end
-        cellConstraints{cellIndex} = vertcat(constraints{:});
-    end
-    constraints = vertcat(cellConstraints{:});
-    initialError = model.initialEgoState(2:6)-referenceStart;
-    clf = struct("certificate", certificate, "lyapunovMatrix", p, "decayRate", rate, ...
-        "referenceStart", referenceStart, "referenceRate", cfg.clf.referenceRate, ...
-        "initialValue", initialError.'*p*initialError, "constraints", constraints);
-    drift = prediction.continuousA(:, :, 1)*model.initialEgoState+prediction.continuousC(:, 1);
-    clf.lieDerivativeDrift = 2*initialError.'*p*(drift(2:6)-cfg.clf.referenceRate);
-    clf.lieDerivativeInput = 2*initialError.'*p*prediction.continuousB(2:6, :, 1);
-    clf.errorOffset = prediction.egoStateOffset(2:6, :)-referenceStart ...
-        -cfg.clf.referenceRate*((0:count)*model.sampleTime);
-    layout = struct("decisionCount", decisionCount, "planCount", planCount, ...
-        "horizonSteps", count, "inputDimension", 2, "inputIndex", 1:planCount, ...
-        "planIndex", 1:planCount, "relaxationIndex", planCount+1:decisionCount, ...
-        "tailSteps", 0, "tailIndex", [], "relaxationCount", count);
-    qp = struct("problemClass", "encounterPredictiveCbfClfSocp", ...
-        "layout", layout, "geometry", geometry, "clf", clf, ...
-        "Hessian", hessian, "linear", linear, "constant", constant, ...
-        "inequalityMatrix", hardMatrix, "inequalityBound", bound, ...
-        "physicalBound", physicalBound, "safetyRows", safetyRows, "rowStage", rowStage, ...
-        "requiredMargin", model.requiredMargin, "exitMargin", model.exitMargin, ...
-        "equalityMatrix", zeros(0, decisionCount), "equalityBound", zeros(0, 1), ...
-        "lowerBound", [lowerInput; zeros(count, 1)], "upperBound", [upperInput; inf(count, 1)], ...
-        "certifiedInfeasible", any(bound(~any(hardMatrix, 2) & ~safetyRows) < 0));
-    qp.terminal = terminal;
-    qp.completion = completion;
-    qp.anchorPlan = anchorPlan(:);
-    % One unit in each hard row's native units normalizes its margin.
-    scale = ones(size(bound));
-    scale(size(geometry.matrix, 1)+2*planCount+(1:count)) = 0;
-    qp.barrier = struct("baseBound", bound, "scale", scale, ...
-        "completionRows", completionRows);
-    % The condensed rows above are the program. The sparse cell-state
-    % program is built only for the lifted form, and never for a
-    % verification-only formulation.
-    qp.stageProgram = [];
-    if string(cfg.solver.programForm)=="lifted" ...
-            && ~(isfield(model,"verificationOnly") && model.verificationOnly)
-        qp.stageProgram = avoidanceStageQp.build(qp,prediction,model);
-    end
-
-end
-
-function certificate = localClfCertificate(model)
-% Continuous Riccati CLF certificate of the path-frame cruise error.
-%
-% The error is relative to the nonlinear cruise trim at the current road
-% curvature. The station coordinate is cyclic at frozen curvature. The
-% continuous Riccati solution P and gain K certify, for the
-% unconstrained linearized error dynamics,
-%
-%   Vdot(e) = -e' (Q + K' R K) e <= -lambdaMin(W,P)*V(e).
-%
-% The configured fraction scales this certified rate in inverse seconds.
-% The metric and trim remain frozen within each formulated horizon. Changes
-% between frames are scheduled local certificates, not a common Lyapunov proof.
-    persistent memoKey memoCertificate
-    cfg = model.cfg;
-    minimumBrakingRatio = cfg.actuation.brakingRatioMinimum;
-    maximumBrakingRatio = cfg.actuation.brakingRatioMaximum;
-    brakingRatioScale = max( ...
-        abs(minimumBrakingRatio), abs(maximumBrakingRatio));
-    key = struct( ...
-        "curvature", laneGeometry.curvature(model.initialEgoState(1),model.lane), ...
-        "accelerationBias", model.longitudinalAccelerationBias, ...
-        "referenceSpeed", max(model.referenceSpeed, ...
-            cfg.clf.certificateSpeedFloor), ...
-        "brakingRatioAccelerationGain", modifiedFialaTire.accelerationGain(cfg), ...
-        "scheduleSpeedFloor", cfg.model.scheduleSpeedFloor, ...
-        "errorScale", [ ...
-            cfg.clf.lateralPositionErrorScale; ...
-            cfg.clf.headingErrorScale; ...
-            cfg.clf.speedErrorScale; ...
-            cfg.clf.lateralVelocityErrorScale; ...
-            cfg.clf.yawRateErrorScale], ...
-        "inputWeight", [ ...
-            cfg.clf.frontWheelSteeringAngleWeight; ...
-            cfg.clf.brakingRatioWeight], ...
-        "inputScale", [ ...
-            cfg.model.frontWheelSteeringAngleMaximum; ...
-            brakingRatioScale], ...
-        "vehicle", cfg.vehicle, ...
-        "roadLoad", cfg.roadLoad, ...
-        "tire", cfg.tire, "actuation", cfg.actuation);
-    if ~isempty(memoKey) && isequaln(key, memoKey)
-        certificate = memoCertificate;
-        return;
-    end
-    operatingCfg = cfg;
-    operatingCfg.referenceSpeed = key.referenceSpeed;
-    [operatingState, operatingInput] = ltvBicycleModel.cruiseEquilibrium( ...
-        key.curvature,operatingCfg,key.accelerationBias);
-    if abs(operatingInput(2))>=1-sqrt(eps)
-        error("collisionAvoidanceController:invalidCruiseOperatingPoint", ...
-            "The certificate cruise trim is outside the differentiable tire domain.");
-    end
-    [continuousA, continuousB] = ltvBicycleModel.continuousMatrices( ...
-        key.curvature,key.referenceSpeed,cfg,[],key.accelerationBias, ...
-        struct("state",operatingState,"input",operatingInput));
-    errorIndex = 2:6;
-    errorStateMatrix = continuousA(errorIndex, errorIndex);
-    errorInputMatrix = continuousB(errorIndex, :);
-    stateWeight = diag(1.0./key.errorScale.^2);
-    inputWeight = diag(key.inputWeight./key.inputScale.^2);
-    try
-        [feedbackGain, lyapunovMatrix] = lqr( ...
-            errorStateMatrix, errorInputMatrix, stateWeight, inputWeight);
-    catch riccatiException
-        error("collisionAvoidanceController:invalidFormulation", ...
-            "The CLF Riccati synthesis at the reference cruise " ...
-            + "failed: %s", riccatiException.message);
-    end
-    decreaseMatrix = stateWeight+feedbackGain.'*inputWeight*feedbackGain;
-    decreaseMatrix = 0.5*(decreaseMatrix+decreaseMatrix.');
-    decreaseEigenvalue = min(real(eig(decreaseMatrix, lyapunovMatrix)));
-    if ~isfinite(decreaseEigenvalue) || decreaseEigenvalue <= 0.0
-        error("collisionAvoidanceController:invalidFormulation", ...
-            "The continuous CLF certificate must have a positive finite decay rate.");
-    end
-    certificate = struct( ...
-        "operatingState", operatingState, ...
-        "operatingInput", operatingInput, ...
-        "operatingCurvature", key.curvature, "operatingAccelerationBias", key.accelerationBias, ...
-        "lyapunovMatrix", lyapunovMatrix, ...
-        "feedbackGain", feedbackGain, ...
-        "decreaseMatrix", decreaseMatrix, ...
-        "certifiedDecreaseRate", decreaseEigenvalue, ...
-        "timeDomain", "continuousTime", ...
-        "errorStateOrder", ["lateralError"; "headingError"; ...
-            "speedError"; "lateralVelocity"; "yawRateError"]);
-    memoKey = key;
-    memoCertificate = certificate;
+    cruise = ltvBicycleModel.sampledCruise(model);
+    model.anchorPlan = cruise.input;
+    prediction = ltvBicycleModel.fixedPredict(model,cruise.input,cruise.stage);
+    % Geometry is affine in the actual held input, not a fixed rollout.
+    prediction = rmfield(prediction,'fixedInputs');
+    geometryModel = model;
+    geometryModel.encounters = struct("key",{},"radius",{},"contract",{});
+    geometry = avoidanceSafetyGeometry.build(geometryModel,prediction);
+    % The obstacle barrier module supplies all obstacle constraints. Permanent
+    % road, chart, domain and slip rows remain for both target/no-target cases.
+    permanent = ~startsWith(geometry.label,"collision:");
+    [cbfMatrix,cbfBound,barrier] = hardEncounterBarrier.rows(model,prediction,geometry.frames);
+    lower = [-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    upper = [cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+    rate = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    lower = max(lower,model.previousInput-rate);
+    upper = min(upper,model.previousInput+rate);
+    matrix = [geometry.matrix(permanent,:);cbfMatrix;eye(2);-eye(2)];
+    bound = [geometry.physicalBound(permanent);cbfBound;upper;-lower];
+    reach = [cfg.model.frontWheelSteeringAngleMaximum; ...
+        max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))];
+    scale = 1+abs(bound)+abs(matrix)*reach;
+    reserve = 4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance) ...
+        *scale.*any(matrix~=0,2);
+    bound = bound-reserve;
+    linearCount = numel(bound);
+    root = chol(cruise.matrix);
+    trackingError = model.initialEgoState(2:6)-cruise.state(2:6);
+    radius = model.initialFrenetErrorBound(2:6);
+    contraction = 1-cruise.decayPerHold;
+    middle = (contraction+cruise.contraction)/2;
+    stateMap = cruise.transition(2:6,2:6);
+    inputMap = cruise.transition(2:6,7:8);
+    drift = cruise.transition(2:6,:)*[cruise.state;cruise.input;1]-cruise.state(2:6);
+    nominalOffset = stateMap*trackingError-inputMap*cruise.input+drift;
+    inputRoot = root*inputMap;
+    numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach));
+    coneRadius = sqrt(middle)*norm(root*trackingError)+numeric;
+    matrix = [matrix;zeros(1,2);-inputRoot];
+    bound = [bound;coneRadius;root*nominalOffset];
+    disturbance = sqrt(middle)*norm(abs(root)*radius) ...
+        +norm(abs(root*stateMap)*radius)+2*numeric;
+    clf = struct('cruise',cruise,'initialValue',trackingError.'*cruise.matrix*trackingError, ...
+        'decayPerHold',cruise.decayPerHold, ...
+        'disturbanceBound',contraction/(contraction-middle)*disturbance^2);
+    weight = diag([cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight]);
+    objectiveMap = root*inputMap;
+    objectiveOffset = root*nominalOffset;
+    hessian = 2*(objectiveMap.'*objectiveMap+weight);
+    linear = 2*(objectiveMap.'*objectiveOffset-weight*cruise.input);
+    program = struct('P',sparse(hessian),'q',linear,'A',sparse(matrix),'b',bound, ...
+        'cones',[0;linearCount;6],'decisionRadius',reach, ...
+        'obstacleCbfRowCount',numel(cbfBound),'barrier',barrier);
 end

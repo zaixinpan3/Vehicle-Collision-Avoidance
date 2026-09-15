@@ -23,9 +23,14 @@ function campaign = runStraightControllerRerun(options)
                     'TargetJerkAmplitude',[.1;.1],'TargetYawAccelerationAmplitude',.05};
             end
             fprintf('\nStarting %s\n',label);
-            report = runExactStateRecursiveFeasibilityScenario('Scenario',scene, ...
-                'SampleCount',options.SampleCount,'Seed',options.Seed, ...
-                'OutputDirectory',fullfile(options.OutputDirectory,label),extra{:});
+            directory=fullfile(options.OutputDirectory,label);
+            try
+                report=runExactStateRecursiveFeasibilityScenario('Scenario',scene, ...
+                    'SampleCount',options.SampleCount,'Seed',options.Seed,'OutputDirectory',directory,extra{:});
+            catch exception
+                if ~startsWith(string(exception.identifier),'collisionAvoidanceController:'),rethrow(exception);end
+                saved=load(fullfile(directory,scene+"-exact-state.mat"),'report');report=saved.report;
+            end
             campaign = localAppend(campaign,label,report,false);
         end
     end
@@ -33,9 +38,14 @@ function campaign = runStraightControllerRerun(options)
         label = "range-exact-oncoming";
         if useEstimator, label = "range-nrmm-oncoming"; end
         fprintf('\nStarting %s\n',label);
-        report = runDeclaredPlantEstimatorControllerScenario( ...
-            SampleCount=options.SampleCount,Seed=options.Seed,UseEstimator=useEstimator, ...
-            OutputDirectory=fullfile(options.OutputDirectory,label));
+        directory=fullfile(options.OutputDirectory,label);
+        try
+            report=runDeclaredPlantEstimatorControllerScenario(SampleCount=options.SampleCount, ...
+                Seed=options.Seed,UseEstimator=useEstimator,OutputDirectory=directory);
+        catch exception
+            if ~startsWith(string(exception.identifier),'collisionAvoidanceController:'),rethrow(exception);end
+            saved=load(fullfile(directory,'joint-declared-plant.mat'),'report');report=saved.report;
+        end
         campaign = localAppend(campaign,label,report,true);
     end
 end
@@ -55,14 +65,6 @@ function campaign = localAppend(campaign,label,report,rangeDriver)
         row.minimumRoadMargin = report.minimumRoadMargin;
         row.failureIdentifier = report.failure.identifier;
         row.failureMessage = report.failure.message;
-        valid = ~cellfun(@isempty,report.metadata);
-        metadata = report.metadata(valid);
-        row.terminalCommands = sum(cellfun(@(m) m.terminalActive,metadata));
-        release = find(cellfun(@(m) m.confirmedRelease,metadata),1);
-        if ~isempty(release)
-            indices = find(valid);
-            row.releaseTime = report.time(indices(release));
-        end
     else
         row.driverSafetyPassed = report.passed;
         row.failureIdentifier = report.failureIdentifier;
@@ -72,10 +74,6 @@ function campaign = localAppend(campaign,label,report,rangeDriver)
             row.minimumSeparationMargin = report.minimumSampledSeparationMargin;
             row.minimumRoadMargin = report.minimumSampledRoadMargin;
             row.minimumModelDomainMargin = report.minimumSampledModelDomainMargin;
-            row.truthContained = report.truthContained;
-            row.terminalCommands = nnz(report.terminalActive);
-            release = find(report.releaseConfirmed,1);
-            if ~isempty(release), row.releaseTime = report.time(release); end
         else
             times = report.admissionSeconds;
         end

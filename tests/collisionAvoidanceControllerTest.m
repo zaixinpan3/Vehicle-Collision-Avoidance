@@ -1,289 +1,255 @@
 classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
-    % Held exact-model execution and rolling prediction certificate behavior.
-    methods (TestClassSetup)
-        function addControllerPaths(testCase)
-            root = fileparts(fileparts(mfilename("fullpath")));
-            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "controller")));
-            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "config")));
-            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root, "tests")));
-        end
+    properties (TestParameter)
+        targetPresent = {false,true};
+        failedStatus = {-999,-2,0,2};
+        badDecision = {[],[NaN;0],[Inf;0],[1i;0],zeros(3,1)};
+        legacyPolicy = {"auto","backup","predictive","singleSolve"};
+        invalidDecay = {0,1,1.01,NaN,Inf};
+        errorRadius = {zeros(6,1),[.001;.001;.0001;.001;.001;.0001]};
     end
-    methods (TestMethodSetup)
-        function resetController(~)
-            collisionAvoidanceController("resetNominalTrajectory");
+    methods (TestClassSetup)
+        function addPaths(testCase)
+            root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
         end
     end
     methods (Test)
-        function commandUsesSteeringAndDimensionlessBrakingRatio(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [command, plan, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            testCase.verifyEqual(command.actuatorInput, plan(:, 1), AbsTol=0);
-            testCase.verifyEqual(command.longitudinalAcceleration, ...
-                modifiedFialaTire.accelerationGain(cfg)*command.brakingRatio, AbsTol=1e-12);
-            testCase.verifyGreaterThanOrEqual(plan(2, :), cfg.actuation.brakingRatioMinimum);
-            testCase.verifyLessThanOrEqual(plan(2, :), cfg.actuation.brakingRatioMaximum);
-            testCase.verifyLessThanOrEqual(abs(plan(1, :)), cfg.model.frontWheelSteeringAngleMaximum);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(stored.safetyScope, "finiteConfirmedEncounterThenInvariantRoadTail");
+        function decayMustLeaveAFiniteUncertaintyBudget(testCase,invalidDecay)
+            testCase.verifyError(@() collisionAvoidanceControllerConfig(struct('clf', ...
+                struct('decreaseRateFraction',invalidDecay))),'collisionAvoidanceController:invalidConfiguration');
         end
-
-        function knownStatesDefineExactMotionWithoutAnExtraDescriptor(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            target = rmfield(target,"predictionMotion");
-            [~,~,~,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            testCase.verifyEqual(stored.encounters.contract.kind,"finite-sensing-motion-v1");
-            testCase.verifyEqual(stored.encounters.contract.jerkBound,zeros(2,1));
-            testCase.verifyEqual(stored.encounters.contract.validityScope,"whileEncounterActive");
+        function everySampleMakesExactlyOneSolverCall(testCase,targetPresent)
+            [ego,target,road,cfg]=localFixture(targetPresent);
+            localHook('reset',[]);cfg.solver.jointFunction=@localHook;
+            [command,plan,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(localHook('count',[]),1);
+            testCase.verifySize(plan,[2,1]);
+            testCase.verifyEqual(command.actuatorInput,plan,AbsTol=0);
+            testCase.verifyEqual(state.appliedInput,plan,AbsTol=0);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1);
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
+            testCase.verifyFalse(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyEqual(fieldnames(state),{'version';'appliedInput';'stateTime'});
         end
-
-        function anAlreadyOverlappingPairCannotAuthorizeACommand(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            target.targetPositionInertial = [2;-1];
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+        function targetsOnlyAddObstacleConstraints(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            [~,~,empty]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,active]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            first=empty.program;second=active.program;
+            [matrix,bound]=localPermanentProgram(second);
+            testCase.verifyEqual(matrix,first.A,AbsTol=0);
+            testCase.verifyEqual(bound,first.b,AbsTol=0);
+            testCase.verifyEqual(second.P,first.P,AbsTol=0);
+            testCase.verifyEqual(second.q,first.q,AbsTol=0);
+            testCase.verifyEqual(first.obstacleCbfRowCount,0);
+            testCase.verifyGreaterThan(second.obstacleCbfRowCount,0);
+            testCase.verifyEqual(second.cones(3:end),first.cones(3:end));
         end
-
-        function aTargetPositionBoxIsCarriedIntoTheCollisionRows(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            target.targetPositionInertialErrorBound = [0.3;0.3];
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(problem.metadata.targetErrorBound(1:2),[0.3;0.3],AbsTol=0);
-            testCase.verifyEqual(stored.encounters.radius(1:2),[0.3;0.3],AbsTol=0);
+        function failedStatusesReturnNoCommandAndAreNeverRetried(testCase,failedStatus)
+            [ego,target,road,cfg]=localFixture(true);
+            localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
+            testCase.verifyEqual(localFailureHook('count',[]),1);
         end
-
-        function anUnreachableTerminalSetExhaustsTheSearchBudget(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            target.targetPositionInertialErrorBound = [50;50];
-            cfg.solver.certificateSearchTimeLimit = 0.5;
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:certificateSearchLimit");
+        function malformedSolvedResultsRaiseAnError(testCase,badDecision)
+            [ego,target,road,cfg]=localFixture(false);
+            cfg.solver.jointFunction=@(~,~) struct('decision',badDecision,'exitFlag',1,'output',struct());
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
-
-        function aFailedSolveExecutesTheCarriedWitnessAtAContinuationFrame(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            cfg.solver.jointFunction = @encounterTestFixture.fail;
-            [command,~,next] = collisionAvoidanceController(nextEgo, ...
-                localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
-            testCase.verifyEqual(next.metadata.certificateSource,"carriedWitness");
-            testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
-            testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyFalse(next.metadata.fallbackUsed);
+        function aPreviousCommandDoesNotProvideAFallback(testCase)
+            [ego,target,road,cfg]=localFixture(false);
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,problem,state);
+            localFailureHook('reset',-2);cfg.solver.jointFunction=@localFailureHook;
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,state), ...
+                'collisionAvoidanceController:optimizationFailed');
+            testCase.verifyEqual(localFailureHook('count',[]),1);
         end
-
-        function missingObservationRequiresACompleteSensorDeclaration(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            nextEgo.perception.completeWithinRange = false;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo,[],route,cfg,stored), ...
-                "collisionAvoidanceController:unconfirmedTargetDeparture");
+        function legacyOptionsCannotSelectAnotherController(testCase,legacyPolicy)
+            [ego,target,road,cfg]=localFixture(true);
+            [command,~,original]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            cfg.controller.executionPolicy=legacyPolicy;cfg.controller.horizonSteps=64;
+            [changed,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifySize(plan,[2,1]);
+            testCase.verifyEqual(problem.program.A,original.program.A,AbsTol=0);
+            testCase.verifyEqual(changed.actuatorInput,command.actuatorInput,AbsTol=1e-10);
         end
-
-        function replanningKeepsTheExitDeadlineAndRollsAfterRelease(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            deadline = stored.completion.deadline;
-            audit = localReplanThroughRelease(target,route,cfg,problem,stored);
-            testCase.verifyTrue(all(audit.certified));
-            testCase.verifyLessThanOrEqual(audit.deadline(audit.active),deadline);
-            testCase.verifyTrue(any(~audit.active));
-            testCase.verifyGreaterThan(audit.deadline(end),deadline);
-            testCase.verifyFalse(audit.terminal(end));
+        function cruiseDissipationHoldsForTheDeclaredInformationBox(testCase,errorRadius)
+            [ego,target,road,cfg]=localFixture(false);
+            ego.position(2)=.05;ego.yaw=.002;ego.speed=7.95;
+            ego.controllerStateErrorBound=errorRadius;
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            residual=localRobustClfResidual(problem,command);
+            testCase.verifyLessThanOrEqual(residual,1e-10);
+            testCase.verifyTrue(problem.metadata.clfDissipationCertified);
+            testCase.verifySize(problem.program.q,[2,1]);
         end
-
-        function aFailedSolverCannotAuthorizeInitialAdmission(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            cfg.solver.jointFunction = @encounterTestFixture.fail;
-            testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, []), ...
-                "collisionAvoidanceController:noCertifiedContinuation");
+        function conflictingCruiseAndBarrierConstraintsRaiseAnError(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            target.targetPositionInertial=[9;0];target.targetVelocityInertial=[0;0];
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
-
-        function aFailedSolveUsesTheCarriedWitness(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            cfg.solver.jointFunction = @encounterTestFixture.fail;
-            [command,~,next] = collisionAvoidanceController(nextEgo, ...
-                localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
-            testCase.verifyEqual(next.metadata.certificateSource,"carriedWitness");
-            testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
-            testCase.verifyFalse(next.metadata.postSolveCertificationPerformed);
+        function anOverlappingTargetCannotBeAdmitted(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            target.targetPositionInertial=[1;0];
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
-
-        function largerJerkBoundsRequireFreshAdmission(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
-            target.targetPositionInertial = target.targetPositionInertial+0.1*target.targetVelocityInertial;
-            target.predictionMotion.jerkBound(1) = 1;
-            [~,~,next] = collisionAvoidanceController(nextEgo,target,route,cfg,stored);
-            testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyTrue(next.metadata.motionBoundsIncreased);
-            testCase.verifyFalse(next.metadata.candidateVerified);
+        function obstacleRowsEncloseTheWholeExecutedHold(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            target.predictionMotion.jerkBound=[.1;.1];
+            target.targetPositionInertialErrorBound=[.1;.1];
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [minimum,residual]=localBarrierResidual(problem,command);
+            testCase.verifyGreaterThanOrEqual(minimum,-1e-9);
+            testCase.verifyLessThanOrEqual(residual,1e-9);
         end
-
-        function aValidObservationPreservesTheOriginalTargetLawWhileRefreshingTheProblem(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            target.targetPositionInertial = target.targetPositionInertial ...
-                +cfg.controller.sampleTime*target.targetVelocityInertial;
-            [~,~,next,certificate] = collisionAvoidanceController(nextEgo,target,route,cfg,stored);
-            testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyEqual(certificate.originalEncounter,stored.originalEncounter);
-            testCase.verifyEqual(next.model.stateTime,nextEgo.stateTime);
-            testCase.verifyGreaterThanOrEqual(localOfflineMargin(certificate),0);
+        function multipleTargetsShareTheSameOptimization(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            targets=[target,target];targets(2).trackId=2;
+            targets(2).targetPositionInertial=[-30;-4];
+            localHook('reset',[]);cfg.solver.jointFunction=@localHook;
+            [~,plan,problem]=collisionAvoidanceController(ego,targets,road,cfg,[]);
+            testCase.verifyEqual(localHook('count',[]),1);
+            testCase.verifySize(plan,[2,1]);
+            testCase.verifySize(problem.metadata.targetErrorBound,[8,2]);
+            testCase.verifySize(problem.program.barrier.normal,[2,2]);
         end
-
-        function inconsistentObservationsInvalidateTheExecutionAssumptions(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
-            nextEgo.position(1) = nextEgo.position(1)+1;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored), ...
-                "collisionAvoidanceController:inconsistentObservation");
+        function anUnsafeSecondTargetCannotBeIgnored(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            targets=[target,target];targets(2).trackId=2;
+            targets(2).targetPositionInertial=[1;0];
+            testCase.verifyError(@() collisionAvoidanceController(ego,targets,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
-
-        function largerYawBoundsRequireFreshAdmission(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            target.predictionMotion.yawAccelerationBound = 0;
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            target.targetPositionInertial = target.targetPositionInertial ...
-                +cfg.controller.sampleTime*target.targetVelocityInertial;
-            target.predictionMotion.yawAccelerationBound = 0.02;
-            [~,~,next] = collisionAvoidanceController(nextEgo,target,route,cfg,stored);
-            testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyTrue(next.metadata.motionBoundsIncreased);
-            testCase.verifyFalse(next.metadata.candidateVerified);
+        function aCollisionBetweenSafeSampledEndpointsStopsTheSolve(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            target.targetPositionInertial=[.4;-10];target.targetVelocityInertial=[0;200];
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
-
-        function measuredActuatorMismatchPreventsReuse(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
-            nextEgo.heldActuatorInput(2) = nextEgo.heldActuatorInput(2)+0.1;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored), ...
-                "collisionAvoidanceController:executionContractViolation");
+        function roadConstraintsRemainHardWithoutATarget(testCase)
+            [ego,target,road,cfg]=localFixture(false);
+            ego.position(2)=cfg.model.lateralDomainRadius+.1;
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
-
-        function lateSamplesCannotSilentlyResetTheClock(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
-            nextEgo.stateTime = 0.2;
-            nextEgo.perception.time = nextEgo.stateTime;
-            testCase.verifyError(@() collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored), ...
-                "collisionAvoidanceController:executionContractViolation");
+        function targetRemovalUsesTheSameSolveWithoutObstacleRows(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,problem,state);
+            [~,~,next]=collisionAvoidanceController(ego,[],road,cfg,state);
+            testCase.verifyFalse(next.metadata.hasTarget);
+            testCase.verifyEqual(next.metadata.obstacleCbfRowCount,0);
+            testCase.verifyEqual(next.metadata.solverCallCount,1);
         end
-
-        function finiteResidualsAreOutsideTheExactStudy(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            cfg.model.plantModelResidualRateBound = 1e-3*ones(6,1);
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:nonexactStudyInput");
+        function inconsistentExecutionStopsBeforeSolving(testCase)
+            [ego,target,road,cfg]=localFixture(false);
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,problem,state);ego.heldActuatorInput=[.1;.2];
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,state), ...
+                'collisionAvoidanceController:executionContractViolation');
         end
-
-        function aSecondTargetIsOutsideTheStrictScene(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            second = target;
-            second.trackId = 2;
-            testCase.verifyError(@() collisionAvoidanceController(ego,[target,second],route,cfg,[]), ...
-                "collisionAvoidanceController:invalidExactScene");
+        function nonzeroPlantResidualIsOutsideTheClaimedScope(testCase)
+            [ego,target,road,cfg]=localFixture(false);
+            cfg.model.plantModelResidualRateBound=1e-3*ones(6,1);
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:nonexactStudyInput');
         end
-
-        function betweenNodeCrossingCannotAuthorizeACommand(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            cfg.controller.sampleTime = 0.5;
-            cfg.controller.horizonSteps = 1;
-            cfg.referenceSpeed = 0;
-            cfg.solver.certificateSearchTimeLimit = 0.5;
-            ego.speed = 0;
-            target.targetPositionInertial = [0; -10];
-            target.targetVelocityInertial = [0; 40];
-            testCase.verifyGreaterThan(avoidanceSafetyGeometry.rectangleDistance([0;0], 0, [0;-10], pi/2, [2.4;.95;2.4;.95]), 0);
-            testCase.verifyGreaterThan(avoidanceSafetyGeometry.rectangleDistance([0;0], 0, [0;10], pi/2, [2.4;.95;2.4;.95]), 0);
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:certificateSearchLimit");
+        function anInjectedFailureStopsTheExperimentAfterOneHold(testCase)
+            folder=string(tempname);mkdir(folder);testCase.addTeardown(@() rmdir(folder,'s'));
+            testCase.verifyError(@() runExactStateRecursiveFeasibilityScenario(Scenario="cruise", ...
+                SampleCount=5,FailAfterAdmission=true,OutputDirectory=folder), ...
+                'collisionAvoidanceController:optimizationFailed');
+            saved=load(fullfile(folder,'cruise-exact-state.mat'));
+            testCase.verifyEqual(saved.report.executedHolds,1);
+            testCase.verifyEqual(saved.report.failureTime,.1,AbsTol=0);
+            testCase.verifyFalse(saved.report.completed);
         end
-
-        function oneOptimizationUsesTheCommonTrackingReference(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [~, ~, problem] = collisionAvoidanceController(ego, target, route, cfg, []);
-            testCase.verifyFalse(isfield(problem.metadata,"maneuverCandidates"));
-            testCase.verifyEqual(problem.qp.clf.referenceStart, [0;0;cfg.referenceSpeed;0;0]);
-            testCase.verifyEqual(numel(problem.metadata.clfRelaxation), cfg.controller.horizonSteps);
-            testCase.verifyGreaterThan(problem.metadata.solverCallCount, 0);
-        end
-
-        function freshOptimizationPreservesHardSafetyWithoutLockingSurplusMargin(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
-            nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            [~,~,next,certificate] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
-            testCase.verifyGreaterThanOrEqual(localOfflineMargin(certificate),0);
-            testCase.verifyEqual(next.metadata.requiredMargin,0);
-        end
-
-        function theExplicitWitnessSurvivesConvenienceStateReset(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            [~, ~, problem, stored] = collisionAvoidanceController(ego, target, route, cfg, []);
-            collisionAvoidanceController("resetNominalTrajectory");
-            nextEgo = encounterTestFixture.nextEgo(stored, problem.model.lane);
-            [~, ~, next] = collisionAvoidanceController(nextEgo, localObservation(target,stored,nextEgo.stateTime), route, cfg, stored);
-            testCase.verifyFalse(next.metadata.fallbackUsed);
-            testCase.verifyTrue(next.metadata.certificateCompatible);
-        end
-
-        function aReferenceChartJumpNeedsAnExplicitJumpCertificate(testCase)
-            [ego, target, ~, cfg] = encounterTestFixture.crossing();
-            cfg.controller.horizonSteps = 4;
-            route = [-100,0;0.2,0;50,5];
-            testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, []), ...
-                "collisionAvoidanceController:unsupportedReferenceJump");
-        end
-
-        function aPositiveMinimumSpeedExcludesTheSlowingTerminalSet(testCase)
-            [ego,target,route,cfg] = encounterTestFixture.crossing();
-            cfg.model.speedMinimum = 1;
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,route,cfg,[]), ...
-                "collisionAvoidanceController:invalidExactScene");
+        function pathAndSpeedRecoverUnderTheHardClf(testCase)
+            report=runExactStateRecursiveFeasibilityScenario(Scenario="cruise",SampleCount=120, ...
+                InitialTrackingError=[.05;.002;-.05;0;0]);
+            testCase.verifyTrue(report.passed);
+            testCase.verifyLessThan(norm(report.state(2:6,end)-[0;0;8;0;0]),1e-3);
+            testCase.verifyLessThanOrEqual(max(report.clfDissipationResidual),0);
+            testCase.verifyEqual(report.solverCallCount,ones(1,120));
         end
     end
 end
 
-function target = localObservation(target,stored,time)
-    if isempty(stored.encounters)
-        target = [];
-        return;
-    end
-    state = targetPrediction.finiteFlow(stored.encounters,time-stored.encounters.time);
-    target.targetPositionInertial = state(1:2);
-    target.targetVelocityInertial = state(3:4);
-    target.targetAccelerationInertial = state(5:6);
-    target.targetHeadingInertial = state(7);
-    target.targetYawRate = state(8);
-end
-
-function audit = localReplanThroughRelease(target,route,cfg,problem,stored)
-    count = stored.remainingSteps+2;
-    audit = struct('certified',false(1,count),'active',false(1,count), ...
-        'deadline',zeros(1,count),'terminal',false(1,count));
-    for index = 1:count
-        ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
-        observed = localObservation(target,stored,ego.stateTime);
-        [~,~,problem,stored] = collisionAvoidanceController(ego,observed,route,cfg,stored);
-        audit.certified(index) = problem.metadata.safetyCertified;
-        audit.active(index) = problem.metadata.hasTarget;
-        audit.deadline(index) = stored.deadline;
-        audit.terminal(index) = problem.metadata.terminalActive;
+function [ego,target,road,cfg]=localFixture(present)
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
+        'controller',struct('sampleTime',.1),'model',struct('lateralDomainRadius',4)));
+    ego=struct('position',[0;0],'yaw',0,'speed',8,'stateTime',0);
+    road=[-100,0;2000,0];
+    target=[];
+    if present
+        target=struct('trackId',1,'targetPositionInertial',[30;4], ...
+            'targetVelocityInertial',[0;0],'targetAccelerationInertial',[0;0], ...
+            'targetHeadingInertial',0,'targetYawRate',0, ...
+            'predictionMotion',struct('kind',"finite-sensing-motion-v1", ...
+            'jerkBound',[0;0],'yawAccelerationBound',0));
     end
 end
 
-function margin = localOfflineMargin(certificate)
-    audit = solveHardCbfClf.certify(certificate.qp,[],certificate.witnessModel,certificate.decision);
-    margin = audit.margin;
+function result=localHook(mode,program)
+    persistent count
+    if string(mode)=="reset",count=0;result=[];return;end
+    if string(mode)=="count",result=count;return;end
+    count=count+1;result=program.defaultSolver();
+end
+
+function result=localFailureHook(mode,value)
+    persistent count status
+    if string(mode)=="reset",count=0;status=value;result=[];return;end
+    if string(mode)=="count",result=count;return;end
+    count=count+1;result=struct('decision',[0;0],'exitFlag',status,'output',struct());
+end
+
+function ego=localSuccessor(ego,problem,state)
+    x=problem.predictedState(:,2);
+    [ego.position,ego.yaw]=laneGeometry.fromFrenet(x,problem.model.lane);
+    ego.speed=x(4);ego.lateralVelocity=x(5);ego.yawRate=x(6);
+    ego.stateTime=ego.stateTime+problem.model.sampleTime;ego.heldActuatorInput=state.appliedInput;
+end
+
+function [matrix,bound]=localPermanentProgram(program)
+    count=program.cones(2);obstacles=program.obstacleCbfRowCount;
+    selected=count-4-obstacles+(1:obstacles);
+    matrix=program.A;bound=program.b;matrix(selected,:)=[];bound(selected)=[];
+end
+
+function residual=localRobustClfResidual(problem,command)
+    meta=problem.metadata;model=problem.model;
+    flow=expm(model.sampleTime*[meta.executedContinuousGenerator;zeros(3,9)]);
+    % All box corners and interior deterministic points are experimental
+    % validation; the norm/Young bound in the derivation supplies the proof.
+    signs=2*dec2bin(0:63,6).'-'0'*2-1;
+    points=[signs,zeros(6,1),.5*signs];
+    initial=model.initialEgoState+model.initialFrenetErrorBound.*points;
+    next=flow(1:6,:)*[initial;repmat(command.actuatorInput,1,size(initial,2));ones(1,size(initial,2))];
+    e=initial(2:6,:)-meta.clfReferenceState(2:6);f=next(2:6,:)-meta.clfReferenceState(2:6);
+    residual=max(sum(f.*(meta.clfMatrix*f),1)-(1-meta.clfDecayPerHold)*sum(e.*(meta.clfMatrix*e),1) ...
+        -meta.clfDisturbanceBound);
+end
+
+function [minimum,residual]=localBarrierResidual(problem,command)
+    model=problem.model;target=model.encounters;normal=problem.program.barrier.normal;
+    support=hypot(model.cfg.vehicle.length/2,model.cfg.vehicle.width/2) ...
+        +hypot(target.halfLength,target.halfWidth)+model.cfg.collision.clearanceMargin;
+    initial=problem.program.barrier.initialUpper;minimum=inf;last=NaN;
+    for time=linspace(0,model.sampleTime,101)
+        flow=expm(time*[problem.metadata.executedContinuousGenerator;zeros(3,9)]);
+        x=flow(1:6,:)*[model.initialEgoState;command.actuatorInput;1];
+        position=laneGeometry.fromFrenet(x,model.lane);
+        [center,radius]=targetPrediction.finiteFlow(target,time);
+        last=normal.'*(position-center(1:2))-abs(normal).'*radius(1:2)-support;
+        minimum=min(minimum,last);
+    end
+    residual=problem.program.barrier.contraction*initial-last;
 end

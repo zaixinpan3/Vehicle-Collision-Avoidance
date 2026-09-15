@@ -89,26 +89,27 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(parsed.yaw, 0.2, AbsTol=1e-14);
         end
 
-        function egoAndTargetCertificateBoxesAreAdmittedAndCarried(testCase)
+        function egoAndTargetCertificateBoxesEnterTheSingleHoldProblem(testCase)
             [ego, target, cfg, lane] = localInputs();
-            [~,~,problem,stored] = collisionAvoidanceController(ego,target,lane,cfg,[]);
+            [~,~,problem] = collisionAvoidanceController(ego,target,lane,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.initialErrorBound(4:6), ego.controllerErrorBound.bounds(4:6), AbsTol=0);
             testCase.verifyEqual(problem.metadata.targetErrorBound(1:2), [0.2;0.2], AbsTol=0);
-            testCase.verifyEqual(stored.encounters.radius(1:2), [0.2;0.2], AbsTol=0);
+            testCase.verifyEqual(problem.model.encounters.radius(1:2), [0.2;0.2], AbsTol=0);
         end
 
-        function aNewlyUncertainObservationIsConditionedByTheExactCarriedFlow(testCase)
+        function eachSolveUsesTheCurrentTargetBox(testCase)
             [ego,target,lane,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,lane,cfg,[]);
-            ego = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            target.targetPositionInertial = target.targetPositionInertial ...
-                +cfg.controller.sampleTime*target.targetVelocityInertial;
-            target.targetPositionInertialErrorBound = [0.01;0.01];
-            [~,~,next,certificate] = collisionAvoidanceController(ego,target,lane,cfg,stored);
+            x=problem.predictedState(:,2);
+            [ego.position,ego.yaw]=laneGeometry.fromFrenet(x,problem.model.lane);
+            ego.speed=x(4);ego.lateralVelocity=x(5);ego.yawRate=x(6);
+            ego.stateTime=cfg.controller.sampleTime;ego.heldActuatorInput=stored.appliedInput;
+            target.targetPositionInertial=target.targetPositionInertial+cfg.controller.sampleTime*target.targetVelocityInertial;
+            target.targetPositionInertialErrorBound=[.01;.01];
+            [~,~,next]=collisionAvoidanceController(ego,target,lane,cfg,stored);
             testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyTrue(next.metadata.candidateVerified);
-            testCase.verifyLessThan(max(certificate.encounters.radius(1:2)),1e-9);
+            testCase.verifyEqual(next.metadata.targetErrorBound(1:2),[.01;.01],AbsTol=0);
         end
 
         function anEgoBoxIsAdmittedWithItsFrenetRadius(testCase)
@@ -126,12 +127,13 @@ end
 
 function [ego, target, cfg, lane] = localInputs()
     [~, crossing, lane, cfg] = encounterTestFixture.crossing();
+    cfg.referenceSpeed=10;
     ego = struct("position", [0; 0], "yawAngle", 0, ...
         "longitudinalVelocity", 10, "lateralVelocity", 0, "yawRate", 0, ...
         "stateTime", 0, "perception",struct("time",0,"range",16,"completeWithinRange",true), ...
         "controllerErrorBound", ...
         localCertificate("ego-state-v1", [0.1; 0.1; 0.01; 0.1; 0.1; 0.001]));
-    target = struct("trackId", "static-target", "targetPositionInertial", [15; -4], ...
+    target = struct("trackId", "static-target", "targetPositionInertial", [50; -4], ...
         "targetVelocityInertial", [0; 32], "targetAccelerationInertial", [0; 0], ...
         "targetYawInertial", pi/2, "targetYawRate", 0, "stateTime", 0, ...
         "controllerErrorBound", localCertificate("target-state-v1", [0.2; 0.2; zeros(6, 1)]), ...

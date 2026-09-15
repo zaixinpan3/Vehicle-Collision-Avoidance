@@ -1,109 +1,10 @@
 classdef solveHardCbfClf
-    %solveHardCbfClf Hard-constrained optimization with solver-status execution.
-    % All physical safety rows enter the solve without violation variables.
-    % certify/certifyInputs are offline research audit utilities; the online
-    % solve never calls them or repairs a returned decision.
-
+    %solveHardCbfClf One conic solve with strict solver-status execution.
     methods (Static)
-        function [result,problem] = solve(problem, cfg)
-            [result,problem] = localHardSolve(problem,cfg);
-        end
-
         function solve = constrained(program,cfg)
-        % Execute only a fully solved hard-constrained program. No external
-        % residual calculation or feasible-iterate acceptance follows it.
             program = localCompactPlanarRows(program);
             problem = struct('layout',struct('decisionCount',numel(program.q)),'stageProgram',program);
             solve = localRunJointProgram(problem,cfg);
-        end
-
-        function record = solverAcceptance(solve,count)
-        % Status metadata, not a separately evaluated safety certificate.
-            record = struct('accepted',solve.feasible,'candidateAccepted',solve.feasible, ...
-                'safetyCertified',solve.feasible,'value',0,'stageViolation',zeros(count,1), ...
-                'hardRowViolation',NaN,'clfViolation',NaN,'margin',NaN, ...
-                'sweptClearanceMargin',NaN,'exitMargin',NaN,'failedConditions',strings(1,0), ...
-                'basis',"hardConstraintsAndSolverStatus",'solverExitFlag',solve.exitFlag);
-            if ~solve.feasible,record.failedConditions="solverStatus";end
-        end
-
-        function names = rowNames(qp)
-        % Human-readable name of every physical row, for diagnostics.
-            planCount = qp.layout.planCount;
-            count = qp.layout.horizonSteps;
-            geometryRows = numel(qp.geometry.label);
-            terminalRows = numel(qp.barrier.completionRows);
-            slewRows = numel(qp.physicalBound)-geometryRows-2*planCount-count-terminalRows;
-            names = [string(qp.geometry.label); repmat("inputUpperBound",planCount,1); ...
-                repmat("inputLowerBound",planCount,1); repmat("clfSlackNonnegative",count,1); ...
-                repmat("inputRate",slewRows,1); repmat("terminalSet",terminalRows,1)];
-        end
-
-        function [check,decision] = certifyInputs(qp,prediction,model,inputs)
-        % Evaluate a mathematical input candidate in the given problem.
-            decision = zeros(qp.layout.decisionCount,1);
-            decision(qp.layout.planIndex) = inputs(:);
-            decision = localRepairClf(qp,decision,model.cfg);
-            check = solveHardCbfClf.certify(qp,prediction,model,decision);
-        end
-
-        function check = certify(qp, ~, model, decision)
-        % Offline audit of physical rows and CLF residuals; not an execution gate.
-            stages = qp.layout.horizonSteps;
-            check = struct("accepted", false, "candidateAccepted",false,"safetyCertified",false, ...
-                "failedConditions", "decision", ...
-                "hardRowViolation", inf, "clfViolation", inf, "margin", -inf, ...
-                "sweptClearanceMargin", -inf, "exitMargin", qp.exitMargin, ...
-                "value", inf, "stageViolation", inf(stages,1), "violatedHardRows", zeros(0,1));
-            if ~isnumeric(decision) || ~isreal(decision) || ~isvector(decision) ...
-                    || numel(decision) ~= qp.layout.decisionCount || any(~isfinite(decision))
-                return;
-            end
-            decision = decision(:);
-            operations = numel(decision)+2;
-            gamma = operations*eps/(1-operations*eps);
-            evaluationAllowance = gamma*(abs(qp.physicalBound)+abs(qp.inequalityMatrix)*abs(decision));
-            margins = qp.physicalBound-qp.inequalityMatrix*decision-evaluationAllowance;
-            violation = max(0, -margins);
-            relaxed = qp.safetyRows;
-            check.hardRowViolation = max([0; violation(~relaxed)]);
-            check.violatedHardRows = find(~relaxed & violation > 0);
-            stageViolation = zeros(stages, 1);
-            if any(relaxed)
-                stageViolation = accumarray(qp.rowStage(relaxed), violation(relaxed), [stages, 1], @max, 0);
-            end
-            check.stageViolation = stageViolation;
-            check.value = sum(stageViolation);
-            allowance = model.cfg.encounter.numericalMargin;
-            check.sweptClearanceMargin = min([inf; margins(relaxed)])-allowance;
-            % Solver buffers are not additional physical obligations. Use
-            % independently enclosed physical margins for acceptance and
-            % keep every non-safety row hard, including the terminal rows.
-            selected = qp.barrier.scale > 0;
-            check.margin = min([model.cfg.encounter.maximumCarriedMargin; ...
-                margins(selected)./qp.barrier.scale(selected)]);
-            check.exitMargin = min([inf; margins(qp.barrier.completionRows)]);
-            check.clfViolation = -inf;
-            for index = 1:numel(qp.clf.constraints)
-                constraint = qp.clf.constraints(index);
-                value = constraint.map*decision+constraint.offset;
-                residual = norm(constraint.root*value)^2+constraint.linear.'*value+constraint.constant;
-                residual = residual+16*(numel(decision)+64)*eps*( ...
-                    norm(abs(constraint.root)*abs(value))^2+abs(constraint.linear).'*abs(value)+abs(constraint.constant));
-                check.clfViolation = max(check.clfViolation, ...
-                    residual-decision(qp.layout.relaxationIndex(constraint.stage)));
-            end
-            conditions = [all(isfinite(margins)), check.hardRowViolation == 0, ...
-                isfinite(check.clfViolation) && check.clfViolation <= 0, ...
-                isfinite(check.value), ~qp.certifiedInfeasible];
-            names = ["finitePrediction", "hardRows", "sampledDataClf", "finiteValue", "finiteProblem"];
-            check.failedConditions = names(~conditions);
-            check.candidateAccepted = all(conditions);
-            check.safetyCertified = check.candidateAccepted && check.value==0;
-            check.accepted = check.safetyCertified;
-            if check.candidateAccepted && ~check.safetyCertified
-                check.failedConditions(end+1) = "positiveSafetyViolation";
-            end
         end
     end
 end
@@ -150,77 +51,6 @@ function program = localCompactPlanarRows(program)
     program.A = [linear(retained,:);sparse(directions(present,:));program.A(count+1:end,:)];
     program.b = [bound(retained);compact(present);program.b(count+1:end)];
     program.cones(2) = nnz(retained)+nnz(present);
-end
-
-function [result,problem] = localHardSolve(problem,cfg)
-% Safety violation variables are absent from the condensed optimization.
-    n = problem.layout.decisionCount;
-    anchor = zeros(n,1);anchor(problem.layout.planIndex) = problem.anchorPlan;
-    if string(cfg.solver.programForm)=="lifted"
-        program = problem.stageProgram;
-        program.inactiveSlackIndex = program.violationIndex;
-    else
-        matrix = problem.inequalityMatrix;
-        bound = problem.inequalityBound-matrix*anchor;
-        cones = [0;numel(bound)];
-        constraints = problem.clf.constraints;
-        rows = zeros(10*numel(constraints),n);limits = zeros(10*numel(constraints),1);
-        for index = 1:numel(constraints)
-            constraint = constraints(index);
-            value = constraint.map*anchor+constraint.offset;
-            tau = -constraint.linear.'*constraint.map;
-            tau(problem.layout.relaxationIndex(constraint.stage)) = ...
-                tau(problem.layout.relaxationIndex(constraint.stage))+1;
-            offset = -constraint.linear.'*value-constraint.constant;
-            selected = 10*(index-1)+(1:10);
-            rows(selected,:) = -[tau;2*constraint.root*constraint.map;tau];
-            limits(selected) = [offset+1;2*constraint.root*value;offset-1];
-        end
-        program = struct('P',triu(sparse(problem.Hessian)), ...
-            'q',problem.linear+problem.Hessian*anchor,'A',sparse([matrix;rows]), ...
-            'b',[bound;limits],'cones',[cones;10*ones(numel(constraints),1)], ...
-            'physicalDecisionCount',n,'inactiveSlackIndex',zeros(1,0));
-    end
-    timer = tic;
-    solve = solveHardCbfClf.constrained(program,cfg);
-    result = localEmptyResult();
-    result.feasible = solve.feasible;result.exitFlag = solve.exitFlag;
-    result.message = solve.message;result.solverCalls = 1;result.output = solve.output;
-    result.acceptance = solveHardCbfClf.solverAcceptance(solve,problem.layout.horizonSteps);
-    result.programDiagnostics = localProgramDiagnostics("hardConstraints",solve,toc(timer));
-    result.algorithm = "hard-constrained CLF SOCP";
-    if solve.feasible
-        result.decision = solve.decision(1:n);
-        if string(cfg.solver.programForm)=="condensed",result.decision = result.decision+anchor;end
-        result.objectiveValue = localJointValue(problem,result.decision);
-        result.clfValue = result.decision(problem.layout.relaxationIndex);
-        result.valueStageOptimum = 0;result.value = 0;result.lexicographicTieResidual = 0;
-        result.iterations = localIterationCount(solve.output);
-    end
-end
-
-function record = localProgramDiagnostics(name, solve, seconds)
-    record = struct("program",name,"exitFlag",solve.exitFlag,"rounds",NaN,"workingRows",NaN, ...
-        "nativeCalls",NaN,"seconds",seconds);
-    if isstruct(solve.output)
-        if isfield(solve.output,"rowGenerationRounds"), record.rounds = solve.output.rowGenerationRounds; end
-        if isfield(solve.output,"workingRowCount"), record.workingRows = solve.output.workingRowCount; end
-        if isfield(solve.output,"nativeCalls"), record.nativeCalls = solve.output.nativeCalls; end
-    end
-end
-
-function [decision, slacks] = localRepairClf(problem, decision, cfg)
-% Only performance slacks may be repaired; inputs are preserved verbatim.
-    slacks = zeros(problem.layout.relaxationCount, 1);
-    for index = 1:numel(problem.clf.constraints)
-        constraint = problem.clf.constraints(index);
-        value = constraint.map*decision+constraint.offset;
-        residual = norm(constraint.root*value)^2+constraint.linear.'*value+constraint.constant;
-        residual = residual+16*(numel(decision)+64)*eps*( ...
-            norm(abs(constraint.root)*abs(value))^2+abs(constraint.linear).'*abs(value)+abs(constraint.constant));
-        slacks(constraint.stage) = max(slacks(constraint.stage), residual);
-    end
-    decision(problem.layout.relaxationIndex) = slacks+cfg.encounter.numericalMargin*(1+abs(slacks));
 end
 
 function solve = localRunJointProgram(problem, cfg)
@@ -379,37 +209,8 @@ function solve = localNormalizeSolve(solve, decisionCount, variableCount)
     end
 end
 
-function value = localJointValue(problem, decision)
-    value = 0.5*decision.'*problem.Hessian*decision ...
-        + problem.linear.'*decision+problem.constant;
-end
-
-function iterations = localIterationCount(output)
-    iterations = 0;
-    if isstruct(output) && isfield(output, "iterations") ...
-            && isnumeric(output.iterations) && isscalar(output.iterations)
-        iterations = double(output.iterations);
-    end
-end
-
 function solve = localEmptySolve()
     solve = struct("decision", zeros(0, 1), "fullDecision", zeros(0, 1), ...
         "exitFlag", -999, "output", struct(), "feasible", false, ...
         "message", "");
-end
-
-function result = localEmptyResult()
-    result = struct( ...
-        "decision", zeros(0, 1), ...
-        "exitFlag", -999, ...
-        "feasible", false, ...
-        "iterations", 0, ...
-        "solverCalls", 0, ...
-        "algorithm", "hard-constrained CLF SOCP", ...
-        "message", "", ...
-        "objectiveValue", inf, ...
-        "clfValue", inf, ...
-        "valueStageOptimum", inf, ...
-        "value", inf, ...
-        "lexicographicTieResidual", 0);
 end

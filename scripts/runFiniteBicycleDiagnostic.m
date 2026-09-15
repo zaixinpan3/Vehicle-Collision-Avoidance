@@ -183,9 +183,9 @@ end
 function [peak,violation] = localResidualAudit(trajectory,input,problem,cfg)
 % Independent ODE trace audit; this is sampled evidence, not a global bound.
     peak = zeros(6,1);
-    a = problem.prediction.continuousA(:,:,1);
-    b = problem.prediction.continuousB(:,:,1);
-    c = problem.prediction.continuousC(:,1);
+    a = problem.metadata.executedContinuousGenerator(:,1:6);
+    b = problem.metadata.executedContinuousGenerator(:,7:8);
+    c = problem.metadata.executedContinuousGenerator(:,9);
     lane = problem.model.lane;
     for index = 1:size(trajectory,1)
         state = trajectory(index,:).';
@@ -198,7 +198,7 @@ function [peak,violation] = localResidualAudit(trajectory,input,problem,cfg)
         flow(1:3) = [stationRate;state(4)*sin(heading)+state(5)*cos(heading);state(6)-curvature*stationRate];
         peak = max(peak,abs(flow-a*frenet-b*input-c));
     end
-    violation = max(peak-problem.prediction.modelErrorRateBound(:,1));
+    violation = max(peak-problem.metadata.executedResidualRateBound);
 end
 
 function ego = localEgoTruth(state)

@@ -45,6 +45,7 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
     egoEstimates = cell(1,count);targetEstimates = cell(1,count);
     certificate = [];command = [];
     failure = struct('identifier',"",'message',"",'time',NaN);
+    failureException = [];
     minimumRoadMargin = inf;minimumSeparationMargin = inf;executedHolds = 0;
     for k = 1:count
         states(:,k) = truth;
@@ -76,6 +77,7 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         catch exception
             controllerSeconds(k) = toc(phase);frameSeconds(k) = toc(frameTimer);
             failure = struct('identifier',string(exception.identifier),'message',string(exception.message),'time',time(k));
+            failureException = exception;
             break;
         end
         controllerSeconds(k)=toc(phase);frameSeconds(k)=toc(frameTimer);
@@ -118,6 +120,7 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
         save(fullfile(options.OutputDirectory,'joint-declared-plant.mat'),'report','initialization','-v7.3');
     end
+    if ~isempty(failureException),rethrow(failureException);end
 end
 
 function state = localTruth(x)

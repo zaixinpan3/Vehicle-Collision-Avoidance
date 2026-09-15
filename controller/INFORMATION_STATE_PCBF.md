@@ -1,5 +1,7 @@
 # Information-state safe MPC with finite encounter completion
 
+> Historical design: the current online algorithm is [the single-solve sampled CBF–CLF controller](SINGLE_SOLVE_CBF_CLF.md). Its one-hold guarantee does not use the continuation architecture analyzed below.
+
 September 15, 2026. The full-horizon policy retains certificate format 22;
 the two-variable constrained backup uses format 24 and a hard sampled
 cruising CLF. See [SAMPLED_BACKUP_CBF_CLF.md](SAMPLED_BACKUP_CBF_CLF.md).

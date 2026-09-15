@@ -1,5 +1,7 @@
 # Finite-encounter terminal certificates with recursive feasibility
 
+> Historical design: the current online algorithm is [the single-solve sampled CBF–CLF controller](SINGLE_SOLVE_CBF_CLF.md). Its one-hold guarantee does not use the continuation architecture analyzed below.
+
 Updated September 14, 2026. The finite open-loop witness is implemented in
 certificate version 22 with `N=L=M`, current observation confirmation,
 non-postponable active deadlines, zero physical safety violation, and a

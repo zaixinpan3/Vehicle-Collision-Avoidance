@@ -1,7 +1,7 @@
 function cfg = collisionAvoidanceControllerConfig(userCfg)
 % collisionAvoidanceControllerConfig Defaults and merge for the controller.
 %
-% Returns the predictive-certificate controller configuration, with supplied
+% Returns the single-solve sampled CBF-CLF configuration, with supplied
 % overrides merged recursively over the declared defaults. Every field
 % the controller reads is defined here; a missing field is a
 % configuration error at the consuming module rather than a silent
@@ -34,32 +34,14 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % Closed-loop period and initial planning window. Admission may extend
-    % the complete witness beyond this window; it is not a target exit deadline.
-    % minimumHorizonSteps floors the speed-scaled fresh horizon
-    % ceil(horizonSteps*speed/referenceSpeed); the carried witness keeps its
-    % own length, so a shorter fresh horizon never weakens the guarantee.
-    % executionPolicy "backup" uses two-variable hard-constrained rollouts
-    % with a hard sampled cruise CLF. "predictive"
-    % retains the SOCP search. "auto" chooses backup for a finite frame budget.
-    cfg.controller = struct( ...
-        "sampleTime", 0.05, ...
-        "horizonSteps", 48, ...
-        "minimumHorizonSteps", 2, ...
-        "executionPolicy", "auto", ...
-        "stationTrustRadius", 2.0);
-
-    % Geometric clearance in metres, certified throughout every held interval.
-    cfg.collision = struct("clearanceMargin", 0.25);
-
-    % Complete encounter certificates. Separating supports
-    % normals are separate certificate variables. All cells share the issued
-    % held input within a sample. Certificate margins are normalized across
-    % the physical hard rows; every predicted interval is certified.
-    cfg.encounter = struct( ...
-        "minimumCells", 2, "taylorOrder", 6, ...
-        "numericalMargin", 1.0e-6, "maximumCarriedMargin", 1.0, ...
-        "inputRateWeight", 0.02);
+    % Exactly one held-input optimization. Legacy horizon and executionPolicy
+    % fields are retained as input-format compatibility only; no code selects
+    % an alternate controller or extends the one-hold optimization.
+    cfg.controller = struct("sampleTime",0.05,"horizonSteps",1, ...
+        "minimumHorizonSteps",1,"executionPolicy","singleSolve","stationTrustRadius",2.0);
+    cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
+    cfg.encounter = struct("minimumCells",2,"taylorOrder",6, ...
+        "numericalMargin",1.0e-6,"maximumCarriedMargin",1.0,"inputRateWeight",0.02);
 
     % Vehicle geometry and inertia.
     cfg.vehicle = struct( ...
@@ -113,12 +95,11 @@ function cfg = localDefaults()
         "orthonormalTolerance", 1.0e-9, ...
         "parameterRangeTolerance", 1.0e-3);
 
-    % Continuous Riccati error scales and normalized input effort weights.
-    % Online input weights penalize deviation from the certificate operating input.
-    % decreaseRateFraction scales the certified decay rate (1/s); slack has
-    % units of V per second and a squared cost weighted by relaxationWeight.
-    % A smaller soft-CLF penalty avoids numerical stagnation of the full-horizon
-    % SOCP during passing. Backup cruise uses a hard cone without this slack.
+    % Discrete Riccati error scales and normalized input effort weights.
+    % decreaseRateFraction retains a strict gap between nominal contraction
+    % and the reported robust sampled dissipation factor. No CLF slack exists.
+    % Legacy relaxationWeight, certificateSpeedFloor and samplePoints fields
+    % remain input-format compatibility settings and do not select constraints.
     cfg.clf = struct( ...
         "lateralPositionErrorScale", 0.5, ...
         "headingErrorScale", 0.1, ...
@@ -133,27 +114,12 @@ function cfg = localDefaults()
         "referenceOffset", zeros(5, 1), ...
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
-    % samplePoints selects where the sampled-data CLF decrease is imposed
-    % in the full-horizon optimizer: "stageNodes" once per hold at its end (the sampled-data
-    % notion of the control period), "endpoints" at the two ends of every
-    % tube cell, "controlPoints" at every Bernstein control point.
-
-    % One hard-constrained conic solve. The hook receives (phase,
-    % problem), with P/q/A/b/cones fields and a [plan; delta] decision.
-    % problem.defaultSolver invokes the native sparse conic solver.
-    % certificateSearchTimeLimit limits wall-clock search work, not trajectory
-    % duration; reaching it reports an unresolved search, never infeasibility.
-    % constraintTolerance is the native solver's relative feasibility
-    % tolerance; the solve-time row reserve scales with it and the program's
-    % dominant magnitude to reserve room for its declared numerical error.
-    % frameDeadlineSeconds budgets fresh work when a witness is available.
-    % The feasible carried suffix supplies control after a failed solve.
-    % Initial admission uses certificateSearchTimeLimit instead. Neither is
-    % a hard bound on a complete MATLAB frame. Auto with a finite deadline
-    % selects the two-variable constrained backup policy.
-    % Legacy lexicographicTieTolerance, rowGeneration and witnessVerification
-    % fields are accepted for configuration compatibility and ignored. All
-    % safety rows enter one hard solve; there is no runtime plan checker.
+    % One conic solve. The hook receives (phase,program), with P/q/A/b/cones
+    % and two actuator decision coordinates [deltaF; beta]. defaultSolver
+    % invokes the native solver once. A hook must honor its feasibility status.
+    % constraintTolerance enters the pre-solve physical row reserves.
+    % frameDeadlineSeconds caps native work, not complete MATLAB frame time.
+    % Legacy search, formulation and witness settings are ignored online.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
@@ -165,10 +131,9 @@ function cfg = localDefaults()
         "rowGeneration", false, ...
         "witnessVerification", "none", ...
         "programForm", "condensed");
-    % programForm selects condensed or lifted full-horizon hard-constrained
-    % optimization. The constrained backup always has two decision variables.
+    % The online program always has two actuator variables and one CLF cone.
 
-    % Fallback target rectangle when an estimate publishes no extent.
+    % Default target rectangle when an estimate publishes no extent.
     cfg.target = struct( ...
         "defaultLength", 4.8, ...
         "defaultWidth", 1.9);
@@ -221,10 +186,11 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
     if ~isscalar(string(cfg.controller.executionPolicy)) ...
-            || ~any(string(cfg.controller.executionPolicy)==["auto","predictive","backup"])
+            || ~any(string(cfg.controller.executionPolicy)==["singleSolve","auto","predictive","backup"])
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "controller.executionPolicy must be auto, predictive or backup.");
+            "Unsupported legacy executionPolicy value; all accepted values use one solve.");
     end
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
@@ -317,9 +283,9 @@ function localValidate(cfg)
     end
     localValidateNonnegativeScalar(cfg.clf.decreaseRateFraction, "clf.decreaseRateFraction");
     if cfg.clf.decreaseRateFraction <= 0.0 ...
-            || cfg.clf.decreaseRateFraction > 1.0
+            || cfg.clf.decreaseRateFraction >= 1.0
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "clf.decreaseRateFraction must lie in (0, 1].");
+            "clf.decreaseRateFraction must lie in (0, 1) to retain a finite robust dissipation bound.");
     end
     if ~isnumeric(cfg.collision.clearanceMargin) ...
             || ~isscalar(cfg.collision.clearanceMargin) ...

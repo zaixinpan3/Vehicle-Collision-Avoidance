@@ -1,7 +1,6 @@
 function report = runEncounterCertificateScenario(options)
-%runEncounterCertificateScenario Exact-state crossing with rolling prediction.
-% Uses the common independently integrated scheduled-model experiment. The
-% target remains observed after crossing; terminal feedback is prediction-only.
+%runEncounterCertificateScenario Exact-state crossing with one solve per hold.
+% The target stays observed. Any unsuccessful solve propagates an error.
     arguments
         options.ForceSolverFailure (1,1) logical = false
         options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1

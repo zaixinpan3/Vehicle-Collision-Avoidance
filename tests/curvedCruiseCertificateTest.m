@@ -23,16 +23,13 @@ classdef curvedCruiseCertificateTest < matlab.unittest.TestCase
         function theCertificateAndCostUseTheRoadCruisePoint(testCase,curvature)
             [ego,road,cfg,state,input] = localFixture(curvature);
             [command,~,problem] = collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),road,cfg,[]);
-            cert = problem.qp.clf.certificate;
-            [a,b] = ltvBicycleModel.continuousMatrices(curvature,cfg.referenceSpeed,cfg,[],0, ...
-                struct("state",state,"input",input));
-            closedLoop = a(2:6,2:6)-b(2:6,:)*cert.feedbackGain;
-            testCase.verifyEqual(cert.operatingCurvature,curvature,AbsTol=1e-14);
-            testCase.verifyEqual(cert.operatingState,state,AbsTol=1e-12);
-            testCase.verifyEqual(cert.operatingInput,input,AbsTol=1e-12);
-            testCase.verifyEqual(problem.qp.clf.referenceStart,state(2:6),AbsTol=1e-12);
-            testCase.verifyEqual(closedLoop.'*cert.lyapunovMatrix+cert.lyapunovMatrix*closedLoop, ...
-                -cert.decreaseMatrix,AbsTol=1e-10);
+            cert = ltvBicycleModel.sampledCruise(problem.model);
+            testCase.verifyEqual(cert.stage.curvature,curvature,AbsTol=1e-14);
+            testCase.verifyEqual(cert.state,state,AbsTol=1e-12);
+            testCase.verifyEqual(cert.input,input,AbsTol=1e-12);
+            testCase.verifyEqual(problem.metadata.clfReferenceState,state,AbsTol=1e-12);
+            residual=cert.closedLoop.'*cert.matrix*cert.closedLoop-cert.contraction*cert.matrix;
+            testCase.verifyLessThanOrEqual(max(eig(residual)),1e-10);
             testCase.verifyTrue(all(isfinite(command.actuatorInput)));
             testCase.verifyTrue(problem.metadata.planCertified);
         end
@@ -42,9 +39,9 @@ classdef curvedCruiseCertificateTest < matlab.unittest.TestCase
             [~,~,left] = collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),road,cfg,[]);
             [ego,road] = localFixture(-1/100);
             [~,~,right] = collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),road,cfg,[]);
-            testCase.verifyGreaterThan(left.qp.clf.certificate.operatingInput(1),0);
-            testCase.verifyEqual(right.qp.clf.certificate.operatingInput, ...
-                [-1;1].*left.qp.clf.certificate.operatingInput,AbsTol=1e-12);
+            testCase.verifyGreaterThan(left.metadata.clfOperatingInput(1),0);
+            testCase.verifyEqual(right.metadata.clfOperatingInput, ...
+                [-1;1].*left.metadata.clfOperatingInput,AbsTol=1e-12);
         end
 
         function anUnattainableTurnDoesNotProduceASubstituteInput(testCase)

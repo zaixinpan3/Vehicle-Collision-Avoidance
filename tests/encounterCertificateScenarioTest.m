@@ -6,21 +6,16 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function solverFailureExecutesTheVerifiedCarriedWitness(testCase)
-            report = runEncounterCertificateScenario(ForceSolverFailure=true,ExecutionPolicy="predictive");
-            testCase.verifyTrue(report.completed);
-            testCase.verifyTrue(report.passed);
-            testCase.verifyTrue(all(report.retainedWitnessUsed(2:end)));
-            testCase.verifyFalse(any(isnan(report.input(:))));
-            testCase.verifyEqual(report.pcbfValue,zeros(size(report.pcbfValue)));
+        function solverFailureStopsTheExperiment(testCase)
+            testCase.verifyError(@() runEncounterCertificateScenario(ForceSolverFailure=true), ...
+                "collisionAvoidanceController:optimizationFailed");
         end
-        function freshSolutionsContinueBeyondTheFirstPredictionEnd(testCase)
-            report = runEncounterCertificateScenario(DeadlineSeconds=inf);
+        function everyCrossingSampleSolvesOnce(testCase)
+            report=runEncounterCertificateScenario(DeadlineSeconds=inf);
             testCase.verifyTrue(report.passed);
-            testCase.verifyFalse(any(report.retainedWitnessUsed));
-            testCase.verifyFalse(any(report.terminalActive));
-            testCase.verifyGreaterThan(report.executedHolds,report.admissionSteps);
-            testCase.verifyLessThan(abs(report.finalCruiseError(3)),0.02);
+            testCase.verifyEqual(report.executedHolds,24);
+            testCase.verifyEqual(report.solverCallCount,ones(1,24));
+            testCase.verifyLessThan(abs(report.state(4,end)-8),1e-4);
         end
     end
 end
