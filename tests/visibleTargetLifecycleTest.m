@@ -34,7 +34,7 @@ classdef visibleTargetLifecycleTest < matlab.unittest.TestCase
             testCase.verifyTrue(p.metadata.targetSetChanged);
             testCase.verifyFalse(p.metadata.candidateVerified);
             testCase.verifyTrue(isnan(p.metadata.pcbfDescentResidual));
-            testCase.verifyEqual(p.metadata.certificateSource,"checkedOptimization");
+            testCase.verifyEqual(p.metadata.certificateSource,"constrainedOptimization");
             testCase.verifyEqual(p.metadata.newlyAdmittedTargetKeys,string({next.encounters.key}));
         end
         function arrivalFailureDoesNotExecuteTheNoTargetWitness(testCase)

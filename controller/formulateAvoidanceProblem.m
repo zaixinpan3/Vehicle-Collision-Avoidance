@@ -13,8 +13,8 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
         zeros(count, planCount), -eye(count)];
     physicalBound = [geometry.physicalBound; upperInput; -lowerInput; zeros(count, 1)];
     safetyRows = [geometry.safety; false(2*planCount+count, 1)];
-    % Stage of every relaxable row: the value function accumulates one
-    % violation per stage over its collision and road rows.
+    % Stage labels support offline physical safety-value audits. Every row
+    % is hard in the online optimization.
     rowStage = [geometry.stage; zeros(2*planCount+count, 1)];
     rateLimit = model.sampleTime*repmat([cfg.model.frontWheelSteeringRateMaximum; ...
         cfg.model.brakingRatioRateMaximum],count,1);
@@ -30,17 +30,12 @@ function qp = formulateAvoidanceProblem(model, prediction, anchorPlan)
     completionRows = numel(physicalBound)+(1:numel(exitBound)).';
     hardMatrix = [hardMatrix; exitMatrix, zeros(numel(exitBound), count)];
     physicalBound = [physicalBound; exitBound];
-    % The terminal set is hard: Huang et al.'s relaxation never touches it.
+    % The terminal set and every finite physical safety row are hard.
     safetyRows = [safetyRows; false(numel(exitBound), 1)];
     rowStage = [rowStage; zeros(numel(exitBound), 1)];
-    % Leave room for strict independent acceptance at an active constraint.
-    % Acceptance charges one reserve; solving with two does not spend that
-    % same allowance on both solver termination and certificate arithmetic.
-    % The solver's feasibility tolerance is relative to the program's
-    % dominant magnitude, so its absolute error is shared by every row. The
-    % solve-time reserve is therefore the larger of a row-scaled numerical
-    % margin and the solver tolerance times that dominant magnitude;
-    % verification keeps the physical rows and an eps-level allowance.
+    % Tighten before solving to reserve room for numerical feasibility error.
+    % Safety is conditional on solver error being covered by these reserves;
+    % no independent runtime certificate is evaluated after solving.
     inputReach = [repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
         max(abs([cfg.actuation.brakingRatioMinimum, cfg.actuation.brakingRatioMaximum]))], count, 1); zeros(count, 1)];
     rowScale = 1+abs(physicalBound)+abs(hardMatrix)*inputReach;

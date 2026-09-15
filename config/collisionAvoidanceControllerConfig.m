@@ -39,8 +39,8 @@ function cfg = localDefaults()
     % minimumHorizonSteps floors the speed-scaled fresh horizon
     % ceil(horizonSteps*speed/referenceSpeed); the carried witness keeps its
     % own length, so a shorter fresh horizon never weakens the guarantee.
-    % executionPolicy "backup" uses bounded fixed-continuation verification
-    % and a hard sampled cruise CLF without an online solver. "predictive"
+    % executionPolicy "backup" uses two-variable hard-constrained rollouts
+    % with a hard sampled cruise CLF. "predictive"
     % retains the SOCP search. "auto" chooses backup for a finite frame budget.
     cfg.controller = struct( ...
         "sampleTime", 0.05, ...
@@ -117,6 +117,8 @@ function cfg = localDefaults()
     % Online input weights penalize deviation from the certificate operating input.
     % decreaseRateFraction scales the certified decay rate (1/s); slack has
     % units of V per second and a squared cost weighted by relaxationWeight.
+    % A smaller soft-CLF penalty avoids numerical stagnation of the full-horizon
+    % SOCP during passing. Backup cruise uses a hard cone without this slack.
     cfg.clf = struct( ...
         "lateralPositionErrorScale", 0.5, ...
         "headingErrorScale", 0.1, ...
@@ -127,38 +129,31 @@ function cfg = localDefaults()
         "brakingRatioWeight", 1.0, ...
         "decreaseRateFraction", 0.9, ...
         "certificateSpeedFloor", 5.0, ...
-        "relaxationWeight", 100.0, ...
+        "relaxationWeight", 0.01, ...
         "referenceOffset", zeros(5, 1), ...
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
     % samplePoints selects where the sampled-data CLF decrease is imposed
-    % and verified: "stageNodes" once per hold at its end (the sampled-data
+    % in the full-horizon optimizer: "stageNodes" once per hold at its end (the sampled-data
     % notion of the control period), "endpoints" at the two ends of every
     % tube cell, "controlPoints" at every Bernstein control point.
 
-    % One hard-margin LP followed by a CLF SOCP. The hook receives (phase,
+    % One hard-constrained conic solve. The hook receives (phase,
     % problem), with P/q/A/b/cones fields and a [plan; delta] decision.
     % problem.defaultSolver invokes the native sparse conic solver.
     % certificateSearchTimeLimit limits wall-clock search work, not trajectory
     % duration; reaching it reports an unresolved search, never infeasibility.
     % constraintTolerance is the native solver's relative feasibility
     % tolerance; the solve-time row reserve scales with it and the program's
-    % dominant magnitude so that solver error cannot cross a physical row.
-    % lexicographicTieTolerance bounds, in metres of accumulated predicted
-    % violation, how far the performance stage may exceed the value-stage
-    % optimum when that optimum is positive; a zero optimum is kept exactly.
-    % frameDeadlineSeconds budgets fresh work when a witness is available:
-    % check before the first attempt and pass remaining time to the native
-    % solver. The carried witness supplies control when work expires (inf
-    % disables). Initial admission uses certificateSearchTimeLimit instead;
-    % neither option is a hard bound on complete MATLAB frames. With auto
-    % executionPolicy, a finite frame budget selects the fixed-backup policy.
-    % rowGeneration solves every
-    % conic program on a working set of its hard rows and adds violated
-    % rows until none remain; the accepted plan is still verified on all
-    % rows. witnessVerification selects how the carried witness is checked:
-    % "shiftedRows" re-evaluates the stored rows shifted by one stage on the
-    % conditioned box (no rebuild), "rebuilt" recomputes tubes and rows.
+    % dominant magnitude to reserve room for its declared numerical error.
+    % frameDeadlineSeconds budgets fresh work when a witness is available.
+    % The feasible carried suffix supplies control after a failed solve.
+    % Initial admission uses certificateSearchTimeLimit instead. Neither is
+    % a hard bound on a complete MATLAB frame. Auto with a finite deadline
+    % selects the two-variable constrained backup policy.
+    % Legacy lexicographicTieTolerance, rowGeneration and witnessVerification
+    % fields are accepted for configuration compatibility and ignored. All
+    % safety rows enter one hard solve; there is no runtime plan checker.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
@@ -167,13 +162,11 @@ function cfg = localDefaults()
         "constraintTolerance", 1.0e-8, ...
         "optimalityTolerance", 1.0e-7, ...
         "lexicographicTieTolerance", 1.0e-6, ...
-        "rowGeneration", true, ...
-        "witnessVerification", "shiftedRows", ...
+        "rowGeneration", false, ...
+        "witnessVerification", "none", ...
         "programForm", "condensed");
-    % programForm "condensed" solves the tiers on the 48 physical unknowns
-    % centred at the seed plan with the CLF tier linearised there (its
-    % slacks are repaired to the true residuals before verification);
-    % "lifted" solves the sparse cell-state conic program.
+    % programForm selects condensed or lifted full-horizon hard-constrained
+    % optimization. The constrained backup always has two decision variables.
 
     % Fallback target rectangle when an estimate publishes no extent.
     cfg.target = struct( ...
@@ -351,9 +344,9 @@ function localValidate(cfg)
     localValidateNonnegativeScalar(cfg.solver.maxIterations, "solver.maxIterations");
     validateattributes(cfg.solver.frameDeadlineSeconds,{'double'},{'scalar','real','positive'});
     validateattributes(cfg.solver.rowGeneration,{'logical'},{'scalar'});
-    if ~ismember(string(cfg.solver.witnessVerification),["shiftedRows","rebuilt"])
+    if ~ismember(string(cfg.solver.witnessVerification),["none","shiftedRows","rebuilt"])
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "solver.witnessVerification must be ""shiftedRows"" or ""rebuilt"".");
+            "solver.witnessVerification must be ""none"", ""shiftedRows"" or ""rebuilt"".");
     end
     if ~ismember(string(cfg.solver.programForm),["condensed","lifted"])
         error("collisionAvoidanceController:invalidConfiguration", ...

@@ -8,7 +8,7 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function finiteSlewProblemSolvesBothNativeStages(testCase)
+        function finiteSlewProblemUsesOneHardConstrainedSolve(testCase)
             [ego,~,route,cfg]=encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             % Exercise explicit actuator slew constraints on the exact plant.
             ego.speed=10;cfg.referenceSpeed=10;
@@ -23,17 +23,17 @@ classdef sparseControllerIntegrationTest < matlab.unittest.TestCase
             statuses=[];cfg.solver.jointFunction=@capture;
             [~,~,problem]=collisionAvoidanceController(ego,encounterTestFixture.stationaryTarget(),route,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(statuses,[1,1]);
+            testCase.verifyEqual(statuses,1);
             function result=capture(~,program)
                 result=program.defaultSolver();statuses(end+1)=result.output.status;
             end
         end
-        function bothLexicographicStagesRetainDynamicsEqualities(testCase)
+        function theHardConstrainedSolveRetainsDynamicsEqualities(testCase)
             [ego,target,route,cfg]=encounterTestFixture.crossing(); cfg.solver.programForm = "lifted";
             equalityCounts=[];cfg.solver.jointFunction=@capture;
             [~,~,problem]=collisionAvoidanceController(ego,target,route,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyNumElements(equalityCounts,2);
+            testCase.verifyNumElements(equalityCounts,1);
             testCase.verifyGreaterThan(equalityCounts,0);
             function result=capture(~,program)
                 equalityCounts(end+1)=program.cones(1);

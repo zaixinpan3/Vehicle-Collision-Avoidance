@@ -1,240 +1,251 @@
-# Sampled backup CBF and cruise CLF
+# Hard-constrained backup CBF and cruise CLF
 
-September 14, 2026. Certificate format 23 introduces a bounded-candidate
-execution policy alongside the predictive SOCP policy (format 22).
-`controller.executionPolicy="backup"` selects it explicitly; `"predictive"`
-selects the optimization policy. The default `"auto"` selects backup when a
-finite `solver.frameDeadlineSeconds` is supplied, and keeps using it for a
-format-23 witness. Moving-offset references retain predictive mode under
-`auto`; explicit backup requires a positive constant-speed trim.
-The experiment's default 100 ms budget selects backup.
+September 15, 2026. Certificate format 24 replaces format 23's prescribed
+rollout checker with a **two-variable hard-constrained optimizer**. No
+independent runtime plan verifier authorizes execution. The full-horizon
+predictive policy also uses one hard-constrained solve, with no safety-value
+LP, omitted-row generation, slack repair or post-solve checker.
 
-## Problem and implemented change
+`controller.executionPolicy="backup"` selects the small optimizer;
+`"predictive"` selects the full-horizon SOCP. `"auto"` selects backup for a
+finite frame budget and continues a format-23/24 stored backup. Moving-offset
+references retain predictive mode under auto. Explicit backup requires a
+positive constant-speed trim. The simulation's 100 ms budget selects backup.
 
-The previous experiment found multi-second admission, positive-slack CLF
-acceptance and persistent post-encounter oscillation. Its stopping backup
-could preserve safety while defeating cruise recovery. Profiling the repaired
-implementation shows that rebuilding prediction and constraints costs more
-than the solver in an ordinary cruising frame. Changing the solver alone
-does not address either problem.
+## A small optimization with a complete continuation
 
-The new policy uses three operations:
+A saturated, slew-limited trim-feedback rollout proposes nominal inputs
+`ubar_i`. This proposal does not authorize execution. For the two-dimensional
+adjustment `w`, define
 
-1. At encounter admission, generate at most two prescribed passing/cruise
-   continuations, each at most 64 holds, and verify the entire continuation.
-   The proposals are saturated, slew-limited sampled feedback rollouts about
-   the cruise trim, with passing offsets and optional speed changes. These
-   are proposals only: neither the feedback gain nor nominal separation
-   authorizes a command.
-2. During an admitted encounter, execute the verified suffix. Current
-   measurements condition the carried boxes and the existing current-scan
-   guard confirms release. No online optimization is needed. The absolute
-   encounter deadline cannot move forward.
-3. After release, propose a sampled cruise input and verify its full hold,
-   sampled CLF decrease and membership of the successor box in the road
-   stopping set. When this immediate handoff is unavailable near the end of
-   a witness, a finite return-to-path rollout can be admitted by the same
-   full safety check. Otherwise execute the carried witness or its invariant
-   stopping continuation.
+    u_0(w) = ubar_0 + w,
+    u_i(w) = ubar_i - K * dx_i,       i > 0,
+    dx_0 = 0,
+    dx_(i+1) = Phi*dx_i + Gamma*(u_i(w)-ubar_i).
 
-There is no online optimizer in this policy. The SOCP implementation remains
-available for experiments requiring a larger search family. Removing the
-optimizer reduces the feasible search family; a failed bank does not prove
-that the encounter is impossible. No positive safety slack is executable.
+Here K acts on the five tracking-error coordinates. Every input, endpoint
+and swept polynomial coefficient is affine in w. This is an open-loop
+parameterization of the whole sequence, not feedback from hypothetical
+future observations. After solving, the entire sequence is evaluated once
+and stored. Its uncertainty uses `rho_(i+1)=abs(Phi)*rho_i`; no future
+measurement shrinkage is assumed.
 
-If a direct terminal input would violate slew limits, at most 16 braking
-transition holds are appended, within the same 64-hold total cap. These
-holds are fully verified with the proposal. Ordinary cruise therefore need
-not jump instantaneously from positive drive to the stopping brake.
+For fixed charts, target predictions and separating normals, the program is
 
-## Declared model and continuous safety
+    minimize  0.5 * w' * w
+    subject to all swept road, collision, chart, model-domain and slip rows,
+               all input and slew rows, including first terminal input,
+               finite robust exit and road terminal-set rows,
+               the sampled cruise CLF cone when cruise is requested.
 
-This remains an experiment with a **declared affine ego plant**, not a
-validated nonlinear vehicle. Each issued hold executes the recorded
-`executedContinuousGenerator`. Backup proposals use the affine generator
-linearized at the requested cruise trim. They do not silently claim inclusion
-of a trajectory-linearized or nonlinear Fiala plant in that generator.
-Cruise references have zero configured moving offset/rate. A fixed curvature
-has a common error metric; changing curvature creates a new local metric and
-does not establish one global path-tracking Lyapunov function.
+All physical safety constraints are hard. Every original Bernstein control
+point is represented, including through the conservative scalar-bound
+reduction described below. A failed proposal may be followed by another
+bounded proposal, but no physical violation variable is optimized or used
+for execution. This two-variable family is a conservative inner
+approximation of the full-horizon search.
 
-`ltvBicycleModel.fixedPredict` keeps only the current hold's two input columns
-in each tube. `avoidanceSafetyGeometry.build` substitutes that hold's actual
-input before assembling scalar margins. It retains every original road,
-chart, model-domain, slip and oriented-footprint separation inequality at
-every Bernstein control point. Substitution includes a floating-point
-evaluation reserve. Safety margins require an additional numerical reserve;
-exact hard-domain/input equalities remain admissible.
+Encounter admission tries at most two passing rollouts, each at most 64
+holds. Active encounters normally execute their stored feasible suffix.
+After confirmed release, the controller first tries a cruise hold and any
+necessary braking transition. With a stored witness, this attempt receives
+at most 15 ms and 20% of the remaining frame for formulation and solving.
+Near exhaustion of the stored plan, one safety-only return-to-path rollout
+can use the remaining budget. Initial road-only admission can instead try
+a finite rollout with the first-hold CLF cone, then safety-only recovery.
+There are at most two solves in an inactive continuation frame and three
+in an inactive admission frame. At most 16 transition holds fit within the 64-hold total.
+Proposed slew changes use 99% of the configured limit to leave numerical
+room; the hard constraint retains the configured limit.
 
-The held-flow template is cached with six initial-state columns and two
-input columns, using the full declared absolute domain in its arithmetic
-reserve. Substituting a stage's initial nominal state leaves the two input
-columns needed by geometry. The template's starting radius is the
-componentwise maximum over the candidate's stage-start boxes, so it also
-covers every stage's uncertainty without assuming future measurement
-shrinkage. This common radius can make an uncertain proposal more
-conservative. Endpoint boxes still use their individual propagated radii.
+## Compact hard rows without a returned-plan check
 
-The cell count is `max(minimumCells,ceil(norm(A,inf)*h/.9))`. This respects
-the geometric-series remainder premise `norm(A,inf)*cellDuration<1`.
-The checked Taylor remainder, not the density of a plotted trajectory,
-establishes intersample containment. Endpoints use the exact affine sampled
-map and monotonically propagated boxes. Continuous geometry is verified
-through the finite confirmation deadline; the road terminal set and first
-terminal-input slew are also checked. Uncertainty is never capped or reset
-in anticipation of a favorable observation.
+Most straight-road continuation rows depend on one control coordinate.
+Numerical cruise synthesis also produces small cross-coefficients that are
+physically retained. The program imposes hard decision bounds `abs(w)<=r`.
+For a row `a_j*w_j+a_l*w_l<=b` with
+`abs(a_l)<=1e-10*abs(a_j)`, a sufficient scalar constraint is
 
-## Predictive CBF guarantee
+    sign(a_j)*w_j <= (b-abs(a_l)*r_l)/abs(a_j).
 
-Let `S(W)` be the sum of nonnegative per-hold physical safety violations of
-a complete witness `W`, including its hard terminal/confirmation obligations.
-Only a verified `S(W)=0` is admitted. In the information state augmented by
-the stored witness and its remaining deadline, the predictive barrier is
-`h_B=-S`. On its certified zero level, the executed shift satisfies
+The cross-effect is charged as an uncertainty support; it is not silently
+rounded away. Arithmetic reserves move the resulting bound inward. Taking
+the minimum bound for each of the four signed coordinate directions then
+represents every contributing inequality. Rows with material coupling and
+all SOC constraints are retained. Nonfinite division results are kept in
+the original row representation. Native assembly also removes identically
+satisfied zero rows and fixed-zero compatibility columns.
 
-    h_B(I_(k+1), W_shift) >= (1-alpha) h_B(I_k,W_k) = 0,
+This is formulation before solving. It neither checks a returned plan nor
+iterates over omitted constraints after a solve. In a captured recovery
+problem, native rows fell from 30,197 to 1,356 and solve time from 71.535 to
+1.794 ms. This isolated comparison excludes formulation and startup; the
+full campaign reports complete-frame timing separately.
 
-for any `alpha` in `(0,1]`. The reason is the same inclusion/shift argument
-as [the information-state proof](INFORMATION_STATE_PCBF.md): conditioned
-boxes lie in the old successor boxes, every remaining hold keeps its verified
-generator and controls, and the terminal law preserves permanent obligations.
-Confirmed release removes target obligations while retaining the road suffix.
-The empty-suffix step is checked by terminal membership.
+## Execution contract and numerical meaning
 
-This is a predictive, sampled information-state barrier certificate. It is
-not a claim that the finite bank computes the globally optimal PCBF, or that
-a smooth instantaneous distance CBF with a globally feasible derivative QP
-has been constructed. Safety is conditional on admission, consistent bounded
-motion/measurements, timely execution of the recorded held inputs and valid
-departure confirmation. New targets or enlarged motion bounds require new
-admission. Re-entry and unobserved targets require additional sensing and
-admission assumptions.
+Only the solver's strict `Solved` status (`exitFlag=1`) and a structurally
+valid finite decision authorize a new plan. Approximate, timed-out,
+iteration-limited and failed solves cannot replace the stored plan. Solver
+hooks must satisfy the same feasibility/status contract as the native
+solver. A hook that falsely reports a feasible solution violates that
+contract; there is deliberately no independent checker to detect it.
 
-## Hard sampled CLF dissipation
+`solveHardCbfClf.certify`, `certifyInputs`, and
+`hardEncounterBarrier.verifyFixed`, `verifyCandidate`, `terminalMembership`
+remain available for **offline research audits only**. The online paths
+never call them. Legacy `rowGeneration`, `witnessVerification` and
+`lexicographicTieTolerance` configuration fields are accepted but ignored.
 
-For fixed curvature, let the five-dimensional error from the constant-speed
-path trim be `e`. With held-input error `v=u-u_*`, the exact sampled error
-map is
+Affine bounds are tightened before solving using arithmetic and solver
+feasibility reserves. Native objective normalization preserves minimizers;
+its optimality tolerance applies to the normalized objective without a
+second scaling. Primal feasibility tolerance is separate and unchanged. The full-horizon
+soft-CLF penalty is reduced from 100 to 0.01 after passing experiments
+exposed numerical stagnation; this does not change the backup hard cone.
+A floating-point solver status is not an interval proof of numerical
+feasibility. The mathematical safety claim assumes returned constraint
+errors are covered by the construction reserves. No independent numerical
+certificate or hardware fault guarantee is claimed.
 
-    e_(k+1) = Phi e_k + Gamma v_k.
+`candidateAccepted`, `safetyCertified` and `planCertified` describe this
+solver-contract-based admission. `acceptance.basis` identifies it explicitly.
+Legacy `candidateVerified` and `shiftedSafetyCandidateChecked` metadata mean
+that a feasible carried continuation was transferred; they do not indicate
+a separate plan audit. Uncomputed physical residuals and margins are NaN. `pcbfValue=0` represents
+the hard feasibility level, not a measured post-solve residual.
+`postSolveCertificationPerformed=false` is published in both policies.
 
-`ltvBicycleModel.sampledCruise` synthesizes a discrete LQR gain `K` and
-positive-definite `P`. It independently checks the contraction of
-`F=Phi-Gamma*K` in the `P` metric, including a numerical reserve:
+## Continuous safety and the predictive barrier
 
-    F' P F <= q2 P,   0 <= q2 < 1,   V(e)=e' P e.
+The declared ego plant is the recorded held affine generator, with zero
+process residual. Target uncertainty follows bounded Cartesian jerk and yaw
+acceleration while active. The held-flow template retains six initial-state
+columns and two input columns, with the full declared domain in its
+arithmetic reserve. Substituting the affine input/state parameterization
+leaves two decision columns. Direct tire-slip input rows are transformed
+with the same stage input map. Endpoint boxes retain individual propagated
+radii; the cached swept template uses a common upper starting radius, which
+can be conservative for uncertain encounters.
 
-With exact feedback and exact arithmetic,
+Taylor remainders, complete yaw intervals, rectangle supports, chart errors
+and propagated boxes enter every swept inequality. Nonnegative Bernstein
+basis weights then imply separation and road containment throughout every
+hold. Finite exit rows require the whole target footprint outside the
+confirmation region. Current sound observation, not a timer, releases the
+target. The road-only terminal set and terminal input transition remain
+hard. No all-future target support is required.
 
-    V(e_(k+1)) - V(e_k) <= -(1-q2) V(e_k).
+For the augmented information/witness state, let S(W) denote the sum of
+nonnegative physical safety violations of a complete continuation whose
+terminal and release obligations are satisfied. Feasibility gives S(W)=0
+mathematically. After the first input is executed, conditioned boxes are
+subsets of the published successor boxes. Monotonicity of reachability
+preserves all remaining rows using the same generators and inputs. Thus
+S(W_shift)=0; for h_B=-S and any alpha in (0,1],
 
-The selected dissipation fraction uses a rate no greater than this bound.
-If input or slew saturation changes the feedback, the gain identity alone
-cannot authorize dissipation: the implemented quadratic difference is
-checked separately on the entire current information box.
+    h_B(I_next,W_shift) >= (1-alpha)*h_B(I,W) = 0.
 
-For the observed center `e_bar` and true error `e=e_bar+eta`,
-`|eta|<=r`, applying the unsaturated input `-K e_bar` gives
+This establishes invariance of the admitted zero level and a predictive
+barrier interpretation. The controller does not compute a global optimal
+PCBF, prove continuity of a value function across all hybrid modes, or
+construct a smooth distance CBF on the entire physical state space.
 
-    e_(k+1) = F e_k + Gamma K eta.
+A fresh feasible plan may replace the witness only without extending its
+active exit deadline. Confirmed release removes target obligations and
+retains road feasibility. At an empty suffix, terminal invariance supplies
+the next input directly, without a terminal membership recheck. The full
+conditional shift proof and sensor contract are in
+[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md). Unlike the general
+soft-constraint PCBF value-function theorem, this implementation uses only
+the feasible zero level. See Huang et al.,
+[Predictive Control Barrier Functions](https://arxiv.org/html/2502.08400v2),
+and Wabersich and Zeilinger,
+[A predictive safety filter](https://arxiv.org/abs/1812.05506), for the
+underlying value-function and stored-backup constructions; their theorems
+do not automatically establish this implementation's hybrid or numerical
+premises.
 
-Let `epsP` enclose `norm(P^(1/2) Gamma K eta)`, including the trim/arithmetic
-reserve. For any `c` with `q2<c<1`, Young's inequality gives
+## Hard sampled cruise dissipation inside the optimizer
 
-    V(e_(k+1)) <= c V(e_k) + c/(c-q2) epsP^2.                 (1)
+For a fixed curvature and requested speed, let e be the five-dimensional
+error from the path trim. Its exact sampled affine map is
 
-The uncertain case keeps at least half the available contraction gap for
-this disturbance bound. The implementation also bounds the direct quadratic
-residual on `e_bar +/- r`, using its linear support and an absolute-matrix
-quadratic enclosure. The smaller analytical justification may authorize the
-exact unsaturated feedback even if that interval expansion is conservative.
-The direct test is mandatory for a saturated proposal.
+    e_next = Phi_e*e + Gamma_e*(u-u_star) + d_trim.
 
-`clfDissipationCertified` means the issued hold has this checked sampled
-dissipation property. Its rate and disturbance bound are reported separately
-from collision/road safety. For consecutive certified cruise holds with a
-common metric and a uniform bound `b` on the additive term,
+Cruise synthesis computes P positive definite, K, and a checked contraction
 
-    V_k <= c^k V_0 + b (1-c^k)/(1-c).
+    F = Phi_e - Gamma_e*K,       F'*P*F <= q2*P,       q2 < 1.
 
-Exact-state cruise is exponentially convergent in the ideal declared model;
-bounded nonvanishing estimation error gives practical dissipation to a
-neighborhood, with a numerical floor in floating-point execution. A clear
-path does not make an arbitrary state admissible: continued cruise decrease
-also requires compatibility with road/input/slew/terminal constraints.
-Near a trim strictly inside those constraints, continuity and the contracting
-feedback provide a local cruising neighborhood. This implementation does not
-compute a maximal cruising attraction region.
+This model/gain synthesis condition is cached; it is not a runtime candidate
+verifier. Select c=1-decayPerHold with q2<c<1, and qmid=(c+q2)/2.
+For the observed center ebar and measurement radius r, define
 
-During avoidance, a finite recovery rollout or terminal braking, safety can
-prevent this decrease. Those commands explicitly report the CLF flag false.
-The controller does not label a large optimization slack as a dissipation
-guarantee, nor promise monotonically decreasing path error during a maneuver
-that must leave an obstructed path. Equation (1) concerns actual sampled
-states. It does not assert that a fixed quadratic `V` decreases pointwise
-at every intersample instant.
-For a common generator, bounded linear flow within each hold also extends
-sampled exponential convergence to the continuous tracking error, with a
-multiplicative intersample bound.
+    R = chol(P),
+    eLower = max(0, norm(R*ebar)-norm(abs(R)*r)),
+    uFeedback = u_star-K*ebar,
+    nu = norm(R*Gamma_e*(u_0(w)-uFeedback)).
 
-## Stopping set at normal cruising speeds
+The hard second-order cone is
 
-The previous fixed brake gain excluded nominal speeds above approximately
-8.7 m/s for the default vehicle, even though the model speed domain reached
-18 m/s. Write passive longitudinal damping as `d`, hold as `h`, acceleration
-gain as `g`, and `phi=(1-exp(-d*h))/d` with its continuous limit at zero.
-The updated gain is
+    nu <= (sqrt(qmid)-sqrt(q2))*eLower + epsilon_num.
 
-    b = min(exp(-d*h)*(1-exp(-h))/phi,
-            .98*(u_f,beta-beta_min)*g/v_max).
+Its right side is known before solving. It allows safety constraints to
+modify the nominal feedback within a quantified dissipation budget. Input
+or slew saturation is therefore handled inside the constrained problem.
+There is no post-solve quadratic CLF acceptance test.
 
-The terminal brake still acts on the lower speed endpoint `l=z_vx-r_vx`:
-`beta=u_f,beta-b*l/g`. Its successor satisfies
+For e=ebar+eta, abs(eta)<=r, the applied input gives
 
-    l^+ = (exp(-d*h)-b*phi)*l,   0 < exp(-d*h)-b*phi < 1.
+    e_next = F*e + Gamma_e*K*eta
+                    + Gamma_e*(u_0-uFeedback) + d_trim.
 
-The coupled nominal/error comparison matrices and stopping-excursion budgets
-are recomputed with this gain. Slower braking therefore consumes a longer
-certified road excursion; it does not obtain a larger speed domain for free.
-Chart size uses the proposed entry speed, while the invariant pose rows
-themselves enforce remaining within the chosen chart. All configured input,
-slip and slew caps and uncertainty terms remain in the terminal certificate.
-Previously stored format-22 terminal laws retain their own verified gains.
+Since eLower <= norm(R*e), the cone and contraction imply
 
-## Runtime contract
+    norm(R*e_next) <= sqrt(qmid)*norm(R*e) + epsilon,
+    epsilon = norm(abs(R*Gamma_e*K)*r)
+              + norm(abs(R)*abs(d_trim)) + 2*epsilon_num.
 
-The mathematical work is bounded by the finite bank and tube construction;
-active carried-witness steps need only conditioning and inclusion checks.
-There is no unbounded horizon extension or iterative solver in the backup
-policy. An already expired frame starts no new candidate work. A failed
-proposal retains a verified incumbent when one exists. Admission has no
-executable command until a complete candidate passes.
+The second numerical allowance covers the assumed cone feasibility error.
+Weighted Young's inequality yields the reported guarantee
 
-A previously verified format-22 plan can also feed the fast executor by
-using `auto` with an infinite budget for offline admission and a finite
-budget during execution. Its own stage generators and inputs are retained;
-the executor does not reinterpret that witness using the cruise generator.
+    V_next <= c*V + b,
+    V=e'*P*e,       b=c/(c-qmid)*epsilon^2.
 
-MATLAB, native allocation, first-use compilation and operating-system
-scheduling do not have certified worst-case execution times here. Measured
-sub-100 ms frames are runtime evidence, not a hard deadline theorem. These
-drivers measure computation time but execute the ideal sample/hold clock;
-they do not validate sensing-to-actuation latency. A deployed executor must
-apply the preverified buffered command on schedule and retain a valid witness
-when a planner misses its deadline; that separate real-time deployment and
-nonlinear flow inclusion remain required for a physical-vehicle claim.
+The implementation sets epsilon_num from the declared primal tolerance,
+input reach and Gamma/P scaling. The bound assumes the actual cone error
+is at most epsilon_num. It is a numerical design allowance, not a separate
+verified residual bound. With zero error and exact arithmetic, b=0 and
+V decreases exponentially. Finite precision and persistent uncertainty give
+practical dissipation to the bound b/(1-c).
 
-## Primary literature checked
+`clfDissipationCertified=true` means the executed first hold came from a
+feasible program containing this hard cone. Recovery, avoidance, carried
+suffixes and terminal stopping do not promise decreasing cruise error and
+publish false. Safety may require leaving the cruise-dissipation mode.
+The finite return rollout's first hold can carry the cone even when its
+successor cannot immediately enter the stopping set. The guarantee is
+sampled, not an all-time derivative inequality inside each hold.
 
-- Breeden, Garg and Panagou, *Control Barrier Functions in Sampled-Data
-  Systems* (2021/2022), distinguish sampled constraints from continuous
-  invariance under held controls. This motivates keeping the swept geometry
-  proof rather than checking only sampled distances.
-  [Paper](https://arxiv.org/abs/2103.03677).
-- Taylor, Dorobantu, Yue, Tabuada and Ames, *Sampled-Data Stabilization with
-  Control Lyapunov Functions via Quadratically Constrained Quadratic
-  Programs* (2021), examine the gap between continuous design and sampled
-  implementation. Our linear exact-map inequality above is derived directly
-  for this declared plant; their nonlinear practical-stability assumptions
-  are not imported automatically.
-  [Author manuscript](https://andrewjamestaylor.github.io/assets/paper_materials/taylor2021sampled_data_stabilization_with_control_lyapunov_functions_via_quadratically_constrained_quadratic_programs/paper.pdf).
+The full-horizon predictive policy retains its soft performance CLF cones;
+its physical safety rows are hard. The hard sampled cruise guarantee above
+belongs to the constrained backup policy. Fixed nonzero curvature admits a
+local trim and common P. Arbitrary curvature switching needs an additional
+common-metric or switching argument; it is not established here.
+
+## Runtime and validation limits
+
+Two decision variables avoid the large full-horizon factorization, while
+cached flow templates reduce formulation work. Every safety row remains represented
+in the hard formulation, including the scalar-bound reduction. Timing includes formulation, solver calls and witness transfer
+separately. A frame budget limits fresh work but does not bound MATLAB or
+operating-system latency. Cold admission, larger uncertain tubes and repeated
+infeasible recovery attempts can overrun 100 ms.
+
+The simulation independently measures true footprint/road margins, state
+containment, input/slew behavior and sampled CLF differences. These are
+experiment audits, not controller execution gates. Results and remaining
+failures are recorded in
+[the validation report](../report/HARD_CONSTRAINED_CONTROLLER_RESULTS_20260915.md).
+No nonlinear physical-vehicle guarantee, universal encounter feasibility,
+detection/re-entry guarantee or certified worst-case execution time is claimed.

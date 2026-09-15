@@ -63,6 +63,8 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
             % must return the same verified value and the same plan.
             [ego,target,road,cfg] = encounterTestFixture.crossing();
             target = rmfield(target,"predictionMotion");
+            % Request enough objective accuracy to compare two transcriptions.
+            cfg.solver.optimalityTolerance = 1e-10;
             cfg.solver.programForm = "lifted";
             [~,~,lifted] = collisionAvoidanceController(ego,target,road,cfg,[]);
             cfg.solver.programForm = "condensed";
@@ -73,9 +75,8 @@ classdef liftedAvoidanceSocpTest < matlab.unittest.TestCase
                 lifted.metadata.jointObjectiveValue,RelTol=1e-5,AbsTol=1e-8);
         end
 
-        function rowGenerationReproducesTheCompleteProgramOptimum(testCase)
-            % A working-set solve that violates no omitted row solves the
-            % complete program; the plan and its verified value agree.
+        function legacyRowGenerationOptionsKeepTheCompleteHardProgram(testCase)
+            % The legacy option is ignored: both solves contain all rows.
             [ego,target,road,cfg] = encounterTestFixture.crossing();
             target = rmfield(target,"predictionMotion");
             cfg.solver.rowGeneration = false;

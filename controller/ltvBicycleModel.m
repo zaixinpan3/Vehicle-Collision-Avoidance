@@ -37,13 +37,14 @@ classdef ltvBicycleModel
             key=current;saved=certificate;
         end
 
-        function prediction = fixedPredict(model, inputs, stage)
-        % Linear-size swept verification of a prescribed held-input sequence.
-        % Each cell has only its own two input columns. Geometry substitutes
-        % the actual stage input before assembling the physical margins.
+        function prediction = fixedPredict(model, inputs, stage, inputSensitivity)
+        % Swept prediction of a fixed sequence or a two-coordinate affine
+        % input family. Geometry uses the same stage input parameterization.
             persistent templateKey templateTubes savedTransition transitionKey
             cfg = model.cfg;
             count = size(inputs,2);
+            parametric = nargin>=4;
+            sensitivity = zeros(6,2,count+1);
             h = model.sampleTime;
             a = stage.continuousA; b = stage.continuousB; c = stage.continuousC;
             currentTransitionKey = {a,b,c,h};
@@ -68,6 +69,10 @@ classdef ltvBicycleModel
                 state = transition(1:6,:)*[state;inputs(:,index);1];
                 radius = abs(transition(1:6,1:6))*radius;
                 nodes(:,index+1) = state; radii(:,index+1) = radius;
+                if parametric
+                    sensitivity(:,:,index+1) = transition(1:6,1:6)*sensitivity(:,:,index) ...
+                        +transition(1:6,7:8)*inputSensitivity(:,:,index);
+                end
             end
             % Initial-state columns let one template cover every held stage.
             % Its arithmetic allowance uses the full declared state domain;
@@ -92,11 +97,21 @@ classdef ltvBicycleModel
                 stageCells = cell(cellCount,1);
                 for indexCell = 1:cellCount
                     tube = templateTubes(indexCell);
+                    stateMap = tube.map(:,1:6,:);
                     tube.offset = tube.offset+reshape(pagemtimes(tube.map(:,1:6,:),nodes(:,index)),6,[]);
                     tube.map = tube.map(:,7:8,:);
-                    tube.endOffset = tube.endOffset+tube.endMap(:,1:6)*nodes(:,index);
+                    endStateMap = tube.endMap(:,1:6);
+                    tube.endOffset = tube.endOffset+endStateMap*nodes(:,index);
                     tube.endMap = tube.endMap(:,7:8);
                     tube.localInputMap = tube.localInputMap(:,7:8,:);
+                    if parametric
+                        tube.endOffset = tube.endOffset+tube.endMap*inputs(:,index);
+                        tube.endMap = endStateMap*sensitivity(:,:,index) ...
+                            +tube.endMap*inputSensitivity(:,:,index);
+                        tube.offset = tube.offset+reshape(pagemtimes(tube.map,inputs(:,index)),6,[]);
+                        tube.map = pagemtimes(stateMap,sensitivity(:,:,index)) ...
+                            +pagemtimes(tube.map,inputSensitivity(:,:,index));
+                    end
                     tube.stage = index;
                     tube.start = (index-1)*h+(indexCell-1)*h/cellCount;
                     tube.duration = h/cellCount;
@@ -111,6 +126,12 @@ classdef ltvBicycleModel
                 "scheduleCurvature",repmat(stage.curvature,1,count+1), ...
                 "scheduleBrakingRatio",repmat(stage.brakingRatio,1,count), ...
                 "cells",vertcat(cells{:}),"stage",stage);
+            if parametric
+                prediction = rmfield(prediction,'fixedInputs');
+                prediction.parametricInputs = inputs;
+                prediction.inputSensitivity = inputSensitivity;
+                prediction.stateSensitivity = sensitivity;
+            end
         end
 
         function [force, slope, components] = roadLoad(speed, cfg)

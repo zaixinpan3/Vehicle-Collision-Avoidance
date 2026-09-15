@@ -1,18 +1,13 @@
 function [command, predictedInput, planningProblem, certificate] = ...
         collisionAvoidanceController(egoState, targetEstimate, laneCenterline, cfg, controllerState)
 %collisionAvoidanceController Predictive CBF safety with a carried witness.
-% A finite frame budget selects bounded fixed-backup verification and hard
-% sampled cruise dissipation. executionPolicy="predictive" retains the SOCP.
-% Supply the fourth output at the next sample. Ego and target estimates carry
-% bounded error boxes. Zero visible targets retain road-constrained CLF cruise.
-% New targets require fresh admission; confirmed removal keeps the road witness.
-% A visible target follows
-% a Cartesian nominal flow with declared jerk and yaw-acceleration bounds;
-% the ego executes the accepted plan's first-stage affine
-% generator. Every continuation frame conditions both boxes, verifies the
-% shifted previous plan with its own carried data, and lets a fresh
-% optimization replace it only with a verified plan of no larger safety
-% value. The reported value is the predictive control barrier function.
+% A finite frame budget selects two-variable hard-constrained backup control
+% with hard sampled cruise dissipation. executionPolicy="predictive" retains
+% the full-horizon SOCP. Supply the fourth output at the next sample.
+% Current measurements condition the stored reachable boxes. Feasibility
+% transfers to the carried suffix without a separate runtime plan checker.
+% A strict successful hard-constrained solve can replace it without delaying
+% active encounter completion. Declared affine plant and sensor contracts apply.
     persistent previousCertificate
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -62,27 +57,11 @@ function [command, predictedInput, planningProblem, certificate] = ...
     preparationSeconds = toc(timer);
     witnessSeconds = 0;
     if ~isempty(candidate)
-        if candidate.rebuilt
-            candidate = hardEncounterBarrier.verifyCandidate(model,candidate);
-        else
-            candidate = hardEncounterBarrier.transferCandidate(model,candidate);
-        end
+        candidate = hardEncounterBarrier.transferCandidate(model,candidate);
         witnessSeconds = candidate.seconds;
-        if ~candidate.check.accepted
-            detail = "";
-            if isfield(candidate.check,"violatedHardRows") && ~isempty(candidate.check.violatedHardRows)
-                names = solveHardCbfClf.rowNames(candidate.qp);
-                detail = sprintf("; violated hard rows %s by at most %.3g", ...
-                    strjoin(unique(names(candidate.check.violatedHardRows)).',","),candidate.check.hardRowViolation);
-            end
-            error("collisionAvoidanceController:carriedWitnessRejected", ...
-                "The carried witness failed verification on the conditioned information set (%s%s); " ...
-                + "a premise of the declared plant, the target law or the measurement contract was violated.", ...
-                strjoin(candidate.check.failedConditions,","),detail);
-        end
     end
     policy = string(cfg.controller.executionPolicy);
-    fixedStored=~isempty(controllerState) && controllerState.version==23;
+    fixedStored=~isempty(controllerState) && any(controllerState.version==[23,24]);
     constantReference=cfg.referenceSpeed>0 && ~any(cfg.clf.referenceOffset) && ~any(cfg.clf.referenceRate);
     if policy=="backup" || (policy=="auto" && constantReference ...
             && (isfinite(cfg.solver.frameDeadlineSeconds) || fixedStored))
@@ -119,23 +98,17 @@ function [command, predictedInput, planningProblem, certificate] = ...
         freshFailure = string(exception.identifier)+": "+string(exception.message);
     end
     if ~isempty(fresh) && ~isempty(candidate)
-        % The fresh plan may replace the carried witness only without
-        % raising the value function; a zero carried value is kept exactly.
-        tolerance = cfg.solver.lexicographicTieTolerance*double(candidate.check.value>0);
+        % A fresh feasible plan must preserve the active exit deadline.
         if ~isempty(encounters) && fresh.qp.completion.deadline>candidate.completion.deadline ...
                 +128*eps(max(1,abs(candidate.completion.deadline)))
             freshFailure = "A replacement witness cannot postpone the certified encounter exit.";
-            fresh = [];
-        elseif fresh.check.value>candidate.check.value+tolerance
-            freshFailure = sprintf("fresh value %.9g exceeds the carried value %.9g", ...
-                fresh.check.value,candidate.check.value);
             fresh = [];
         end
     end
     h = model.sampleTime;
     phase = tic;
     if ~isempty(fresh)
-        source = "checkedOptimization";
+        source = "constrainedOptimization";
         frame = localFreshFrame(fresh,fresh.model,identity,encounters,originalEncounter);
         solverCalls = fresh.result.solverCalls;
         tieResidual = fresh.result.lexicographicTieResidual;
@@ -145,12 +118,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
         tieResidual = 0;
         if candidate.optimizedStages==0
             frame = localTerminalFrame(controllerState,candidate,model,identity,encounters,originalEncounter);
-        elseif candidate.rebuilt
-            rebuilt = struct("model",candidate.model,"prediction",candidate.prediction,"qp",candidate.qp, ...
-                "result",struct("decision",candidate.decision),"check",candidate.check);
-            frame = localFreshFrame(rebuilt,candidate.model,identity,encounters,originalEncounter);
-            frame.certificate.source = source;
-        elseif candidate.optimizedStages>0
+        else
             frame = localTransferredFrame(controllerState,candidate,model,encounters);
         end
     end
@@ -178,7 +146,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
         "dischargedTargetKeys", strings(1,0), ...
         "clfRelaxation", frame.clfRelaxation, "clfDecayRate", frame.clfDecayRate, ...
         "collisionDiscretization", "sweptBernsteinCells", "acceptance", check, ...
-        "hasTarget", ~isempty(encounters), "postSolveCertificationPerformed", true, "runtimeSeconds", toc(timer));
+        "hasTarget", ~isempty(encounters), "postSolveCertificationPerformed", false, "runtimeSeconds", toc(timer));
     metadata.runtime = struct("inputPreparationSeconds", preparationSeconds, ...
         "carriedWitnessSeconds", witnessSeconds, ...
         "predictionSeconds", planningTiming.predictionSeconds, ...
@@ -204,7 +172,7 @@ function [command, predictedInput, planningProblem, certificate] = ...
     metadata.candidateValue = NaN;
     metadata.candidateSeconds = witnessSeconds;
     metadata.pcbfDescentResidual = NaN;
-    metadata.verificationMethod = "freshEnclosureRows";
+    metadata.verificationMethod = "hardConstraintsAndSolverStatus";
     if ~isempty(candidate)
         metadata.candidateValue = candidate.check.value;
         % Executed descent: V(k+1) - (V(k) - xi_0(k)) must not be positive.
@@ -285,7 +253,7 @@ end
 
 function [command,inputs,problem,certificate] = localBackupControl( ...
         model,candidate,stored,identity,original,timer,preparationSeconds,witnessSeconds)
-% Bounded candidate generation, full swept verification, and a cheap executor.
+% Bounded rollout proposals and a two-variable solve containing all hard rows.
     cfg=model.cfg; h=model.sampleTime;
     model.declaredLinearizationPolicy="cruiseTrim";
     if cfg.referenceSpeed<=0 || any(cfg.clf.referenceOffset) || any(cfg.clf.referenceRate)
@@ -293,24 +261,33 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
             'The backup policy requires the constant-speed path trim; use predictive for a moving offset reference.');
     end
     cruise=ltvBicycleModel.sampledCruise(model);
-    fresh=[]; attempts=0; verificationSeconds=0; failure="";
+    model.cfg.solver.workTimer=timer;
+    model.cfg.solver.workTimeLimit=cfg.solver.certificateSearchTimeLimit;
+    if ~isempty(candidate)
+        model.cfg.solver.workTimeLimit=max(0,cfg.solver.frameDeadlineSeconds-.002);
+    end
+    fresh=[]; attempts=0; formulationSeconds=0; solveSeconds=0; solverCalls=0; failure="";
     clf=struct('certified',false,'initialValue',NaN,'nextValue',NaN, ...
         'upperResidual',NaN,'disturbanceBound',NaN,'decayPerHold',cruise.decayPerHold);
     active=~isempty(model.encounters);
     deadlineHit=~isempty(candidate) && toc(timer)+.002>=cfg.solver.frameDeadlineSeconds;
-    if deadlineHit,failure="collisionAvoidanceController:frameDeadline: The verified witness supplies this hold.";end
+    if deadlineHit,failure="collisionAvoidanceController:frameDeadline: The feasible witness supplies this hold.";end
     if ~active && ~deadlineHit
         input=localFeedbackProposal(model,cruise,0,cfg.referenceSpeed,1);
-        clf=localSampledDissipation(model,cruise,input);
-        if clf.certified
-            input=localBrakeTransition(model,cruise,input);
-            phase=tic; attempts=attempts+1;
-            [check,prediction,terminal,completion]=localFixedAttempt(model,input,cruise.stage);
-            verificationSeconds=verificationSeconds+toc(phase);
-            if check.accepted
-                fresh=struct('input',input,'prediction',prediction,'terminal',terminal, ...
-                    'completion',completion,'check',check);
-            end
+        input=localBrakeTransition(model,cruise,input);
+        attempts=attempts+1;
+        cruiseModel=model;
+        if ~isempty(candidate) && isfinite(cfg.solver.frameDeadlineSeconds)
+            elapsed=toc(timer);
+            remaining=max(0,model.cfg.solver.workTimeLimit-elapsed);
+            cruiseModel.cfg.solver.workTimeLimit=elapsed+min(.015,.2*remaining);
+        end
+        [check,prediction,terminal,completion,input,clf,program]=localConstrainedAttempt(cruiseModel,input,cruise,true);
+        formulationSeconds=formulationSeconds+check.formulationSeconds;
+        solveSeconds=solveSeconds+check.solveSeconds;solverCalls=solverCalls+check.solverCalls;
+        if check.accepted
+            fresh=struct('input',input,'prediction',prediction,'terminal',terminal, ...
+                'completion',completion,'check',check,'program',program);
         end
     end
     if isempty(fresh) && ~deadlineHit && (isempty(candidate) || (~active && candidate.optimizedStages<=1))
@@ -332,7 +309,11 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
         else
             speeds=cfg.referenceSpeed;offsets=0;
         end
-        proposals=min(3,max(numel(offsets),numel(speeds)));
+        proposals=max(numel(offsets),numel(speeds));
+        if ~active
+            proposals=2;
+            if ~isempty(candidate),proposals=1;end
+        end
         for index=1:proposals
             if ~isempty(candidate) && toc(timer)+.002>=cfg.solver.frameDeadlineSeconds
                 deadlineHit=true;break;
@@ -348,18 +329,17 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
             end
             input=localFeedbackProposal(model,cruise,offset,speed,count);
             input=localBrakeTransition(model,cruise,input);
-            phase=tic;attempts=attempts+1;
-            [check,prediction,terminal,completion]=localFixedAttempt(model,input,cruise.stage);
-            verificationSeconds=verificationSeconds+toc(phase);
+            attempts=attempts+1;
+            [check,prediction,terminal,completion,input,clf,program]=localConstrainedAttempt( ...
+                model,input,cruise,~active && isempty(candidate) && index==1);
+            formulationSeconds=formulationSeconds+check.formulationSeconds;
+            solveSeconds=solveSeconds+check.solveSeconds;solverCalls=solverCalls+check.solverCalls;
             if check.accepted
                 fresh=struct('input',input,'prediction',prediction,'terminal',terminal, ...
-                    'completion',completion,'check',check);
-                clf=localSampledDissipation(model,cruise,input(:,1));
-                clf.certified=clf.certified && ~active;
+                    'completion',completion,'check',check,'program',program);
                 break;
             end
-            failure=sprintf('Fixed continuation rejected: safety value %.6g, hard violation %.6g.', ...
-                check.value,check.hardRowViolation);
+            failure=check.message;
         end
     end
     if ~isempty(fresh)
@@ -367,9 +347,9 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
         prediction=fresh.prediction;
         count=size(inputs,2);
         check=fresh.check;
-        source="checkedBackup";
+        source="constrainedBackup";
         if ~active && clf.certified,source="sampledClfCruise";end
-        certificate=struct('version',23,'kind',"fixedBackup",'identity',identity,'stateTime',model.stateTime, ...
+        certificate=struct('version',24,'kind',"constrainedBackup",'identity',identity,'stateTime',model.stateTime, ...
             'deadline',model.stateTime+count*h,'remainingSteps',count,'consumedStages',0,'horizonSteps',count, ...
             'margin',check.margin,'value',0,'stageViolation',zeros(count,1),'plan',inputs,'decision',inputs(:), ...
             'qp',[],'prediction',[],'predictedState',prediction.fixedStates, ...
@@ -414,7 +394,7 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
         prediction=[];
     else
         error('collisionAvoidanceController:noCertifiedContinuation', ...
-            'No complete fixed continuation was certified in %d bounded attempts. %s',attempts,failure);
+            'No feasible hard-constrained continuation was obtained in %d bounded attempts. %s',attempts,failure);
     end
     command=localCommand(inputs(:,1),model.initialEgoState,stage.speed,stage.curvature,stage.brakingRatio,model);
     command.actuationTime=model.stateTime;
@@ -426,11 +406,11 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
     targetUntil=NaN;
     if active,targetUntil=certificate.completion.deadline;end
     timing=struct('inputPreparationSeconds',preparationSeconds,'carriedWitnessSeconds',witnessSeconds, ...
-        'predictionSeconds',0,'formulationAndWitnessSeconds',verificationSeconds,'solveSeconds',0, ...
+        'predictionSeconds',0,'formulationAndWitnessSeconds',formulationSeconds,'solveSeconds',solveSeconds, ...
         'acceptanceAndCommitSeconds',0,'diagnosticsSeconds',0);
     metadata=struct('planCertified',check.accepted,'certificateSource',source,'fallbackUsed',false, ...
         'safetyCertified',check.safetyCertified,'candidateAccepted',check.candidateAccepted, ...
-        'solverCallCount',0,'acceptance',check,'pcbfValue',0,'stageViolation',zeros(size(inputs,2),1), ...
+        'solverCallCount',solverCalls,'acceptance',check,'pcbfValue',0,'stageViolation',zeros(size(inputs,2),1), ...
         'pcbfDescentResidual',NaN,'candidateVerified',~isempty(candidate),'candidateSeconds',witnessSeconds, ...
         'terminalActive',terminalActive,'hasTarget',active,'confirmedRelease',released, ...
         'jointAdmissionPerformed',active && (isempty(stored) || model.targetSetChanged || model.motionBoundsIncreased), ...
@@ -450,8 +430,8 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
         'clfInitialValue',clf.initialValue,'clfValueProfile',[clf.initialValue,clf.nextValue], ...
         'clfRelaxation',[],'clfDecayRate',clf.decayPerHold/h,'clfOperatingCurvature',cruise.stage.curvature, ...
         'clfOperatingInput',cruise.input,'clfMatrix',cruise.matrix,'clfReferenceState',cruise.state(2:6), ...
-        'clfMetricChanged',false,'executionPolicy',"backup",'verificationMethod',"fixedSweptVerification", ...
-        'postSolveCertificationPerformed',true,'recursivelyFeasible',true, ...
+        'clfMetricChanged',false,'executionPolicy',"backup",'verificationMethod',"hardConstraintsAndSolverStatus", ...
+        'postSolveCertificationPerformed',false,'recursivelyFeasible',true, ...
         'recursiveFeasibilityClaimed',true,'indefiniteRecursiveFeasibilityClaimed',~active, ...
         'terminalContinuationCertified',true,'encounterComplete',~active,'carriedMargin',check.margin, ...
         'requiredMargin',0,'hardRowViolation',check.hardRowViolation,'certifiedDuration',certificate.certifiedDuration, ...
@@ -473,26 +453,32 @@ function [command,inputs,problem,certificate] = localBackupControl( ...
     metadata.deadlineMet=metadata.runtimeSeconds<=min(h,cfg.solver.frameDeadlineSeconds);
     certificate.lastAttemptSeconds=0;certificate.lastAttemptStages=max(1,size(inputs,2));
     certificate.metadata=metadata;
-    problem=struct('model',model,'prediction',prediction,'qp',[],'layout',[], ...
+    if isempty(fresh),program=[];else,program=fresh.program;end
+    problem=struct('model',model,'prediction',prediction,'qp',program,'layout',[], ...
         'decision',inputs(:),'inputPlan',inputs,'metadata',metadata);
 end
 
-function [check,prediction,terminal,completion] = localFixedAttempt(model,inputs,stage)
+function [check,prediction,terminal,completion,inputs,clf,program] = localConstrainedAttempt(model,inputs,cruise,required)
+    attemptTimer=tic;
     try
-        [check,prediction,terminal,completion]=hardEncounterBarrier.verifyFixed(model,inputs,stage);
+        [check,prediction,terminal,completion,inputs,clf,program] = ...
+            hardEncounterBarrier.constrainedBackup(model,inputs,cruise,required);
     catch exception
         if ~startsWith(string(exception.identifier),'collisionAvoidanceController:')
             rethrow(exception);
         end
-        check=struct('accepted',false,'value',Inf,'hardRowViolation',Inf, ...
-            'failedConditions',string(exception.identifier));
-        prediction=[];terminal=[];completion=[];
+        check=struct('accepted',false,'value',NaN,'hardRowViolation',NaN, ...
+            'failedConditions',string(exception.identifier),'message',string(exception.message),'solverCalls',0, ...
+            'formulationSeconds',toc(attemptTimer),'solveSeconds',0);
+        prediction=[];terminal=[];completion=[];program=[];
+        clf=struct('certified',false,'initialValue',NaN,'nextValue',NaN, ...
+            'upperResidual',NaN,'disturbanceBound',NaN,'decayPerHold',cruise.decayPerHold);
     end
 end
 
 function inputs = localBrakeTransition(model,cruise,inputs)
 % Ramp from the proposed final input to the stopping law when slew requires
-% it. Every appended hold belongs to the same full swept verification.
+% it. Every appended hold belongs to the same hard-constrained swept formulation.
     terminal=hardEncounterBarrier.roadTerminalDynamics(model,cruise.stage.curvature);
     state=model.initialEgoState;radius=model.initialFrenetErrorBound;
     transition=cruise.transition(1:6,1:6);
@@ -501,7 +487,7 @@ function inputs = localBrakeTransition(model,cruise,inputs)
         radius=abs(transition)*radius;
     end
     cfg=model.cfg;
-    rate=(1-1e-10)*model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    rate=.99*model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
     upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
     count=size(inputs,2);
@@ -526,7 +512,7 @@ function inputs = localFeedbackProposal(model,cruise,offset,speed,count)
     desired=cruise.state(2:6);desired(1)=offset;desired(3)=speed;
     lower=[-min(.12,cfg.model.frontWheelSteeringAngleMaximum);max(-.8,cfg.actuation.brakingRatioMinimum)];
     upper=[min(.12,cfg.model.frontWheelSteeringAngleMaximum);min(.8,cfg.actuation.brakingRatioMaximum)];
-    change=model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    change=.99*model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     previous=model.previousInput;
     inputs=zeros(2,count);
     for index=1:count
@@ -535,34 +521,6 @@ function inputs = localFeedbackProposal(model,cruise,offset,speed,count)
         inputs(:,index)=input;previous=input;
         state=cruise.transition(1:6,:)*[state;input;1];
     end
-end
-
-function result = localSampledDissipation(model,cruise,input)
-% Bound the actual quadratic difference on the complete current error box.
-    p=cruise.matrix;error=model.initialEgoState(2:6)-cruise.state(2:6);
-    radius=model.initialFrenetErrorBound(2:6);
-    next=cruise.transition(2:6,:)*[model.initialEgoState;input;1]-cruise.state(2:6);
-    decay=cruise.decayPerHold;
-    if any(radius),decay=min(decay,.5*(1-cruise.contraction));end
-    contraction=1-decay;
-    a=cruise.transition(2:6,2:6);
-    quadratic=a.'*p*a-contraction*p;
-    linear=2*(a.'*p*next-contraction*p*error);
-    initialValue=error.'*p*error;nextValue=next.'*p*next;
-    upper=nextValue-contraction*initialValue+abs(linear).'*radius+radius.'*abs(quadratic)*radius;
-    trimDrift=cruise.transition(2:6,:)*[cruise.state;cruise.input;1]-cruise.state(2:6);
-    arithmetic=256*eps*(1+abs(cruise.state(2:6)));
-    disturbance=(norm(abs(chol(p)*cruise.transition(2:6,7:8)*cruise.gain)*radius) ...
-        +norm(abs(chol(p))*(abs(trimDrift)+arithmetic)))^2;
-    bound=contraction/max(eps,contraction-cruise.contraction)*disturbance;
-    rounding=1024*eps*(abs(next).'*abs(p)*abs(next)+contraction*abs(error).'*abs(p)*abs(error)+abs(upper)+bound);
-    % The unclipped feedback has a separately verified matrix inequality,
-    % avoiding the interval expansion's artificial conservatism near trim.
-    feedback=cruise.input-cruise.gain*error;
-    exactFeedback=isequal(input,feedback);
-    certified=exactFeedback || upper+rounding<=bound;
-    result=struct('certified',certified,'initialValue',initialValue,'nextValue',nextValue, ...
-        'upperResidual',upper+rounding,'disturbanceBound',bound,'decayPerHold',decay);
 end
 
 function cfg = localControllerConfiguration(userCfg)
@@ -611,7 +569,7 @@ function localAddKernelPath()
 end
 
 function frame = localFreshFrame(fresh,model,identity,encounters,originalEncounter)
-% Certificate and outputs of a plan verified in full at this frame (a fresh
+% Certificate and outputs of a hard-constrained plan solved at this frame (a fresh
 % plan, or a rebuilt carried witness): consumedStages is zero.
     prediction = fresh.prediction;
     qp = fresh.qp;
@@ -640,7 +598,7 @@ function frame = localFreshFrame(fresh,model,identity,encounters,originalEncount
         "safetyScope","finiteConfirmedEncounterThenInvariantRoadTail", ...
         "certifiedDuration",optimizedStages*model.sampleTime, ...
         "stages",carried.stages,"cellStage",carried.cellStage,"cellFrames",carried.cellFrames, ...
-        "cellNormals",{carried.cellNormals},"terminal",carried.terminal,"source","checkedOptimization", ...
+        "cellNormals",{carried.cellNormals},"terminal",carried.terminal,"source","constrainedOptimization", ...
         "completion",qp.completion,"confirmation",model.confirmation, ...
         "tailDecelerating",predictedState(4,end)<model.initialEgoState(4)-0.25 ...
             && model.initialEgoState(4)<model.referenceSpeed);
@@ -679,7 +637,7 @@ end
 
 function frame = localTerminalFrame(stored,candidate,model,identity,encounters,originalEncounter)
 % Certificate and outputs when no optimized stage remains: the sampled
-% terminal law from the carried nominal box, verified by terminal membership.
+% terminal law from the carried nominal box, feasible by terminal invariance.
     terminal = candidate.terminal;
     center = candidate.terminalCenter;
     radius = candidate.terminalRadius;

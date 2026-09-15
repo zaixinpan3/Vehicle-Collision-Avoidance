@@ -1,23 +1,30 @@
 classdef solveHardCbfClf
-    %solveHardCbfClf Lexicographic safety-value LP, CLF SOCP and independent verification.
-    % Stage A minimizes the accumulated per-stage safety violation with every
-    % non-safety row hard; its optimum is the plan's value. Stage B optimizes
-    % the CLF performance cost among plans within that value. Verification
-    % recomputes the violation of any decision from the physical rows.
+    %solveHardCbfClf Hard-constrained optimization with solver-status execution.
+    % All physical safety rows enter the solve without violation variables.
+    % certify/certifyInputs are offline research audit utilities; the online
+    % solve never calls them or repairs a returned decision.
 
     methods (Static)
         function [result,problem] = solve(problem, cfg)
-            result = localEmptyResult();
-            if problem.certifiedInfeasible
-                result.message = "A constant hard constraint is infeasible.";
-                result.exitFlag = -2;
-                return;
-            end
-            if string(cfg.solver.programForm)=="condensed"
-                [result, problem] = localCondensedLexicographicSolve(problem, cfg);
-            else
-                [result, problem] = localLexicographicSolve(problem, cfg);
-            end
+            [result,problem] = localHardSolve(problem,cfg);
+        end
+
+        function solve = constrained(program,cfg)
+        % Execute only a fully solved hard-constrained program. No external
+        % residual calculation or feasible-iterate acceptance follows it.
+            program = localCompactPlanarRows(program);
+            problem = struct('layout',struct('decisionCount',numel(program.q)),'stageProgram',program);
+            solve = localRunJointProgram(problem,cfg);
+        end
+
+        function record = solverAcceptance(solve,count)
+        % Status metadata, not a separately evaluated safety certificate.
+            record = struct('accepted',solve.feasible,'candidateAccepted',solve.feasible, ...
+                'safetyCertified',solve.feasible,'value',0,'stageViolation',zeros(count,1), ...
+                'hardRowViolation',NaN,'clfViolation',NaN,'margin',NaN, ...
+                'sweptClearanceMargin',NaN,'exitMargin',NaN,'failedConditions',strings(1,0), ...
+                'basis',"hardConstraintsAndSolverStatus",'solverExitFlag',solve.exitFlag);
+            if ~solve.feasible,record.failedConditions="solverStatus";end
         end
 
         function names = rowNames(qp)
@@ -41,8 +48,7 @@ classdef solveHardCbfClf
         end
 
         function check = certify(qp, ~, model, decision)
-        % Numerical candidates keep non-safety rows hard. Executable acceptance
-        % additionally requires exactly zero accumulated physical violation.
+        % Offline audit of physical rows and CLF residuals; not an execution gate.
             stages = qp.layout.horizonSteps;
             check = struct("accepted", false, "candidateAccepted",false,"safetyCertified",false, ...
                 "failedConditions", "decision", ...
@@ -102,271 +108,94 @@ classdef solveHardCbfClf
     end
 end
 
-function [result, problem] = localLexicographicSolve(problem, cfg)
-% Stage A decides the value: the margin LP with every violation fixed at
-% zero is feasible exactly when a zero-violation plan exists, and its point
-% supplies a numerical interior; otherwise the value LP minimizes the
-% accumulated violation. Stage B optimizes performance within that value.
-    physical = problem.layout.decisionCount;
-    base = problem.stageProgram;
-    scale = problem.barrier.scale;
-    model = struct("cfg", cfg);
-    result = localEmptyResult();
-    rows = [base.rowMap.equality;base.rowMap.inequality;base.rowMap.violation];
-    marginScale = [zeros(numel(base.rowMap.equality),1);scale(base.inequalityIndices); ...
-        zeros(numel(base.rowMap.violation),1)];
-    variables = numel(base.q)+1;
-    matrix = [base.A(rows,:),sparse(marginScale)];
-    extra = sparse(2,variables);extra(:,end) = [1;-1];
-    marginProgram = struct("P",sparse(variables,variables), ...
-        "q",[zeros(variables-1,1);-1],"A",[matrix;extra], ...
-        "b",[base.b(rows)+problem.requiredMargin*marginScale; ...
-            cfg.encounter.maximumCarriedMargin;-problem.requiredMargin], ...
-        "cones",[numel(base.rowMap.equality);numel(rows)-numel(base.rowMap.equality)+2], ...
-        "physicalDecisionCount",physical, ...
-        "inactiveSlackIndex",[problem.layout.relaxationIndex(:).',base.violationIndex(:).'], ...
-        "generatedRowCount",numel(base.rowMap.inequality),"anchorPoint",[base.anchorPoint;0]);
-    auxiliary = struct("layout",struct("decisionCount",physical),"stageProgram",marginProgram);
-    marginSolve = localRunJointProgram(auxiliary, cfg);
-    result.solverCalls = 1;
-    result.exitFlag = marginSolve.exitFlag;
-    result.message = "zero-value margin: "+marginSolve.message;
-    if marginSolve.feasible
-        valueOptimum = 0;
-        candidate = localRepairClf(problem, marginSolve.decision, cfg);
-        check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.candidateAccepted || check.value > 0
-            result.message = result.message+"; "+strjoin(check.failedConditions,",");
-            return;
-        end
-        % Reserve a small numerical interior, not the maximized surplus.
-        % Hard safety is already established at the zero level.
-        selected = scale>0;
-        available = min((problem.barrier.baseBound(selected) ...
-            -problem.inequalityMatrix(selected,:)*candidate)./scale(selected));
-        interiorMargin = max(problem.requiredMargin, ...
-            min(10*cfg.encounter.numericalMargin,0.5*max(0,available)));
-        inactive = base.violationIndex;
-        budget = 0;
-    else
-        if ~ismember(marginSolve.exitFlag,[-2,-3])
-            return;
-        end
-        linear = zeros(numel(base.q),1);
-        linear(base.violationIndex) = 1;
-        valueProgram = struct("P",sparse(numel(base.q),numel(base.q)),"q",linear, ...
-            "A",base.A(rows,:),"b",base.b(rows), ...
-            "cones",[numel(base.rowMap.equality);numel(rows)-numel(base.rowMap.equality)], ...
-            "physicalDecisionCount",physical,"inactiveSlackIndex",problem.layout.relaxationIndex, ...
-            "generatedRowCount",numel(base.rowMap.inequality),"anchorPoint",base.anchorPoint);
-        auxiliary = struct("layout",struct("decisionCount",physical),"stageProgram",valueProgram);
-        valueSolve = localRunJointProgram(auxiliary, cfg);
-        result.solverCalls = 2;
-        result.exitFlag = valueSolve.exitFlag;
-        result.message = "safety value: "+valueSolve.message;
-        if ~valueSolve.feasible, return; end
-        valueOptimum = sum(max(0, valueSolve.fullDecision(base.violationIndex)));
-        candidate = localRepairClf(problem, valueSolve.decision, cfg);
-        check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.candidateAccepted
-            result.message = result.message+"; "+strjoin(check.failedConditions,",");
-            return;
-        end
-        % A positive value leaves no interior; the tie tolerance bounds the
-        % performance stage's violation above the value optimum.
-        interiorMargin = problem.requiredMargin;
-        inactive = zeros(1, 0);
-        budget = valueOptimum+cfg.solver.lexicographicTieTolerance;
+function program = localCompactPlanarRows(program)
+% Intersect all one-coordinate inequalities before the numerical solve.
+% This is an equivalent hard-bound reduction (with inward roundoff), not
+% a check of a returned plan. Coupled rows and every cone remain unchanged.
+    if numel(program.q)~=2 || program.cones(1)~=0,return;end
+    count = program.cones(2);
+    linear = program.A(1:count,:);bound = program.b(1:count);
+    if isfield(program,'decisionRadius')
+        radius = program.decisionRadius;
+        coefficients = full(linear);
+        [small,coordinate] = min(abs(coefficients),[],2);
+        large = max(abs(coefficients),[],2);
+        selected = small>0 & small<=1e-10*large;
+        rows = find(selected);
+        % Retain small cross-effects as an uncertainty support over explicit
+        % hard decision bounds. No coefficient is silently rounded to zero.
+        support = small(selected).*radius(coordinate(selected));
+        bound(selected) = bound(selected)-support ...
+            -8*eps(max(1,abs(bound(selected))+support));
+        coefficients(sub2ind(size(coefficients),rows,coordinate(selected))) = 0;
+        linear = [sparse(coefficients);sparse([1,0;-1,0;0,1;0,-1])];
+        bound = [bound;radius(1);radius(1);radius(2);radius(2)];
     end
-    result.valueStageOptimum = valueOptimum;
-    problem.inequalityBound = problem.barrier.baseBound-interiorMargin*scale;
-    problem.stageProgram = avoidanceStageQp.updateBounds(problem);
-    problem.stageProgram.inactiveSlackIndex = inactive;
-    problem.stageProgram.b(base.rowMap.budget) = budget;
-    % The value-stage point seeds the performance stage's working set.
-    if isfield(marginSolve,"fullDecision") && numel(marginSolve.fullDecision)>=numel(base.q)
-        problem.stageProgram.referencePoint = marginSolve.fullDecision(1:numel(base.q));
-    end
-    if exist("valueSolve","var") && numel(valueSolve.fullDecision)==numel(base.q)
-        problem.stageProgram.referencePoint = valueSolve.fullDecision;
-    end
-    solve = localRunJointProgram(problem, cfg);
-    calls = result.solverCalls+1;
-    result.solverCalls = calls;
-    result.exitFlag = solve.exitFlag;
-    result.message = "performance: "+solve.message;
-    if ~solve.feasible, return; end
-    decision = localRepairClf(problem, solve.decision, cfg);
-    check = solveHardCbfClf.certify(problem, [], model, decision);
-    result.decision = decision;
-    if check.candidateAccepted
-        result = localCertifiedResult(problem, decision, solve, calls, valueOptimum, check);
-    else
-        result.message = result.message+"; "+strjoin(check.failedConditions,",") ...
-            +"; hard violation "+check.hardRowViolation+"; value "+check.value;
-    end
+    first = full(linear(:,1));second = full(linear(:,2));
+    axis = (first~=0 & second==0) | (first==0 & second~=0);
+    if ~any(axis),return;end
+    indices = find(axis);
+    coefficient = first(axis)+second(axis);
+    limit = bound(axis)./abs(coefficient);
+    limit = limit-8*eps(max(1,abs(limit)));
+    finite = isfinite(limit);
+    axis(indices(~finite)) = false;
+    coefficient = coefficient(finite);limit = limit(finite);
+    coordinate = 1+double(second(axis)~=0);
+    group = 2*coordinate-1+double(coefficient<0);
+    compact = accumarray(group,limit,[4,1],@min,Inf);
+    present = isfinite(compact);
+    directions = [1,0;-1,0;0,1;0,-1];
+    retained = ~axis;
+    program.A = [linear(retained,:);sparse(directions(present,:));program.A(count+1:end,:)];
+    program.b = [bound(retained);compact(present);program.b(count+1:end)];
+    program.cones(2) = nnz(retained)+nnz(present);
 end
 
-function [result, problem] = localCondensedLexicographicSolve(problem, cfg)
-% The same three tiers on the physical unknowns only: every row is the
-% condensed row of the verification, centred at the seed plan so that the
-% right-hand sides are margins rather than absolute stations. Stage A is the
-% margin LP (feasible exactly when a zero-violation plan exists), else the
-% value LP; stage B is the CLF SOCP with the same rotated-cone encoding of
-% the convex majorant as the lifted form, written on the physical
-% unknowns. Every program runs through row generation; the matrices stay
-% dense because every condensed row couples all inputs.
+function [result,problem] = localHardSolve(problem,cfg)
+% Safety violation variables are absent from the condensed optimization.
     n = problem.layout.decisionCount;
-    count = problem.layout.horizonSteps;
-    relaxationIndex = problem.layout.relaxationIndex(:).';
-    model = struct("cfg", cfg);
+    anchor = zeros(n,1);anchor(problem.layout.planIndex) = problem.anchorPlan;
+    if string(cfg.solver.programForm)=="lifted"
+        program = problem.stageProgram;
+        program.inactiveSlackIndex = program.violationIndex;
+    else
+        matrix = problem.inequalityMatrix;
+        bound = problem.inequalityBound-matrix*anchor;
+        cones = [0;numel(bound)];
+        constraints = problem.clf.constraints;
+        rows = zeros(10*numel(constraints),n);limits = zeros(10*numel(constraints),1);
+        for index = 1:numel(constraints)
+            constraint = constraints(index);
+            value = constraint.map*anchor+constraint.offset;
+            tau = -constraint.linear.'*constraint.map;
+            tau(problem.layout.relaxationIndex(constraint.stage)) = ...
+                tau(problem.layout.relaxationIndex(constraint.stage))+1;
+            offset = -constraint.linear.'*value-constraint.constant;
+            selected = 10*(index-1)+(1:10);
+            rows(selected,:) = -[tau;2*constraint.root*constraint.map;tau];
+            limits(selected) = [offset+1;2*constraint.root*value;offset-1];
+        end
+        program = struct('P',triu(sparse(problem.Hessian)), ...
+            'q',problem.linear+problem.Hessian*anchor,'A',sparse([matrix;rows]), ...
+            'b',[bound;limits],'cones',[cones;10*ones(numel(constraints),1)], ...
+            'physicalDecisionCount',n,'inactiveSlackIndex',zeros(1,0));
+    end
+    timer = tic;
+    solve = solveHardCbfClf.constrained(program,cfg);
     result = localEmptyResult();
-    anchor = zeros(n,1);
-    anchor(problem.layout.planIndex) = problem.anchorPlan(:);
-    matrix = problem.inequalityMatrix;
-    scale = problem.barrier.scale;
-    baseMargin = problem.barrier.baseBound-matrix*anchor;
-    safety = problem.safetyRows;
-    rowStage = problem.rowStage;
-    % The geometry rows, the ones subject to generation, are the leading
-    % rows of the condensed matrix; no reordering copy is needed.
-    generated = size(problem.geometry.matrix,1);
-    rowCount = numel(baseMargin);
-    orderedMatrix = matrix;
-    orderedScale = scale;
-    orderedSafety = safety;
-    orderedStage = rowStage;
-    order = (1:rowCount).';
-    % Violation columns: one per stage, entering the safety rows with -1.
-    violationColumns = zeros(rowCount,count);
-    violationColumns(sub2ind(size(violationColumns),find(orderedSafety),orderedStage(orderedSafety))) = -1;
-    % ---- Stage A: margin LP over [delta; m], slacks and violations inactive.
-    % Stage A decides zero-violation feasibility and supplies an interior
-    % point. When the seed itself satisfies every tightened row, that is
-    % settled without a solve. Otherwise the closest zero-violation point
-    % to the seed is found by a proximal QP; unlike a margin maximisation it
-    % is not degenerate in the inputs, so a working-set solve settles in a
-    % round or two instead of wandering through the omitted rows.
-    timer = tic;
-    seedFeasible = all(baseMargin>=0);
-    marginSolve = localEmptySolve();
-    marginSolve.feasible = seedFeasible;
-    marginSolve.exitFlag = 1;
-    marginSolve.decision = zeros(n,1);
-    marginSolve.output = struct("message","seed satisfies every row","rowGenerationRounds",0, ...
-        "workingRowCount",0,"nativeCalls",0);
-    if ~seedFeasible
-        proximalProgram = struct("P",speye(n),"q",zeros(n,1), ...
-            "A",orderedMatrix,"b",baseMargin(order)-problem.requiredMargin*orderedScale, ...
-            "cones",[0;numel(order)],"physicalDecisionCount",n, ...
-            "inactiveSlackIndex",relaxationIndex, ...
-            "generatedRowCount",generated,"anchorPoint",zeros(n,1));
-        auxiliary = struct("layout",struct("decisionCount",n),"stageProgram",proximalProgram);
-        marginSolve = localRunJointProgram(auxiliary, cfg);
-    end
-    result.solverCalls = double(~seedFeasible);
-    result.exitFlag = marginSolve.exitFlag;
-    result.message = "zero-value feasibility: "+marginSolve.message;
-    result.programDiagnostics = localProgramDiagnostics("feasibility",marginSolve,toc(timer));
-    if marginSolve.feasible
-        valueOptimum = 0;
-        candidate = localRepairClf(problem, anchor+marginSolve.decision(1:n), cfg);
-        check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.candidateAccepted || check.value > 0
-            result.message = result.message+"; "+strjoin(check.failedConditions,",");
-            return;
-        end
-        selected = scale>0;
-        available = min((problem.barrier.baseBound(selected) ...
-            -matrix(selected,:)*candidate)./scale(selected));
-        interiorMargin = max(problem.requiredMargin, ...
-            min(10*cfg.encounter.numericalMargin,0.5*max(0,available)));
-        violationsActive = false;
-        budget = 0;
-        referencePoint = [marginSolve.decision(1:n);zeros(count,1)];
-    else
-        if ~ismember(marginSolve.exitFlag,[-2,-3])
-            return;
-        end
-        timer = tic;
-        valueProgram = struct("P",sparse(n+count,n+count),"q",[zeros(n,1);ones(count,1)], ...
-            "A",[orderedMatrix,violationColumns;zeros(count,n),-eye(count)], ...
-            "b",[baseMargin(order);zeros(count,1)], ...
-            "cones",[0;numel(order)+count],"physicalDecisionCount",n, ...
-            "inactiveSlackIndex",relaxationIndex, ...
-            "generatedRowCount",generated,"anchorPoint",zeros(n+count,1));
-        auxiliary = struct("layout",struct("decisionCount",n),"stageProgram",valueProgram);
-        valueSolve = localRunJointProgram(auxiliary, cfg);
-        result.solverCalls = result.solverCalls+1;
-        result.exitFlag = valueSolve.exitFlag;
-        result.message = "safety value: "+valueSolve.message;
-        result.programDiagnostics(end+1) = localProgramDiagnostics("value",valueSolve,toc(timer));
-        if ~valueSolve.feasible, return; end
-        valueOptimum = sum(max(0, valueSolve.fullDecision(n+(1:count))));
-        candidate = localRepairClf(problem, anchor+valueSolve.decision(1:n), cfg);
-        check = solveHardCbfClf.certify(problem, [], model, candidate);
-        if ~check.candidateAccepted
-            result.message = result.message+"; "+strjoin(check.failedConditions,",");
-            return;
-        end
-        interiorMargin = problem.requiredMargin;
-        violationsActive = true;
-        budget = valueOptimum+cfg.solver.lexicographicTieTolerance;
-        referencePoint = valueSolve.fullDecision(1:n+count);
-    end
-    result.valueStageOptimum = valueOptimum;
-    problem.inequalityBound = problem.barrier.baseBound-interiorMargin*scale;
-    % ---- Stage B: CLF SOCP over [delta; xi]. Each majorant s >= |R v|^2 + l'v + c
-    % with v = M(anchor+delta)+o is the rotated cone
-    % (tau+1, 2 R v, tau-1) with tau = s - l'v - c, as in the lifted form.
-    constraints = problem.clf.constraints;
-    coneCount = numel(constraints);
-    coneRows = zeros(10*coneCount,n+count);
-    coneBound = zeros(10*coneCount,1);
-    for index = 1:coneCount
-        constraint = constraints(index);
-        value0 = constraint.map*anchor+constraint.offset;
-        tMap = -constraint.linear.'*constraint.map;
-        tMap(relaxationIndex(constraint.stage)) = tMap(relaxationIndex(constraint.stage))+1;
-        tOffset = -constraint.linear.'*value0-constraint.constant;
-        rows = 10*(index-1)+(1:10);
-        coneRows(rows,1:n) = -[tMap;2*constraint.root*constraint.map;tMap];
-        coneBound(rows) = [tOffset+1;2*constraint.root*value0;tOffset-1];
-    end
-    hessian = sparse(n+count,n+count);
-    hessian(1:n,1:n) = sparse(problem.Hessian);
-    linear = [problem.linear+problem.Hessian*anchor;zeros(count,1)];
-    inequality = [orderedMatrix,violationColumns; ...
-        zeros(count,n),-eye(count); ...
-        zeros(1,n),ones(1,count)];
-    bound = [baseMargin(order)-interiorMargin*orderedScale;zeros(count,1);budget];
-    inactive = zeros(1,0);
-    if ~violationsActive, inactive = n+(1:count); end
-    performanceProgram = struct("P",triu(hessian),"q",linear, ...
-        "A",[inequality;coneRows],"b",[bound;coneBound], ...
-        "cones",[0;size(inequality,1);10*ones(coneCount,1)],"physicalDecisionCount",n, ...
-        "inactiveSlackIndex",inactive,"generatedRowCount",generated, ...
-        "anchorPoint",zeros(n+count,1),"referencePoint",referencePoint);
-    auxiliary = struct("layout",struct("decisionCount",n),"stageProgram",performanceProgram);
-    timer = tic;
-    solve = localRunJointProgram(auxiliary, cfg);
-    calls = result.solverCalls+1;
-    result.solverCalls = calls;
-    result.exitFlag = solve.exitFlag;
-    result.message = "performance: "+solve.message;
-    diagnostics = [result.programDiagnostics,localProgramDiagnostics("performance",solve,toc(timer))];
-    result.programDiagnostics = diagnostics;
-    if ~solve.feasible, return; end
-    decision = localRepairClf(problem, anchor+solve.decision(1:n), cfg);
-    check = solveHardCbfClf.certify(problem, [], model, decision);
-    result.decision = decision;
-    if check.candidateAccepted
-        result = localCertifiedResult(problem, decision, solve, calls, valueOptimum, check);
-        result.algorithm = "condensed safety-value LP and CLF SOCP";
-        result.programDiagnostics = diagnostics;
-    else
-        result.message = result.message+"; "+strjoin(check.failedConditions,",") ...
-            +"; hard violation "+check.hardRowViolation+"; value "+check.value;
+    result.feasible = solve.feasible;result.exitFlag = solve.exitFlag;
+    result.message = solve.message;result.solverCalls = 1;result.output = solve.output;
+    result.acceptance = solveHardCbfClf.solverAcceptance(solve,problem.layout.horizonSteps);
+    result.programDiagnostics = localProgramDiagnostics("hardConstraints",solve,toc(timer));
+    result.algorithm = "hard-constrained CLF SOCP";
+    if solve.feasible
+        result.decision = solve.decision(1:n);
+        if string(cfg.solver.programForm)=="condensed",result.decision = result.decision+anchor;end
+        result.objectiveValue = localJointValue(problem,result.decision);
+        result.clfValue = result.decision(problem.layout.relaxationIndex);
+        result.valueStageOptimum = 0;result.value = 0;result.lexicographicTieResidual = 0;
+        result.iterations = localIterationCount(solve.output);
     end
 end
 
@@ -394,38 +223,16 @@ function [decision, slacks] = localRepairClf(problem, decision, cfg)
     decision(problem.layout.relaxationIndex) = slacks+cfg.encounter.numericalMargin*(1+abs(slacks));
 end
 
-function result = localCertifiedResult(problem, decision, solve, calls, valueOptimum, check)
-    result = localEmptyResult();
-    result.feasible = true;
-    result.decision = decision;
-    result.exitFlag = solve.exitFlag;
-    result.message = solve.message;
-    result.solverCalls = calls;
-    result.iterations = localIterationCount(solve.output);
-    result.output = solve.output;
-    result.objectiveValue = localJointValue(problem, decision);
-    result.clfValue = decision(problem.layout.relaxationIndex);
-    result.valueStageOptimum = valueOptimum;
-    result.value = check.value;
-    result.lexicographicTieResidual = check.value-valueOptimum;
-    result.algorithm = "safety-value LP and CLF SOCP";
-end
-
 function solve = localRunJointProgram(problem, cfg)
     hook = cfg.solver.jointFunction;
     try
         if isempty(hook)
-            if cfg.solver.rowGeneration && isfield(problem.stageProgram,"generatedRowCount") ...
-                    && problem.stageProgram.generatedRowCount>0
-                solve = localGeneratedSolve(problem, cfg);
-            else
-                solve = localDefaultSolve(problem, cfg);
-            end
+            solve = localDefaultSolve(problem,cfg);
         else
             % The hook solves the same reduced conic program as the native
             % path: inactive columns are removed together with the rows they
             % leave identically zero, so no degenerate dependent constraints
-            % remain. Only physical decisions survive independent checking.
+            % remain. The hook must satisfy the same feasibility/status contract.
             program = problem.stageProgram;
             [reduced,retained] = localReducedProgram(program);
             reduced.defaultSolver = @() localReduceSolve(localDefaultSolve(problem, cfg), retained);
@@ -449,80 +256,6 @@ function solve = localRunJointProgram(problem, cfg)
         solve.decision = solve.decision(1:problem.layout.decisionCount);
     end
     solve = localNormalizeSolve(solve, problem.layout.decisionCount, numel(problem.stageProgram.q));
-end
-
-function solve = localGeneratedSolve(problem, cfg)
-% Row generation: solve on a working set of the hard rows, check every
-% omitted row at the solution, add the violated ones and repeat. A solution
-% of the relaxed program that violates no omitted row solves the full
-% program; an infeasible relaxed program proves the full one infeasible.
-% The accepted plan is verified on all physical rows afterwards regardless.
-    program = problem.stageProgram;
-    equalities = program.cones(1);
-    nonnegative = program.cones(2);
-    generated = program.generatedRowCount;
-    eligible = equalities+(1:generated).';
-    essential = equalities+(generated+1:nonnegative).';
-    conic = (equalities+nonnegative+1:size(program.A,1)).';
-    variables = numel(program.q);
-    reference = zeros(variables,1);
-    if isfield(program,"referencePoint") && numel(program.referencePoint)==variables
-        reference = program.referencePoint(:);
-    elseif isfield(program,"anchorPoint")
-        reference(1:min(variables,numel(program.anchorPoint))) = program.anchorPoint(1:min(variables,numel(program.anchorPoint)));
-    end
-    % Products use the whole matrix once and slice the vector: slicing
-    % thousands of dense rows out of the matrix would copy it per round.
-    eligibleBound = program.b(eligible);
-    fullProduct = program.A*reference;
-    slack = eligibleBound-fullProduct(eligible);
-    seedCount = min(generated,max(100,4*program.physicalDecisionCount));
-    [~,order] = sort(slack,"ascend");
-    working = false(generated,1);
-    working(order(1:seedCount)) = true;
-    working(slack<=0) = true;
-    rounds = 0;
-    maximumRounds = 6;
-    nativeCalls = 0;
-    while rounds<maximumRounds
-        rounds = rounds+1;
-        nativeCalls = nativeCalls+1;
-        rows = [(1:equalities).';eligible(working);essential;conic];
-        sub = problem;
-        sub.stageProgram = program;
-        sub.stageProgram.A = program.A(rows,:);
-        sub.stageProgram.b = program.b(rows);
-        sub.stageProgram.cones = [equalities;nnz(working)+numel(essential);program.cones(3:end)];
-        solve = localDefaultSolve(sub, cfg);
-        solve.output.rowGenerationRounds = rounds;
-        solve.output.workingRowCount = nnz(working);
-        solve.output.nativeCalls = nativeCalls;
-        if any(solve.exitFlag==[-2,-3])
-            % Infeasible or unbounded on a row subset is conclusive for the
-            % complete program.
-            return;
-        end
-        if ~any(solve.exitFlag==[1,2]) || numel(solve.decision)~=variables || any(~isfinite(solve.decision))
-            % Only a cleanly solved subset can certify the omitted rows;
-            % anything else is decided by the complete program.
-            break;
-        end
-        point = solve.decision;
-        fullProduct = program.A*point;
-        magnitude = abs(program.A)*abs(point);
-        residual = fullProduct(eligible)-eligibleBound;
-        tolerance = 10*cfg.solver.constraintTolerance*(1+abs(eligibleBound)+magnitude(eligible));
-        violated = ~working & residual>tolerance;
-        if ~any(violated)
-            return;
-        end
-        working(violated) = true;
-    end
-    % The working set did not settle: fall back to the complete program.
-    solve = localDefaultSolve(problem, cfg);
-    solve.output.rowGenerationRounds = rounds+1;
-    solve.output.workingRowCount = generated;
-    solve.output.nativeCalls = nativeCalls+1;
 end
 
 function [reduced,retained] = localReducedProgram(program)
@@ -570,17 +303,19 @@ function solve = localDefaultSolve(problem, cfg)
         end
         nativeSolver = @solveAvoidanceSocpMex;
     end
-    program = problem.stageProgram;
-    retained = true(numel(program.q),1);
-    if isfield(program,"inactiveSlackIndex"),retained(program.inactiveSlackIndex) = false;end
-    linear = program.q(retained);
+    original = problem.stageProgram;
+    [program,retained] = localReducedProgram(original);
+    linear = program.q;
     bound = program.b;
     % Positive objective scaling preserves minimizers. The lifted CLF
     % epigraph can otherwise trigger a false native infeasibility report.
-    hessian = sparse(program.P(retained,retained));
+    hessian = sparse(program.P);
     objectiveScale = 1/max([1;abs(linear);abs(nonzeros(hessian))]);
+    % Apply the requested optimization tolerance to the normalized objective.
+    % Rescaling it a second time can demand sub-machine objective accuracy;
+    % the independent primal feasibility tolerance is unchanged.
     options = [cfg.solver.constraintTolerance, ...
-        cfg.solver.optimalityTolerance*objectiveScale,cfg.solver.maxIterations];
+        cfg.solver.optimalityTolerance,cfg.solver.maxIterations];
     if isfield(cfg.solver,"workTimer") && isfinite(cfg.solver.workTimeLimit)
         remaining = cfg.solver.workTimeLimit-toc(cfg.solver.workTimer);
         if remaining<=0
@@ -592,11 +327,11 @@ function solve = localDefaultSolve(problem, cfg)
         options(4) = remaining;
     end
     [nativeDecision, output] = nativeSolver( ...
-        objectiveScale*hessian, objectiveScale*linear, sparse(program.A(:,retained)), bound, program.cones, ...
+        objectiveScale*hessian, objectiveScale*linear, sparse(program.A), bound, program.cones, ...
         options);
     output.objectiveValue = output.objectiveValue/objectiveScale;
     output.objectiveScale = objectiveScale;
-    stageDecision = zeros(numel(program.q),1);stageDecision(retained) = nativeDecision;
+    stageDecision = zeros(numel(original.q),1);stageDecision(retained) = nativeDecision;
     flag = -7;
     switch output.status
         case 1
@@ -610,7 +345,7 @@ function solve = localDefaultSolve(problem, cfg)
         case {7, 8}
             flag = 0;
     end
-    output.algorithm = "Clarabel safety-value LP and CLF SOCP";
+    output.algorithm = "Clarabel hard-constrained CLF SOCP";
     output.message = "Clarabel status "+string(output.status);
     solve = struct("decision", stageDecision, ...
         "exitFlag", flag, "output", output);
@@ -631,9 +366,9 @@ function solve = localNormalizeSolve(solve, decisionCount, variableCount)
         solve.exitFlag = -999;
     end
     solve.exitFlag = double(solve.exitFlag);
-    % A feasible iterate can preserve safety after an iteration limit or
-    % numerical termination. The caller verifies the complete decision.
-    solve.feasible = any(solve.exitFlag == [1, 2, 0, -7]) ...
+    % Execution relies on a fully solved optimizer status, never on an
+    % independently checked iterate from a failed or incomplete solve.
+    solve.feasible = solve.exitFlag==1 ...
         && isnumeric(solve.decision) && isreal(solve.decision) ...
         && numel(solve.decision) == decisionCount ...
         && all(isfinite(solve.decision), "all");
@@ -670,7 +405,7 @@ function result = localEmptyResult()
         "feasible", false, ...
         "iterations", 0, ...
         "solverCalls", 0, ...
-        "algorithm", "safety-value LP and CLF SOCP", ...
+        "algorithm", "hard-constrained CLF SOCP", ...
         "message", "", ...
         "objectiveValue", inf, ...
         "clfValue", inf, ...

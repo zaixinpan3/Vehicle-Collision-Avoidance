@@ -2,12 +2,110 @@ classdef hardEncounterBarrier
     %hardEncounterBarrier Rolling safe MPC with a carried recursive-feasibility witness.
     % The plan accepted at one frame is carried, together with its own stage
     % generators, cell charts, separating normals and terminal rows, to the
-    % next frame. There the shifted plan is verified on the conditioned
-    % information set before any fresh optimization may replace it. The
+    % next frame. Conditioning transfers feasibility to the shifted plan;
+    % fresh hard-constrained optimization may replace it. The
     % analytic terminal law is the tail of that witness; it is commanded only
     % when no optimized stage remains in the carried plan.
 
     methods (Static)
+        function [status,prediction,terminal,completion,inputs,clf,program] = constrainedBackup(model,inputs,cruise,cruiseRequired)
+        % Optimize two control coordinates. All future controls and states
+        % are affine in these coordinates; all safety rows are hard.
+            formulationTimer = tic;
+            count = size(inputs,2);cfg = model.cfg;
+            if any(cfg.model.ltvModelErrorRateBound) || any(cfg.model.plantModelResidualRateBound)
+                error('collisionAvoidanceController:nonexactStudyInput', ...
+                    'Constrained continuations require the declared zero-residual affine plant.');
+            end
+            model.anchorPlan = zeros(2,1);
+            sensitivity = zeros(2,2,count);sensitivity(:,:,1) = eye(2);
+            stateMap = zeros(6,2);
+            for index = 1:count
+                if index>1,sensitivity(:,:,index) = -cruise.gain*stateMap(2:6,:);end
+                stateMap = cruise.transition(1:6,1:6)*stateMap ...
+                    +cruise.transition(1:6,7:8)*sensitivity(:,:,index);
+            end
+            prediction = ltvBicycleModel.fixedPredict(model,inputs,cruise.stage,sensitivity);
+            geometry = avoidanceSafetyGeometry.build(model,prediction);
+            final = prediction.fixedStates(:,end);radius = prediction.initialErrorBound(:,end);
+            finalMap = prediction.stateSensitivity(:,:,end);
+            terminal = localTerminalSet(model,[],final);
+            if any(radius(4:6)) && ~terminal.errorBudgetFinite
+                error('collisionAvoidanceController:invalidTerminalModel','Uncertain stopping requires a finite error budget.');
+            end
+            [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
+                model,prediction,finalMap,final,terminal.frame);
+            terminalInput = terminal.input+terminal.feedback*final+terminal.radiusFeedback*radius;
+            terminalInputMap = terminal.feedback*finalMap;
+            inputMap = reshape(permute(sensitivity,[1,3,2]),[],2);
+            lower = [-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+            upper = [cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+            rate = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+            inputCenter = [inputs(:);terminalInput];
+            allInputMap = [inputMap;terminalInputMap];
+            changeMap = allInputMap-[zeros(2);allInputMap(1:end-2,:)];
+            changeCenter = inputCenter-[model.previousInput;inputCenter(1:end-2)];
+            rateBound = repmat(rate,count+1,1);finiteRate = isfinite(rateBound);
+            matrix = [geometry.matrix;terminal.stateRows*finalMap;exitMatrix; ...
+                allInputMap;-allInputMap;changeMap(finiteRate,:);-changeMap(finiteRate,:)];
+            bound = [geometry.physicalBound; ...
+                terminal.stateBound-terminal.stateRows*final-terminal.errorRows*radius;exitBound; ...
+                repmat(upper,count+1,1)-inputCenter;inputCenter-repmat(lower,count+1,1); ...
+                rateBound(finiteRate)-changeCenter(finiteRate);rateBound(finiteRate)+changeCenter(finiteRate)];
+            % Reserve for declared solver feasibility error before solving.
+            reach = [2*cfg.model.frontWheelSteeringAngleMaximum; ...
+                cfg.actuation.brakingRatioMaximum-cfg.actuation.brakingRatioMinimum];
+            scale = 1+abs(bound)+abs(matrix)*reach;
+            reserve = 4*max(cfg.encounter.numericalMargin*scale, ...
+                cfg.solver.constraintTolerance*max(scale)).*any(matrix~=0,2);
+            bound = bound-reserve;
+            clf = struct('certified',cruiseRequired,'initialValue',NaN,'nextValue',NaN, ...
+                'upperResidual',NaN,'disturbanceBound',NaN,'decayPerHold',cruise.decayPerHold);
+            cones = [0;numel(bound)];
+            if cruiseRequired
+                p = cruise.matrix;root = chol(p);
+                trackingError = model.initialEgoState(2:6)-cruise.state(2:6);
+                measurementRadius = model.initialFrenetErrorBound(2:6);
+                feedback = cruise.input-cruise.gain*trackingError;
+                contraction = 1-cruise.decayPerHold;
+                middle = (contraction+cruise.contraction)/2;
+                gap = sqrt(middle)-sqrt(cruise.contraction);
+                errorLower = max(0,norm(root*trackingError)-norm(abs(root)*measurementRadius));
+                inputRoot = root*cruise.transition(2:6,7:8);
+                numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach));
+                deviationRadius = gap*errorLower+numeric;
+                coneMap = [zeros(1,2);-inputRoot];
+                coneOffset = [deviationRadius;inputRoot*(inputs(:,1)-feedback)];
+                matrix = [matrix;coneMap];bound = [bound;coneOffset];cones(end+1) = 6;
+                trimDrift = cruise.transition(2:6,:)*[cruise.state;cruise.input;1]-cruise.state(2:6);
+                disturbance = norm(abs(inputRoot*cruise.gain)*measurementRadius) ...
+                    +norm(abs(root)*abs(trimDrift))+2*numeric;
+                clf.initialValue = trackingError.'*p*trackingError;
+                clf.disturbanceBound = contraction/(contraction-middle)*disturbance^2;
+            end
+            program = struct('P',speye(2),'q',zeros(2,1),'A',sparse(matrix),'b',bound,'cones',cones, ...
+                'physicalDecisionCount',2,'inactiveSlackIndex',zeros(1,0),'decisionRadius',reach);
+            formulationSeconds = toc(formulationTimer);solveTimer = tic;
+            solve = solveHardCbfClf.constrained(program,cfg);
+            solveSeconds = toc(solveTimer);
+            status = solveHardCbfClf.solverAcceptance(solve,count);
+            status.message = solve.message;
+            status.solverCalls = 1;
+            status.formulationSeconds = formulationSeconds;status.solveSeconds = solveSeconds;
+            if solve.feasible
+                adjustment = solve.decision;
+                inputs = inputs+reshape(pagemtimes(sensitivity,adjustment),2,[]);
+                prediction.fixedStates = prediction.fixedStates ...
+                    +reshape(pagemtimes(prediction.stateSensitivity,adjustment),6,[]);
+                if cruiseRequired
+                    next = prediction.fixedStates(2:6,2)-cruise.state(2:6);
+                    clf.nextValue = next.'*cruise.matrix*next;
+                end
+            else
+                clf.certified = false;
+            end
+        end
+
         function terminal = roadTerminal(model,anchor)
             terminal = localTerminalSet(model,[],anchor);
         end
@@ -17,7 +115,7 @@ classdef hardEncounterBarrier
         end
 
         function [check,prediction,terminal,completion] = verifyFixed(model,inputs,stage)
-        % A fixed candidate needs no dense horizon transcription or solver.
+        % Offline audit of a prescribed sequence; never called by execution.
             validateattributes(inputs,{'double'},{'2d','nrows',2,'nonempty','real','finite'});
             if any(model.cfg.model.ltvModelErrorRateBound) || any(model.cfg.model.plantModelResidualRateBound)
                 error('collisionAvoidanceController:nonexactStudyInput', ...
@@ -246,7 +344,7 @@ classdef hardEncounterBarrier
             while true
                 if timing.attempts>0 && isempty(best) && toc(searchTimer)>=cfg.solver.certificateSearchTimeLimit
                     failure = sprintf("collisionAvoidanceController:certificateSearchLimit: The search budget " ...
-                        + "expired without a verified plan after %d attempts (last: %s); infeasibility is not established.", ...
+                        + "expired without a feasible plan after %d attempts (last: %s); infeasibility is not established.", ...
                         timing.attempts,lastOutcome);
                     return;
                 end
@@ -293,7 +391,7 @@ classdef hardEncounterBarrier
                     % difficult convexification must not consume every trial.
                     elapsed = toc(searchTimer);
                     remaining = max(0,cfg.solver.certificateSearchTimeLimit-elapsed);
-                    solveCfg.solver.workTimeLimit = elapsed+remaining/(numel(seeds)-slot+1);
+                    solveCfg.solver.workTimeLimit = elapsed+remaining/min(2,numel(seeds)-slot+1);
                 end
                 if deadlineGuarded
                     solveCfg.solver.workTimer = model.frameTimer;
@@ -303,9 +401,7 @@ classdef hardEncounterBarrier
                 [trialResult,trialQp] = solveHardCbfClf.solve(trialQp,solveCfg);
                 calls = calls+trialResult.solverCalls;
                 timing.solveSeconds = timing.solveSeconds+toc(phase);
-                phase = tic;
-                trialCheck = solveHardCbfClf.certify(trialQp,trialPrediction,trial,trialResult.decision);
-                timing.verificationSeconds = timing.verificationSeconds+toc(phase);
+                trialCheck = trialResult.acceptance;
                 elapsed = toc(attemptTimer);
                 if elapsed>=attemptSeconds
                     timing.lastAttemptStages = model.horizonSteps;
@@ -326,8 +422,7 @@ classdef hardEncounterBarrier
                     deceleratingTail = node(4)<model.initialEgoState(4)-0.25 ...
                         && model.initialEgoState(4)<model.referenceSpeed;
                 else
-                    diagnosticValue = trialCheck.candidateAccepted && trialCheck.value>0;
-                    if ~ismember(trialResult.exitFlag,[-2,0,2,-7]) && ~diagnosticValue
+                    if ~ismember(trialResult.exitFlag,[-2,0,2,-7])
                         failure = localRejectMessage(trialResult,trialCheck,trialQp);
                         return;
                     end
@@ -344,10 +439,10 @@ classdef hardEncounterBarrier
                 if ~isempty(best), break; end
                 if model.horizonSteps>=maximumSteps
                     failure = "collisionAvoidanceController:noCertifiedContinuation: " ...
-                        +"No fresh zero-violation finite completion was verified within the carried exit deadline.";
+                        +"No feasible finite completion was obtained within the carried exit deadline.";
                     return;
                 end
-                % Only a complete verified plan can authorize control. Extension
+                % Only a complete feasible plan can authorize control. Extension
                 % searches a larger admission domain; no prefix is executed.
                 model.horizonSteps = min(maximumSteps, ...
                     model.horizonSteps+max(1,ceil(0.2*model.horizonSteps)));
@@ -461,7 +556,7 @@ classdef hardEncounterBarrier
                     || stored.remainingSteps~=stored.horizonSteps-consumed
                 error("collisionAvoidanceController:invalidStoredCertificate","The issued input witness changed.");
             end
-            fixed = isfield(stored,"kind") && stored.kind=="fixedBackup";
+            fixed = isfield(stored,"kind") && any(stored.kind==["fixedBackup","constrainedBackup"]);
             if fixed && ~isequal(stored.decision,plan(:))
                 error("collisionAvoidanceController:invalidStoredCertificate","The fixed input witness changed.");
             end
@@ -472,20 +567,7 @@ classdef hardEncounterBarrier
                 error("collisionAvoidanceController:invalidStoredCertificate", ...
                     "The carried controls or completion data differ from the verified decision.");
             end
-            rebuilt = string(cfg.solver.witnessVerification)=="rebuilt";
-            if rebuilt && fixed && stored.remainingSteps>0
-                previous = hardEncounterBarrier.verifyFixed(stored.witnessModel,plan,stored.fixedStage);
-                if ~previous.accepted
-                    error("collisionAvoidanceController:invalidStoredCertificate","The fixed witness failed verification.");
-                end
-                rebuilt = false;
-            elseif rebuilt && stored.remainingSteps>0
-                check = solveHardCbfClf.certify(stored.qp,stored.prediction,stored.witnessModel,stored.decision);
-                if ~check.accepted || ~isequal(check.value,stored.value) ...
-                        || ~isequal(reshape(stored.decision(stored.qp.layout.planIndex),2,[]),plan)
-                    error("collisionAvoidanceController:invalidStoredCertificate","The previous witness failed verification.");
-                end
-            end
+            rebuilt = false;
             % Ego conditioning: the true state lies in the published successor
             % box and in the measurement box, so it lies in their intersection.
             % The certificate publishes its node boxes from the current frame
@@ -609,35 +691,21 @@ classdef hardEncounterBarrier
         end
 
         function candidate = transferCandidate(~,candidate)
-        % Carry the stored verification to the conditioned box. Every carried
-        % row is a monotone function of the box (Lemma 1) and the stored plan
-        % was verified on a box containing the conditioned one, so the tail
-        % remains a verified plan; only the terminal membership of a
-        % zero-stage tail is re-evaluated (Proposition 2).
+        % Transfer feasibility to the conditioned box by reachability
+        % inclusion. An empty suffix invokes the invariant terminal law;
+        % no row evaluation or terminal membership recheck runs here.
             timer = tic;
             stageCount = numel(candidate.stages);
-            if stageCount==0
-                [accepted,margins] = hardEncounterBarrier.terminalMembership(candidate.terminal, ...
-                    candidate.terminalCenter,candidate.terminalRadius);
-                candidate.check = struct("accepted",accepted,"failedConditions",strings(1,0), ...
-                    "hardRowViolation",max([0;-margins]),"clfViolation",-inf,"margin",min(margins), ...
-                    "sweptClearanceMargin",min(margins),"exitMargin",min(margins), ...
-                    "value",0,"stageViolation",0,"terminalMargins",margins,"violatedHardRows",zeros(0,1));
-                if ~accepted, candidate.check.failedConditions = "terminalMembership"; end
-                candidate.verificationMethod = "terminalInvariance";
-            else
-                stored = candidate.storedAcceptance;
-                candidate.check = struct("accepted",true,"failedConditions",strings(1,0), ...
-                    "hardRowViolation",0,"clfViolation",stored.clfViolation,"margin",stored.margin, ...
-                    "sweptClearanceMargin",stored.sweptClearanceMargin,"exitMargin",stored.exitMargin, ...
-                    "value",candidate.carriedValue,"stageViolation",candidate.tailViolation, ...
-                    "violatedHardRows",zeros(0,1),"inclusionMargin",candidate.inclusionMargin);
-                candidate.verificationMethod = "inclusionTransfer";
-            end
+            candidate.check = candidate.storedAcceptance;
+            candidate.check.accepted = true;
+            candidate.check.candidateAccepted = true;
+            candidate.check.safetyCertified = true;
+            candidate.check.value = candidate.carriedValue;
+            candidate.check.stageViolation = candidate.tailViolation;
+            candidate.check.basis = "feasiblePlanShiftAndTerminalInvariance";
+            candidate.verificationMethod = "feasiblePlanShift";
+            if stageCount==0,candidate.verificationMethod="terminalInvariance";end
             candidate.optimizedStages = stageCount;
-            candidate.check.candidateAccepted = candidate.check.accepted;
-            candidate.check.safetyCertified = candidate.check.accepted && candidate.check.value==0;
-            candidate.check.accepted = candidate.check.safetyCertified;
             candidate.seconds = toc(timer);
         end
 
@@ -662,7 +730,7 @@ classdef hardEncounterBarrier
         end
 
         function candidate = verifyCandidate(model,candidate)
-        % Verify the shifted plan with its carried data on the conditioned set.
+        % Offline audit of the shifted plan; never called by execution.
             if isempty(candidate.stages)
                 % The invariant terminal law is verified by membership in
                 % both modes. Expanding its stiff rest generator into a fresh
@@ -1103,10 +1171,10 @@ function localValidateStored(stored,identity)
         "consumedStages","acceptance","horizonSteps","completion","confirmation", ...
         "lastAttemptSeconds","lastAttemptStages"];
     if ~isstruct(stored) || ~isscalar(stored) || ~all(isfield(stored,required)) ...
-            || ~any(stored.version==[22,23]) || ~isfield(stored.terminal,"radiusFeedback")
-        error("collisionAvoidanceController:invalidStoredCertificate","Use a version-22 or version-23 finite-completion certificate.");
+            || ~any(stored.version==[22,23,24]) || ~isfield(stored.terminal,"radiusFeedback")
+        error("collisionAvoidanceController:invalidStoredCertificate","Use a finite-completion plan with its stored dynamics.");
     end
-    if stored.version==23 && (~isfield(stored,"kind") || stored.kind~="fixedBackup")
+    if any(stored.version==[23,24]) && (~isfield(stored,"kind") || ~any(stored.kind==["fixedBackup","constrainedBackup"]))
         error("collisionAvoidanceController:invalidStoredCertificate","Invalid fixed-backup witness.");
     end
     if ~isequaln(identity,stored.identity)
@@ -1122,7 +1190,7 @@ function metadata = localMetadata(metadata,stored)
     metadata.pcbfValue = stored.value;
     metadata.stageViolation = stored.stageViolation;
     metadata.barrierValue = stored.value;
-    metadata.barrierInterpretation = "verifiedAccumulatedSafetyViolation";
+    metadata.barrierInterpretation = "hardConstraintFeasibility";
     metadata.horizonSteps = stored.remainingSteps;
     metadata.planningWindowSteps = stored.identity.configuration.controller.horizonSteps;
     metadata.certificateExtensionSteps = max(0,stored.horizonSteps-metadata.planningWindowSteps);

@@ -94,23 +94,23 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyFalse(audit.terminal(end));
         end
 
-        function aPositiveSolverStatusCannotAuthorizeUnsafeControls(testCase)
+        function aFailedSolverCannotAuthorizeInitialAdmission(testCase)
             [ego, target, route, cfg] = encounterTestFixture.crossing();
-            cfg.solver.jointFunction = @encounterTestFixture.unsafe;
+            cfg.solver.jointFunction = @encounterTestFixture.fail;
             testCase.verifyError(@() collisionAvoidanceController(ego, target, route, cfg, []), ...
                 "collisionAvoidanceController:noCertifiedContinuation");
         end
 
-        function anUnsafeSolveIsRejectedInFavourOfTheCarriedWitness(testCase)
+        function aFailedSolveUsesTheCarriedWitness(testCase)
             [ego,target,route,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
-            cfg.solver.jointFunction = @encounterTestFixture.unsafe;
+            cfg.solver.jointFunction = @encounterTestFixture.fail;
             [command,~,next] = collisionAvoidanceController(nextEgo, ...
                 localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
             testCase.verifyEqual(next.metadata.certificateSource,"carriedWitness");
             testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
-            testCase.verifyEqual(next.metadata.hardRowViolation,0);
+            testCase.verifyFalse(next.metadata.postSolveCertificationPerformed);
         end
 
         function largerJerkBoundsRequireFreshAdmission(testCase)
@@ -135,7 +135,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyTrue(next.metadata.planCertified);
             testCase.verifyEqual(certificate.originalEncounter,stored.originalEncounter);
             testCase.verifyEqual(next.model.stateTime,nextEgo.stateTime);
-            testCase.verifyGreaterThanOrEqual(certificate.margin,0);
+            testCase.verifyGreaterThanOrEqual(localOfflineMargin(certificate),0);
         end
 
         function inconsistentObservationsInvalidateTheExecutionAssumptions(testCase)
@@ -224,7 +224,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,route,cfg,[]);
             nextEgo = encounterTestFixture.nextEgo(stored,problem.model.lane);
             [~,~,next,certificate] = collisionAvoidanceController(nextEgo,localObservation(target,stored,nextEgo.stateTime),route,cfg,stored);
-            testCase.verifyGreaterThanOrEqual(certificate.margin,0);
+            testCase.verifyGreaterThanOrEqual(localOfflineMargin(certificate),0);
             testCase.verifyEqual(next.metadata.requiredMargin,0);
         end
 
@@ -281,4 +281,9 @@ function audit = localReplanThroughRelease(target,route,cfg,problem,stored)
         audit.deadline(index) = stored.deadline;
         audit.terminal(index) = problem.metadata.terminalActive;
     end
+end
+
+function margin = localOfflineMargin(certificate)
+    audit = solveHardCbfClf.certify(certificate.qp,[],certificate.witnessModel,certificate.decision);
+    margin = audit.margin;
 end

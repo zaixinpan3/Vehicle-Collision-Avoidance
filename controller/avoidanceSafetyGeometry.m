@@ -141,7 +141,9 @@ classdef avoidanceSafetyGeometry
                 numericTube = struct("stage",tube.stage,"map",tube.map,"offset",tube.offset, ...
                     "localStateMap",tube.localStateMap,"localInputMap",tube.localInputMap, ...
                     "localOffset",tube.localOffset,"numericalRadius",tube.numericalRadius);
-                if isfield(prediction,"fixedInputs"), numericTube.stage = 1; end
+                if isfield(prediction,"fixedInputs") || isfield(prediction,"parametricInputs")
+                    numericTube.stage = 1;
+                end
                 projectionData{cellIndex} = struct("cfg",numericCfg,"tube",numericTube, ...
                     "nominal",nominalCells{cellIndex},"stationRange",[frame.stationLower;frame.stationUpper], ...
                     "stateRadius",stateRadius,"scheduleSpeed",prediction.scheduleSpeedProfile(tube.stage), ...
@@ -159,6 +161,13 @@ classdef avoidanceSafetyGeometry
             for cellIndex = 1:numel(groups)
                 names = ["modelDomain";"tireSlip";sourceLabels{cellIndex}];
                 group = projected(cellIndex);
+                if isfield(prediction,"parametricInputs")
+                    stage = prediction.cells(cellIndex).stage;
+                    direct = reshape(permute(group.local.nodeInputRows,[1,3,2]),[],2);
+                    group.matrix = group.matrix+direct*(prediction.inputSensitivity(:,:,stage)-eye(2));
+                    group.physicalBound = group.physicalBound-direct*prediction.parametricInputs(:,stage);
+                    group.stage(:) = stage;
+                end
                 if isfield(prediction,"fixedInputs")
                     stage = prediction.cells(cellIndex).stage;
                     input=prediction.fixedInputs(:,stage);

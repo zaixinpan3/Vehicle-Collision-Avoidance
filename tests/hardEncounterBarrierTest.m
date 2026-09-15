@@ -18,13 +18,13 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.terminalPolicyRole,"carriedWitnessTail");
             testCase.verifyTrue(problem.metadata.terminalContinuationCertified);
             testCase.verifyFalse(problem.metadata.physicalVehicleGuaranteeEstablished);
-            testCase.verifyEqual(problem.metadata.certificateSource,"checkedOptimization");
+            testCase.verifyEqual(problem.metadata.certificateSource,"constrainedOptimization");
             testCase.verifyEqual(problem.metadata.pcbfValue,0);
             testCase.verifyEqual(stored.version,22);
             testCase.verifyEqual(stored.certifiedDuration,stored.remainingSteps*cfg.controller.sampleTime,AbsTol=1e-12);
             testCase.verifyEqual(numel(stored.stages),stored.remainingSteps);
             testCase.verifyEqual(numel(stored.cellFrames),numel(stored.prediction.cells));
-            testCase.verifyGreaterThan(stored.acceptance.exitMargin,0);
+            testCase.verifyGreaterThan(localOfflineExitMargin(stored),0);
             testCase.verifyEqual(stored.encounters.contract.validityScope,"whileEncounterActive");
         end
 
@@ -39,7 +39,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             [ego,target,road,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyGreaterThan(stored.predictedState(4,end),7.9);
-            testCase.verifyGreaterThan(stored.acceptance.exitMargin,0);
+            testCase.verifyGreaterThan(localOfflineExitMargin(stored),0);
             testCase.verifyFalse(problem.metadata.terminalActive);
             testCase.verifyEqual(problem.metadata.commandCertifiedDuration,cfg.controller.sampleTime);
         end
@@ -83,7 +83,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(boxed.encounters.radius(1),0.1,AbsTol=0);
             testCase.verifyTrue(boxed.qp.terminal.targetIndependent);
             testCase.verifyEqual(boxed.qp.terminal.stateRows,exact.qp.terminal.stateRows,AbsTol=1e-9);
-            testCase.verifyGreaterThan(boxed.acceptance.exitMargin,0);
+            testCase.verifyGreaterThan(localOfflineExitMargin(boxed),0);
         end
 
         function uncertainFutureMotionCanReceiveABoundedCertificate(testCase)
@@ -111,13 +111,13 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
                 "collisionAvoidanceController:noCertifiedContinuation"));
         end
 
-        function anUnsafeSolverDecisionIsRejectedInFavourOfTheCarriedWitness(testCase)
+        function aNonSolvedDecisionCannotReplaceTheCarriedWitness(testCase)
             [ego,target,road,cfg,stored] = localContinuation();
             cfg.solver.jointFunction = @localUnsafeSolve;
             [command,~,problem] = collisionAvoidanceController(ego,target,road,cfg,stored);
             testCase.verifyEqual(problem.metadata.certificateSource,"carriedWitness");
             testCase.verifyEqual(command.actuatorInput,stored.plan(:,2),AbsTol=0);
-            testCase.verifyEqual(problem.metadata.hardRowViolation,0);
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
         end
 
         function theTerminalLawIsCommandedOnlyAfterEveryOptimizedStageIsConsumed(testCase)
@@ -347,7 +347,7 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.pcbfValue,0);
         end
 
-        function transferredAndRebuiltWitnessesIssueTheSameCommands(testCase)
+        function legacyVerificationOptionsDoNotRecheckPlans(testCase)
             % With the fresh solver failing, every command is the carried
             % tail. The inclusion transfer must issue exactly what the
             % rebuilt verification issues, down to the terminal law.
@@ -377,8 +377,8 @@ classdef hardEncounterBarrierTest < matlab.unittest.TestCase
             end
             testCase.verifyEqual(commands{1},commands{2},AbsTol=1e-12);
             testCase.verifyEqual(values{1},values{2},AbsTol=1e-12);
-            testCase.verifyEqual(methods{1}(1:5),repmat("inclusionTransfer",1,5));
-            testCase.verifyEqual(methods{2}(1:5),repmat("carriedEnclosureRows",1,5));
+            testCase.verifyEqual(methods{1}(1:5),repmat("feasiblePlanShift",1,5));
+            testCase.verifyEqual(methods{2}(1:5),repmat("feasiblePlanShift",1,5));
             testCase.verifyEqual(methods{1}(6:9),repmat("terminalInvariance",1,4));
             testCase.verifyEqual(methods{2}(6:9),repmat("terminalInvariance",1,4));
         end
@@ -495,7 +495,7 @@ function [ego,target,road,cfg,stored] = localContinuation()
 end
 
 function result = localUnsafeSolve(~,program)
-    result = struct('decision',100*ones(size(program.q)),'exitFlag',1,'output',struct());
+    result = struct('decision',100*ones(size(program.q)),'exitFlag',0,'output',struct());
 end
 
 function [center,radius] = localExactTerminalNode(stored)
@@ -565,4 +565,9 @@ function result = localPerformanceFailure(~,program)
     else
         result = encounterTestFixture.fail([],[]);
     end
+end
+
+function margin = localOfflineExitMargin(stored)
+    audit = solveHardCbfClf.certify(stored.qp,stored.prediction,stored.witnessModel,stored.decision);
+    margin = audit.exitMargin;
 end

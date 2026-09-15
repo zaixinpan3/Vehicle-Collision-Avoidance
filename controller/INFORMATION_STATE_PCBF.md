@@ -1,14 +1,14 @@
 # Information-state safe MPC with finite encounter completion
 
-Predictive-policy certificate format 22, September 14, 2026. The bounded-work
-backup policy uses format 23 and a hard sampled cruising CLF; see
-[SAMPLED_BACKUP_CBF_CLF.md](SAMPLED_BACKUP_CBF_CLF.md). The controller carries a
-finite, independently verified encounter witness followed by a
-**target-independent road terminal controller**. Its executable safety value
-is exactly zero. Positive safety-value solutions remain solver diagnostics;
-they cannot authorize a command. The finite reach-avoid derivation and global
-entry limitations are developed in
-[FINITE_ENCOUNTER_TERMINAL_DESIGN.md](FINITE_ENCOUNTER_TERMINAL_DESIGN.md).
+September 15, 2026. The full-horizon policy retains certificate format 22;
+the two-variable constrained backup uses format 24 and a hard sampled
+cruising CLF. See [SAMPLED_BACKUP_CBF_CLF.md](SAMPLED_BACKUP_CBF_CLF.md).
+The controller carries a finite feasible encounter continuation followed by
+a **target-independent road terminal controller**. All physical safety
+constraints are hard inside the optimizer. Solver status authorizes a new
+plan; there is no separate runtime plan checker or safety-value-zero gate.
+The finite reach-avoid derivation and global entry limitations are developed
+in [FINITE_ENCOUNTER_TERMINAL_DESIGN.md](FINITE_ENCOUNTER_TERMINAL_DESIGN.md).
 
 ## Executed specification and premises
 
@@ -48,6 +48,10 @@ The conditional guarantee requires:
 - The retained sampled road terminal model, comparison contraction and
   invariant-domain premises hold. These are the existing declared rest-model
   assumptions, not a validated nonlinear vehicle inclusion.
+
+- A strict successful solve returns a feasible point of the hard-constrained
+  formulation, with numerical errors covered by its construction reserves.
+  This is a solver contract, not an independently validated numerical result.
 
 These are not claims of nonlinear vehicle safety, sensing reliability,
 feasibility of arbitrary encounters, or real-time execution.
@@ -102,10 +106,9 @@ This affine directional condition is a conservative inner approximation of
 the nonconvex exterior of a ball. For a predicted close approach, admission
 proposes an exit direction along relative motion, so an observed approaching
 exterior target must pass before a position observation can release it. Other
-encounters use the final anchor's relative direction. A carried rebuild keeps
-the original exit direction and chart. All exit rows are hard in both
-lexicographic optimization stages. Only verified finite completions admit
-control; a search failure does not establish physical collision inevitability
+encounters use the final anchor's relative direction. The stored witness keeps
+the original exit direction and chart. All exit rows are hard in the
+optimization. Only feasible finite completions admit control; a search failure does not establish physical collision inevitability
 or global infeasibility.
 
 At admission the declared range must exceed both body circumradii plus
@@ -134,15 +137,14 @@ stated scan contract; this does not prove safety across re-entry, temporary
 loss of an exterior track, or detection latency.
 
 Admission estimates an initial horizon from relative motion and the required
-departure side. This is a search proposal only: finite exit must still be
-verified. Smooth left/right offset paths propose consistent cell normals,
-while every held-input stage retains the same swept verification. A positive
-safety-value diagnostic or an approximate solver result that fails verification
-can try another proposal. The timed search extends the horizon after exhausted
+departure side. This is a search proposal only: finite exit remains a
+hard constraint. Smooth left/right offset paths propose consistent cell normals,
+while every held-input stage retains the same swept constraints. An
+unsuccessful or approximate solve can lead to another proposal. The timed search extends the horizon after exhausted
 seeds; it reserves time for alternative normal families. During an active encounter a fresh
 horizon is capped at the stored absolute exit deadline. One remaining hold
 is supported. A replacement cannot move that deadline later. A failed fresh
-solve leaves the independently verified carried suffix available. After
+solve leaves the feasible carried suffix available. After
 release the road-only problem can replan with its usual rolling horizon.
 
 ## Road-only invariant terminal set
@@ -190,8 +192,9 @@ is invariant under the declared comparison assumptions. Enumerating nominal
 velocity signs gives the linear rows `Af*z+Ef*rho<=bf`. Velocity-domain,
 terminal-input and first-terminal-input slew constraints are retained. There
 are **no target rows or infinite-time target support calculations** in this
-set. Its controller may reduce speed after handoff; cruise remains a soft
-CLF performance objective.
+set. Its controller may reduce speed after handoff. The constrained backup
+policy imposes hard sampled cruise dissipation when cruise is feasible; the
+full-horizon policy retains a soft CLF performance objective.
 
 The input is stored as `uf+K*z+Kr*rho`, where `Kr=-K` in the longitudinal
 brake channel. Both contributions enter the first-terminal-input slew rows.
@@ -203,45 +206,52 @@ The terminal input uses the carried nominal and its certified box. In
 particular, conditioning a new measurement does not silently recenter that
 nominal and change the verified transition from the last planned input.
 
-## Independent acceptance and recursive argument
+## Solver acceptance and recursive argument
 
-The verifier evaluates physical rows with an arithmetic allowance charged
-against their margins. For stage `i`, `xi_i` is the nonnegative maximum
-collision/road row violation, and `S=sum(xi_i)`. It reports:
+Every collision, road, domain, input, slew, exit and road-terminal condition
+is a hard solver constraint. The condensed program has no safety violation
+variables; the lifted program fixes its compatibility violation columns to
+zero. `candidateAccepted`, `safetyCertified` and `accepted` follow the strict
+successful solver status and valid decision shape. Uncomputed margins are
+NaN. Failed or approximate statuses cannot replace a stored feasible plan.
+No post-solve repair, omitted-row check or independent residual calculation
+runs in the controller. Public verification helpers are offline audit tools.
 
-- `candidateAccepted`: finite decision, hard domain/exit/road-terminal rows
-  and relaxed CLF checks passed;
-- `safetyCertified`: those checks passed **and `S==0`**;
-- `accepted`: an alias for `safetyCertified` used by execution.
+Numerical reserves tighten constraints before solving. The proof assumes
+that the solver's feasibility error lies within these reserves. It does not
+turn a floating-point status into an interval certificate. Solver hooks must
+satisfy the same contract. Legacy checker configuration fields are ignored.
 
-Numerical solve reserves provide space for solver error. Neither solver
-feasibility tolerances nor the lexicographic tie tolerance permit positive
-physical safety violation. The CLF remains soft and convex. Only
-`clf.samplePoints="controlPoints"` enforces a common majorant at every
-Bernstein point and supports an all-time cell dissipation interpretation;
-endpoints or stage nodes support their stated sample checks only.
-
-For a zero-value admitted witness, the swept rows certify its first hold.
+For an admitted feasible witness, the swept rows establish its first hold.
 The next conditioned ego and target sets are subsets of the carried
-successor enclosures. With the same controls and generators, reachable sets
-are monotone under inclusion, so the stored suffix still covers all valid
-successors. `transferCandidate` reuses that verification;
-`verifyCandidate` rebuilds with the carried data and independently checks it.
-A fresh solve can replace this witness only after zero-value verification
-and without extending its active exit deadline.
+successor enclosures. With the same controls and generators, reachability
+is monotone under inclusion, so the stored suffix covers every valid
+successor. `transferCandidate` transfers this feasibility directly. A fresh
+feasible solve can replace it without extending its active exit deadline.
+No row reevaluation or terminal membership recheck is needed for this
+mathematical induction.
 
 If a current observation releases the target early, removing its constraints
-preserves the road-safe suffix and terminal set. Otherwise the finite exit
-row and the confirmation premise imply release at the fixed deadline. The
+preserves the road-safe suffix and terminal set. Otherwise finite exit and
+the confirmation premise imply release at the fixed deadline. The invariant
 road terminal law then preserves the permanent obligations. Induction gives
 swept collision safety during the admitted active encounter and road
 continuation afterward, conditional on the stated premises.
 
-For the same remaining witness and unchanged obligations, dropping the first
-stage yields `S_next <= S_current-xi_0`; at the executable level both values
-are exactly zero. A positive diagnostic value or locally selected normals
-do not establish an exact global PCBF value function. No indefinite old-target
-model or invariant target halfspace enters this proof.
+Mathematically, let xi_i be the nonnegative physical safety violation of
+hold i and S their sum for the complete continuation. Feasibility implies
+S=0. Dropping the first hold yields S_next <= S_current-xi_0=0. This is the
+invariant zero level of a predictive barrier on the augmented information
+and witness state. S is not evaluated as an online execution gate, and the
+implementation does not compute a global optimal PCBF or prove a global
+continuous value function over every hybrid mode. No infinite old-target
+model or invariant target halfspace enters the argument.
+
+The backup policy's sampled cruise cone gives V_next <= c*V+b on its cruise
+holds, as derived in the companion note. The full-horizon CLF remains soft
+and convex. Only its control-point option uses a common majorant at every
+Bernstein point; checking stage nodes alone cannot establish an all-time
+cell derivative inequality.
 
 ## Runtime metadata and implementation
 
@@ -255,18 +265,17 @@ problem. `physicalVehicleGuaranteeEstablished` remains false.
 `hardEncounterBarrier` owns finite completion and observation guards alongside
 road terminal construction and witness transfer. `targetPrediction` retains
 finite bounded motion and conditioning. `formulateAvoidanceProblem` appends
-hard exit and road terminal rows. `solveHardCbfClf` distinguishes numerical
-candidates from executable certificates; `collisionAvoidanceController`
-checks and publishes the carried state.
+hard exit and road terminal rows. `solveHardCbfClf` solves the hard program and reports its status;
+`collisionAvoidanceController` conditions and publishes the carried state.
 
 Before fresh work, the planner checks the frame budget, including the first
 attempt. The maximum observed attempt cost screens long horizons. Native
 Clarabel receives the remaining program time via an optional fourth options
-entry; all omitted-row checks and independent verification still apply to
-any returned decision. An expired frame uses the carried witness. Initial
+entry. Every physical row enters the solve; no independent checker follows
+the returned decision. An expired frame uses the carried witness. Initial
 admission instead uses `certificateSearchTimeLimit` and cannot execute until
 it obtains a complete witness. Native time limits do not bound MATLAB
-formulation, factorization setup, verification, or operating-system delays;
+formulation, factorization setup or operating-system delays;
 this is not a hard 100 ms execution guarantee.
 
 `runExactStateRecursiveFeasibilityScenario` independently samples the true

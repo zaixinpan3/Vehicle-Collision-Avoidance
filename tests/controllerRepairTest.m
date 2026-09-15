@@ -43,7 +43,7 @@ classdef controllerRepairTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(certificate.predictedState(1,end)-certificate.predictedState(1,1),33.4);
         end
 
-        function aPositiveValueAttemptCanTryAnotherPassingSide(testCase)
+        function anInfeasibleAttemptCanTryAnotherPassingSide(testCase)
             [ego,target,road,cfg] = localScene("stationary");
             [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
             model = problem.model;

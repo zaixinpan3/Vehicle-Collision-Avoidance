@@ -1,5 +1,9 @@
 # Real-time plan for the information-state PCBF controller
 
+Current implementation: [format-24 hard-constrained optimization without a
+runtime checker](SAMPLED_BACKUP_CBF_CLF.md), September 15, 2026. The
+verification-based proposals below describe the earlier source versions.
+
 September 12, 2026. This note records where the time went in the
 controller at commit `e83df709` (certificate version 19), why, and a staged
 redesign that keeps the recursive-feasibility argument of

@@ -34,7 +34,7 @@ end
 
 function program = localLiftedProgram(qp,prediction,model)
 %localLiftedProgram Sparse cell-state realization of the same finite SOCP.
-% The independent checker still evaluates the condensed physical decisions.
+% The online solve fixes compatibility safety-violation columns to zero.
 % Every sparse block is assembled from triplet lists in one call; indexed
 % assignment into large sparse matrices was the dominant formulation cost.
     physicalCount = qp.layout.decisionCount;
@@ -42,9 +42,9 @@ function program = localLiftedProgram(qp,prediction,model)
     cells = prediction.cells;
     cellCount = numel(cells);
     stateCount = 6*(cellCount+1);
-    % One nonnegative safety violation per stage follows the auxiliary
-    % states. It relaxes only collision and road rows; every other row,
-    % including the terminal set, remains hard.
+    % Legacy per-stage violation columns follow the auxiliary states. The
+    % hard-constrained solve fixes them to zero before calling the optimizer;
+    % retaining their indices preserves the offline transcription interface.
     violationIndex = physicalCount+stateCount+(1:count);
     total = physicalCount+stateCount+count;
     stateIndex = reshape(physicalCount+(1:stateCount),6,[]);

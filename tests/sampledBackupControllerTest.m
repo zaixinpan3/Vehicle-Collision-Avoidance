@@ -4,6 +4,8 @@ classdef sampledBackupControllerTest < matlab.unittest.TestCase
         uncertainty = struct('exact',zeros(6,1),'bounded',[.01;.01;.001;.01;.002;.001]);
         scene = {"stationary","oncoming","crossing"};
         curvature = struct('left',1/400,'right',-1/400,'turn',1/100);
+        malformedDecision = struct('complex',[1i;0],'nonfinite',[NaN;0],'short',0);
+        exitStatus = struct('limit',0,'almost',2,'numerical',-7,'infeasible',-2);
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -15,12 +17,64 @@ classdef sampledBackupControllerTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aNonSolvedStatusNeverAuthorizesACommand(testCase,exitStatus)
+            cfg=collisionAvoidanceControllerConfig();
+            cfg.solver.jointFunction=@(~,p) struct('decision',zeros(size(p.q)), ...
+                'exitFlag',exitStatus,'output',struct());
+            result=solveHardCbfClf.constrained(localBoxProgram(),cfg);
+            testCase.verifyFalse(result.feasible);
+        end
+
+        function aMalformedSolvedDecisionCannotAuthorizeACommand(testCase,malformedDecision)
+            cfg=collisionAvoidanceControllerConfig();
+            cfg.solver.jointFunction=@(~,~) struct('decision',malformedDecision, ...
+                'exitFlag',1,'output',struct());
+            result=solveHardCbfClf.constrained(localBoxProgram(),cfg);
+            testCase.verifyFalse(result.feasible);
+        end
+
+        function hardBoundsLimitTheOptimizerWithoutAnExternalCheck(testCase)
+            result=solveHardCbfClf.constrained(localBoxProgram(),collisionAvoidanceControllerConfig());
+            testCase.verifyTrue(result.feasible);
+            testCase.verifyEqual(result.decision,[.4;0],AbsTol=1e-7);
+        end
+
+        function scalarBoundReductionRetainsSmallCrossEffects(testCase)
+            cfg=collisionAvoidanceControllerConfig();
+            cfg.solver.constraintTolerance=1e-12;cfg.solver.optimalityTolerance=1e-12;
+            program=struct('P',speye(2),'q',[-2;-2], ...
+                'A',sparse([1,1e-10;0,1]),'b',[.4;.5],'cones',[0;2], ...
+                'decisionRadius',[1;1],'physicalDecisionCount',2,'inactiveSlackIndex',[]);
+            result=solveHardCbfClf.constrained(program,cfg);
+            testCase.verifyTrue(result.feasible);
+            testCase.verifyLessThanOrEqual(max(program.A*result.decision-program.b),1e-12);
+            testCase.verifyEqual(result.decision,[.4;.5],AbsTol=1e-9);
+        end
+
+        function theOptimizerCorrectsAnUnsafeNominalRollout(testCase)
+            [ego,road,cfg]=localScene();
+            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            cruise=ltvBicycleModel.sampledCruise(problem.model);
+            nominal=[.12;cruise.input(2)];
+            [status,~,~,~,inputs]=hardEncounterBarrier.constrainedBackup(problem.model,nominal,cruise,false);
+            audit=hardEncounterBarrier.verifyFixed(problem.model,inputs,cruise.stage);
+            testCase.verifyTrue(status.accepted);
+            testCase.verifyLessThan(inputs(1),.03);
+            testCase.verifyTrue(audit.accepted);
+        end
+
+        function parametricTubesEncloseChangedInputsAndInitialBoxes(testCase,uncertainty)
+            worst=localParametricAudit(uncertainty);
+            testCase.verifyLessThanOrEqual(worst,5e-12);
+        end
+
         function cruiseDissipatesForEveryVertexOfTheInformationBox(testCase,uncertainty)
             [problem,worst,roadMargin] = localCruiseAudit(uncertainty);
             testCase.verifyTrue(problem.metadata.clfDissipationCertified);
             testCase.verifyLessThanOrEqual(worst,2e-12);
             testCase.verifyGreaterThan(roadMargin,0);
-            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyGreaterThan(problem.metadata.solverCallCount,0);
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
         end
 
         function cachedSweptTubesEncloseEveryInitialBoxVertex(testCase,uncertainty)
@@ -36,9 +90,9 @@ classdef sampledBackupControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.clfOperatingCurvature,curvature,AbsTol=1e-14);
         end
 
-        function anOnlineSolverIsUnnecessaryForAvoidanceAndCruise(testCase,scene)
+        function hardConstrainedPlansAvoidAndRecoverCruise(testCase,scene)
             report = runExactStateRecursiveFeasibilityScenario(Scenario=scene,SampleCount=180, ...
-                ExecutionPolicy="backup",FailAfterAdmission=true,Seed=20260914);
+                ExecutionPolicy="backup",FailAfterAdmission=false,Seed=20260914);
             testCase.verifyTrue(report.passed,report.failureMessage);
             testCase.verifyEqual(report.executedHolds,180);
             testCase.verifyLessThan(norm(report.finalCruiseError),1e-3);
@@ -113,6 +167,8 @@ classdef sampledBackupControllerTest < matlab.unittest.TestCase
             model=problem.model;model.cfg.model.plantModelResidualRateBound(4)=.01;
             testCase.verifyError(@() hardEncounterBarrier.verifyFixed(model,cruise.input,cruise.stage), ...
                 'collisionAvoidanceController:nonexactStudyInput');
+            testCase.verifyError(@() hardEncounterBarrier.constrainedBackup(model,cruise.input,cruise,true), ...
+                'collisionAvoidanceController:nonexactStudyInput');
         end
 
         function theFixedVerifierRejectsAnUnsafeInputSequence(testCase)
@@ -152,8 +208,7 @@ end
 function [ego,road,cfg] = localScene()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',10, ...
         'controller',struct('sampleTime',.1,'horizonSteps',16,'executionPolicy','backup'), ...
-        'model',struct('lateralDomainRadius',4),'solver',struct('frameDeadlineSeconds',.1, ...
-        'jointFunction',@localForbiddenSolver)));
+        'model',struct('lateralDomainRadius',4),'solver',struct('frameDeadlineSeconds',.1)));
     ego=struct('position',[0;0],'yaw',0,'speed',10,'stateTime',0, ...
         'perception',struct('time',0,'range',16,'completeWithinRange',true));
     boundary=struct('origin',zeros(2,1),'longitudinalDirection',[1;0],'lateralDirection',[0;1], ...
@@ -244,4 +299,44 @@ function [problem,residual] = localCurvedAudit(curvature)
     residual=after.'*metadata.clfMatrix*after ...
         -(1-metadata.clfDissipation.decayPerHold)*before.'*metadata.clfMatrix*before ...
         -metadata.clfDissipation.disturbanceBound;
+end
+
+function program = localBoxProgram()
+    program=struct('P',speye(2),'q',[-2;0],'A',sparse([eye(2);-eye(2)]), ...
+        'b',[.4;.2;.4;.2],'cones',[0;4],'physicalDecisionCount',2,'inactiveSlackIndex',[]);
+end
+
+function worst = localParametricAudit(radius)
+    [ego,road,cfg]=localScene();
+    [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+    model=problem.model;model.initialFrenetErrorBound=radius;
+    cruise=ltvBicycleModel.sampledCruise(model);
+    inputs=cruise.input+[-.015,.018,-.003;-.03,.04,0];
+    sensitivity=cat(3,eye(2),[.4,.02;.01,.6],[-.2,.01;.02,.3]);
+    prediction=ltvBicycleModel.fixedPredict(model,inputs,cruise.stage,sensitivity);
+    generator=[cruise.stage.continuousA,cruise.stage.continuousB,cruise.stage.continuousC;zeros(3,9)];
+    signs=2*double(dec2bin(0:63,6).'-'0')-1;
+    worst=-Inf;
+    for adjustment=[-.004,-.004,.004,.004;-.02,.02,-.02,.02]
+        actualInputs=inputs+reshape(pagemtimes(sensitivity,adjustment),2,[]);
+        initial=model.initialEgoState+radius.*signs;
+        for stage=1:size(inputs,2)
+            cells=prediction.cells([prediction.cells.stage]==stage);
+            for index=1:numel(cells)
+                tube=cells(index);degree=size(tube.offset,2)-1;
+                points=tube.offset+reshape(pagemtimes(tube.map,adjustment),6,[]);
+                for fraction=linspace(0,1,5)
+                    powers=0:degree;
+                    basis=arrayfun(@(power) nchoosek(degree,power),powers) ...
+                        .*fraction.^powers.*(1-fraction).^(degree-powers);
+                    time=tube.start-(stage-1)*model.sampleTime+fraction*tube.duration;
+                    actual=expm(time*generator)*[initial;repmat(actualInputs(:,stage),1,64);ones(1,64)];
+                    residual=abs(actual(1:6,:)-points*basis.')-tube.radius*basis.';
+                    worst=max(worst,max(residual,[],'all'));
+                end
+            end
+            actual=expm(model.sampleTime*generator)*[initial;repmat(actualInputs(:,stage),1,64);ones(1,64)];
+            initial=actual(1:6,:);
+        end
+    end
 end
