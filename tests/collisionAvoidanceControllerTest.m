@@ -25,27 +25,27 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             localHook('reset',[]);cfg.solver.jointFunction=@localHook;
             [command,plan,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyEqual(localHook('count',[]),1);
-            testCase.verifySize(plan,[2,1]);
-            testCase.verifyEqual(command.actuatorInput,plan,AbsTol=0);
-            testCase.verifyEqual(state.appliedInput,plan,AbsTol=0);
+            testCase.verifySize(plan,[2,problem.metadata.horizonSteps]);
+            testCase.verifyEqual(command.actuatorInput,plan(:,1),AbsTol=0);
+            testCase.verifyEqual(state.appliedInput,plan(:,1),AbsTol=0);
             testCase.verifyEqual(problem.metadata.solverCallCount,1);
             testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
             testCase.verifyFalse(problem.metadata.recursiveFeasibilityGuaranteed);
-            testCase.verifyEqual(fieldnames(state),{'version';'appliedInput';'stateTime'});
+            testCase.verifyGreaterThan(size(state.plan,2),1);
+            testCase.verifyTrue(problem.metadata.predictionContinuationRetained);
+            testCase.verifyTrue(state.terminal.targetIndependent);
+            testCase.verifyFalse(problem.metadata.terminalActive);
         end
-        function targetsOnlyAddObstacleConstraints(testCase)
+        function targetFreeControlRetainsThePermanentTerminalCertificate(testCase)
             [ego,target,road,cfg]=localFixture(true);
             [~,~,empty]=collisionAvoidanceController(ego,[],road,cfg,[]);
             [~,~,active]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            first=empty.program;second=active.program;
-            [matrix,bound]=localPermanentProgram(second);
-            testCase.verifyEqual(matrix,first.A,AbsTol=0);
-            testCase.verifyEqual(bound,first.b,AbsTol=0);
-            testCase.verifyEqual(second.P,first.P,AbsTol=0);
-            testCase.verifyEqual(second.q,first.q,AbsTol=0);
-            testCase.verifyEqual(first.obstacleCbfRowCount,0);
-            testCase.verifyGreaterThan(second.obstacleCbfRowCount,0);
-            testCase.verifyEqual(second.cones(3:end),first.cones(3:end));
+            testCase.verifyEqual(empty.program.obstacleCbfRowCount,0);
+            testCase.verifyGreaterThan(active.program.obstacleCbfRowCount,0);
+            testCase.verifyTrue(empty.program.terminal.targetIndependent);
+            testCase.verifyFalse(empty.program.completion.active);
+            testCase.verifyTrue(active.program.completion.active);
+            testCase.verifyEqual(empty.metadata.clfOperatingInput,active.metadata.clfOperatingInput);
         end
         function failedStatusesReturnNoCommandAndAreNeverRetried(testCase,failedStatus)
             [ego,target,road,cfg]=localFixture(true);
@@ -69,14 +69,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:optimizationFailed');
             testCase.verifyEqual(localFailureHook('count',[]),1);
         end
-        function legacyOptionsCannotSelectAnotherController(testCase,legacyPolicy)
-            [ego,target,road,cfg]=localFixture(true);
-            [command,~,original]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            cfg.controller.executionPolicy=legacyPolicy;cfg.controller.horizonSteps=64;
-            [changed,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifySize(plan,[2,1]);
-            testCase.verifyEqual(problem.program.A,original.program.A,AbsTol=0);
-            testCase.verifyEqual(changed.actuatorInput,command.actuatorInput,AbsTol=1e-10);
+        function configurationControlsThePredictionLengthWithoutSelectingAFallback(testCase,legacyPolicy)
+            [ego,target,road,cfg]=localFixture(false);
+            cfg.controller.executionPolicy=legacyPolicy;cfg.controller.horizonSteps=8;
+            [~,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifySize(plan,[2,8]);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1);
+            testCase.verifyFalse(problem.metadata.fallbackUsed);
+            testCase.verifyEqual(problem.metadata.terminalPolicyRole,"predictionCertificateOnly");
         end
         function cruiseDissipationHoldsForTheDeclaredInformationBox(testCase,errorRadius)
             [ego,target,road,cfg]=localFixture(false);
@@ -86,11 +86,11 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             residual=localRobustClfResidual(problem,command);
             testCase.verifyLessThanOrEqual(residual,1e-10);
             testCase.verifyTrue(problem.metadata.clfDissipationCertified);
-            testCase.verifySize(problem.program.q,[3,1]);
+            testCase.verifySize(problem.program.q,[2*problem.metadata.horizonSteps+1,1]);
         end
         function avoidanceCanRelaxCruiseWhileKeepingTheBarrierHard(testCase)
             [ego,target,road,cfg]=localFixture(true);
-            target.targetPositionInertial=[9.8;0];target.targetVelocityInertial=[0;0];
+            target.targetPositionInertial=[15;0];target.targetVelocityInertial=[0;0];
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             [minimum,residual]=localBarrierResidual(problem,command);
             testCase.verifyGreaterThan(problem.metadata.clfSlack,1e-4);
@@ -109,8 +109,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(high.metadata.clfSlack,0);
             testCase.verifyLessThan(high.metadata.clfSlack,low.metadata.clfSlack);
             testCase.verifyEqual(high.metadata.clfSlackPenalty, ...
-                cfg.clf.relaxationWeight*high.decision(3)^2,AbsTol=1e-12);
-            testCase.verifyEqual(high.decision(1:2),high.inputPlan,AbsTol=0);
+                cfg.clf.relaxationWeight*high.decision(high.program.layout.relaxationIndex)^2,AbsTol=1e-12);
+            testCase.verifyEqual(high.decision(1:2),high.inputPlan(:,1),AbsTol=0);
             testCase.verifyEqual(high.program.A,low.program.A,AbsTol=0);
             testCase.verifyEqual(high.program.b,low.program.b,AbsTol=0);
         end
@@ -132,13 +132,13 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         function multipleTargetsShareTheSameOptimization(testCase)
             [ego,target,road,cfg]=localFixture(true);
             targets=[target,target];targets(2).trackId=2;
-            targets(2).targetPositionInertial=[-30;-4];
+            targets(2).targetPositionInertial=[-12;-4];targets(2).targetVelocityInertial=[-16;0];
             localHook('reset',[]);cfg.solver.jointFunction=@localHook;
             [~,plan,problem]=collisionAvoidanceController(ego,targets,road,cfg,[]);
             testCase.verifyEqual(localHook('count',[]),1);
-            testCase.verifySize(plan,[2,1]);
+            testCase.verifySize(plan,[2,problem.metadata.horizonSteps]);
             testCase.verifySize(problem.metadata.targetErrorBound,[8,2]);
-            testCase.verifySize(problem.program.barrier.normal,[2,2]);
+            testCase.verifySize(problem.program.completion.direction,[2,2]);
         end
         function anUnsafeSecondTargetCannotBeIgnored(testCase)
             [ego,target,road,cfg]=localFixture(true);
@@ -159,14 +159,56 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
         end
-        function targetRemovalUsesTheSameSolveWithoutObstacleRows(testCase)
+        function aMissingTargetInsideTheRangeIsNotAConfirmedRelease(testCase)
             [ego,target,road,cfg]=localFixture(true);
             [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
             ego=localSuccessor(ego,problem,state);
-            [~,~,next]=collisionAvoidanceController(ego,[],road,cfg,state);
+            testCase.verifyError(@() collisionAvoidanceController(ego,[],road,cfg,state), ...
+                'collisionAvoidanceController:inconsistentObservation');
+        end
+        function theShiftedPlanIsFeasibleInTheNextOptimization(testCase,errorRadius)
+            [ego,target,road,cfg]=localFixture(true);
+            ego.controllerStateErrorBound=errorRadius;
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,problem,state);
+            target.targetPositionInertial=target.targetPositionInertial+cfg.controller.sampleTime*target.targetVelocityInertial;
+            [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,state);
+            witness=state.plan(:,2:end);
+            residual=next.program.physicalMatrix*[witness(:);0]-next.program.physicalBound;
+            testCase.verifyLessThanOrEqual(max(residual),0);
+            testCase.verifyTrue(next.metadata.inheritedFeasibleFamily);
+            testCase.verifyEqual(next.program.completion.deadline,problem.program.completion.deadline);
+            testCase.verifyEqual(next.metadata.horizonSteps,problem.metadata.horizonSteps-1);
+            testCase.verifyEqual(next.carriedWitness.stages,state.stages(2:end));
+        end
+        function confirmedDepartureStartsAnotherOptimizedCruisePlan(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            target.targetPositionInertial=[18;4];target.targetVelocityInertial=[20;0];
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,problem,state);
+            target.targetPositionInertial=target.targetPositionInertial+cfg.controller.sampleTime*target.targetVelocityInertial;
+            [~,plan,next]=collisionAvoidanceController(ego,target,road,cfg,state);
+            testCase.verifyTrue(next.metadata.confirmedRelease);
             testCase.verifyFalse(next.metadata.hasTarget);
-            testCase.verifyEqual(next.metadata.obstacleCbfRowCount,0);
+            testCase.verifyFalse(next.metadata.terminalActive);
+            testCase.verifySize(plan,[2,cfg.controller.horizonSteps]);
             testCase.verifyEqual(next.metadata.solverCallCount,1);
+        end
+        function acceptedTerminalBoxesHaveAnInvariantContinuation(testCase,errorRadius)
+            [ego,target,road,cfg]=localFixture(false);
+            ego.controllerStateErrorBound=errorRadius;
+            [~,~,~,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [margin,inputMargin,slewMargin]=localTerminalAudit(state,cfg);
+            testCase.verifyGreaterThanOrEqual(margin,-1e-10);
+            testCase.verifyGreaterThanOrEqual(inputMargin,0);
+            testCase.verifyGreaterThanOrEqual(slewMargin,0);
+        end
+        function changingTheSavedPlanInvalidatesItsCertificate(testCase)
+            [ego,target,road,cfg]=localFixture(false);
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,problem,state);state.plan(2,end)=state.plan(2,end)+.1;
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,state), ...
+                'collisionAvoidanceController:invalidStoredCertificate');
         end
         function inconsistentExecutionStopsBeforeSolving(testCase)
             [ego,target,road,cfg]=localFixture(false);
@@ -184,7 +226,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         function anInjectedFailureStopsTheExperimentAfterOneHold(testCase)
             folder=string(tempname);mkdir(folder);testCase.addTeardown(@() rmdir(folder,'s'));
             testCase.verifyError(@() runExactStateRecursiveFeasibilityScenario(Scenario="cruise", ...
-                SampleCount=5,FailAfterAdmission=true,OutputDirectory=folder), ...
+                SampleCount=5,FailAfterAdmission=true,DeadlineSeconds=Inf,OutputDirectory=folder), ...
                 'collisionAvoidanceController:optimizationFailed');
             saved=load(fullfile(folder,'cruise-exact-state.mat'));
             testCase.verifyEqual(saved.report.executedHolds,1);
@@ -193,7 +235,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         end
         function pathAndSpeedRecoverWithTheOptimizedClfSlack(testCase)
             report=runExactStateRecursiveFeasibilityScenario(Scenario="cruise",SampleCount=120, ...
-                InitialTrackingError=[.05;.002;-.05;0;0]);
+                InitialTrackingError=[.05;.002;-.05;0;0],DeadlineSeconds=Inf);
             testCase.verifyTrue(report.passed);
             testCase.verifyLessThan(norm(report.state(2:6,end)-[0;0;8;0;0]),1e-3);
             testCase.verifyLessThanOrEqual(max(report.clfDissipationResidual),0);
@@ -205,12 +247,13 @@ end
 function [ego,target,road,cfg]=localFixture(present)
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
         'controller',struct('sampleTime',.1),'model',struct('lateralDomainRadius',4)));
-    ego=struct('position',[0;0],'yaw',0,'speed',8,'stateTime',0);
+    ego=struct('position',[0;0],'yaw',0,'speed',8,'stateTime',0, ...
+        'perception',struct('time',0,'range',16,'completeWithinRange',true));
     road=[-100,0;2000,0];
     target=[];
     if present
-        target=struct('trackId',1,'targetPositionInertial',[30;4], ...
-            'targetVelocityInertial',[0;0],'targetAccelerationInertial',[0;0], ...
+        target=struct('trackId',1,'targetPositionInertial',[12;4], ...
+            'targetVelocityInertial',[16;0],'targetAccelerationInertial',[0;0], ...
             'targetHeadingInertial',0,'targetYawRate',0, ...
             'predictionMotion',struct('kind',"finite-sensing-motion-v1", ...
             'jerkBound',[0;0],'yawAccelerationBound',0));
@@ -236,12 +279,7 @@ function ego=localSuccessor(ego,problem,state)
     [ego.position,ego.yaw]=laneGeometry.fromFrenet(x,problem.model.lane);
     ego.speed=x(4);ego.lateralVelocity=x(5);ego.yawRate=x(6);
     ego.stateTime=ego.stateTime+problem.model.sampleTime;ego.heldActuatorInput=state.appliedInput;
-end
-
-function [matrix,bound]=localPermanentProgram(program)
-    count=program.cones(2);obstacles=program.obstacleCbfRowCount;
-    selected=count-5-obstacles+(1:obstacles);
-    matrix=program.A;bound=program.b;matrix(selected,:)=[];bound(selected)=[];
+    ego.perception.time=ego.stateTime;
 end
 
 function residual=localRobustClfResidual(problem,command)
@@ -259,17 +297,34 @@ function residual=localRobustClfResidual(problem,command)
 end
 
 function [minimum,residual]=localBarrierResidual(problem,command)
-    model=problem.model;target=model.encounters;normal=problem.program.barrier.normal;
-    support=hypot(model.cfg.vehicle.length/2,model.cfg.vehicle.width/2) ...
-        +hypot(target.halfLength,target.halfWidth)+model.cfg.collision.clearanceMargin;
-    initial=problem.program.barrier.initialUpper;minimum=inf;last=NaN;
-    for time=linspace(0,model.sampleTime,101)
-        flow=expm(time*[problem.metadata.executedContinuousGenerator;zeros(3,9)]);
-        x=flow(1:6,:)*[model.initialEgoState;command.actuatorInput;1];
-        position=laneGeometry.fromFrenet(x,model.lane);
-        [center,radius]=targetPrediction.finiteFlow(target,time);
-        last=normal.'*(position-center(1:2))-abs(normal).'*radius(1:2)-support;
-        minimum=min(minimum,last);
+% Independent rectangle audit of the first hold, plus all physical plan rows.
+    model=problem.model;target=model.encounters(1);
+    generator=[problem.metadata.executedContinuousGenerator;zeros(3,9)];
+    minimum=Inf;
+    for time=linspace(0,model.sampleTime,21)
+        state=expm(time*generator)*[model.initialEgoState;command.actuatorInput;1];
+        [position,heading]=laneGeometry.fromFrenet(state(1:6),model.lane);
+        center=targetPrediction.finiteFlow(target,time);
+        distance=avoidanceSafetyGeometry.rectangleDistance(position,heading,center(1:2),center(7), ...
+            [model.cfg.vehicle.length/2;model.cfg.vehicle.width/2;target.halfLength;target.halfWidth]);
+        minimum=min(minimum,distance-model.cfg.collision.clearanceMargin);
     end
-    residual=problem.program.barrier.contraction*initial-last;
+    residual=max(problem.program.physicalMatrix*problem.decision-problem.program.physicalBound);
+end
+
+function [margin,inputMargin,slewMargin]=localTerminalAudit(state,cfg)
+% Audit the hypothetical certificate without executing a controller fallback.
+    center=state.predictedState(:,end);radius=state.stateErrorBound(:,end);
+    prior=state.plan(:,end);margin=Inf;inputMargin=Inf;slewMargin=Inf;
+    lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+    rate=cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    for index=1:100
+        [~,margins]=hardEncounterBarrier.terminalMembership(state.terminal,center,radius);
+        margin=min(margin,min(margins));
+        step=hardEncounterBarrier.terminalStep(state.terminal,center,radius,cfg.controller.sampleTime);
+        inputMargin=min([inputMargin;step.input-lower;upper-step.input]);
+        slewMargin=min([slewMargin;rate-abs(step.input-prior)]);
+        center=step.successor;radius=step.successorRadius;prior=step.input;
+    end
 end

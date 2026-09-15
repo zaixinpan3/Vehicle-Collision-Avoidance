@@ -1,11 +1,17 @@
 # One hard predictive CBF–CLF controller
 
-Current-scope note, September 12, 2026: finite perception is no longer part of
-the controller problem. The active version-19 controller uses one persistent
-target, bounded estimation boxes on both vehicles, a robust invariant terminal
-set and a carried recursive-feasibility witness. This document records earlier
-finite-encounter analysis; current use and guarantees are in
-[INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md).
+Current implementation, September 15, 2026: predictive continuation is
+restored with a complete finite input plan, rectangular swept collision rows,
+finite confirmed exit, and an invariant road terminal certificate. The
+format-26 controller performs one optimization per sample, preserves a
+feasible affine suffix during an unchanged active encounter, and fails before
+issuing any command when optimization fails. The terminal law is never a
+runtime fallback. The sampled CLF retains its penalized norm slack.
+Authoritative current interfaces, equations and guarantee limits are in
+[SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md).
+
+The remainder records the earlier version-16 design and is not the current
+execution contract.
 
 The version-16 implementation uses one hard safety formulation for cruise and
 avoidance. Every held interval in the admitted horizon includes uncertain

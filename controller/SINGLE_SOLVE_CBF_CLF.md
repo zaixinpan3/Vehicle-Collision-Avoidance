@@ -1,126 +1,127 @@
-# Single-solve sampled CBF–CLF controller
+# Predictive continuation with one soft-CLF solve per sample
 
-The current controller solves one three-variable SOCP at every sample. The
-variables are the steering angle and signed braking ratio held until the next
-sample, and one nonnegative cruise CLF slack. Every physical constraint is hard;
-only the CLF is soft. Targets
-add obstacle constraints; the objective, CLF, road constraints, actuator limits
-and slew limits are identical with and without targets. There are no terminal
-sets, continuation policies, fallback commands, alternate normal searches,
-solver retries, physical safety slacks, or post-solve plan checkers.
+The format-26 controller optimizes a complete finite input sequence. The
+configured prediction length is used (default 16 holds), and finite encounter
+admission may require a longer sequence. Only the first input is executed.
+The fourth output retains the accepted input plan, exact affine node boxes,
+Bernstein enclosures, stage generators, separating normals, charts, finite
+exit deadline, and target-independent terminal set.
 
-This design supersedes the online mechanisms described in
-`SAMPLED_BACKUP_CBF_CLF.md` and `INFORMATION_STATE_PCBF.md`. Those documents
-record earlier analyses. The fourth controller output, format 25, contains
-only the applied input and timestamp. It cannot supply a future command.
+The terminal law is exclusively a prediction-side mathematical certificate.
+It never directly supplies an actuator command. An unsuccessful or malformed
+solve raises `collisionAvoidanceController:optimizationFailed` before control
+is issued, including when a carried feasible witness exists. There is one
+optimization per sample, no retry, and no separate post-solve acceptance checker.
+The former forced one-hold truncation and circumdisk barrier-decay rows are
+removed. Current swept collision constraints use oriented rectangles.
 
-## Scope of the guarantees
+## Optimization and model
 
-The plant is the declared held affine bicycle generator with zero process
-residual. The physical state must be inside the current published error box,
-and target Cartesian jerk must obey its declared bound during the hold. The
-road chart and footprint bounds must cover the entire hold. Inputs execute
-immediately and remain held for the declared sample period. A current empty
-target list asserts that there is no target obligation to include; detection,
-missed detections and re-entry guarantees belong to the sensing interface.
-No all-future target model is used.
-
-A successful solve certifies the next hold under these assumptions and the
-solver feasibility contract. Chaining successful solves establishes safety of
-the executed prefix. This implementation does **not** establish recursive
-feasibility, a controlled invariant domain for the joint constraints, or a
-physical-vehicle guarantee. Stopping the simulation after failure is not a
-physical safe-stop maneuver. There is no safety claim beyond the last completed
-certified hold when a successor problem has no solution.
-
-## One optimization
-
-Let the exact sampled error dynamics about the constant-speed path trim be
+For horizon $N$, the decision is $[U;\delta]$, where
+$U=[u_0^\top,\ldots,u_{N-1}^\top]^\top$ and $\delta\ge0$ is the first-hold
+sampled CLF norm slack. The quadratic objective is
 
 \[
-e^+=F e+G(u-u_*)+d,\qquad e=x_{2:6}-x_{*,2:6}.
+\sum_{i=1}^{N}e_i^\top P e_i+
+\sum_{i=0}^{N-1}(u_i-u_*)^\top W(u_i-u_*)+w_\delta\delta^2.
 \]
 
-`ltvBicycleModel.sampledCruise` synthesizes a positive definite matrix
-\(P=R^\top R\) using the discrete Riccati equation. This is cached matrix
-synthesis; its feedback gain is not executed and does not generate a backup
-trajectory. The trim includes road load, the declared acceleration bias and the steady
-body-heading offset on a curved path. `referenceSpeed` specifies longitudinal
-body speed; the curved-path trim may also have steady lateral body velocity.
-The same frozen-curvature generator builds the swept tube and executes in the
-exact-state experiment.
+The cruise trim $u_*$ and metric $P$ are those used to synthesize the discrete
+Riccati CLF certificate. Road load and local curvature enter that trim.
+Prediction anchors select convex geometry; they are not desired accelerations
+or input references. Future state and input decisions affect collision,
+road/chart/model-domain, slip, actuator and slew constraints. The only relaxed
+constraint is the first-hold CLF. Its units and dissipation bound below are
+unchanged from the soft-CLF design.
 
-The objective is
+The declared plant is the held affine bicycle generator, with zero process
+residual. An admitted prediction uses the sampled cruise generator frozen at
+its admitted curvature. An inherited prediction retains that exact generator,
+trim and metric; it is not replaced by a newly scheduled plant. This scope
+does not establish nonlinear physical-vehicle inclusion or a common Lyapunov
+proof across curvature/metric changes.
+
+## Complete prediction certificate
+
+Every held interval has a swept Bernstein enclosure. Oriented rectangle
+support bounds, target finite-flow uncertainty, and road/model allowances
+produce hard affine rows. The finite target model retains Cartesian jerk and
+yaw-acceleration bounds; no all-future support bound is imposed.
+
+The final node must certify both:
+
+1. The entire target footprint lies outside the declared complete perception
+   region in a certified separating direction. A current valid observation,
+   not a timer, discharges the encounter. Its absolute deadline cannot move
+   forward during inherited optimization.
+2. The ego information box belongs to the target-independent road terminal
+   set, including terminal-input entry slew. This is the comparison-system
+   stopping-excursion construction, with rows of the form
+   $A_f z_N+E_f\rho_N\le b_f$. The hypothetical terminal law brakes the lower
+   speed endpoint and admits a nonnegative invariant speed box.
+
+`hardEncounterBarrier.completionRows` constructs both conditions.
+`terminalStep`, `terminalFlow`, and `terminalMembership` describe or audit
+this mathematical terminal continuation; the online controller never calls
+them to obtain its command. Physical road boundaries are optional. Model-domain
+and chart constraints remain present when the scenario has no road boundaries.
+
+## Feasible continuation is part of the next optimization
+
+Store the accepted hard affine family $A U\le b$, with its inward numerical
+reserves. Partition $A=[A_0\;A_+]$. After executing $u_0^*$, the inherited
+family is
 
 \[
-\min_{u,\delta\ge0}\;\|R(F\hat e+G(u-u_*)+d)\|^2
- +(u-u_*)^\top W(u-u_*)+w_\delta\delta^2,\quad W\succ0,\ w_\delta>0.
+A_+ U^+\le b-A_0u_0^*.
 \]
 
-The feasible set consists of the hard input/slew polytope, swept road,
-chart, state-domain and tire-slip inequalities, the optional obstacle rows
-below, and one soft CLF cone. The decision order is
-`[frontWheelSteeringAngle; brakingRatio; clfSlack]`; only the first two
-coordinates are issued to the actuators. `cfg.clf.relaxationWeight` sets
-\(w_\delta\), default 100. The slack relaxes the **norm** CLF constraint below;
-it is in units of \(\sqrt V\), not of \(V\) or \(\dot V\). It has no upper
-bound, and its coefficient in every physical safety row is exactly zero.
-There is no lexicographic or preliminary optimization. Previous
-inputs enter only the slew bounds. Legacy horizon and execution-policy options
-are accepted for input compatibility but cannot select a different algorithm.
+The accepted suffix $U^{+*}=(u_1^*,\ldots,u_{N-1}^*)$ satisfies this family
+by direct substitution. Rows with no remaining decision dependence are
+already fixed by the certified prefix and can be removed. The first-stage
+slew row shifts in the same way. No additional tightening or new geometric
+convexification is applied to the inherited family.
 
-## Obstacle barrier
+The cell maps and offsets undergo the same substitution. Their original
+radii, normals and charts remain valid; current measurement intersection
+only restricts the actual information set. The prediction centers are
+propagated with exact held affine transitions, not with truncated polynomial
+node approximations. The CLF uses the current conditioned state, and its
+unbounded nonnegative slack admits any finite physically feasible suffix.
+Therefore it cannot destroy existence of a solution to the inherited hard
+family. The solver uses translated coordinates about the carried/trim plan
+to improve conditioning; this exact translation does not constrain its optimum.
 
-For each currently supplied target, choose once the unit direction \(n\) from
-its measured center toward the ego center. Let
+This proves mathematical successor feasibility **within an admitted active
+encounter, with unchanged obligations, valid information-set inclusion,
+unchanged execution/model contracts, and a nonempty finite suffix**. Numerical
+solver completion is a separate obligation. The terminal construction supplies
+a mathematical safe continuation after the certified exit, but that law is
+not an executable fallback in this implementation.
 
-\[
-D=\sqrt{\ell_E^2+w_E^2}+\sqrt{\ell_T^2+w_T^2}+d_{\min},\qquad
-b(t)=n^\top(p_E(t)-p_T(t))-D.
-\]
+After confirmed release, the controller starts a fresh cruise performance
+horizon. A new target, enlarged motion bounds, or partial release among multiple
+targets also requires fresh formulation/admission. This implementation does
+not prove that every such fresh convexification contains the old road witness.
+Accordingly, `recursiveFeasibilityGuaranteed` remains false for the complete
+online hybrid controller; `inheritedFeasibleFamily` specifically identifies
+frames to which the affine shift argument applies. Saving a witness alone
+would not justify a stronger claim.
 
-The two circumdisks enclose the oriented rectangular footprints at every yaw.
-Thus \(b\ge0\) suffices for separation. This approximation is conservative,
-particularly for lateral passing. Direction selection is deterministic geometry,
-not another optimization. A coincident pair uses an arbitrary unit direction
-and an infeasible initial-membership row.
+## Observation and execution contracts
 
-The program enforces robust initial membership and sampled decrease:
+Targets must have stable identities and bounded finite motion. An active
+encounter requires a current `perception` declaration with `time`, `range`,
+and logical `completeWithinRange=true`. An observed exterior target imposes
+no current encounter obligation. Missing data cannot release an interior
+reachable target. New target admission and future re-entry remain separate
+conditions, not consequences of the old certificate.
 
-\[
-\underline b(0)\ge0,\qquad
-\underline b(h)\ge e^{-\lambda h}\overline b(0),\quad\lambda>0.
-\]
-
-The upper and lower bounds include both published state boxes and chart error.
-Using an upper initial bound is conservative but proves the sampled inequality
-for every possible true initial barrier, without assuming future measurements
-reduce uncertainty. This is a sampled barrier condition; existence of a feasible
-input is not asserted on the entire geometric safe set.
-
-The sampled inequality alone is insufficient to exclude intersample collision.
-For every swept Bernstein cell, the program additionally imposes
-\(b(t)\ge0\) throughout the cell. The held affine ego flow uses the existing
-Taylor remainder enclosure. Target position and its radius use the exact
-finite polynomials
-
-\[
-\bar p_T(t)=\bar p_0+t\bar v_0+\tfrac12t^2\bar a_0,\quad
-r_p(t)=r_{p,0}+t r_{v,0}+\tfrac12t^2r_{a,0}+\tfrac16t^3J.
-\]
-
-Every Bernstein coefficient of the lower barrier is constrained nonnegative.
-Nonnegative basis functions summing to one then imply intersample separation.
-The final Bernstein endpoint also supplies the sampled decrease row. Different
-holds may choose different normals: each newly solved hold independently
-establishes initial membership and complete intersample separation.
-
-The distinction between sampled barrier conditions and intersample safety is
-also treated by Tan, Das, Ames and Burdick,
-[Zero-Order Control Barrier Functions for Sampled-Data Systems with State and
-Input Dependent Safety Constraints](https://arxiv.org/abs/2411.17079).
-The specific circumdisk/Bernstein construction above is this implementation's
-sufficient condition, not a claim that the paper proves this complete controller.
+Every successor reports the actual previous held input and next timestamp.
+Measured ego/target boxes are intersected with the carried prediction. An
+empty intersection violates the declared execution/measurement/model contract.
+The observer implementation and its high-gain mathematical framework are
+unchanged by this restoration.
 
 ## Soft sampled CLF and its dissipation bound
 
@@ -155,7 +156,7 @@ B=\frac{c}{c-a}\sigma^2,\qquad
 S(\delta)=\frac{c}{c-a}\delta(2\sigma+\delta).
 \]
 
-Metadata reports `clfSlack` as the optimizer's third decision,
+Metadata reports `clfSlack` as the optimizer's final decision,
 `clfSlackPenalty` as \(w_\delta\delta^2\), `clfDisturbanceBound` as \(B\), and
 `clfSlackDissipationBound` as \(S(\delta)\). A tiny negative numerical slack is
 replaced by zero only when forming this outward reporting allowance; neither
@@ -188,26 +189,18 @@ the residual with that allowance removed, and the unrelaxed residual. Offline
 experimental success uses the slack-dependent inequality. A positive unrelaxed
 residual remains visible and is never described as unrelaxed CLF dissipation.
 
-## Solver and failure behavior
+## Numerical and runtime scope
 
-`solveHardCbfClf.constrained` passes the single conic program to Clarabel. The
-three-variable program retains all physical rows; the older two-coordinate
-row-compaction helper is not used for this program. Physical row reserves
-are formed before solving. Execution requires a strict successful solver
-status and a finite, real, correctly sized command. These are solver result
-handling, not a separate residual checker. A custom solver hook must obey the
-same status/feasibility contract. A false success declaration is not detected
-by an independent verifier in this design.
+The native solver must return strict success with a finite, real decision of
+the expected size. Physical reserves are constructed before solving; there is
+no independent online residual verifier. A solver hook must satisfy the same
+feasibility/status contract. Incorrect success declarations are not caught by
+a separate checker. The test suite audits physical rows, sampled rectangles,
+CLF dissipation, witness shifting and terminal membership independently.
 
-An infeasible, timed-out, incomplete or malformed solver result raises
-`collisionAvoidanceController:optimizationFailed`. The exact-state and
-estimator/declared-plant drivers save their diagnostic prefix when an output
-directory is supplied, then rethrow the error. Neither advances the plant with
-an old command after a failed solve. Offline tests and experimental geometry
-measurements remain independent of command execution.
-
-`frameDeadlineSeconds` limits the native solve, including solver dispatch
-preparation counted by its work timer. It does not establish a worst-case bound
-on MATLAB input parsing, Riccati synthesis, geometry construction, JIT loading
-or scheduling. End-to-end timing is reported separately. Real-time suitability
-must therefore distinguish warm measurements, cold startup and a proved WCET.
+`frameDeadlineSeconds` limits native solver work. It does not bound complete
+MATLAB preparation, prediction construction, loading, or scheduling. Experiments
+report complete measured frame times and cold/warm behavior separately. The
+restored full prediction is not yet qualified for every-frame 100 ms execution.
+See the dated restoration report under `report/` for measured results and
+remaining admission/performance failures.

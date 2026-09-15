@@ -135,8 +135,14 @@ function solve = localDefaultSolve(problem, cfg)
     end
     original = problem.stageProgram;
     [program,retained] = localReducedProgram(original);
-    linear = program.q;
-    bound = program.b;
+    center = zeros(numel(program.q),1);
+    if isfield(program,'anchorPlan')
+        center(1:numel(program.anchorPlan)) = program.anchorPlan;
+    end
+    % Translate the full plan about its carried/trim seed. This is an exact
+    % coordinate change; it does not constrain the optimizer toward that seed.
+    linear = program.q+program.P*center;
+    bound = program.b-program.A*center;
     % Positive objective scaling preserves minimizers. The lifted CLF
     % epigraph can otherwise trigger a false native infeasibility report.
     hessian = sparse(program.P);
@@ -159,9 +165,10 @@ function solve = localDefaultSolve(problem, cfg)
     [nativeDecision, output] = nativeSolver( ...
         objectiveScale*hessian, objectiveScale*linear, sparse(program.A), bound, program.cones, ...
         options);
-    output.objectiveValue = output.objectiveValue/objectiveScale;
+    output.objectiveValue = output.objectiveValue/objectiveScale ...
+        +0.5*center.'*program.P*center+program.q.'*center;
     output.objectiveScale = objectiveScale;
-    stageDecision = zeros(numel(original.q),1);stageDecision(retained) = nativeDecision;
+    stageDecision = zeros(numel(original.q),1);stageDecision(retained) = nativeDecision+center;
     flag = -7;
     switch output.status
         case 1

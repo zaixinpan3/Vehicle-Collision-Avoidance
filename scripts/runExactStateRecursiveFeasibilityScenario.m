@@ -1,5 +1,5 @@
 function report = runExactStateRecursiveFeasibilityScenario(options)
-%runExactStateRecursiveFeasibilityScenario Exact affine single-solve experiment.
+%runExactStateRecursiveFeasibilityScenario Exact affine predictive-control experiment.
 % The historical entry-point name is retained. Recursive feasibility is not
 % claimed. Any control failure saves the executed prefix and then rethrows.
 % Geometry and CLF measurements below are offline experimental diagnostics;
@@ -26,7 +26,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8, ...
-        "controller",struct("sampleTime",0.1),"model",struct("lateralDomainRadius",4), ...
+        "controller",struct("sampleTime",0.1,"minimumHorizonSteps",options.MinimumHorizonSteps, ...
+        "executionPolicy",options.ExecutionPolicy),"model",struct("lateralDomainRadius",4), ...
         "solver",struct("frameDeadlineSeconds",options.DeadlineSeconds)));
     originalCfg = cfg;
     stream = RandStream("mt19937ar",Seed=options.Seed);
@@ -50,6 +51,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     lane = [];previousState = [];previousInput = [];
     count = options.SampleCount;
     states = nan(6,count+1);inputs=nan(2,count);seconds=nan(1,count);calls=zeros(1,count);
+    horizons=zeros(1,count);inherited=false(1,count);releases=false(1,count);terminalCommands=false(1,count);
+    inheritedViolation=nan(1,count);terminalMargin=nan(1,count);
     clfResidual=nan(1,count);clfValue=nan(1,count);cbfRows=zeros(1,count);
     clfSlack=nan(1,count);clfSlackBound=nan(1,count);clfUnrelaxedResidual=nan(1,count);
     minimumSeparation=inf;minimumRoad=inf;minimumDomain=inf;maximumSlew=0;
@@ -58,6 +61,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         time = (sample-1)*h;
         frameTimer = tic;
         ego = localEgoMeasurement(x,time,previousInput,options.EgoErrorBound,stream,lane);
+        ego.perception = struct('time',time,'range',options.ConfirmationRange,'completeWithinRange',true);
         target = localTargetMeasurement(truthTarget,time,options.TargetErrorBound,stream);
         if options.Scenario=="cruise",target=[];end
         try
@@ -73,6 +77,16 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         states(:,sample)=x;
         metadata=problem.metadata;calls(sample)=metadata.solverCallCount;
         cbfRows(sample)=metadata.obstacleCbfRowCount;
+        horizons(sample)=metadata.horizonSteps;inherited(sample)=metadata.inheritedFeasibleFamily;
+        releases(sample)=metadata.confirmedRelease;terminalCommands(sample)=metadata.terminalActive;
+        % Offline audits do not authorize or reject a command.
+        if inherited(sample)
+            oldDecision=[problem.carriedWitness.inputs(:);0];
+            inheritedViolation(sample)=max(problem.program.physicalMatrix*oldDecision-problem.program.physicalBound);
+        end
+        [~,margins]=hardEncounterBarrier.terminalMembership(problem.program.terminal, ...
+            previousState.predictedState(:,end),previousState.stateErrorBound(:,end));
+        terminalMargin(sample)=min(margins);
         inputs(:,sample)=command.actuatorInput;
         if ~isempty(previousInput)
             rate=h*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
@@ -114,6 +128,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'sampleCount',count,'executedHolds',executed,'completed',isempty(failure), ...
         'time',(0:executed)*h,'state',states(:,1:executed+1),'input',inputs(:,1:executed), ...
         'solverCallCount',calls(1:executed),'obstacleCbfRowCount',cbfRows(1:executed), ...
+        'horizonSteps',horizons(1:executed),'inheritedFeasibleFamily',inherited(1:executed), ...
+        'confirmedRelease',releases(1:executed),'terminalCommands',terminalCommands(1:executed), ...
+        'inheritedWitnessViolation',inheritedViolation(1:executed),'terminalMembershipMargin',terminalMargin(1:executed), ...
         'clfValue',clfValue(1:executed),'clfDissipationResidual',clfResidual(1:executed), ...
         'clfSlack',clfSlack(1:executed),'clfSlackDissipationBound',clfSlackBound(1:executed), ...
         'clfUnrelaxedDissipationResidual',clfUnrelaxedResidual(1:executed), ...
@@ -122,7 +139,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'failureIdentifier',"",'failureMessage',"",'failureTime',NaN, ...
         'egoErrorBound',options.EgoErrorBound,'targetErrorBound',options.TargetErrorBound, ...
         'targetMotion',truthTarget,'recursiveFeasibilityGuaranteed',false, ...
-        'scope',"Successful single solves certify one held affine interval; no continuation after a failed solve");
+        'scope',"Predictive finite encounter and road-terminal witness; failed optimization ends execution");
     report.passed=report.completed && minimumSeparation>=-1e-8 ...
         && (~options.UseRoadBoundaries || minimumRoad>=-1e-8) ...
         && minimumDomain>=-1e-8 && maximumSlew<=1e-8 && all(clfResidual(1:executed)<=1e-8);

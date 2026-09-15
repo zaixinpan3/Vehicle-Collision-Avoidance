@@ -3,8 +3,8 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-The controller uses one SOCP with two actuator inputs and a penalized CLF slack.
-Its format-25 state stores only the previous input and timestamp.
+The controller uses one SOCP with a full input sequence and a penalized first-hold CLF slack.
+Its format-26 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -16,10 +16,10 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public target-array entry; one solve per hold, applied-input memory, error on any failed solve |
+| `collisionAvoidanceController.m` | Public target-array entry; one solve per hold, prediction and terminal-witness storage, error on any failed solve |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
-| `hardEncounterBarrier.m` | Sampled obstacle barrier and swept intersample rows (`rows`) |
-| `formulateAvoidanceProblem.m` | Three-variable objective, hard swept safety and obstacle rows, and one sampled CLF cone with optimized nonnegative slack |
+| `hardEncounterBarrier.m` | Finite encounter admission/conditioning, invariant road-terminal rows and carried-witness data |
+| `formulateAvoidanceProblem.m` | Full-plan objective and hard swept/terminal rows, affine elimination of the executed prefix, and one soft sampled CLF cone |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
 | `solveHardCbfClf.m` | Single hard-safety, soft-CLF SOCP (`constrained`) and strict solver-status handling; legacy two-coordinate row compaction does not apply to this program |
 | `avoidanceSafetyGeometry.m` | Swept separation (`build`), passing-side proposals (`passingNormals`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
@@ -39,10 +39,13 @@ Do not move controller helpers into those directories to evade the limit.
 
 ## Current interfaces and scope
 
-The public controller signature is unchanged. Its fourth output is applied-input
-memory, format 25, and contains no plan or terminal controller. The online path
-calls `formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained` exactly
-once. Removed terminal, checker and carried-witness methods have no wrappers.
+The public controller signature is unchanged. Its fourth output is a
+format-26 predictive certificate. The online path calls
+`formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained` once per
+sample. A valid active encounter inherits the accepted constraint family by
+eliminating the executed input. The terminal law is a mathematical witness;
+failed optimization never dispatches it or a stored input. New admission and
+post-release cruise use a fresh predictive program.
 
 `avoidanceStageQp` and the general model/geometry kernels remain standalone
 research transcription and model utilities; they are not alternate execution

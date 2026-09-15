@@ -89,8 +89,9 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(parsed.yaw, 0.2, AbsTol=1e-14);
         end
 
-        function egoAndTargetCertificateBoxesEnterTheSingleHoldProblem(testCase)
+        function egoAndTargetCertificateBoxesEnterThePredictiveProblem(testCase)
             [ego, target, cfg, lane] = localInputs();
+            target.targetPositionInertial(1)=12;
             [~,~,problem] = collisionAvoidanceController(ego,target,lane,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.initialErrorBound(4:6), ego.controllerErrorBound.bounds(4:6), AbsTol=0);
@@ -98,18 +99,21 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.model.encounters.radius(1:2), [0.2;0.2], AbsTol=0);
         end
 
-        function eachSolveUsesTheCurrentTargetBox(testCase)
+        function currentMeasurementsConditionTheCarriedTargetBox(testCase)
             [ego,target,lane,cfg] = encounterTestFixture.crossing();
             [~,~,problem,stored] = collisionAvoidanceController(ego,target,lane,cfg,[]);
             x=problem.predictedState(:,2);
             [ego.position,ego.yaw]=laneGeometry.fromFrenet(x,problem.model.lane);
             ego.speed=x(4);ego.lateralVelocity=x(5);ego.yawRate=x(6);
             ego.stateTime=cfg.controller.sampleTime;ego.heldActuatorInput=stored.appliedInput;
+            ego.perception.time=ego.stateTime;
             target.targetPositionInertial=target.targetPositionInertial+cfg.controller.sampleTime*target.targetVelocityInertial;
             target.targetPositionInertialErrorBound=[.01;.01];
             [~,~,next]=collisionAvoidanceController(ego,target,lane,cfg,stored);
             testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyEqual(next.metadata.targetErrorBound(1:2),[.01;.01],AbsTol=0);
+            testCase.verifyLessThanOrEqual(next.metadata.targetErrorBound(1:2),[.01;.01]);
+            testCase.verifyLessThanOrEqual(next.metadata.targetErrorBound(1:2),1e-12*ones(2,1));
+            testCase.verifyTrue(next.metadata.inheritedFeasibleFamily);
         end
 
         function anEgoBoxIsAdmittedWithItsFrenetRadius(testCase)

@@ -1,7 +1,7 @@
 function cfg = collisionAvoidanceControllerConfig(userCfg)
 % collisionAvoidanceControllerConfig Defaults and merge for the controller.
 %
-% Returns the single-solve sampled CBF-CLF configuration, with supplied
+% Returns the predictive CBF and sampled CLF configuration, with supplied
 % overrides merged recursively over the declared defaults. Every field
 % the controller reads is defined here; a missing field is a
 % configuration error at the consuming module rather than a silent
@@ -34,11 +34,10 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % Exactly one held-input optimization. Legacy horizon and executionPolicy
-    % fields are retained as input-format compatibility only; no code selects
-    % an alternate controller or extends the one-hold optimization.
-    cfg.controller = struct("sampleTime",0.05,"horizonSteps",1, ...
-        "minimumHorizonSteps",1,"executionPolicy","singleSolve","stationTrustRadius",2.0);
+    % One solve optimizes the complete predictive continuation. The terminal
+    % policy is a certificate only; failed optimization never executes it.
+    cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
+        "minimumHorizonSteps",4,"executionPolicy","singleSolve","stationTrustRadius",2.0);
     cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
     cfg.encounter = struct("minimumCells",2,"taylorOrder",6, ...
         "numericalMargin",1.0e-6,"maximumCarriedMargin",1.0,"inputRateWeight",0.02);
@@ -115,11 +114,11 @@ function cfg = localDefaults()
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
     % One conic solve. The hook receives (phase,program), with P/q/A/b/cones
-    % and decision coordinates [deltaF; beta; clfSlack]. defaultSolver
+    % and decision coordinates [inputPlan(:); clfSlack]. defaultSolver
     % invokes the native solver once. A hook must honor its feasibility status.
     % constraintTolerance enters the pre-solve physical row reserves.
     % frameDeadlineSeconds caps native work, not complete MATLAB frame time.
-    % Legacy search, formulation and witness settings are ignored online.
+    % A finite exit may require more stages than the performance window.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
