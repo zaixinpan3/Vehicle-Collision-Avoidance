@@ -6,10 +6,13 @@ Latest implementation and validation: [Optimized soft CLF with hard safety, Sept
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
+Latest failure analysis: [Single-hold infeasibility, shared uncertainty and passing geometry](SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md).
+
 Each report states its experiment date and scope. Earlier results describe the revision tested at that time.
 
 | Report | File |
 | --- | --- |
+| Single-hold decay-row obstructions, uncertainty correlation and blocked passing geometry | [SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md](SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md) |
 | CLF slack, optional road boundaries, and remaining hard-input infeasibility | [CLF_SLACK_NO_ROAD_RERUN_20260915.md](CLF_SLACK_NO_ROAD_RERUN_20260915.md) |
 | Optimized CLF slack, preserved hard safety, failure diagnosis and runtime | [SOFT_CLF_CONTROLLER_RESULTS_20260915.md](SOFT_CLF_CONTROLLER_RESULTS_20260915.md) |
 | One hard optimization per sample, explicit failure, sampled dissipation and timing | [SINGLE_SOLVE_CONTROLLER_RESULTS_20260915.md](SINGLE_SOLVE_CONTROLLER_RESULTS_20260915.md) |
