@@ -3,7 +3,8 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-Format 25 replaces the online search and backup paths with one two-input SOCP.
+The controller uses one SOCP with two actuator inputs and a penalized CLF slack.
+Its format-25 state stores only the previous input and timestamp.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -18,9 +19,9 @@ Do not move controller helpers into those directories to evade the limit.
 | `collisionAvoidanceController.m` | Public target-array entry; one solve per hold, applied-input memory, error on any failed solve |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
 | `hardEncounterBarrier.m` | Sampled obstacle barrier and swept intersample rows (`rows`) |
-| `formulateAvoidanceProblem.m` | Two-input objective, permanent swept safety constraints, obstacle rows and one hard sampled CLF cone |
+| `formulateAvoidanceProblem.m` | Three-variable objective, hard swept safety and obstacle rows, and one sampled CLF cone with optimized nonnegative slack |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
-| `solveHardCbfClf.m` | Single hard SOCP (`constrained`), pre-solve row compaction and strict solver-status handling |
+| `solveHardCbfClf.m` | Single hard-safety, soft-CLF SOCP (`constrained`) and strict solver-status handling; legacy two-coordinate row compaction does not apply to this program |
 | `avoidanceSafetyGeometry.m` | Swept separation (`build`), passing-side proposals (`passingNormals`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |

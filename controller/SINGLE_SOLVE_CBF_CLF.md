@@ -1,12 +1,13 @@
 # Single-solve sampled CBF–CLF controller
 
-The current controller solves one two-variable SOCP at every sample. The
+The current controller solves one three-variable SOCP at every sample. The
 variables are the steering angle and signed braking ratio held until the next
-sample. Every physical constraint and the cruise CLF constraint is hard. Targets
+sample, and one nonnegative cruise CLF slack. Every physical constraint is hard;
+only the CLF is soft. Targets
 add obstacle constraints; the objective, CLF, road constraints, actuator limits
 and slew limits are identical with and without targets. There are no terminal
 sets, continuation policies, fallback commands, alternate normal searches,
-solver retries, safety slacks, or post-solve plan checkers.
+solver retries, physical safety slacks, or post-solve plan checkers.
 
 This design supersedes the online mechanisms described in
 `SAMPLED_BACKUP_CBF_CLF.md` and `INFORMATION_STATE_PCBF.md`. Those documents
@@ -52,13 +53,19 @@ exact-state experiment.
 The objective is
 
 \[
-\min_u\;\|R(F\hat e+G(u-u_*)+d)\|^2
- +(u-u_*)^\top W(u-u_*),\quad W\succ0.
+\min_{u,\delta\ge0}\;\|R(F\hat e+G(u-u_*)+d)\|^2
+ +(u-u_*)^\top W(u-u_*)+w_\delta\delta^2,\quad W\succ0,\ w_\delta>0.
 \]
 
 The feasible set consists of the hard input/slew polytope, swept road,
 chart, state-domain and tire-slip inequalities, the optional obstacle rows
-below, and one hard CLF cone. There is no slack decision variable. Previous
+below, and one soft CLF cone. The decision order is
+`[frontWheelSteeringAngle; brakingRatio; clfSlack]`; only the first two
+coordinates are issued to the actuators. `cfg.clf.relaxationWeight` sets
+\(w_\delta\), default 100. The slack relaxes the **norm** CLF constraint below;
+it is in units of \(\sqrt V\), not of \(V\) or \(\dot V\). It has no upper
+bound, and its coefficient in every physical safety row is exactly zero.
+There is no lexicographic or preliminary optimization. Previous
 inputs enter only the slew bounds. Legacy horizon and execution-policy options
 are accepted for input compatibility but cannot select a different algorithm.
 
@@ -115,7 +122,7 @@ Input Dependent Safety Constraints](https://arxiv.org/abs/2411.17079).
 The specific circumdisk/Bernstein construction above is this implementation's
 sufficient condition, not a claim that the paper proves this complete controller.
 
-## Hard sampled CLF dissipation
+## Soft sampled CLF and its dissipation bound
 
 Let \(q_0<1\) bound the Riccati feedback's nominal squared-norm contraction,
 choose \(0<f<1\), and set
@@ -128,7 +135,7 @@ The controller enforces the single SOC
 
 \[
 \|R(F\hat e+G(u-u_*)+d)\|
-\le \sqrt a\,\|R\hat e\|+\epsilon_{\rm num}.
+\le \sqrt a\,\|R\hat e\|+\epsilon_{\rm num}+\delta,\qquad\delta\ge0.
 \]
 
 For \(e=\hat e+\eta\), \(|\eta|\le r\), define
@@ -138,33 +145,54 @@ For \(e=\hat e+\eta\), \(|\eta|\le r\), define
 \]
 
 The triangle inequality gives
-\(\|Re^+\|\le\sqrt a\|Re\|+\sigma\). Young's inequality yields
+\(\|Re^+\|\le\sqrt a\|Re\|+\sigma+\delta\). Young's inequality yields
 
 \[
-V(e^+)\le cV(e)+B,\qquad
-B=\frac{c}{c-a}\sigma^2,\qquad V(e)=e^\top Pe.
+V(e^+)\le cV(e)+B+S(\delta),\qquad V(e)=e^\top Pe,
+\]
+\[
+B=\frac{c}{c-a}\sigma^2,\qquad
+S(\delta)=\frac{c}{c-a}\delta(2\sigma+\delta).
 \]
 
-The reported `clfDisturbanceBound` is \(B\), not an optimized relaxation. For
-exact arithmetic and exact states, \(B=0\) and this is strict sampled
-exponential dissipation. With numerical allowance or measurement uncertainty,
-it is practical sampled dissipation; uniform \(B\) implies
-\(\limsup V\le B/(1-c)\) along an indefinitely feasible sequence. No claim of
+Metadata reports `clfSlack` as the optimizer's third decision,
+`clfSlackPenalty` as \(w_\delta\delta^2\), `clfDisturbanceBound` as \(B\), and
+`clfSlackDissipationBound` as \(S(\delta)\). A tiny negative numerical slack is
+replaced by zero only when forming this outward reporting allowance; neither
+the solver decision nor the command is changed or checked. The reported
+`clfDissipationCertified` flag means this **slack-dependent sampled bound**,
+as specified by `clfDissipationScope`.
+
+At zero slack, exact arithmetic and exact states, \(B=0\) and this is sampled
+exponential dissipation. Positive slack allows \(V\) to increase, including
+when avoiding an obstacle requires leaving exact cruise. A positive quadratic
+penalty does not itself prove that slack vanishes, even on a clear road.
+Strict decrease follows whenever \(B+S(\delta)<(1-c)V\). If
+\(B_k+S(\delta_k)\le\overline E\) uniformly along an indefinitely feasible
+sequence, the bound implies \(\limsup V\le\overline E/(1-c)\).
+This conditional statement does not assert such a uniform bound exists.
+No claim of
 pointwise continuous-time \(\dot V<0\) is made between samples. A common fixed
 curvature and trim are required to chain one metric across holds. A changed
 curvature/metric or reference needs a separate switching analysis.
 
-At exact cruising equilibrium, hard zero-error dissipation prevents braking or
-steering away from that equilibrium. An obstacle can therefore make the hard
-CBF and hard cruise CLF incompatible. The numerical allowance only permits a
-tiny neighborhood; it does not provide meaningful avoidance freedom. The code
-reports infeasibility rather than silently relaxing either requirement.
+For any finite physical input satisfying the hard constraints, a finite
+nonnegative slack can satisfy the CLF cone. Thus the CLF no longer excludes a
+physically feasible input merely because it would increase tracking error.
+Hard obstacle, road, domain and actuator constraints can still conflict. The
+controller stops on an unsuccessful solve; slack provides no backup design
+or recursive-feasibility guarantee.
+
+The exact-state driver saves the optimized slack, its dissipation allowance,
+the residual with that allowance removed, and the unrelaxed residual. Offline
+experimental success uses the slack-dependent inequality. A positive unrelaxed
+residual remains visible and is never described as unrelaxed CLF dissipation.
 
 ## Solver and failure behavior
 
-`solveHardCbfClf.constrained` passes one hard conic program to Clarabel. Its
-pre-solve row compaction preserves coupled constraints; tiny cross coefficients
-are bounded over explicit input limits before removal. Physical row reserves
+`solveHardCbfClf.constrained` passes the single conic program to Clarabel. The
+three-variable program retains all physical rows; the older two-coordinate
+row-compaction helper is not used for this program. Physical row reserves
 are formed before solving. Execution requires a strict successful solver
 status and a finite, real, correctly sized command. These are solver result
 handling, not a separate residual checker. A custom solver hook must obey the

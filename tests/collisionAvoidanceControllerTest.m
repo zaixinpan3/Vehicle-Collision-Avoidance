@@ -2,7 +2,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
     properties (TestParameter)
         targetPresent = {false,true};
         failedStatus = {-999,-2,0,2};
-        badDecision = {[],[NaN;0],[Inf;0],[1i;0],zeros(3,1)};
+        badDecision = {[],[NaN;0;0],[Inf;0;0],[1i;0;0],zeros(4,1)};
         legacyPolicy = {"auto","backup","predictive","singleSolve"};
         invalidDecay = {0,1,1.01,NaN,Inf};
         errorRadius = {zeros(6,1),[.001;.001;.0001;.001;.001;.0001]};
@@ -86,13 +86,33 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             residual=localRobustClfResidual(problem,command);
             testCase.verifyLessThanOrEqual(residual,1e-10);
             testCase.verifyTrue(problem.metadata.clfDissipationCertified);
-            testCase.verifySize(problem.program.q,[2,1]);
+            testCase.verifySize(problem.program.q,[3,1]);
         end
-        function conflictingCruiseAndBarrierConstraintsRaiseAnError(testCase)
+        function avoidanceCanRelaxCruiseWhileKeepingTheBarrierHard(testCase)
             [ego,target,road,cfg]=localFixture(true);
-            target.targetPositionInertial=[9;0];target.targetVelocityInertial=[0;0];
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:optimizationFailed');
+            target.targetPositionInertial=[9.8;0];target.targetVelocityInertial=[0;0];
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [minimum,residual]=localBarrierResidual(problem,command);
+            testCase.verifyGreaterThan(problem.metadata.clfSlack,1e-4);
+            testCase.verifyGreaterThanOrEqual(minimum,0);
+            testCase.verifyLessThanOrEqual(residual,0);
+            testCase.verifyLessThanOrEqual(localRobustClfResidual(problem,command),1e-10);
+            testCase.verifyGreaterThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
+        end
+        function theConfiguredPenaltyControlsOptimizedRelaxation(testCase)
+            [ego,target,road,cfg]=localFixture(false);
+            ego.position(2)=.05;ego.yaw=.002;ego.speed=7.95;
+            cfg.clf.relaxationWeight=.01;
+            [~,~,low]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            cfg.clf.relaxationWeight=100;
+            [~,~,high]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyGreaterThanOrEqual(high.metadata.clfSlack,0);
+            testCase.verifyLessThan(high.metadata.clfSlack,low.metadata.clfSlack);
+            testCase.verifyEqual(high.metadata.clfSlackPenalty, ...
+                cfg.clf.relaxationWeight*high.decision(3)^2,AbsTol=1e-12);
+            testCase.verifyEqual(high.decision(1:2),high.inputPlan,AbsTol=0);
+            testCase.verifyEqual(high.program.A,low.program.A,AbsTol=0);
+            testCase.verifyEqual(high.program.b,low.program.b,AbsTol=0);
         end
         function anOverlappingTargetCannotBeAdmitted(testCase)
             [ego,target,road,cfg]=localFixture(true);
@@ -171,7 +191,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(saved.report.failureTime,.1,AbsTol=0);
             testCase.verifyFalse(saved.report.completed);
         end
-        function pathAndSpeedRecoverUnderTheHardClf(testCase)
+        function pathAndSpeedRecoverWithTheOptimizedClfSlack(testCase)
             report=runExactStateRecursiveFeasibilityScenario(Scenario="cruise",SampleCount=120, ...
                 InitialTrackingError=[.05;.002;-.05;0;0]);
             testCase.verifyTrue(report.passed);
@@ -220,7 +240,7 @@ end
 
 function [matrix,bound]=localPermanentProgram(program)
     count=program.cones(2);obstacles=program.obstacleCbfRowCount;
-    selected=count-4-obstacles+(1:obstacles);
+    selected=count-5-obstacles+(1:obstacles);
     matrix=program.A;bound=program.b;matrix(selected,:)=[];bound(selected)=[];
 end
 
@@ -235,7 +255,7 @@ function residual=localRobustClfResidual(problem,command)
     next=flow(1:6,:)*[initial;repmat(command.actuatorInput,1,size(initial,2));ones(1,size(initial,2))];
     e=initial(2:6,:)-meta.clfReferenceState(2:6);f=next(2:6,:)-meta.clfReferenceState(2:6);
     residual=max(sum(f.*(meta.clfMatrix*f),1)-(1-meta.clfDecayPerHold)*sum(e.*(meta.clfMatrix*e),1) ...
-        -meta.clfDisturbanceBound);
+        -meta.clfDisturbanceBound-meta.clfSlackDissipationBound);
 end
 
 function [minimum,residual]=localBarrierResidual(problem,command)

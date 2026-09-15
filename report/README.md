@@ -2,7 +2,7 @@
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest implementation and validation: [Single-solve CBF–CLF controller, September 15, 2026](SINGLE_SOLVE_CONTROLLER_RESULTS_20260915.md).
+Latest implementation and validation: [Optimized soft CLF with hard safety, September 15, 2026](SOFT_CLF_CONTROLLER_RESULTS_20260915.md).
 
 Latest independent rerun: [Version-23 straight scenes, 90 s cruise recovery and first-admission timing](CONTROLLER_V23_RERUN_20260914.md).
 
@@ -10,6 +10,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Optimized CLF slack, preserved hard safety, failure diagnosis and runtime | [SOFT_CLF_CONTROLLER_RESULTS_20260915.md](SOFT_CLF_CONTROLLER_RESULTS_20260915.md) |
 | One hard optimization per sample, explicit failure, sampled dissipation and timing | [SINGLE_SOLVE_CONTROLLER_RESULTS_20260915.md](SINGLE_SOLVE_CONTROLLER_RESULTS_20260915.md) |
 | Hard-constrained solver execution, sampled cruise CLF and runtime results | [HARD_CONSTRAINED_CONTROLLER_RESULTS_20260915.md](HARD_CONSTRAINED_CONTROLLER_RESULTS_20260915.md) |
 | Independent version-23 straight scenes, hard cruise dissipation and runtime audit | [CONTROLLER_V23_RERUN_20260914.md](CONTROLLER_V23_RERUN_20260914.md) |

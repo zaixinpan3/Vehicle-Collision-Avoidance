@@ -175,7 +175,7 @@ function solve = localDefaultSolve(problem, cfg)
         case {7, 8}
             flag = 0;
     end
-    output.algorithm = "Clarabel hard-constrained CLF SOCP";
+    output.algorithm = "Clarabel hard-safety soft-CLF SOCP";
     output.message = "Clarabel status "+string(output.status);
     solve = struct("decision", stageDecision, ...
         "exitFlag", flag, "output", output);

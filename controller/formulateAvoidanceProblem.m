@@ -1,6 +1,6 @@
 function [program,prediction,clf] = formulateAvoidanceProblem(model)
-%formulateAvoidanceProblem One held-input SOCP, with hard safety and CLF rows.
-% No terminal set, tail, CLF slack, or alternative control formulation.
+%formulateAvoidanceProblem One SOCP with hard safety and a soft sampled CLF.
+% Decision order: held steering, held braking ratio, nonnegative CLF slack.
     cfg = model.cfg;
     cruise = ltvBicycleModel.sampledCruise(model);
     model.anchorPlan = cruise.input;
@@ -27,6 +27,9 @@ function [program,prediction,clf] = formulateAvoidanceProblem(model)
     reserve = 4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance) ...
         *scale.*any(matrix~=0,2);
     bound = bound-reserve;
+    % Only the CLF has a slack column. Every physical row keeps coefficient 0.
+    matrix = [matrix,zeros(numel(bound),1);0,0,-1];
+    bound = [bound;0];
     linearCount = numel(bound);
     root = chol(cruise.matrix);
     trackingError = model.initialEgoState(2:6)-cruise.state(2:6);
@@ -40,18 +43,19 @@ function [program,prediction,clf] = formulateAvoidanceProblem(model)
     inputRoot = root*inputMap;
     numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach));
     coneRadius = sqrt(middle)*norm(root*trackingError)+numeric;
-    matrix = [matrix;zeros(1,2);-inputRoot];
+    matrix = [matrix;0,0,-1;-inputRoot,zeros(5,1)];
     bound = [bound;coneRadius;root*nominalOffset];
     disturbance = sqrt(middle)*norm(abs(root)*radius) ...
         +norm(abs(root*stateMap)*radius)+2*numeric;
     clf = struct('cruise',cruise,'initialValue',trackingError.'*cruise.matrix*trackingError, ...
         'decayPerHold',cruise.decayPerHold, ...
-        'disturbanceBound',contraction/(contraction-middle)*disturbance^2);
+        'disturbanceBound',contraction/(contraction-middle)*disturbance^2, ...
+        'normDisturbance',disturbance,'youngFactor',contraction/(contraction-middle));
     weight = diag([cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight]);
     objectiveMap = root*inputMap;
     objectiveOffset = root*nominalOffset;
-    hessian = 2*(objectiveMap.'*objectiveMap+weight);
-    linear = 2*(objectiveMap.'*objectiveOffset-weight*cruise.input);
+    hessian = 2*blkdiag(objectiveMap.'*objectiveMap+weight,cfg.clf.relaxationWeight);
+    linear = [2*(objectiveMap.'*objectiveOffset-weight*cruise.input);0];
     program = struct('P',sparse(hessian),'q',linear,'A',sparse(matrix),'b',bound, ...
         'cones',[0;linearCount;6],'decisionRadius',reach, ...
         'obstacleCbfRowCount',numel(cbfBound),'barrier',barrier);
