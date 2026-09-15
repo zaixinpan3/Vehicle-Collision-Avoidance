@@ -4,12 +4,13 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest implementation and validation: [Optimized soft CLF with hard safety, September 15, 2026](SOFT_CLF_CONTROLLER_RESULTS_20260915.md).
 
-Latest independent rerun: [Version-23 straight scenes, 90 s cruise recovery and first-admission timing](CONTROLLER_V23_RERUN_20260914.md).
+Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
 Each report states its experiment date and scope. Earlier results describe the revision tested at that time.
 
 | Report | File |
 | --- | --- |
+| CLF slack, optional road boundaries, and remaining hard-input infeasibility | [CLF_SLACK_NO_ROAD_RERUN_20260915.md](CLF_SLACK_NO_ROAD_RERUN_20260915.md) |
 | Optimized CLF slack, preserved hard safety, failure diagnosis and runtime | [SOFT_CLF_CONTROLLER_RESULTS_20260915.md](SOFT_CLF_CONTROLLER_RESULTS_20260915.md) |
 | One hard optimization per sample, explicit failure, sampled dissipation and timing | [SINGLE_SOLVE_CONTROLLER_RESULTS_20260915.md](SINGLE_SOLVE_CONTROLLER_RESULTS_20260915.md) |
 | Hard-constrained solver execution, sampled cruise CLF and runtime results | [HARD_CONSTRAINED_CONTROLLER_RESULTS_20260915.md](HARD_CONSTRAINED_CONTROLLER_RESULTS_20260915.md) |

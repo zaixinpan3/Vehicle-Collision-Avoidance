@@ -4,9 +4,11 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
 % claimed. Any control failure saves the executed prefix and then rethrows.
 % Geometry and CLF measurements below are offline experimental diagnostics;
 % they do not accept, reject, repair, or select a controller command.
+% Road boundaries are opt-in. The declared model domain always remains hard.
     arguments
         options.Scenario (1,1) string {mustBeMember(options.Scenario,["stationary","oncoming","crossing","cruise"])} = "stationary"
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 120
+        options.UseRoadBoundaries (1,1) logical = false
         options.FailAfterAdmission (1,1) logical = false
         options.OutputDirectory (1,1) string = ""
         options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
@@ -36,11 +38,14 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         "halfLength",cfg.target.defaultLength/2,"halfWidth",cfg.target.defaultWidth/2);
     if options.Scenario=="oncoming",truthTarget.center=[60;0;-8;0;0;0;pi;0];end
     if options.Scenario=="crossing",truthTarget.center=[15;-4;0;32;0;0;pi/2;0];end
-    boundary = struct("origin",zeros(2,1),"longitudinalDirection",[1;0], ...
-        "lateralDirection",[0;1],"coefficients",[0;0;-5], ...
-        "parameterRange",[-100;2000],"safeSideSign",1);
-    boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
-    road = struct("centerline",[-100,0;2000,0],"boundaries",boundaries);
+    road = struct("centerline",[-100,0;2000,0]);
+    if options.UseRoadBoundaries
+        boundary = struct("origin",zeros(2,1),"longitudinalDirection",[1;0], ...
+            "lateralDirection",[0;1],"coefficients",[0;0;-5], ...
+            "parameterRange",[-100;2000],"safeSideSign",1);
+        boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
+        road.boundaries = boundaries;
+    end
     x = [0;0;0;8;0;0]+[0;options.InitialTrackingError];
     lane = [];previousState = [];previousInput = [];
     count = options.SampleCount;
@@ -85,8 +90,10 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
                     [cfg.vehicle.length/2;cfg.vehicle.width/2;truthTarget.halfLength;truthTarget.halfWidth]);
                 minimumSeparation=min(minimumSeparation,separation-cfg.collision.clearanceMargin);
             end
-            support=cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
-            minimumRoad=min(minimumRoad,5-abs(position(2))-support-cfg.collision.clearanceMargin);
+            if options.UseRoadBoundaries
+                support=cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
+                minimumRoad=min(minimumRoad,5-abs(position(2))-support-cfg.collision.clearanceMargin);
+            end
             minimumDomain=min(minimumDomain,localDomainMargin(value(1:6),cfg));
         end
         x=value(1:6);states(:,sample+1)=x;executed=sample;
@@ -100,7 +107,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         if options.FailAfterAdmission,cfg.solver.jointFunction=@localFailedSolve;end
     end
     attempted=executed+double(~isempty(failure));
+    if ~options.UseRoadBoundaries,minimumRoad=NaN;end
     report=struct('scenario',options.Scenario,'configuration',originalCfg,'seed',options.Seed, ...
+        'roadBoundariesEnabled',options.UseRoadBoundaries, ...
         'solverFailureInjected',options.FailAfterAdmission, ...
         'sampleCount',count,'executedHolds',executed,'completed',isempty(failure), ...
         'time',(0:executed)*h,'state',states(:,1:executed+1),'input',inputs(:,1:executed), ...
@@ -114,7 +123,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'egoErrorBound',options.EgoErrorBound,'targetErrorBound',options.TargetErrorBound, ...
         'targetMotion',truthTarget,'recursiveFeasibilityGuaranteed',false, ...
         'scope',"Successful single solves certify one held affine interval; no continuation after a failed solve");
-    report.passed=report.completed && minimumSeparation>=-1e-8 && minimumRoad>=-1e-8 ...
+    report.passed=report.completed && minimumSeparation>=-1e-8 ...
+        && (~options.UseRoadBoundaries || minimumRoad>=-1e-8) ...
         && minimumDomain>=-1e-8 && maximumSlew<=1e-8 && all(clfResidual(1:executed)<=1e-8);
     report.runtime=struct('frameSeconds',seconds(1:attempted),'deadlineSeconds',options.DeadlineSeconds, ...
         'deadlineMisses',nnz(seconds(1:attempted)>options.DeadlineSeconds), ...

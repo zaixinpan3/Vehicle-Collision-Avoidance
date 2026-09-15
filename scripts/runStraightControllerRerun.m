@@ -4,9 +4,11 @@ function campaign = runStraightControllerRerun(options)
 % its trial; the remaining independent trials still run. Timing includes
 % failed and final unexecuted decisions. Overruns are measured, not applied
 % as actuation delay. Generated artifacts go to OutputDirectory, not scripts.
+% Physical road boundaries are disabled by default; the model domain remains.
     arguments
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260914
+        options.UseRoadBoundaries (1,1) logical = false
         options.OutputDirectory (1,1) string = fullfile(tempdir,"straight-controller-rerun")
     end
     if ~isfolder(options.OutputDirectory), mkdir(options.OutputDirectory); end
@@ -26,7 +28,8 @@ function campaign = runStraightControllerRerun(options)
             directory=fullfile(options.OutputDirectory,label);
             try
                 report=runExactStateRecursiveFeasibilityScenario('Scenario',scene, ...
-                    'SampleCount',options.SampleCount,'Seed',options.Seed,'OutputDirectory',directory,extra{:});
+                    'SampleCount',options.SampleCount,'Seed',options.Seed, ...
+                    'UseRoadBoundaries',options.UseRoadBoundaries,'OutputDirectory',directory,extra{:});
             catch exception
                 if ~startsWith(string(exception.identifier),'collisionAvoidanceController:'),rethrow(exception);end
                 saved=load(fullfile(directory,scene+"-exact-state.mat"),'report');report=saved.report;
@@ -41,7 +44,8 @@ function campaign = runStraightControllerRerun(options)
         directory=fullfile(options.OutputDirectory,label);
         try
             report=runDeclaredPlantEstimatorControllerScenario(SampleCount=options.SampleCount, ...
-                Seed=options.Seed,UseEstimator=useEstimator,OutputDirectory=directory);
+                Seed=options.Seed,UseEstimator=useEstimator, ...
+                UseRoadBoundaries=options.UseRoadBoundaries,OutputDirectory=directory);
         catch exception
             if ~startsWith(string(exception.identifier),'collisionAvoidanceController:'),rethrow(exception);end
             saved=load(fullfile(directory,'joint-declared-plant.mat'),'report');report=saved.report;

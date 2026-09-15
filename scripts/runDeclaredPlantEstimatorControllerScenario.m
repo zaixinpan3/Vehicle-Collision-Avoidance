@@ -7,12 +7,14 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
 % not simulate delayed actuation or establish nonlinear-vehicle safety.
 % UseEstimator=false supplies exact states with the same physical range gate
 % for a controller-only comparison; it does not run or reset the observer.
+% Road boundaries are opt-in; model-domain constraints remain enabled.
     arguments
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
         options.TargetInitialDistance (1,1) double {mustBePositive} = 100
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260913
         options.OutputDirectory (1,1) string = ""
         options.UseEstimator (1,1) logical = true
+        options.UseRoadBoundaries (1,1) logical = false
     end
     root = fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'estimator'),fullfile(root,'solver','nrmm'));
@@ -33,10 +35,13 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
     else
         initialization = struct('scope',"Exact-state controller comparison; no observer initialization");
     end
-    boundary = struct('origin',[0;0],'longitudinalDirection',[1;0],'lateralDirection',[0;1], ...
-        'coefficients',[0;0;-5],'parameterRange',[-100;2000],'safeSideSign',1);
-    boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
-    road = struct('centerline',[-100,0;2000,0],'boundaries',boundaries);
+    road = struct('centerline',[-100,0;2000,0]);
+    if options.UseRoadBoundaries
+        boundary = struct('origin',[0;0],'longitudinalDirection',[1;0],'lateralDirection',[0;1], ...
+            'coefficients',[0;0;-5],'parameterRange',[-100;2000],'safeSideSign',1);
+        boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
+        road.boundaries = boundaries;
+    end
     count = options.SampleCount+1;
     time = (0:options.SampleCount)*cfg.controller.sampleTime;
     states = nan(6,count);inputs = nan(2,count);frameSeconds = nan(1,count);
@@ -91,8 +96,10 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
             elapsed=fraction*cfg.controller.sampleTime;
             flowed=expm(elapsed*generator)*[x;command.actuatorInput;1];
             [position,heading]=laneGeometry.fromFrenet(flowed(1:6),lane);
-            lateralSupport=cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
-            minimumRoadMargin=min(minimumRoadMargin,5-abs(position(2))-lateralSupport-cfg.collision.clearanceMargin);
+            if options.UseRoadBoundaries
+                lateralSupport=cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
+                minimumRoadMargin=min(minimumRoadMargin,5-abs(position(2))-lateralSupport-cfg.collision.clearanceMargin);
+            end
             target=targetFunction(time(k)+elapsed,[]);
             separation=avoidanceSafetyGeometry.rectangleDistance(position,heading,target.targetPositionInertial,pi, ...
                 [cfg.vehicle.length/2;cfg.vehicle.width/2;target.targetLength/2;target.targetWidth/2]);
@@ -105,7 +112,9 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         end
     end
     kept=1:k;
+    if ~options.UseRoadBoundaries,minimumRoadMargin=NaN;end
     report=struct('completed',strlength(failure.identifier)==0,'failure',failure,'executedHolds',executedHolds, ...
+        'roadBoundariesEnabled',options.UseRoadBoundaries, ...
         'time',time(kept),'state',states(:,kept),'input',inputs(:,kept),'published',published(kept), ...
         'certified',certified(kept),'frameSeconds',frameSeconds(kept),'observerSeconds',observerSeconds(kept), ...
         'controllerSeconds',controllerSeconds(kept),'audit',{audits(kept)},'metadata',{metadata(kept)}, ...
