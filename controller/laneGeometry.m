@@ -65,7 +65,8 @@ classdef laneGeometry
                 middle = curve.heading+curve.curvature*curve.length/2;
                 station = curve.length/2+atan2(sin(heading-middle),cos(heading-middle))/curve.curvature;
             end
-            station = min(max(station,0),curve.length);
+            % The analytic reference continues beyond the display arc. On a
+            % circle prepare() unwraps this coordinate about the carried node.
             [point,heading] = laneGeometry.referencePose(station,0,curve);
             lateral = sum([-sin(heading);cos(heading)].*(position-point),1);
             projection = struct("point",point,"heading",heading, ...
@@ -77,8 +78,8 @@ classdef laneGeometry
                 error("collisionAvoidanceController:invalidReferenceCurve", ...
                     "The lateral strip must remain inside a regular Frenet chart.");
             end
-            lower = max(0,station-radius);
-            upper = min(curve.length,station+radius);
+            lower = station-radius;
+            upper = station+radius;
             [point,heading] = laneGeometry.referencePose(station,0,curve);
             tangent = [cos(heading);sin(heading)];
             lateral = [-sin(heading);cos(heading)];
@@ -112,8 +113,7 @@ classdef laneGeometry
                 radius(2) = distanceRadius;
                 radius(3) = inputRadius(3)+angle;
             end
-            valid = projection.station-radius(1)>0 ...
-                && projection.station+radius(1)<curve.length;
+            valid = all(isfinite(radius));
         end
 
         function projection = project(position, lane)
@@ -128,6 +128,14 @@ classdef laneGeometry
 
             if isfield(lane, "referenceCurve")
                 projection = laneGeometry.projectReferenceCurve(reshape(position,2,[]),lane.referenceCurve);
+                return;
+            end
+            if all(abs(lane.tangent-lane.tangent(1,:))<1e-12,'all')
+                tangent=lane.tangent(1,:).';lateral=[-tangent(2);tangent(1)];
+                station=tangent.'*(reshape(position,2,[])-lane.segmentStart(1,:).');
+                point=lane.segmentStart(1,:).'+tangent*station;
+                projection=struct('point',point,'heading',atan2(tangent(2),tangent(1))+zeros(size(station)), ...
+                    'station',station,'lateralPosition',lateral.'*(reshape(position,2,[])-point));
                 return;
             end
             persistent nativeProjector
@@ -195,6 +203,14 @@ classdef laneGeometry
         % is constant per segment. These bounds include both sides of every vertex.
 
             if isscalar(radius),radius = repmat(radius,numel(station),1);end
+            if ~isfield(lane,'referenceCurve') && all(abs(lane.tangent-lane.tangent(1,:))<1e-12,'all')
+                tangent=lane.tangent(1,:).';lateral=[-tangent(2);tangent(1)];
+                frame=arrayfun(@(s,r) struct('origin',lane.segmentStart(1,:).','tangent',tangent, ...
+                    'lateral',lateral,'heading',atan2(tangent(2),tangent(1)), ...
+                    'segmentIndex',1,'stationLower',s-r,'stationUpper',s+r, ...
+                    'positionErrorBound',zeros(2,1),'headingErrorBound',0),station(:),radius(:));
+                return;
+            end
             if isfield(lane, "referenceCurve")
                 frame = arrayfun(@(s,r) laneGeometry.referenceFrame( ...
                     lane.referenceCurve,s,r,lateralRadius),station(:),radius(:));

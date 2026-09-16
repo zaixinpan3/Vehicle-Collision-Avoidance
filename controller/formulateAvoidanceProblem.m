@@ -1,18 +1,89 @@
 function [program,prediction,clf] = formulateAvoidanceProblem(model)
+%formulateAvoidanceProblem Witness-preserving predictive CBF / soft CLF solve.
+% A fresh convexification may replace an inherited certificate only after
+% its known feasible candidate satisfies the COMPLETE new conic program.
+% This is formulation selection BEFORE the single optimizer invocation.
+    carry=model.carriedWitness;
+    if isempty(carry)
+        [program,prediction,clf]=localFormulate(model);
+        return;
+    end
+    if isempty(model.encounters)
+        fresh=model;fresh.carriedWitness=[];
+        fresh.horizonSteps=max(model.cfg.controller.horizonSteps,model.cfg.controller.minimumHorizonSteps);
+        fresh.initializationPlan=localContinuation(model,fresh.horizonSteps);
+        [candidate,predicted,candidateClf]=localFormulate(fresh);
+        if localWitnessFeasible(candidate,candidate.feasibleWitness)
+            program=candidate;prediction=predicted;clf=candidateClf;
+            program.replacementContainsWitness=true;
+            return;
+        end
+    end
+    if carry.remainingSteps>0
+        [program,prediction,clf]=localFormulate(model);
+    else
+        % The confirmed exit has occurred and true-state modal membership is
+        % retained. Optimize a new hold with a proved feasible input.
+        model.carriedWitness=[];model.horizonSteps=1;model.terminalOptimization=true;
+        model.initializationPlan=localContinuation(model,1);
+        [program,prediction,clf]=localFormulate(model);
+    end
+    program.replacementContainsWitness=false;
+end
+
+function inputs=localContinuation(model,count)
+    carry=model.carriedWitness;
+    cruise=model.cruiseCertificate;
+    x=model.initialEgoState;inputs=zeros(2,count);
+    retained=0;
+    if ~isempty(carry),retained=min(count,size(carry.inputs,2));end
+    for stage=1:count
+        if stage<=retained
+            input=carry.inputs(:,stage);
+        else
+            input=cruise.input-cruise.gain*(x(2:6)-cruise.state(2:6));
+        end
+        inputs(:,stage)=input;
+        x=cruise.transition(1:6,:)*[x;input;1];
+    end
+end
+
+function witness=localCompleteSlack(program,anchor)
+    witness=[anchor;0];
+    first=program.cones(2)+1;
+    value=program.b(first:first+5)-program.A(first:first+5,:)*witness;
+    witness(end)=max(0,norm(value(2:end))-value(1))+1;
+end
+
+function accepted=localWitnessFeasible(program,witness)
+    value=program.b-program.A*witness;
+    allowance=64*numel(witness)*eps*(1+abs(program.b)+abs(program.A)*abs(witness));
+    count=program.cones(2);
+    accepted=all(isfinite(value)) && all(value(1:count)>=allowance(1:count));
+    for dimension=program.cones(3:end).'
+        cone=value(count+(1:dimension));
+        accepted=accepted && cone(1)>=norm(cone(2:end))+norm(allowance(count+(1:dimension)));
+        count=count+dimension;
+    end
+end
+
+function [program,prediction,clf] = localFormulate(model)
 %formulateAvoidanceProblem Predictive hard safety with a soft sampled CLF.
 % Optimize the complete input sequence and the first-hold CLF norm slack.
 % The finite target exit and invariant road terminal set are hard constraints.
     cfg = model.cfg;
-    cruise = ltvBicycleModel.sampledCruise(model);
+    cruise = model.cruiseCertificate;
+    if isempty(cruise),cruise=ltvBicycleModel.sampledCruise(model);end
+    model.cruiseCertificate=cruise;
     inherited = ~isempty(model.carriedWitness);
     if inherited
         cruise = model.carriedWitness.program.cruiseCertificate;
-        [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor] = localShift(model);
+        [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model);
     else
         [prediction,anchor] = hardEncounterBarrier.predict(model,cruise);
         model.anchorPlan = anchor;
         geometry = avoidanceSafetyGeometry.build(model,prediction);
-        [terminalMatrix,terminalBound,terminal,completion] = ...
+        [terminalMatrix,terminalBound,terminal,completion,terminalCone] = ...
             hardEncounterBarrier.completionRows(model,prediction,geometry);
         count = prediction.stageCount;
         planCount = 2*count;
@@ -22,15 +93,40 @@ function [program,prediction,clf] = formulateAvoidanceProblem(model)
         difference = eye(planCount)-diag(ones(planCount-2,1),-2);
         prior = [model.previousInput;zeros(planCount-2,1)];
         finiteRate = isfinite(rate);
-        matrix = [geometry.matrix;eye(planCount);-eye(planCount); ...
-            difference(finiteRate,:);-difference(finiteRate,:);terminalMatrix];
-        physicalBound = [geometry.physicalBound;upper;-lower; ...
-            rate(finiteRate)+prior(finiteRate);rate(finiteRate)-prior(finiteRate);terminalBound];
-        reach = max(abs(lower),abs(upper));
-        scale = 1+abs(physicalBound)+abs(matrix)*reach;
-        reserve = 4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance) ...
-            *scale.*any(matrix~=0,2);
-        bound = physicalBound-reserve;
+        if isfield(model,'terminalOptimization') && model.terminalOptimization
+            % This one-hold optimization uses the invariant policy only to
+            % prove nonemptiness. Both actuator coordinates remain decisions.
+            candidate=terminal.input+terminal.feedback*(model.initialEgoState-terminal.reference);
+            matrix=terminal.deviationRows;
+            physicalBound=terminal.deviationBound+matrix*candidate;
+            labels=repmat("terminalHoldAndSlew",numel(physicalBound),1);
+            matrix=[matrix;difference(finiteRate,:);-difference(finiteRate,:)];
+            physicalBound=[physicalBound;rate(finiteRate)+prior(finiteRate);rate(finiteRate)-prior(finiteRate)];
+            labels=[labels;repmat("slew",2*nnz(finiteRate),1)];
+            mapped=terminal.modalMatrix*cruise.transition(2:6,7:8);
+            room=terminal.radius-terminal.comparison*terminal.radius-terminal.disturbanceSupport;
+            for mode=1:5
+                selected=3*mode-2:3*mode;
+                terminalCone.matrix(selected,:)=[zeros(1,2);-real(mapped(mode,:));-imag(mapped(mode,:))];
+                terminalCone.bound(selected)=[room(mode)-terminal.reserve; ...
+                    -real(mapped(mode,:)*candidate);-imag(mapped(mode,:)*candidate)];
+            end
+            bound=physicalBound;
+        else
+            matrix = [geometry.matrix;eye(planCount);-eye(planCount); ...
+                difference(finiteRate,:);-difference(finiteRate,:);terminalMatrix];
+            physicalBound = [geometry.physicalBound;upper;-lower; ...
+                rate(finiteRate)+prior(finiteRate);rate(finiteRate)-prior(finiteRate);terminalBound];
+            labels=[geometry.label;repmat("actuator",2*planCount,1); ...
+                repmat("slew",2*nnz(finiteRate),1); ...
+                repmat("terminalEntry",numel(terminalBound)-numel(model.encounters),1); ...
+                "exit:"+string({model.encounters.key}).'];
+            reach = max(abs(lower),abs(upper));
+            scale = 1+abs(physicalBound)+abs(matrix)*reach;
+            reserve = 4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance) ...
+                *scale.*any(matrix~=0,2);
+            bound = physicalBound-reserve;
+        end
     end
     count = prediction.stageCount;
     planCount = 2*count;
@@ -55,7 +151,8 @@ function [program,prediction,clf] = formulateAvoidanceProblem(model)
     numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach(1:2)));
     coneRadius = sqrt(middle)*norm(root*trackingError)+numeric;
     matrix = [matrix;zeros(1,planCount),-1;-inputRoot,zeros(5,planCount-1)];
-    bound = [bound;coneRadius;root*nominalOffset];
+    bound = [bound;coneRadius;root*nominalOffset;terminalCone.bound];
+    matrix = [matrix;terminalCone.matrix,zeros(size(terminalCone.matrix,1),1)];
     disturbance = sqrt(middle)*norm(abs(root)*radius) ...
         +norm(abs(root*stateMap)*radius)+2*numeric;
     clf = struct('cruise',cruise,'initialValue',trackingError.'*cruise.matrix*trackingError, ...
@@ -76,18 +173,27 @@ function [program,prediction,clf] = formulateAvoidanceProblem(model)
     layout = struct('planIndex',1:planCount,'planCount',planCount,'horizonSteps',count, ...
         'decisionCount',planCount+1,'relaxationIndex',planCount+1);
     program = struct('P',sparse(hessian),'q',[linear;0],'A',sparse(matrix),'b',bound, ...
-        'cones',[0;linearCount;6],'decisionRadius',reach, ...
+        'cones',[0;linearCount;6;terminalCone.sizes],'decisionRadius',reach, ...
         'obstacleCbfRowCount',nnz(startsWith(geometry.label,"collision:")), ...
         'geometry',geometry,'terminal',terminal,'completion',completion,'layout',layout, ...
+        'clfNumericalReserve',numeric, ...
         'physicalMatrix',physicalMatrix,'physicalBound',physicalBound, ...
+        'physicalLabels',labels,'terminalCone',terminalCone, ...
         'anchorPlan',anchor,'safetyBound',safetyBound,'inheritedFeasibleFamily',inherited, ...
         'cruiseCertificate',cruise);
+    program.terminalConePhysicalBound=terminalCone.bound;
+    program.terminalConePhysicalBound(1:3:end)=program.terminalConePhysicalBound(1:3:end)+terminal.reserve;
     if inherited
-        program.inheritedWitness = [model.carriedWitness.inputs(:);0];
+        program.terminalConePhysicalBound=model.carriedWitness.program.terminalConePhysicalBound ...
+            -model.carriedWitness.program.terminalCone.matrix(:,1:2)*model.carriedWitness.issuedInput;
     end
+    program.replacementContainsWitness=false;
+    program.terminalOptimization=isfield(model,'terminalOptimization') && model.terminalOptimization;
+    program.feasibleWitness=localCompleteSlack(program,anchor);
+    if inherited,program.inheritedWitness=program.feasibleWitness;end
 end
 
-function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor] = localShift(model)
+function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model)
 % Eliminate the executed input from the accepted affine family. The old
 % enclosures and numerical reserves are inherited without reconstruction.
 % Conditioning only restricts the true state set, so it cannot invalidate
@@ -98,11 +204,24 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     executed = carry.issuedInput;
     columns = 3:old.layout.planCount;
     matrix = old.physicalMatrix(:,columns);
-    selected = any(matrix~=0,2);
+    labels=old.physicalLabels;
+    removed=ismember(labels,"collision:"+model.dischargedTargetKeys) ...
+        | ismember(labels,"exit:"+model.dischargedTargetKeys);
+    selected = any(matrix~=0,2) & ~removed;
     physicalBound = old.physicalBound-old.physicalMatrix(:,1:2)*executed;
     bound = old.safetyBound-old.physicalMatrix(:,1:2)*executed;
     matrix = matrix(selected,:);physicalBound=physicalBound(selected);bound=bound(selected);
+    labels=labels(selected);
+    terminalCone=old.terminalCone;
+    terminalCone.bound=terminalCone.bound-terminalCone.matrix(:,1:2)*executed;
+    terminalCone.matrix=terminalCone.matrix(:,columns);
     terminal=carry.terminal;completion=carry.completion;anchor=carry.inputs(:);
+    retained=~ismember(completion.keys,model.dischargedTargetKeys);
+    completion.keys=completion.keys(retained);
+    completion.direction=completion.direction(:,retained);
+    completion.stateRow=completion.stateRow(retained,:);
+    completion.stateBound=completion.stateBound(retained);
+    completion.active=~isempty(completion.keys);
     prediction=carry.prediction;
     prediction.nominalInitialState=carry.predictedCenter;
     prediction.stageCount=prediction.stageCount-1;
@@ -139,7 +258,7 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
         prediction.cells(index)=tube;
     end
     geometry=old.geometry;
-    selected=geometry.stage>=2;
+    selected=geometry.stage>=2 & ~ismember(geometry.label,"collision:"+model.dischargedTargetKeys);
     geometry.physicalBound=geometry.physicalBound(selected)-geometry.matrix(selected,1:2)*executed;
     geometry.matrix=geometry.matrix(selected,columns);
     geometry.stage=geometry.stage(selected)-1;geometry.label=geometry.label(selected);

@@ -10,7 +10,9 @@ function report = runTerminalCbfProofAudit(options)
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",0.5, ...
         "model",struct("speedMaximum",1), ...
         "controller",struct("sampleTime",.1,"horizonSteps",4)));
-    % Evaluate the equations in TERMINAL_CBF_PROOF.md as a research example.
+    % Auxiliary stopping-model counterexamples; the current modal-set proof
+    % and its executable tests are in TERMINAL_CBF_PROOF.md and
+    % recursiveSafetyClosureTest.m. This auxiliary audit is not that proof.
     % There is no terminal-set admission or controller fallback API here.
     terminal = localAffineExample(cfg,0);
     poseRows = [eye(3);-eye(3)];
@@ -101,7 +103,7 @@ function report = runTerminalCbfProofAudit(options)
         cleanup = onCleanup(@() fclose(fid));
         fprintf(fid,'%s\n',jsonencode(report,PrettyPrint=true));
     end
-    fprintf('Terminal CBF audit passed=%d; complete online controller proof=%d\n', ...
+    fprintf('Auxiliary stopping-model audit passed=%d; this audit claims an online proof=%d\n', ...
         report.auditPassed,report.fullControllerCbfEstablished);
 end
 

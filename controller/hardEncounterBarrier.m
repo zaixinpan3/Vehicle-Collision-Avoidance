@@ -8,11 +8,23 @@ classdef hardEncounterBarrier
             model.encounters = struct("key",{});
             model.confirmation = [];
             model.carriedWitness = [];
+            model.measurementRadiusLimit = model.initialFrenetErrorBound;
+            if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
+                curvature=abs(model.lane.referenceCurve.curvature);
+                distance=norm(ego.stateErrorBound(1:2));
+                radial=1/curvature-cfg.model.lateralDomainRadius;
+                if distance>=radial
+                    error('collisionAvoidanceController:invalidUncertaintyChart','The sensing bound crosses the reference center.');
+                end
+                angle=asin(distance/radial);
+                model.measurementRadiusLimit(1:3)=[angle/curvature;distance;ego.stateErrorBound(3)+angle];
+            end
+            model.cruiseCertificate = [];
             model.exitMargin = inf;
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=26
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=27
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -26,6 +38,18 @@ classdef hardEncounterBarrier
                 if abs(model.stateTime-stored.stateTime-model.sampleTime)>1e-10 ...
                         || ~isequal(ego.heldActuatorInput,stored.appliedInput)
                     error('collisionAvoidanceController:executionContractViolation','The next timestamp and issued held input are required.');
+                end
+                model.measurementRadiusLimit = stored.terminal.measurementRadiusLimit;
+                if any(model.initialFrenetErrorBound>model.measurementRadiusLimit+1e-12)
+                    error('collisionAvoidanceController:changedMeasurementContract', ...
+                        'Successor ego measurement bounds exceed the admitted sensing contract.');
+                end
+                model.cruiseCertificate = stored.program.cruiseCertificate;
+                model.permanentTerminal = stored.terminal;
+                if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
+                    period = 2*pi/abs(model.lane.referenceCurve.curvature);
+                    model.initialEgoState(1) = model.initialEgoState(1)+period*round( ...
+                        (stored.predictedState(1,2)-model.initialEgoState(1))/period);
                 end
                 [model.initialEgoState,model.initialFrenetErrorBound] = localConditionBox( ...
                     stored.predictedState(:,2),stored.stateErrorBound(:,2), ...
@@ -73,7 +97,7 @@ classdef hardEncounterBarrier
                 if ~isempty(match) && stored.completion.active ...
                         && model.stateTime>=stored.completion.deadline-1e-10
                     completion = stored.completion;
-                    completion.direction = completion.direction(:,match);
+                    completion.direction = completion.direction(:,completion.keys==target.key);
                     outside = valid && hardEncounterBarrier.observedExterior(model,target,completion);
                 else
                     outside = valid && hardEncounterBarrier.observedExterior(model,target);
@@ -125,8 +149,7 @@ classdef hardEncounterBarrier
             if isfield(model,'exitDeadline')
                 model.horizonSteps = min(model.horizonSteps,round((model.exitDeadline-model.stateTime)/model.sampleTime));
             end
-            if ~isempty(carry) && ~isempty(model.encounters) && carry.remainingSteps>0 ...
-                    && isempty(model.dischargedTargetKeys)
+            if ~isempty(carry)
                 % Choose the inherited feasible family before the one solve.
                 % This is a predictive optimization, never fallback execution.
                 model.carriedWitness = carry;
@@ -134,6 +157,8 @@ classdef hardEncounterBarrier
             end
             if ~isempty(stored)
                 model.initializationPlan = [stored.plan(:,2:end),stored.plan(:,end)];
+            elseif isempty(model.encounters)
+                [model.horizonSteps,model.initializationPlan]=localCruiseAdmission(model);
             end
         end
 
@@ -248,48 +273,44 @@ classdef hardEncounterBarrier
             end
         end
 
-        function [matrix,bound,terminal,completion] = completionRows(model,prediction,~)
-            cfg = model.cfg;
-            if any(cfg.model.ltvModelErrorRateBound~=0) || any(cfg.model.plantModelResidualRateBound~=0)
-                error("collisionAvoidanceController:nonexactStudyInput", ...
-                    "The invariant terminal construction requires zero ego process residuals.");
-            end
-            % The terminal node is evaluated through the exact held-input stage
-            % transitions, not the Bernstein tubes: an exact initial state then
-            % has an exactly zero terminal box, and the box of an uncertain
-            % state is the interval hull of the exact affine chain.
+        function [matrix,bound,terminal,completion,cone] = completionRows(model,prediction,~)
+        % The terminal modal set and its sampled feedback use the ONLINE generator.
+            terminal = localTerminalSet(model);
             [finalMap,finalOffset] = localExactFinalMap(model,prediction);
-            finalRadius = prediction.initialErrorBound(:,end);
-            if isfield(model,"prescribedTerminal") && ~isempty(model.prescribedTerminal)
-                terminal = model.prescribedTerminal;
-            else
-                anchor = finalOffset+finalMap*model.anchorPlan;
-                terminal = localTerminalSet(model,prediction,anchor);
+            radius = prediction.initialErrorBound(:,end);
+            modal=terminal.modalMatrix;
+            cone.matrix=zeros(15,prediction.planCount);cone.bound=zeros(15,1);
+            cone.sizes=3*ones(5,1);
+            for mode=1:5
+                rows=3*mode-2:3*mode;
+                mapped=modal(mode,:)*finalMap(2:6,:);
+                offset=modal(mode,:)*(finalOffset(2:6)-terminal.reference(2:6));
+                cone.matrix(rows,:)=[zeros(1,prediction.planCount);-real(mapped);-imag(mapped)];
+                cone.bound(rows)=[terminal.radius(mode)-terminal.reserve-abs(modal(mode,:))*radius(2:6); ...
+                    real(offset);imag(offset)];
             end
-            if any(finalRadius(4:6)~=0) && ~terminal.errorBudgetFinite
-                error("collisionAvoidanceController:invalidTerminalModel", ...
-                    "An uncertain terminal velocity needs passive road-load damping for its open-loop error budget.");
-            end
-            rows = terminal.stateRows;
-            matrix = rows*finalMap;
-            % The nominal enters through the signed rows; the box enters through
-            % the error rows, which include the open-loop future excursion.
-            bound = terminal.stateBound-rows*finalOffset-terminal.errorRows*finalRadius;
-            % The first terminal input must satisfy slew relative to u_(N-1). The
-            % law acts on the predicted lower speed endpoint, so the fixed
-            % propagated radius contributes to this affine bound.
-            rate = model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+            % Any conditioned terminal center lies in the certified modal set.
+            % Its first feedback input must also honor the preceding input.
+            last = zeros(2,prediction.planCount);last(:,end-1:end)=eye(2);
+            deltaMap = terminal.feedback*finalMap-last;
+            deltaOffset = terminal.input+terminal.feedback*(finalOffset-terminal.reference);
+            rate = model.sampleTime*[model.cfg.model.frontWheelSteeringRateMaximum; ...
+                model.cfg.model.brakingRatioRateMaximum];
             selected = isfinite(rate);
-            lastInput = zeros(2,prediction.planCount);
-            lastInput(:,end-1:end) = eye(2);
-            changeMap = terminal.feedback*finalMap-lastInput;
-            changeOffset = terminal.input+terminal.feedback*finalOffset+terminal.radiusFeedback*finalRadius;
-            matrix = [matrix;changeMap(selected,:);-changeMap(selected,:)];
-            bound = [bound;rate(selected)-changeOffset(selected);rate(selected)+changeOffset(selected)];
+            support = abs(terminal.feedback)*radius;
+            matrix = [deltaMap(selected,:);-deltaMap(selected,:)];
+            bound = [rate(selected)-support(selected)-deltaOffset(selected); ...
+                rate(selected)-support(selected)+deltaOffset(selected)];
+            frame = laneGeometry.frameBounds(model.lane,finalOffset(1)+finalMap(1,:)*model.anchorPlan, ...
+                model.cfg.controller.stationTrustRadius+radius(1),model.cfg.model.lateralDomainRadius);
             [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
-                model,prediction,finalMap,finalOffset,terminal.frame);
-            matrix = [matrix;exitMatrix];
-            bound = [bound;exitBound];
+                model,prediction,finalMap,finalOffset,frame);
+            completion.keys = string({model.encounters.key});
+            matrix = [matrix;exitMatrix];bound=[bound;exitBound];
+        end
+
+        function terminal = terminalCertificate(model)
+            terminal = localTerminalSet(model);
         end
 
         function record = carriedData(prediction,qp,optimizedStages)
@@ -313,53 +334,37 @@ classdef hardEncounterBarrier
         end
 
         function step = terminalStep(terminal,center,radius,sampleTime)
-        % One hold of the sampled terminal law from a node box: the exact
-        % held-input flow of the declared rest model, its successor box as the
-        % interval hull, and the hypothetical terminal affine generator.
-            % Brake the smallest possible speed. The lower endpoint obeys
-            % l+ = rho*l >= 0; the upper endpoint includes passive error decay.
-            input = terminal.input+terminal.feedback*center+terminal.radiusFeedback*radius;
+        % A hypothetical held feedback step, never an actuator fallback.
+        % successorRadius is PRIOR to the next bounded measurement.
+            input = terminal.input+terminal.feedback*(center-terminal.reference);
             generator = [terminal.continuousA,terminal.continuousB,terminal.continuousC];
             exact = expm(sampleTime*[generator;zeros(3,9)]);
-            step = struct("input",input,"generator",generator, ...
-                "successor",exact(1:6,:)*[center;input;1], ...
-                "successorRadius",abs(exact(1:6,1:6))*radius, ...
-                "stage",struct("continuousA",terminal.continuousA,"continuousB",terminal.continuousB, ...
-                    "continuousC",terminal.continuousC,"speed",0,"curvature",terminal.curvature, ...
-                    "brakingRatio",input(2),"tireModel",terminal.tireModel));
-            % Analytic nonnegativity permits clipping roundoff below zero in
-            % this successor interval; the upper endpoint is only enlarged.
-            step.successor(4) = max(step.successor(4),step.successorRadius(4));
+            step = struct('input',input,'generator',generator, ...
+                'successor',exact(1:6,:)*[center;input;1], ...
+                'successorRadius',abs(exact(1:6,1:6))*radius,'stage',terminal.cruise.stage);
         end
 
         function states = terminalFlow(terminal,initial,steps)
-        % Absolute-time evaluation of the sampled nominal terminal closed loop.
+        % Exact-state sampled terminal feedback for independent validation.
             validateattributes(steps,{'double'},{'real','finite','nonnegative','integer'});
-            states = repmat(initial,1,numel(steps));
-            f = terminal.continuousA(5:6,5:6);
+            states = zeros(6,numel(steps));
             for index = 1:numel(steps)
-                attenuation = terminal.longitudinalRatio^steps(index);
-                lateralFlow = expm(f*(steps(index)*terminal.sampleTime));
-                states(1:3,index) = initial(1:3) ...
-                    +terminal.stepMatrix(1:3,4)*((1-attenuation)/(1-terminal.longitudinalRatio))*initial(4) ...
-                    +terminal.continuousA(1:3,5:6)*(f\((lateralFlow-eye(2))*initial(5:6)));
-                states(4,index) = attenuation*initial(4);
-                states(5:6,index) = lateralFlow*initial(5:6);
+                x=initial;
+                for stage=1:steps(index)
+                    next=hardEncounterBarrier.terminalStep(terminal,x,zeros(6,1),terminal.sampleTime);
+                    x=next.successor;
+                end
+                states(:,index)=x;
             end
         end
 
         function [accepted,margins] = terminalMembership(terminal,center,radius)
-        % Node-level test of the robust terminal set for a nominal and its box.
-            operations = 8;
-            gamma = operations*eps/(1-operations*eps);
-            allowance = gamma*(abs(terminal.stateBound)+abs(terminal.stateRows)*abs(center) ...
-                +abs(terminal.errorRows)*abs(radius));
-            margins = terminal.stateBound-terminal.stateRows*center-terminal.errorRows*radius-allowance;
-            % Exact ordering of the stored floating-point endpoints needs no
-            % dot-product allowance. Subtraction near rest is exact (Sterbenz).
-            margins(end) = center(4)-radius(4);
+        % Prior box inclusion in the terminal modal set, before conditioning.
+            margins = terminal.radius-abs(terminal.modalMatrix*(center(2:6)-terminal.reference(2:6))) ...
+                -abs(terminal.modalMatrix)*radius(2:6);
             accepted = all(isfinite(margins)) && all(margins>=0);
         end
+
     end
 end
 
@@ -392,203 +397,144 @@ function [center,radius] = localConditionBox(predictedCenter,predictedRadius,mea
     radius = (upper-lower)/2;
 end
 
-function terminal = localTerminalSet(model,~,anchor)
-% Robust road terminal set for braking from the lower speed endpoint.
-    cfg = model.cfg;
-    curvature = laneGeometry.curvature(anchor(1),model.lane);
-    terminal = localTerminalDynamics(model,curvature);
-    % Include the certified stopping excursion of nominal plus error in the
-    % chart. A local linearization radius is not a required stopping position.
-    excursion = max(terminal.poseExcursion(1,:),terminal.errorExcursion(1,:));
-    % Chart size is a proposal; the invariant pose rows themselves enforce
-    % its boundaries. Using the entire velocity domain here can demand road
-    % data far behind the car even for a modest entry speed.
-    terminalRadius = cfg.controller.stationTrustRadius+excursion*min( ...
-        terminal.velocityLimit,abs(anchor(4:6))+model.initialFrenetErrorBound(4:6));
-    frame = laneGeometry.frameBounds(model.lane,anchor(1),terminalRadius,cfg.model.lateralDomainRadius);
-    data = struct("frame",[frame.origin;frame.tangent;frame.lateral;frame.heading; ...
-        frame.positionErrorBound;frame.headingErrorBound;frame.stationLower;frame.stationUpper], ...
-        "nominal",anchor,"targets",struct([]),"boundaries",model.road.boundaries, ...
-        "settings",[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.model.headingDomainRadius; ...
-            cfg.model.lateralDomainRadius;cfg.collision.clearanceMargin], ...
-        "duration",0,"degree",3);
-    roadRows = avoidanceSafetyGeometry.cellRows(data);
-    poseRows = [eye(3);-eye(3);roadRows.state(:,1:3)];
-    poseBound = [frame.stationUpper;cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius; ...
-        -frame.stationLower;cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius;roadRows.bound];
-    % A p + R |v| <= b is invariant for the terminal comparison dynamics.
-    % Enumerate signs of the nominal velocity to obtain ordinary linear rows.
-    signs = 2*double(dec2bin(0:7,3)-'0')-1;
-    poseCount = size(poseRows,1);
-    projectedFlow = poseRows*terminal.continuousA(1:3,4:6);
-    % The nominal longitudinal velocity stays nonnegative under the braking
-    % law, so a lower station bound needs no fictitious backward budget.
-    growth = [max(projectedFlow(:,1),0),abs(projectedFlow(:,2:3))];
-    budget = localBudget(growth,terminal.comparison);
-    % The estimation error evolves open loop. Its budget is symmetric and it
-    % dominates the nominal budget, which keeps membership monotone under
-    % box inclusion.
-    if terminal.errorBudgetFinite
-        errorBudget = localBudget(abs(projectedFlow)+budget*terminal.errorInputCoupling,terminal.errorComparison);
-        if any(errorBudget<budget-1024*eps*(1+abs(budget)),"all")
-            error("collisionAvoidanceController:invalidTerminalModel", ...
-                "The open-loop error budget must dominate the nominal budget.");
-        end
-        errorBudget = max(errorBudget,budget);
+function terminal = localTerminalSet(model)
+% An invariant information-state cruise set for the admitted affine plant.
+% The sensor contract bounds EVERY future posterior measurement box. No
+% favorable future reset is used anywhere in the finite open-loop witness.
+    if isfield(model,'permanentTerminal'),terminal=model.permanentTerminal;return;end
+    cfg=model.cfg;
+    if ~isempty(model.cruiseCertificate)
+        cruise=model.cruiseCertificate;
     else
-        errorBudget = budget;
+        cruise=ltvBicycleModel.sampledCruise(model);
     end
-    rows = [repelem(poseRows,8,1),repelem(budget,8,1).*repmat(signs,poseCount,1)];
-    limits = repelem(poseBound,8);
-    errorRows = [repelem(abs(poseRows),8,1),repelem(errorBudget,8,1)];
-    % Both signs of the velocity box and its nonnegative lower speed endpoint.
-    % Radius feedback makes this last row invariant: l+ = rho*l.
-    rows = [rows;zeros(6,3),[eye(3);-eye(3)];0,0,0,-1,0,0];
-    limits = [limits;terminal.velocityLimit;terminal.velocityLimit;0];
-    errorRows = [errorRows;zeros(6,3),[eye(3);eye(3)];0,0,0,1,0,0];
-    terminal.poseBudget = budget;
-    terminal.poseErrorBudget = errorBudget;
-    terminal.stateRows = rows;
-    terminal.stateBound = limits;
-    terminal.errorRows = errorRows;
-    terminal.poseRows = poseRows;
-    terminal.poseBound = poseBound;
-    terminal.frame = frame;
-    terminal.anchorHeading = anchor(3);
-    terminal.anchorState = anchor;
-    terminal.targetNormals = zeros(2,0);
-    terminal.futureTargetSupports = zeros(0,1);
-    terminal.targetIndependent = true;
-end
-
-function budget = localBudget(growth,comparison)
-% Nonnegative row budgets R with R*C + growth <= 0, with a checked reserve.
-    poseCount = size(growth,1);
-    budget = growth/(-comparison);
-    budget = budget+4096*eps*(1+norm(budget,inf))*ones(poseCount,1)*(ones(1,3)/(-comparison));
-    residual = budget*comparison+growth;
-    allowance = 128*eps*(abs(budget)*abs(comparison)+abs(growth));
-    if any(budget<0,"all") || any(residual+allowance>0,"all")
-        error("collisionAvoidanceController:invalidTerminalModel", ...
-            "A terminal excursion budget failed verification.");
+    if ~isfield(model.lane,'referenceCurve') && ( ...
+            any(abs(model.lane.tangent-model.lane.tangent(1,:))>1e-12,'all') ...
+            || any(abs(model.lane.segmentCurvature)>1e-12))
+        error('collisionAvoidanceController:unsupportedReferenceJump', ...
+            'The recursive certificate requires a continuous straight or analytic constant-curvature reference.');
     end
-end
-
-function terminal = localTerminalDynamics(model,curvature)
-% The rest dynamics depend on the configuration, the hold and the curvature
-% only; the last result is reused while those are unchanged.
-    persistent memoKey memoTerminal
-    key = struct("curvature",curvature,"sampleTime",model.sampleTime, ...
-        "bias",model.longitudinalAccelerationBias,"cfg",rmfield(model.cfg,"solver"));
-    if ~isempty(memoKey) && isequaln(key,memoKey)
-        terminal = memoTerminal;
-        return;
+    if ~isempty(model.road.boundaries)
+        error('collisionAvoidanceController:optimizationFailed', ...
+            'The recursive cruise certificate requires an unbounded road-free reference domain.');
     end
-    cfg = model.cfg;
-    h = model.sampleTime;
-    gain = modifiedFialaTire.accelerationGain(cfg);
-    if model.longitudinalAccelerationBias~=0
-        error("collisionAvoidanceController:invalidTerminalModel", ...
-            "The invariant rest schedule requires zero independent acceleration bias.");
+    persistent savedKey saved
+    key={cruise,model.measurementRadiusLimit,rmfield(cfg,'solver'),cfg.solver.constraintTolerance};
+    if ~isempty(savedKey) && isequaln(key,savedKey),terminal=saved;return;end
+    gain=cruise.gain;
+    [basis,eigenvalues]=eig(cruise.closedLoop);
+    modal=basis\eye(5);contraction=abs(diag(eigenvalues));
+    if rcond(basis)<1e-10 || any(contraction>=1)
+        error('collisionAvoidanceController:invalidTerminalModel','No well-conditioned stable terminal modal basis exists.');
     end
-    input = [0;-model.longitudinalAccelerationBias/gain];
-    [a,b,c,tireModel] = ltvBicycleModel.continuousMatrices(curvature,0,cfg,input(2),model.longitudinalAccelerationBias);
-    if any(a(:,1:3)~=0,"all") || any(a(5:6,4)~=0) || any(b(5:6,2)~=0) ...
-            || norm(c+b*input,inf)>64*eps*(1+norm(c,inf))
-        error("collisionAvoidanceController:invalidTerminalModel","The terminal scheduled rest structure is not valid.");
-    end
-    damping = -a(4,4);
-    if damping==0, phi = h; else, phi = -expm1(-damping*h)/damping; end
-    brakeGain = exp(-damping*h)*(-expm1(-h))/phi;
-    % A fixed one-per-second brake unnecessarily excludes ordinary cruise
-    % speeds when the acceleration gain is small. Reduce the gain so the
-    % same invariant law covers the configured speed domain. The excursion
-    % budget below grows with the longer stop, preserving road coverage.
-    brakeGain = min(brakeGain,.98*(input(2)-cfg.actuation.brakingRatioMinimum)*gain/cfg.model.speedMaximum);
-    feedback = zeros(2,6);
-    feedback(2,4) = -brakeGain/gain;
-    radiusFeedback = -feedback;
-    flow = expm(h*[a,b;zeros(2,8)]);
-    step = flow(1:6,1:6)+flow(1:6,7:8)*feedback;
-    rho = exp(-damping*h)-brakeGain*phi;
-    % Open-loop error comparison and its braked nominal counterpart.
-    errorComparison = abs(a(4:6,4:6));
-    errorComparison(1:4:end) = diag(a(4:6,4:6));
-    comparison = errorComparison;
-    comparison(1,1) = comparison(1,1)-brakeGain;
-    errorInputCoupling = zeros(3);
-    errorInputCoupling(1,1) = brakeGain;
-    [errorDirection,errorHurwitz] = localComparisonDirection(errorComparison);
-    if errorHurwitz
-        direction = errorDirection;
-    else
-        [direction,hurwitz] = localComparisonDirection(comparison);
-        if ~hurwitz
-            error("collisionAvoidanceController:invalidTerminalModel","No contracting terminal velocity comparison exists.");
+    a=cruise.stage.continuousA(2:6,2:6);b=cruise.stage.continuousB(2:6,:);
+    ref=cruise.state(2:6);trim=cruise.input;
+    continuousDrift=cruise.stage.continuousA(2:6,:)*cruise.state+b*trim+cruise.stage.continuousC(2:6);
+    sampledDrift=cruise.transition(2:6,:)*[cruise.state;trim;1]-ref;
+    cap=model.measurementRadiusLimit(2:6);
+    limits=[cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius; ...
+        cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
+    lower=[-limits(1:2);cfg.model.speedMinimum;-limits(4:5)];
+    inputLimit=[cfg.model.frontWheelSteeringAngleMaximum; ...
+        max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))];
+    cellCount=max(cfg.encounter.minimumCells,ceil(2*norm(a,inf)*model.sampleTime));
+    % Parameters [initial tracking error; held input deviation] give common
+    % Bernstein rows for ALL terminal states, rather than sampled tests.
+    tubes=stateUncertainty.heldInterval(a,[zeros(5),b],continuousDrift, ...
+        [eye(5),zeros(5,2)],zeros(5,1),zeros(5,1),zeros(5,1),model.sampleTime, ...
+        cfg.encounter.taylorOrder,limits+abs(ref),[limits+abs(ref);inputLimit+abs(trim)], ...
+        zeros(5,1),cellCount);
+    slip=cfg.model.slipAngleMaximum(:);
+    if isscalar(slip),slip=repmat(slip,2,1);end
+    speed=max(cruise.stage.speed,cfg.model.scheduleSpeedFloor);
+    slipState=[0,0,0,1,cfg.vehicle.lf;0,0,0,1,-cfg.vehicle.lr]/speed;
+    slipInput=[-1,0;0,0];
+    stateRows=[eye(5);-eye(5);slipState;-slipState];
+    inputRows=[zeros(10,2);slipInput;-slipInput];
+    bounds=[limits;-lower;slip;slip]-stateRows*ref-inputRows*trim;
+    rows=zeros(0,7);holdBound=zeros(0,1);
+    for index=1:numel(tubes)
+        tube=tubes(index);
+        for point=1:size(tube.offset,2)
+            rows=[rows;stateRows*tube.map(:,:,point)+[zeros(size(stateRows,1),5),inputRows]]; %#ok<AGROW>
+            holdBound=[holdBound;bounds-stateRows*tube.offset(:,point)-abs(stateRows)*tube.radius(:,point)]; %#ok<AGROW>
         end
     end
-    if any(comparison*direction>=0) || ~(rho>0 && rho<1)
-        error("collisionAvoidanceController:invalidTerminalModel","No contracting terminal velocity comparison exists.");
+    inputRows=[eye(2);-eye(2)];
+    rows=[rows;zeros(4,5),inputRows];
+    holdBound=[holdBound;[inputLimit(1);cfg.actuation.brakingRatioMaximum; ...
+        inputLimit(1);-cfg.actuation.brakingRatioMinimum]-inputRows*trim];
+    reserve=16*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance);
+    holdBound=holdBound-reserve*(1+abs(holdBound));
+    feedbackRows=rows*[eye(5);-gain];
+    support=abs(feedbackRows*basis);
+    noise=abs(rows(:,6:7)*gain)*cap;
+    rate=model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    finite=isfinite(rate);
+    change=eye(2)+gain*cruise.transition(2:6,7:8);
+    slewSupport=abs(gain*(eye(5)-cruise.closedLoop)*basis);
+    slewNoise=(abs(change*gain)+abs(gain))*cap+abs(gain*sampledDrift);
+    disturbance=abs(modal*cruise.transition(2:6,7:8)*gain)*cap+abs(modal*sampledDrift);
+    % Numerical eigensynthesis residual is included as a nonnegative modal
+    % coupling; its certificate is checked componentwise below.
+    transformed=modal*cruise.closedLoop*basis;
+    comparison=abs(transformed)+4096*eps*(1+abs(modal)*abs(cruise.closedLoop)*abs(basis));
+    base=(eye(5)-comparison)\(disturbance+2*reserve);
+    available=[holdBound-noise;rate(finite)-slewNoise(finite)];
+    shape=[support;slewSupport(finite,:)];
+    direction=(eye(5)-comparison)\ones(5,1);
+    direction=direction/max(direction);
+    growth=shape*direction;
+    active=growth>0;
+    scale=min((available(active)-shape(active,:)*base)./growth(active));
+    radius=base+.95*scale*direction;
+    if any(radius<=0) || any(base<0) || any(direction<=0) || ~(scale>0) ...
+            || any(comparison*radius+disturbance>radius-2*reserve) ...
+            || any(shape*radius>available)
+        error('collisionAvoidanceController:invalidTerminalModel', ...
+            'The sensing and actuator contract has no certified modal terminal set.');
     end
-    excursion = localExcursion(abs(a(1:3,4:6)),comparison);
-    if errorHurwitz
-        errorExcursion = localExcursion(abs(a(1:3,4:6))+excursion*errorInputCoupling,errorComparison);
-    else
-        errorExcursion = excursion;
-    end
-    caps = [cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
-    caps(1) = min(caps(1),(input(2)-cfg.actuation.brakingRatioMinimum)*gain/brakeGain);
-    rate = h*cfg.model.brakingRatioRateMaximum;
-    if isfinite(rate), caps(1) = min(caps(1),rate*gain/(brakeGain*(1-rho))); end
-    slip = cfg.model.slipAngleMaximum(:);
-    if isscalar(slip), slip = repmat(slip,2,1); end
-    slipDirection = [direction(2)+cfg.vehicle.lf*direction(3); ...
-        direction(2)+cfg.vehicle.lr*direction(3)]/cfg.model.scheduleSpeedFloor;
-    % At zero scheduled speed the longitudinal and lateral velocity channels
-    % are decoupled in both comparison matrices, so each block is scaled to
-    % its own limits; a single scale would let the longitudinal cap starve
-    % the lateral box. The joint contraction is verified below.
-    longitudinalScale = caps(1)/direction(1);
-    lateralScale = min([caps(2:3)./direction(2:3);slip./slipDirection]);
-    if ~(longitudinalScale>0) || ~(lateralScale>0) ...
-            || input(2)>cfg.actuation.brakingRatioMaximum || input(2)<cfg.actuation.brakingRatioMinimum
-        error("collisionAvoidanceController:invalidTerminalModel","The terminal input and velocity domain are empty.");
-    end
-    velocityLimit = 0.99*[longitudinalScale*direction(1);lateralScale*direction(2:3)];
-    reserve = 128*eps*(abs(comparison)*velocityLimit);
-    if any(comparison*velocityLimit+reserve>=0) ...
-            || (errorHurwitz && any(errorComparison*velocityLimit+128*eps*(abs(errorComparison)*velocityLimit)>=0))
-        error("collisionAvoidanceController:invalidTerminalModel","The scaled terminal velocity box is not contracting.");
-    end
-    terminal = struct("continuousA",a,"continuousB",b,"continuousC",c,"tireModel",tireModel, ...
-        "input",input,"feedback",feedback,"radiusFeedback",radiusFeedback,"stepMatrix",step,"sampleTime",h, ...
-        "longitudinalRatio",rho,"comparison",comparison,"errorComparison",errorComparison, ...
-        "errorBudgetFinite",errorHurwitz,"poseExcursion",excursion,"errorExcursion",errorExcursion, ...
-        "velocityLimit",velocityLimit,"curvature",curvature, ...
-        "errorInputCoupling",errorInputCoupling,"feedbackArgument","certifiedLowerSpeedEndpoint");
-    memoKey = key;
-    memoTerminal = terminal;
+    deviationRows=[rows(:,6:7);change(finite,:);-change(finite,:)];
+    deviationBound=[holdBound-support*radius-noise; ...
+        rate(finite)-slewSupport(finite,:)*radius-slewNoise(finite); ...
+        rate(finite)-slewSupport(finite,:)*radius-slewNoise(finite)];
+    terminal=struct('cruise',cruise,'reference',cruise.state,'input',trim, ...
+        'feedback',[zeros(2,1),-gain],'modalMatrix',modal,'modalBasis',basis,'radius',radius,'reserve',reserve, ...
+        'measurementRadiusLimit',model.measurementRadiusLimit,'holdRows',rows,'holdBound',holdBound, ...
+        'sampleTime',model.sampleTime,'contraction',contraction,'comparison',comparison, ...
+        'disturbanceSupport',disturbance,'holdSupport',support,'holdNoise',noise, ...
+        'deviationRows',deviationRows,'deviationBound',deviationBound, ...
+        'continuousA',cruise.stage.continuousA,'continuousB',cruise.stage.continuousB, ...
+        'continuousC',cruise.stage.continuousC,'targetIndependent',true, ...
+        'scope',"boundedMeasurementRobustModalCruise",'sameOnlineGenerator',true);
+    savedKey=key;saved=terminal;
 end
 
-function [direction,hurwitz] = localComparisonDirection(comparison)
-% A positive vector with C*q < 0 certifies that the Metzler matrix C is Hurwitz.
-    hurwitz = false;
-    direction = zeros(3,1);
-    if rcond(-comparison)<=1e-12, return; end
-    direction = (-comparison)\ones(3,1);
-    reserve = 128*eps*(abs(comparison)*abs(direction));
-    hurwitz = all(direction>0) && all(comparison*direction+reserve<0);
-end
-
-function excursion = localExcursion(growth,comparison)
-    excursion = growth/(-comparison);
-    reserve = 4096*eps*(1+norm(excursion,inf));
-    excursion = excursion+reserve*ones(3,1)*(ones(1,3)/(-comparison));
-    residual = excursion*comparison+growth;
-    residualReserve = 128*eps*(abs(excursion)*abs(comparison)+abs(growth));
-    if any(residual+residualReserve>0,"all")
-        error("collisionAvoidanceController:invalidTerminalModel","The excursion comparison failed numerical verification.");
+function [count,inputs]=localCruiseAdmission(model)
+% A bounded feedback rollout proposes sufficient recovery TIME, not a hard
+% early-recovery requirement or a substitute actuator command.
+    terminal=localTerminalSet(model);cfg=model.cfg;
+    count=model.horizonSteps;maximum=4*count;
+    inputs=zeros(2,maximum);x=model.initialEgoState;rho=model.initialFrenetErrorBound;
+    previous=model.previousInput;cruise=terminal.cruise;
+    lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+    rate=model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    for index=1:maximum
+        input=terminal.input+terminal.feedback*(x-terminal.reference);
+        slipCenter=(x(5)+cfg.vehicle.lf*x(6))/max(cruise.stage.speed,cfg.model.scheduleSpeedFloor);
+        slipLimit=.8*cfg.model.slipAngleMaximum(1);
+        input(1)=min(max(input(1),slipCenter-slipLimit),slipCenter+slipLimit);
+        input=min(max(input,max(lower,previous-rate)),min(upper,previous+rate));
+        inputs(:,index)=input;previous=input;
+        x=cruise.transition(1:6,:)*[x;input;1];
+        rho=abs(cruise.transition(1:6,1:6))*rho;
+        [~,margin]=hardEncounterBarrier.terminalMembership(terminal,x,rho);
+        if index>=count && all(margin>4*terminal.reserve)
+            count=index;inputs=inputs(:,1:count);return;
+        end
     end
+    count=maximum;inputs=inputs(:,1:count);
 end
 
 function [direction,steps,passing] = localEncounterProposal(model,range)

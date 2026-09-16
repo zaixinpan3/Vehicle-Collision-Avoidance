@@ -1,127 +1,80 @@
-# Predictive continuation with one soft-CLF solve per sample
+# One-solve predictive safety with a recursively feasible continuation
 
-The format-26 controller optimizes a complete finite input sequence. The
-configured prediction length is used (default 16 holds), and finite encounter
-admission may require a longer sequence. Only the first input is executed.
-The fourth output retains the accepted input plan, exact affine node boxes,
-Bernstein enclosures, stage generators, separating normals, charts, finite
-exit deadline, and target-independent terminal set.
+The format-27 controller retains a complete finite input plan, swept rectangle
+collision certificate, finite confirmed exit and a permanent terminal
+information-state set. Both the predictor and terminal set use the same
+admitted held affine cruise generator. Physical input effort remains centered
+on the CLF/LQR trim; the first-hold CLF has a nonnegative squared-penalty slack.
+The target high-gain observer is unchanged.
 
-The terminal law is exclusively a prediction-side mathematical certificate.
-It never directly supplies an actuator command. An unsuccessful or malformed
-solve raises `collisionAvoidanceController:optimizationFailed` before control
-is issued, including when a carried feasible witness exists. There is one
-optimization per sample, no retry, and no separate post-solve acceptance checker.
-The former forced one-hold truncation and circumdisk barrier-decay rows are
-removed. Current swept collision constraints use oriented rectangles.
+The complete mathematical proof and its precise premises are in
+[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md). The guarantee covers admitted
+encounters, partial/full confirmed release, prediction exhaustion and
+indefinite target-free operation under the declared model, sensing and
+admission contracts. `recursiveFeasibilityGuaranteed=true` has this conditional
+scope, explicitly published in metadata. It is not a 100 ms runtime guarantee
+or a nonlinear physical-vehicle claim.
 
-## Optimization and model
+## Actual next-frame optimization
 
-For horizon $N$, the decision is $[U;\delta]$, where
-$U=[u_0^\top,\ldots,u_{N-1}^\top]^\top$ and $\delta\ge0$ is the first-hold
-sampled CLF norm slack. The quadratic objective is
+1. Retain the accepted hard affine family, terminal SOC, generators and swept
+   enclosures. Substitute the executed input to obtain its feasible suffix.
+2. After confirmed target release, delete only that target's collision and exit
+   rows. Retain the permanent certificate and any remaining target obligations.
+3. A fresh target-free performance horizon may replace the suffix only when
+   a concrete candidate satisfies every row and all cones of that new problem.
+4. If the suffix is exhausted and no longer replacement is certified, solve
+   a free one-hold constrained optimization inside the invariant terminal
+   information-state set. Its feedback candidate proves nonemptiness; the
+   optimizer chooses the command.
+
+One native optimization runs per frame. No failure is repaired by a saved
+command, terminal control law, alternate optimizer or retry. A failed solve
+or failed independent hard-safety verification ends the simulation.
+
+## Terminal set and sensing contract
+
+The terminal set is a product of disks in the stable modal coordinates of
+the same sampled LQR closed-loop map. Its component radii satisfy robust
+contraction, Bernstein hold-domain/slip/input inequalities and finite slew
+limits. The finite plan's final information box must lie in this set and satisfy
+robust transition slew to every possible conditioned terminal feedback input.
+
+The sensing limit is initialized from the admitted ego measurement enclosure
+and retained. A curved reference uses a uniform radial/chart conversion over
+the declared lateral domain. Future published measurement bounds must remain
+within it. Finite prediction never assumes a favorable future measurement
+reset. The local terminal problem retains true-state modal membership as well as
+the measured box; it does not require each later rectangular hull to lie
+inside the modal set. Only the permanent invariant argument uses the bound
+on future actual measurements. Increasing this bound is a changed contract.
+
+The permanent reference is an analytically continued straight line or constant-
+curvature curve with no physical road boundaries, matching the current
+no-road-boundary experiment specification. Model domains remain hard. Finite
+centerline samples and analytic arc length no longer cause projection clipping
+at their display endpoints. Curved station measurements unwrap about the
+carried prediction. A finite physical road, arbitrary polyline corner, or
+varying-curvature path needs its own permanent continuation certificate; such
+geometry is not silently admitted under this theorem.
+
+## Objective and certificate storage
+
+For `N` holds the decision is `[U; delta]` and the objective is
 
 \[
 \sum_{i=1}^{N}e_i^\top P e_i+
 \sum_{i=0}^{N-1}(u_i-u_*)^\top W(u_i-u_*)+w_\delta\delta^2.
 \]
 
-The cruise trim $u_*$ and metric $P$ are those used to synthesize the discrete
-Riccati CLF certificate. Road load and local curvature enter that trim.
-Prediction anchors select convex geometry; they are not desired accelerations
-or input references. Future state and input decisions affect collision,
-road/chart/model-domain, slip, actuator and slew constraints. The only relaxed
-constraint is the first-hold CLF. Its units and dissipation bound below are
-unchanged from the soft-CLF design.
+The first-hold CLF and five terminal modal inequalities are SOC constraints. All
+collision, domain, slip, actuator and slew rows are hard. The absolute target
+exit deadline is preserved while any admitted target remains active.
 
-The declared plant is the held affine bicycle generator, with zero process
-residual. An admitted prediction uses the sampled cruise generator frozen at
-its admitted curvature. An inherited prediction retains that exact generator,
-trim and metric; it is not replaced by a newly scheduled plant. This scope
-does not establish nonlinear physical-vehicle inclusion or a common Lyapunov
-proof across curvature/metric changes.
-
-## Complete prediction certificate
-
-Every held interval has a swept Bernstein enclosure. Oriented rectangle
-support bounds, target finite-flow uncertainty, and road/model allowances
-produce hard affine rows. The finite target model retains Cartesian jerk and
-yaw-acceleration bounds; no all-future support bound is imposed.
-
-The final node must certify both:
-
-1. The entire target footprint lies outside the declared complete perception
-   region in a certified separating direction. A current valid observation,
-   not a timer, discharges the encounter. Its absolute deadline cannot move
-   forward during inherited optimization.
-2. The ego information box belongs to the target-independent road terminal
-   set, including terminal-input entry slew. This is the comparison-system
-   stopping-excursion construction, with rows of the form
-   $A_f z_N+E_f\rho_N\le b_f$. The hypothetical terminal law brakes the lower
-   speed endpoint and admits a nonnegative invariant speed box.
-
-`hardEncounterBarrier.completionRows` constructs both conditions.
-`terminalStep`, `terminalFlow`, and `terminalMembership` describe or audit
-this mathematical terminal continuation; the online controller never calls
-them to obtain its command. Physical road boundaries are optional. Model-domain
-and chart constraints remain present when the scenario has no road boundaries.
-
-## Feasible continuation is part of the next optimization
-
-Store the accepted hard affine family $A U\le b$, with its inward numerical
-reserves. Partition $A=[A_0\;A_+]$. After executing $u_0^*$, the inherited
-family is
-
-\[
-A_+ U^+\le b-A_0u_0^*.
-\]
-
-The accepted suffix $U^{+*}=(u_1^*,\ldots,u_{N-1}^*)$ satisfies this family
-by direct substitution. Rows with no remaining decision dependence are
-already fixed by the certified prefix and can be removed. The first-stage
-slew row shifts in the same way. No additional tightening or new geometric
-convexification is applied to the inherited family.
-
-The cell maps and offsets undergo the same substitution. Their original
-radii, normals and charts remain valid; current measurement intersection
-only restricts the actual information set. The prediction centers are
-propagated with exact held affine transitions, not with truncated polynomial
-node approximations. The CLF uses the current conditioned state, and its
-unbounded nonnegative slack admits any finite physically feasible suffix.
-Therefore it cannot destroy existence of a solution to the inherited hard
-family. The solver uses translated coordinates about the carried/trim plan
-to improve conditioning; this exact translation does not constrain its optimum.
-
-This proves mathematical successor feasibility **within an admitted active
-encounter, with unchanged obligations, valid information-set inclusion,
-unchanged execution/model contracts, and a nonempty finite suffix**. Numerical
-solver completion is a separate obligation. The terminal construction supplies
-a mathematical safe continuation after the certified exit, but that law is
-not an executable fallback in this implementation.
-
-After confirmed release, the controller starts a fresh cruise performance
-horizon. A new target, enlarged motion bounds, or partial release among multiple
-targets also requires fresh formulation/admission. This implementation does
-not prove that every such fresh convexification contains the old road witness.
-Accordingly, `recursiveFeasibilityGuaranteed` remains false for the complete
-online hybrid controller; `inheritedFeasibleFamily` specifically identifies
-frames to which the affine shift argument applies. Saving a witness alone
-would not justify a stronger claim.
-
-## Observation and execution contracts
-
-Targets must have stable identities and bounded finite motion. An active
-encounter requires a current `perception` declaration with `time`, `range`,
-and logical `completeWithinRange=true`. An observed exterior target imposes
-no current encounter obligation. Missing data cannot release an interior
-reachable target. New target admission and future re-entry remain separate
-conditions, not consequences of the old certificate.
-
-Every successor reports the actual previous held input and next timestamp.
-Measured ego/target boxes are intersected with the carried prediction. An
-empty intersection violates the declared execution/measurement/model contract.
-The observer implementation and its high-gain mathematical framework are
-unchanged by this restoration.
+The returned format-27 state contains the plan, verified inherited affine
+bounds and terminal cone, exact nominal nodes, uncertainty boxes, cell
+geometry, stable target identities, common generator and permanent terminal
+certificate. Earlier state formats must be reset.
 
 ## Soft sampled CLF and its dissipation bound
 
@@ -180,27 +133,37 @@ curvature/metric or reference needs a separate switching analysis.
 For any finite physical input satisfying the hard constraints, a finite
 nonnegative slack can satisfy the CLF cone. Thus the CLF no longer excludes a
 physically feasible input merely because it would increase tracking error.
-Hard obstacle, road, domain and actuator constraints can still conflict. The
-controller stops on an unsuccessful solve; slack provides no backup design
-or recursive-feasibility guarantee.
+Hard obstacle, domain and actuator constraints can still conflict at new
+admission. After admission, the predictive and invariant-set construction
+establishes successor feasibility; CLF slack preserves that feasible family.
+A failed numerical solve still stops control.
 
 The exact-state driver saves the optimized slack, its dissipation allowance,
 the residual with that allowance removed, and the unrelaxed residual. Offline
 experimental success uses the slack-dependent inequality. A positive unrelaxed
 residual remains visible and is never described as unrelaxed CLF dissipation.
 
-## Numerical and runtime scope
+## Numerical verification and runtime
 
-The native solver must return strict success with a finite, real decision of
-the expected size. Physical reserves are constructed before solving; there is
-no independent online residual verifier. A solver hook must satisfy the same
-feasibility/status contract. Incorrect success declarations are not caught by
-a separate checker. The test suite audits physical rows, sampled rectangles,
-CLF dissipation, witness shifting and terminal membership independently.
+A native positive solve status with a finite real decision is necessary but
+not sufficient. A positive approximate-solve status is permitted only after
+the same independent certificate checks; it is reported separately.
+Infeasibility, iteration limits and timeouts remain failures. `solveHardCbfClf.certify` checks physical hard rows and terminal
+SOCs with arithmetic allowances before a command is returned. The inherited
+family may consume part of its original inward reserve to contain the actual
+accepted numerical solution, but it may never exceed the physical safety
+bound. This avoids repeated tightening invalidating a carried witness.
+`postSolveCertificationPerformed=true` reports this check.
 
-`frameDeadlineSeconds` limits native solver work. It does not bound complete
-MATLAB preparation, prediction construction, loading, or scheduling. Experiments
-report complete measured frame times and cold/warm behavior separately. The
-restored full prediction is not yet qualified for every-frame 100 ms execution.
-See the dated restoration report under `report/` for measured results and
-remaining admission/performance failures.
+Fresh-problem selection checks the complete candidate against the proposed
+optimization before its single solve. CLF slack is chosen large enough for
+that feasibility witness; it remains optimized in the actual solve.
+
+The normalized objective tolerance remains 1e-7. Safety depends on a verified
+feasible solution, not exact objective minimization. Physical feasibility uses
+its separate tolerance and independent safety reserves.
+
+`frameDeadlineSeconds` limits native work, not total frame preparation or
+scheduling. A 100 ms total deadline remains a separate measured requirement.
+The controller has no executable fallback when a mathematically feasible
+problem fails to solve on time. See the current dated report under `report/`.

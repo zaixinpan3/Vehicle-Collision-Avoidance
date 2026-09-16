@@ -1,14 +1,17 @@
 # One hard predictive CBF–CLF controller
 
-Current implementation, September 15, 2026: predictive continuation is
-restored with a complete finite input plan, rectangular swept collision rows,
-finite confirmed exit, and an invariant road terminal certificate. The
-format-26 controller performs one optimization per sample, preserves a
-feasible affine suffix during an unchanged active encounter, and fails before
-issuing any command when optimization fails. The terminal law is never a
-runtime fallback. The sampled CLF retains its penalized norm slack.
-Authoritative current interfaces, equations and guarantee limits are in
-[SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md).
+Current implementation, September 15, 2026: the format-27 controller retains
+predictive continuation across active encounters, partial/full release and
+prediction exhaustion. Its terminal information-state cruise set uses the
+same generator as online prediction. A fresh optimization must contain a
+verified feasible candidate; an exhausted suffix leads to a free invariant-set
+optimization. One optimization runs per frame, and failed solving or physical
+certificate validation issues no command. The terminal law is a mathematical
+candidate, never a runtime fallback. The CLF retains its squared slack penalty.
+
+See [SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md) for current interfaces and
+[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md) for the complete conditional
+recursive-feasibility proof, sensing assumptions, and supported road scope.
 
 The remainder records the earlier version-16 design and is not the current
 execution contract.

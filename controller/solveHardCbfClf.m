@@ -1,6 +1,39 @@
 classdef solveHardCbfClf
     %solveHardCbfClf One conic solve with strict solver-status execution.
     methods (Static)
+        function program = certify(program,decision)
+        % Validate physical safety independently of a numerical success flag.
+        % Transfer a feasible affine family WITHOUT repeated inward tightening.
+            gamma=64*numel(decision)*eps;
+            value=program.physicalMatrix*decision;
+            allowance=gamma*(1+abs(program.physicalBound)+abs(program.physicalMatrix)*abs(decision));
+            certified=max(program.safetyBound,value+allowance);
+            map=program.terminalCone.matrix;
+            input=decision(program.layout.planIndex);
+            cone=program.terminalCone.bound-map*input;
+            coneAllowance=gamma*(1+abs(program.terminalCone.bound)+abs(map)*abs(input));
+            tops=1:3:numel(cone);
+            adjusted=program.terminalCone.bound;
+            for first=tops
+                adjusted(first)=adjusted(first)+max(0,norm(cone(first+(1:2))) ...
+                    +norm(coneAllowance(first+(0:2)))-cone(first));
+            end
+            first=program.cones(2)+1;
+            clf=program.b(first:first+5)-program.A(first:first+5,:)*decision;
+            if any(~isfinite(certified)) || any(certified>program.physicalBound) ...
+                    || any(~isfinite(adjusted)) || any(adjusted(tops)>program.terminalConePhysicalBound(tops))
+                error('collisionAvoidanceController:optimizationFailed', ...
+                    'The returned solution failed the hard-safety certificate. No command was issued.');
+            end
+            if norm(clf(2:end))-clf(1)>program.clfNumericalReserve ...
+                    || decision(end)<-program.clfNumericalReserve
+                error('collisionAvoidanceController:optimizationFailed', ...
+                    'The returned solution failed the reserved soft-CLF inequality. No command was issued.');
+            end
+            program.safetyBound=certified;
+            program.terminalCone.bound=adjusted;
+        end
+
         function solve = constrained(program,cfg)
             program = localCompactPlanarRows(program);
             problem = struct('layout',struct('decisionCount',numel(program.q)),'stageProgram',program);
@@ -203,9 +236,10 @@ function solve = localNormalizeSolve(solve, decisionCount, variableCount)
         solve.exitFlag = -999;
     end
     solve.exitFlag = double(solve.exitFlag);
-    % Execution relies on a fully solved optimizer status, never on an
-    % independently checked iterate from a failed or incomplete solve.
-    solve.feasible = solve.exitFlag==1 ...
+    % Exact optimality is unnecessary for recursive feasibility. A positive
+    % approximate-solve status may proceed ONLY to independent certification.
+    % Infeasibility, iteration limits and timeouts still issue no command.
+    solve.feasible = any(solve.exitFlag==[1,2]) ...
         && isnumeric(solve.decision) && isreal(solve.decision) ...
         && numel(solve.decision) == decisionCount ...
         && all(isfinite(solve.decision), "all");

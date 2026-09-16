@@ -2,7 +2,7 @@
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest implementation and validation: [Predictive continuation restored, with explicit admission and runtime limitations, September 15, 2026](PREDICTIVE_CONTINUATION_RESTORATION_20260915.md).
+Latest implementation and validation: [Recursive feasibility closure, same-model robust terminal set and successor validation, September 15, 2026](RECURSIVE_FEASIBILITY_CLOSURE_20260915.md).
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
@@ -12,6 +12,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Complete conditional recursive-feasibility construction and straight-scene validation | [RECURSIVE_FEASIBILITY_CLOSURE_20260915.md](RECURSIVE_FEASIBILITY_CLOSURE_20260915.md) |
 | Predictive continuation restoration, carried feasibility, 30 s straight trials and runtime limits | [PREDICTIVE_CONTINUATION_RESTORATION_20260915.md](PREDICTIVE_CONTINUATION_RESTORATION_20260915.md) |
 | Single-hold decay-row obstructions, uncertainty correlation and blocked passing geometry | [SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md](SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md) |
 | CLF slack, optional road boundaries, and remaining hard-input infeasibility | [CLF_SLACK_NO_ROAD_RERUN_20260915.md](CLF_SLACK_NO_ROAD_RERUN_20260915.md) |

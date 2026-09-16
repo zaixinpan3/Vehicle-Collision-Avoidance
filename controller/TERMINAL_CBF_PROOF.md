@@ -1,388 +1,379 @@
-# Terminal invariance audit and conditional predictive CBF theorem
+# Recursive feasibility and encounter safety of the implemented controller
 
-Research and implementation date: September 8, 2026.
+This is the current format-27 proof. It replaces the previous stopping-tail
+argument. The implemented terminal certificate uses the **same held affine
+plant** as the online predictor. Its feedback is a feasible prediction candidate;
+it is never an actuator fallback. `hardEncounterBarrier`,
+`formulateAvoidanceProblem`, and `solveHardCbfClf.certify` implement the objects
+below. Numerical tests validate the implementation; the induction below, not
+simulation duration, establishes the recursive statement.
 
-The subsequent hard-margin, retained-deadline implementation and its conditional
-encounter proof are in [HARD_PREDICTIVE_CBF.md](HARD_PREDICTIVE_CBF.md). It uses
-perception exit rather than the retired invariant terminal set audited here.
-References below to the current online controller concern the default
-version-10 lookahead policy; the nonlinear counterexamples remain applicable.
+## 1. Statement and declared scope
 
-## Result and scope
+Starting from an accepted feasible certificate, every subsequent optimization
+has a feasible candidate, and every accepted executed hold satisfies the active
+collision and permanent model-domain/input/slew constraints, provided that:
 
-The dissipative terminal construction evaluated in this audit yields a locally Lipschitz,
-nonsmooth CBF for its declared, disturbance-free, zero-speed scheduled affine
-model and fixed safe pose halfspaces. This result is proved below and evaluated
-in a self-contained mathematical experiment. The retired runtime utility and
-its unused rest-tail prediction path have been deleted; no copy is retained
-as an alternative controller.
+1. The plant is the declared zero-residual, held affine bicycle model. Its
+   admitted generator, sample time, configuration and reference do not change.
+   The frozen generator is retained across target release and reoptimization.
+2. Ego measurements contain the true state. Their Frenet component radii never
+   exceed the stored `measurementRadiusLimit`. Measurements and actual held
+   input/time satisfy the execution and set-intersection contracts.
+3. While a target remains active, its true motion belongs to its admitted
+   finite-flow model. Current observations are sound. A complete observation
+   confirms absence from the declared sensing region, or a current conditioned
+   target enclosure certifies exterior membership. Observation semantics must
+   cover the footprint used by the exit certificate; missed detections cannot
+   count as release.
+4. New targets, increased motion bounds, and other enlarged obligations must
+   admit a new feasible certificate. Arbitrary newly appearing obstacles are
+   not covered by the previous encounter's theorem.
+5. The permanent reference is an analytically continued straight line or
+   constant-curvature reference, with no physical road-boundary constraints.
+   Lateral, heading, speed, lateral-velocity, yaw-rate and slip domains remain
+   hard. Centerline samples / analytic arc length describe the reference;
+   they are not physical end-of-road barriers. A finite road or a changing
+   curvature requires a different permanent continuation certificate.
+6. A returned numerical solution passes the independent hard-row and terminal
+   cone verification. To execute an indefinitely safe physical sequence, a
+   valid solve must also finish before each actuation deadline. Mathematical
+   nonemptiness does not imply numerical completion within 100 ms.
 
-Huang, Wang, Margellos and Goulart's safe-MPC argument supplies an appropriate
-conditional predictive extension: a safety-slack value function is nonincreasing
-because a feasible plan can be shifted and completed inside an invariant terminal
-set. A fixed affine auxiliary problem using our terminal set implements that
-argument in `scripts/runTerminalCbfProofAudit.m`.
+These are explicit model/sensing/admission conditions, not claims about arbitrary
+unseen traffic or a nonlinear physical vehicle. The target high-gain observer
+is unchanged. The new ego sensing premise bounds its published measurement
+set; it does not replace the target observer with a different estimator.
 
-**This does not establish a CBF for the current online vehicle controller.** The
-old terminal set contains a boundary with unavoidable outward motion under the
-nonlinear bicycle, so it is not a control-invariant set for that model. Its fixed
-rest input also cannot preserve a bounded pose budget against persistent forcing.
-These are explicit mathematical obstructions, beyond the absence of an online
-terminal constraint. Adding the old constraint to the current SOCP would not
-repair them. No such integration, zeroing of model uncertainty, additional target
-route assumption, or backup execution is introduced by this operation.
+## 2. Common plant and information sets
 
-## 1. Research method and primary sources
-
-The question is whether the existing terminal set can support a CBF claim for
-the current finite-sensing, nonlinear, sampled controller. The method is a
-premise-by-premise proof audit, constructive derivation and counterexample search.
-This is a focused technical investigation, not a systematic literature review.
-Source selection favors complete original papers on predictive barriers,
-sampled execution and output-feedback terminal conditions. Search terms included
-"predictive control barrier functions terminal set recursive feasibility" and
-"finite horizon control barrier function terminal set time varying obstacles".
-
-| Source and material examined | Use and limitation |
-|---|---|
-| Huang, J., Wang, H., Margellos, K., and Goulart, P. (2025), *Predictive Control Barrier Functions: Bridging model predictive control and control barrier functions*, ECC, pp. 2623–2629. User-provided published PDF in `reference/`; Definition II.1, Eq. (8), Lemmas III.1–III.5, Eqs. (10)–(11), Theorem 4. [Author preprint](https://arxiv.org/abs/2502.08400). | Main value-function/shift argument. Safety slack is distinct from CLF slack. We do not import maximal-invariant-set or recovery claims for our online solver. |
-| Wabersich, K. P., and Zeilinger, M. N., *Predictive control barrier functions: Enhanced safety mechanisms for learning-based control*, [full text, version 3](https://arxiv.org/html/2105.10241v3), Sections II-A and III. | Terminal continuation and the distinction between hard feasible safety and soft recovery. Its tightened recovery formulation is not substituted for our objective. |
-| Breeden, J., Garg, K., and Panagou, D., *Control Barrier Functions in Sampled-Data Systems*, [full text, version 2](https://arxiv.org/html/2103.03677v2), Section II and Theorem 1. | Sample-node invariance alone does not certify intersample separation. |
-| Köhler, J., Müller, M. A., and Allgöwer, F., *Robust output feedback model predictive control using online estimation bounds*, [full text](https://arxiv.org/html/2105.03427), observer bounds and robust MPC terminal assumptions. | Estimator error bounds and robust continuation are separate hypotheses; a high-gain observer alone does not establish the required tube property. |
-
-Titles, authors and the relevant text were checked against the supplied PDF and
-primary preprints. No secondary summary is used as a theorem premise. Derivations
-and counterexamples below are project analysis. AI-assisted research tools were
-used for source inspection, derivation, implementation and validation; numerical
-checks are not presented as machine-verified proofs or independent peer review.
-
-## 2. The affine terminal dynamics under examination
-
-Write the terminal state as \(x=(p,v)\), with
+Let `x = [s; d; ePsi; vx; vy; r]`, `u = [deltaF; beta]`, and
 
 \[
-p=(s,d,e_\psi),\qquad v=(v_x,v_y,r).
+ x^+=F x+G u+g,\qquad
+ [F\ G\ g]=[I_6\ 0]\exp\!\left(h
+ \begin{bmatrix}A&B&c\\0&0&0\end{bmatrix}\right).
 \]
 
-For fixed scheduled curvature, zero scheduled speed and the admissible constant
-input \(u_R=(0,-b_\star/g_\beta)\), the existing affine model has
+Every future hold in an admitted program retains this exact generator. The
+sampled cruise certificate provides a reference `x_*`, trim `u_*`, gain `K`,
+and `P = R^T R > 0`. Since `A(2:6,1)=0`, tracking error
+`e = x(2:6)-x_*(2:6)` satisfies
 
 \[
-\dot p=Gv,\qquad \dot v=Fv. \tag{1}
+ e^+=F_e e+G_e(u-u_*)+d_*,\qquad
+ F_c=F_e-G_eK,\qquad \|R F_c R^{-1}\|_2\le q<1.
 \]
 
-There is no persistent additive disturbance in (1). The longitudinal channel is
-independent, \(\dot v_x=-a v_x\), \(a>0\), so the domain
+Here `d_* = F(2:6,:)*x_* + G(2:6,:)*u_* + g(2:6) - x_*(2:6)`
+is the actual sampled trim residual. Its absolute support is charged below;
+the code does not assume a numerically synthesized trim is exactly balanced.
+The implemented `q` includes the synthesis arithmetic allowance. The input
+`u_*` includes aerodynamic and rolling loads and the curvature-specific trim.
+
+An ego information box is `X = z + [-rho,rho]`. Finite open-loop prediction
+uses exact affine nominal nodes and the interval recursion
 
 \[
-\mathcal D_R=\{(p,v):v_x\ge0\}
+ z_{i+1}=Fz_i+Gu_i+g,\qquad \rho_{i+1}=|F|\rho_i.
 \]
 
-is invariant. Let \(C\) be the Metzler comparison matrix of \(F\): retain its
-diagonal and take absolute values off diagonal. Assume \(C\) is Hurwitz. Define
+Swept Bernstein enclosures additionally cover all times inside every hold,
+including polynomial remainder and arithmetic allowances. No hypothetical
+future measurement is used to shrink these finite predicted boxes.
+
+At the next actual observation, conditioning produces a box inside the carried
+successor box and the current measurement box. Thus it preserves the old
+trajectory enclosure and satisfies `rho <= r_bar`, where `r_bar` is the
+admitted sensing limit. On a circular reference a station is unwrapped about
+the carried successor, rather than jumping by one revolution.
+
+## 3. Robust modal terminal set and its information-state interpretation
+
+One common ellipsoid with the slowest contraction factor can substantially
+overestimate the effect of measurement noise in faster longitudinal modes.
+The implementation instead uses a product of disks in stable modal coordinates.
+The CLF metric and performance objective remain unchanged.
+
+Let `V` be a nonsingular modal basis of `F_c`, `W=V^{-1}`, and let `r` be the
+five tracking-coordinate measurement bounds. Complex conjugate modes are
+retained; every physical error is real. Define
 
 \[
-M=|G|(-C)^{-1}\ge0,\qquad q>0,\qquad Cq<0. \tag{2}
+ \mathcal Z=\{e\in\mathbb R^5: |W e|\le a\},\qquad a>0.
 \]
 
-A positive scaling of \(q\propto(-C)^{-1}\mathbf1\) preserves \(Cq<0\).
-The numerical vector of ones fixes a comparison direction with compatible
-component units; it is not a disturbance assumption. Any application must
-choose the scale to enforce its velocity, slip and force constraints. The
-fixed input must be admissible. The research LP below is restricted to the
-longitudinal subspace, with zero steering, lateral velocity and yaw rate.
-
-Let the fixed terminal pose region be \(Ap\le b\). Its rows must already account
-for the full vehicle footprint and any obstacle obligations throughout the
-terminal continuation. The scalar input bounds, velocity envelope, and fixed
-pose halfspaces concern the declared affine model. They are not a nonlinear
-vehicle certificate. Entry slew and a pending input queue need separate checks.
-
-## 3. A terminal barrier, rather than only a membership test
-
-For positive row scales \(\sigma_j\), define
+Each complex magnitude inequality is an ordinary three-dimensional SOC.
+Let `C >= |W F_c V|` include the numerical synthesis allowance, and
 
 \[
-h_f(p,v)=\min\left\{
- \min_j\frac{b_j-A_jp-|A_j|M|v|}{\sigma_j},
- 1-\max_i\frac{|v_i|}{q_i}\right\},\qquad
-\mathcal X_f=\{x\in\mathcal D_R:h_f(x)\ge0\}. \tag{3}
+ d=|W G_e K|r+|Wd_*|.
 \]
 
-A supplied strict interior pose establishes nonemptiness. Compactness of the
-pose polytope, needed for the predictive theorem below, must also be established
-by its geometry. The function
-is piecewise affine and locally Lipschitz. We do not claim it is differentiable
-at changes of active face or signs. The domain restriction \(v_x\ge0\) is checked
-separately; putting \(v_x\) into a margin required to increase would be incorrect
-for a stopping trajectory.
-
-**Proposition 1 — terminal invariance and barrier inequality.** Under (1)–(2),
-the admissible constant input \(u_R\) makes \(h_f(x(t))\) nondecreasing for all
-\(x(0)\in\mathcal D_R\). Every nonempty superlevel set of (3) is invariant under
-that input. In particular, \(h_f\ge0\) implies \(Ap\le b\) and \(|v|\le q\).
-
-**Proof.** Componentwise comparison gives \(D^+|v|\le C|v|\). For each pose row,
+Synthesis checks
 
 \[
-\begin{aligned}
-D^+\big(A_jp+|A_j|M|v|\big)
-&\le |A_j||G||v|+|A_j|MC|v|\\
-&=0,
-\end{aligned}\tag{4}
+ Ca+d\le a-2\epsilon_f\mathbf 1. \tag{1}
 \]
 
-because \(MC=-|G|\). Thus each pose margin in (3) is nondecreasing. With
-\(y=\max_i|v_i|/q_i\), positivity of the off-diagonal entries gives, at every
-active component,
+This is a componentwise contraction/forcing condition. The positive radius
+and strict reserve also certify a stable nonnegative comparison matrix.
+It is not a numerical trajectory sampling argument.
+
+The hypothetical feedback uses the current conditioned estimate:
 
 \[
-D^+y\le \max_i\frac{(Cq)_i}{q_i}y=-\lambda y,
-\quad \lambda=\min_i\frac{-(Cq)_i}{q_i}>0. \tag{5}
+ \kappa(\hat z)=u_*-K\hat e,\qquad
+ \hat e=e+\nu,\quad |\nu|\le r.
 \]
 
-Therefore \(1-y\) is nondecreasing too. The minimum of these nondecreasing
-quantities is nondecreasing. These Dini/comparison inequalities apply to the
-absolutely continuous affine trajectories, including zero velocity components.
-Domain invariance follows from the independent damped longitudinal channel.
-This proves the claims. Equivalently, \(B_f=-h_f\) satisfies
+For this input the **true** tracking error obeys
 
 \[
-B_f(\Phi_h(x,u_R))-B_f(x)\le0 \tag{6}
+ e^+=F_c e-G_eK\nu+d_*,\qquad |We^+|\le Ca+d\le a-2\epsilon_f.
+ \tag{2}
 \]
 
-for every held duration \(h\ge0\). This is a nonsmooth barrier statement; a
-classical gradient/Lie-derivative formula at a nonsmooth face is unnecessary.
+The invariant object is the true state set intersected with the current
+information box. A rectangular outer hull need not itself remain inside the
+modal set after every measurement. The implementation retains the terminal
+set certificate as well as the box; it does not infer loss of true-state
+membership from outer-box overapproximation. The estimate's error is bounded
+because the conditioned box contains the truth and is a subset of the current
+bounded measurement box.
 
-**Exact set evaluation in algebra.** Enumerating the eight velocity sign vectors
-turns (3) into \(h_f(x)=\min_l(\bar b_l-\bar A_lx)\). For a signed-generator
-enclosure \(Z=z+L[-1,1]^m\),
+### Continuous hold and input constraints
+
+Synthesis builds common Bernstein rows parameterized by the **true** initial
+tracking error and held input deviation:
 
 \[
-\inf_{x\in Z}h_f(x)=\min_l\left(
-\bar b_l-\bar A_lz-\|\bar A_lL\|_1\right). \tag{7}
+ H_e e+H_u(u-u_*)\le b_h.
 \]
 
-The exchange of two infima is exact. This is implemented without converting a
-propagated generator matrix back into a coordinate box. Independently maximizing
-the pose and absolute-velocity terms would generally lose their correlations.
-Ordinary floating-point evaluations of (2) and (7) remain numerical evaluations;
-the implementation is not an interval-arithmetic proof checker.
-
-## 4. Huang-style predictive extension
-
-Use \(B_N\) for the auxiliary safety value, reserving \(V_{\mathrm{CLF}}\) for the
-cruise Lyapunov function. Consider a *fixed* continuous discrete transition \(f\),
-compact admissible inputs, normalized continuous state rows \(c(x)\le0\), and
-the following problem for \(N\ge1\):
+They cover every point in the hold, domain/slip/input limits and numerical
+reserves. The known continuous trim residual is included in the Bernstein
+affine offsets and therefore in `b_h`. For feedback with bounded measurement error, a sufficient whole-set
+support condition is
 
 \[
-\begin{aligned}
-B_N(x)=\min_{u_{0:N-1},\xi_{0:N-1}}&\ \sum_{i=0}^{N-1}\xi_i\\
-\text{subject to }&\ x_0=x,\quad x_{i+1}=f(x_i,u_i),\\
-&u_i\in\mathcal U,\quad x_i\in\mathcal D_R,\\
-&c(x_i)\le\mathbf1\xi_i,\quad \xi_i\ge0,\\
-&x_N\in\mathcal X_f.
-\end{aligned}\tag{8}
+ |(H_e-H_uK)V|a+|H_uK|r\le b_h. \tag{3}
 \]
 
-Assume: (i) the nonempty compact terminal set is inside the unrelaxed state set
-and is invariant under an admissible terminal law for **the same transition**;
-(ii) optima are attained; and (iii) \(B_N\) is continuous on its feasible domain
-\(\mathcal D_N\). A fixed affine, polyhedral problem such as the auxiliary LP
-below supplies a continuous piecewise-affine value on its feasible domain.
-Polytopic state/input sets alone are not a sufficient continuity argument for
-an arbitrary nonlinear, relinearized or changing-maneuver optimization; we keep
-that regularity obligation explicit rather than importing it from a citation.
-
-**Proposition 2 — predictive CBF.** Under these assumptions, \(\mathcal D_N\) and
-\(\mathcal C_N=\{x:B_N(x)=0\}\) are invariant under the first input of a global
-minimizer of (8), and
+For a free optimized input, define the input deviation from the hypothetical
+feedback `v = u - kappa(hat z)`. The terminal optimization imposes
 
 \[
-B_N(f(x,u_0^*))-B_N(x)\le-\xi_0^*\le0. \tag{9}
+ H_u v\le b_h-|(H_e-H_uK)V|a-|H_uK|r. \tag{4}
 \]
 
-Thus \(B_N\), with safe zero sublevel set \(\mathcal C_N\), is a discrete-time
-CBF in the sense of Huang et al., Definition II.1.
+It therefore covers the same continuous hold for every true state in
+`mathcal Z` consistent with the estimate. The feedback candidate is `v=0`;
+its command is not imposed as an equality.
 
-**Proof.** Shift an attained minimizing sequence and append the terminal law:
+### Finite input rate and the previous-input state
+
+For a current input `u=kappa(hat z)+v` and a hypothetical next feedback input,
+let `J=I+K G_e`. Direct substitution gives
 
 \[
-\tilde u=(u_1^*,\ldots,u_{N-1}^*,\kappa_f(x_N^*)),\qquad
-\tilde\xi=(\xi_1^*,\ldots,\xi_{N-1}^*,0). \tag{10}
+ u^+_{\kappa}-u=K(I-F_c)e+J K\nu-Jv-K\nu^+-Kd_*.
 \]
 
-All retained constraints are unchanged. Terminal invariance admits the last
-input and the new endpoint. Since \(\mathcal X_f\subseteq\{c\le0\}\), the
-appended stage needs zero slack. The new optimum is no larger than this feasible
-candidate's cost, proving (9) and domain invariance. Nonnegativity and attainment
-give \(B_N=0\) exactly when a zero-slack trajectory to \(\mathcal X_f\) exists.
-Equation (9) preserves this zero set, which lies in the physical state set at
-sample instants. Continuity supplies the remaining stated CBF regularity.
-
-This is the argument of Huang et al., Eqs. (8)–(11) and Theorem 4, specialized to
-our terminal construction. Strict decrease is unnecessary for invariance. We
-do not infer exact cruise convergence, a globally maximal safe set, or
-continuous-time collision safety from (9). For sampled execution, a transition
-must additionally constrain its entire held trajectory, not just its endpoints.
-
-**Relation to the current objective.** The safety slack \(\xi\) is not our CLF
-slack \(\delta\). Neither the CLF value nor the joint state/input/slack objective
-is identified with \(B_N\). On \(\mathcal C_N\), *any feasible hard-safety MPC*
-with the same terminal and dynamics conditions selects a zero-cost minimizer
-of (8). It can therefore minimize the existing performance objective, including
-input deviation from the CLF operating point and squared CLF slack, without an
-extra auxiliary optimization at runtime. Outside \(\mathcal C_N\), the
-nonincrease proof requires the auxiliary optimum or an independently proved
-descent rule; arbitrary weighted performance tradeoffs do not supply it.
-Positive auxiliary safety slack is not permission to execute unsafe controls.
-
-## 5. What must also hold for this estimator/controller
-
-For uncertain observations, the state of the proof is the information set,
-including target motion parameters, active obligations, certificate clock and
-committed input queue. Every possible successor must admit the conditioned tail.
-The policy class must be closed under conditioning and terminal extension;
-enclosures must contain the true trajectories. A new measurement can tighten a
-retained set, but cannot silently replace its covered futures. A relinearized
-inner approximation must retain a feasible representation of the old witness.
-
-For the old affine terminal model with uncertain initial state and no process
-disturbance, its constant \(u_R\) is common to all states. Propagating signed
-generators preserves the exact affine image, so (7) supplies the needed set
-membership check. This is demonstrated by the auxiliary audit. It does not
-prove these properties for the online changing linearizations, noisy NRMM
-interface, or nonzero process residual.
-
-Moving targets require terminal collision coverage for the remaining obligation,
-or a valid finite-encounter exit/transfer. The user's finite sensing convention
-does not require extrapolating a target forever. It does require that the
-certificate cover the active encounter and any applicable sensing handoff.
-Appending a timeless ego-rest step is not such a proof. A shrinking-clock
-reach–avoid construction is another possible route, discussed in
-`ENCOUNTER_SCOPED_CBF_CLF.md`; Huang's fixed-horizon invariant-terminal theorem
-does not establish it automatically.
-
-## 6. Obstructions to applying the old terminal set directly
-
-### Nonlinear boundary counterexample
-
-For a straight road, the scheduled rest model uses \(\dot d=v_y\), and
-\(M_{d,v_x}=0\). Its terminal set consequently admits
+Define
 
 \[
-d=b_d,\quad e_\psi=\theta>0,\quad v_x>0,\quad v_y=r=0
-\tag{11}
+ S=|K(I-F_c)V|a+(|JK|+|K|)r+|Kd_*|.
 \]
 
-when the other pose and velocity bounds have slack. For the current nonlinear
-bicycle, however,
+Synthesis requires `S < h u_dot_max` for each finite rate limit. Terminal
+optimization additionally imposes
 
 \[
-\dot d=v_x\sin\theta>0. \tag{12}
+ \pm Jv\le h\dot u_{\max}-S. \tag{5}
 \]
 
-This instantaneous velocity is independent of steering and drive/brake inputs.
-The existing nonnegative velocity excursion term cannot compensate for outward
-motion from the boundary. Thus the old set is **not control invariant** for the
-nonlinear model, even with perfect state knowledge and no external disturbance.
-This is stronger than showing that a particular terminal input performs poorly:
-no bounded force/steering action can prevent immediate exit from that admitted
-boundary state. It does not prove that a different, smaller nonlinear terminal
-set or another CBF is impossible.
+Thus the *next* feedback candidate satisfies slew for every allowed next
+measurement. The actual current slew relative to `u^-` is enforced directly.
+The previous input and the condition that the feedback candidate is currently
+slew-admissible belong to the terminal information state.
 
-The audit uses \(b_d=0.05\) m, \(\theta=0.2\) rad and \(v_x=0.8\) m/s. It also
-propagates an interior initial state under zero input for 0.5 s with the actual
-nonlinear prediction kernel, separately from the boundary argument. The
-resulting lateral displacement exceeds 0.05 m while the affine certificate
-remains positive. This is a terminal-set counterexample, not a collision claimed
-to have occurred under the online controller.
+### Successor membership under a free optimized input
 
-### Persistent forcing counterexample
-
-An admitted longitudinal residual \(\epsilon>0\) changes the terminal channel to
+The true successor under this input is
 
 \[
-\dot s=v_x,\qquad \dot v_x=-a v_x+\epsilon.
+ e^+=F_c e-G_eK\nu+G_e v+d_*.
 \]
 
-Even a small steady velocity \(\epsilon/a\) causes unbounded station drift. With
-the old budget \(s+v_x/a\le b_s\),
+The terminal optimization uses five SOCs
 
 \[
-\frac{d}{dt}(s+v_x/a)=\epsilon/a>0. \tag{13}
+ |(W G_e)_j v|\le a_j-(Ca)_j-d_j-\epsilon_f. \tag{6}
 \]
 
-Therefore its zero-disturbance proof does not extend to arbitrary persistent
-forcing. Increasing a finite pose margin postpones violation; it does not make
-that set invariant under \(u_R\). The proof therefore excludes any nonzero persistent residual for this fixed
-terminal policy; this is a model assumption, not an online configuration change.
+Equations (4)-(6), current slew, and a soft CLF form the actual one-hold
+optimization. At `v=0`, (1), (3) and (5) establish all its hard inequalities.
+For *any* accepted optimized `v`, (6) puts the true successor back in
+`mathcal Z`, and (5) permits the next feedback candidate. Measurement
+conditioning preserves truth inclusion and the bounded sensing contract.
+This establishes invariant information-state feasibility.
 
-### Moving-target counterexample
+### Entry from the finite open-loop plan
 
-A stopped ego remains in its own terminal set while a target with constant
-velocity reaches it. The audit uses a target initially 10 m ahead, moving at
--2 m/s, and evaluates overlap after 3 s. This respects a short, constant-motion
-encounter. It disproves the inference from ego rest to joint collision safety;
-it is not an assertion that the actual controller would choose to remain there.
+The finite plan's terminal box must satisfy, for every mode,
 
-## 7. Implementation decision and validation
+\[
+ |W_j(z_{N,2:6}-x_{*,2:6})|+|W_j|\rho_{N,2:6}
+ \le a_j-\epsilon_f, \tag{7}
+\]
 
-The executable audit evaluates (2), (3) and (7), checks exact affine flow and
-Huang's shifted LP candidate, and reproduces the three counterexamples. It is
-an isolated research experiment, not an admission utility or executable backup
-controller. Its local equation helpers are not called by the online pipeline.
+and the robust first feedback transition
 
-The obsolete `terminalDissipation` and `stateUncertainty.terminalRest` APIs,
-`ltvBicycleModel.predict`/`brakingSchedule` rest-tail path, unused
-`terminal.backupDeceleration` setting, and solver-outage continuation scenario
-have been removed. Applicable finite-prediction and uncertainty tests now use
-the maintained interfaces. Earlier stationary-pose/dissipation documents are
-consolidated here; their implementation history remains in Git (baseline
-`64b397e61e811e6e588997091d9869a7db51143b`). There is one maintained online
-controller path, with solver failure terminating execution.
+\[
+ |u_*-K(z_{N,2:6}-x_{*,2:6})-u_{N-1}|+
+ |K|\rho_{N,2:6}\le h\dot u_{\max}. \tag{8}
+\]
 
-The current online controller remains at `recursiveFeasibilityClaimed=false`.
-Its default finite-sensing branch has no dissipative terminal constraint; its
-future nominal stages, changing local models and empirical residual settings
-also fail to establish the assumptions of Proposition 2. Formal integration
-requires a terminal set for the actual nonlinear inclusion, terminal target
-coverage or valid exit, full execution-tube certification, and a representation
-that preserves feasible tails. Actuation queues, slew bounds and numerical
-deadlines belong in that argument. No stored controller is executed on failure.
+Equation (7) covers the entire prior terminal box. A conditioned terminal
+center lies in that box, so (8) guarantees that its feedback candidate is
+slew-admissible. The true state lies in `mathcal Z`. These are exactly the
+premises of the local invariant optimization above. No future measurement
+shrinkage is used when certifying the finite plan.
 
-Reproduce the mathematical-model audit with:
+## 4. Complete finite encounter witness
 
-```matlab
-addpath('scripts');
-report = runTerminalCbfProofAudit(OutputDirectory="/absolute/output/path");
-assert(report.auditPassed);
-assert(~report.fullControllerCbfEstablished);
-```
+An accepted witness stores its input sequence, exact affine node maps,
+uncertainty enclosures, Bernstein cells, geometry, physical row labels,
+terminal cones, finite exit directions/deadline, and common cruise generator.
+The hard affine family is `M U <= b`. It includes collision separation, model
+and slip domains, actuator bounds, slew and robust terminal-entry/exit rows.
+The terminal SOCs are also stored. Safety constraints have no slack. The
+first-hold CLF has an unbounded nonnegative norm slack with a squared cost.
 
-The auxiliary program is a four-stage, 100 ms fixed affine LP using the same
-terminal matrix. Steering and lateral/yaw initial states are zero; braking
-ratio lies in [-1,0]. It preserves a signed-generator initial enclosure with
-station radius 0.01 m and longitudinal-velocity radius 0.001 m/s. It runs five
-updates for an initially safe speed and an initially constraint-violating speed.
-The latter is a mathematical safety-recovery example, not an executable vehicle
-trial. No random seed or measurement noise is used. No runtime qualification is
-claimed. See [the audit results](../report/TERMINAL_CBF_PROOF_RESULTS.md) for measured results.
+Target finite-flow tubes include the admitted Cartesian jerk and yaw-
+acceleration bounds. The final directional exterior inequality covers the
+complete target footprint plus the sensing radius. It establishes that a
+sound current scan must confirm release by the stored absolute deadline.
+The deadline never moves forward during inherited active-encounter planning.
+Prediction alone never releases a target.
 
-## 8. Adversarial review and research decision
+## 5. Successor construction for every controller mode
 
-| Checkpoint | Challenge | Resolution |
-|---|---|---|
-| Scope | Would an affine theorem answer the nonlinear controller question? | State the affine result separately and actively search for nonlinear counterexamples. |
-| Synthesis | Is strict barrier decrease needed? | Huang's shift gives nonincrease; invariance does not need an added tightening schedule. |
-| Synthesis | Can CLF slack or the existing performance cost stand in for safety slack? | No. Define \(B_N\) separately; a hard-feasible performance optimizer is sufficient only on its zero set with matching terminal premises. |
-| Synthesis | Does a failed terminal input prove that no terminal control can work? | Use the instantaneous outward boundary velocity in (12), independent of input, to prove noninvariance of this set. |
-| Final | Does a passing auxiliary LP qualify the online controller? | No. Preserve the explicit false online-proof flag and all three counterexamples. |
-| Final | Do citations prove nonlinear continuity, estimator containment or numeric timing? | No. Keep them as unestablished application conditions. |
+### Nonempty suffix, including partial or full confirmed release
 
-The terminal affine CBF and conditional predictive theorem are established in
-the stated mathematical scope. A formal CBF proof for the present nonlinear
-finite-sensing controller is not established, and the old terminal set cannot
-be inserted unchanged to obtain one. This limitation follows from the model
-counterexample, independently of the selected literature or solver performance.
+Partition `M = [M_0 M_+]`. After applying the first accepted input `u_0`,
+substitute it in every stored affine row and terminal cones:
+
+\[
+ M_+ U^+\le b-M_0u_0. \tag{9}
+\]
+
+Do the identical substitution in the exact node maps and swept enclosures.
+The accepted suffix is feasible by substitution. Rows concerning only the
+already executed prefix may be removed. There is no additional tightening,
+relinearization, chart change or normal reselection in this inherited family.
+Conditioning only restricts the covered physical states.
+
+Confirmed release removes `collision:<key>` and `exit:<key>` rows for that
+key. The remaining road/domain/input/slew/terminal obligations stay intact.
+Completion directions are indexed by stable target keys. Removing an obligation
+cannot invalidate the old suffix. In particular, **partial release no longer
+forces an unproved fresh admission of all remaining obligations**.
+
+The first-hold CLF cannot remove this candidate: for any finite hard-feasible
+input its cone can be satisfied by a finite nonnegative slack.
+
+### Fresh no-target performance horizon
+
+The controller may try to restore the configured performance horizon. It
+constructs a concrete candidate from the carried suffix followed by the same
+terminal feedback applied to nominal predicted nodes. It does not assume
+this candidate passes a new convexification or that open-loop uncertainty
+remains small for that longer horizon.
+
+Before invoking the optimizer, it checks the candidate against **every row
+and all CLF and terminal cones of the proposed new program**. Only a program containing this
+candidate may replace the inherited one. Otherwise the inherited program is
+used. This is pre-solve selection of an optimization problem, not selection
+of an actuator command after solver failure. Exactly one optimization runs.
+
+### Empty suffix after confirmed encounter completion
+
+If no fresh longer horizon containing a feasible candidate is obtained, the
+controller formulates a one-hold optimization. Both actuator coordinates and
+CLF slack remain free. The hard hold rows are those used in terminal synthesis;
+there are also current-input slew, terminal SOCs and terminal-entry slew rows.
+
+Its current information state has true-state membership in the robust modal
+set and an admissible first feedback transition by (7)-(8). Equations (1),
+(3), (5), and (6) show that the hypothetical input `kappa(hat z)` is feasible
+in the actual one-hold problem. A finite CLF slack completes its decision.
+Any accepted optimizer output preserves true-state membership and next-input
+admissibility by (5)-(6), while the sensing contract bounds the next estimate.
+Thus **this actual optimization and every successor are nonempty**.
+
+This one-hold terminal optimization is a local invariant MPC problem, not
+mandatory execution of `kappa`, a saved input, or a stopping controller.
+The configured multi-hold performance horizon is attempted again next frame.
+
+## 6. Induction and safety theorem
+
+The initial accepted witness certifies its first continuous hold. At each
+subsequent sample exactly one of the preceding constructions applies:
+
+- a nonempty suffix supplies a feasible candidate, with only confirmed
+  obligations removed;
+- a replacement program explicitly contains a feasible candidate;
+- terminal-set invariance supplies a feasible candidate to the one-hold
+  optimization after the finite suffix is exhausted.
+
+These cases cover active encounters, partial release, full release, and
+indefinite no-target operation. Their assumptions include the previous held
+input, bounded measurement sets, the common plant and stable target contracts.
+By induction every successor problem is feasible, and each accepted hold is
+safe for every obligation still active during that hold. Under the observation
+contract, finite target obligations discharge by their certified deadlines;
+permanent model and actuator constraints remain satisfied thereafter.
+
+A new target can invalidate the initial-feasibility premise of a *new* task.
+An optimization timeout can prevent execution of the mathematically existing
+candidate. Neither event is silently labeled successful recursive execution.
+
+This proves invariance of the admitted predictive safety domain in the
+augmented information/witness state. It does not by itself assert a globally
+continuous scalar CBF for arbitrary changing obstacles, or that soft CLF slack
+vanishes and guarantees asymptotic tracking under every disturbance sequence.
+
+## 7. Numerical certificate transfer
+
+`solveHardCbfClf.certify` independently checks hard physical rows and terminal
+SOC before any command is returned. A positive approximate status may also be certified; exact optimality is not
+needed for the theorem. Infeasible, timed-out or iteration-limited solves are
+not accepted. A positive solver status alone is insufficient.
+Pre-solve reserves separate tightened solver rows from physical constraints.
+If numerical residuals consume part of a reserve, the stored inherited bound
+is enlarged just enough to contain the accepted decision with an arithmetic
+allowance, **and only while remaining inside the physical bound**. The same
+rule applies to the terminal cones radii. A failed check ends control.
+
+Subsequent shifting uses these stored certified bounds, rather than imposing
+a fresh numerical tightening at every step. The proof is the real-arithmetic
+argument above; floating-point residual/enclosure checks support its numerical
+implementation, not a formally verified interval implementation of `expm`,
+Riccati synthesis or every machine operation. No nonlinear-plant inclusion or
+unconditional real-time guarantee is implied.
+
+## Reference and distinction from fixed-horizon MPC
+
+Huang, Wang, Margellos and Goulart, *Predictive Control Barrier Functions:
+Bridging model predictive control and control barrier functions* (2025),
+Section III and Lemma III.1, use a shifted sequence and invariant terminal
+extension to establish feasibility of the successor problem:
+https://arxiv.org/html/2502.08400v2.
+
+Here the active finite encounter uses a shrinking stored witness, followed by
+an invariant **information-state optimization**. Verified fresh horizons may
+replace either construction. This is the explicit hybrid counterpart of the
+terminal-extension argument; it does not assume that a stored plan belongs to
+an independently rebuilt problem merely because it is used as an initial guess.

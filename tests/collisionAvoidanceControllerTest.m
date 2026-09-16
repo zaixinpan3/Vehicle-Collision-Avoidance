@@ -29,8 +29,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,plan(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,plan(:,1),AbsTol=0);
             testCase.verifyEqual(problem.metadata.solverCallCount,1);
-            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
-            testCase.verifyFalse(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
+            testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
             testCase.verifyGreaterThan(size(state.plan,2),1);
             testCase.verifyTrue(problem.metadata.predictionContinuationRetained);
             testCase.verifyTrue(state.terminal.targetIndependent);
@@ -325,6 +325,6 @@ function [margin,inputMargin,slewMargin]=localTerminalAudit(state,cfg)
         step=hardEncounterBarrier.terminalStep(state.terminal,center,radius,cfg.controller.sampleTime);
         inputMargin=min([inputMargin;step.input-lower;upper-step.input]);
         slewMargin=min([slewMargin;rate-abs(step.input-prior)]);
-        center=step.successor;radius=step.successorRadius;prior=step.input;
+        center=step.successor;radius=min(step.successorRadius,state.terminal.measurementRadiusLimit);prior=step.input;
     end
 end

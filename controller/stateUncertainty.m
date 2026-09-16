@@ -216,6 +216,17 @@ classdef stateUncertainty
                     cartesianState,cartesianRadius,lane.referenceCurve);
                 return;
             end
+            if all(abs(lane.tangent-lane.tangent(1,:))<1e-12,'all')
+                tangent=lane.tangent(1,:);normal=[-tangent(2),tangent(1)];
+                radius=cartesianRadius;
+                radius(1)=abs(tangent)*cartesianRadius(1:2);
+                radius(2)=abs(normal)*cartesianRadius(1:2);
+                error=atan2(sin(cartesianState(3)-atan2(tangent(2),tangent(1))), ...
+                    cos(cartesianState(3)-atan2(tangent(2),tangent(1))));
+                if radius(3)>0 && abs(error)+radius(3)>=pi,radius(3)=2*pi;end
+                chartValid=true;
+                return;
+            end
             radius = cartesianRadius;
             position = cartesianState(1:2);
             centre = laneGeometry.project(position, lane);

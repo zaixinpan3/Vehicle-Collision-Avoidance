@@ -1,7 +1,7 @@
 function report = runExactStateRecursiveFeasibilityScenario(options)
 %runExactStateRecursiveFeasibilityScenario Exact affine predictive-control experiment.
-% The historical entry-point name is retained. Recursive feasibility is not
-% claimed. Any control failure saves the executed prefix and then rethrows.
+% Recursive feasibility is conditional on the declared model, sensing and
+% encounter-admission contracts. Numerical failure still terminates the run.
 % Geometry and CLF measurements below are offline experimental diagnostics;
 % they do not accept, reject, repair, or select a controller command.
 % Road boundaries are opt-in. The declared model domain always remains hard.
@@ -52,6 +52,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     count = options.SampleCount;
     states = nan(6,count+1);inputs=nan(2,count);seconds=nan(1,count);calls=zeros(1,count);
     horizons=zeros(1,count);inherited=false(1,count);releases=false(1,count);terminalCommands=false(1,count);
+    terminalOptimizations=false(1,count);replacements=false(1,count);approximate=false(1,count);
+    verified=false(1,count);recursive=false(1,count);
     inheritedViolation=nan(1,count);terminalMargin=nan(1,count);
     clfResidual=nan(1,count);clfValue=nan(1,count);cbfRows=zeros(1,count);
     clfSlack=nan(1,count);clfSlackBound=nan(1,count);clfUnrelaxedResidual=nan(1,count);
@@ -79,14 +81,19 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         cbfRows(sample)=metadata.obstacleCbfRowCount;
         horizons(sample)=metadata.horizonSteps;inherited(sample)=metadata.inheritedFeasibleFamily;
         releases(sample)=metadata.confirmedRelease;terminalCommands(sample)=metadata.terminalActive;
+        terminalOptimizations(sample)=metadata.terminalInvariantOptimization;
+        replacements(sample)=metadata.freshProblemContainsWitness;
+        approximate(sample)=metadata.approximateSolveCertified;
+        verified(sample)=metadata.postSolveCertificationPerformed;
+        recursive(sample)=metadata.recursiveFeasibilityGuaranteed;
         % Offline audits do not authorize or reject a command.
         if inherited(sample)
             oldDecision=[problem.carriedWitness.inputs(:);0];
             inheritedViolation(sample)=max(problem.program.physicalMatrix*oldDecision-problem.program.physicalBound);
         end
-        [~,margins]=hardEncounterBarrier.terminalMembership(problem.program.terminal, ...
-            previousState.predictedState(:,end),previousState.stateErrorBound(:,end));
-        terminalMargin(sample)=min(margins);
+        cone=reshape(problem.program.terminalConePhysicalBound ...
+            -problem.program.terminalCone.matrix*problem.decision(problem.program.layout.planIndex),3,[]);
+        terminalMargin(sample)=min(cone(1,:)-vecnorm(cone(2:3,:),2,1));
         inputs(:,sample)=command.actuatorInput;
         if ~isempty(previousInput)
             rate=h*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
@@ -130,6 +137,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'solverCallCount',calls(1:executed),'obstacleCbfRowCount',cbfRows(1:executed), ...
         'horizonSteps',horizons(1:executed),'inheritedFeasibleFamily',inherited(1:executed), ...
         'confirmedRelease',releases(1:executed),'terminalCommands',terminalCommands(1:executed), ...
+        'terminalInvariantOptimization',terminalOptimizations(1:executed), ...
+        'verifiedReplacement',replacements(1:executed),'approximateSolveCertified',approximate(1:executed), ...
+        'hardCertificateVerified',verified(1:executed), ...
         'inheritedWitnessViolation',inheritedViolation(1:executed),'terminalMembershipMargin',terminalMargin(1:executed), ...
         'clfValue',clfValue(1:executed),'clfDissipationResidual',clfResidual(1:executed), ...
         'clfSlack',clfSlack(1:executed),'clfSlackDissipationBound',clfSlackBound(1:executed), ...
@@ -138,7 +148,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'minimumSampledModelDomainMargin',minimumDomain,'maximumSlewViolation',maximumSlew, ...
         'failureIdentifier',"",'failureMessage',"",'failureTime',NaN, ...
         'egoErrorBound',options.EgoErrorBound,'targetErrorBound',options.TargetErrorBound, ...
-        'targetMotion',truthTarget,'recursiveFeasibilityGuaranteed',false, ...
+        'targetMotion',truthTarget,'recursiveFeasibilityGuaranteed',executed>0 && all(recursive(1:executed)), ...
         'scope',"Predictive finite encounter and road-terminal witness; failed optimization ends execution");
     report.passed=report.completed && minimumSeparation>=-1e-8 ...
         && (~options.UseRoadBoundaries || minimumRoad>=-1e-8) ...
