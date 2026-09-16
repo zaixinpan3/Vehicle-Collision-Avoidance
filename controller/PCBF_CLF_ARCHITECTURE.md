@@ -1,45 +1,32 @@
-# One hard predictive CBF–CLF controller
+# Predictive CBF and soft CLF controller
 
-Current implementation, September 15, 2026: the format-27 controller retains
-predictive continuation across active encounters, partial/full release and
-prediction exhaustion. Its terminal information-state cruise set uses the
-same generator as online prediction. A fresh optimization must contain a
-verified feasible candidate; an exhausted suffix leads to a free invariant-set
-optimization. One optimization runs per frame, and failed solving or physical
-certificate validation issues no command. The terminal law is a mathematical
-candidate, never a runtime fallback. The CLF retains its squared slack penalty.
+Current implementation, September 16, 2026: the format-28 controller searches
+a finite conservative polyhedral family at initial encounter admission. It
+retains predictive continuation across active encounters, confirmed partial
+or full target release, and prediction exhaustion. The terminal information
+set uses the same held affine generator as online prediction. The CLF retains
+its squared slack penalty, and input effort remains relative to the certificate
+operating input. The high-gain target observer is unchanged.
 
-See [SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md) for current interfaces and
-[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md) for the complete conditional
-recursive-feasibility proof, sensing assumptions, and supported road scope.
+Admission has no selected maneuver side or prescribed lateral trajectory.
+Each cell-target pair and each finite-exit condition has a finite set of
+geometric directions. Integer branch-and-bound with lazy constraint generation
+searches their assignments. Every accepted assignment is solved as a complete
+convex problem and independently certified. Infeasible approximations and
+unfinished searches are distinct outcomes. No claim of global performance
+optimality or complete coverage of all physically safe trajectories is made.
+See [FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md) for the approximation,
+branch count, search logic, sound pruning and limitations.
 
-The remainder records the earlier version-16 design and is not the current
-execution contract.
-
-The version-16 implementation uses one hard safety formulation for cruise and
-avoidance. Every held interval in the admitted horizon includes uncertain
-collision geometry, road boundaries, model-domain, actuator and slew limits.
-The only optimization relaxation belongs to CLF performance.
-
-The nonlinear modified Fiala force law retains its intrinsic combined-force
-saturation. No additional axle-force polygon is imposed on its affine
-approximation. Tire-slip model domains remain hard. Certificate version 16
-rejects earlier witnesses and the removed `model.frictionPolygonSides` option.
-Nonlinear model enclosure remains a separate premise.
-
-The configured horizon seeds admission search; it does not prescribe a target
-exit time. The one complete certificate may contain more intervals. A checked
-complete witness is retained through exit, target-free expiry renews the same
-formulation, and first detection does not inherit an old cruise expiry. See
-[the free-completion-time correction](FREE_COMPLETION_TIME.md).
-
-The controller first maximizes a nonnegative certified safety margin by LP,
-then minimizes tracking, input effort and CLF relaxation in an SOCP while
-preserving that margin. Independent verification authorizes the chosen input.
-There is no track/yield/pass-left/pass-right selection, partial certification,
-nominal-only safety suffix, delayed-input path, exit-route contract, or
-fresh-solve-only execution policy. Earlier certificate formats and removed
-configuration fields are rejected.
+After admission, the actual accepted branch is preserved: substitute the
+executed input in its affine family, retain the terminal cones and continuous
+swept enclosures, and condition successor information by inclusion. The
+resulting suffix supplies a feasible candidate for the next convex solve.
+Confirmed removal deletes only that target's obligations. A fresh target-free
+horizon may replace the suffix only when a full feasible witness is retained.
+At prediction exhaustion, the permanent invariant-set optimization still
+chooses its control freely. A terminal policy is a mathematical witness and
+never an executed fallback.
 
 ```matlab
 cfg = collisionAvoidanceControllerConfig();
@@ -48,34 +35,17 @@ certificate = [];
     collisionAvoidanceController(ego, targets, road, cfg, certificate);
 ```
 
-Supply timestamped complete circular perception at admission, stable target
-identities and finite motion bounds. Zero targets use the same formulation.
-Subsequent calls carry the certificate, scheduled timestamp and actually held
-input. The four-argument convenience interface stores the same certificate;
-resetting convenience state is not a mathematical successor construction.
+Supply timestamped complete circular perception, stable target identifiers,
+finite motion bounds, and the actual previous held input. The conditional
+recursive-feasibility proof and sensing/model assumptions are in
+[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md). It applies after complete
+admission. Fresh target entry is a new feasibility obligation. The declared
+plant remains the zero-residual held affine model; separate nonlinear Fiala
+studies do not silently extend the online theorem.
 
-During an active encounter, the original prediction matrices, geometry, target origins, executed prefix
-and absolute deadline remain in the certificate. Between information events,
-removing the executed input leaves a checked feasible suffix. Reoptimization
-can replace that suffix only without reducing the certified margin. A failed
-replacement leaves the checked incumbent available; no alternative control
-law is invoked.
-
-At first detection during an already active encounter, the augmented joint
-state must belong to the certifiable feasible domain of the remaining original
-problem. First detection during target-free execution instead starts fresh
-complete admission. New constraints are added
-jointly with all retained obligations. The event can reduce the nonnegative
-margin, but cannot reset the deadline, discard old targets, or change executed
-inputs. Failure to obtain a checked joint witness issues no control and does
-not prove that the mathematical feasible set is empty.
-
-Verified perception exit
-returns an empty command. The caller stops the encounter. This implementation
-establishes conditional finite-encounter recursive feasibility for the declared
-inclusion; it does not establish indefinite driving, a physical vehicle model
-enclosure, or a zero-latency real-time implementation.
-
-See [the proof and runtime contract](HARD_PREDICTIVE_CBF.md),
-[the target interface](TARGET_PREDICTION_CONTRACT.md), and
-[the encounter scope and implementation status](SINGLE_PATH_RECURSIVE_FEASIBILITY.md).
+No command is issued after exhausted/incomplete search, failed convex solving
+or failed hard verification. Frame latency remains a separate requirement;
+allowing a longer offline search does not establish 100 ms operation.
+See [SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md) for the CLF derivation,
+terminal details and certificate interface, and the dated reports under
+`report/` for executed experiments.

@@ -112,12 +112,9 @@ classdef avoidanceSafetyGeometry
                 sourceLabels{cellIndex} = [targetLabels;boundaryLabels];
             end
             data = vertcat(cellData{:});
-            if nativeGeometry
-                allGeometricRows = avoidanceCellRowsKernelMex(data);
-            else
-                allGeometricRows = avoidanceSafetyGeometry.cellRows(data);
-            end
             if isfield(prediction,"separationNormals")
+                allGeometricRows = repmat(localCellRows(cellData{1}, ...
+                    prediction.separationNormals{1}),numel(groups),1);
                 for cellIndex = 1:numel(groups)
                     directions = prediction.separationNormals{cellIndex};
                     validateattributes(directions,{'double'},{'size',[2,numel(model.encounters)],'finite','real'});
@@ -126,6 +123,10 @@ classdef avoidanceSafetyGeometry
                     end
                     allGeometricRows(cellIndex) = localCellRows(cellData{cellIndex},directions);
                 end
+            elseif nativeGeometry
+                allGeometricRows = avoidanceCellRowsKernelMex(data);
+            else
+                allGeometricRows = avoidanceSafetyGeometry.cellRows(data);
             end
             projectionData = cell(numel(groups),1);
             numericCfg = struct("model",struct("lateralDomainRadius",cfg.model.lateralDomainRadius, ...
@@ -180,33 +181,14 @@ classdef avoidanceSafetyGeometry
                 local.nodeLabels = names(local.nodeLabels);
                 localGroups{cellIndex} = local;
                 group = rmfield(group,"local");group.label = names(group.label);
+                group.cellIndex = repmat(cellIndex,numel(group.physicalBound),1);
                 groups{cellIndex} = group;
             end
             groups = vertcat(groups{:});
             geometry = struct("matrix", vertcat(groups.matrix), "physicalBound", vertcat(groups.physicalBound), ...
                 "safety", vertcat(groups.safety), "label", vertcat(groups.label), "stage", vertcat(groups.stage), ...
-                "frames", vertcat(frames{:}), "normals", {normalGroups},"local",vertcat(localGroups{:}));
-        end
-
-        function normals = passingNormals(model,prediction,anchor,side)
-        % Consistent passing-side proposals; only full swept checking admits them.
-            cfg = model.cfg;
-            target = model.encounters;
-            offset = min(0.75*cfg.model.lateralDomainRadius, ...
-                cfg.vehicle.width/2+target.halfWidth+cfg.collision.clearanceMargin+0.85);
-            normals = cell(numel(prediction.cells),1);
-            for index = 1:numel(prediction.cells)
-                tube = prediction.cells(index);
-                time = tube.start+tube.duration/2;
-                state = mean(reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset,2);
-                blend = (1-cos(pi*min(1,time/0.8)))/2;
-                state(2) = (1-blend)*model.initialEgoState(2)+blend*side*offset;
-                [position,heading] = laneGeometry.fromFrenet(state,model.lane);
-                center = targetPrediction.finiteFlow(target,time);
-                [~,normals{index}] = avoidanceSafetyGeometry.rectangleDistance( ...
-                    position,heading,center(1:2),center(7), ...
-                    [cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth]);
-            end
+                "frames", vertcat(frames{:}), "normals", {normalGroups},"local",vertcat(localGroups{:}), ...
+                "cellIndex",vertcat(groups.cellIndex));
         end
 
         function [normals,information] = optimizeNormals(model,prediction,plan)

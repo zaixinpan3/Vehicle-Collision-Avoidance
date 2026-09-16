@@ -21,7 +21,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.InitialTrackingError (5,1) double {mustBeFinite} = zeros(5,1)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
         options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 1
-        options.ExecutionPolicy (1,1) string = "singleSolve"
+        options.ExecutionPolicy (1,1) string = "finiteBranches"
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
@@ -51,6 +51,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     lane = [];previousState = [];previousInput = [];
     count = options.SampleCount;
     states = nan(6,count+1);inputs=nan(2,count);seconds=nan(1,count);calls=zeros(1,count);
+    branchSearch=cell(1,count);
     horizons=zeros(1,count);inherited=false(1,count);releases=false(1,count);terminalCommands=false(1,count);
     terminalOptimizations=false(1,count);replacements=false(1,count);approximate=false(1,count);
     verified=false(1,count);recursive=false(1,count);
@@ -78,6 +79,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         end
         states(:,sample)=x;
         metadata=problem.metadata;calls(sample)=metadata.solverCallCount;
+        branchSearch{sample}=metadata.branchSearch;
         cbfRows(sample)=metadata.obstacleCbfRowCount;
         horizons(sample)=metadata.horizonSteps;inherited(sample)=metadata.inheritedFeasibleFamily;
         releases(sample)=metadata.confirmedRelease;terminalCommands(sample)=metadata.terminalActive;
@@ -135,6 +137,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'sampleCount',count,'executedHolds',executed,'completed',isempty(failure), ...
         'time',(0:executed)*h,'state',states(:,1:executed+1),'input',inputs(:,1:executed), ...
         'solverCallCount',calls(1:executed),'obstacleCbfRowCount',cbfRows(1:executed), ...
+        'branchSearch',{branchSearch(1:executed)}, ...
         'horizonSteps',horizons(1:executed),'inheritedFeasibleFamily',inherited(1:executed), ...
         'confirmedRelease',releases(1:executed),'terminalCommands',terminalCommands(1:executed), ...
         'terminalInvariantOptimization',terminalOptimizations(1:executed), ...
@@ -153,10 +156,10 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     report.passed=report.completed && minimumSeparation>=-1e-8 ...
         && (~options.UseRoadBoundaries || minimumRoad>=-1e-8) ...
         && minimumDomain>=-1e-8 && maximumSlew<=1e-8 && all(clfResidual(1:executed)<=1e-8);
-    report.runtime=struct('frameSeconds',seconds(1:attempted),'deadlineSeconds',options.DeadlineSeconds, ...
-        'deadlineMisses',nnz(seconds(1:attempted)>options.DeadlineSeconds), ...
+    report.runtime=struct('frameSeconds',seconds(1:attempted),'deadlineSeconds',h, ...
+        'searchBudgetSeconds',options.DeadlineSeconds,'deadlineMisses',nnz(seconds(1:attempted)>h), ...
         'maximumSeconds',max(seconds(1:attempted)),'medianSeconds',median(seconds(1:attempted)), ...
-        'scope',"Input assembly and control, excluding plant integration and offline diagnostics; native solve alone is time-limited");
+        'scope',"Input assembly and control against the actual hold period, excluding plant integration and offline diagnostics; offline search budget is reported separately");
     report.runtimeQualified=report.passed && report.runtime.deadlineMisses==0;
     if ~isempty(failure)
         report.failureIdentifier=string(failure.identifier);report.failureMessage=string(failure.message);

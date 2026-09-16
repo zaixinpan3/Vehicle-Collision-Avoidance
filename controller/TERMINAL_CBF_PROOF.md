@@ -1,6 +1,6 @@
 # Recursive feasibility and encounter safety of the implemented controller
 
-This is the current format-27 proof. It replaces the previous stopping-tail
+This is the current format-28 proof. It replaces the previous stopping-tail
 argument. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
@@ -296,7 +296,11 @@ Before invoking the optimizer, it checks the candidate against **every row
 and all CLF and terminal cones of the proposed new program**. Only a program containing this
 candidate may replace the inherited one. Otherwise the inherited program is
 used. This is pre-solve selection of an optimization problem, not selection
-of an actuator command after solver failure. Exactly one optimization runs.
+of an actuator command after solver failure. An admitted retained branch uses one optimization per sample. Fresh admission
+may search multiple convex branches, as specified in
+[FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md). The theorem starts
+only after one complete branch has passed the original hard certificate;
+its entire affine family and terminal cones are then inherited unchanged.
 
 ### Empty suffix after confirmed encounter completion
 

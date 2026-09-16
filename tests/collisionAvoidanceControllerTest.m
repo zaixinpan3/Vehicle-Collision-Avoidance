@@ -47,12 +47,16 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyTrue(active.program.completion.active);
             testCase.verifyEqual(empty.metadata.clfOperatingInput,active.metadata.clfOperatingInput);
         end
-        function failedStatusesReturnNoCommandAndAreNeverRetried(testCase,failedStatus)
+        function failedStatusesNeverIssueAnUncertifiedCommand(testCase,failedStatus)
             [ego,target,road,cfg]=localFixture(true);
             localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
-            testCase.verifyEqual(localFailureHook('count',[]),1);
+            if failedStatus==-2
+                testCase.verifyGreaterThan(localFailureHook('count',[]),1);
+            else
+                testCase.verifyEqual(localFailureHook('count',[]),1);
+            end
         end
         function malformedSolvedResultsRaiseAnError(testCase,badDecision)
             [ego,target,road,cfg]=localFixture(false);

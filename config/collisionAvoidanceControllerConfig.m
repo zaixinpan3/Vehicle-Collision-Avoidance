@@ -34,12 +34,12 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % One solve optimizes the complete predictive continuation. The terminal
-    % policy is a certificate only; failed optimization never executes it.
+    % Fresh admission searches finite convex branches. Accepted continuations
+    % need one convex solve; the terminal policy remains a certificate only.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
-        "minimumHorizonSteps",4,"executionPolicy","singleSolve","stationTrustRadius",2.0);
+        "minimumHorizonSteps",4,"executionPolicy","finiteBranches","stationTrustRadius",2.0);
     cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
-    cfg.encounter = struct("minimumCells",2,"taylorOrder",6, ...
+    cfg.encounter = struct("minimumCells",2,"taylorOrder",6,"separationDirectionCount",8, ...
         "numericalMargin",1.0e-6,"maximumCarriedMargin",1.0,"inputRateWeight",0.02);
 
     % Vehicle geometry and inertia.
@@ -113,11 +113,11 @@ function cfg = localDefaults()
         "referenceOffset", zeros(5, 1), ...
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
-    % One conic solve. The hook receives (phase,program), with P/q/A/b/cones
-    % and decision coordinates [inputPlan(:); clfSlack]. defaultSolver
-    % invokes the native solver once. A hook must honor its feasibility status.
+    % Each convex subproblem calls the hook with (phase,program), P/q/A/b/cones
+    % and coordinates [inputPlan(:); clfSlack]. Fresh admission may solve
+    % several subproblems; a hook must honor its feasibility status.
     % constraintTolerance enters the pre-solve physical row reserves.
-    % frameDeadlineSeconds caps native work, not complete MATLAB frame time.
+    % frameDeadlineSeconds is a complete controller-frame acceptance deadline.
     % A finite exit may require more stages than the performance window.
     cfg.solver = struct( ...
         "jointFunction", [], ...
@@ -187,9 +187,9 @@ end
 function localValidate(cfg)
     validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
     if ~isscalar(string(cfg.controller.executionPolicy)) ...
-            || ~any(string(cfg.controller.executionPolicy)==["singleSolve","auto","predictive","backup"])
+            || ~any(string(cfg.controller.executionPolicy)==["finiteBranches","singleSolve","auto","predictive","backup"])
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "Unsupported legacy executionPolicy value; all accepted values use one solve.");
+            "Unsupported executionPolicy; accepted aliases use the same finite-branch admission algorithm.");
     end
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
@@ -308,6 +308,11 @@ function localValidate(cfg)
     end
     localValidateNonnegativeScalar(cfg.solver.maxIterations, "solver.maxIterations");
     validateattributes(cfg.solver.frameDeadlineSeconds,{'double'},{'scalar','real','positive'});
+    validateattributes(cfg.encounter.separationDirectionCount,{'double'}, ...
+        {'scalar','integer','finite','>=',4});
+    assert(mod(cfg.encounter.separationDirectionCount,4)==0, ...
+        'collisionAvoidanceController:invalidConfiguration', ...
+        'The finite direction count must be a positive multiple of four.');
     validateattributes(cfg.solver.rowGeneration,{'logical'},{'scalar'});
     if ~ismember(string(cfg.solver.witnessVerification),["none","shiftedRows","rebuilt"])
         error("collisionAvoidanceController:invalidConfiguration", ...

@@ -1,6 +1,6 @@
-# One-solve predictive safety with a recursively feasible continuation
+# Predictive safety with finite convex admission branches
 
-The format-27 controller retains a complete finite input plan, swept rectangle
+The format-28 controller retains a complete finite input plan, swept rectangle
 collision certificate, finite confirmed exit and a permanent terminal
 information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
@@ -28,9 +28,13 @@ or a nonlinear physical-vehicle claim.
    information-state set. Its feedback candidate proves nonemptiness; the
    optimizer chooses the command.
 
-One native optimization runs per frame. No failure is repaired by a saved
-command, terminal control law, alternate optimizer or retry. A failed solve
-or failed independent hard-safety verification ends the simulation.
+An admitted active encounter uses one convex optimization of its retained
+branch per frame. Fresh admission searches the finite polyhedral family
+described in [FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md), using
+integer assignment search and complete convex subproblems. No prescribed
+lateral trajectory or maneuver side is used. Exhausted or incomplete search
+and failed independent hard-safety verification issue no command; a stored
+input or terminal law is never executed as a fallback.
 
 ## Terminal set and sensing contract
 
@@ -71,7 +75,7 @@ The first-hold CLF and five terminal modal inequalities are SOC constraints. All
 collision, domain, slip, actuator and slew rows are hard. The absolute target
 exit deadline is preserved while any admitted target remains active.
 
-The returned format-27 state contains the plan, verified inherited affine
+The returned format-28 state contains the plan, verified inherited affine
 bounds and terminal cone, exact nominal nodes, uncertainty boxes, cell
 geometry, stable target identities, common generator and permanent terminal
 certificate. Earlier state formats must be reset.
@@ -163,7 +167,10 @@ The normalized objective tolerance remains 1e-7. Safety depends on a verified
 feasible solution, not exact objective minimization. Physical feasibility uses
 its separate tolerance and independent safety reserves.
 
-`frameDeadlineSeconds` limits native work, not total frame preparation or
-scheduling. A 100 ms total deadline remains a separate measured requirement.
+`frameDeadlineSeconds` is shared by admission preparation and all search
+solves. Numerical solver time limits do not preempt MATLAB preparation or
+operating-system scheduling; the actual frame time remains independently
+measured against the control hold. An offline diagnostic search budget does
+not change that real-time requirement.
 The controller has no executable fallback when a mathematically feasible
 problem fails to solve on time. See the current dated report under `report/`.

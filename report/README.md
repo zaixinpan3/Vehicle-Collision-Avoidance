@@ -2,7 +2,7 @@
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest implementation and validation: [Recursive feasibility closure, same-model robust terminal set and successor validation, September 15, 2026](RECURSIVE_FEASIBILITY_CLOSURE_20260915.md).
+Latest implementation and validation: [Finite conservative convex branches without prescribed maneuvers, September 16, 2026](FINITE_CONVEX_BRANCH_RESULTS_20260916.md).
 
 Latest diagnosis: [Verified nonlinear oncoming avoidance exists despite the rejected admission constraints, September 16, 2026](ONCOMING_AVOIDANCE_WITNESS_20260916.md).
 
@@ -14,6 +14,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Finite convex branch admission, straight-scene validation and timing limits | [FINITE_CONVEX_BRANCH_RESULTS_20260916.md](FINITE_CONVEX_BRANCH_RESULTS_20260916.md) |
 | Nonlinear oncoming avoidance witness, continuous verification and restrictive collision geometry | [ONCOMING_AVOIDANCE_WITNESS_20260916.md](ONCOMING_AVOIDANCE_WITNESS_20260916.md) |
 | Oncoming first-admission LP ablations and numerical infeasibility certificate | [ONCOMING_ADMISSION_DIAGNOSIS_20260916.md](ONCOMING_ADMISSION_DIAGNOSIS_20260916.md) |
 | Complete conditional recursive-feasibility construction and straight-scene validation | [RECURSIVE_FEASIBILITY_CLOSURE_20260915.md](RECURSIVE_FEASIBILITY_CLOSURE_20260915.md) |

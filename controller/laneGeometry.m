@@ -21,6 +21,20 @@ classdef laneGeometry
                 station(index) = (min(values(1,:))+max(values(1,:)))/2;
                 extent(index) = cfg.controller.stationTrustRadius ...
                     +(max(values(1,:))-min(values(1,:)))/2+max(radius(1,:));
+                if isfield(model,'encounters') && ~isempty(model.encounters)
+                    % A fresh obstacle certificate covers the actuator-reachable
+                    % station interval, not a corridor around a guessed path.
+                    bound = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+                        max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))], ...
+                        size(tube.map,2)/2,1);
+                    support = reshape(pagemtimes(abs(tube.map(1,:,:)),bound),1,[]);
+                    lower = min(tube.offset(1,:)-support-radius(1,:));
+                    upper = max(tube.offset(1,:)+support+radius(1,:));
+                    allowance = max(128*eps,cfg.encounter.numericalMargin) ...
+                        *(1+max(abs([lower,upper])));
+                    station(index) = (lower+upper)/2;
+                    extent(index) = (upper-lower)/2+allowance;
+                end
             end
             frames = laneGeometry.frameBounds(model.lane,station,extent,cfg.model.lateralDomainRadius);
             for index = 1:numel(tubes)

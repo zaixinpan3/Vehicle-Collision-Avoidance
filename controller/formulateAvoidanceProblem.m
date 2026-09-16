@@ -191,6 +191,9 @@ function [program,prediction,clf] = localFormulate(model)
     program.terminalOptimization=isfield(model,'terminalOptimization') && model.terminalOptimization;
     program.feasibleWitness=localCompleteSlack(program,anchor);
     if inherited,program.inheritedWitness=program.feasibleWitness;end
+    if ~inherited && ~isempty(model.encounters)
+        program.branchFamily=solveHardCbfClf.buildBranches(model,prediction,program);
+    end
 end
 
 function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model)
@@ -263,5 +266,21 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     geometry.matrix=geometry.matrix(selected,columns);
     geometry.stage=geometry.stage(selected)-1;geometry.label=geometry.label(selected);
     geometry.safety=geometry.safety(selected);
+    geometry.cellIndex=geometry.cellIndex(selected);
+    geometry.cellIndex=geometry.cellIndex-min(geometry.cellIndex)+1;
     geometry.frames=geometry.frames(keep);geometry.normals=geometry.normals(keep);
+    geometry.normals=cellfun(@(normal) normal(:,retained),geometry.normals,UniformOutput=false);
+    geometry.local=geometry.local(keep);
+    for index=1:numel(geometry.local)
+        local=geometry.local(index);
+        rows=~ismember(local.nodeLabels,"collision:"+model.dischargedTargetKeys);
+        expanded=repmat(rows,size(local.nodeStateRows,3),1);
+        local.stateMatrix=local.stateMatrix(expanded,:);
+        local.inputMatrix=local.inputMatrix(expanded,:);local.bound=local.bound(expanded);
+        local.nodeStateRows=local.nodeStateRows(rows,:,:);
+        local.nodeStartStateRows=local.nodeStartStateRows(rows,:,:);
+        local.nodeInputRows=local.nodeInputRows(rows,:,:);
+        local.nodeLimits=local.nodeLimits(rows,:);local.nodeLabels=local.nodeLabels(rows);
+        local.stage=local.stage-1;geometry.local(index)=local;
+    end
 end

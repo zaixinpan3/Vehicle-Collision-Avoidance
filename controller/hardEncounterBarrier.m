@@ -24,7 +24,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=27
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=28
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -139,12 +139,10 @@ classdef hardEncounterBarrier
                 if isempty(model.encounters),carry.completion.active=false;end
             end
             model.horizonSteps = max(cfg.controller.horizonSteps,cfg.controller.minimumHorizonSteps);
-            model.passingRequired = false;
             for index = 1:numel(model.encounters)
                 trial = model;trial.encounters=model.encounters(index);
-                [~,steps,passing] = localEncounterProposal(trial,model.confirmation.range);
+                [~,steps,~] = localEncounterProposal(trial,model.confirmation.range);
                 model.horizonSteps = max(model.horizonSteps,steps);
-                model.passingRequired = model.passingRequired || passing;
             end
             if isfield(model,'exitDeadline')
                 model.horizonSteps = min(model.horizonSteps,round((model.exitDeadline-model.stateTime)/model.sampleTime));
@@ -173,21 +171,6 @@ classdef hardEncounterBarrier
             prescribed.prescribedStages = repmat(cruise.stage,count,1);
             anchor = inputs(:);
             prediction = ltvBicycleModel.finitePredict(prescribed,[]);
-            if model.passingRequired
-                normals = cell(numel(prediction.cells),numel(model.encounters));
-                side = 1;
-                if model.initialEgoState(2)<-0.1,side=-1;end
-                projection=laneGeometry.project(model.encounters(1).center(1:2),model.lane);
-                if projection.lateralPosition>model.initialEgoState(2)+0.1,side=-1;end
-                for index = 1:numel(model.encounters)
-                    trial = model;trial.encounters=model.encounters(index);
-                    normals(:,index)=avoidanceSafetyGeometry.passingNormals(trial,prediction,anchor,side);
-                end
-                prediction.separationNormals = cell(numel(prediction.cells),1);
-                for index = 1:numel(prediction.cells)
-                    prediction.separationNormals{index}=[normals{index,:}];
-                end
-            end
         end
 
         function [matrix,bound,completion] = finiteCompletionRows(model,prediction,finalMap,finalOffset,frame)
@@ -203,6 +186,7 @@ classdef hardEncounterBarrier
                 trial=model;trial.encounters=target;
                 [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
                 if ~isempty(proposed),direction=proposed;end
+                if isfield(model,'completionDirections'),direction=model.completionDirections(:,index);end
                 [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
                 matrix(index,:)=row*finalMap;bound(index)=limit-row*finalOffset;
                 directions(:,index)=direction;rows(index,:)=row;limits(index)=limit;
