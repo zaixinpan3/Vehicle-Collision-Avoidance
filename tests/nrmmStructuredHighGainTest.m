@@ -132,10 +132,42 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
                 "Seed",17,"NoiseModel","boundedUniform","DesignFunction",@(~) design);
             testCase.verifyTrue(result.metrics.allSamplesFinite);
             testCase.verifyTrue(result.metrics.truthOperatingDomainValid);
-            testCase.verifyLessThan(result.metrics.relativePositionRmse,0.08);
-            testCase.verifyLessThan(result.metrics.targetVelocityRmse,1);
-            testCase.verifyLessThan(result.metrics.targetAccelerationRmse,3);
+            testCase.verifyLessThan(result.metrics.relativePositionRmse,0.05);
+            testCase.verifyLessThan(result.metrics.targetVelocityRmse,0.25);
+            testCase.verifyLessThan(result.metrics.targetAccelerationRmse,0.6);
+            testCase.verifyLessThan(result.metrics.peakInitialAccelerationError,10);
             testCase.verifyFalse(result.metrics.digitalErrorBoundCertified);
+        end
+
+        function slowerSensingRetainsUsefulTargetDerivatives(testCase)
+            cfg = testCase.Config;
+            cfg.runtime.samplePeriod = 0.04;
+            result = runOnlineNrmmComplexManeuverScenario("Plot",false,"Report",false, ...
+                "Seed",23,"NoiseModel","boundedUniform","Config",cfg);
+
+            testCase.verifyTrue(result.metrics.allSamplesFinite);
+            testCase.verifyTrue(result.metrics.truthOperatingDomainValid);
+            testCase.verifyLessThan(result.metrics.relativePositionRmse,0.065);
+            testCase.verifyLessThan(result.metrics.targetVelocityRmse,0.35);
+            testCase.verifyLessThan(result.metrics.targetAccelerationRmse,0.6);
+        end
+
+        function changingMotionRetainsAccuracyWithBoundedResponseLag(testCase)
+            cfg = testCase.Config;
+            cfg.target.domain.relativePositionMaximum = 55;
+            cfg.target.model.scalarAccelerationRateMaximum = 1.5;
+            cfg.target.model.curvatureRateMaximum = 0.0175;
+            result = runOnlineNrmmComplexManeuverScenario("Plot",false,"Report",false, ...
+                "Seed",23,"NoiseModel","boundedUniform","Config",cfg, ...
+                "TargetMotion","varying");
+
+            testCase.verifyTrue(result.metrics.allSamplesFinite);
+            testCase.verifyTrue(result.metrics.truthOperatingDomainValid);
+            testCase.verifyTrue(result.metrics.declaredModelJerkCovered);
+            testCase.verifyLessThan(result.metrics.relativePositionRmse,0.065);
+            testCase.verifyLessThan(result.metrics.targetVelocityRmse,0.35);
+            testCase.verifyLessThan(result.metrics.targetAccelerationRmse,0.8);
+            testCase.verifyLessThan(result.metrics.curvatureLagSeconds,1.0);
         end
     end
 end

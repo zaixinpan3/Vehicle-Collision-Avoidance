@@ -2,7 +2,7 @@
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest estimator evaluation: [41 synthetic tracking trials, noise, radar dropout and 165 passing tests, September 16, 2026](NRMM_ESTIMATOR_EVALUATION_20260916.md).
+Latest estimator improvement: [Free-metric gain synthesis, paired noise reduction and response-lag tradeoff, September 16, 2026](NRMM_NOISE_REDUCTION_20260916.md).
 
 Latest implementation and validation: [Distance-dual-only control after removing finite-branch initialization, September 16, 2026](DISTANCE_DUAL_ONLY_RESULTS_20260916.md).
 
@@ -18,6 +18,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| NRMM derivative-noise reduction with retained continuous decay and paired validation | [NRMM_NOISE_REDUCTION_20260916.md](NRMM_NOISE_REDUCTION_20260916.md) |
 | Ordinary-distance degeneracy, first-admission failure and current hard-feasible witnesses | [DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md](DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md) |
 | NRMM estimator: tracking accuracy, startup/reacquisition peaks, uncertainty and runtime | [NRMM_ESTIMATOR_EVALUATION_20260916.md](NRMM_ESTIMATOR_EVALUATION_20260916.md) |
 | Distance-dual-only cleanup, explicit admission failures and current regression results | [DISTANCE_DUAL_ONLY_RESULTS_20260916.md](DISTANCE_DUAL_ONLY_RESULTS_20260916.md) |

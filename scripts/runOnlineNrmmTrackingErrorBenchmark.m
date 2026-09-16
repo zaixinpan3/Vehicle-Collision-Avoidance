@@ -2,6 +2,7 @@ function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
 % runOnlineNrmmTrackingErrorBenchmark Compare multistage high-gain designs.
 % Paired trials use identical truth, sensor draws, and initial conditions.
 % Cases include bounded noise, 25 Hz sensing, model variation, and dropout.
+% Cases may select a subset; continuous-observation studies can omit dropout.
 % BaselineRuntime and BaselineDesign can point to versioned source exports;
 % no historical implementation is kept in the active repository. Continuous
 % Lyapunov bounds and empirical sampled errors are reported separately.
@@ -9,6 +10,10 @@ function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"config"),fullfile(root,"estimator"));
     parser = inputParser;
+    availableCases = ["retained-noise-free","retained-noise","varying-noise", ...
+        "dropout-noise","retained-noise-25Hz"];
+    addParameter(parser,"Cases",availableCases,@(x) isstring(x) && isvector(x) ...
+        && ~isempty(x) && all(ismember(x,availableCases)) && numel(unique(x)) == numel(x));
     addParameter(parser,"Report",true,@(x) islogical(x) && isscalar(x));
     addParameter(parser,"Seed",7,@(x) isscalar(x) && isfinite(x) && x == fix(x) && x >= 0);
     addParameter(parser,"Duration",12,@(x) isscalar(x) && isfinite(x) && x > 4);
@@ -21,8 +26,7 @@ function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
         error("runOnlineNrmmTrackingErrorBenchmark:incompleteBaseline", ...
             "Supply both baseline runtime and design functions.");
     end
-    cases = ["retained-noise-free","retained-noise","varying-noise", ...
-        "dropout-noise","retained-noise-25Hz"];
+    cases = options.Cases(:).';
     labels = "structured-high-gain";
     if ~isempty(options.BaselineRuntime)
         labels = ["baseline-high-gain",labels];

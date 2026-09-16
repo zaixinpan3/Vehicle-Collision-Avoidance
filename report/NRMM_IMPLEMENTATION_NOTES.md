@@ -8,6 +8,14 @@ results below are separate from that continuous-time ISS theorem. Historical num
 the direct common-gyro redesign. Current implementation descriptions below use
 the redesigned core and position-normalized target metric.
 
+The September 16 noise-reduction revision additionally frees the target
+Lyapunov metric at each candidate bandwidth. The normalized observer shape,
+NRMM vector field and required continuous decay rate are retained; the earlier
+identity `A'P+PA=-I` no longer fixes the physical certificate. See
+[the current evaluation](NRMM_NOISE_REDUCTION_20260916.md) for paired results
+and response-lag qualifications. Historical numerical tables retain their
+original gain designs.
+
 ## 1. Continuous design followed by digital realization
 
 `synthesizeNrmmObserverGains.m` determines the continuous gains from physical

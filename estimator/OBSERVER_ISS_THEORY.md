@@ -282,7 +282,7 @@ W_T=\sqrt{z_T^T(P\otimes I_2)z_T},
 \]
 \[
 A_\ell=\begin{bmatrix}-\ell_1&1&0\\-\ell_2&0&1\\-\ell_3&0&0\end{bmatrix},
-\qquad A_\ell^TP+PA_\ell=-I_3,\quad P>0.
+\qquad P>0.
 \]
 All components of \(z_T\) have position units. Relative to the earlier
 acceleration-normalized metric, \(W_T\) and every input coefficient are divided
@@ -293,11 +293,27 @@ The common rotation term contributes zero to the quadratic derivative. Applying
 Young inequalities separately to the velocity and acceleration sensitivities
 of \(\Delta\Phi_e/\omega_T^2\) yields the sufficient condition
 \[
-\omega_TI_3-\tau_q(L_q/\omega_T)^2e_2e_2^T-\tau_sL_s^2e_3e_3^T
+-\omega_T(A_\ell^TP+PA_\ell)-\tau_q(L_q/\omega_T)^2e_2e_2^T-\tau_sL_s^2e_3e_3^T
  -(\tau_q^{-1}+\tau_s^{-1})(Pe_3)(Pe_3)^T\succeq2\lambda_TP.
 \]
-`synthesizeTargetTrackerCertificate.m` retains its normalized observer LMI,
-positive-multiplier search, generalized-eigenvalue rate, and checked residual.
+`synthesizeTargetTrackerCertificate.m` retains the normalized observer LMI
+that selects \(\ell\). For each candidate bandwidth it now solves for \(P\)
+and positive multipliers together, without fixing \(A_\ell^TP+PA_\ell=-I\).
+With \(a_q=L_q/\omega_T\), \(a_s=L_s\), the equivalent Schur condition is
+\[
+\begin{bmatrix}
+\omega_T(A_\ell^TP+PA_\ell)+2\lambda_TP
+  +\operatorname{diag}(0,\tau_q a_q^2,\tau_s a_s^2)&Pe_3&Pe_3\\
+e_3^TP&-\tau_q&0\\
+e_3^TP&0&-\tau_s
+\end{bmatrix}\preceq0.
+\]
+The program minimizes \(\operatorname{tr}(P)\) subject to \(P\succeq I\)
+and strict numerical margins. The normalization fixes the homogeneous scale;
+the metric is not asserted to minimize the physical error bound globally.
+Every recovered metric and the original dissipation inequality are checked
+algebraically. This freedom reduces the conservatism of the earlier fixed
+Lyapunov identity while preserving the same Lipschitz extension and decay floor.
 Feasibility of the returned matrix is the certificate; numerical optimization
 is not claimed globally optimal or verified with directed rounding.
 
@@ -357,10 +373,16 @@ within-velocity cancellation and does not claim all cross-stage cancellations.
 
 ## 7. Explicit gain-selection preference and position output
 
-The target shape is unchanged. Its physical bandwidth minimizes the largest
-ultimate physical component bound normalized by its operating-domain scale,
+The target shape is unchanged. At each candidate bandwidth a free metric is
+synthesized as above. A bracketed one-dimensional search selects a feasible
+local minimum of the largest ultimate physical component bound normalized by
+its operating-domain scale,
 subject to \(\lambda_T\ge1/T_{\rm domain}\), \(\omega_T>1\), where
-\(T_{\rm domain}=\bar\rho/(\overline V_E+\bar V_T)\).
+\(T_{\rm domain}=\bar\rho/(\overline V_E+\bar V_T)\). The search reports its
+bracket, does not claim global optimality, and rejects infeasible or numerically
+unresolved metric solves. When all disturbances vanish, minimum feasible
+bandwidth is the tie-break objective. No simulated tracking error or sensor
+sample period enters either optimization.
 The fixed velocity gain retains the declared minimum-bandwidth transit rule
 \(k_v=\log(20)/T_{\rm domain}\). This is an engineering preference, not
 an ISS optimality claim. Section 4 explains why gain increases need not improve

@@ -2,8 +2,9 @@ function certificate = synthesizeTargetTrackerCertificate( ...
         lipschitz, chain, domainTransitTime)
 % synthesizeTargetTrackerCertificate Retain the high-gain chain and certify it.
 %
-% A normalized observer LMI selects l and the identity A(l)'P+PA(l)=-I
-% fixes its Lyapunov metric. The physical gains remain [l1*w;l2*w^2;l3*w^3].
+% A normalized observer LMI selects l. At each candidate physical bandwidth,
+% a second LMI selects a free Lyapunov metric and two Lipschitz multipliers.
+% The physical gains remain [l1*w;l2*w^2;l3*w^3].
 % Separate global Lipschitz channels Lq and Ls enter a two-multiplier
 % dissipation inequality after scaling z=[eRho;eQ/w;eS/w^2].
 %
@@ -34,16 +35,15 @@ function certificate = synthesizeTargetTrackerCertificate( ...
         localSolveNormalizedShape( ...
             chainMatrix, outputVector, normalizedDecayRate);
     closedLoopMatrix = chainMatrix-injectionVector*outputVector.';
-    lyapunovMatrix = localSolveLyapunovIdentity(closedLoopMatrix);
     domainTransitDecayRate = 1.0/domainTransitTime;
-    bound = localOptimizeBandwidth(lyapunovMatrix, injectionVector, ...
-        lipschitz, chain, unitVector, domainTransitTime);
+    [bound, lyapunovMatrix] = localOptimizeBandwidth(closedLoopMatrix, ...
+        injectionVector, lipschitz, chain, unitVector, domainTransitTime);
     construction = ...
-        "normalized-observer-lmi-plus-structured-lipschitz-iss";
+        "normalized-observer-lmi-plus-free-metric-lipschitz-iss";
 
     lyapunovMatrix = (lyapunovMatrix+lyapunovMatrix.')/2.0;
     lyapunovResidual = closedLoopMatrix.'*lyapunovMatrix ...
-        + lyapunovMatrix*closedLoopMatrix+eye(3);
+        + lyapunovMatrix*closedLoopMatrix;
     lyapunovEigenvalues = eig(lyapunovMatrix);
     residualMargin = -max(eig( ...
         (lyapunovResidual+lyapunovResidual.')/2.0));
@@ -181,99 +181,67 @@ function [injectionVector, lyapunovMatrix, objective] = ...
     objective = value(boundedRealVariable);
 end
 
-function lyapunovMatrix = localSolveLyapunovIdentity(closedLoopMatrix)
-% localSolveLyapunovIdentity Fix the certificate by A'P+PA=-I.
-
-    stateDimension = size(closedLoopMatrix, 1);
-    identity = eye(stateDimension);
-    lyapunovOperator = kron(identity, closedLoopMatrix.') ...
-        + kron(closedLoopMatrix.', identity);
-    vectorizedMatrix = -lyapunovOperator\identity(:);
-    lyapunovMatrix = reshape( ...
-        vectorizedMatrix, stateDimension, stateDimension);
-    lyapunovMatrix = (lyapunovMatrix+lyapunovMatrix.')/2.0;
-    residual = closedLoopMatrix.'*lyapunovMatrix ...
-        + lyapunovMatrix*closedLoopMatrix+identity;
-    tolerance = 1024.0*eps(max(1.0, norm(lyapunovMatrix)));
-    if min(eig(lyapunovMatrix)) <= 0.0 ...
-            || max(abs(residual), [], "all") > tolerance
-        error("synthesizeTargetTrackerCertificate:invalidLyapunovIdentity", ...
-            "The solved target shape did not yield a valid unique certificate.");
-    end
-end
-
-function bestBound = localOptimizeBandwidth(lyapunovMatrix, ...
+function [bestBound, metric] = localOptimizeBandwidth(closedLoopMatrix, ...
         injectionVector, lipschitz, chain, unitVector, domainTransitTime)
-% localOptimizeBandwidth Minimize ultimate bounds with a declared decay floor.
+% Re-solve the metric at each bandwidth; do not constrain A'P+PA to -I.
 
     requiredRate = 1/domainTransitTime;
-    rate = @(bandwidth) localStructuredRate( ...
-        bandwidth,lyapunovMatrix,lipschitz,unitVector);
-    lowerBandwidth = 1+1e-8;
-    if rate(lowerBandwidth) < requiredRate
-        upperBandwidth = 2*lowerBandwidth;
-        while rate(upperBandwidth) < requiredRate
-            upperBandwidth = 2*upperBandwidth;
-            if upperBandwidth > 1e6
-                error("synthesizeTargetTrackerCertificate:infeasibleDecay", ...
-                    "Failed to bracket the required structured decay rate.");
-            end
-        end
-        lowerBandwidth = fzero(@(bandwidth) rate(bandwidth)-requiredRate, ...
-            [lowerBandwidth,upperBandwidth]);
-        lowerBandwidth = lowerBandwidth+1e-7*max(1,lowerBandwidth);
-    end
-    objective = @(bandwidth) localTargetObjective(bandwidth, ...
-        lyapunovMatrix,injectionVector,lipschitz,chain,unitVector,domainTransitTime);
     disturbancePresent = chain.velocityUltimate > 0 ...
         || chain.gyroscopeNoiseMaximum > 0 || chain.radarNoiseMaximum > 0 ...
         || chain.modelJerkMaximum > 0;
-    if ~disturbancePresent
-        bestBandwidth = lowerBandwidth;
-        searchBracket = [lowerBandwidth,lowerBandwidth];
-    else
-        grid = lowerBandwidth*2.^(0:12);
-        values = arrayfun(objective,grid);
-        [~,index] = min(values);
-        if index == numel(grid)
-            error("synthesizeTargetTrackerCertificate:unboundedBandwidthSearch", ...
-                "The ultimate-bound search did not bracket a finite minimum.");
-        end
-        searchBracket = [grid(max(1,index-1)),grid(index+1)];
-        interior = fminbnd(objective,searchBracket(1),searchBracket(2), ...
-            optimset("Display","off","TolX",1e-8*lowerBandwidth));
-        candidates = [lowerBandwidth,interior,searchBracket];
-        [~,index] = min(arrayfun(objective,candidates));
-        bestBandwidth = candidates(index);
-    end
-    bestBound = localTargetBound(bestBandwidth,lyapunovMatrix, ...
+    evaluate = @(bandwidth) localTargetBound(bandwidth,closedLoopMatrix, ...
         injectionVector,lipschitz,chain,unitVector,domainTransitTime);
-    if bestBound.lambda < requiredRate*(1-1e-7)
-        error("synthesizeTargetTrackerCertificate:invalidDecay", ...
-            "The selected target gains violate their declared decay constraint.");
+    objective = @(bandwidth) localTargetObjective(bandwidth,evaluate,disturbancePresent);
+    grid = 1+1e-6;
+    values = objective(grid);
+    % Bracket a feasible local minimum without asserting global optimality.
+    for iteration = 1:20
+        grid(end+1) = 2*grid(end); %#ok<AGROW>
+        values(end+1) = objective(grid(end)); %#ok<AGROW>
+        [bestValue,index] = min(values);
+        if isfinite(bestValue) && index < numel(grid)
+            break
+        end
     end
-    if abs(bestBandwidth-lowerBandwidth) <= 1e-6*lowerBandwidth
-        bestBound.activeConstraint = "domain-transit-decay";
-    else
+    if ~isfinite(bestValue) || index == numel(grid)
+        error("synthesizeTargetTrackerCertificate:unboundedBandwidthSearch", ...
+            "Could not bracket a certified finite bandwidth minimum.");
+    end
+    searchBracket = [grid(max(1,index-1)),grid(index+1)];
+    interior = fminbnd(objective,searchBracket(1),searchBracket(2), ...
+        optimset("Display","off","TolX",1e-5));
+    candidates = [grid(index),interior,searchBracket];
+    [~,index] = min(arrayfun(objective,candidates));
+    bestBound = evaluate(candidates(index));
+    if ~isfield(bestBound,"lambda") || bestBound.lambda < requiredRate
+        error("synthesizeTargetTrackerCertificate:invalidDecay", ...
+            "The selected target gains lack the required decay certificate.");
+    end
+    metric = bestBound.lyapunovMatrix;
+    if disturbancePresent
         bestBound.activeConstraint = "normalized-ultimate-state-bound";
+    else
+        bestBound.activeConstraint = "domain-transit-decay";
     end
     bestBound.searchBracket = searchBracket;
 end
 
-function objective = localTargetObjective(bandwidth,lyapunovMatrix, ...
-        injectionVector,lipschitz,chain,unitVector,domainTransitTime)
-    bound = localTargetBound(bandwidth,lyapunovMatrix,injectionVector, ...
-        lipschitz,chain,unitVector,domainTransitTime);
+function objective = localTargetObjective(bandwidth,evaluate,disturbancePresent)
+    bound = evaluate(bandwidth);
     objective = bound.objectiveValue;
+    if ~disturbancePresent && isfinite(objective)
+        objective = bandwidth;
+    end
 end
 
-function bound = localTargetBound(bandwidth,lyapunovMatrix, ...
+function bound = localTargetBound(bandwidth,closedLoopMatrix, ...
         injectionVector,lipschitz,chain,unitVector,domainTransitTime)
 % localTargetBound Use the metric's actual input and output directions.
 
-    [lambda,multipliers,dissipationMatrix] = localStructuredRate( ...
-        bandwidth,lyapunovMatrix,lipschitz,unitVector);
-    if lambda <= 0
+    lambda = 1/domainTransitTime;
+    [lyapunovMatrix,multipliers,dissipationMatrix] = localSolveMetric( ...
+        bandwidth,closedLoopMatrix,lipschitz,unitVector,lambda);
+    if isempty(lyapunovMatrix)
         bound = struct("objectiveValue",Inf);
         return
     end
@@ -304,6 +272,7 @@ function bound = localTargetBound(bandwidth,lyapunovMatrix, ...
             "The structured Lipschitz dissipation inequality failed verification.");
     end
     bound = struct("bandwidth",bandwidth,"lambda",lambda, ...
+        "lyapunovMatrix",lyapunovMatrix, ...
         "multipliers",multipliers,"dissipationMatrix",dissipationMatrix, ...
         "lipschitzResidualMargin",residualMargin, ...
         "gainConstant",sqrt(max(eig(lyapunovMatrix))), ...
@@ -321,42 +290,50 @@ function bound = localTargetBound(bandwidth,lyapunovMatrix, ...
         "objectiveValue",max(normalizedComponentBounds));
 end
 
-function [lambda,multipliers,residual] = localStructuredRate( ...
-        bandwidth,metric,lipschitz,unitVector)
-% localStructuredRate Optimize two Young multipliers and verify the result.
-%
-% M = w*I - tq*(Lq/w)^2*e2*e2' - ts*Ls^2*e3*e3'
-%             - (1/tq+1/ts)*(P*e3)*(P*e3)'.
-% M >= 2*lambda*P certifies Wdot <= -lambda*W before exogenous inputs.
-% Every returned rate is checked algebraically; optimizer success is not
-% the certificate, nor is the numerical maximizer claimed to be global.
+function [metric,multipliers,residual] = localSolveMetric( ...
+        bandwidth,closedLoopMatrix,lipschitz,unitVector,lambda)
+% A free metric reduces conservatism while retaining the same decay floor.
+% The Schur complement bounds the two independent Lipschitz channels.
+% P >= I fixes homogeneous scaling; trace(P) prefers a compact metric.
 
-    direction = metric*unitVector;
+    metricVariable = sdpvar(3,3);
+    multiplierVariable = sdpvar(2,1);
     sensitivities = [lipschitz.phiVelocity/bandwidth;lipschitz.phiAcceleration];
-    initial = log(norm(direction)./sensitivities);
-    objective = @(logMultipliers) localRateLoss(logMultipliers, ...
-        bandwidth,metric,direction,sensitivities);
-    optimum = fminsearch(objective,initial, ...
-        optimset("Display","off","TolX",1e-8,"TolFun",1e-10));
-    multipliers = exp(optimum);
-    matrix = bandwidth*eye(3) ...
-        -diag([0;multipliers.*sensitivities.^2]) ...
-        -sum(1./multipliers)*(direction*direction.');
-    rawRate = 0.5*min(real(eig(matrix,metric)));
-    lambda = rawRate-1e-8*max(1,abs(rawRate));
-    residual = matrix-2*lambda*metric;
-end
-
-function loss = localRateLoss(logMultipliers,bandwidth,metric,direction,sensitivities)
-    if any(abs(logMultipliers) > 60)
-        loss = realmax;
+    weighted = bandwidth*(closedLoopMatrix.'*metricVariable ...
+        +metricVariable*closedLoopMatrix)+2*lambda*metricVariable ...
+        +diag([0;multiplierVariable.*sensitivities.^2]);
+    direction = metricVariable*unitVector;
+    block = [weighted,direction,direction; ...
+        direction.',-multiplierVariable(1),0; ...
+        direction.',0,-multiplierVariable(2)];
+    margin = 1e-6;
+    diagnostics = optimize([metricVariable >= eye(3), ...
+        multiplierVariable >= margin,block <= -margin*eye(5)], ...
+        trace(metricVariable),localSolverOptions());
+    metric = [];
+    multipliers = [];
+    residual = [];
+    % Infeasible or numerically unresolved points cannot certify a candidate.
+    if diagnostics.problem ~= 0
         return
     end
-    multipliers = exp(logMultipliers);
-    matrix = bandwidth*eye(3) ...
+    candidate = value(metricVariable);
+    candidate = (candidate+candidate.')/2;
+    multipliers = value(multiplierVariable);
+    if any(~isfinite(candidate),"all") || any(~isfinite(multipliers)) ...
+            || min(eig(candidate)) < 1-1e-7 || any(multipliers <= 0)
+        return
+    end
+    direction = candidate*unitVector;
+    residual = -bandwidth*(closedLoopMatrix.'*candidate ...
+        +candidate*closedLoopMatrix)-2*lambda*candidate ...
         -diag([0;multipliers.*sensitivities.^2]) ...
         -sum(1./multipliers)*(direction*direction.');
-    loss = -0.5*min(real(eig(matrix,metric)));
+    residual = (residual+residual.')/2;
+    if any(~isfinite(residual),"all") || min(eig(residual)) < -1e-8
+        return
+    end
+    metric = candidate;
 end
 
 function localPrepareSolver()
