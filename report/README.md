@@ -4,6 +4,8 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest implementation and validation: [Finite conservative convex branches without prescribed maneuvers, September 16, 2026](FINITE_CONVEX_BRANCH_RESULTS_20260916.md).
 
+Latest runtime assessment: [Real-time feasibility, active-encounter bottlenecks and equivalent row-reduction benchmark, September 16, 2026](REALTIME_FEASIBILITY_20260916.md).
+
 Latest diagnosis: [Verified nonlinear oncoming avoidance exists despite the rejected admission constraints, September 16, 2026](ONCOMING_AVOIDANCE_WITNESS_20260916.md).
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
@@ -14,6 +16,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Real-time feasibility, admission versus active convex solves, and equivalent row reduction | [REALTIME_FEASIBILITY_20260916.md](REALTIME_FEASIBILITY_20260916.md) |
 | Finite convex branch admission, straight-scene validation and timing limits | [FINITE_CONVEX_BRANCH_RESULTS_20260916.md](FINITE_CONVEX_BRANCH_RESULTS_20260916.md) |
 | Nonlinear oncoming avoidance witness, continuous verification and restrictive collision geometry | [ONCOMING_AVOIDANCE_WITNESS_20260916.md](ONCOMING_AVOIDANCE_WITNESS_20260916.md) |
 | Oncoming first-admission LP ablations and numerical infeasibility certificate | [ONCOMING_ADMISSION_DIAGNOSIS_20260916.md](ONCOMING_ADMISSION_DIAGNOSIS_20260916.md) |
