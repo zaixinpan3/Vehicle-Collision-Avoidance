@@ -37,7 +37,7 @@ function cfg = localDefaults()
     % Fresh admission searches finite convex branches. Accepted continuations
     % need one convex solve; the terminal policy remains a certificate only.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
-        "minimumHorizonSteps",4,"executionPolicy","finiteBranches","stationTrustRadius",2.0);
+        "minimumHorizonSteps",4,"executionPolicy","distanceDual","stationTrustRadius",2.0);
     cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
     cfg.encounter = struct("taylorOrder",6,"separationDirectionCount",8, ...
         "numericalMargin",1.0e-6,"maximumCarriedMargin",1.0,"inputRateWeight",0.02);
@@ -187,9 +187,9 @@ end
 function localValidate(cfg)
     validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
     if ~isscalar(string(cfg.controller.executionPolicy)) ...
-            || ~any(string(cfg.controller.executionPolicy)==["finiteBranches","singleSolve","auto","predictive","backup"])
+            || ~any(string(cfg.controller.executionPolicy)==["distanceDual","finiteBranches","singleSolve","auto","predictive","backup"])
         error("collisionAvoidanceController:invalidConfiguration", ...
-            "Unsupported executionPolicy; accepted aliases use the same finite-branch admission algorithm.");
+            "Unsupported executionPolicy; accepted aliases use distance-dual convexification with finite initialization.");
     end
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);

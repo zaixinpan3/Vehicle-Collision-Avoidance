@@ -20,7 +20,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyError(@() collisionAvoidanceControllerConfig(struct('clf', ...
                 struct('decreaseRateFraction',invalidDecay))),'collisionAvoidanceController:invalidConfiguration');
         end
-        function everySampleMakesExactlyOneSolverCall(testCase,targetPresent)
+        function everyClearSampleMakesOneTrajectorySolve(testCase,targetPresent)
             [ego,target,road,cfg]=localFixture(targetPresent);
             localHook('reset',[]);cfg.solver.jointFunction=@localHook;
             [command,plan,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
@@ -28,7 +28,8 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifySize(plan,[2,problem.metadata.horizonSteps]);
             testCase.verifyEqual(command.actuatorInput,plan(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,plan(:,1),AbsTol=0);
-            testCase.verifyEqual(problem.metadata.solverCallCount,1);
+            testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.distanceSolverCallCount);
             testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
             testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
             testCase.verifyGreaterThan(size(state.plan,2),1);

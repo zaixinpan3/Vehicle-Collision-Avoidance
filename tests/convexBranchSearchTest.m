@@ -67,6 +67,8 @@ classdef convexBranchSearchTest < matlab.unittest.TestCase
             road=[-100,0;2000,0];
             [~,~,first,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyGreaterThan(first.metadata.integerSolverCallCount,0);
+            testCase.verifyFalse(first.metadata.dualConvexification.used);
+            testCase.verifyGreaterThan(first.metadata.dualConvexification.overlappingMidpoints,0);
             testCase.verifyTrue(first.metadata.postSolveCertificationPerformed);
             x=state.predictedState(:,2);
             [ego.position,ego.yaw]=laneGeometry.fromFrenet(x,first.model.lane);

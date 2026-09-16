@@ -184,6 +184,68 @@ classdef avoidanceSafetyGeometry
                 "cellIndex",vertcat(groups.cellIndex));
         end
 
+        function [normal,information] = distanceDual(egoPosition,egoYaw,targetPosition,targetYaw,halfDimensions,cfg)
+        % Li et al. (2023), equation 12, on the full configuration polygon.
+        % Overlap has zero ordinary distance and supplies no usable direction.
+            [signedDistance,~,~,outside]=avoidanceSafetyGeometry.rectangleDistance( ...
+                egoPosition,egoYaw,targetPosition,targetYaw,halfDimensions);
+            axes=[1,0,-1,0;0,1,0,-1];
+            egoRotation=localRotation(egoYaw);targetRotation=localRotation(targetYaw);
+            matrix=[egoRotation*axes,targetRotation*axes].';
+            bound=matrix*targetPosition+abs(matrix*egoRotation)*halfDimensions(1:2) ...
+                +abs(matrix*targetRotation)*halfDimensions(3:4);
+            residual=matrix*egoPosition-bound;
+            lambda=zeros(8,1);status=0;normal=zeros(2,1);
+            if outside
+                if exist("solveAvoidanceSocpMex","file")~=3
+                    addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','clarabel','matlab'));
+                end
+                [lambda,output]=solveAvoidanceSocpMex(sparse(8,8),-residual, ...
+                    sparse([-eye(8);zeros(1,8);-matrix.']),[zeros(8,1);1;0;0],[0;8;3], ...
+                    [cfg.solver.constraintTolerance,cfg.solver.optimalityTolerance,cfg.solver.maxIterations]);
+                status=output.status;
+                if any(status==[1,4]) && all(isfinite(lambda))
+                    % Numerical dual variables propose a direction only.
+                    % Full robust support rows independently establish safety.
+                    vector=matrix.'*lambda;
+                    if norm(vector)>1e-6,normal=vector/norm(vector);end
+                end
+            end
+            information=struct('available',norm(normal)>0,'distance',residual.'*lambda, ...
+                'signedDistance',signedDistance,'multipliers',lambda,'matrix',matrix, ...
+                'bound',bound,'nativeStatus',status,'nativeCalls',double(outside));
+        end
+
+        function [normals,information] = distanceDualNormals(model,prediction,plan,frames)
+        % Optimize continuous directions at the anchor's hold midpoints.
+        % These anchors are numerical coordinates, never tracking references.
+            cells=prediction.cells;targets=numel(model.encounters);
+            normals=cell(numel(cells),1);available=true;overlaps=0;calls=0;
+            minimum=Inf;maximumGap=0;cfg=model.cfg;
+            for index=1:numel(cells)
+                tube=cells(index);frame=frames(index);degree=size(tube.offset,2)-1;
+                weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
+                points=reshape(pagemtimes(tube.map,plan),6,[])+tube.offset;
+                state=points*weights;
+                position=frame.origin+[frame.tangent,frame.lateral]*state(1:2);
+                yaw=frame.heading+state(3);normals{index}=zeros(2,targets);
+                for targetIndex=1:targets
+                    target=model.encounters(targetIndex);
+                    center=targetPrediction.finiteFlow(target,tube.start+tube.duration/2);
+                    [normal,dual]=avoidanceSafetyGeometry.distanceDual(position,yaw,center(1:2),center(7), ...
+                        [cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth],cfg);
+                    normals{index}(:,targetIndex)=normal;
+                    available=available && dual.available;calls=calls+dual.nativeCalls;
+                    overlaps=overlaps+double(dual.signedDistance<=0);
+                    minimum=min(minimum,dual.signedDistance);
+                    maximumGap=max(maximumGap,abs(dual.distance-max(dual.signedDistance,0)));
+                end
+            end
+            information=struct('available',available,'overlappingMidpoints',overlaps, ...
+                'distanceSolverCalls',calls,'minimumAnchorDistance',minimum, ...
+                'maximumDistanceGap',maximumGap,'used',false,'witnessPreserved',false);
+        end
+
         function [normals,information] = optimizeNormals(model,prediction,plan)
         %avoidanceSafetyGeometry.optimizeNormals Continuous maximum-margin cell-normal proposals.
         % A small SOCP separates synchronous relative Bernstein footprint enclosures.

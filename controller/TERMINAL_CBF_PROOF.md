@@ -1,6 +1,6 @@
 # Recursive feasibility and encounter safety of the implemented controller
 
-This is the current format-29 proof. It replaces the previous stopping-tail
+This is the current format-30 proof. It replaces the previous stopping-tail
 argument. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
@@ -321,6 +321,19 @@ forces an unproved fresh admission of all remaining obligations**.
 The first-hold CLF cannot remove this candidate: for any finite hard-feasible
 input its cone can be satisfied by a finite nonnegative slack.
 
+### Distance-dual collision-row replacement
+
+The controller may solve Li et al.'s distance dual at the carried anchor and
+propose new continuous separation normals. The resulting whole-hold rows
+retain the complete footprint, uncertainty and truncation allowances.
+The same inherited suffix, completed with CLF slack, must satisfy every row
+and every cone of the proposed program before it is selected. Thus replacing
+the collision rows preserves a concrete feasible continuation. When this
+check fails, the unchanged inherited program is optimized. Exit directions,
+absolute deadlines and terminal conditions are preserved. No normal-selection
+heuristic alone is used as a recursive-feasibility argument. See
+[DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
+
 ### Fresh no-target performance horizon
 
 The controller may try to restore the configured performance horizon. It
@@ -333,11 +346,13 @@ Before invoking the optimizer, it checks the candidate against **every row
 and all CLF and terminal cones of the proposed new program**. Only a program containing this
 candidate may replace the inherited one. Otherwise the inherited program is
 used. This is pre-solve selection of an optimization problem, not selection
-of an actuator command after solver failure. An admitted retained branch uses one optimization per sample. Fresh admission
-may search multiple convex branches, as specified in
+of an actuator command after solver failure. An admitted retained branch uses
+one trajectory optimization per sample, preceded by distance-dual geometry
+queries when targets are active. Fresh admission may search multiple convex branches, as specified in
 [FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md). The theorem starts
 only after one complete branch has passed the original hard certificate;
-its entire affine family and terminal cones are then inherited unchanged.
+its affine family and terminal cones are inherited before any optional
+witness-preserving collision-row replacement.
 
 ### Empty suffix after confirmed encounter completion
 

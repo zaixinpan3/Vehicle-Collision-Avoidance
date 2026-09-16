@@ -1,5 +1,5 @@
 function report = runEncounterCertificateScenario(options)
-%runEncounterCertificateScenario Exact-state crossing with one solve per hold.
+%runEncounterCertificateScenario Crossing with one trajectory solve per hold.
 % The target stays observed. Any unsuccessful solve propagates an error.
     arguments
         options.ForceSolverFailure (1,1) logical = false

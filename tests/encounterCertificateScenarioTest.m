@@ -10,11 +10,12 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
             testCase.verifyError(@() runEncounterCertificateScenario(ForceSolverFailure=true), ...
                 "collisionAvoidanceController:optimizationFailed");
         end
-        function everyCrossingSampleSolvesOnce(testCase)
+        function everyCrossingSampleSolvesOneTrajectory(testCase)
             report=runEncounterCertificateScenario(DeadlineSeconds=inf);
             testCase.verifyTrue(report.passed);
             testCase.verifyEqual(report.executedHolds,24);
-            testCase.verifyEqual(report.solverCallCount,ones(1,24));
+            testCase.verifyEqual(report.trajectorySolverCallCount,ones(1,24));
+            testCase.verifyEqual(report.solverCallCount,1+report.distanceSolverCallCount);
             % This tests solve/continuation behavior, not an early recovery
             % deadline. The dedicated long cruise-recovery test checks tracking.
             testCase.verifyFalse(any(report.terminalCommands));

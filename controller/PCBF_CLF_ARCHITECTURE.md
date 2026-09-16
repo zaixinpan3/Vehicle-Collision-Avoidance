@@ -1,7 +1,8 @@
 # Predictive CBF and soft CLF controller
 
-Current implementation, September 16, 2026: the format-29 controller searches
-a finite conservative polyhedral family at initial encounter admission. It
+Current implementation, September 16, 2026: the format-30 controller uses
+distance-dual convexification, with a finite conservative family for initial
+admission when the dual-directed problem is unavailable or infeasible. It
 retains predictive continuation across active encounters, confirmed partial
 or full target release, and prediction exhaustion. The terminal information
 set uses the same held affine generator as online prediction. The CLF retains
@@ -15,7 +16,10 @@ Geometry ranges follow actuator reachability. The terminal invariant set is
 synthesized from the same actuator limits, without hidden state/slip bounds.
 
 Admission has no selected maneuver side or prescribed lateral trajectory.
-Each cell-target pair and each finite-exit condition has a finite set of
+Li et al.'s distance dual supplies continuous separating directions at computed
+anchor poses. Those directions enter the complete robust swept constraints;
+collision remains hard. See [DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
+When initialization is needed, each cell-target pair and each finite-exit condition has a finite set of
 geometric directions. Integer branch-and-bound with lazy constraint generation
 searches their assignments. Every accepted assignment is solved as a complete
 convex problem and independently certified. Infeasible approximations and
@@ -24,10 +28,13 @@ optimality or complete coverage of all physically safe trajectories is made.
 See [FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md) for the approximation,
 branch count, search logic, sound pruning and limitations.
 
-After admission, the actual accepted branch is preserved: substitute the
+After admission, first preserve the actual accepted branch: substitute the
 executed input in its affine family, retain the terminal cones and continuous
 swept enclosures, and condition successor information by inclusion. The
 resulting suffix supplies a feasible candidate for the next convex solve.
+New distance-dual collision rows may replace the inherited rows only after
+that same suffix passes every proposed hard row and CLF/terminal cone.
+Otherwise the inherited program remains the optimization problem.
 Confirmed removal deletes only that target's obligations. A fresh target-free
 horizon may replace the suffix only when a full feasible witness is retained.
 At prediction exhaustion, the permanent invariant-set optimization still

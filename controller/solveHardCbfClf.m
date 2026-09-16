@@ -99,14 +99,32 @@ classdef solveHardCbfClf
                 'testedAssignments',0,'exhausted',false,'status',"singleConvexProgram", ...
                 'log10AssignmentCount',0,'selectedDirections',zeros(0,1),'activeGroups',0, ...
                 'integerSeconds',0);
+            if isfield(program,'admissionGeometry')
+                context=program.admissionGeometry;program=rmfield(program,'admissionGeometry');
+                if program.dualConvexification.used
+                    result=solveHardCbfClf.constrained(program,cfg);
+                    information.conicCalls=information.conicCalls+1;
+                    if result.feasible
+                        information.status="distanceDualFeasible";return;
+                    elseif result.exitFlag~=-2
+                        information.status="searchIncomplete";return;
+                    end
+                end
+                program.dualConvexification.used=false;
+                if isfield(cfg.solver,'workTimer') && toc(cfg.solver.workTimer)>=cfg.solver.workTimeLimit
+                    result=localFailure(0,"The distance-dual initialization reached the frame deadline.");
+                    information.status="searchIncomplete";return;
+                end
+                program.branchFamily=solveHardCbfClf.buildBranches(context.model,context.prediction,program);
+            end
             if ~isfield(program,'branchFamily')
-                result=solveHardCbfClf.constrained(program,cfg);information.conicCalls=1;
+                result=solveHardCbfClf.constrained(program,cfg);information.conicCalls=information.conicCalls+1;
                 return;
             end
             family=program.branchFamily;program=rmfield(program,'branchFamily');
             base=localCommonProgram(program);
             information.log10AssignmentCount=family.log10AssignmentCount;
-            result=solveHardCbfClf.constrained(base,cfg);information.conicCalls=1;
+            result=solveHardCbfClf.constrained(base,cfg);information.conicCalls=information.conicCalls+1;
             if ~result.feasible
                 information.exhausted=result.exitFlag==-2;
                 information.status="searchIncomplete";
@@ -150,8 +168,15 @@ classdef solveHardCbfClf
                 end
                 options=optimoptions('intlinprog','Display','off','MaxTime',remaining, ...
                     'ConstraintTolerance',cfg.solver.constraintTolerance,'MaxFeasiblePoints',1);
+                % Rank feasible initialization toward forward path progress.
+                % This changes no branch constraint or trajectory SOCP cost.
+                objective=zeros(numel(lower),1);
+                if isfield(family,'prediction')
+                    station=family.prediction.egoStateMatrix(1,:,end).';
+                    objective(1:numel(station))=-station/max(1,norm(station,inf));
+                end
                 integerTimer=tic;
-                [candidate,~,flag,output]=intlinprog(zeros(numel(lower),1),indices, ...
+                [candidate,~,flag,output]=intlinprog(objective,indices, ...
                     [linear;cuts],[bound;cutBounds],equality,equalityBound,lower,upper,options);
                 information.integerSeconds=information.integerSeconds+toc(integerTimer);
                 information.activeGroups=numel(active);

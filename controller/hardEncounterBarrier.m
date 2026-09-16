@@ -26,7 +26,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=29
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=30
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...

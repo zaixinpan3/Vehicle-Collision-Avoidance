@@ -1,5 +1,11 @@
 # Finite convex branches for predictive collision avoidance
 
+In format 30 this finite family initializes encounters when the continuous
+distance-dual proposal is unavailable or its hard trajectory problem is
+infeasible. It is no longer constructed for every fresh admission. Later
+distance-dual updates preserve the known feasible suffix; see
+[DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
+
 ## Modeling decision
 
 The user authorized a conservative polyhedral approximation on September 16,
@@ -99,6 +105,10 @@ an equality constraint on the optimized trajectory.
    Check every candidate against the complete original family and add violated
    groups. These are outer relaxations used only for search, never
    executable safety certificates.
+   Rank integer search candidates by increasing terminal path station when
+   a physical prediction map is available. This affine objective biases the
+   initializer toward the requested forward cruise task; it changes no
+   feasible constraint, no pruning certificate and no trajectory SOCP cost.
 4. Use supporting half-spaces as outer relaxations of the terminal SOCs in
    the integer master. Solve the complete original SOCP for a candidate
    assignment, retaining the actual terminal cones, the original performance

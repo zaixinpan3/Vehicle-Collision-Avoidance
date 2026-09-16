@@ -21,7 +21,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.InitialTrackingError (5,1) double {mustBeFinite} = zeros(5,1)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
         options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 1
-        options.ExecutionPolicy (1,1) string = "finiteBranches"
+        options.ExecutionPolicy (1,1) string = "distanceDual"
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
@@ -52,6 +52,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     count = options.SampleCount;
     states = nan(6,count+1);inputs=nan(2,count);seconds=nan(1,count);calls=zeros(1,count);
     branchSearch=cell(1,count);
+    dualConvexification=cell(1,count);trajectoryCalls=zeros(1,count);distanceCalls=zeros(1,count);
     horizons=zeros(1,count);inherited=false(1,count);releases=false(1,count);terminalCommands=false(1,count);
     terminalOptimizations=false(1,count);replacements=false(1,count);approximate=false(1,count);
     verified=false(1,count);recursive=false(1,count);
@@ -80,6 +81,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         states(:,sample)=x;
         metadata=problem.metadata;calls(sample)=metadata.solverCallCount;
         branchSearch{sample}=metadata.branchSearch;
+        dualConvexification{sample}=metadata.dualConvexification;
+        trajectoryCalls(sample)=metadata.trajectorySolverCallCount;
+        distanceCalls(sample)=metadata.distanceSolverCallCount;
         cbfRows(sample)=metadata.obstacleCbfRowCount;
         horizons(sample)=metadata.horizonSteps;inherited(sample)=metadata.inheritedFeasibleFamily;
         releases(sample)=metadata.confirmedRelease;terminalCommands(sample)=metadata.terminalActive;
@@ -138,6 +142,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'time',(0:executed)*h,'state',states(:,1:executed+1),'input',inputs(:,1:executed), ...
         'solverCallCount',calls(1:executed),'obstacleCbfRowCount',cbfRows(1:executed), ...
         'branchSearch',{branchSearch(1:executed)}, ...
+        'dualConvexification',{dualConvexification(1:executed)}, ...
+        'trajectorySolverCallCount',trajectoryCalls(1:executed),'distanceSolverCallCount',distanceCalls(1:executed), ...
         'horizonSteps',horizons(1:executed),'inheritedFeasibleFamily',inherited(1:executed), ...
         'confirmedRelease',releases(1:executed),'terminalCommands',terminalCommands(1:executed), ...
         'terminalInvariantOptimization',terminalOptimizations(1:executed), ...

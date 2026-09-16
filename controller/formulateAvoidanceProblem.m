@@ -191,9 +191,62 @@ function [program,prediction,clf] = localFormulate(model)
     program.terminalOptimization=isfield(model,'terminalOptimization') && model.terminalOptimization;
     program.feasibleWitness=localCompleteSlack(program,anchor);
     if inherited,program.inheritedWitness=program.feasibleWitness;end
-    if ~inherited && ~isempty(model.encounters)
-        program.branchFamily=solveHardCbfClf.buildBranches(model,prediction,program);
+    program.dualConvexification=struct('available',false,'overlappingMidpoints',0, ...
+        'distanceSolverCalls',0,'minimumAnchorDistance',Inf,'maximumDistanceGap',0, ...
+        'used',false,'witnessPreserved',false);
+    if ~isempty(model.encounters)
+        [candidate,dual]=localDualGeometry(model,prediction,program,anchor);
+        if dual.available && (~inherited || localWitnessFeasible(candidate,localCompleteSlack(candidate,anchor)))
+            program=candidate;dual.used=true;dual.witnessPreserved=inherited;
+        end
+        program.dualConvexification=dual;
+        if ~inherited
+            % Search the finite family only when the distance-dual candidate
+            % is unavailable or its complete hard trajectory problem fails.
+            model.anchorPlan=anchor;
+            program.admissionGeometry=struct('model',model,'prediction',prediction);
+        end
     end
+end
+
+function [candidate,information]=localDualGeometry(model,prediction,program,anchor)
+% Rebuild only collision rows. The inherited terminal/exit conditions and
+% absolute completion deadline remain exactly as certified before this call.
+    [normals,information]=avoidanceSafetyGeometry.distanceDualNormals( ...
+        model,prediction,anchor,program.geometry.frames);
+    candidate=program;
+    if ~information.available,return;end
+    model.anchorPlan=anchor;prediction.geometryAnchor=anchor;
+    prediction.geometryFrames=program.geometry.frames;
+    prediction.geometryNominal=cell(numel(prediction.cells),1);
+    for index=1:numel(prediction.cells)
+        tube=prediction.cells(index);
+        prediction.geometryNominal{index}=reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
+    end
+    prediction.separationNormals=normals;
+    geometry=avoidanceSafetyGeometry.build(model,prediction);
+    collision=startsWith(geometry.label,"collision:");
+    keep=~startsWith(program.physicalLabels,"collision:");
+    matrix=[geometry.matrix(collision,:);program.physicalMatrix(keep,program.layout.planIndex)];
+    physicalBound=[geometry.physicalBound(collision);program.physicalBound(keep)];
+    option=geometry.matrix(collision,:);physical=geometry.physicalBound(collision);
+    scale=1+abs(physical)+abs(option)*program.decisionRadius;
+    reserve=4*max(model.cfg.encounter.numericalMargin,model.cfg.solver.constraintTolerance) ...
+        *scale.*any(option~=0,2);
+    bound=[physical-reserve;program.safetyBound(keep)];
+    candidate.physicalMatrix=[matrix,zeros(numel(bound),1)];
+    candidate.physicalBound=physicalBound;candidate.safetyBound=bound;
+    candidate.physicalLabels=[geometry.label(collision);program.physicalLabels(keep)];
+    first=program.cones(2)+1;
+    candidate.A=sparse([candidate.physicalMatrix;zeros(1,program.layout.planCount),-1;program.A(first:end,:)]);
+    candidate.b=[bound;0;program.b(first:end)];candidate.cones(2)=numel(bound)+1;
+    % Keep inherited road rows in geometry as well as in the actual program.
+    road=~startsWith(program.geometry.label,"collision:");
+    fields=["matrix","physicalBound","label","stage","safety","cellIndex"];
+    for field=fields
+        geometry.(field)=[geometry.(field)(collision,:);program.geometry.(field)(road,:)];
+    end
+    candidate.geometry=geometry;candidate.obstacleCbfRowCount=nnz(collision);
 end
 
 function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model)
@@ -257,7 +310,11 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
         tube.map=tube.map(:,columns,:);
         tube.endOffset=tube.endOffset+tube.endMap(:,1:2)*executed;
         tube.endMap=tube.endMap(:,columns);
-        tube.stage=tube.stage-1;tube.start=tube.start-model.sampleTime;tube.time=tube.time-model.sampleTime;
+        tube.stage=tube.stage-1;
+        % Each certificate is one complete hold. Reconstruct its clock from
+        % the integer stage; repeated subtraction can create negative zero.
+        tube.start=(tube.stage-1)*model.sampleTime;
+        tube.time=tube.start+linspace(0,tube.duration,numel(tube.time));
         prediction.cells(index)=tube;
     end
     geometry=old.geometry;

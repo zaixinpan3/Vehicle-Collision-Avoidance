@@ -2,7 +2,7 @@
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest implementation and validation: [Whole-hold certificates without state/slip operating constraints, September 16, 2026](WHOLE_HOLD_ACTUATOR_CONSTRAINTS_20260916.md).
+Latest implementation and validation: [Distance-dual convexification, straight-scene recovery and remaining timing limits, September 16, 2026](DISTANCE_DUAL_ADOPTION_20260916.md).
 
 Latest runtime assessment: [Real-time feasibility, active-encounter bottlenecks and equivalent row-reduction benchmark, September 16, 2026](REALTIME_FEASIBILITY_20260916.md).
 
@@ -16,6 +16,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Distance-dual adoption, initialization, recursive inclusion and straight-scene validation | [DISTANCE_DUAL_ADOPTION_20260916.md](DISTANCE_DUAL_ADOPTION_20260916.md) |
 | Whole-hold certificates, actuator-only operating limits and straight-scene validation | [WHOLE_HOLD_ACTUATOR_CONSTRAINTS_20260916.md](WHOLE_HOLD_ACTUATOR_CONSTRAINTS_20260916.md) |
 | Real-time feasibility, admission versus active convex solves, and equivalent row reduction | [REALTIME_FEASIBILITY_20260916.md](REALTIME_FEASIBILITY_20260916.md) |
 | Finite convex branch admission, straight-scene validation and timing limits | [FINITE_CONVEX_BRANCH_RESULTS_20260916.md](FINITE_CONVEX_BRANCH_RESULTS_20260916.md) |

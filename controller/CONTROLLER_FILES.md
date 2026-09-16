@@ -3,9 +3,10 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-Fresh admission searches finite convex geometry branches. Each complete
+Fresh admission first tries distance-dual geometry, with finite convex
+branches available for initialization. Each complete
 branch is an SOCP with a full input sequence and penalized first-hold CLF slack.
-Its format-28 state retains the complete prediction and terminal continuation.
+Its format-30 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -23,9 +24,9 @@ Do not move controller helpers into those directories to evade the limit.
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard swept/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
 | `solveHardCbfClf.m` | Finite directional families (`buildBranches`), lazy integer assignment search with complete SOCP checks (`branches`), convex solving (`constrained`) and independent verification (`certify`) |
-| `avoidanceSafetyGeometry.m` | Swept separation (`build`), continuous normal proposals (`optimizeNormals`), rectangle distance (`rectangleDistance`) and shared numeric kernels (`cellRows`, `projectRows`) |
+| `avoidanceSafetyGeometry.m` | Swept separation (`build`), online distance duals (`distanceDual`, `distanceDualNormals`), offline continuous normal proposals (`optimizeNormals`), rectangle distance and shared numeric kernels |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
-| `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics, signed road forces (`roadLoad`) and slip-domain rows (`slipRows`) |
+| `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
 | `targetPrediction.m` | Bounded target admission (`admitOnline`), reachable-box conditioning (`condition`), absolute-time flow, offline uncertainty studies and footprint support |
@@ -41,10 +42,11 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-28 predictive certificate. The online path calls
+format-30 predictive certificate. The online path calls
 `formulateAvoidanceProblem(model)` and `solveHardCbfClf.branches`. Fresh
 admission may require several convex/integer solves; accepted successors
-retain one convex family. No geometric maneuver template is generated. A valid active encounter inherits the accepted constraint family by
+retain one feasible convex family, optionally replacing collision rows through
+a witness-preserving distance-dual update. No geometric maneuver template is generated. A valid active encounter inherits the accepted constraint family by
 eliminating the executed input. The terminal law is a mathematical witness;
 failed optimization never dispatches it or a stored input. New target admission requires a fresh certificate. After release, a fresh
 performance program must contain a verified feasible candidate; otherwise
