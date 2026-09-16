@@ -12,31 +12,24 @@ classdef laneGeometry
         % Batch charts with individual station radii over one validated lane.
             cfg = model.cfg;
             nominal = cell(numel(tubes),1);
-            station = zeros(numel(tubes),1);extent = station;
+            station = zeros(numel(tubes),1);extent = station;lateralExtent = station;
             for index = 1:numel(tubes)
                 tube = tubes(index);
                 values = reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
                 nominal{index} = values;
                 radius = tube.radius;
-                station(index) = (min(values(1,:))+max(values(1,:)))/2;
-                extent(index) = cfg.controller.stationTrustRadius ...
-                    +(max(values(1,:))-min(values(1,:)))/2+max(radius(1,:));
-                if isfield(model,'encounters') && ~isempty(model.encounters)
-                    % A fresh obstacle certificate covers the actuator-reachable
-                    % station interval, not a corridor around a guessed path.
-                    bound = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
-                        max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))], ...
-                        size(tube.map,2)/2,1);
-                    support = reshape(pagemtimes(abs(tube.map(1,:,:)),bound),1,[]);
-                    lower = min(tube.offset(1,:)-support-radius(1,:));
-                    upper = max(tube.offset(1,:)+support+radius(1,:));
-                    allowance = max(128*eps,cfg.encounter.numericalMargin) ...
-                        *(1+max(abs([lower,upper])));
-                    station(index) = (lower+upper)/2;
-                    extent(index) = (upper-lower)/2+allowance;
-                end
+                bound = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+                    max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))], ...
+                    size(tube.map,2)/2,1);
+                support = reshape(pagemtimes(abs(tube.map),bound),6,[]);
+                lower = min(tube.offset(1,:)-support(1,:)-radius(1,:));
+                upper = max(tube.offset(1,:)+support(1,:)+radius(1,:));
+                allowance = max(128*eps,cfg.encounter.numericalMargin)*(1+max(abs([lower,upper])));
+                station(index) = (lower+upper)/2;
+                extent(index) = (upper-lower)/2+allowance;
+                lateralExtent(index) = max(abs(tube.offset(2,:))+support(2,:)+radius(2,:));
             end
-            frames = laneGeometry.frameBounds(model.lane,station,extent,cfg.model.lateralDomainRadius);
+            frames = laneGeometry.frameBounds(model.lane,station,extent,max(lateralExtent));
             for index = 1:numel(tubes)
                 frames(index).referenceHeadingErrorBound = frames(index).headingErrorBound;
             end
@@ -88,10 +81,8 @@ classdef laneGeometry
         end
 
         function frame = referenceFrame(curve, station, radius, lateralRadius)
-            if abs(curve.curvature)*lateralRadius >= 1
-                error("collisionAvoidanceController:invalidReferenceCurve", ...
-                    "The lateral strip must remain inside a regular Frenet chart.");
-            end
+            % The forward Frenet map is defined for every finite lateral offset.
+            % Invertibility of a measurement chart is checked at observation time.
             lower = station-radius;
             upper = station+radius;
             [point,heading] = laneGeometry.referencePose(station,0,curve);

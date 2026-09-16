@@ -157,11 +157,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
         end
-        function roadConstraintsRemainHardWithoutATarget(testCase)
+        function aDiagnosticLateralRangeDoesNotRejectTargetFreeRecovery(testCase)
             [ego,target,road,cfg]=localFixture(false);
             ego.position(2)=cfg.model.lateralDomainRadius+.1;
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:optimizationFailed');
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
+            testCase.verifyLessThanOrEqual(abs(command.actuatorInput), ...
+                [cfg.model.frontWheelSteeringAngleMaximum;1]);
+            testCase.verifyFalse(any(problem.program.physicalLabels=="modelDomain"));
         end
         function aMissingTargetInsideTheRangeIsNotAConfirmedRelease(testCase)
             [ego,target,road,cfg]=localFixture(true);

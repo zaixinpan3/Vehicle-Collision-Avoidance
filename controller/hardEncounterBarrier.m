@@ -12,7 +12,9 @@ classdef hardEncounterBarrier
             if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
                 curvature=abs(model.lane.referenceCurve.curvature);
                 distance=norm(ego.stateErrorBound(1:2));
-                radial=1/curvature-cfg.model.lateralDomainRadius;
+                % Declare a Frenet sensing contract from the current Cartesian
+                % measurement box, without imposing a lateral state domain.
+                radial=abs(1/model.lane.referenceCurve.curvature-model.initialEgoState(2))-2*distance;
                 if distance>=radial
                     error('collisionAvoidanceController:invalidUncertaintyChart','The sensing bound crosses the reference center.');
                 end
@@ -24,7 +26,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=28
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=29
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -220,7 +222,7 @@ classdef hardEncounterBarrier
             z = model.initialEgoState;
             rho = model.initialFrenetErrorBound;
             frame = laneGeometry.frameBounds(model.lane,z(1), ...
-                max(model.cfg.controller.stationTrustRadius,rho(1)),model.cfg.model.lateralDomainRadius);
+                max(model.cfg.controller.stationTrustRadius,rho(1)),abs(z(2))+rho(2));
             direction = localExitDirection(target.center,frame,z);
             if ~isempty(model.confirmation.exitDirection)
                 direction = model.confirmation.exitDirection;
@@ -245,7 +247,7 @@ classdef hardEncounterBarrier
             z = model.initialEgoState;
             rho = model.initialFrenetErrorBound;
             frame = laneGeometry.frameBounds(model.lane,z(1), ...
-                max(model.cfg.controller.stationTrustRadius,rho(1)),model.cfg.model.lateralDomainRadius);
+                max(model.cfg.controller.stationTrustRadius,rho(1)),abs(z(2))+rho(2));
             map = [frame.tangent,frame.lateral];
             delta = center(1:2)-frame.origin-map*z(1:2);
             positionRadius = radius(1:2)+abs(map)*rho(1:2)+frame.positionErrorBound;
@@ -285,8 +287,11 @@ classdef hardEncounterBarrier
             matrix = [deltaMap(selected,:);-deltaMap(selected,:)];
             bound = [rate(selected)-support(selected)-deltaOffset(selected); ...
                 rate(selected)-support(selected)+deltaOffset(selected)];
-            frame = laneGeometry.frameBounds(model.lane,finalOffset(1)+finalMap(1,:)*model.anchorPlan, ...
-                model.cfg.controller.stationTrustRadius+radius(1),model.cfg.model.lateralDomainRadius);
+            reach = repmat([model.cfg.model.frontWheelSteeringAngleMaximum; ...
+                max(abs([model.cfg.actuation.brakingRatioMinimum,model.cfg.actuation.brakingRatioMaximum]))],prediction.stageCount,1);
+            extent = abs(finalMap)*reach+radius;
+            frame = laneGeometry.frameBounds(model.lane,finalOffset(1), ...
+                extent(1),abs(finalOffset(2))+extent(2));
             [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
                 model,prediction,finalMap,finalOffset,frame);
             completion.keys = string({model.encounters.key});
@@ -411,43 +416,17 @@ function terminal = localTerminalSet(model)
     if rcond(basis)<1e-10 || any(contraction>=1)
         error('collisionAvoidanceController:invalidTerminalModel','No well-conditioned stable terminal modal basis exists.');
     end
-    a=cruise.stage.continuousA(2:6,2:6);b=cruise.stage.continuousB(2:6,:);
     ref=cruise.state(2:6);trim=cruise.input;
-    continuousDrift=cruise.stage.continuousA(2:6,:)*cruise.state+b*trim+cruise.stage.continuousC(2:6);
     sampledDrift=cruise.transition(2:6,:)*[cruise.state;trim;1]-ref;
     cap=model.measurementRadiusLimit(2:6);
-    limits=[cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius; ...
-        cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
-    lower=[-limits(1:2);cfg.model.speedMinimum;-limits(4:5)];
     inputLimit=[cfg.model.frontWheelSteeringAngleMaximum; ...
         max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))];
-    cellCount=max(cfg.encounter.minimumCells,ceil(2*norm(a,inf)*model.sampleTime));
-    % Parameters [initial tracking error; held input deviation] give common
-    % Bernstein rows for ALL terminal states, rather than sampled tests.
-    tubes=stateUncertainty.heldInterval(a,[zeros(5),b],continuousDrift, ...
-        [eye(5),zeros(5,2)],zeros(5,1),zeros(5,1),zeros(5,1),model.sampleTime, ...
-        cfg.encounter.taylorOrder,limits+abs(ref),[limits+abs(ref);inputLimit+abs(trim)], ...
-        zeros(5,1),cellCount);
-    slip=cfg.model.slipAngleMaximum(:);
-    if isscalar(slip),slip=repmat(slip,2,1);end
-    speed=max(cruise.stage.speed,cfg.model.scheduleSpeedFloor);
-    slipState=[0,0,0,1,cfg.vehicle.lf;0,0,0,1,-cfg.vehicle.lr]/speed;
-    slipInput=[-1,0;0,0];
-    stateRows=[eye(5);-eye(5);slipState;-slipState];
-    inputRows=[zeros(10,2);slipInput;-slipInput];
-    bounds=[limits;-lower;slip;slip]-stateRows*ref-inputRows*trim;
-    rows=zeros(0,7);holdBound=zeros(0,1);
-    for index=1:numel(tubes)
-        tube=tubes(index);
-        for point=1:size(tube.offset,2)
-            rows=[rows;stateRows*tube.map(:,:,point)+[zeros(size(stateRows,1),5),inputRows]]; %#ok<AGROW>
-            holdBound=[holdBound;bounds-stateRows*tube.offset(:,point)-abs(stateRows)*tube.radius(:,point)]; %#ok<AGROW>
-        end
-    end
+    % The held terminal input is constant throughout the complete sample.
+    % Only actuator amplitude/slew restricts the invariant modal certificate.
     inputRows=[eye(2);-eye(2)];
-    rows=[rows;zeros(4,5),inputRows];
-    holdBound=[holdBound;[inputLimit(1);cfg.actuation.brakingRatioMaximum; ...
-        inputLimit(1);-cfg.actuation.brakingRatioMinimum]-inputRows*trim];
+    rows=[zeros(4,5),inputRows];
+    holdBound=[inputLimit(1);cfg.actuation.brakingRatioMaximum; ...
+        inputLimit(1);-cfg.actuation.brakingRatioMinimum]-inputRows*trim;
     reserve=16*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance);
     holdBound=holdBound-reserve*(1+abs(holdBound));
     feedbackRows=rows*[eye(5);-gain];
@@ -506,9 +485,6 @@ function [count,inputs]=localCruiseAdmission(model)
     rate=model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     for index=1:maximum
         input=terminal.input+terminal.feedback*(x-terminal.reference);
-        slipCenter=(x(5)+cfg.vehicle.lf*x(6))/max(cruise.stage.speed,cfg.model.scheduleSpeedFloor);
-        slipLimit=.8*cfg.model.slipAngleMaximum(1);
-        input(1)=min(max(input(1),slipCenter-slipLimit),slipCenter+slipLimit);
         input=min(max(input,max(lower,previous-rate)),min(upper,previous+rate));
         inputs(:,index)=input;previous=input;
         x=cruise.transition(1:6,:)*[x;input;1];
@@ -530,7 +506,7 @@ function [direction,steps,passing] = localEncounterProposal(model,range)
     passing = false;
     [position,heading] = laneGeometry.fromFrenet(model.initialEgoState,model.lane);
     frame = laneGeometry.frameBounds(model.lane,model.initialEgoState(1), ...
-        cfg.controller.stationTrustRadius,cfg.model.lateralDomainRadius);
+        cfg.controller.stationTrustRadius,abs(model.initialEgoState(2))+model.initialFrenetErrorBound(2));
     target = model.encounters;
     relative = target.center(1:2)-position;
     egoVelocity = [cos(heading),-sin(heading);sin(heading),cos(heading)]*model.initialEgoState(4:5);

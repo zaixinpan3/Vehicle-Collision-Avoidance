@@ -27,17 +27,13 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyLessThan(fresh.positionErrorBound, initial.positionErrorBound);
         end
 
-        function aSpeedBoxMeetingTheDomainIsReadAndAnEmptyIntersectionIsRejected(testCase)
-            % A vehicle at rest measured with speed error publishes a box
-            % straddling zero; the reader admits the box, not only its centre.
+        function reverseSpeedMeasurementsAreNotClippedToADiagnosticDomain(testCase)
             [ego, target, cfg, lane] = localInputs();
             ego.longitudinalVelocity = -0.02;
-            ego.controllerErrorBound.bounds(4) = 0.05;
-            parsed = readPlanningInputs(ego, target, lane, cfg);
-            testCase.verifyEqual(parsed.modelState(4), -0.02);
             ego.controllerErrorBound.bounds(4) = 0.01;
-            testCase.verifyError(@() readPlanningInputs(ego, target, lane, cfg), ...
-                "collisionAvoidanceController:invalidInput");
+            parsed = readPlanningInputs(ego, target, lane, cfg);
+            testCase.verifyEqual(parsed.modelState(4), -0.02,AbsTol=0);
+            testCase.verifyEqual(parsed.stateErrorBound(4),0.01,AbsTol=0);
         end
 
         function staleBoundsAreRejected(testCase)

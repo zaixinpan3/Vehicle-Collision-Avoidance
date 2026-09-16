@@ -1,6 +1,6 @@
 # Recursive feasibility and encounter safety of the implemented controller
 
-This is the current format-28 proof. It replaces the previous stopping-tail
+This is the current format-29 proof. It replaces the previous stopping-tail
 argument. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
@@ -12,7 +12,7 @@ simulation duration, establishes the recursive statement.
 
 Starting from an accepted feasible certificate, every subsequent optimization
 has a feasible candidate, and every accepted executed hold satisfies the active
-collision and permanent model-domain/input/slew constraints, provided that:
+collision and permanent actuator-amplitude/slew constraints, provided that:
 
 1. The plant is the declared zero-residual, held affine bicycle model. Its
    admitted generator, sample time, configuration and reference do not change.
@@ -31,8 +31,10 @@ collision and permanent model-domain/input/slew constraints, provided that:
    not covered by the previous encounter's theorem.
 5. The permanent reference is an analytically continued straight line or
    constant-curvature reference, with no physical road-boundary constraints.
-   Lateral, heading, speed, lateral-velocity, yaw-rate and slip domains remain
-   hard. Centerline samples / analytic arc length describe the reference;
+   No additional state or tire-slip bounds are imposed. The forward reference
+   map covers the actuator-reachable envelope; each measured inverse chart
+   must remain well defined and meet the declared Frenet sensing contract.
+   Centerline samples / analytic arc length describe the reference;
    they are not physical end-of-road barriers. A finite road or a changing
    curvature requires a different permanent continuation certificate.
 6. A returned numerical solution passes the independent hard-row and terminal
@@ -81,6 +83,38 @@ uses exact affine nominal nodes and the interval recursion
 Swept Bernstein enclosures additionally cover all times inside every hold,
 including polynomial remainder and arithmetic allowances. No hypothetical
 future measurement is used to shrink these finite predicted boxes.
+
+### Whole-hold enclosure without imposed state bounds
+
+There is exactly one certified interval per held command. For
+$\dot x=Ax+Bu+c$, let $d=Ax_0+Bu+c$ and truncate its power series at order $p$.
+Writing $\gamma=\|A\|_\infty h$ and choosing $p+2>\gamma$ gives, for $0\le t\le h$,
+
+\[
+ |R_p(t)|\le
+ \frac{|A|^p\mathbf 1\,\overline d}{(p+1)!}
+ \frac{t^{p+1}}{1-\gamma/(p+2)},\qquad
+ \overline d\ge\|d\|_\infty.
+\]
+
+To see this, bound the first omitted term componentwise, then bound every
+successive factorial-series ratio by $\gamma/(p+2)$. Unlike the former
+$1/(1-\gamma)$ bound, this does not require subdivision when $\gamma\ge1$.
+For a condensed initial state $x_0=MU+o$, compute
+$|x_0|\le |M|\bar U+|o|$ from the actuator box. This is a consequence of
+reachability, not a state constraint. Apply the same argument to initial
+error, numerical error and bounded disturbance terms. Increase $p$ until
+the truncation support at $h$ is at most $10^{-11}$; order above 64 fails
+explicitly. Arithmetic allowances are added separately. Bernstein degree is
+$p+1$ and may therefore exceed the configured minimum Taylor order.
+
+The geometry uses this reachable tube to bound station, lateral displacement
+and heading. No station corridor, lateral/heading box or tire-slip row is
+added. A reachable heading interval spanning a full rotation uses the
+rectangle circumradius as a global support upper bound. All directions in
+the finite grid remain available, with one direction per complete hold.
+The declared globally affine plant scope is essential: removing the old
+model-domain rows does not establish nonlinear physical-model validity.
 
 At the next actual observation, conditioning produces a box inside the carried
 successor box and the current measurement box. Thus it preserves the old
@@ -144,17 +178,20 @@ bounded measurement box.
 
 ### Continuous hold and input constraints
 
-Synthesis builds common Bernstein rows parameterized by the **true** initial
-tracking error and held input deviation:
+The input is held constant for the entire period. Synthesis uses actuator
+amplitude rows with `H_e=0` and `H_u=[I;-I]`, parameterized by the **true**
+initial tracking error and held input deviation:
 
 \[
  H_e e+H_u(u-u_*)\le b_h.
 \]
 
-They cover every point in the hold, domain/slip/input limits and numerical
-reserves. The known continuous trim residual is included in the Bernstein
-affine offsets and therefore in `b_h`. For feedback with bounded measurement error, a sufficient whole-set
-support condition is
+The bound `b_h` is the actuator range shifted by trim and reduced by the
+numerical reserve. Because the input is held, these four rows apply for the
+whole period without interval subdivision or state/slip constraints. The
+sampled trim residual remains in the modal disturbance support above. For
+feedback with bounded measurement error, a sufficient whole-set support
+condition is
 
 \[
  |(H_e-H_uK)V|a+|H_uK|r\le b_h. \tag{3}
@@ -244,10 +281,10 @@ shrinkage is used when certifying the finite plan.
 ## 4. Complete finite encounter witness
 
 An accepted witness stores its input sequence, exact affine node maps,
-uncertainty enclosures, Bernstein cells, geometry, physical row labels,
+uncertainty enclosures, whole-hold Bernstein tubes, geometry, physical row labels,
 terminal cones, finite exit directions/deadline, and common cruise generator.
-The hard affine family is `M U <= b`. It includes collision separation, model
-and slip domains, actuator bounds, slew and robust terminal-entry/exit rows.
+The hard affine family is `M U <= b`. It includes collision separation,
+actuator bounds, slew and robust terminal-entry/exit rows.
 The terminal SOCs are also stored. Safety constraints have no slack. The
 first-hold CLF has an unbounded nonnegative norm slack with a squared cost.
 
@@ -276,7 +313,7 @@ relinearization, chart change or normal reselection in this inherited family.
 Conditioning only restricts the covered physical states.
 
 Confirmed release removes `collision:<key>` and `exit:<key>` rows for that
-key. The remaining road/domain/input/slew/terminal obligations stay intact.
+key. The remaining input/slew/terminal obligations stay intact.
 Completion directions are indexed by stable target keys. Removing an obligation
 cannot invalidate the old suffix. In particular, **partial release no longer
 forces an unproved fresh admission of all remaining obligations**.
@@ -338,7 +375,7 @@ input, bounded measurement sets, the common plant and stable target contracts.
 By induction every successor problem is feasible, and each accepted hold is
 safe for every obligation still active during that hold. Under the observation
 contract, finite target obligations discharge by their certified deadlines;
-permanent model and actuator constraints remain satisfied thereafter.
+permanent actuator constraints remain satisfied thereafter.
 
 A new target can invalidate the initial-feasibility premise of a *new* task.
 An optimization timeout can prevent execution of the mathematically existing

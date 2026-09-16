@@ -6,7 +6,7 @@ classdef straightRoadBoundaryConfigurationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function noRoadBoundaryAllowsSpaceInsideTheModelDomain(testCase)
+        function aRoadFreeTrialReportsItsDiagnosticEnvelope(testCase)
             report = runExactStateRecursiveFeasibilityScenario(Scenario="cruise", ...
                 SampleCount=1,DeadlineSeconds=30,InitialTrackingError=[3.9;0;0;0;0]);
             testCase.verifyTrue(report.passed);
@@ -20,10 +20,12 @@ classdef straightRoadBoundaryConfigurationTest < matlab.unittest.TestCase
                 InitialTrackingError=[3.9;0;0;0;0]), ...
                 'collisionAvoidanceController:optimizationFailed');
         end
-        function removingTheRoadDoesNotRemoveTheModelDomain(testCase)
-            testCase.verifyError(@() runExactStateRecursiveFeasibilityScenario( ...
-                Scenario="cruise",SampleCount=1,DeadlineSeconds=30,InitialTrackingError=[4.1;0;0;0;0]), ...
-                'collisionAvoidanceController:optimizationFailed');
+        function aStateOutsideTheDiagnosticEnvelopeCanStillBeCertified(testCase)
+            report=runExactStateRecursiveFeasibilityScenario(Scenario="cruise", ...
+                SampleCount=1,DeadlineSeconds=30,InitialTrackingError=[4.1;0;0;0;0]);
+            testCase.verifyTrue(report.passed);
+            testCase.verifyLessThan(report.minimumSampledModelDomainMargin,0);
+            testCase.verifyFalse(report.stateAndSlipBoundsEnforced);
         end
     end
 end

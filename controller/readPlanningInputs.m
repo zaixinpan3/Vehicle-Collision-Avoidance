@@ -17,7 +17,7 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
     if isempty(targetEstimate)
         targetEstimate = localBundledTargetEstimate(egoState);
     end
-    ego = localReadEgoState(egoState, cfg);
+    ego = localReadEgoState(egoState);
     ego.stateTime = localOptionalStateScalar(egoState, "stateTime", NaN);
     if isfield(egoState, "committedActuatorInput") && ~isempty(egoState.committedActuatorInput)
         error("collisionAvoidanceController:invalidInput", ...
@@ -39,13 +39,13 @@ function targetEstimate = localBundledTargetEstimate(egoInput)
     end
 end
 
-function ego = localReadEgoState(data, cfg)
+function ego = localReadEgoState(data)
     if ~isstruct(data) || ~isscalar(data)
         error("collisionAvoidanceController:invalidInput", ...
             "egoState must be a scalar structure.");
     end
     if isfield(data, "egoState")
-        ego = localReadNrmmEgoState(data, cfg);
+        ego = localReadNrmmEgoState(data);
         return;
     end
 
@@ -75,13 +75,12 @@ function ego = localReadEgoState(data, cfg)
     ego.modelState = [position; yaw; longitudinalVelocity; ...
         lateralVelocity; yawRate];
     [ego.stateErrorBound, ego.errorCertificate] = localEgoErrorBounds(data);
-    localCheckSpeedDomain(longitudinalVelocity, ego.stateErrorBound(4), cfg, "measured");
     ego.longitudinalAccelerationBias = localOptionalStateScalar( ...
         data, "longitudinalAccelerationBias", 0.0);
     ego.heldActuatorInput = localOptionalHeldActuatorInput(data);
 end
 
-function ego = localReadNrmmEgoState(data, cfg)
+function ego = localReadNrmmEgoState(data)
     % The cascaded estimator publishes egoState as the six-element vector
     % [x; vx; ax; y; vy; ay] in inertial coordinates; no jerk state exists.
     estimate = localFiniteVector( ...
@@ -97,34 +96,15 @@ function ego = localReadNrmmEgoState(data, cfg)
     velocityRoundoff = 100.0 * eps(max( ...
         1.0, norm(inertialVelocity, inf)));
     bodyVelocity(abs(bodyVelocity) <= velocityRoundoff) = 0.0;
-    longitudinalVelocity = bodyVelocity(1);
     ego = struct();
     ego.position = position;
     ego.yaw = yaw;
     ego.inertialVelocity = inertialVelocity;
     ego.modelState = [position; yaw; bodyVelocity; yawRate];
     [ego.stateErrorBound, ego.errorCertificate] = localEgoErrorBounds(data);
-    localCheckSpeedDomain(longitudinalVelocity, ego.stateErrorBound(4), cfg, "estimated");
     ego.longitudinalAccelerationBias = localOptionalStateScalar( ...
         data, "longitudinalAccelerationBias", 0.0);
     ego.heldActuatorInput = localOptionalHeldActuatorInput(data);
-end
-
-function localCheckSpeedDomain(longitudinalVelocity, radius, cfg, kind)
-% The published speed box must meet the model domain. A box that straddles
-% the domain edge is legitimate for a vehicle at rest measured with error;
-% its centre is conditioned against the carried box and the domain on
-% continuation frames, and admission separately requires an in-domain centre.
-    speedRoundoff = 100.0*eps(max([ ...
-        1.0, abs(longitudinalVelocity)+radius, ...
-        abs(cfg.model.speedMinimum), abs(cfg.model.speedMaximum)]));
-    if longitudinalVelocity+radius < cfg.model.speedMinimum ...
-            -max(speedRoundoff, 10.0*cfg.solver.constraintTolerance) ...
-            || longitudinalVelocity-radius ...
-                > cfg.model.speedMaximum+speedRoundoff
-        error("collisionAvoidanceController:invalidInput", ...
-            "The %s longitudinal velocity box lies outside the model domain.", kind);
-    end
 end
 
 function [bounds, certificate] = localEgoErrorBounds(data)

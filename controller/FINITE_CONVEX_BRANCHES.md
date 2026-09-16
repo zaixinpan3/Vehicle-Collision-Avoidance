@@ -27,7 +27,8 @@ polyhedral replacement avoids claiming an impossible exact finite cover.
 ## Finite directional certificate
 
 Choose K uniformly spaced unit directions, with K a multiple of four; the
-default is eight. All K directions are available in every cell for every
+default is eight. Each cell is now one complete held-input period; there are no temporal
+subcells. All K directions are available in every hold for every
 target. They do not encode a chosen trajectory or a chosen maneuver side.
 Let n_q denote direction q. For a fixed pair of poses, define
 
@@ -40,7 +41,9 @@ configuration obstacle. Its safe exterior is a union of K separating
 half-spaces. The approximation is conservative near rounded corners and
 when directions are coarse. In the implemented uncertain, rotating case,
 the same construction uses the existing sound target supports and convex
-piecewise-affine majorants of ego footprint support over the heading domain.
+piecewise-affine majorants of ego footprint support over the computed
+actuator-reachable heading interval. A full-rotation interval uses a constant
+circumradius bound. Neither choice imposes a heading-domain constraint.
 Each majorant piece is enforced. Thus each branch is still convex in the
 input sequence, and acceptance implies the original required body clearance.
 
@@ -60,7 +63,7 @@ finite direction enumeration does not remove it.
 Finite target exit also has K directional alternatives, including the entire
 target footprint and the declared sensing range. No guessed exit direction
 is mandatory. Let E_jq be these affine final-state branches. With permanent
-convex constraints H (dynamics, domains, input/slew, road, terminal SOCs and
+convex constraints H (dynamics, input/slew, optional road, terminal SOCs and
 soft CLF), the finite planning set is
 
 \[
@@ -72,8 +75,8 @@ soft CLF), the finite planning set is
 
 Each complete assignment sigma defines a convex SOCP. With C cells and J
 targets, the raw assignment count is K^{J(C+1)}; empty branches and duplicate
-assignments need not be enumerated literally. The failed oncoming frame has
-C=224, J=1 and K=8, giving 8^225, approximately 10^203.195, raw assignments.
+assignments need not be enumerated literally. At the 32-hold oncoming horizon, C=32, J=1 and K=8, giving 8^33
+raw assignments. This replaces the former seven-subcell-per-hold family.
 These are geometric assignments through time, not two global maneuver modes.
 
 The fixed affine plant and support bounds remain conservative modeling
@@ -138,7 +141,7 @@ terminal certificate, soft CLF and high-gain target observer remain in place.
 The change concerns finding an initial member of the safe predictive domain.
 It does not establish admission for all physically avoidable encounters,
 nonlinear plant inclusion, or guaranteed 100 ms computation. A fixed K, fixed
-cell partition and bounded set of horizons can still reject a safe physical
+hold partition and bounded set of horizons can still reject a safe physical
 trajectory. Search times and full-frame deadlines must be reported separately
 from safety and final cruise recovery.
 

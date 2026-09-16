@@ -168,17 +168,20 @@ follows that speed exactly.
 
 ## Constraints and uncertainty
 
-Steering, signed braking ratio, slip-angle domains, longitudinal speed,
-lateral velocity, yaw rate, heading, lateral position and chart station are
-hard constraints throughout every held interval. Slip limits describe the
-admitted model domain; they do not establish the nonlinear tangent's accuracy.
-A positive minimum speed and weak braking authority can be admitted when a
-finite certificate passes. There is no universal exact-rest requirement.
+Steering and signed longitudinal-input amplitude and finite slew limits are
+hard constraints. State and tire-slip diagnostic ranges do not restrict the
+online optimization or input parser. Collision and finite-exit geometry use
+computed actuator-reachable state envelopes rather than imposed state boxes.
+The terminal invariant set certifies actuator-admissible continuation using
+the same affine generator. No exact-rest requirement is imposed.
 
 The two model rate fields specify continuous derivative-error bounds.
 `stateUncertainty.flowTube` encloses the complete affine flow using a Taylor
 polynomial, a remainder and arithmetic allowances, represented in Bernstein
-form. Endpoint propagation retains cancellation in the nominal transition.
+form. One tube covers the entire hold. Adaptive polynomial order and a
+factorial-ratio tail bound replace temporal subdivision; the initial-state
+magnitude is derived from its affine input map and actuator bounds.
+Endpoint propagation retains cancellation in the nominal transition.
 Initial Cartesian boxes require an invertible projection chart; a cell
 spanning a noncollinear polyline reference jump needs a separate jump/reset
 certificate and is currently rejected.

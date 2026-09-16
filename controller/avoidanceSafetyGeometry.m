@@ -26,7 +26,6 @@ classdef avoidanceSafetyGeometry
         % One separating normal per cell; every Bernstein point uses that normal.
         % The cellRows entry exposes the shared numeric geometry kernel for codegen.
             cfg = model.cfg;
-            degree = cfg.encounter.taylorOrder+1;
             groups = cell(numel(prediction.cells), 1);
             frames = cell(numel(groups), 1);
             normalGroups = cell(numel(groups), 1);
@@ -65,7 +64,6 @@ classdef avoidanceSafetyGeometry
                     [computedFrames,computedNominal] = laneGeometry.sweptCellFrames(model,prediction.cells,model.anchorPlan);
                 end
             end
-            nominalCells = cell(numel(groups),1);
             cellData = cell(numel(groups),1);
             activeTargets = cell(numel(groups),1);
             sourceLabels = cell(numel(groups),1);
@@ -100,13 +98,16 @@ classdef avoidanceSafetyGeometry
                     targets(targetIndex) = target;
                     targetLabels(targetIndex) = "collision:"+encounter.key;
                 end
+                reach = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+                    max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],size(tube.map,2)/2,1);
+                support = reshape(pagemtimes(abs(tube.map),reach),6,[]);
+                envelope = max(abs(tube.offset)+support+tube.radius,[],2);
                 data = struct("frame",[frame.origin;frame.tangent;frame.lateral;frame.heading; ...
                     frame.positionErrorBound;frame.headingErrorBound;frame.stationLower;frame.stationUpper], ...
                     "nominal",nominal,"targets",targets,"boundaries",boundaries, ...
-                    "settings",[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.model.headingDomainRadius; ...
-                        cfg.model.lateralDomainRadius;cfg.collision.clearanceMargin], ...
-                    "duration",tube.duration,"degree",degree);
-                nominalCells{cellIndex} = nominal;
+                    "settings",[cfg.vehicle.length/2;cfg.vehicle.width/2;envelope(3); ...
+                        envelope(2);cfg.collision.clearanceMargin], ...
+                    "duration",tube.duration,"degree",size(tube.offset,2)-1);
                 cellData{cellIndex} = data;
                 activeTargets{cellIndex} = active;
                 sourceLabels{cellIndex} = [targetLabels;boundaryLabels];
@@ -129,25 +130,17 @@ classdef avoidanceSafetyGeometry
                 allGeometricRows = avoidanceSafetyGeometry.cellRows(data);
             end
             projectionData = cell(numel(groups),1);
-            numericCfg = struct("model",struct("lateralDomainRadius",cfg.model.lateralDomainRadius, ...
-                "headingDomainRadius",cfg.model.headingDomainRadius,"speedMinimum",cfg.model.speedMinimum, ...
-                "speedMaximum",cfg.model.speedMaximum,"lateralVelocityMaximum",cfg.model.lateralVelocityMaximum, ...
-                "yawRateMaximum",cfg.model.yawRateMaximum,"scheduleSpeedFloor",cfg.model.scheduleSpeedFloor, ...
-                "slipAngleMaximum",repmat(cfg.model.slipAngleMaximum(:),2/numel(cfg.model.slipAngleMaximum),1)), ...
-                "vehicle",struct("lf",cfg.vehicle.lf,"lr",cfg.vehicle.lr));
             for cellIndex = 1:numel(groups)
                 tube = prediction.cells(cellIndex);
                 stateRadius = tube.radius;
-                frame = frames{cellIndex};
                 numericTube = struct("stage",tube.stage,"map",tube.map,"offset",tube.offset, ...
                     "localStateMap",tube.localStateMap,"localInputMap",tube.localInputMap, ...
                     "localOffset",tube.localOffset,"numericalRadius",tube.numericalRadius);
                 if isfield(prediction,"fixedInputs") || isfield(prediction,"parametricInputs")
                     numericTube.stage = 1;
                 end
-                projectionData{cellIndex} = struct("cfg",numericCfg,"tube",numericTube, ...
-                    "nominal",nominalCells{cellIndex},"stationRange",[frame.stationLower;frame.stationUpper], ...
-                    "stateRadius",stateRadius,"scheduleSpeed",prediction.scheduleSpeedProfile(tube.stage), ...
+                projectionData{cellIndex} = struct("tube",numericTube, ...
+                    "stateRadius",stateRadius, ...
                     "geometricRows",allGeometricRows(cellIndex),"planCount",prediction.planCount);
                 normals = zeros(2,numel(model.encounters));
                 normals(:,activeTargets{cellIndex}) = allGeometricRows(cellIndex).normals;
@@ -160,7 +153,7 @@ classdef avoidanceSafetyGeometry
                 projected = avoidanceSafetyGeometry.projectRows(data);
             end
             for cellIndex = 1:numel(groups)
-                names = ["modelDomain";"tireSlip";sourceLabels{cellIndex}];
+                names = sourceLabels{cellIndex};
                 group = projected(cellIndex);
                 if isfield(prediction,"parametricInputs")
                     stage = prediction.cells(cellIndex).stage;
@@ -385,35 +378,14 @@ end
 
 function result = localProjectedRows(data)
 % Apply the same cell rows to condensed and local coordinates in one kernel.
-    cfg = data.cfg;tube = data.tube;
-    frame = struct("stationLower",data.stationRange(1),"stationUpper",data.stationRange(2));
+    tube = data.tube;
     stateRadius = data.stateRadius;pointCount = size(tube.offset,2);
-    lower = [frame.stationLower; -cfg.model.lateralDomainRadius; -cfg.model.headingDomainRadius; ...
-        cfg.model.speedMinimum; -cfg.model.lateralVelocityMaximum; -cfg.model.yawRateMaximum];
-    upper = [frame.stationUpper; cfg.model.lateralDomainRadius; cfg.model.headingDomainRadius; ...
-        cfg.model.speedMaximum; cfg.model.lateralVelocityMaximum; cfg.model.yawRateMaximum];
-    stateRows = [eye(6); -eye(6)];
-    inputRows = zeros(12, 2);
-    limits = repmat([upper; -lower], 1, pointCount);
-    safety = false(12, 1);
-    labels = ones(12,1);
-    speed = max(data.scheduleSpeed, cfg.model.scheduleSpeedFloor);
-    slips = [0, 0, 0, 0, 1/speed, cfg.vehicle.lf/speed; ...
-        0, 0, 0, 0, 1/speed, -cfg.vehicle.lr/speed];
-    stateRows = [stateRows; slips; -slips];
-    inputRows = [inputRows; -1, 0; 0, 0; 1, 0; 0, 0];
-    slipLimit = cfg.model.slipAngleMaximum(:);
-    if isscalar(slipLimit), slipLimit = [slipLimit; slipLimit]; end
-    limits = [limits; repmat([slipLimit; slipLimit], 1, pointCount)];
-    safety = [safety; false(4, 1)];
-    labels = [labels; 2*ones(4,1)];
     geometricRows = data.geometricRows;
     rowCount = size(geometricRows.state,1);
-    stateRows = [stateRows;geometricRows.state];
-    inputRows = [inputRows;zeros(rowCount,2)];
-    limits = [limits;geometricRows.bound];
-    safety = [safety;true(rowCount,1)];
-    labels = [labels;2+geometricRows.source];
+    stateRows = geometricRows.state;
+    inputRows = zeros(rowCount,2);
+    limits = geometricRows.bound;
+    labels = geometricRows.source;
     pointStateRows = repmat(stateRows,1,1,pointCount);
     pointStartRows = zeros(size(pointStateRows));
     pointInputRows = repmat(inputRows,1,1,pointCount);
@@ -436,7 +408,7 @@ function result = localProjectedRows(data)
         "nodeLabels",labels);
     result = struct("matrix",reshape(permute(mapped,[1,3,2]),[],data.planCount), ...
         "physicalBound",physical(:), ...
-        "safety",repmat(safety,pointCount,1),"label",repmat(labels,pointCount,1), ...
+        "safety",true(numel(physical),1),"label",repmat(labels,pointCount,1), ...
         "stage",repmat(tube.stage,numel(physical),1),"local",local);
 end
 

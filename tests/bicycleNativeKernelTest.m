@@ -41,13 +41,12 @@ classdef bicycleNativeKernelTest < matlab.unittest.TestCase
             [a,b,c] = ltvBicycleModel.linearizationKernel(state,input(:,1),curvature,cfg,0,zeros(6,1),.05);
             map = zeros(6,24);held = map;held(:,1:2) = b;
             radius = [.02;.03;.001;.04;.02;.01];rate = [.2;.06;.02;2.5;5;4];
-            stateLimit = [100;6;.4;18;3;1];inputLimit = ones(24,1);
-            count = max(1,ceil(2*norm(a,inf)*.05));
+            inputLimit = ones(24,1);
             for order = [3,6]
                 expected = stateUncertainty.heldInterval(a,held,c,map,state,radius,rate,.05, ...
-                    order,stateLimit,inputLimit,zeros(6,1),count);
+                    order,inputLimit,zeros(6,1));
                 actual = bicycleHeldIntervalKernelMex(a,held,c,map,state,radius,rate,.05, ...
-                    order,stateLimit,inputLimit,zeros(6,1),count);
+                    order,inputLimit,zeros(6,1));
                 testCase.verifyEqual(actual,expected,AbsTol=1e-10,RelTol=1e-12);
             end
         end

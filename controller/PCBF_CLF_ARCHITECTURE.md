@@ -1,12 +1,18 @@
 # Predictive CBF and soft CLF controller
 
-Current implementation, September 16, 2026: the format-28 controller searches
+Current implementation, September 16, 2026: the format-29 controller searches
 a finite conservative polyhedral family at initial encounter admission. It
 retains predictive continuation across active encounters, confirmed partial
 or full target release, and prediction exhaustion. The terminal information
 set uses the same held affine generator as online prediction. The CLF retains
 its squared slack penalty, and input effort remains relative to the certificate
 operating input. The high-gain target observer is unchanged.
+
+Each held command has one complete Bernstein certificate, with adaptive
+polynomial order and no internal time subdivision. State-box and tire-slip
+constraints are removed; actuator amplitude and finite slew bounds remain.
+Geometry ranges follow actuator reachability. The terminal invariant set is
+synthesized from the same actuator limits, without hidden state/slip bounds.
 
 Admission has no selected maneuver side or prescribed lateral trajectory.
 Each cell-target pair and each finite-exit condition has a finite set of

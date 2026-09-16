@@ -22,32 +22,34 @@ classdef stateUncertainty
             transition=stateFlow+measurementMap;
         end
 
-        function tubes = heldInterval(a,b,c,map,offset,radius,rate,duration,order,stateLimit,inputLimit,numericalRadius,cellCount)
-        %heldInterval Share one complete held-interval enclosure algorithm.
-            step = duration/cellCount;
-            first = stateUncertainty.flowTube(a,b,c,map,offset,radius,rate,step,order, ...
-                stateLimit,inputLimit,numericalRadius);
-            tubes = repmat(first,cellCount,1);
-            for index = 2:cellCount
-                previous = tubes(index-1);
-                tubes(index) = stateUncertainty.flowTube(a,b,c,previous.endMap, ...
-                    previous.endOffset,previous.endRadius,rate,step,order, ...
-                    stateLimit,inputLimit,previous.endNumericalRadius);
-            end
+        function tube = heldInterval(a,b,c,map,offset,radius,rate,duration,order,inputLimit,numericalRadius)
+        %heldInterval One complete control hold, without temporal subdivision.
+            tube = stateUncertainty.flowTube(a,b,c,map,offset,radius,rate,duration,order, ...
+                inputLimit,numericalRadius);
         end
 
-        function tube = flowTube(a, b, c, map, offset, radius, rate, duration, order, stateLimit, inputLimit, numericalRadius)
-        %flowTube Taylor/Bernstein enclosure of a complete held-input cell.
-        % The polynomial is affine in the state and held input. Its remainder
-        % uses a scalar exponential-series majorant. The initial nominal
-        % state and input must satisfy the supplied absolute domain bounds.
+        function tube = flowTube(a, b, c, map, offset, radius, rate, duration, order, inputLimit, numericalRadius)
+        %flowTube Whole-hold Taylor/Bernstein enclosure from actuator reachability.
+        % A factorial-series tail is valid for arbitrary finite norm(A)*h.
+        % Increase polynomial order, never divide the hold into smaller cells.
             sizeState = size(a, 1);
-            if nargin<12, numericalRadius = zeros(sizeState,1); end
-            degree = order+1;
+            if nargin<11, numericalRadius = zeros(sizeState,1); end
             gain = norm(a, inf)*duration;
-            if gain >= 1
-                error("collisionAvoidanceController:invalidCertificationCell", ...
-                    "Certification cells require norm(A,inf)*duration < 1.");
+            coefficientMagnitude = abs(map)*inputLimit+abs(offset);
+            driftBound = abs(a)*coefficientMagnitude+abs(b)*inputLimit+abs(c);
+            errorDrift = abs(a)*radius+rate;
+            magnitude = max(driftBound)+max(errorDrift)+max(abs(a)*numericalRadius);
+            order = max(order,ceil(gain));
+            while true
+                if order>64
+                    error('collisionAvoidanceController:unresolvedFlowEnclosure', ...
+                        'The complete hold needs polynomial order above the supported numerical range.');
+                end
+                degree = order+1;
+                ratio = gain/(order+2);
+                tailWeight = (abs(a)^order*ones(sizeState,1))/factorial(degree)/(1-ratio);
+                if max(tailWeight)*magnitude*duration^degree<=1e-11,break;end
+                order = order+1;
             end
             columnCount = sizeState+size(b, 2)+1;
             polynomial = zeros(sizeState, columnCount, degree+1);
@@ -71,10 +73,6 @@ classdef stateUncertainty
                 numericalPolynomial(:,powerIndex+1) = abs(powerA*a)*numericalRadius/powerFactorial;
                 powerA = powerA*a;
             end
-            driftBound = abs(a)*stateLimit+abs(b)*inputLimit+abs(c);
-            errorDrift = abs(a)*radius+rate;
-            tailWeight = abs(a)^order*ones(sizeState, 1) ...
-                /factorial(degree)/(1-gain);
             radiusPolynomial(:, end) = tailWeight*(max(driftBound)+max(errorDrift));
             numericalPolynomial(:,end) = tailWeight*(max(driftBound)+max(abs(a)*numericalRadius));
             % Arithmetic allowance, charged to the enclosures rather than to
@@ -82,9 +80,8 @@ classdef stateUncertainty
             % no polynomial arithmetic has taken place.
             operations = size(map, 2)+sizeState*order+degree^2;
             gamma = operations*eps/(1-operations*eps);
-            coefficientMagnitude = abs(map)*inputLimit+abs(offset);
             arithmetic = 16*gamma*(1+abs(a)*coefficientMagnitude ...
-                +abs(b)*inputLimit+abs(c))/(1-gain);
+                +abs(b)*inputLimit+abs(c))*exp(gain);
             radiusPolynomial(:, 2) = radiusPolynomial(:, 2)+arithmetic;
             numericalPolynomial(:,2) = numericalPolynomial(:,2)+arithmetic;
             transform = stateUncertainty.bernsteinTransform(degree, duration);

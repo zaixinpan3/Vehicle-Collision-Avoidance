@@ -6,6 +6,11 @@ classdef targetPrediction
         % Touching convex majorant of rectangle support over a yaw interval.
         % Every vertex projection is concave wherever it is nonnegative.
         % Tangents there cover every possible support-maximizing vertex.
+            if errorMaximum>=pi
+                offset=hypot(halfLength,halfWidth)+64*eps*(1+halfLength+halfWidth);
+                slope=0;
+                return;
+            end
             rotation = [cos(referenceHeading),-sin(referenceHeading); ...
                 sin(referenceHeading),cos(referenceHeading)];
             localNormal = rotation.'*normal;

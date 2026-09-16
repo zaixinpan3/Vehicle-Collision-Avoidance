@@ -20,10 +20,14 @@ classdef constantCurvatureReferenceTest < matlab.unittest.TestCase
                 end
             end
         end
-        function aLateralStripCrossingTheCircleCenterIsRejected(testCase)
-            curve = localCurve();
-            testCase.verifyError(@() laneGeometry.referenceFrame(curve,30,3,401), ...
-                "collisionAvoidanceController:invalidReferenceCurve");
+        function theForwardChartBoundsOffsetsAcrossTheCircleCenter(testCase)
+            curve=localCurve();
+            frame=laneGeometry.referenceFrame(curve,30,3,401);
+            states=[27,33,27,33;-401,-401,401,401];
+            positions=laneGeometry.referencePose(states(1,:),states(2,:),curve);
+            mapped=frame.origin+[frame.tangent,frame.lateral]*states;
+            testCase.verifyLessThanOrEqual(max(abs(positions-mapped),[],2), ...
+                frame.positionErrorBound+1e-10);
         end
         function arcCoordinatesRoundTripAcrossSampleVertices(testCase)
             curve = localCurve();s = [1,20.03,20.11,55];d = [0,2,-4,1];

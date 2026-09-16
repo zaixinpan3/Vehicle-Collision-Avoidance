@@ -58,11 +58,6 @@ classdef ltvBicycleModel
             nodes = zeros(6,count+1); radii = nodes;
             nodes(:,1) = state; radii(:,1) = radius;
             cells = cell(count,1);
-            % The geometric-series remainder requires norm(A)*dt < 1.
-            cellCount = max(cfg.encounter.minimumCells,ceil(norm(a,inf)*h/0.9));
-            stateLimit = [model.lane.segmentStation(end)+model.lane.segmentLength(end); ...
-                cfg.model.lateralDomainRadius;cfg.model.headingDomainRadius; ...
-                cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
             inputLimit = [cfg.model.frontWheelSteeringAngleMaximum; ...
                 max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))];
             for index = 1:count
@@ -75,50 +70,48 @@ classdef ltvBicycleModel
                 end
             end
             % Initial-state columns let one template cover every held stage.
-            % Its arithmetic allowance uses the full declared state domain;
+            % Its arithmetic allowance uses the computed initial-state envelope;
             % the common radius encloses every stage's starting information box.
             radiusCap = max(radii(:,1:count),[],2);
+            initialLimit = max(abs(nodes(:,1:count)),[],2);
             currentTemplateKey = {a,b,c,h,cfg.encounter.taylorOrder, ...
-                stateLimit,inputLimit,radiusCap,cellCount};
+                initialLimit,inputLimit,radiusCap};
             if isempty(templateKey) || ~isequal(templateKey,currentTemplateKey)
                 augmentedB = [zeros(6),b];
                 initialMap = [eye(6),zeros(6,2)];
-                augmentedLimit = [stateLimit;inputLimit];
+                augmentedLimit = [initialLimit;inputLimit];
                 if exist("bicycleHeldIntervalKernelMex","file")==3
                     templateTubes = bicycleHeldIntervalKernelMex(a,augmentedB,c,initialMap,zeros(6,1),radiusCap, ...
-                        zeros(6,1),h,cfg.encounter.taylorOrder,stateLimit,augmentedLimit,zeros(6,1),cellCount);
+                        zeros(6,1),h,cfg.encounter.taylorOrder,augmentedLimit,zeros(6,1));
                 else
                     templateTubes = stateUncertainty.heldInterval(a,augmentedB,c,initialMap,zeros(6,1),radiusCap, ...
-                        zeros(6,1),h,cfg.encounter.taylorOrder,stateLimit,augmentedLimit,zeros(6,1),cellCount);
+                        zeros(6,1),h,cfg.encounter.taylorOrder,augmentedLimit,zeros(6,1));
                 end
                 templateKey = currentTemplateKey;
             end
             for index = 1:count
-                stageCells = cell(cellCount,1);
-                for indexCell = 1:cellCount
-                    tube = templateTubes(indexCell);
-                    stateMap = tube.map(:,1:6,:);
-                    tube.offset = tube.offset+reshape(pagemtimes(tube.map(:,1:6,:),nodes(:,index)),6,[]);
-                    tube.map = tube.map(:,7:8,:);
-                    endStateMap = tube.endMap(:,1:6);
-                    tube.endOffset = tube.endOffset+endStateMap*nodes(:,index);
-                    tube.endMap = tube.endMap(:,7:8);
-                    tube.localInputMap = tube.localInputMap(:,7:8,:);
-                    if parametric
-                        tube.endOffset = tube.endOffset+tube.endMap*inputs(:,index);
-                        tube.endMap = endStateMap*sensitivity(:,:,index) ...
-                            +tube.endMap*inputSensitivity(:,:,index);
-                        tube.offset = tube.offset+reshape(pagemtimes(tube.map,inputs(:,index)),6,[]);
-                        tube.map = pagemtimes(stateMap,sensitivity(:,:,index)) ...
-                            +pagemtimes(tube.map,inputSensitivity(:,:,index));
-                    end
-                    tube.stage = index;
-                    tube.start = (index-1)*h+(indexCell-1)*h/cellCount;
-                    tube.duration = h/cellCount;
-                    tube.time = tube.start+(0:cfg.encounter.taylorOrder+1)*tube.duration/(cfg.encounter.taylorOrder+1);
-                    stageCells{indexCell} = tube;
+                tube = templateTubes;
+                stateMap = tube.map(:,1:6,:);
+                tube.offset = tube.offset+reshape(pagemtimes(tube.map(:,1:6,:),nodes(:,index)),6,[]);
+                tube.map = tube.map(:,7:8,:);
+                endStateMap = tube.endMap(:,1:6);
+                tube.endOffset = tube.endOffset+endStateMap*nodes(:,index);
+                tube.endMap = tube.endMap(:,7:8);
+                tube.localInputMap = tube.localInputMap(:,7:8,:);
+                if parametric
+                    tube.endOffset = tube.endOffset+tube.endMap*inputs(:,index);
+                    tube.endMap = endStateMap*sensitivity(:,:,index) ...
+                        +tube.endMap*inputSensitivity(:,:,index);
+                    tube.offset = tube.offset+reshape(pagemtimes(tube.map,inputs(:,index)),6,[]);
+                    tube.map = pagemtimes(stateMap,sensitivity(:,:,index)) ...
+                        +pagemtimes(tube.map,inputSensitivity(:,:,index));
                 end
-                cells{index} = vertcat(stageCells{:});
+                tube.stage = index;
+                tube.start = (index-1)*h;
+                tube.duration = h;
+                degree = size(tube.offset,2)-1;
+                tube.time = tube.start+(0:degree)*tube.duration/degree;
+                cells{index} = tube;
             end
             prediction = struct("stageCount",count,"nodeCount",count+1,"planCount",2, ...
                 "fixedInputs",inputs,"fixedStates",nodes,"initialErrorBound",radii, ...
@@ -166,49 +159,6 @@ classdef ltvBicycleModel
                 components = struct("aerodynamicForce", aerodynamic, ...
                     "rollingResistanceForce", rolling);
             end
-        end
-
-        function [matrix, offset, stageRows, stageOffset] = slipRows(prediction, model)
-        %ltvBicycleModel.slipRows Hard slip-angle model domains, without axle friction limits.
-        % Coefficients act on [s,d,ePsi,vx,vy,r,deltaF,beta]. Each robust row charges
-        % the support of the same state box used by prediction and geometry.
-            cfg = model.cfg;
-            limit = double(cfg.model.slipAngleMaximum(:));
-            if isscalar(limit)
-                limit = repmat(limit, 2, 1);
-            end
-            if numel(limit) ~= 2 || ~isreal(limit) || any(~isfinite(limit)) ...
-                    || any(limit <= 0.0) || any(limit >= pi/2)
-                error("collisionAvoidanceController:invalidConfiguration", ...
-                    "model.slipAngleMaximum must contain positive limits below pi/2.");
-            end
-            stageCount = prediction.stageCount;
-            controlCount = size(prediction.egoStateMatrix, 2);
-            stageRows = zeros(4, 8, stageCount);
-            stageOffset = -ones(4, stageCount);
-            speed = max(prediction.scheduleSpeedProfile(1:stageCount), cfg.model.scheduleSpeedFloor);
-            inverseSpeed = reshape(1.0./speed, 1, 1, []);
-            signs = [1.0; -1.0; 1.0; -1.0]./repelem(limit, 2);
-            stageRows(:, 5, :) = signs.*inverseSpeed;
-            stageRows(:, 6, :) = signs.*[cfg.vehicle.lf; cfg.vehicle.lf; ...
-                -cfg.vehicle.lr; -cfg.vehicle.lr].*inverseSpeed;
-            stageRows(1:2, 7, :) = -signs(1:2).*ones(1, 1, stageCount);
-            if isfield(prediction, "egoStateErrorBound")
-                support = pagemtimes(abs(stageRows(:, 1:6, :)), ...
-                    reshape(prediction.egoStateErrorBound(:, 1:stageCount), 6, 1, []));
-                stageOffset = stageOffset+reshape(support, 4, stageCount);
-            end
-            mapped = pagemtimes(stageRows(:, 1:6, :), ...
-                prediction.egoStateMatrix(:, :, 1:stageCount));
-            for stageIdx = 1:stageCount
-                inputRange = 2*stageIdx-1:2*stageIdx;
-                mapped(:, inputRange, stageIdx) = mapped(:, inputRange, stageIdx) ...
-                    + stageRows(:, 7:8, stageIdx);
-            end
-            matrix = reshape(permute(mapped, [1, 3, 2]), [], controlCount);
-            mappedOffset = pagemtimes(stageRows(:, 1:6, :), ...
-                reshape(prediction.egoStateOffset(:, 1:stageCount), 6, 1, []));
-            offset = reshape(reshape(mappedOffset, 4, [])+stageOffset, [], 1);
         end
 
         function derivative = fialaWorldDynamics(state,input,cfg)
@@ -450,9 +400,6 @@ classdef ltvBicycleModel
                     stageStates(:,1:linearizedCount),model.linearizationInputs(:,1:linearizedCount),schedule.curvature(1:linearizedCount), ...
                     kernelCfg,model.longitudinalAccelerationBias,baseRate,h);
             end
-            stateLimit = [model.lane.segmentStation(end)+model.lane.segmentLength(end); ...
-                cfg.model.lateralDomainRadius; cfg.model.headingDomainRadius; ...
-                cfg.model.speedMaximum; cfg.model.lateralVelocityMaximum; cfg.model.yawRateMaximum];
             inputLimit = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
                 max(abs([cfg.actuation.brakingRatioMinimum, cfg.actuation.brakingRatioMaximum]))], count, 1);
             cells = cell(count, 1);
@@ -523,32 +470,27 @@ classdef ltvBicycleModel
                 prediction.stageMatrixA(:, :, stage) = exact(1:6, 1:6);
                 prediction.stageMatrixB(:, :, stage) = exact(1:6, 7:8);
                 prediction.stageAffine(:, stage) = exact(1:6, 9);
-                cellCount = max(cfg.encounter.minimumCells, ceil(2*norm(a, inf)*h));
-                dt = h/cellCount;
                 heldMap = zeros(6, planCount);
                 heldMap(:, 2*stage-1:2*stage) = b;
                 if exist("bicycleHeldIntervalKernelMex","file")==3
                     stageTubes = bicycleHeldIntervalKernelMex(a,heldMap,c,map,offset,radius, ...
-                        rate,h,cfg.encounter.taylorOrder,stateLimit,inputLimit,numericalRadius,cellCount);
+                        rate,h,cfg.encounter.taylorOrder,inputLimit,numericalRadius);
                 else
                     stageTubes = stateUncertainty.heldInterval(a,heldMap,c,map,offset,radius, ...
-                        rate,h,cfg.encounter.taylorOrder,stateLimit,inputLimit,numericalRadius,cellCount);
+                        rate,h,cfg.encounter.taylorOrder,inputLimit,numericalRadius);
                 end
-                stageCells = cell(cellCount, 1);
-                for cellIndex = 1:cellCount
-                    tube = stageTubes(cellIndex);
-                    tube.localInputMap = tube.localInputMap(:,2*stage-1:2*stage,:);
-                    tube.stage = stage;
-                    tube.start = (stage-1)*h+(cellIndex-1)*dt;
-                    tube.duration = dt;
-                    tube.time = tube.start+(0:cfg.encounter.taylorOrder+1)*dt/(cfg.encounter.taylorOrder+1);
-                    stageCells{cellIndex} = tube;
-                    map = tube.endMap;
-                    offset = tube.endOffset;
-                    radius = tube.endRadius;
-                    numericalRadius = tube.endNumericalRadius;
-                end
-                cells{stage} = vertcat(stageCells{:});
+                tube = stageTubes;
+                tube.localInputMap = tube.localInputMap(:,2*stage-1:2*stage,:);
+                tube.stage = stage;
+                tube.start = (stage-1)*h;
+                tube.duration = h;
+                degree = size(tube.offset,2)-1;
+                tube.time = tube.start+(0:degree)*h/degree;
+                cells{stage} = tube;
+                map = tube.endMap;
+                offset = tube.endOffset;
+                radius = tube.endRadius;
+                numericalRadius = tube.endNumericalRadius;
                 prediction.egoStateMatrix(:, :, stage+1) = map;
                 prediction.egoStateOffset(:, stage+1) = offset;
                 prediction.egoStateErrorBound(:, stage+1) = radius;

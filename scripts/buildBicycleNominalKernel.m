@@ -47,12 +47,12 @@ function information = buildBicycleNominalKernel()
     file = fopen(wrapper,"w");
     assert(file>=0,"buildBicycleNominalKernel:writeFailed","Cannot create generated adapter.");
     cleanup = onCleanup(@() fclose(file));
-    fprintf(file,"function tubes = bicycleHeldIntervalKernel(a,b,c,map,x,r,q,h,p,xMax,uMax,n,cells)\n");
-    fprintf(file,"tubes = stateUncertainty.heldInterval(a,b,c,map,x,r,q,h,p,xMax,uMax,n,cells);\nend\n");
+    fprintf(file,"function tubes = bicycleHeldIntervalKernel(a,b,c,map,x,r,q,h,p,uMax,n)\n");
+    fprintf(file,"tubes = stateUncertainty.heldInterval(a,b,c,map,x,r,q,h,p,uMax,n);\nend\n");
     clear cleanup;
     types = {zeros(6),coder.typeof(0,[6,Inf],[false,true]),zeros(6,1), ...
         coder.typeof(0,[6,Inf],[false,true]),zeros(6,1),zeros(6,1),zeros(6,1),0,0, ...
-        zeros(6,1),coder.typeof(0,[Inf,1],[true,false]),zeros(6,1),0};
+        coder.typeof(0,[Inf,1],[true,false]),zeros(6,1)};
     clear bicycleHeldIntervalKernelMex;
     codegen("-config",settings,wrapper,"-args",types,"-o", ...
         fullfile(output,"bicycleHeldIntervalKernelMex"),"-d",fullfile(output,"generatedHeldInterval"));

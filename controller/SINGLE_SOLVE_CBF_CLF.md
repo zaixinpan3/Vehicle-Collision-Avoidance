@@ -1,6 +1,6 @@
 # Predictive safety with finite convex admission branches
 
-The format-28 controller retains a complete finite input plan, swept rectangle
+The format-29 controller retains a complete finite input plan, swept rectangle
 collision certificate, finite confirmed exit and a permanent terminal
 information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
@@ -40,13 +40,13 @@ input or terminal law is never executed as a fallback.
 
 The terminal set is a product of disks in the stable modal coordinates of
 the same sampled LQR closed-loop map. Its component radii satisfy robust
-contraction, Bernstein hold-domain/slip/input inequalities and finite slew
-limits. The finite plan's final information box must lie in this set and satisfy
+contraction, held-input amplitude inequalities and finite slew limits.
+State and slip bounds are not imposed. The finite plan's final information box must lie in this set and satisfy
 robust transition slew to every possible conditioned terminal feedback input.
 
 The sensing limit is initialized from the admitted ego measurement enclosure
-and retained. A curved reference uses a uniform radial/chart conversion over
-the declared lateral domain. Future published measurement bounds must remain
+and retained. A curved reference converts the current Cartesian measurement
+box to a declared Frenet radius limit without imposing a lateral state domain. Future published measurement bounds must remain
 within it. Finite prediction never assumes a favorable future measurement
 reset. The local terminal problem retains true-state modal membership as well as
 the measured box; it does not require each later rectangular hull to lie
@@ -55,7 +55,7 @@ on future actual measurements. Increasing this bound is a changed contract.
 
 The permanent reference is an analytically continued straight line or constant-
 curvature curve with no physical road boundaries, matching the current
-no-road-boundary experiment specification. Model domains remain hard. Finite
+no-road-boundary experiment specification. Only actuator amplitude/slew and the collision/terminal certificates are hard. Finite
 centerline samples and analytic arc length no longer cause projection clipping
 at their display endpoints. Curved station measurements unwrap about the
 carried prediction. A finite physical road, arbitrary polyline corner, or
@@ -72,11 +72,11 @@ For `N` holds the decision is `[U; delta]` and the objective is
 \]
 
 The first-hold CLF and five terminal modal inequalities are SOC constraints. All
-collision, domain, slip, actuator and slew rows are hard. The absolute target
+collision, actuator and slew rows are hard. The absolute target
 exit deadline is preserved while any admitted target remains active.
 
-The returned format-28 state contains the plan, verified inherited affine
-bounds and terminal cone, exact nominal nodes, uncertainty boxes, cell
+The returned format-29 state contains the plan, verified inherited affine
+bounds and terminal cone, exact nominal nodes, uncertainty boxes, whole-hold
 geometry, stable target identities, common generator and permanent terminal
 certificate. Earlier state formats must be reset.
 
@@ -137,7 +137,7 @@ curvature/metric or reference needs a separate switching analysis.
 For any finite physical input satisfying the hard constraints, a finite
 nonnegative slack can satisfy the CLF cone. Thus the CLF no longer excludes a
 physically feasible input merely because it would increase tracking error.
-Hard obstacle, domain and actuator constraints can still conflict at new
+Hard obstacle and actuator constraints can still conflict at new
 admission. After admission, the predictive and invariant-set construction
 establishes successor feasibility; CLF slack preserves that feasible family.
 A failed numerical solve still stops control.
