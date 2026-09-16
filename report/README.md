@@ -8,7 +8,7 @@ Latest implementation and validation: [Distance-dual-only control after removing
 
 Latest runtime assessment: [Real-time feasibility, active-encounter bottlenecks and equivalent row-reduction benchmark, September 16, 2026](REALTIME_FEASIBILITY_20260916.md).
 
-Latest diagnosis: [Verified nonlinear oncoming avoidance exists despite the rejected admission constraints, September 16, 2026](ONCOMING_AVOIDANCE_WITNESS_20260916.md).
+Latest diagnosis: [Stationary and oncoming distance-dual initialization failures and current feasible witnesses, September 16, 2026](DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md).
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
@@ -18,6 +18,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Ordinary-distance degeneracy, first-admission failure and current hard-feasible witnesses | [DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md](DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md) |
 | NRMM estimator: tracking accuracy, startup/reacquisition peaks, uncertainty and runtime | [NRMM_ESTIMATOR_EVALUATION_20260916.md](NRMM_ESTIMATOR_EVALUATION_20260916.md) |
 | Distance-dual-only cleanup, explicit admission failures and current regression results | [DISTANCE_DUAL_ONLY_RESULTS_20260916.md](DISTANCE_DUAL_ONLY_RESULTS_20260916.md) |
 | Distance-dual adoption, initialization, recursive inclusion and straight-scene validation | [DISTANCE_DUAL_ADOPTION_20260916.md](DISTANCE_DUAL_ADOPTION_20260916.md) |
