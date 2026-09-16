@@ -4,6 +4,8 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest implementation and validation: [Recursive feasibility closure, same-model robust terminal set and successor validation, September 15, 2026](RECURSIVE_FEASIBILITY_CLOSURE_20260915.md).
 
+Latest diagnosis: [Oncoming first-admission failure: fixed lateral separation conflicts with heading/slip limits, September 16, 2026](ONCOMING_ADMISSION_DIAGNOSIS_20260916.md).
+
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
 Latest failure analysis: [Single-hold infeasibility, shared uncertainty and passing geometry](SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md).
@@ -12,6 +14,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Oncoming first-admission LP ablations and numerical infeasibility certificate | [ONCOMING_ADMISSION_DIAGNOSIS_20260916.md](ONCOMING_ADMISSION_DIAGNOSIS_20260916.md) |
 | Complete conditional recursive-feasibility construction and straight-scene validation | [RECURSIVE_FEASIBILITY_CLOSURE_20260915.md](RECURSIVE_FEASIBILITY_CLOSURE_20260915.md) |
 | Predictive continuation restoration, carried feasibility, 30 s straight trials and runtime limits | [PREDICTIVE_CONTINUATION_RESTORATION_20260915.md](PREDICTIVE_CONTINUATION_RESTORATION_20260915.md) |
 | Single-hold decay-row obstructions, uncertainty correlation and blocked passing geometry | [SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md](SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md) |
