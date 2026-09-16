@@ -1,8 +1,7 @@
 # Predictive CBF and soft CLF controller
 
-Current implementation, September 16, 2026: the format-30 controller uses
-distance-dual convexification, with a finite conservative family for initial
-admission when the dual-directed problem is unavailable or infeasible. It
+Current implementation, September 16, 2026: the format-31 controller uses
+distance-dual convexification as its sole collision-convexification method. It
 retains predictive continuation across active encounters, confirmed partial
 or full target release, and prediction exhaustion. The terminal information
 set uses the same held affine generator as online prediction. The CLF retains
@@ -19,16 +18,15 @@ Admission has no selected maneuver side or prescribed lateral trajectory.
 Li et al.'s distance dual supplies continuous separating directions at computed
 anchor poses. Those directions enter the complete robust swept constraints;
 collision remains hard. See [DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
-When initialization is needed, each cell-target pair and each finite-exit condition has a finite set of
-geometric directions. Integer branch-and-bound with lazy constraint generation
-searches their assignments. Every accepted assignment is solved as a complete
-convex problem and independently certified. Infeasible approximations and
-unfinished searches are distinct outcomes. No claim of global performance
+Every fresh anchor midpoint must yield a valid distance-dual direction before
+the hard trajectory SOCP is built. Overlap/contact makes ordinary distance zero;
+unavailable initialization stops control without claiming physical infeasibility.
+No direction-grid enumeration, integer search or alternate initializer remains.
+The stationary and oncoming scenarios that previously depended on finite
+initialization must therefore be assessed afresh. No claim of global performance
 optimality or complete coverage of all physically safe trajectories is made.
-See [FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md) for the approximation,
-branch count, search logic, sound pruning and limitations.
 
-After admission, first preserve the actual accepted branch: substitute the
+After admission, first preserve the actual accepted constraint family: substitute the
 executed input in its affine family, retain the terminal cones and continuous
 swept enclosures, and condition successor information by inclusion. The
 resulting suffix supplies a feasible candidate for the next convex solve.
@@ -56,7 +54,7 @@ admission. Fresh target entry is a new feasibility obligation. The declared
 plant remains the zero-residual held affine model; separate nonlinear Fiala
 studies do not silently extend the online theorem.
 
-No command is issued after exhausted/incomplete search, failed convex solving
+No command is issued after unavailable distance geometry, failed convex solving
 or failed hard verification. Frame latency remains a separate requirement;
 allowing a longer offline search does not establish 100 ms operation.
 See [SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md) for the CLF derivation,

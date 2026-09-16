@@ -3,10 +3,9 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-Fresh admission first tries distance-dual geometry, with finite convex
-branches available for initialization. Each complete
-branch is an SOCP with a full input sequence and penalized first-hold CLF slack.
-Its format-30 state retains the complete prediction and terminal continuation.
+Fresh admission uses distance-dual geometry exclusively, followed by a hard
+trajectory SOCP with a full input sequence and penalized first-hold CLF slack.
+Its format-31 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -18,13 +17,13 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public target-array entry; finite admission search, one inherited-branch solve per successor, complete witness storage, no command after failed search |
+| `collisionAvoidanceController.m` | Public target-array entry; distance-dual admission, one inherited-family solve per successor, complete witness storage, no command after failed search |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard swept/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
-| `solveHardCbfClf.m` | Finite directional families (`buildBranches`), lazy integer assignment search with complete SOCP checks (`branches`), convex solving (`constrained`) and independent verification (`certify`) |
-| `avoidanceSafetyGeometry.m` | Swept separation (`build`), online distance duals (`distanceDual`, `distanceDualNormals`), offline continuous normal proposals (`optimizeNormals`), rectangle distance and shared numeric kernels |
+| `solveHardCbfClf.m` | Convex trajectory solving (`constrained`) and independent verification (`certify`) |
+| `avoidanceSafetyGeometry.m` | Swept separation (`build`), online distance duals (`distanceDual`, `distanceDualNormals`), rectangle distance and shared numeric kernels |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
@@ -42,9 +41,10 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-30 predictive certificate. The online path calls
-`formulateAvoidanceProblem(model)` and `solveHardCbfClf.branches`. Fresh
-admission may require several convex/integer solves; accepted successors
+format-31 predictive certificate. The online path calls
+`formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained`. Fresh
+admission uses distance queries and a hard trajectory solve; an infeasible
+trajectory may be retried at a longer horizon by the same method. Accepted successors
 retain one feasible convex family, optionally replacing collision rows through
 a witness-preserving distance-dual update. No geometric maneuver template is generated. A valid active encounter inherits the accepted constraint family by
 eliminating the executed input. The terminal law is a mathematical witness;

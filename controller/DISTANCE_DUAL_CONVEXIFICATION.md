@@ -1,6 +1,6 @@
 # Distance-dual convexification with a retained safety witness
 
-Current implementation: controller format 30, September 16, 2026.
+Current implementation: controller format 31, September 16, 2026.
 
 ## Source and scope
 
@@ -46,8 +46,7 @@ For positive distance, define the proposed unit normal
 \(n=A^\top\lambda^*/\|A^\top\lambda^*\|_2\).
 The implementation solves an eight-variable SOCP with the existing native
 solver. It compares against independent exact rectangle geometry in tests.
-Directions are continuous; they are not rounded to the eight initialization
-directions.
+Directions are continuous; no finite direction grid is constructed.
 
 For an interior point, the ordinary distance is zero and lambda=0 is optimal.
 There is no usable positive-separation direction from that solution. The
@@ -83,32 +82,35 @@ CLF uses a slack, with its existing squared penalty. The exit direction and
 absolute encounter-completion deadline are not changed by this update.
 The final independent hard-certificate check is unchanged.
 
-## First admission and overlap initialization
+## First admission and unavailable initialization
 
-A usable distance-dual candidate is tried first. A complete feasible solve
-is independently certified and can be admitted without integer search.
-If a midpoint overlaps, or the complete hard dual-directed program is
-infeasible, the existing finite conservative branch family initializes a
-safe witness. It is constructed lazily, only when required. Solver errors,
-numerical incompleteness and expired deadlines do not count as infeasibility
-and do not authorize execution of any unchecked candidate.
+Distance-dual geometry is the sole online collision convexification. At fresh
+admission the controller computes the cruise-input anchor, its whole-hold
+frames and distance-dual normals before constructing collision rows. Every
+midpoint must supply a valid normal. Overlap or contact yields zero ordinary
+distance and no usable direction; the controller reports initialization failure
+before invoking the hard trajectory solver. A numerical distance-solver failure
+also supplies no direction. The error reports the number of overlapping/touching
+midpoints and the minimum anchor signed distance; it does not claim physical
+infeasibility or infeasibility of a trajectory problem that was never solved.
 
-This retains the user's finite-search authorization and addresses a concrete
-initialization limitation of ordinary distance duals. It is not a backup
-controller. Every issued command comes from the final verified predictive
-optimization. There is no claim that either local distance convexification
-or the finite conservative initializer finds every physically feasible path.
+When all normals are available, solve the complete hard trajectory SOCP and
+independently verify it. A proven infeasible trajectory program may trigger the
+existing finite horizon extension, using the same distance-dual method. Solver
+errors, iteration limits and expired deadlines terminate the call. There is no
+integer search, finite directional initializer, penetration-normal substitute,
+collision slack or alternate controller. The configured prediction horizon is
+not a maneuver template and the CLF/input objective is unchanged.
 
-The integer initializer's search objective favors terminal path station,
-\(\max_U e_s^\top z_N(U)\), subject to the same finite family and physical
-constraints. This affine ranking does not change the feasible family, prune
-extra branches, prescribe a maneuver or modify the final SOCP's CLF/input
-objective. The initializer still stops at the first verified complete feasible
-branch; it does not certify global performance optimality. Pure zero-cost
-integer feasibility can select an encounter exit obtained by reversing away
-from a stationary target. Subsequent local dual updates can then remain in
-that retreating solution, producing repeated departure and re-entry. Progress
-ranking is an initialization remedy, not a new safety or convergence theorem.
+This removal intentionally narrows first-admission capability. The previous
+stationary/oncoming successes used the removed initializer and are not evidence
+of successful admission by this implementation. An overlap-capable initialization
+within the selected method remains unresolved. Failed initialization emits no
+command and terminates the scenario, as required by the execution contract.
+
+The obsolete execution-policy selector and finite direction count are removed,
+not accepted as aliases. Stored controller format 31 rejects earlier states so
+that a previously initialized constraint family cannot enter through state reuse.
 
 ## Recursive-feasibility preservation
 
@@ -142,7 +144,7 @@ premises remain those in [TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md).
 ## Runtime interpretation
 
 Distance SOCPs and the trajectory SOCP are separate work. Metadata counts
-both, as well as any integer initialization calls. A full-frame 100 ms claim
+both. No integer solver is called. A full-frame 100 ms claim
 requires measuring their sum with formulation and verification. A faster
 distance calculation or one successful frozen-frame solve does not establish
 that bound. Experimental results belong under `report/`.

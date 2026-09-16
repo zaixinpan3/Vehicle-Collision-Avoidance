@@ -1,6 +1,6 @@
 # Recursive feasibility and encounter safety of the implemented controller
 
-This is the current format-30 proof. It replaces the previous stopping-tail
+This is the current format-31 proof. It replaces the previous stopping-tail
 argument. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
@@ -346,13 +346,15 @@ Before invoking the optimizer, it checks the candidate against **every row
 and all CLF and terminal cones of the proposed new program**. Only a program containing this
 candidate may replace the inherited one. Otherwise the inherited program is
 used. This is pre-solve selection of an optimization problem, not selection
-of an actuator command after solver failure. An admitted retained branch uses
+of an actuator command after solver failure. An admitted retained family uses
 one trajectory optimization per sample, preceded by distance-dual geometry
-queries when targets are active. Fresh admission may search multiple convex branches, as specified in
-[FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md). The theorem starts
-only after one complete branch has passed the original hard certificate;
-its affine family and terminal cones are inherited before any optional
-witness-preserving collision-row replacement.
+queries when targets are active. Fresh admission uses the same distance-dual
+method; no finite branch search remains. The theorem starts only after one
+complete convex program passes the original hard certificate. An overlapping
+initial anchor may prevent obtaining this first witness and lies outside that
+premise; recursive feasibility does not prove universal admission. Its affine
+family and terminal cones are inherited before any optional witness-preserving
+collision-row replacement. Format 31 rejects earlier stored certificates.
 
 ### Empty suffix after confirmed encounter completion
 

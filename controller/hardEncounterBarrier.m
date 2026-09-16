@@ -26,7 +26,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=30
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=31
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -188,7 +188,6 @@ classdef hardEncounterBarrier
                 trial=model;trial.encounters=target;
                 [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
                 if ~isempty(proposed),direction=proposed;end
-                if isfield(model,'completionDirections'),direction=model.completionDirections(:,index);end
                 [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
                 matrix(index,:)=row*finalMap;bound(index)=limit-row*finalOffset;
                 directions(:,index)=direction;rows(index,:)=row;limits(index)=limit;

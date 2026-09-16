@@ -1,6 +1,6 @@
 # Predictive safety with distance-dual convexification
 
-The format-30 controller retains a complete finite input plan, swept rectangle
+The format-31 controller retains a complete finite input plan, swept rectangle
 collision certificate, finite confirmed exit and a permanent terminal
 information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
@@ -29,14 +29,14 @@ or a nonlinear physical-vehicle claim.
    optimizer chooses the command.
 
 An admitted active encounter uses distance-dual queries and one trajectory
-optimization of its retained or witness-preserving updated
-branch per frame. Fresh admission tries distance-dual geometry first and,
-when necessary, searches the finite polyhedral family
-described in [FINITE_CONVEX_BRANCHES.md](FINITE_CONVEX_BRANCHES.md), using
-integer assignment search and complete convex subproblems. No prescribed
-lateral trajectory or maneuver side is used. Exhausted or incomplete search
-and failed independent hard-safety verification issue no command; a stored
-input or terminal law is never executed as a fallback.
+optimization of its retained or witness-preserving updated constraint family
+per frame. Fresh admission uses only distance-dual geometry. An overlapping or
+touching anchor has no positive-distance direction and stops admission before
+a trajectory solve; this is not a physical infeasibility conclusion. Finite
+branch enumeration, integer optimization and alternate initialization are absent.
+No prescribed lateral trajectory or maneuver side is used. Unavailable geometry,
+failed solving and failed independent hard-safety verification issue no command;
+a stored input or terminal law is never executed as a fallback.
 
 Distance-dual details and the complete-witness replacement condition are in
 [DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
@@ -80,7 +80,7 @@ The first-hold CLF and five terminal modal inequalities are SOC constraints. All
 collision, actuator and slew rows are hard. The absolute target
 exit deadline is preserved while any admitted target remains active.
 
-The returned format-30 state contains the plan, verified inherited affine
+The returned format-31 state contains the plan, verified inherited affine
 bounds and terminal cone, exact nominal nodes, uncertainty boxes, whole-hold
 geometry, stable target identities, common generator and permanent terminal
 certificate. Earlier state formats must be reset.

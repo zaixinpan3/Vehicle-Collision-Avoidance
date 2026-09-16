@@ -7,7 +7,7 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
     end
     methods (Test)
         function solverFailureStopsTheExperiment(testCase)
-            testCase.verifyError(@() runEncounterCertificateScenario(ForceSolverFailure=true), ...
+            testCase.verifyError(@() runEncounterCertificateScenario(ForceSolverFailure=true,DeadlineSeconds=inf), ...
                 "collisionAvoidanceController:optimizationFailed");
         end
         function everyCrossingSampleSolvesOneTrajectory(testCase)

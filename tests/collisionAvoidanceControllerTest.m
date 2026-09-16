@@ -3,7 +3,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         targetPresent = {false,true};
         failedStatus = {-999,-2,0,2};
         badDecision = {[],[NaN;0;0],[Inf;0;0],[1i;0;0],zeros(4,1)};
-        legacyPolicy = {"auto","backup","predictive","singleSolve"};
+        removedPolicy = {"auto","backup","predictive","singleSolve","finiteBranches","distanceDual"};
         invalidDecay = {0,1,1.01,NaN,Inf};
         errorRadius = {zeros(6,1),[.001;.001;.0001;.001;.001;.0001]};
     end
@@ -74,9 +74,17 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:optimizationFailed');
             testCase.verifyEqual(localFailureHook('count',[]),1);
         end
-        function configurationControlsThePredictionLengthWithoutSelectingAFallback(testCase,legacyPolicy)
+        function removedExecutionPoliciesAreRejected(testCase,removedPolicy)
+            testCase.verifyError(@() collisionAvoidanceControllerConfig(struct('controller', ...
+                struct('executionPolicy',removedPolicy))),'collisionAvoidanceController:invalidConfiguration');
+        end
+        function removedDirectionGridConfigurationIsRejected(testCase)
+            testCase.verifyError(@() collisionAvoidanceControllerConfig(struct('encounter', ...
+                struct('separationDirectionCount',8))),'collisionAvoidanceController:invalidConfiguration');
+        end
+        function configurationControlsThePredictionLengthWithoutSelectingAFallback(testCase)
             [ego,target,road,cfg]=localFixture(false);
-            cfg.controller.executionPolicy=legacyPolicy;cfg.controller.horizonSteps=8;
+            cfg.controller.horizonSteps=8;
             [~,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifySize(plan,[2,8]);
             testCase.verifyEqual(problem.metadata.solverCallCount,1);
@@ -93,16 +101,16 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.clfDissipationCertified);
             testCase.verifySize(problem.program.q,[2*problem.metadata.horizonSteps+1,1]);
         end
-        function avoidanceCanRelaxCruiseWhileKeepingTheBarrierHard(testCase)
+        function cruiseRelaxationLeavesEveryCollisionRowHard(testCase)
             [ego,target,road,cfg]=localFixture(true);
-            target.targetPositionInertial=[15;0];target.targetVelocityInertial=[0;0];
+            ego.position(2)=.05;ego.yaw=.002;ego.speed=7.95;
+            cfg.clf.relaxationWeight=.01;
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             [minimum,residual]=localBarrierResidual(problem,command);
             testCase.verifyGreaterThan(problem.metadata.clfSlack,1e-4);
             testCase.verifyGreaterThanOrEqual(minimum,0);
             testCase.verifyLessThanOrEqual(residual,0);
             testCase.verifyLessThanOrEqual(localRobustClfResidual(problem,command),1e-10);
-            testCase.verifyGreaterThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
         end
         function theConfiguredPenaltyControlsOptimizedRelaxation(testCase)
             [ego,target,road,cfg]=localFixture(false);

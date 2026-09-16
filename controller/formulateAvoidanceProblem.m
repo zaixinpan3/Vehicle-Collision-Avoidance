@@ -76,12 +76,29 @@ function [program,prediction,clf] = localFormulate(model)
     if isempty(cruise),cruise=ltvBicycleModel.sampledCruise(model);end
     model.cruiseCertificate=cruise;
     inherited = ~isempty(model.carriedWitness);
+    dual=struct('available',false,'overlappingMidpoints',0, ...
+        'distanceSolverCalls',0,'minimumAnchorDistance',Inf,'maximumDistanceGap',0, ...
+        'used',false,'witnessPreserved',false);
     if inherited
         cruise = model.carriedWitness.program.cruiseCertificate;
         [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model);
     else
         [prediction,anchor] = hardEncounterBarrier.predict(model,cruise);
         model.anchorPlan = anchor;
+        if ~isempty(model.encounters)
+            [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
+            [normals,dual]=avoidanceSafetyGeometry.distanceDualNormals(model,prediction,anchor,frames);
+            if ~dual.available
+                error('collisionAvoidanceController:optimizationFailed', ...
+                    ['Distance-dual initialization is unavailable at t=%.9g s: ' ...
+                    '%d overlapping or touching anchor midpoints, minimum signed distance %.9g m. ' ...
+                    'No complete hard trajectory problem was solved and no command was issued.'], ...
+                    model.stateTime,dual.overlappingMidpoints,dual.minimumAnchorDistance);
+            end
+            prediction.geometryAnchor=anchor;prediction.geometryFrames=frames;
+            prediction.geometryNominal=nominal;prediction.separationNormals=normals;
+            dual.used=true;
+        end
         geometry = avoidanceSafetyGeometry.build(model,prediction);
         [terminalMatrix,terminalBound,terminal,completion,terminalCone] = ...
             hardEncounterBarrier.completionRows(model,prediction,geometry);
@@ -191,22 +208,13 @@ function [program,prediction,clf] = localFormulate(model)
     program.terminalOptimization=isfield(model,'terminalOptimization') && model.terminalOptimization;
     program.feasibleWitness=localCompleteSlack(program,anchor);
     if inherited,program.inheritedWitness=program.feasibleWitness;end
-    program.dualConvexification=struct('available',false,'overlappingMidpoints',0, ...
-        'distanceSolverCalls',0,'minimumAnchorDistance',Inf,'maximumDistanceGap',0, ...
-        'used',false,'witnessPreserved',false);
-    if ~isempty(model.encounters)
+    if inherited && ~isempty(model.encounters)
         [candidate,dual]=localDualGeometry(model,prediction,program,anchor);
-        if dual.available && (~inherited || localWitnessFeasible(candidate,localCompleteSlack(candidate,anchor)))
-            program=candidate;dual.used=true;dual.witnessPreserved=inherited;
-        end
-        program.dualConvexification=dual;
-        if ~inherited
-            % Search the finite family only when the distance-dual candidate
-            % is unavailable or its complete hard trajectory problem fails.
-            model.anchorPlan=anchor;
-            program.admissionGeometry=struct('model',model,'prediction',prediction);
+        if dual.available && localWitnessFeasible(candidate,localCompleteSlack(candidate,anchor))
+            program=candidate;dual.used=true;dual.witnessPreserved=true;
         end
     end
+    program.dualConvexification=dual;
 end
 
 function [candidate,information]=localDualGeometry(model,prediction,program,anchor)

@@ -34,12 +34,12 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % Fresh admission searches finite convex branches. Accepted continuations
+    % Distance-dual geometry defines the sole collision convexification. Continuations
     % need one convex solve; the terminal policy remains a certificate only.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
-        "minimumHorizonSteps",4,"executionPolicy","distanceDual","stationTrustRadius",2.0);
+        "minimumHorizonSteps",4,"stationTrustRadius",2.0);
     cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
-    cfg.encounter = struct("taylorOrder",6,"separationDirectionCount",8, ...
+    cfg.encounter = struct("taylorOrder",6, ...
         "numericalMargin",1.0e-6,"maximumCarriedMargin",1.0,"inputRateWeight",0.02);
 
     % Vehicle geometry and inertia.
@@ -186,11 +186,6 @@ end
 
 function localValidate(cfg)
     validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
-    if ~isscalar(string(cfg.controller.executionPolicy)) ...
-            || ~any(string(cfg.controller.executionPolicy)==["distanceDual","finiteBranches","singleSolve","auto","predictive","backup"])
-        error("collisionAvoidanceController:invalidConfiguration", ...
-            "Unsupported executionPolicy; accepted aliases use distance-dual convexification with finite initialization.");
-    end
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0
@@ -306,11 +301,6 @@ function localValidate(cfg)
     end
     localValidateNonnegativeScalar(cfg.solver.maxIterations, "solver.maxIterations");
     validateattributes(cfg.solver.frameDeadlineSeconds,{'double'},{'scalar','real','positive'});
-    validateattributes(cfg.encounter.separationDirectionCount,{'double'}, ...
-        {'scalar','integer','finite','>=',4});
-    assert(mod(cfg.encounter.separationDirectionCount,4)==0, ...
-        'collisionAvoidanceController:invalidConfiguration', ...
-        'The finite direction count must be a positive multiple of four.');
     validateattributes(cfg.solver.rowGeneration,{'logical'},{'scalar'});
     if ~ismember(string(cfg.solver.witnessVerification),["none","shiftedRows","rebuilt"])
         error("collisionAvoidanceController:invalidConfiguration", ...
