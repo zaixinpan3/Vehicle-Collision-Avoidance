@@ -2,10 +2,17 @@ function result = runOnlineNrmmComplexManeuverScenario(varargin)
 % runOnlineNrmmComplexManeuverScenario Reproducible open-loop estimator scenario.
 % Options: Plot, Report, Duration (12 s), Seed (7), NoiseModel ('none' or
 % 'boundedUniform'), Config (nrmmTrackingConfig), DropoutIntervals (N-by-2 s),
-% and TargetMotion ('retained' or 'varying'). Initial estimates use documented
+% TargetMotion ('retained', 'varying' or 'laneChange'), and EgoManeuver
+% ('retained', 'straight' or 'aggressive'). Initial estimates use documented
 % offsets; metrics discard the first 2 s. The retained truth and random draws
 % are unchanged from the paired high-gain baseline. The varying case declares
-% changing geometric A and curvature and measures response lag.
+% changing geometric A and curvature and measures response lag; laneChange
+% applies one sinusoidal curvature pulse (zero net heading change).
+% Scenario-campaign options, all defaulting to the retained values:
+% TargetInitialPosition (1-by-2 m), TargetInitialHeading (rad),
+% TargetInitialSpeed (m/s), NoiseScale (multiplies every bounded draw, so a
+% value above 1 exceeds the declared sensor bounds) and InitialOffsetScale
+% (multiplies the documented initial estimate offsets).
 % Lyapunov ultimate bounds are reported separately for the continuous model;
 % they are not asserted as certified sample-by-sample digital error radii.
 
@@ -21,7 +28,7 @@ function result = runOnlineNrmmComplexManeuverScenario(varargin)
         design.yaw.courseModel.rearAxleDistance, ...
         design.target.domain.rearAxleDistance, options);
     measurements = localMeasurements(truth, cfg, options);
-    initial = localInitialEstimate(truth);
+    initial = localInitialEstimate(truth, options);
     estimate = localRunObserver(time, measurements, initial, cfg, design, options);
     metrics = localMetrics(truth, estimate, time, transientDuration, cfg, options);
     metrics.curvatureLagSeconds = localCurvatureLag(truth,estimate,options);
@@ -67,13 +74,8 @@ function truth = localTruth(time, ...
 % nonzero. Target: VCdot = AC (constant), betaC constant, and
 % psiCdot = VC*sin(betaC)/lrC, so [rho; q; s] follows the observer model.
 
-    egoSpeed = 12.0+1.2*sin(0.25*time);
-    egoSpeedDot = 0.30*cos(0.25*time);
-    egoSpeedDdot = -0.075*sin(0.25*time);
-    egoYawRate = 0.12*sin(0.35*time);
-    egoYawAcceleration = 0.042*cos(0.35*time);
-    egoYawJerk = -0.0147*sin(0.35*time);
-    egoYaw = (0.12/0.35)*(1.0-cos(0.35*time));
+    [egoSpeed,egoSpeedDot,egoSpeedDdot,egoYaw,egoYawRate, ...
+        egoYawAcceleration,egoYawJerk] = localEgoProfile(time,options.egoManeuver);
     normalizedYawRate = egoRearAxleDistance*egoYawRate./egoSpeed;
     normalizedYawRateDerivative = egoRearAxleDistance ...
         .* (egoYawAcceleration.*egoSpeed-egoYawRate.*egoSpeedDot) ...
@@ -112,11 +114,12 @@ function truth = localTruth(time, ...
             + egoSpeed.*egoCourseAcceleration).*egoCourseNormal;
 
     % Sharma target parameters (all constant by assumption).
-    targetInitialSpeed = 12.5;                        % m/s VC(0)
+    % Retained defaults: 12.5 m/s, heading 0.10 rad, position [25, 4] m.
+    targetInitialSpeed = options.targetInitialSpeed;  % m/s VC(0)
     targetScalarAcceleration = 0.08;                  % m/s^2 AC
     targetSideslip = 0.0064;                          % rad betaC
-    targetInitialHeading = 0.10;                      % rad psiC(0)
-    targetInitialPosition = [25.0, 4.0];              % m, inertial
+    targetInitialHeading = options.targetInitialHeading; % rad psiC(0)
+    targetInitialPosition = options.targetInitialPosition; % m, inertial
 
     targetSpeed = targetInitialSpeed+targetScalarAcceleration*time;
     targetHeading = targetInitialHeading ...
@@ -137,15 +140,15 @@ function truth = localTruth(time, ...
 
     targetCurvature = repmat(sin(targetSideslip)/targetRearAxleDistance,numel(time),1);
     scalarAccelerationTruth = repmat(targetScalarAcceleration,numel(time),1);
-    if options.targetMotion == "varying"
-        centre = options.duration/2;
+    if options.targetMotion ~= "retained"
+        profile = localTargetMotionProfile(options.targetMotion,options.duration, ...
+            targetScalarAcceleration,targetCurvature(1));
         initialCourse = targetInitialHeading+targetSideslip;
-        [~,trajectory] = ode113(@(t,x) localVaryingDerivative(t,x,centre,targetCurvature(1)), ...
+        [~,trajectory] = ode113(@(t,x) localProfileDerivative(t,x,profile), ...
             time,[targetInitialPosition.';initialCourse;targetInitialSpeed], ...
             odeset("RelTol",1.0e-11,"AbsTol",1.0e-12));
-        transition = 0.5*(1+tanh((time-centre)/0.2));
-        scalarAccelerationTruth = 0.08+0.6*transition;
-        targetCurvature = targetCurvature-0.007*transition;
+        scalarAccelerationTruth = profile.scalarAcceleration(time);
+        targetCurvature = profile.curvature(time);
         targetPosition = trajectory(:,1:2);
         targetCourse = trajectory(:,3);
         targetSpeed = trajectory(:,4);
@@ -193,11 +196,82 @@ function truth = localTruth(time, ...
         "targetTransformedState", targetTransformedState);
 end
 
-function derivative = localVaryingDerivative(time,state,centre,curvature)
-    transition = 0.5*(1+tanh((time-centre)/0.2));
-    acceleration = 0.08+0.6*transition;
-    curvature = curvature-0.007*transition;
-    derivative = [state(4)*cos(state(3));state(4)*sin(state(3));curvature*state(4);acceleration];
+function profile = localTargetMotionProfile(motion,duration,acceleration,curvature)
+% localTargetMotionProfile Time functions of scalar acceleration and curvature.
+%
+% varying: smooth 0.2 s tanh transition at mid-duration raising A by 0.6 m/s^2
+% and lowering curvature by 0.007 1/m. laneChange: one full sine period of
+% curvature with amplitude 0.005 1/m over 4 s starting at 4 s, so the heading
+% returns to its pre-maneuver value and the target shifts laterally by about
+% 2 m; the peak curvature rate is 0.005*2*pi/4 1/(m s). With the retained
+% base curvature 0.004 1/m the peak 0.009 1/m stays inside the 0.015 rad
+% sideslip domain (0.009375 1/m).
+    profile = struct("window",[NaN,NaN]);
+    switch motion
+        case "varying"
+            centre = duration/2;
+            transition = @(t) 0.5*(1+tanh((t-centre)/0.2));
+            profile.scalarAcceleration = @(t) acceleration+0.6*transition(t);
+            profile.curvature = @(t) curvature-0.007*transition(t);
+            profile.window = [centre-0.5,centre+1.5];
+            profile.curvatureRateMaximum = 0.0175;
+        case "laneChange"
+            start = 4.0;
+            period = 4.0;
+            amplitude = 0.005;
+            pulse = @(t) amplitude*sin(2*pi*(t-start)/period).*(t >= start & t <= start+period);
+            profile.scalarAcceleration = @(t) acceleration+zeros(size(t));
+            profile.curvature = @(t) curvature+pulse(t);
+            profile.window = [start-0.5,start+period+0.5];
+            profile.curvatureRateMaximum = amplitude*2*pi/period;
+        otherwise
+            error("runOnlineNrmmComplexManeuverScenario:invalidTargetMotion", ...
+                "TargetMotion must be 'retained', 'varying' or 'laneChange'.");
+    end
+end
+
+function derivative = localProfileDerivative(time,state,profile)
+    derivative = [state(4)*cos(state(3));state(4)*sin(state(3)); ...
+        profile.curvature(time)*state(4);profile.scalarAcceleration(time)];
+end
+
+function [speed,speedDot,speedDdot,yaw,yawRate,yawAcceleration,yawJerk] = ...
+        localEgoProfile(time,maneuver)
+% localEgoProfile Analytic ego speed and yaw profiles with exact derivatives.
+%
+% retained: the paired-baseline profile. straight: constant 12 m/s, zero yaw
+% rate. aggressive: 12 +/- 3 m/s speed swings and the retained slow turn plus
+% a 0.16 rad/s, 1.2 rad/s weave (peak yaw rate 0.28 rad/s, peak yaw
+% acceleration about 0.23 rad/s^2), inside the default ego domain.
+    switch maneuver
+        case "retained"
+            speed = 12.0+1.2*sin(0.25*time);
+            speedDot = 0.30*cos(0.25*time);
+            speedDdot = -0.075*sin(0.25*time);
+            yawRate = 0.12*sin(0.35*time);
+            yawAcceleration = 0.042*cos(0.35*time);
+            yawJerk = -0.0147*sin(0.35*time);
+            yaw = (0.12/0.35)*(1.0-cos(0.35*time));
+        case "straight"
+            speed = 12.0+zeros(size(time));
+            speedDot = zeros(size(time));
+            speedDdot = zeros(size(time));
+            yawRate = zeros(size(time));
+            yawAcceleration = zeros(size(time));
+            yawJerk = zeros(size(time));
+            yaw = zeros(size(time));
+        case "aggressive"
+            speed = 12.0+3.0*sin(0.5*time);
+            speedDot = 1.5*cos(0.5*time);
+            speedDdot = -0.75*sin(0.5*time);
+            yawRate = 0.12*sin(0.35*time)+0.16*sin(1.2*time);
+            yawAcceleration = 0.042*cos(0.35*time)+0.192*cos(1.2*time);
+            yawJerk = -0.0147*sin(0.35*time)-0.2304*sin(1.2*time);
+            yaw = (0.12/0.35)*(1.0-cos(0.35*time))+(0.16/1.2)*(1.0-cos(1.2*time));
+        otherwise
+            error("runOnlineNrmmComplexManeuverScenario:invalidEgoManeuver", ...
+                "EgoManeuver must be 'retained', 'straight' or 'aggressive'.");
+    end
 end
 
 function measurements = localMeasurements(truth, cfg, options)
@@ -221,13 +295,15 @@ function measurements = localMeasurements(truth, cfg, options)
             error("runOnlineNrmmComplexManeuverScenario:invalidNoiseModel", ...
                 "NoiseModel must be 'none' or 'boundedUniform'.");
     end
-    componentScale = 1.0/sqrt(2.0);
+    % NoiseScale = 1 realizes the declared bounds exactly; larger values
+    % deliberately violate them to probe degradation.
+    componentScale = options.noiseScale/sqrt(2.0);
     gpsPositionBound = componentScale ...
         * cfg.measurement.gps.positionNoiseMaximum;
     gpsVelocityBound = componentScale ...
         * cfg.measurement.gps.velocityNoiseMaximum;
     imuBound = componentScale*cfg.measurement.imu.noiseMaximum;
-    gyroscopeBound = cfg.measurement.gyroscope.noiseMaximum;
+    gyroscopeBound = options.noiseScale*cfg.measurement.gyroscope.noiseMaximum;
     radarBound = componentScale*cfg.measurement.radar.noiseMaximum;
 
     measurements = struct();
@@ -242,18 +318,20 @@ function measurements = localMeasurements(truth, cfg, options)
         truth.targetTransformedState(:, 1:2)+radarBound*unitNoise(:, 8:9);
 end
 
-function initial = localInitialEstimate(truth)
+function initial = localInitialEstimate(truth, options)
 % localInitialEstimate Truth plus the documented initialization offsets.
 %
-% The target q offset is below 1 m/s. The same offsets are used for the
-% improved high-gain observer and an independently versioned comparator.
+% The target q offset is below 1 m/s at unit scale. The same offsets are
+% used for the improved high-gain observer and an independently versioned
+% comparator; InitialOffsetScale multiplies every offset uniformly.
 
+    scale = options.initialOffsetScale;
     initial = struct( ...
-        "egoPosition", truth.egoPosition(1, :).'+[1.0; -0.8], ...
-        "egoYaw", truth.egoYaw(1)+0.03, ...
-        "egoBodyVelocity", [truth.egoSpeed(1); 0.0]+[0.5; -0.3], ...
+        "egoPosition", truth.egoPosition(1, :).'+scale*[1.0; -0.8], ...
+        "egoYaw", truth.egoYaw(1)+scale*0.03, ...
+        "egoBodyVelocity", [truth.egoSpeed(1); 0.0]+scale*[0.5; -0.3], ...
         "targetState", truth.targetTransformedState(1, :).' ...
-        + [1.0; -0.5; 0.5; 0.5; 0.2; -0.2]);
+        + scale*[1.0; -0.5; 0.5; 0.5; 0.2; -0.2]);
 end
 
 function estimate = localRunObserver(time, measurements, initial, cfg, design, options)
@@ -437,6 +515,10 @@ function metrics = localMetrics(truth, estimate, time, transientDuration, cfg, o
         metrics.truthOperatingDomainValid = metrics.truthOperatingDomainValid ...
             && cfg.target.model.scalarAccelerationRateMaximum >= 1.5 ...
             && cfg.target.model.curvatureRateMaximum >= 0.0175;
+    elseif options.targetMotion == "laneChange"
+        profile = localTargetMotionProfile("laneChange",options.duration,0,0);
+        metrics.truthOperatingDomainValid = metrics.truthOperatingDomainValid ...
+            && cfg.target.model.curvatureRateMaximum+1e-12 >= profile.curvatureRateMaximum;
     end
     metrics.domainViolationQuantities = unique( ...
         finalOutput.estimatedOperatingDomainAudit.violationQuantities, ...
@@ -456,14 +538,14 @@ end
 
 function lag = localCurvatureLag(truth,estimate,options)
     lag = NaN;
-    if options.targetMotion ~= "varying"
+    if options.targetMotion == "retained"
         return
     end
     q = estimate.targetState(:,3:4);
     s = estimate.targetState(:,5:6);
     curvature = sum([-q(:,2),q(:,1)].*s,2)./vecnorm(q,2,2).^3;
-    centre = options.duration/2;
-    selected = truth.time >= centre-0.5 & truth.time <= centre+1.5;
+    profile = localTargetMotionProfile(options.targetMotion,options.duration,0,0);
+    selected = truth.time >= profile.window(1) & truth.time <= profile.window(2);
     candidates = (-1:options.configuration.runtime.samplePeriod:2).';
     error = Inf(size(candidates));
     for index = 1:numel(candidates)
@@ -556,13 +638,33 @@ function options = localOptions(varargin)
     addParameter(parser, "Config", nrmmTrackingConfig(), @(x) isstruct(x) && isscalar(x));
     addParameter(parser, "DropoutIntervals", zeros(0,2), ...
         @(x) isnumeric(x) && size(x,2) == 2 && all(isfinite(x), "all") && all(x(:,2) >= x(:,1)));
-    addParameter(parser,"TargetMotion","retained",@(x) any(string(x) == ["retained","varying"]));
+    addParameter(parser,"TargetMotion","retained", ...
+        @(x) any(string(x) == ["retained","varying","laneChange"]));
+    addParameter(parser,"EgoManeuver","retained", ...
+        @(x) any(string(x) == ["retained","straight","aggressive"]));
+    addParameter(parser,"TargetInitialPosition",[25.0,4.0], ...
+        @(x) isnumeric(x) && isequal(size(x),[1,2]) && all(isfinite(x)));
+    addParameter(parser,"TargetInitialHeading",0.10, ...
+        @(x) isnumeric(x) && isscalar(x) && isfinite(x));
+    addParameter(parser,"TargetInitialSpeed",12.5, ...
+        @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0);
+    addParameter(parser,"NoiseScale",1.0, ...
+        @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x >= 0);
+    addParameter(parser,"InitialOffsetScale",1.0, ...
+        @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x >= 0);
     addParameter(parser,"RuntimeFunction",@onlineNrmmTrackingRuntime,@(x) isa(x,"function_handle"));
     addParameter(parser,"DesignFunction",@synthesizeNrmmObserverGains,@(x) isa(x,"function_handle"));
     parse(parser, varargin{:});
     options = struct( ...
         "runtimeFunction", parser.Results.RuntimeFunction, "designFunction", parser.Results.DesignFunction, ...
-        "targetMotion", string(parser.Results.TargetMotion), "configuration", parser.Results.Config, "dropoutIntervals", parser.Results.DropoutIntervals, ...
+        "targetMotion", string(parser.Results.TargetMotion), ...
+        "egoManeuver", string(parser.Results.EgoManeuver), ...
+        "targetInitialPosition", double(parser.Results.TargetInitialPosition), ...
+        "targetInitialHeading", double(parser.Results.TargetInitialHeading), ...
+        "targetInitialSpeed", double(parser.Results.TargetInitialSpeed), ...
+        "noiseScale", double(parser.Results.NoiseScale), ...
+        "initialOffsetScale", double(parser.Results.InitialOffsetScale), ...
+        "configuration", parser.Results.Config, "dropoutIntervals", parser.Results.DropoutIntervals, ...
         "plot", parser.Results.Plot, ...
         "report", parser.Results.Report, ...
         "seed", double(parser.Results.Seed), ...

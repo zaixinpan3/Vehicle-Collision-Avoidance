@@ -3,6 +3,7 @@
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
 Latest estimator improvement: [Free-metric gain synthesis, paired noise reduction and response-lag tradeoff, September 16, 2026](NRMM_NOISE_REDUCTION_20260916.md).
+Latest estimator evaluation: [Multi-scenario campaign, September 17, 2026](NRMM_ESTIMATOR_SCENARIOS_20260917.md).
 
 Latest implementation and validation: [Overlap-aware admission, straight controller timing and remaining joint-certificate limits, September 16, 2026](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md).
 
@@ -27,6 +28,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 | NRMM derivative-noise reduction with retained continuous decay and paired validation | [NRMM_NOISE_REDUCTION_20260916.md](NRMM_NOISE_REDUCTION_20260916.md) |
 | Ordinary-distance degeneracy, first-admission failure and current hard-feasible witnesses | [DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md](DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md) |
 | NRMM estimator: tracking accuracy, startup/reacquisition peaks, uncertainty and runtime | [NRMM_ESTIMATOR_EVALUATION_20260916.md](NRMM_ESTIMATOR_EVALUATION_20260916.md) |
+| NRMM estimator multi-scenario campaign: ego/target maneuvers, oncoming pass, noise, offsets and radar gaps | [NRMM_ESTIMATOR_SCENARIOS_20260917.md](NRMM_ESTIMATOR_SCENARIOS_20260917.md) |
 | Distance-dual-only cleanup, explicit admission failures and current regression results | [DISTANCE_DUAL_ONLY_RESULTS_20260916.md](DISTANCE_DUAL_ONLY_RESULTS_20260916.md) |
 | Distance-dual adoption, initialization, recursive inclusion and straight-scene validation | [DISTANCE_DUAL_ADOPTION_20260916.md](DISTANCE_DUAL_ADOPTION_20260916.md) |
 | Whole-hold certificates, actuator-only operating limits and straight-scene validation | [WHOLE_HOLD_ACTUATOR_CONSTRAINTS_20260916.md](WHOLE_HOLD_ACTUATOR_CONSTRAINTS_20260916.md) |

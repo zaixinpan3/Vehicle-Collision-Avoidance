@@ -1,7 +1,10 @@
 function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
 % runOnlineNrmmTrackingErrorBenchmark Compare multistage high-gain designs.
 % Paired trials use identical truth, sensor draws, and initial conditions.
-% Cases include bounded noise, 25 Hz sensing, model variation, and dropout.
+% Cases include bounded noise, 25 Hz sensing, model variation, and dropout,
+% plus campaign cases: aggressive ego weaving, a straight-road oncoming target
+% (8 s, 100 m domain), a target lane change, noise at twice the declared
+% bounds, three-times initial offsets, and intermittent 0.2 s radar gaps.
 % Cases may select a subset; continuous-observation studies can omit dropout.
 % BaselineRuntime and BaselineDesign can point to versioned source exports;
 % no historical implementation is kept in the active repository. Continuous
@@ -11,7 +14,8 @@ function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
     addpath(fullfile(root,"config"),fullfile(root,"estimator"));
     parser = inputParser;
     availableCases = ["retained-noise-free","retained-noise","varying-noise", ...
-        "dropout-noise","retained-noise-25Hz"];
+        "dropout-noise","retained-noise-25Hz","aggressive-ego-noise","oncoming-noise", ...
+        "lane-change-noise","noise-2x","large-offset-noise","intermittent-dropout-noise"];
     addParameter(parser,"Cases",availableCases,@(x) isstring(x) && isvector(x) ...
         && ~isempty(x) && all(ismember(x,availableCases)) && numel(unique(x)) == numel(x));
     addParameter(parser,"Report",true,@(x) islogical(x) && isscalar(x));
@@ -39,6 +43,10 @@ function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
         count = options.MonteCarloRuns;
         motion = "retained";
         dropouts = zeros(0,2);
+        duration = options.Duration;
+        scenario = struct("EgoManeuver","retained","TargetInitialPosition",[25,4], ...
+            "TargetInitialHeading",0.10,"TargetInitialSpeed",12.5, ...
+            "NoiseScale",1,"InitialOffsetScale",1);
         if caseName == "retained-noise-free"
             noise = "none";
             count = 1;
@@ -51,6 +59,28 @@ function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
             dropouts = [options.Duration/3,options.Duration/3+1];
         elseif caseName == "retained-noise-25Hz"
             cfg.runtime.samplePeriod = 0.04;
+        elseif caseName == "aggressive-ego-noise"
+            scenario.EgoManeuver = "aggressive";
+            cfg.target.domain.relativePositionMaximum = 80;
+        elseif caseName == "oncoming-noise"
+            % Head-on target on a straight road; the pass happens near 4 s.
+            scenario.EgoManeuver = "straight";
+            scenario.TargetInitialPosition = [95,3.5];
+            scenario.TargetInitialHeading = pi;
+            scenario.TargetInitialSpeed = 11;
+            cfg.target.domain.relativePositionMaximum = 100;
+            duration = min(options.Duration,8);
+        elseif caseName == "lane-change-noise"
+            motion = "laneChange";
+            cfg.target.domain.relativePositionMaximum = 55;
+            cfg.target.model.curvatureRateMaximum = 0.008;
+        elseif caseName == "noise-2x"
+            scenario.NoiseScale = 2;
+        elseif caseName == "large-offset-noise"
+            scenario.InitialOffsetScale = 3;
+        elseif caseName == "intermittent-dropout-noise"
+            starts = (2.5:2:duration-1.5).';
+            dropouts = [starts,starts+0.2];
         end
         for label = labels
             runtimeFunction = @onlineNrmmTrackingRuntime;
@@ -62,8 +92,14 @@ function benchmark = runOnlineNrmmTrackingErrorBenchmark(varargin)
             design = designFunction(cfg);
             for run = 1:count
                 result = runOnlineNrmmComplexManeuverScenario("Plot",false,"Report",false, ...
-                    "Duration",options.Duration,"Seed",options.Seed+run-1,"NoiseModel",noise, ...
+                    "Duration",duration,"Seed",options.Seed+run-1,"NoiseModel",noise, ...
                     "Config",cfg,"TargetMotion",motion,"DropoutIntervals",dropouts, ...
+                    "EgoManeuver",scenario.EgoManeuver, ...
+                    "TargetInitialPosition",scenario.TargetInitialPosition, ...
+                    "TargetInitialHeading",scenario.TargetInitialHeading, ...
+                    "TargetInitialSpeed",scenario.TargetInitialSpeed, ...
+                    "NoiseScale",scenario.NoiseScale, ...
+                    "InitialOffsetScale",scenario.InitialOffsetScale, ...
                     "RuntimeFunction",runtimeFunction,"DesignFunction",@(~) design);
                 metrics = result.metrics;
                 assert(metrics.truthOperatingDomainValid, ...
