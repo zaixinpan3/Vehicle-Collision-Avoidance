@@ -65,7 +65,8 @@ classdef solveHardCbfClf
             bound=[bound;program.terminalCone.bound];
             scales=[repmat(cfg.vehicle.width+cfg.collision.clearanceMargin,count,1); ...
                 max(program.terminal.radius(:),sqrt(eps))];
-            restoration=struct('P',sparse(n+total,n+total),'q',[zeros(n,1);1./scales], ...
+            restoration=struct('P',spdiags([zeros(n,1);2./scales.^2],0,n+total,n+total), ...
+                'q',zeros(n+total,1), ...
                 'A',sparse(matrix),'b',bound,'cones',[0;numel(labels)+total;program.terminalCone.sizes], ...
                 'anchorPlan',[program.anchorPlan;zeros(total,1)], ...
                 'deficitNames',[names;"terminalCone:"+string((1:cones).')], ...
@@ -78,7 +79,7 @@ classdef solveHardCbfClf
             solve.deficits=inf(total,1);solve.normalizedDeficit=Inf;
             if solve.feasible
                 solve.deficits=max(0,solve.decision(n+1:end));
-                solve.normalizedDeficit=sum(solve.deficits./scales);
+                solve.normalizedDeficit=sum((solve.deficits./scales).^2);
             end
         end
 
@@ -94,7 +95,10 @@ function solve=localGeneratedSolve(problem,cfg)
         solve=localRunJointProgram(problem,cfg);return;
     end
     source=full.retainedRows(1:count);geometric=source<=numel(full.geometry.label);
-    active=~geometric;groups=full.geometry.cellIndex(source(geometric));
+    % Domains have no slack. Working-set iterates are internal; convergence
+    % requires every original domain row as well as every collision row.
+    rowGroups=2*full.geometry.cellIndex+double(full.geometry.label=="poseDomain");
+    active=~geometric;groups=rowGroups(source(geometric));
     rows=find(geometric);anchor=full.anchorPlan;
     residual=full.A(equalities+rows,:)*anchor-full.b(equalities+rows);
     sorted=sortrows([groups,-residual,rows],[1,2]);
@@ -115,7 +119,7 @@ function solve=localGeneratedSolve(problem,cfg)
         if ~any(violated),break;end
         % Add the worst row of each violated held-cell family. The original
         % full verifier remains authoritative for physical safety.
-        rows=find(violated);groups=full.geometry.cellIndex(source(rows));
+        rows=find(violated);groups=rowGroups(source(rows));
         sorted=sortrows([groups,-value(rows),rows],[1,2]);
         first=[true;diff(sorted(:,1))~=0];active(sorted(first,3))=true;
         if iteration==12,solve.feasible=false;solve.message="Constraint generation did not close the complete program.";end

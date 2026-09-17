@@ -27,7 +27,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=32
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=33
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -190,13 +190,18 @@ classdef hardEncounterBarrier
                 target=model.encounters(index);
                 [center,radius]=targetPrediction.finiteFlow(target,duration);
                 direction=localExitDirection(center,frame,anchor);
+                if isfield(frame,'positionMap')
+                    position=laneGeometry.fromFrenet(anchor,model.lane);
+                    relative=center(1:2)-position;
+                    if norm(relative)>sqrt(eps),direction=relative/norm(relative);end
+                end
                 trial=model;trial.encounters=target;
                 [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
                 if isfield(model,'exitDirections')
                     direction=model.exitDirections(:,index);
                     validateattributes(direction,{'double'},{'size',[2,1],'finite','real'});
                     assert(abs(norm(direction)-1)<1e-10,'collisionAvoidanceController:invalidExitDirection','A unit exit direction is required.');
-                elseif ~isempty(proposed)
+                elseif ~isempty(proposed) && ~isfield(frame,'positionMap')
                     direction=proposed;
                 end
                 [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
@@ -233,6 +238,9 @@ classdef hardEncounterBarrier
             rho = model.initialFrenetErrorBound;
             frame = laneGeometry.frameBounds(model.lane,z(1), ...
                 max(model.cfg.controller.stationTrustRadius,rho(1)),abs(z(2))+rho(2));
+            if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
+                frame=laneGeometry.localPoseFrame(model.lane.referenceCurve,z(1:3),rho(1:3));
+            end
             direction = localExitDirection(target.center,frame,z);
             if ~isempty(model.confirmation.exitDirection)
                 direction = model.confirmation.exitDirection;
@@ -243,6 +251,9 @@ classdef hardEncounterBarrier
                 % A new direction need not be better for anisotropic boxes.
                 frame = completion.frame;
                 direction = completion.direction;
+            end
+            if isfield(frame,'domainCenter') && any(abs(z(1:3)-frame.domainCenter)+rho(1:3)>frame.domainRadius)
+                outside=false;return;
             end
             [row,bound] = localExitRow(model,target,target.center,target.radius,rho,frame,direction);
             allowance = 32*eps*(abs(bound)+abs(row)*abs(z));
@@ -269,7 +280,7 @@ classdef hardEncounterBarrier
             end
         end
 
-        function [matrix,bound,terminal,completion,cone] = completionRows(model,prediction,~)
+        function [matrix,bound,terminal,completion,cone] = completionRows(model,prediction,geometry)
         % The terminal modal set and its sampled feedback use the ONLINE generator.
             terminal = localTerminalSet(model);
             [finalMap,finalOffset] = localExactFinalMap(model,prediction);
@@ -302,9 +313,19 @@ classdef hardEncounterBarrier
             extent = abs(finalMap)*reach+radius;
             frame = laneGeometry.frameBounds(model.lane,finalOffset(1), ...
                 extent(1),abs(finalOffset(2))+extent(2));
+            domainCount=0;
+            if ~isempty(model.encounters) && isfield(geometry.frames,'positionMap')
+                frame=geometry.frames(end);
+                directions=[eye(3);-eye(3)];
+                domainMatrix=directions*finalMap(1:3,:);
+                domainBound=[frame.domainRadius;frame.domainRadius] ...
+                    +directions*(frame.domainCenter-finalOffset(1:3))-abs(directions)*radius(1:3);
+                matrix=[matrix;domainMatrix];bound=[bound;domainBound];domainCount=6;
+            end
             [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
                 model,prediction,finalMap,finalOffset,frame);
             completion.keys = string({model.encounters.key});
+            completion.domainRowCount=domainCount;
             matrix = [matrix;exitMatrix];bound=[bound;exitBound];
         end
 
@@ -547,7 +568,8 @@ function [direction,steps,passing] = localEncounterProposal(model,range)
 end
 
 function direction = localExitDirection(center,frame,anchor)
-    direction = center(1:2)-frame.origin-[frame.tangent,frame.lateral]*anchor(1:2);
+    [pose,~]=laneGeometry.poseData(frame);
+    direction = center(1:2)-pose(1:2)-reshape(pose(3:14),2,6)*anchor;
     if norm(direction)<sqrt(eps), direction = frame.lateral; end
     direction = direction/norm(direction);
 end
@@ -556,12 +578,15 @@ function [row,bound] = localExitRow(model,target,center,radius,egoRadius,frame,d
 % Directional exterior membership is a convex inner approximation of the
 % complement of the range ball. Charge both boxes, chart error and the entire
 % target body. Norm scaling keeps the implication valid after normalization.
-    row = [direction.'*[frame.tangent,frame.lateral],zeros(1,4)];
+    [pose,domain]=laneGeometry.poseData(frame);
+    row = direction.'*reshape(pose(3:14),2,6);
+    positionCharge=abs(direction).'*frame.positionErrorBound;
+    if domain(1)>0,positionCharge=norm(direction)*pose(22);end
     body = targetPrediction.rectangleSupport(target.halfLength,target.halfWidth, ...
         -direction,center(7),radius(7))*norm(direction);
     distance = model.confirmation.range+model.cfg.encounter.numericalMargin;
-    bound = direction.'*(center(1:2)-frame.origin)-abs(direction).'*radius(1:2) ...
-        -abs(row)*egoRadius-abs(direction).'*frame.positionErrorBound ...
+    bound = direction.'*(center(1:2)-pose(1:2))-abs(direction).'*radius(1:2) ...
+        -abs(row)*egoRadius-positionCharge ...
         -body-distance*norm(direction);
     bound = bound-256*eps*(1+abs(bound)+abs(direction).'*(abs(center(1:2))+abs(frame.origin)));
 end

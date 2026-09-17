@@ -20,18 +20,27 @@ classdef avoidanceStageQp
                 end
                 rhs(rows)=-prediction.stageMatrixB(:,:,stage)*anchor(inputs);
             end
-            matrix=[program.A,sparse(size(program.A,1),6*count)];bound=program.b;
             geometric=numel(program.geometry.label);cursor=0;
+            rowBlocks=cell(numel(program.geometry.local),1);columnBlocks=rowBlocks;valueBlocks=rowBlocks;
+            bound=program.b;
             for cellIndex=1:numel(program.geometry.local)
-                cell=program.geometry.local(cellIndex);stage=cell.stage;
-                rows=cursor+(1:numel(cell.bound));cursor=cursor+numel(rows);
-                matrix(rows,1:n)=0;
-                matrix(rows,2*stage-1:2*stage)=cell.inputMatrix;
-                if stage>1,matrix(rows,indices(:,stage-1))=cell.stateMatrix;end
-                bound(rows)=cell.bound-cell.stateMatrix*centers(:,stage) ...
+                localRows=program.geometry.local(cellIndex);stage=localRows.stage;
+                rows=cursor+(1:numel(localRows.bound));cursor=cursor+numel(rows);
+                columns=2*stage-1:2*stage;coefficients=localRows.inputMatrix;
+                if stage>1
+                    columns=[columns,indices(:,stage-1).'];coefficients=[coefficients,localRows.stateMatrix];
+                end
+                [r,c,v]=find(coefficients);
+                rowBlocks{cellIndex}=reshape(rows(r),[],1);
+                columnBlocks{cellIndex}=reshape(columns(c),[],1);valueBlocks{cellIndex}=v;
+                bound(rows)=localRows.bound-localRows.stateMatrix*centers(:,stage) ...
                     +program.safetyBound(rows)-program.geometry.physicalBound(rows);
             end
             assert(cursor==geometric,'avoidanceStageQp:geometryRows','Inconsistent stage row mapping.');
+            geometricMatrix=sparse(vertcat(rowBlocks{:}),vertcat(columnBlocks{:}), ...
+                vertcat(valueBlocks{:}),geometric,total);
+            geometricMatrix(:,n+1:original)=program.A(1:geometric,n+1:original);
+            matrix=[geometricMatrix;program.A(geometric+1:end,:),sparse(size(program.A,1)-geometric,6*count)];
             % The terminal modal cone acts on the final state. Its stored RHS
             % and numerical reserve are transferred without reconstruction.
             modal=program.terminal.modalMatrix;
@@ -42,7 +51,7 @@ classdef avoidanceStageQp
             matrix(rows,1:n)=0;matrix(rows,indices(:,end))=terminalMap;
             bound(rows)=bound(rows)+terminalMap*(prediction.egoStateOffset(:,end)-centers(:,end));
             if isfield(program,'restoration') && program.restoration
-                hessian=sparse(total,total);linear=[program.q;zeros(6*count,1)];
+                hessian=blkdiag(program.P,sparse(6*count,6*count));linear=[program.q;zeros(6*count,1)];
             else
                 cruise=program.cruiseCertificate;
                 hessian=blkdiag(2*spdiags(program.inputWeight,0,n,n), ...

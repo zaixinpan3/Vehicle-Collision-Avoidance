@@ -102,8 +102,10 @@ classdef avoidanceSafetyGeometry
                     max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],size(tube.map,2)/2,1);
                 support = reshape(pagemtimes(abs(tube.map),reach),6,[]);
                 envelope = max(abs(tube.offset)+support+tube.radius,[],2);
+                [pose,domain]=laneGeometry.poseData(frame);
                 data = struct("frame",[frame.origin;frame.tangent;frame.lateral;frame.heading; ...
                     frame.positionErrorBound;frame.headingErrorBound;frame.stationLower;frame.stationUpper], ...
+                    "pose",pose,"domain",domain, ...
                     "nominal",nominal,"targets",targets,"boundaries",boundaries, ...
                     "settings",[cfg.vehicle.length/2;cfg.vehicle.width/2;envelope(3); ...
                         envelope(2);cfg.collision.clearanceMargin], ...
@@ -118,7 +120,7 @@ classdef avoidanceSafetyGeometry
                 end
                 cellData{cellIndex} = data;
                 activeTargets{cellIndex} = active;
-                sourceLabels{cellIndex} = [targetLabels;boundaryLabels];
+                sourceLabels{cellIndex} = [targetLabels;boundaryLabels;"poseDomain"];
             end
             data = vertcat(cellData{:});
             if nativeGeometry
@@ -212,8 +214,8 @@ classdef avoidanceSafetyGeometry
                     weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
                 end
                 points=reshape(pagemtimes(tube.map,plan),6,[])+tube.offset;
-                state=points*weights;position=frame.origin+[frame.tangent,frame.lateral]*state(1:2);
-                yaw=frame.heading+state(3);normals{index}=zeros(2,targets);
+                state=points*weights;[position,yaw]=laneGeometry.fromFrenet(state,model.lane);
+                normals{index}=zeros(2,targets);
                 for targetIndex=1:targets
                     target=model.encounters(targetIndex);
                     center=targetPrediction.finiteFlow(target,tube.start+tube.duration/2);
@@ -253,7 +255,8 @@ classdef avoidanceSafetyGeometry
                                 +targetPrediction.rectangleSupport(cfg.vehicle.length/2,cfg.vehicle.width/2,direction,yaw,0);
                             score(option)=direction.'*(position-center(1:2))-support;
                         else
-                            rows=queries(option);
+                            rows=queries(option);selected=rows.source==1;
+                            rows.state=rows.state(selected,:);rows.bound=rows.bound(selected,:);
                             margin=rows.bound-rows.state*points-abs(rows.state)*tube.radius;
                             reach=repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
                                 max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],prediction.stageCount,1);
@@ -306,10 +309,8 @@ classdef avoidanceSafetyGeometry
         % obstacle, with equality at the closest point), and whether the
         % position was outside.
         %
-        % Called in PATH COORDINATES by stage 1 (formulateAvoidanceProblem), with the
-        % heading errors as the yaws and the target centre as the origin, and
-        % in Cartesian coordinates by the harness for the physical clearance
-        % readout.
+        % Cartesian positions and physical yaws are used for geometric queries
+        % and the harness's independent physical-clearance readout.
         %
             [vertices, faceNormal, faceBound] = localConfigurationObstacle( ...
                 egoYaw, targetPosition, targetYaw, halfDimensions);
@@ -325,24 +326,27 @@ function rows = localCellRows(data,prescribedNormals)
     frame = data.frame;origin = frame(1:2);tangent = frame(3:4);lateral = frame(5:6);
     heading = frame(7);positionError = frame(8:9);headingError = frame(10);
     stationRange = frame(11:12).';
+    pose=data.pose;positionMap=reshape(pose(3:14),2,6);positionOffset=pose(1:2);
+    yawOffset=pose(15);yawRow=pose(16:21).';
+    localDomain=data.domain(1)>0;
     settings = data.settings;halfLength = settings(1);halfWidth = settings(2);
     headingDomain = settings(3);lateralDomain = settings(4);clearanceMargin = settings(5);
     nominal = data.nominal;pointCount = size(nominal,2);
     targetCount = numel(data.targets);boundaryCount = numel(data.boundaries);
-    maximumRows = 12*(targetCount+boundaryCount);
+    maximumRows = 12*(targetCount+boundaryCount)+6;
     state = zeros(maximumRows,6);bound = zeros(maximumRows,pointCount);
     source = zeros(maximumRows,1);
     normals = zeros(2,targetCount);count = 0;
     for index = 1:targetCount
         target = data.targets(index);
         middle = targetPrediction.finiteFlow(target,data.duration/2);
-        centerEgo = origin+[tangent,lateral]*mean(nominal(1:2,:),2);
+        centerEgo = positionOffset+positionMap*mean(nominal,2);
         if nargin > 1
             normal = prescribedNormals(:,index);
         elseif isfield(data,'normals') && ~isempty(data.normals)
             normal=data.normals(:,index);
         else
-            [~,normal] = avoidanceSafetyGeometry.rectangleDistance(centerEgo,heading+mean(nominal(3,:)), ...
+            [~,normal] = avoidanceSafetyGeometry.rectangleDistance(centerEgo,yawOffset+yawRow*mean(nominal,2), ...
                 middle(1:2),middle(7),[halfLength;halfWidth;target.halfLength;target.halfWidth]);
         end
         normals(:,index) = normal;
@@ -358,13 +362,21 @@ function rows = localCellRows(data,prescribedNormals)
         yawCenter = (target.center(7)+endCenter(7))/2;
         yawRadius = abs(endCenter(7)-target.center(7))/2+endRadius(7);
         targetSupport = targetPrediction.rectangleSupport(target.halfLength,target.halfWidth,normal,yawCenter,yawRadius);
-        [egoSupport,headingSlope] = targetPrediction.rectangleSupportMajorant(normal,heading, ...
-            halfLength,halfWidth,mean(nominal(3,:)),headingDomain+headingError);
+        yawCenter=heading;yawExtent=headingDomain+headingError;
+        positionCharge=abs(normal).'*positionError;
+        if localDomain
+            yawCenter=yawOffset+yawRow(1:3)*data.domain(2:4);
+            yawExtent=abs(yawRow(1:3))*data.domain(5:7);
+            positionCharge=norm(normal)*pose(22);
+        end
+        yawAnchor=yawOffset+yawRow*mean(nominal,2)-yawCenter;
+        [egoSupport,headingSlope] = targetPrediction.rectangleSupportMajorant(normal,yawCenter, ...
+            halfLength,halfWidth,yawAnchor,yawExtent);
         rowCount = numel(egoSupport);selected = count+(1:rowCount);
-        state(selected,:) = repmat([-normal.'*[tangent,lateral],zeros(1,4)],rowCount,1);
-        state(selected,3) = headingSlope;
-        bound(selected,:) = normal.'*origin-normal.'*targetPosition-abs(normal).'*targetRadius ...
-            -targetSupport-egoSupport-clearanceMargin-abs(normal).'*positionError-abs(headingSlope)*headingError;
+        state(selected,:) = repmat(-normal.'*positionMap,rowCount,1)+headingSlope*yawRow;
+        bound(selected,:) = normal.'*positionOffset-normal.'*targetPosition-abs(normal).'*targetRadius ...
+            -targetSupport-egoSupport-headingSlope*(yawOffset-yawCenter)-clearanceMargin ...
+            -positionCharge-abs(headingSlope)*headingError;
         source(selected) = index;count = count+rowCount;
     end
     for index = 1:boundaryCount
@@ -394,6 +406,13 @@ function rows = localCellRows(data,prescribedNormals)
             -abs(normal).'*positionError-abs(headingSlope)*headingError;
         bound(selected,:) = repmat(limit,1,pointCount);
         source(selected) = targetCount+index;count = count+rowCount;
+    end
+    if localDomain
+        selected=count+(1:6);
+        directions=[eye(3);-eye(3)];
+        state(selected,:)=[directions,zeros(6,3)];
+        bound(selected,:)=repmat([data.domain(5:7);data.domain(5:7)]+directions*data.domain(2:4),1,pointCount);
+        source(selected)=targetCount+boundaryCount+1;count=count+6;
     end
     rows = struct("state",state(1:count,:),"bound",bound(1:count,:), ...
         "source",source(1:count),"normals",normals);

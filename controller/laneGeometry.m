@@ -12,6 +12,24 @@ classdef laneGeometry
         % Batch charts with individual station radii over one validated lane.
             cfg = model.cfg;
             nominal = cell(numel(tubes),1);
+            curved = isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0 ...
+                && ~isempty(model.encounters);
+            if curved
+                scale=1;if isfield(model,'poseTrustScale'),scale=model.poseTrustScale;end
+                frames=repmat(laneGeometry.localPoseFrame(model.lane.referenceCurve,zeros(3,1), ...
+                    model.cfg.controller.poseTrustRadius),numel(tubes),1);
+                for index=1:numel(tubes)
+                    tube=tubes(index);
+                    values=reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
+                    nominal{index}=values;
+                    lower=min(values(1:3,:)-tube.radius(1:3,:),[],2);
+                    upper=max(values(1:3,:)+tube.radius(1:3,:),[],2);
+                    center=(lower+upper)/2;
+                    radius=(upper-lower)/2+scale*cfg.controller.poseTrustRadius;
+                    frames(index)=laneGeometry.localPoseFrame(model.lane.referenceCurve,center,radius);
+                end
+                return;
+            end
             station = zeros(numel(tubes),1);extent = station;lateralExtent = station;
             for index = 1:numel(tubes)
                 tube = tubes(index);
@@ -49,6 +67,41 @@ classdef laneGeometry
                     "The finite arc must have less than one complete revolution.");
             end
             curve.origin = curve.origin(:);
+        end
+
+        function frame = localPoseFrame(curve,center,radius)
+        % A first-order pose map certified on a hard box in [s,d,e_psi].
+            validateattributes(center,{'double'},{'size',[3,1],'finite','real'});
+            validateattributes(radius,{'double'},{'size',[3,1],'finite','real','nonnegative'});
+            [position,heading]=laneGeometry.referencePose(center(1),center(2),curve);
+            tangent=[cos(heading);sin(heading)];lateral=[-tangent(2);tangent(1)];
+            k=curve.curvature;
+            jacobian=[(1-k*center(2))*tangent,lateral,zeros(2,4)];
+            offset=position-jacobian(:,1:3)*center;
+            yawRow=[k,0,1,0,0,0];yawOffset=heading-k*center(1);
+            extent=abs(center(2))+radius(2);
+            remainder=abs(k)*(1+abs(k)*extent)*radius(1)^2/2 ...
+                +abs(k)*radius(1)*radius(2);
+            remainder=remainder+128*eps*(1+norm(position)+norm(offset)+norm(jacobian,'fro')*norm(abs(center)+radius));
+            frame=struct('origin',position-tangent*center(1)-lateral*center(2), ...
+                'tangent',tangent,'lateral',lateral,'heading',heading,'segmentIndex',1, ...
+                'stationLower',center(1)-radius(1),'stationUpper',center(1)+radius(1), ...
+                'positionErrorBound',repmat(remainder,2,1),'headingErrorBound',0, ...
+                'referenceHeadingErrorBound',0,'positionMap',jacobian,'positionOffset',offset, ...
+                'yawRow',yawRow,'yawOffset',yawOffset,'positionRemainder',remainder, ...
+                'domainCenter',center,'domainRadius',radius);
+        end
+
+        function [pose,domain] = poseData(frame)
+        % Shared numeric format; geometric tangent remains a unit direction.
+            if isfield(frame,'positionMap')
+                pose=[frame.positionOffset;frame.positionMap(:);frame.yawOffset;frame.yawRow.';frame.positionRemainder];
+                domain=[1;frame.domainCenter;frame.domainRadius];
+            else
+                jacobian=[frame.tangent,frame.lateral,zeros(2,4)];
+                pose=[frame.origin;jacobian(:);frame.heading;0;0;1;0;0;0;0];
+                domain=zeros(7,1);
+            end
         end
 
         function [position, heading] = referencePose(station, lateral, curve)

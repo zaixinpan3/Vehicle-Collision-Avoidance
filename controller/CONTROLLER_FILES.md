@@ -5,7 +5,7 @@ current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
 Fresh admission uses analytic support families and search-only restoration, followed by a hard
 trajectory SOCP with a full input sequence and penalized first-hold CLF slack.
-Its format-32 state retains the complete prediction and terminal continuation.
+Its format-33 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -41,7 +41,7 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-32 predictive certificate. The online path calls
+format-33 predictive certificate. The online path calls
 `formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained`. Fresh
 admission uses bounded support sectors, whole-hold scoring, grouped-deficit
 restoration and final hard verification. Accepted successors retain the
@@ -57,5 +57,6 @@ remains the declared zero-residual held affine plant.
 
 Clear changed MATLAB functions/classes after updating a live session. Native
 kernels remain under the excluded `solver/` tree and must be regenerated with `scripts/buildAvoidanceGeometryKernel.m`
-after this support-kernel interface change. `controllerSourceBudgetTest` enforces the
+after this pose/domain kernel interface change; format-33 kernels include
+the numeric affine pose map and hard local-domain payload. `controllerSourceBudgetTest` enforces the
 20-source upper limit.

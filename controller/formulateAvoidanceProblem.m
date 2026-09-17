@@ -72,7 +72,7 @@ function accepted=localWitnessFeasible(program,witness)
     end
 end
 
-function [program,prediction,clf] = localFormulate(model)
+function [program,prediction,clf] = localFormulate(model,prediction,anchor,proposedNormals)
 %formulateAvoidanceProblem Predictive hard safety with a soft sampled CLF.
 % Optimize the complete input sequence and the first-hold CLF norm slack.
 % The finite target exit and invariant road terminal set are hard constraints.
@@ -88,11 +88,12 @@ function [program,prediction,clf] = localFormulate(model)
         cruise = model.carriedWitness.program.cruiseCertificate;
         [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model);
     else
-        [prediction,anchor] = hardEncounterBarrier.predict(model,cruise);
+        if nargin<2,[prediction,anchor] = hardEncounterBarrier.predict(model,cruise);end
         model.anchorPlan = anchor;
         if ~isempty(model.encounters)
             [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
             [normals,dual]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor,frames);
+            if nargin>=4,normals=proposedNormals;end
             if ~dual.available
                 error('collisionAvoidanceController:invalidSeparationNormal','A finite unit support direction is required.');
             end
@@ -137,7 +138,8 @@ function [program,prediction,clf] = localFormulate(model)
                 rate(finiteRate)+prior(finiteRate);rate(finiteRate)-prior(finiteRate);terminalBound];
             labels=[geometry.label;repmat("actuator",2*planCount,1); ...
                 repmat("slew",2*nnz(finiteRate),1); ...
-                repmat("terminalEntry",numel(terminalBound)-numel(model.encounters),1); ...
+                repmat("terminalEntry",numel(terminalBound)-numel(model.encounters)-completion.domainRowCount,1); ...
+                repmat("terminalPoseDomain",completion.domainRowCount,1); ...
                 "exit:"+string({model.encounters.key}).'];
             reach = max(abs(lower),abs(upper));
             scale = 1+abs(physicalBound)+abs(matrix)*reach;
@@ -231,6 +233,11 @@ function [candidate,information,prediction]=localSupportGeometry(model,predictio
     end
     candidate=program;
     if ~information.available,return;end
+    if ~program.inheritedFeasibleFamily && isfield(program.geometry.frames,'positionMap')
+        [candidate,prediction]=localFormulate(model,prediction,anchor,normals);
+        information=candidate.supportGeometry;
+        return;
+    end
     model.anchorPlan=anchor;prediction.geometryAnchor=anchor;
     prediction.geometryFrames=program.geometry.frames;
     prediction.geometryNominal=cell(numel(prediction.cells),1);
@@ -241,26 +248,20 @@ function [candidate,information,prediction]=localSupportGeometry(model,predictio
     prediction.separationNormals=normals;
     geometry=avoidanceSafetyGeometry.build(model,prediction);
     collision=startsWith(geometry.label,"collision:");
-    keep=~startsWith(program.physicalLabels,"collision:");
-    matrix=[geometry.matrix(collision,:);program.physicalMatrix(keep,program.layout.planIndex)];
-    physicalBound=[geometry.physicalBound(collision);program.physicalBound(keep)];
-    option=geometry.matrix(collision,:);physical=geometry.physicalBound(collision);
+    keep=(numel(program.geometry.label)+1:numel(program.physicalLabels)).';
+    matrix=[geometry.matrix;program.physicalMatrix(keep,program.layout.planIndex)];
+    physicalBound=[geometry.physicalBound;program.physicalBound(keep)];
+    option=geometry.matrix;physical=geometry.physicalBound;
     scale=1+abs(physical)+abs(option)*program.decisionRadius;
     reserve=4*max(model.cfg.encounter.numericalMargin,model.cfg.solver.constraintTolerance) ...
         *scale.*any(option~=0,2);
     bound=[physical-reserve;program.safetyBound(keep)];
     candidate.physicalMatrix=[matrix,zeros(numel(bound),1)];
     candidate.physicalBound=physicalBound;candidate.safetyBound=bound;
-    candidate.physicalLabels=[geometry.label(collision);program.physicalLabels(keep)];
+    candidate.physicalLabels=[geometry.label;program.physicalLabels(keep)];
     first=program.cones(2)+1;
     candidate.A=sparse([candidate.physicalMatrix;zeros(1,program.layout.planCount),-1;program.A(first:end,:)]);
     candidate.b=[bound;0;program.b(first:end)];candidate.cones(2)=numel(bound)+1;
-    % Keep inherited road rows in geometry as well as in the actual program.
-    road=~startsWith(program.geometry.label,"collision:");
-    fields=["matrix","physicalBound","label","stage","safety","cellIndex"];
-    for field=fields
-        geometry.(field)=[geometry.(field)(collision,:);program.geometry.(field)(road,:)];
-    end
     candidate.prediction=prediction;candidate.geometry=geometry;candidate.obstacleCbfRowCount=nnz(collision);
     candidate.supportGeometry=information;candidate.supportGeometry.used=true;
 end

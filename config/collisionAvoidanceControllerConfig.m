@@ -34,10 +34,11 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % Distance-dual geometry defines the sole collision convexification. Continuations
-    % need one convex solve; the terminal policy remains a certificate only.
+    % Signed support geometry defines the collision convexification. Continuations
+    % retain one convex program; the terminal policy remains a certificate only.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
-        "minimumHorizonSteps",4,"stationTrustRadius",2.0);
+        "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
+        "poseTrustRadius",[2;4;0.5]);
     cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
     cfg.encounter = struct("taylorOrder",6, ...
         "numericalMargin",1.0e-6,"maximumCarriedMargin",1.0,"inputRateWeight",0.02);
@@ -241,6 +242,8 @@ function localValidate(cfg)
     end
     localValidateNonnegativeScalar(cfg.controller.stationTrustRadius, ...
         "controller.stationTrustRadius");
+    validateattributes(cfg.controller.poseTrustRadius,{'double'}, ...
+        {'size',[3,1],'real','finite','positive'});
     localValidateNonnegativeScalar(cfg.model.lateralDomainRadius, ...
         "model.lateralDomainRadius");
     for name = ["ltvModelErrorRateBound", "plantModelResidualRateBound"]

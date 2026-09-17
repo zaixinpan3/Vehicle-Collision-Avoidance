@@ -1,6 +1,6 @@
 # Recursive feasibility and encounter safety of the implemented controller
 
-This is the current format-32 proof. It replaces the previous stopping-tail
+This is the current format-33 proof. It replaces the previous stopping-tail
 argument. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
@@ -108,11 +108,21 @@ the truncation support at $h$ is at most $10^{-11}$; order above 64 fails
 explicitly. Arithmetic allowances are added separately. Bernstein degree is
 $p+1$ and may therefore exceed the configured minimum Taylor order.
 
-The geometry uses this reachable tube to bound station, lateral displacement
-and heading. No station corridor, lateral/heading box or tire-slip row is
-added. A reachable heading interval spanning a full rotation uses the
-rectangle circumradius as a global support upper bound. All directions in
-the finite grid remain available, with one direction per complete hold.
+On a straight reference the geometry uses the actuator-reachable tube to
+bound station, lateral displacement and heading. Active circular encounters
+instead use the certified local pose map and exact affine yaw described in
+[SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md). Six hard box rows on
+every uncertain Bernstein coefficient establish whole-hold validity of the
+Taylor remainder and footprint majorant. They constrain only the selected
+convex approximation domain, not road width or tire slip. The terminal exit
+row uses the same final domain, with hard endpoint containment. These rows
+cannot be relaxed by search deficits. The conditional shift proof retains
+their coefficients, frame data and uncertainty enclosures unchanged. A fresh
+local domain can replace them only together with a complete feasible witness.
+The whole-hold safety implication therefore includes domain membership as an
+explicit premise. Each hold still uses one separating direction and no time
+subdivision. A reachable heading interval spanning a full rotation in the
+unrestricted straight branch uses a global rectangle circumradius bound.
 The declared globally affine plant scope is essential: removing the old
 model-domain rows does not establish nonlinear physical-model validity.
 
@@ -356,7 +366,7 @@ the original hard certificate. Neither a finite direction at overlap nor a
 positive-deficit restoration solution supplies this premise. Recursive
 feasibility does not prove universal admission or numerical deadline success.
 The accepted affine family and terminal cones are inherited before optional
-geometry replacement. Format 32 rejects earlier stored certificates.
+geometry replacement. Format 33 rejects earlier stored certificates.
 
 ### Empty suffix after confirmed encounter completion
 
@@ -440,7 +450,7 @@ an independently rebuilt problem merely because it is used as an initial guess.
 
 ## Changed measurement contracts
 
-Format 32 treats an enlarged ego measurement enclosure limit as a new admission
+Format 33 treats an enlarged ego measurement enclosure limit as a new admission
 obligation. It conditions the actual successor against the carried prediction,
 but discards the old terminal certificate as authority for the larger future
 sensing bound. It rebuilds and independently verifies the complete problem.

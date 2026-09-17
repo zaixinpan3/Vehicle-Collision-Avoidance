@@ -1,6 +1,6 @@
 # Predictive safety with overlap-aware support search
 
-The format-32 controller retains a complete finite input plan, swept rectangle
+The format-33 controller retains a complete finite input plan, swept rectangle
 collision certificate, finite confirmed exit and a permanent terminal
 information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
@@ -62,7 +62,11 @@ on future actual measurements. Increasing this bound is a changed contract.
 
 The permanent reference is an analytically continued straight line or constant-
 curvature curve with no physical road boundaries, matching the current
-no-road-boundary experiment specification. Only actuator amplitude/slew and the collision/terminal certificates are hard. Finite
+no-road-boundary experiment specification. Actuator amplitude/slew and the
+collision/terminal certificates are hard, including the local pose-domain
+rows required to validate the circular affine geometry. Those domains move
+with fresh search anchors and are retained by accepted continuations; they
+are not physical road or tire-slip constraints. Finite
 centerline samples and analytic arc length no longer cause projection clipping
 at their display endpoints. Curved station measurements unwrap about the
 carried prediction. A finite physical road, arbitrary polyline corner, or
@@ -82,7 +86,7 @@ The first-hold CLF and five terminal modal inequalities are SOC constraints. All
 collision, actuator and slew rows are hard. The absolute target
 exit deadline is preserved while any admitted target remains active.
 
-The returned format-32 state contains the plan, verified inherited affine
+The returned format-33 state contains the plan, verified inherited affine
 bounds and terminal cone, exact nominal nodes, uncertainty boxes, whole-hold
 geometry, stable target identities, common generator and permanent terminal
 certificate. Earlier state formats must be reset.

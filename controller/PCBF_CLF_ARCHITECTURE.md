@@ -1,6 +1,6 @@
 # Predictive CBF and soft CLF controller
 
-Current implementation, September 16, 2026: the format-32 controller uses
+Current implementation, September 17, 2026: the format-33 controller uses
 overlap-aware support geometry and feasibility restoration. It
 retains predictive continuation across active encounters, confirmed partial
 or full target release, and prediction exhaustion. The terminal information
@@ -11,7 +11,10 @@ operating input. The high-gain target observer is unchanged.
 Each held command has one complete Bernstein certificate, with adaptive
 polynomial order and no internal time subdivision. State-box and tire-slip
 constraints are removed; actuator amplitude and finite slew bounds remain.
-Geometry ranges follow actuator reachability. The terminal invariant set is
+Active circular encounters use local affine pose maps with hard whole-hold
+validity domains. These domains certify the geometric approximation; they are
+not physical road boundaries or nonlinear plant-validity claims. Straight and
+target-free geometry retains actuator reachability. The terminal invariant set is
 synthesized from the same actuator limits, without hidden state/slip bounds.
 
 Fresh admission searches bounded geometric support families. An analytic signed
@@ -22,7 +25,8 @@ holds. No lateral path, amplitude, passing time or avoidance acceleration is
 prescribed. Controls remain optimization variables.
 
 A colliding seed enters search-only feasibility restoration: minimize grouped,
-normalized collision, exit and terminal deficits with actuator limits hard.
+squared normalized collision, exit and terminal deficits with actuator limits
+and local pose domains hard.
 Whole-hold margin proposals update the geometry. A final hard-safety, soft-CLF
 solve removes every search deficit and passes independent physical verification.
 Bounded sector, exit-direction and horizon searches are incomplete; failure is

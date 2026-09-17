@@ -1,6 +1,6 @@
 # Overlap-aware support convexification
 
-Controller format 32, September 16, 2026.
+Controller format 33, September 17, 2026.
 
 ## Geometric contract
 
@@ -20,13 +20,60 @@ trajectory, lateral amplitude, acceleration target or passing time. These
 sectors and candidate directions are an incomplete inner search, not an exact
 finite partition of the original nonconvex safe set.
 
+## Certified circular pose maps
+
+For a constant-curvature reference and a local anchor $(s_0,d_0)$, define
+$\Delta s=s-s_0$, $\Delta d=d-d_0$. The Cartesian position approximation is
+
+$$
+p_{\rm aff}=c(s_0)+d_0n(s_0)+(1-\kappa d_0)t(s_0)\Delta s+n(s_0)\Delta d.
+$$
+
+On $|\Delta s|\le r_s$, $|\Delta d|\le r_d$, write $D=|d_0|+r_d$.
+The Euclidean Taylor remainder is bounded by
+
+$$
+E_p=\tfrac12|\kappa|(1+|\kappa|D)r_s^2+|\kappa|r_s r_d,
+$$
+
+plus an arithmetic reserve. A unit collision/exit direction is charged $E_p$.
+The affine heading $\theta(s_0)+\kappa(s-s_0)+e_\psi$ is exact for a circle.
+Rectangle support majorants use that same affine heading and its domain;
+station and heading are not treated as independent orientation errors.
+Geometric unit tangent/normal vectors remain separate from the position
+Jacobian. Direction proposals and nominal distances use exact circular poses.
+
+Every Bernstein coefficient, including its propagated radius, must satisfy
+six hard inequalities for the local box in $(s,d,e_\psi)$. Convex hull
+containment then establishes domain validity over the entire unchanged hold.
+These inequalities have no restoration slack. Internal working sets may omit
+rows temporarily, but no completed solve or executable certificate can omit
+their full check. Terminal exterior membership uses the final cell's map and
+six additional hard endpoint-domain rows. Current observation release must
+also lie inside the chosen map's domain.
+
+Fresh admission centers each domain on the numerical anchor's enclosed hold,
+with configurable extra radii `controller.poseTrustRadius = [2;4;0.5]` in m,
+m and rad. Additional bounded families expand those radii. Reanchoring updates
+collision geometry, hard domains and terminal exit rows together; it does not
+prescribe a trajectory. An inherited family retains its old maps/domains and
+absolute completion deadline. Optional normal replacement must preserve the
+complete carried witness, including the domain and terminal rows.
+
+This extension covers analytic constant-curvature encounters without physical
+road boundaries. It does not add variable-curvature models, correlated-set
+conditioning or a new road-constrained terminal set.
+
 ## Admission and restoration
 
 Clear seeds attempt the hard problem first. Colliding seeds start with
 restoration. Collision deficits are shared by each hold-target pair; exit and
 terminal-entry rows and each terminal cone receive search-only deficits.
-Physical input/slew limits and affine dynamics remain hard. Positive normalized
-deficits are minimized without a competing cruise objective. The optional
+Physical input/slew limits, affine dynamics and local pose-domain rows remain
+hard. The sum of squared normalized deficits is minimized without a competing
+cruise or input objective. This makes zero the same hard-feasibility target as
+the former linear deficit objective and improves numerical behavior in curved
+searches; positive values still have no execution authority. The optional
 lexicographic proximity objective is not needed by this implementation.
 
 After restoration, controls update the support geometry. A new hard problem
@@ -47,7 +94,8 @@ in these coordinates; input cost remains relative to the CLF operating point.
 Exact duplicate left sides retain only their tightest bound.
 
 For larger geometry programs, numerical constraint generation starts with the
-most violated rows of each hold and retains all permanent hard rows and cones.
+most violated rows of each hold, separately grouping collision and local-domain
+rows, and retains all nongeometric hard rows and cones.
 Every returned decision is checked against all omitted inequalities, and
 violated rows are added. The loop cannot accept an unfinished working set.
 The independent original-program verifier remains unchanged. Restoration uses
