@@ -120,7 +120,7 @@ classdef avoidanceSafetyGeometry
                 end
                 cellData{cellIndex} = data;
                 activeTargets{cellIndex} = active;
-                sourceLabels{cellIndex} = [targetLabels;boundaryLabels;"poseDomain"];
+                sourceLabels{cellIndex} = [targetLabels;boundaryLabels;"poseDomain";"referencePhaseDomain"];
             end
             data = vertcat(cellData{:});
             if nativeGeometry
@@ -131,6 +131,24 @@ classdef avoidanceSafetyGeometry
             projectionData = cell(numel(groups),1);
             for cellIndex = 1:numel(groups)
                 tube = prediction.cells(cellIndex);
+                if isfield(prediction,'referencePhaseIndex')
+                    % Stage-local phase rows share the swept projection kernel,
+                    % so the lifted SOCP retains its sparse temporal structure.
+                    phase=linspace(prediction.referenceStates(1,tube.stage), ...
+                        prediction.referenceStates(1,tube.stage+1),size(tube.offset,2));
+                    geometric=allGeometricRows(cellIndex);
+                    geometric.state=[geometric.state;1,zeros(1,5);-1,zeros(1,5)];
+                    geometric.bound=[geometric.bound;cfg.encounter.referencePhaseRadius+phase; ...
+                        cfg.encounter.referencePhaseRadius-phase];
+                    geometric.source=[geometric.source;repmat(numel(sourceLabels{cellIndex}),2,1)];
+                    lateralLimit=model.cruiseCertificate.lateralRegularityRadius;
+                    if isfinite(lateralLimit)
+                        geometric.state=[geometric.state;0,1,zeros(1,4);0,-1,zeros(1,4)];
+                        geometric.bound=[geometric.bound;repmat(lateralLimit,2,numel(phase))];
+                        geometric.source=[geometric.source;repmat(numel(sourceLabels{cellIndex}),2,1)];
+                    end
+                    allGeometricRows(cellIndex)=geometric;
+                end
                 stateRadius = tube.radius;
                 numericTube = struct("stage",tube.stage,"map",tube.map,"offset",tube.offset, ...
                     "localStateMap",tube.localStateMap,"localInputMap",tube.localInputMap, ...
@@ -366,7 +384,7 @@ function rows = localCellRows(data,prescribedNormals)
         positionCharge=abs(normal).'*positionError;
         if localDomain
             yawCenter=yawOffset+yawRow(1:3)*data.domain(2:4);
-            yawExtent=abs(yawRow(1:3))*data.domain(5:7);
+            yawExtent=abs(yawRow(1:3))*data.domain(5:7)+headingError;
             positionCharge=norm(normal)*pose(22);
         end
         yawAnchor=yawOffset+yawRow*mean(nominal,2)-yawCenter;

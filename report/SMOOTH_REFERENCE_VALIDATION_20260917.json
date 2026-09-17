@@ -1,0 +1,1196 @@
+{
+  "date": "2026-09-17",
+  "outcome": "partial",
+  "scope": "Exact declared scheduled affine plant and exact ego/target states; physical pose follows spatial PCHIP curvature; no nonlinear vehicle claim; offline audits excluded from frame timing",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "configuration": {
+    "sampleTime": 0.1,
+    "referenceSpeed": 8,
+    "phaseRadiusMeters": 2,
+    "perceptionRangeMeters": 16,
+    "clearanceMeters": 0.25,
+    "profileLengthMeters": 120,
+    "diagnosticFrameBudgetSeconds": 5,
+    "strictFrameBudgetSeconds": 0.1,
+    "roadBoundaries": false,
+    "estimator": false,
+    "egoCartesianPositionUncertainty": 0,
+    "processResidual": 0,
+    "mainScenarioSlewBounds": "unbounded defaults; finite slew checked by terminal tests",
+    "randomInputs": "none; deterministic profiles and target motion"
+  },
+  "checks": {
+    "total": 657,
+    "passed": 657,
+    "failed": 0,
+    "incomplete": 0
+  },
+  "focusedChecks": {
+    "total": 24,
+    "passed": 24,
+    "failed": 0,
+    "incomplete": 0
+  },
+  "additionalChecks": [
+    "9 bicycle native/interpreted kernel tests passed",
+    "1 core source budget test passed (20 files)",
+    "Code Analyzer run on changed MATLAB files: local settings fallback and performance advisories; no syntax failure",
+    "Geometry MEX rebuilt successfully; generated binaries excluded",
+    "git diff --check passed"
+  ],
+  "trials": [
+    {
+      "path": "sBend",
+      "scenario": "cruise",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.146584,
+      "maximumFrameMilliseconds": 74.717,
+      "medianFrameMilliseconds": 14.7975,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": null,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 4.6537970246627106e-06,
+      "maximumStationPhaseError": 0.01051605931991162,
+      "finalTrackingError": [
+        -5.146386441847727e-07,
+        -1.254876827541552e-10,
+        0.00032875272252219645,
+        -4.970172348266465e-13,
+        -4.350710857732647e-13
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "strictTiming": {
+        "path": "sBend",
+        "scenario": "cruise",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000565,
+        "maximumFrameMilliseconds": 17.840999999999998,
+        "medianFrameMilliseconds": 14.8415,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": null,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 4.6537970246627106e-06,
+        "maximumStationPhaseError": 0.01051605931991162,
+        "finalTrackingError": [
+          -5.146386441847727e-07,
+          -1.254876827541552e-10,
+          0.00032875272252219645,
+          -4.970172348266465e-13,
+          -4.350710857732647e-13
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null
+      },
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "maximumLateralError": 0.0029682925864910567,
+      "maximumHeadingTrimError": 0.0016771522493228231,
+      "profile": {
+        "origin": [
+          0,
+          0
+        ],
+        "heading": 0,
+        "curvature": 0,
+        "length": 120,
+        "curvatureProfile": [
+          [
+            0,
+            0
+          ],
+          [
+            10,
+            0.007499999999999999
+          ],
+          [
+            20,
+            0.012990381056766578
+          ],
+          [
+            30,
+            0.015
+          ],
+          [
+            40,
+            0.01299038105676658
+          ],
+          [
+            50,
+            0.007499999999999999
+          ],
+          [
+            60,
+            8.49830834647197e-18
+          ],
+          [
+            70,
+            -0.007499999999999995
+          ],
+          [
+            80,
+            -0.012990381056766576
+          ],
+          [
+            90,
+            -0.015
+          ],
+          [
+            100,
+            -0.012990381056766578
+          ],
+          [
+            110,
+            -0.0074999999999999945
+          ],
+          [
+            120,
+            0
+          ]
+        ],
+        "continuation": "constantCurvature"
+      },
+      "artifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/sBend/cruise/diagnostic/smooth-reference-trial.mat",
+      "strictArtifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/sBend/cruise/periodic/smooth-reference-trial.mat",
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.057049,
+        "callSeconds": [],
+        "attemptedCalls": 0,
+        "discardedCommandCount": 0,
+        "probeCertified": [],
+        "failureIdentifier": [],
+        "allProbesCertified": false,
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes; no commands applied",
+        "cruiseProbes": {
+          "seconds": [
+            0.549869,
+            0.036306,
+            0.024087
+          ],
+          "certified": [
+            true,
+            true,
+            true
+          ],
+          "failureIdentifier": [
+            "",
+            "",
+            ""
+          ]
+        }
+      },
+      "slowestFrameIndex": 1,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.012382,
+        "formulationSeconds": 0.034473,
+        "solveSeconds": 0.021037
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.034473,
+        "solveSeconds": 0.021037,
+        "normalizedDeficits": [],
+        "deficitNames": [],
+        "deficits": [],
+        "deficitScales": [],
+        "supportSectors": [],
+        "initialOverlappingMidpoints": 0
+      }
+    },
+    {
+      "path": "transition",
+      "scenario": "cruise",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.054562,
+      "maximumFrameMilliseconds": 16.479,
+      "medianFrameMilliseconds": 14.808,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": null,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 1.0623994897637767e-06,
+      "maximumStationPhaseError": 0.0069972268872788845,
+      "finalTrackingError": [
+        4.3586722937924774e-05,
+        1.575866238091861e-07,
+        6.266476961158673e-05,
+        1.343165878520125e-07,
+        1.390966572645258e-06
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "strictTiming": {
+        "path": "transition",
+        "scenario": "cruise",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000531,
+        "maximumFrameMilliseconds": 18.849,
+        "medianFrameMilliseconds": 15.297,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": null,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 1.0623994897637767e-06,
+        "maximumStationPhaseError": 0.0069972268872788845,
+        "finalTrackingError": [
+          4.3586722937924774e-05,
+          1.575866238091861e-07,
+          6.266476961158673e-05,
+          1.343165878520125e-07,
+          1.390966572645258e-06
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null
+      },
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "maximumLateralError": 0.001706898200166231,
+      "maximumHeadingTrimError": 0.0003928130579418619,
+      "profile": {
+        "origin": [
+          0,
+          0
+        ],
+        "heading": 0,
+        "curvature": 0,
+        "length": 120,
+        "curvatureProfile": [
+          [
+            0,
+            0
+          ],
+          [
+            10,
+            0.00034074173710931687
+          ],
+          [
+            20,
+            0.001339745962155613
+          ],
+          [
+            30,
+            0.002928932188134523
+          ],
+          [
+            40,
+            0.004999999999999999
+          ],
+          [
+            50,
+            0.007411809548974793
+          ],
+          [
+            60,
+            0.009999999999999997
+          ],
+          [
+            70,
+            0.012588190451025208
+          ],
+          [
+            80,
+            0.014999999999999998
+          ],
+          [
+            90,
+            0.017071067811865476
+          ],
+          [
+            100,
+            0.01866025403784439
+          ],
+          [
+            110,
+            0.019659258262890684
+          ],
+          [
+            120,
+            0.02
+          ]
+        ],
+        "continuation": "constantCurvature"
+      },
+      "artifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/transition/cruise/diagnostic/smooth-reference-trial.mat",
+      "strictArtifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/transition/cruise/periodic/smooth-reference-trial.mat",
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.044269,
+        "callSeconds": [],
+        "attemptedCalls": 0,
+        "discardedCommandCount": 0,
+        "probeCertified": [],
+        "failureIdentifier": [],
+        "allProbesCertified": false,
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes; no commands applied",
+        "cruiseProbes": {
+          "seconds": [
+            0.272773,
+            0.016747,
+            0.016456
+          ],
+          "certified": [
+            true,
+            true,
+            true
+          ],
+          "failureIdentifier": [
+            "",
+            "",
+            ""
+          ]
+        }
+      },
+      "slowestFrameIndex": 0,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.002688,
+        "formulationSeconds": 0.010646,
+        "solveSeconds": 0.002686
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.010646,
+        "solveSeconds": 0.002686,
+        "normalizedDeficits": [],
+        "deficitNames": [],
+        "deficits": [],
+        "deficitScales": [],
+        "supportSectors": [],
+        "initialOverlappingMidpoints": 0
+      }
+    },
+    {
+      "path": "asymmetric",
+      "scenario": "cruise",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.051745,
+      "maximumFrameMilliseconds": 20.156,
+      "medianFrameMilliseconds": 14.4025,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": null,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 1.5578027207667142e-06,
+      "maximumStationPhaseError": 0.006814322210999535,
+      "finalTrackingError": [
+        -1.0765292331327196e-07,
+        1.0649990565630807e-12,
+        -0.00017327452247695163,
+        8.436307760985452e-16,
+        7.63249572445468e-16
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "strictTiming": {
+        "path": "asymmetric",
+        "scenario": "cruise",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000333,
+        "maximumFrameMilliseconds": 17.346,
+        "medianFrameMilliseconds": 14.2185,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": null,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 1.5578027207667142e-06,
+        "maximumStationPhaseError": 0.006814322210999535,
+        "finalTrackingError": [
+          -1.0765292331327196e-07,
+          1.0649990565630807e-12,
+          -0.00017327452247695163,
+          8.436307760985452e-16,
+          7.63249572445468e-16
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null
+      },
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "maximumLateralError": 0.0024238743855856375,
+      "maximumHeadingTrimError": 0.0010587958585964938,
+      "profile": {
+        "origin": [
+          0,
+          0
+        ],
+        "heading": 0,
+        "curvature": 0,
+        "length": 120,
+        "curvatureProfile": [
+          [
+            0,
+            0
+          ],
+          [
+            20,
+            0.005
+          ],
+          [
+            45,
+            0.018
+          ],
+          [
+            75,
+            0.01
+          ],
+          [
+            100,
+            0
+          ],
+          [
+            120,
+            0
+          ]
+        ],
+        "continuation": "constantCurvature"
+      },
+      "artifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/asymmetric/cruise/diagnostic/smooth-reference-trial.mat",
+      "strictArtifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/asymmetric/cruise/periodic/smooth-reference-trial.mat",
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.046898,
+        "callSeconds": [],
+        "attemptedCalls": 0,
+        "discardedCommandCount": 0,
+        "probeCertified": [],
+        "failureIdentifier": [],
+        "allProbesCertified": false,
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes; no commands applied",
+        "cruiseProbes": {
+          "seconds": [
+            0.296235,
+            0.020228,
+            0.022979
+          ],
+          "certified": [
+            true,
+            true,
+            true
+          ],
+          "failureIdentifier": [
+            "",
+            "",
+            ""
+          ]
+        }
+      },
+      "slowestFrameIndex": 0,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.003786,
+        "formulationSeconds": 0.012686,
+        "solveSeconds": 0.00306
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.012686,
+        "solveSeconds": 0.00306,
+        "normalizedDeficits": [],
+        "deficitNames": [],
+        "deficits": [],
+        "deficitScales": [],
+        "supportSectors": [],
+        "initialOverlappingMidpoints": 0
+      }
+    },
+    {
+      "path": "sBend",
+      "scenario": "stationary",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.049668,
+      "maximumFrameMilliseconds": 268.157,
+      "medianFrameMilliseconds": 15.702,
+      "deadlineMisses": 3,
+      "runtimeQualified": false,
+      "minimumSampledSeparationMargin": 0.24409978418247524,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 0.0006928004385951276,
+      "maximumStationPhaseError": 0.8854807906432001,
+      "finalTrackingError": [
+        1.2862912842640672e-06,
+        3.210328821539243e-09,
+        2.440603955911058e-05,
+        2.5889685897087955e-07,
+        3.0589003977375526e-07
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "strictTiming": {
+        "path": "sBend",
+        "scenario": "stationary",
+        "completed": false,
+        "passed": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "coldReferenceCompilationSeconds": 0.001005,
+        "maximumFrameMilliseconds": 107.893,
+        "medianFrameMilliseconds": 107.893,
+        "deadlineMisses": 1,
+        "runtimeQualified": false,
+        "minimumSampledSeparationMargin": null,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 0,
+        "maximumStationPhaseError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit Inf, elapsed 0.10626 s); solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "failureTime": 0
+      },
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": true,
+      "maximumLateralError": 2.6357241154286353,
+      "maximumHeadingTrimError": 0.5418409693811749,
+      "profile": {
+        "origin": [
+          0,
+          0
+        ],
+        "heading": 0,
+        "curvature": 0,
+        "length": 120,
+        "curvatureProfile": [
+          [
+            0,
+            0
+          ],
+          [
+            10,
+            0.007499999999999999
+          ],
+          [
+            20,
+            0.012990381056766578
+          ],
+          [
+            30,
+            0.015
+          ],
+          [
+            40,
+            0.01299038105676658
+          ],
+          [
+            50,
+            0.007499999999999999
+          ],
+          [
+            60,
+            8.49830834647197e-18
+          ],
+          [
+            70,
+            -0.007499999999999995
+          ],
+          [
+            80,
+            -0.012990381056766576
+          ],
+          [
+            90,
+            -0.015
+          ],
+          [
+            100,
+            -0.012990381056766578
+          ],
+          [
+            110,
+            -0.0074999999999999945
+          ],
+          [
+            120,
+            0
+          ]
+        ],
+        "continuation": "constantCurvature"
+      },
+      "artifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/sBend/stationary/diagnostic/smooth-reference-trial.mat",
+      "strictArtifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/sBend/stationary/periodic/smooth-reference-trial.mat",
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 1.448283,
+        "callSeconds": [
+          0.823166,
+          0.304308,
+          0.27723
+        ],
+        "attemptedCalls": 3,
+        "discardedCommandCount": 3,
+        "probeCertified": [
+          true,
+          true,
+          true
+        ],
+        "failureIdentifier": [
+          "",
+          "",
+          ""
+        ],
+        "allProbesCertified": true,
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes; no commands applied"
+      },
+      "slowestFrameIndex": 0,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.003497,
+        "formulationSeconds": 0.125766,
+        "solveSeconds": 0.134468
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 9,
+        "familyAttempts": 1,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.125766,
+        "solveSeconds": 0.134468,
+        "normalizedDeficits": 0.3608020422655158,
+        "deficitNames": [
+          "collision:trackId:1:1",
+          "collision:trackId:1:2",
+          "collision:trackId:1:3",
+          "collision:trackId:1:4",
+          "collision:trackId:1:5",
+          "collision:trackId:1:6",
+          "collision:trackId:1:7",
+          "collision:trackId:1:8",
+          "collision:trackId:1:9",
+          "collision:trackId:1:10",
+          "collision:trackId:1:11",
+          "collision:trackId:1:12",
+          "collision:trackId:1:13",
+          "collision:trackId:1:14",
+          "collision:trackId:1:15",
+          "collision:trackId:1:16",
+          "collision:trackId:1:17",
+          "collision:trackId:1:18",
+          "collision:trackId:1:19",
+          "collision:trackId:1:20",
+          "collision:trackId:1:21",
+          "collision:trackId:1:22",
+          "collision:trackId:1:23",
+          "collision:trackId:1:24",
+          "collision:trackId:1:25",
+          "collision:trackId:1:26",
+          "collision:trackId:1:27",
+          "collision:trackId:1:28",
+          "collision:trackId:1:29",
+          "collision:trackId:1:30",
+          "collision:trackId:1:31",
+          "collision:trackId:1:32",
+          "collision:trackId:1:33",
+          "collision:trackId:1:34",
+          "collision:trackId:1:35",
+          "collision:trackId:1:36",
+          "collision:trackId:1:37",
+          "collision:trackId:1:38",
+          "collision:trackId:1:39",
+          "collision:trackId:1:40",
+          "collision:trackId:1:41",
+          "collision:trackId:1:42",
+          "collision:trackId:1:43",
+          "collision:trackId:1:44",
+          "collision:trackId:1:45",
+          "collision:trackId:1:46",
+          "collision:trackId:1:47",
+          "collision:trackId:1:48",
+          "exit:trackId:1",
+          "terminalCone:1",
+          "terminalCone:2",
+          "terminalCone:3",
+          "terminalCone:4",
+          "terminalCone:5",
+          "terminalCone:6"
+        ],
+        "deficits": [
+          0.00025091788476272676,
+          0.0002507566749018468,
+          0.0002505585205662203,
+          0.0002503199438032216,
+          0.0002500431503440901,
+          0.0002497239406598233,
+          0.0002493544894768724,
+          0.00024892885547378045,
+          0.0002484429353533673,
+          0.0002479014347022649,
+          0.0002473329834879864,
+          0.000246390275354037,
+          0.0002448781156489204,
+          0.00024334727448996566,
+          0.8403499752739444,
+          0.00024431240938264644,
+          0.0002447112936259268,
+          0.0002450429037347034,
+          0.0002450411960108955,
+          0.00024454640165193404,
+          0.0002440529274030193,
+          0.00024484766225598483,
+          0.9805739212579127,
+          0.00953821213813659,
+          0.00024389380033689083,
+          0.0002443583123991839,
+          0.00024548015077142406,
+          0.0002459075361447441,
+          0.0002464823048792792,
+          0.0002470684508833333,
+          0.0002475747542866646,
+          0.00024808201883517355,
+          0.0002485474263352051,
+          0.0002489442372962849,
+          0.00024927859923463286,
+          0.0002495751087336847,
+          0.0002498594211938997,
+          0.0002501489923129705,
+          0.0002504495807056039,
+          0.0002507542330519814,
+          0.0002510445258879366,
+          0.0002512793010753499,
+          0.0002514219384209641,
+          0.0002514531626442561,
+          0.00025137505327637764,
+          0.00025121993853315187,
+          0.00025103816520117764,
+          0.000250869170801703,
+          0.00024780236326365406,
+          9.478025738067768e-05,
+          9.498886212238484e-05,
+          9.498886212238481e-05,
+          0.00010242867765888733,
+          8.503033984501592e-05,
+          8.540658929019971e-05
+        ],
+        "deficitScales": [
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          0.9441442592139286,
+          0.8285619058819136,
+          0.8285619058819136,
+          0.8453906762599417,
+          0.8285619058819136,
+          0.8285619058819136
+        ],
+        "supportSectors": -1,
+        "initialOverlappingMidpoints": 12
+      }
+    },
+    {
+      "path": "sBend",
+      "scenario": "oncoming",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.001223,
+      "maximumFrameMilliseconds": 151.5,
+      "medianFrameMilliseconds": 15.673,
+      "deadlineMisses": 1,
+      "runtimeQualified": false,
+      "minimumSampledSeparationMargin": 0.35015737402630454,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 0.00017245968797817077,
+      "maximumStationPhaseError": 0.2121487659892125,
+      "finalTrackingError": [
+        -6.037079555373449e-07,
+        2.2567157829199414e-11,
+        0.00042638686098506184,
+        -3.266774807320759e-15,
+        -3.363716236604573e-15
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "strictTiming": {
+        "path": "sBend",
+        "scenario": "oncoming",
+        "completed": false,
+        "passed": false,
+        "executedHolds": 26,
+        "durationSeconds": 2.6,
+        "coldReferenceCompilationSeconds": 0.000582,
+        "maximumFrameMilliseconds": 119.062,
+        "medianFrameMilliseconds": 15.743,
+        "deadlineMisses": 1,
+        "runtimeQualified": false,
+        "minimumSampledSeparationMargin": 13.210284903142322,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 2.7085792478516446e-07,
+        "maximumStationPhaseError": 0.0006223314447950656,
+        "finalTrackingError": [
+          0.0021746372082761117,
+          0.00051420283852225,
+          0.00014961284174042078,
+          -0.004509964183339363,
+          -0.003673504207572592
+        ],
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 2.2109, elapsed 0.11784 s); No hard-certified admission obtained.). No command was issued.",
+        "failureTime": 2.6
+      },
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": true,
+      "maximumLateralError": 2.9632091664448295,
+      "maximumHeadingTrimError": 0.6071301987289798,
+      "profile": {
+        "origin": [
+          0,
+          0
+        ],
+        "heading": 0,
+        "curvature": 0,
+        "length": 120,
+        "curvatureProfile": [
+          [
+            0,
+            0
+          ],
+          [
+            10,
+            0.007499999999999999
+          ],
+          [
+            20,
+            0.012990381056766578
+          ],
+          [
+            30,
+            0.015
+          ],
+          [
+            40,
+            0.01299038105676658
+          ],
+          [
+            50,
+            0.007499999999999999
+          ],
+          [
+            60,
+            8.49830834647197e-18
+          ],
+          [
+            70,
+            -0.007499999999999995
+          ],
+          [
+            80,
+            -0.012990381056766576
+          ],
+          [
+            90,
+            -0.015
+          ],
+          [
+            100,
+            -0.012990381056766578
+          ],
+          [
+            110,
+            -0.0074999999999999945
+          ],
+          [
+            120,
+            0
+          ]
+        ],
+        "continuation": "constantCurvature"
+      },
+      "artifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/sBend/oncoming/diagnostic/smooth-reference-trial.mat",
+      "strictArtifact": "/home/zai/.cache/collisionAvoidance/general-path-20260917/final/sBend/oncoming/periodic/smooth-reference-trial.mat",
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.122937,
+        "callSeconds": [
+          0.046687,
+          0.017927,
+          0.018208
+        ],
+        "attemptedCalls": 3,
+        "discardedCommandCount": 3,
+        "probeCertified": [
+          true,
+          true,
+          true
+        ],
+        "failureIdentifier": [
+          "",
+          "",
+          ""
+        ],
+        "allProbesCertified": true,
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes; no commands applied"
+      },
+      "slowestFrameIndex": 26,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.005068,
+        "formulationSeconds": 0.07386899999999999,
+        "solveSeconds": 0.06769700000000001
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 8,
+        "familyAttempts": 1,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.07386899999999999,
+        "solveSeconds": 0.06769700000000001,
+        "normalizedDeficits": 2.210920466837221,
+        "deficitNames": [
+          "collision:trackId:1:1",
+          "collision:trackId:1:2",
+          "collision:trackId:1:3",
+          "collision:trackId:1:4",
+          "collision:trackId:1:5",
+          "collision:trackId:1:6",
+          "collision:trackId:1:7",
+          "collision:trackId:1:8",
+          "collision:trackId:1:9",
+          "collision:trackId:1:10",
+          "collision:trackId:1:11",
+          "collision:trackId:1:12",
+          "collision:trackId:1:13",
+          "collision:trackId:1:14",
+          "collision:trackId:1:15",
+          "collision:trackId:1:16",
+          "collision:trackId:1:17",
+          "collision:trackId:1:18",
+          "collision:trackId:1:19",
+          "collision:trackId:1:20",
+          "collision:trackId:1:21",
+          "collision:trackId:1:22",
+          "collision:trackId:1:23",
+          "collision:trackId:1:24",
+          "collision:trackId:1:25",
+          "collision:trackId:1:26",
+          "collision:trackId:1:27",
+          "collision:trackId:1:28",
+          "collision:trackId:1:29",
+          "collision:trackId:1:30",
+          "collision:trackId:1:31",
+          "collision:trackId:1:32",
+          "exit:trackId:1",
+          "terminalCone:1",
+          "terminalCone:2",
+          "terminalCone:3",
+          "terminalCone:4",
+          "terminalCone:5",
+          "terminalCone:6"
+        ],
+        "deficits": [
+          0.00011529982459217932,
+          0.00011532790066994064,
+          0.00011535801052689392,
+          0.0001153962055829253,
+          0.00011544019397282007,
+          0.00011548110299934941,
+          0.00011551771194050686,
+          0.00011558571775437702,
+          0.5537004176398702,
+          2.309609967901068,
+          0.04349622698429493,
+          0.04427479171483029,
+          0.017402986431743647,
+          2.1383988342368525,
+          0.0468236058162521,
+          0.00011517370591045423,
+          0.00011533748469830335,
+          0.00011540498115839052,
+          0.00011530012008965915,
+          0.00011519068623843401,
+          0.00011499637373198108,
+          0.00011485461080530072,
+          0.00011494298715949645,
+          0.00011507197179456344,
+          0.00011514117541161805,
+          0.00011517809351275377,
+          0.00011519150790654079,
+          0.00011516961673162654,
+          0.0001151313449863969,
+          0.00011505745019762968,
+          0.00011503683647727583,
+          0.00011511905419105357,
+          0.00011538582537785557,
+          5.0987413509412216e-05,
+          4.445667086440403e-05,
+          4.4456670864404e-05,
+          4.475261403595787e-05,
+          5.89658617932816e-05,
+          4.323249457731638e-05
+        ],
+        "deficitScales": [
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          2.15,
+          0.9586845151341278,
+          0.8285619058819136,
+          0.8285619058819136,
+          0.8285619058819136,
+          0.8285619058819136,
+          0.8285619058819136
+        ],
+        "supportSectors": -1,
+        "initialOverlappingMidpoints": 7
+      }
+    }
+  ],
+  "limitations": [
+    "Hard clock-relative 2 m phase domain restricts braking/waiting; not general speed-independent path following.",
+    "Strict 100 ms encounter admission remains unqualified.",
+    "Declared scheduled affine plant; no nonlinear physical flow inclusion guarantee.",
+    "Nonzero Cartesian ego position uncertainty for profile inverse projection is not implemented.",
+    "Explicit smooth curvature profile and constant-curvature continuation required; arbitrary sampled polyline is not silently smoothed."
+  ],
+  "developmentArtifacts": "/home/zai/.cache/collisionAvoidance/general-path-20260917",
+  "developmentTimingMilliseconds": {
+    "densePhaseRows": {
+      "stationary": 2192.774,
+      "oncoming": 849.472
+    },
+    "firstSparsePhaseRows": {
+      "stationary": 252.024,
+      "oncoming": 153.974
+    }
+  }
+}

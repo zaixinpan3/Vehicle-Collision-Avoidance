@@ -5,7 +5,7 @@ current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
 Fresh admission uses analytic support families and search-only restoration, followed by a hard
 trajectory SOCP with a full input sequence and penalized first-hold CLF slack.
-Its format-33 state retains the complete prediction and terminal continuation.
+Its format-34 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -24,8 +24,8 @@ Do not move controller helpers into those directories to evade the limit.
 | `avoidanceStageQp.m` | Equivalent sparse stage transcription and exact duplicate-row reduction (`build`) |
 | `solveHardCbfClf.m` | Hard and search-only conic solving (`constrained`, `restore`), constraint generation and independent verification (`certify`) |
 | `avoidanceSafetyGeometry.m` | Swept separation (`build`), analytic support proposals (`supportDirection`, `supportNormals`), rectangle distance and shared numeric kernels |
-| `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
-| `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics and signed road forces (`roadLoad`) |
+| `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and certified local chart bounds |
+| `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
 | `targetPrediction.m` | Bounded target admission (`admitOnline`), reachable-box conditioning (`condition`), absolute-time flow, offline uncertainty studies and footprint support |
@@ -41,7 +41,7 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-33 predictive certificate. The online path calls
+format-34 predictive certificate. The online path calls
 `formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained`. Fresh
 admission uses bounded support sectors, whole-hold scoring, grouped-deficit
 restoration and final hard verification. Accepted successors retain the
@@ -57,6 +57,6 @@ remains the declared zero-residual held affine plant.
 
 Clear changed MATLAB functions/classes after updating a live session. Native
 kernels remain under the excluded `solver/` tree and must be regenerated with `scripts/buildAvoidanceGeometryKernel.m`
-after this pose/domain kernel interface change; format-33 kernels include
+after changing the shared geometry kernel; the current kernels include
 the numeric affine pose map and hard local-domain payload. `controllerSourceBudgetTest` enforces the
 20-source upper limit.

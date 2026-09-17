@@ -228,6 +228,11 @@ function [lane, road] = localReadLane(rawGeometry, ego, cfg)
             rawLane = [];
         end
     end
+    if isempty(rawLane) && isstruct(rawGeometry) && isfield(rawGeometry,"referenceCurve") ...
+            && ~isempty(rawGeometry.referenceCurve)
+        curve=laneGeometry.validateReferenceCurve(rawGeometry.referenceCurve);
+        rawLane=laneGeometry.referencePose(linspace(0,curve.length,max(2,ceil(curve.length/2)+1)),0,curve).';
+    end
     lane = localReadCenterline(rawLane, ego);
     if isstruct(rawGeometry) && isfield(rawGeometry, "referenceCurve") ...
             && ~isempty(rawGeometry.referenceCurve)

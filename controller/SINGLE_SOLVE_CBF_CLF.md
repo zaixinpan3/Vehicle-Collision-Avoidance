@@ -1,6 +1,6 @@
 # Predictive safety with overlap-aware support search
 
-The format-33 controller retains a complete finite input plan, swept rectangle
+The format-34 controller retains a complete finite input plan, swept rectangle
 collision certificate, finite confirmed exit and a permanent terminal
 information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
@@ -86,7 +86,7 @@ The first-hold CLF and five terminal modal inequalities are SOC constraints. All
 collision, actuator and slew rows are hard. The absolute target
 exit deadline is preserved while any admitted target remains active.
 
-The returned format-33 state contains the plan, verified inherited affine
+The returned format-34 state contains the plan, verified inherited affine
 bounds and terminal cone, exact nominal nodes, uncertainty boxes, whole-hold
 geometry, stable target identities, common generator and permanent terminal
 certificate. Earlier state formats must be reset.
@@ -185,3 +185,13 @@ measured against the control hold. An offline diagnostic search budget does
 not change that real-time requirement.
 The controller has no executable fallback when a mathematically feasible
 problem fails to solve on time. See the current dated report under `report/`.
+
+## Smooth variable-curvature references
+
+Profiles use a fixed reference-phase sequence of held affine models, backward
+Riccati five-error CLF matrices, and a verified six-dimensional terminal family.
+The online objective still penalizes path/velocity error, trim-input deviation
+and squared CLF slack. Whole-hold phase domains prevent arbitrary mismatch
+between the scheduled model and actual station. The reference/terminal setup is
+explicitly measured separately from periodic frames. See
+[the full construction and limitations](CURVED_CRUISE_CERTIFICATE.md).

@@ -10,7 +10,8 @@ classdef hardEncounterBarrier
             model.carriedWitness = [];
             model.measurementContractChanged=false;
             model.measurementRadiusLimit = model.initialFrenetErrorBound;
-            if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
+            if isfield(model.lane,'referenceCurve') && ~laneGeometry.isVaryingReference(model.lane) ...
+                    && model.lane.referenceCurve.curvature~=0
                 curvature=abs(model.lane.referenceCurve.curvature);
                 distance=norm(ego.stateErrorBound(1:2));
                 % Declare a Frenet sensing contract from the current Cartesian
@@ -27,7 +28,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=33
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=34
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -48,12 +49,17 @@ classdef hardEncounterBarrier
                 if model.measurementContractChanged
                     model.measurementRadiusLimit=max(measuredLimit,model.measurementRadiusLimit);
                 end
-                model.cruiseCertificate = stored.program.cruiseCertificate;
-                if ~model.measurementContractChanged,model.permanentTerminal = stored.terminal;end
+                if laneGeometry.isVaryingReference(model.lane)
+                    model.cruiseCertificate = ltvBicycleModel.sampledCruise(model);
+                else
+                    model.cruiseCertificate = stored.program.cruiseCertificate;
+                    if ~model.measurementContractChanged,model.permanentTerminal = stored.terminal;end
+                end
                 % Enlarged bounds require a NEW complete certificate. The
                 % old prediction still conditions the actual successor, but
                 % does not prove the changed future sensing contract feasible.
-                if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
+                if isfield(model.lane,'referenceCurve') && ~laneGeometry.isVaryingReference(model.lane) ...
+                        && model.lane.referenceCurve.curvature~=0
                     period = 2*pi/abs(model.lane.referenceCurve.curvature);
                     model.initialEgoState(1) = model.initialEgoState(1)+period*round( ...
                         (stored.predictedState(1,2)-model.initialEgoState(1))/period);
@@ -170,14 +176,35 @@ classdef hardEncounterBarrier
         function [prediction,anchor] = predict(model,cruise)
             count = model.horizonSteps;
             inputs = repmat(cruise.input,1,count);
+            prescribed = model;
+            prescribed.prescribedStages = repmat(cruise.stage,count,1);
+            scheduled=isfield(cruise,'scheduled') && cruise.scheduled;
+            if scheduled
+                referenceStates=zeros(6,count+1);referenceInputs=zeros(2,count);
+                referenceMatrices=zeros(5,5,count+1);
+                for index=1:count+1
+                    reference=ltvBicycleModel.referenceAt(model,cruise.index+index-1);
+                    referenceStates(:,index)=reference.state;
+                    referenceMatrices(:,:,index)=reference.matrix;
+                    if index<=count
+                        prescribed.prescribedStages(index)=reference.stage;
+                        inputs(:,index)=reference.input;
+                        referenceInputs(:,index)=reference.input;
+                    end
+                end
+            end
             if isfield(model,'initializationPlan')
                 retained = min(count,size(model.initializationPlan,2));
                 inputs(:,1:retained)=model.initializationPlan(:,1:retained);
             end
-            prescribed = model;
-            prescribed.prescribedStages = repmat(cruise.stage,count,1);
             anchor = inputs(:);
             prediction = ltvBicycleModel.finitePredict(prescribed,[]);
+            if scheduled
+                prediction.referenceStates=referenceStates;
+                prediction.referenceInputs=referenceInputs;
+                prediction.referenceMatrices=referenceMatrices;
+                prediction.referencePhaseIndex=cruise.index;
+            end
         end
 
         function [matrix,bound,completion] = finiteCompletionRows(model,prediction,finalMap,finalOffset,frame)
@@ -238,7 +265,8 @@ classdef hardEncounterBarrier
             rho = model.initialFrenetErrorBound;
             frame = laneGeometry.frameBounds(model.lane,z(1), ...
                 max(model.cfg.controller.stationTrustRadius,rho(1)),abs(z(2))+rho(2));
-            if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
+            if isfield(model.lane,'referenceCurve') && (laneGeometry.isVaryingReference(model.lane) ...
+                    || model.lane.referenceCurve.curvature~=0)
                 frame=laneGeometry.localPoseFrame(model.lane.referenceCurve,z(1:3),rho(1:3));
             end
             direction = localExitDirection(target.center,frame,z);
@@ -282,18 +310,26 @@ classdef hardEncounterBarrier
 
         function [matrix,bound,terminal,completion,cone] = completionRows(model,prediction,geometry)
         % The terminal modal set and its sampled feedback use the ONLINE generator.
-            terminal = localTerminalSet(model);
+            terminalModel=model;
+            if isfield(prediction,'referencePhaseIndex')
+                terminalModel.referencePhaseIndex=prediction.referencePhaseIndex+prediction.stageCount;
+                if isfield(model,'terminalOptimization') && model.terminalOptimization
+                    terminalModel.referencePhaseIndex=prediction.referencePhaseIndex;
+                end
+            end
+            terminal = localTerminalSet(terminalModel);
             [finalMap,finalOffset] = localExactFinalMap(model,prediction);
             radius = prediction.initialErrorBound(:,end);
             modal=terminal.modalMatrix;
-            cone.matrix=zeros(15,prediction.planCount);cone.bound=zeros(15,1);
-            cone.sizes=3*ones(5,1);
-            for mode=1:5
+            stateIndex=terminal.stateIndex;modeCount=size(modal,1);
+            cone.matrix=zeros(3*modeCount,prediction.planCount);cone.bound=zeros(3*modeCount,1);
+            cone.sizes=3*ones(modeCount,1);
+            for mode=1:modeCount
                 rows=3*mode-2:3*mode;
-                mapped=modal(mode,:)*finalMap(2:6,:);
-                offset=modal(mode,:)*(finalOffset(2:6)-terminal.reference(2:6));
+                mapped=modal(mode,:)*finalMap(stateIndex,:);
+                offset=modal(mode,:)*(finalOffset(stateIndex)-terminal.reference(stateIndex));
                 cone.matrix(rows,:)=[zeros(1,prediction.planCount);-real(mapped);-imag(mapped)];
-                cone.bound(rows)=[terminal.radius(mode)-terminal.reserve-abs(modal(mode,:))*radius(2:6); ...
+                cone.bound(rows)=[terminal.radius(mode)-terminal.reserve-abs(modal(mode,:))*radius(stateIndex); ...
                     real(offset);imag(offset)];
             end
             % Any conditioned terminal center lies in the certified modal set.
@@ -362,6 +398,11 @@ classdef hardEncounterBarrier
             step = struct('input',input,'generator',generator, ...
                 'successor',exact(1:6,:)*[center;input;1], ...
                 'successorRadius',abs(exact(1:6,1:6))*radius,'stage',terminal.cruise.stage);
+            if isfield(terminal,'scheduled') && terminal.scheduled
+                nextModel=terminal.scheduleModel;
+                nextModel.referencePhaseIndex=terminal.index+1;
+                step.nextTerminal=localTerminalSet(nextModel);
+            end
         end
 
         function states = terminalFlow(terminal,initial,steps)
@@ -370,9 +411,11 @@ classdef hardEncounterBarrier
             states = zeros(6,numel(steps));
             for index = 1:numel(steps)
                 x=initial;
+                currentTerminal=terminal;
                 for stage=1:steps(index)
-                    next=hardEncounterBarrier.terminalStep(terminal,x,zeros(6,1),terminal.sampleTime);
+                    next=hardEncounterBarrier.terminalStep(currentTerminal,x,zeros(6,1),terminal.sampleTime);
                     x=next.successor;
+                    if isfield(next,'nextTerminal'),currentTerminal=next.nextTerminal;end
                 end
                 states(:,index)=x;
             end
@@ -380,8 +423,9 @@ classdef hardEncounterBarrier
 
         function [accepted,margins] = terminalMembership(terminal,center,radius)
         % Prior box inclusion in the terminal modal set, before conditioning.
-            margins = terminal.radius-abs(terminal.modalMatrix*(center(2:6)-terminal.reference(2:6))) ...
-                -abs(terminal.modalMatrix)*radius(2:6);
+            selected=terminal.stateIndex;
+            margins = terminal.radius-abs(terminal.modalMatrix*(center(selected)-terminal.reference(selected))) ...
+                -abs(terminal.modalMatrix)*radius(selected);
             accepted = all(isfinite(margins)) && all(margins>=0);
         end
 
@@ -421,6 +465,10 @@ function terminal = localTerminalSet(model)
 % An invariant information-state cruise set for the admitted affine plant.
 % The sensor contract bounds EVERY future posterior measurement box. No
 % favorable future reset is used anywhere in the finite open-loop witness.
+    if laneGeometry.isVaryingReference(model.lane)
+        terminal=localScheduledTerminalSet(model);
+        return;
+    end
     if isfield(model,'permanentTerminal'),terminal=model.permanentTerminal;return;end
     cfg=model.cfg;
     if ~isempty(model.cruiseCertificate)
@@ -492,7 +540,7 @@ function terminal = localTerminalSet(model)
     deviationBound=[holdBound-support*radius-noise; ...
         rate(finite)-slewSupport(finite,:)*radius-slewNoise(finite); ...
         rate(finite)-slewSupport(finite,:)*radius-slewNoise(finite)];
-    terminal=struct('cruise',cruise,'reference',cruise.state,'input',trim, ...
+    terminal=struct('cruise',cruise,'reference',cruise.state,'input',trim,'stateIndex',2:6, ...
         'feedback',[zeros(2,1),-gain],'modalMatrix',modal,'modalBasis',basis,'radius',radius,'reserve',reserve, ...
         'measurementRadiusLimit',model.measurementRadiusLimit,'holdRows',rows,'holdBound',holdBound, ...
         'sampleTime',model.sampleTime,'contraction',contraction,'comparison',comparison, ...
@@ -501,7 +549,186 @@ function terminal = localTerminalSet(model)
         'continuousA',cruise.stage.continuousA,'continuousB',cruise.stage.continuousB, ...
         'continuousC',cruise.stage.continuousC,'targetIndependent',true, ...
         'scope',"boundedMeasurementRobustModalCruise",'sameOnlineGenerator',true);
+    terminal.nextRadius=radius;
+    terminal.nextModalMatrix=modal;
+    terminal.nextReference=cruise.state;
+    terminal.successorInputMap=modal*cruise.transition(2:6,7:8);
     savedKey=key;saved=terminal;
+end
+
+function terminal=localScheduledTerminalSet(model)
+% A finite reference-indexed family with an invariant constant-curvature tail.
+% Every transition and held phase domain is checked; a curvature grid is not
+% treated as a certificate for an undeclared continuous parameter family.
+    cfg=model.cfg;
+    if isfield(model,'road') && ~isempty(model.road.boundaries)
+        error('collisionAvoidanceController:optimizationFailed', ...
+            'The scheduled terminal certificate requires an unbounded road-free reference domain.');
+    end
+    bank=ltvBicycleModel.referenceSchedule(model);
+    if isfield(model,'referencePhaseIndex')
+        index=model.referencePhaseIndex;
+    else
+        current=ltvBicycleModel.sampledCruise(model);index=current.index;
+    end
+    persistent savedKey saved
+    key={bank.key,model.measurementRadiusLimit,cfg.solver.constraintTolerance};
+    if isempty(savedKey) || ~isequaln(savedKey,key)
+        saved=localScheduledTerminalFamily(model,bank);
+        savedKey=key;
+    end
+    selected=min(index,bank.tailIndex);
+    terminal=saved{selected};
+    reference=ltvBicycleModel.referenceAt(model,index);
+    terminal.reference=reference.state;terminal.nextReference=reference.nextState;
+    terminal.cruise=reference;terminal.index=index;
+    % Keep only inputs needed to select the immutable successor certificate.
+    terminal.scheduleModel=struct('cfg',cfg,'sampleTime',model.sampleTime,'lane',model.lane, ...
+        'longitudinalAccelerationBias',model.longitudinalAccelerationBias, ...
+        'measurementRadiusLimit',model.measurementRadiusLimit, ...
+        'initialEgoState',reference.state,'stateTime',cfg.clf.referenceEpoch+(index-1)*model.sampleTime);
+end
+
+function terminals=localScheduledTerminalFamily(model,bank)
+% Sparse offline feasibility synthesis. The online optimization still uses
+% six modal SOCs, actuator rows and a short certified prediction horizon.
+    cfg=model.cfg;count=bank.tailIndex;dimension=6;decisionCount=dimension*count+1;
+    cap=model.measurementRadiusLimit(:);h=model.sampleTime;
+    reserve=16*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance);
+    phaseRadius=cfg.encounter.referencePhaseRadius;
+    scales=[min(2,phaseRadius);cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale; ...
+        cfg.clf.speedErrorScale;cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+    q=diag(1./scales.^2);
+    inputWeight=diag([10*cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight]);
+    gains=zeros(2,dimension,count);closed=zeros(dimension,dimension,count);
+    for index=1:count
+        reference=bank.certificates{index};f=reference.transition(1:6,1:6);g=reference.transition(1:6,7:8);
+        gains(:,:,index)=dlqr(f,g,q,inputWeight);
+        closed(:,:,index)=f-g*gains(:,:,index);
+    end
+    [basis,~]=eig(closed(:,:,1));modal=basis\eye(dimension);
+    if rcond(basis)<1e-10
+        error('collisionAvoidanceController:invalidTerminalModel', ...
+            'The scheduled terminal modal coordinates are ill-conditioned.');
+    end
+    lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+    rate=h*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    finiteRate=isfinite(rate);inputRows=[eye(2);-eye(2)];
+    matrixParts=cell(count,1);boundParts=cell(count,1);equalParts=cell(count,1);
+    ingredients=cell(count,1);
+    for index=1:count
+        next=min(index+1,count);columns=(index-1)*dimension+(1:dimension);
+        nextColumns=(next-1)*dimension+(1:dimension);
+        reference=bank.certificates{index};nextReference=bank.certificates{next};
+        gain=gains(:,:,index);nextGain=gains(:,:,next);
+        g=reference.transition(1:6,7:8);fc=closed(:,:,index);
+        drift=reference.transition(1:6,:)*[reference.state;reference.input;1]-reference.nextState;
+        comparison=abs(modal*fc*basis)+4096*eps*(1+abs(modal)*abs(fc)*abs(basis));
+        disturbance=abs(modal*drift)+abs(modal*g*gain)*cap;
+        holdBound=[upper-reference.input;reference.input-lower];
+        holdBound=holdBound-reserve*(1+abs(holdBound));
+        holdSupport=abs(inputRows*gain*basis);holdNoise=abs(inputRows*gain)*cap;
+        change=eye(2)+nextGain*g;
+        slewSupport=abs((gain-nextGain*fc)*basis);
+        slewNoise=abs(gain+nextGain*g*gain)*cap+abs(nextGain)*cap ...
+            +abs(nextReference.input-reference.input-nextGain*drift);
+        % This generous enclosure supplies Taylor arithmetic limits. Its
+        % support rows below verify it; it is not a physical state limit.
+        envelope=[phaseRadius;1000*ones(5,1)];
+        stage=reference.stage;
+        tube=stateUncertainty.heldInterval(stage.continuousA,[zeros(6),stage.continuousB], ...
+            stage.continuousC,[eye(6),zeros(6,2)],reference.state,zeros(6,1),zeros(6,1), ...
+            h,cfg.encounter.taylorOrder,[envelope;max(abs([lower,upper]),[],2)],zeros(6,1));
+        coefficients=size(tube.offset,2);
+        phaseSupport=zeros(coefficients,dimension);phaseBound=zeros(coefficients,1);
+        phaseInput=zeros(coefficients,2);
+        for coefficient=1:coefficients
+            fraction=(coefficient-1)/(coefficients-1);
+            phase=reference.state(1)+fraction*(reference.nextState(1)-reference.state(1));
+            flowInput=tube.map(1,7:8,coefficient);
+            flowState=tube.map(1,1:6,coefficient);
+            driftHold=tube.offset(1,coefficient)+flowInput*reference.input-phase;
+            phaseSupport(coefficient,:)=abs((flowState-flowInput*gain)*basis);
+            phaseBound(coefficient)=phaseRadius-abs(driftHold)-abs(flowInput*gain)*cap ...
+                -tube.radius(1,coefficient)-reserve;
+            phaseInput(coefficient,:)=flowInput;
+        end
+        if isfinite(reference.lateralRegularityRadius)
+            for coefficient=1:coefficients
+                flowInput=tube.map(2,7:8,coefficient);
+                flowState=tube.map(2,1:6,coefficient);
+                driftHold=tube.offset(2,coefficient)+flowInput*reference.input;
+                phaseSupport(end+1,:)=abs((flowState-flowInput*gain)*basis); %#ok<AGROW>
+                phaseBound(end+1,1)=reference.lateralRegularityRadius-abs(driftHold) ...
+                    -abs(flowInput*gain)*cap-tube.radius(2,coefficient)-reserve; %#ok<AGROW>
+                phaseInput(end+1,:)=flowInput; %#ok<AGROW>
+            end
+        end
+        localMatrix=[comparison;holdSupport;slewSupport(finiteRate,:);abs(basis); ...
+            phaseSupport;-eye(dimension)];
+        localBound=[-disturbance-2*reserve;holdBound-holdNoise-2*reserve; ...
+            rate(finiteRate)-slewNoise(finiteRate)-2*reserve;envelope; ...
+            phaseBound-2*reserve;zeros(dimension,1)];
+        rows=sparse(size(localMatrix,1),decisionCount);rows(:,columns)=localMatrix;
+        rows(1:dimension,nextColumns)=rows(1:dimension,nextColumns)-eye(dimension);
+        rows(end-dimension+1:end,end)=1;
+        matrixParts{index}=rows;boundParts{index}=localBound;
+        pairs=sparse(0,decisionCount);
+        for mode=1:dimension
+            if all(abs(imag(basis(:,mode)))<1e-14),continue;end
+            [distance,match]=min(sum(abs(basis-conj(basis(:,mode))).^2,1));
+            if match>mode && distance<1e-16
+                row=sparse(1,decisionCount);row(columns(mode))=1;row(columns(match))=-1;
+                pairs=[pairs;row]; %#ok<AGROW>
+            end
+        end
+        equalParts{index}=pairs;
+        ingredients{index}=struct('comparison',comparison,'disturbance',disturbance, ...
+            'holdBound',holdBound,'holdSupport',holdSupport,'holdNoise',holdNoise, ...
+            'change',change,'slewSupport',slewSupport,'slewNoise',slewNoise, ...
+            'phaseSupport',phaseSupport,'phaseBound',phaseBound,'phaseInput',phaseInput);
+    end
+    matrix=vertcat(matrixParts{:});bound=vertcat(boundParts{:});equal=vertcat(equalParts{:});
+    objective=zeros(decisionCount,1);objective(end)=-1;
+    options=optimoptions('linprog','Display','none','ConstraintTolerance',1e-9);
+    [solution,~,flag]=linprog(objective,matrix,bound,equal,zeros(size(equal,1),1), ...
+        [repmat(4*reserve,dimension*count,1);0],[],options);
+    if flag<=0 || isempty(solution) || any(~isfinite(solution)) ...
+            || max(matrix*solution-bound)>reserve/4 ...
+            || any(abs(equal*solution)>reserve/4)
+        error('collisionAvoidanceController:invalidTerminalModel', ...
+            'No verified phase-indexed terminal family satisfies sensing, phase and actuator constraints.');
+    end
+    radii=reshape(solution(1:end-1),dimension,count);terminals=cell(count,1);
+    for index=1:count
+        next=min(index+1,count);reference=bank.certificates{index};data=ingredients{index};
+        gain=gains(:,:,index);radius=radii(:,index);nextRadius=radii(:,next);
+        phaseRoom=data.phaseBound-data.phaseSupport*radius;
+        slewRoom=rate(finiteRate)-data.slewSupport(finiteRate,:)*radius-data.slewNoise(finiteRate);
+        deviationRows=[inputRows;data.change(finiteRate,:);-data.change(finiteRate,:); ...
+            data.phaseInput;-data.phaseInput];
+        deviationBound=[data.holdBound-data.holdSupport*radius-data.holdNoise; ...
+            slewRoom;slewRoom;phaseRoom;phaseRoom];
+        if any(data.comparison*radius+data.disturbance>nextRadius-reserve) ...
+                || any(deviationBound<reserve)
+            error('collisionAvoidanceController:invalidTerminalModel', ...
+                'The independently checked terminal family has insufficient numerical reserve.');
+        end
+        stage=reference.stage;
+        terminals{index}=struct('cruise',reference,'reference',reference.state,'input',reference.input, ...
+            'feedback',-gain,'stateIndex',1:6,'modalMatrix',modal,'modalBasis',basis,'radius',radius, ...
+            'nextRadius',nextRadius,'nextModalMatrix',modal,'nextReference',reference.nextState, ...
+            'successorInputMap',modal*reference.transition(1:6,7:8),'reserve',reserve, ...
+            'measurementRadiusLimit',cap,'sampleTime',h,'comparison',data.comparison, ...
+            'contraction',abs(eig(closed(:,:,index))),'disturbanceSupport',data.disturbance, ...
+            'holdRows',[zeros(4,dimension),inputRows],'holdBound',data.holdBound, ...
+            'holdSupport',data.holdSupport,'holdNoise',data.holdNoise, ...
+            'deviationRows',deviationRows,'deviationBound',deviationBound, ...
+            'continuousA',stage.continuousA,'continuousB',stage.continuousB,'continuousC',stage.continuousC, ...
+            'targetIndependent',true,'sameOnlineGenerator',true,'scheduled',true,'index',index, ...
+            'phaseRadius',phaseRadius,'scope',"boundedPhaseScheduledModalContinuation");
+    end
 end
 
 function [count,inputs]=localCruiseAdmission(model)
@@ -520,6 +747,11 @@ function [count,inputs]=localCruiseAdmission(model)
         inputs(:,index)=input;previous=input;
         x=cruise.transition(1:6,:)*[x;input;1];
         rho=abs(cruise.transition(1:6,1:6))*rho;
+        if isfield(terminal,'scheduled') && terminal.scheduled
+            nextModel=terminal.scheduleModel;
+            nextModel.referencePhaseIndex=terminal.index+1;
+            terminal=localTerminalSet(nextModel);cruise=terminal.cruise;
+        end
         [~,margin]=hardEncounterBarrier.terminalMembership(terminal,x,rho);
         if all(margin>4*terminal.reserve)
             if index>=cfg.controller.minimumHorizonSteps,feasibleCount=index;end

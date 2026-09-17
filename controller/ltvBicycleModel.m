@@ -3,7 +3,16 @@ classdef ltvBicycleModel
 
     methods (Static)
         function certificate = sampledCruise(model)
-        % Common discrete-time CLF for the frozen-curvature declared plant.
+        % Discrete CLF for a constant trim or an immutable reference schedule.
+            if laneGeometry.isVaryingReference(model.lane)
+                phase=(model.stateTime-model.cfg.clf.referenceEpoch)/model.sampleTime;
+                if ~isfinite(phase) || phase < -1e-8 || abs(phase-round(phase))>1e-7
+                    error('collisionAvoidanceController:invalidReferencePhase', ...
+                        'A scheduled reference requires a timestamp on its declared sampling clock.');
+                end
+                certificate=ltvBicycleModel.referenceAt(model,round(phase)+1);
+                return;
+            end
             persistent key saved
             cfg = model.cfg;
             curvature = laneGeometry.curvature(model.initialEgoState(1),model.lane);
@@ -35,6 +44,89 @@ classdef ltvBicycleModel
                 'transition',flow,'closedLoop',closed,'contraction',contraction,'stage',stage, ...
                 'decayPerHold',cfg.clf.decreaseRateFraction*(1-contraction));
             key=current;saved=certificate;
+        end
+
+        function bank = referenceSchedule(model)
+        % Compile a finite sequence of declared affine holds and a constant tail.
+        % This is reference preparation, not nonlinear flow certification. Each
+        % changing trim's exact sampled defect is retained by terminal synthesis.
+            persistent key saved
+            cfg=model.cfg;curve=model.lane.referenceCurve;h=model.sampleTime;
+            current=struct('curve',curve,'configuration',rmfield(cfg,'solver'), ...
+                'bias',model.longitudinalAccelerationBias,'sampleTime',h);
+            if ~isempty(key) && isequaln(key,current),bank=saved;return;end
+            assert(laneGeometry.isVaryingReference(model.lane), ...
+                'collisionAvoidanceController:invalidReferenceSchedule','A curvature profile is required.');
+            curvatureBound=laneGeometry.referenceCurvatureBounds(curve,0,curve.length);
+            lateralRegularityRadius=Inf;
+            if curvatureBound>0,lateralRegularityRadius=.8/curvatureBound;end
+            station=0;certificates={};index=0;
+            while true
+                index=index+1;
+                if index>10000
+                    error('collisionAvoidanceController:referenceScheduleTooLong', ...
+                        'Reference preparation supports at most 10000 declared holds.');
+                end
+                [curvature,curvatureRate]=laneGeometry.referenceCurvature(station,curve);
+                if station>=curve.length,curvatureRate=0;end
+                [state,input]=ltvBicycleModel.cruiseEquilibrium(curvature,cfg,model.longitudinalAccelerationBias);
+                state(1)=station;
+                [a,b,c,tire]=ltvBicycleModel.continuousMatrices(curvature,cfg.referenceSpeed,cfg,[], ...
+                    model.longitudinalAccelerationBias,struct('state',state,'input',input));
+                speed=hypot(state(4),state(5));
+                % The spatial curvature derivative couples phase and heading.
+                % Preserve the nominal flow while adding its station Jacobian.
+                a(3,1)=-speed*curvatureRate;c(3)=c(3)-a(3,1)*station;
+                transition=expm(h*[a,b,c;zeros(3,9)]);
+                stage=struct('continuousA',a,'continuousB',b,'continuousC',c,'tireModel',tire, ...
+                    'speed',state(4),'brakingRatio',input(2),'curvature',curvature);
+                certificates{index}=struct('state',state,'input',input,'stage',stage, ...
+                    'transition',transition,'index',index,'scheduled',true, ...
+                    'lateralRegularityRadius',lateralRegularityRadius); %#ok<AGROW>
+                if station>=curve.length,break;end
+                station=station+h*speed;
+            end
+            count=numel(certificates);
+            scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+                cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+            q=diag(1./scales.^2);r=diag([10*cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight]);
+            tail=certificates{end};f=tail.transition(2:6,2:6);g=tail.transition(2:6,7:8);
+            [~,pNext]=dlqr(f,g,q,r);normalization=norm(pNext,inf);
+            stepStation=h*hypot(tail.state(4),tail.state(5));
+            for j=count:-1:1
+                phase=certificates{j};f=phase.transition(2:6,2:6);g=phase.transition(2:6,7:8);
+                gain=(r+g.'*pNext*g)\(g.'*pNext*f);
+                closed=f-g*gain;p=q+gain.'*r*gain+closed.'*pNext*closed;p=(p+p.')/2;
+                if j==count,p=pNext;end
+                contraction=max(real(eig(closed.'*pNext*closed,p)));
+                contraction=contraction+4096*eps*(1+norm(closed,'fro')^2)*cond(p);
+                if contraction>=1 || min(eig(p))<=0
+                    error('collisionAvoidanceController:invalidCruiseCertificate', ...
+                        'The reference sequence lacks a strict cross-stage Riccati contraction.');
+                end
+                phase.gain=gain;phase.matrix=p/normalization;phase.nextMatrix=pNext/normalization;
+                phase.closedLoop=closed;phase.contraction=contraction;
+                phase.decayPerHold=cfg.clf.decreaseRateFraction*(1-contraction);
+                if j<count,phase.nextState=certificates{j+1}.state;
+                else,phase.nextState=phase.state;phase.nextState(1)=phase.state(1)+stepStation;end
+                phase.referenceDefect=phase.transition(1:6,:)*[phase.state;phase.input;1]-phase.nextState;
+                certificates{j}=phase;pNext=p;
+            end
+            bank=struct('certificates',{certificates},'tailIndex',count,'stepStation',stepStation, ...
+                'sampleTime',h,'key',current,'scope',"declaredScheduledAffinePlantWithBoundedPhase");
+            key=current;saved=bank;
+        end
+
+        function certificate = referenceAt(model,index)
+        % Absolute one-based phase; the final constant-curvature hold repeats.
+            bank=ltvBicycleModel.referenceSchedule(model);
+            assert(isscalar(index) && index>=1 && index==round(index), ...
+                'collisionAvoidanceController:invalidReferencePhase','Reference phase must be a positive integer.');
+            certificate=bank.certificates{min(index,bank.tailIndex)};
+            shift=max(0,index-bank.tailIndex)*bank.stepStation;
+            certificate.state(1)=certificate.state(1)+shift;
+            certificate.nextState(1)=certificate.nextState(1)+shift;
+            certificate.index=index;
         end
 
         function prediction = fixedPredict(model, inputs, stage, inputSensitivity)
@@ -178,6 +270,10 @@ classdef ltvBicycleModel
             parameters = modifiedFialaTire.parameters(cfg);
             tire = struct("corneringStiffness",parameters.corneringStiffness, ...
                 "longitudinalForceScale",parameters.longitudinalForceScale);
+            if laneGeometry.isVaryingReference(model.lane)
+                [states,stateJacobian,inputJacobian]=localProfileRollout(model,inputs,kernelCfg,tire,nargout>1);
+                return;
+            end
             station = model.lane.segmentStation(:);
             curvature = model.lane.segmentCurvature(:);
             if isfield(model.lane,"referenceCurve")
@@ -658,6 +754,39 @@ function [a,b,c,tire] = localOperatingPointMatrices(curvature,state,input,cfg,bi
     c = flow-a*state-b*input;
 end
 
+function [states,stateJacobian,inputJacobian]=localProfileRollout(model,inputs,cfg,parameters,linearize)
+% Diagnostic nonlinear RK4 rollout; never a substitute for flow inclusion.
+    count=size(inputs,2);states=zeros(6,count+1);states(:,1)=model.initialEgoState;
+    stateJacobian=zeros(6,6,count);inputJacobian=zeros(6,2,count);
+    subdivisions=max(1,ceil(model.sampleTime/.01));h=model.sampleTime/subdivisions;
+    for stage=1:count
+        x=states(:,stage);u=inputs(:,stage);
+        if linearize
+            point=[x;u];difference=eps^(1/3)*(1+abs(point));
+            difference(8)=min(difference(8),max(1e-10,(1-abs(u(2)))/4));
+            batch=point+[zeros(8,1),diag(difference),-diag(difference)];
+            x=batch(1:6,:);u=batch(7:8,:);
+        end
+        for substep=1:subdivisions
+            k1=localProfileFlow(x,u,model,cfg,parameters);
+            k2=localProfileFlow(x+h*k1/2,u,model,cfg,parameters);
+            k3=localProfileFlow(x+h*k2/2,u,model,cfg,parameters);
+            k4=localProfileFlow(x+h*k3,u,model,cfg,parameters);
+            x=x+h*(k1+2*k2+2*k3+k4)/6;
+        end
+        states(:,stage+1)=x(:,1);
+        if linearize
+            jacobian=(x(:,2:9)-x(:,10:17))./(2*difference.');
+            stateJacobian(:,:,stage)=jacobian(:,1:6);inputJacobian(:,:,stage)=jacobian(:,7:8);
+        end
+    end
+end
+
+function derivative=localProfileFlow(x,u,model,cfg,parameters)
+    curvature=laneGeometry.referenceCurvature(x(1,:),model.lane.referenceCurve);
+    derivative=localNominalFlow(x,u,curvature,cfg,parameters,model.longitudinalAccelerationBias);
+end
+
 function derivative = localNominalFlow(state,input,curvature,cfg,parameters,bias)
     vx = state(4,:);vy = state(5,:);r = state(6,:);delta = input(1,:);beta = input(2,:);
     speed = max(vx,cfg.model.scheduleSpeedFloor);
@@ -671,8 +800,8 @@ function derivative = localNominalFlow(state,input,curvature,cfg,parameters,bias
     fx = parameters.longitudinalForceScale*beta;
     frontX = fx(1,:).*cos(delta)-fy(1,:).*sin(delta);
     frontY = fx(1,:).*sin(delta)+fy(1,:).*cos(delta);
-    stationRate = (vx.*cos(state(3,:))-vy.*sin(state(3,:)))./(1-curvature*state(2,:));
-    derivative = [stationRate;vx.*sin(state(3,:))+vy.*cos(state(3,:));r-curvature*stationRate; ...
+    stationRate = (vx.*cos(state(3,:))-vy.*sin(state(3,:)))./(1-curvature.*state(2,:));
+    derivative = [stationRate;vx.*sin(state(3,:))+vy.*cos(state(3,:));r-curvature.*stationRate; ...
         (frontX+fx(2,:)-ltvBicycleModel.roadLoad(vx,cfg))/cfg.vehicle.m+vy.*r+bias; ...
         (frontY+fy(2,:))/cfg.vehicle.m-vx.*r; ...
         (cfg.vehicle.lf*frontY-cfg.vehicle.lr*fy(2,:))/cfg.vehicle.Iz];

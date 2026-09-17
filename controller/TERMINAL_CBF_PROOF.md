@@ -1,6 +1,6 @@
 # Recursive feasibility and encounter safety of the implemented controller
 
-This is the current format-33 proof. It replaces the previous stopping-tail
+This is the current format-34 proof. It replaces the previous stopping-tail
 argument. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
@@ -15,8 +15,9 @@ has a feasible candidate, and every accepted executed hold satisfies the active
 collision and permanent actuator-amplitude/slew constraints, provided that:
 
 1. The plant is the declared zero-residual, held affine bicycle model. Its
-   admitted generator, sample time, configuration and reference do not change.
-   The frozen generator is retained across target release and reoptimization.
+   admitted generator sequence, sample time, configuration and reference do not change.
+   A constant generator or the compiled phase-indexed sequence is retained across
+   target release and reoptimization.
 2. Ego measurements contain the true state. Their Frenet component radii never
    exceed the stored `measurementRadiusLimit`. Measurements and actual held
    input/time satisfy the execution and set-intersection contracts.
@@ -30,13 +31,14 @@ collision and permanent actuator-amplitude/slew constraints, provided that:
    admit a new feasible certificate. Arbitrary newly appearing obstacles are
    not covered by the previous encounter's theorem.
 5. The permanent reference is an analytically continued straight line or
-   constant-curvature reference, with no physical road-boundary constraints.
+   constant-curvature reference, or an explicitly continued smooth profile with
+   the scheduled terminal family described below, without physical road boundaries.
    No additional state or tire-slip bounds are imposed. The forward reference
    map covers the actuator-reachable envelope; each measured inverse chart
    must remain well defined and meet the declared Frenet sensing contract.
    Centerline samples / analytic arc length describe the reference;
-   they are not physical end-of-road barriers. A finite road or a changing
-   curvature requires a different permanent continuation certificate.
+   they are not physical end-of-road barriers. Smooth profiles additionally require
+   the hard reference-phase domain and the verified six-dimensional terminal family.
 6. A returned numerical solution passes the independent hard-row and terminal
    cone verification. To execute an indefinitely safe physical sequence, a
    valid solve must also finish before each actuation deadline. Mathematical
@@ -463,3 +465,27 @@ For target-free initial admission, the configured nominal performance horizon
 may be shortened, within `minimumHorizonSteps`, if only a shorter finite witness
 can reach the permanent terminal set. This changes the selected certificate
 horizon; it removes neither terminal membership nor predictive continuation.
+
+## Scheduled smooth-reference extension
+
+For curvature profiles, replace the fixed F,G,g and terminal set by the immutable
+phase-indexed F_j,G_j,g_j and E_j. The complete construction and assumptions are in
+[the smooth-reference certificate](CURVED_CRUISE_CERTIFICATE.md). In particular:
+
+1. All finite held generators and the constant-curvature tail are explicitly
+   specified, with the reference clock fixed by the execution contract.
+2. The six-dimensional modal inclusion charges the moving reference defect,
+   future measurement support, cross-stage gains and input slew. Its last phase
+   is invariant under station translation at constant trim path speed.
+3. Both finite prediction and every terminal hold enforce the same reference
+   phase domain; the within-hold terminal flow uses sampled, held feedback.
+4. Conditioning does not change the inherited model family. Eliminating the
+   first input preserves the remaining phase domains and terminal deadline.
+5. Once the finite witness is exhausted, the current terminal family provides
+   a feasible next-hold candidate into its successor, with optimized deviations
+   independently checked. Its feedback is never an executed fallback.
+
+Inducting on this indexed inclusion gives the same conditional recursive
+feasibility and swept safety statement. Five-dimensional CLF slack affects
+performance only. This extension does not establish nonlinear vehicle inclusion
+or permit unbounded delay relative to the reference clock.

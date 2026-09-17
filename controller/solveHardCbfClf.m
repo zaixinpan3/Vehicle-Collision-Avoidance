@@ -97,7 +97,8 @@ function solve=localGeneratedSolve(problem,cfg)
     source=full.retainedRows(1:count);geometric=source<=numel(full.geometry.label);
     % Domains have no slack. Working-set iterates are internal; convergence
     % requires every original domain row as well as every collision row.
-    rowGroups=2*full.geometry.cellIndex+double(full.geometry.label=="poseDomain");
+    rowGroups=3*full.geometry.cellIndex+double(full.geometry.label=="poseDomain") ...
+        +2*double(full.geometry.label=="referencePhaseDomain");
     active=~geometric;groups=rowGroups(source(geometric));
     rows=find(geometric);anchor=full.anchorPlan;
     residual=full.A(equalities+rows,:)*anchor-full.b(equalities+rows);

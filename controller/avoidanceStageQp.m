@@ -44,20 +44,23 @@ classdef avoidanceStageQp
             % The terminal modal cone acts on the final state. Its stored RHS
             % and numerical reserve are transferred without reconstruction.
             modal=program.terminal.modalMatrix;
-            terminalMap=zeros(15,6);
-            terminalMap(2:3:end,2:6)=-real(modal);
-            terminalMap(3:3:end,2:6)=-imag(modal);
-            rows=size(matrix,1)-14:size(matrix,1);
+            modeCount=size(modal,1);terminalMap=zeros(3*modeCount,6);
+            terminalMap(2:3:end,program.terminal.stateIndex)=-real(modal);
+            terminalMap(3:3:end,program.terminal.stateIndex)=-imag(modal);
+            rows=size(matrix,1)-3*modeCount+1:size(matrix,1);
             matrix(rows,1:n)=0;matrix(rows,indices(:,end))=terminalMap;
             bound(rows)=bound(rows)+terminalMap*(prediction.egoStateOffset(:,end)-centers(:,end));
             if isfield(program,'restoration') && program.restoration
                 hessian=blkdiag(program.P,sparse(6*count,6*count));linear=[program.q;zeros(6*count,1)];
             else
-                cruise=program.cruiseCertificate;
+                blocks=cell(count,1);stateLinear=zeros(6,count);
+                for stage=1:count
+                    p=program.referenceMatrices(:,:,stage+1);blocks{stage}=2*blkdiag(0,p);
+                    stateLinear(2:6,stage)=2*p*(centers(2:6,stage+1)-program.referenceStates(2:6,stage+1));
+                end
                 hessian=blkdiag(2*spdiags(program.inputWeight,0,n,n), ...
-                    2*program.slackWeight,kron(speye(count),2*blkdiag(0,cruise.matrix)));
-                linear=[-2*program.inputWeight.*repmat(cruise.input,count,1);0; ...
-                    reshape([zeros(1,count);2*cruise.matrix*(centers(2:6,2:end)-cruise.state(2:6))],[],1)];
+                    2*program.slackWeight,sparse(blkdiag(blocks{:})));
+                linear=[-2*program.inputWeight.*program.referenceInputs(:);0;stateLinear(:)];
             end
             lifted.P=hessian;lifted.q=linear;
             linearCount=program.cones(2);

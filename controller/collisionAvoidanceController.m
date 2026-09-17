@@ -23,7 +23,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     timer = tic;
     cfg = localControllerConfiguration(cfg);
     [ego,lane,road,observations] = readPlanningInputs(egoState,targetEstimate,laneCenterline,cfg);
-    model = localFiniteModel(ego,lane,road,cfg);
+    model = localFiniteModel(ego,lane,road,cfg,previousState);
     if cfg.referenceSpeed<=0 || any(cfg.clf.referenceOffset) || any(cfg.clf.referenceRate)
         error("collisionAvoidanceController:unsupportedCruiseReference", ...
             "The cruise CLF requires positive constant speed and zero path-error reference.");
@@ -35,6 +35,15 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     identity = struct('configuration',rmfield(cfg,'solver'),'lane',lane,'road',road, ...
         'accelerationBias',ego.longitudinalAccelerationBias);
     [model,carry] = hardEncounterBarrier.prepare(model,ego,observations,previousState,identity);
+    if laneGeometry.isVaryingReference(lane) && isempty(model.cruiseCertificate)
+        model.cruiseCertificate=ltvBicycleModel.sampledCruise(model);
+    end
+    if laneGeometry.isVaryingReference(lane) ...
+            && abs(model.initialEgoState(1)-model.cruiseCertificate.state(1))+model.initialFrenetErrorBound(1) ...
+            >cfg.encounter.referencePhaseRadius
+        error('collisionAvoidanceController:referencePhaseOutsideDomain', ...
+            'The measured station is outside the declared scheduled-model phase domain.');
+    end
     preparationSeconds = toc(timer);
     solverCfg=cfg;solverCfg.solver.workTimer=timer;
     solverCfg.solver.workTimeLimit=min(cfg.solver.frameDeadlineSeconds,cfg.solver.certificateSearchTimeLimit);
@@ -66,8 +75,10 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     command.measurementTime = model.stateTime;
     command.actuationTime = model.stateTime;
     command.holdSeconds = model.sampleTime;
-    nextError = cruise.transition(2:6,:)*[model.initialEgoState;firstInput;1]-cruise.state(2:6);
-    nextValue = nextError.'*cruise.matrix*nextError;
+    nextReference=cruise.state;nextMatrix=cruise.matrix;
+    if isfield(cruise,'nextState'),nextReference=cruise.nextState;nextMatrix=cruise.nextMatrix;end
+    nextError = cruise.transition(2:6,:)*[model.initialEgoState;firstInput;1]-nextReference(2:6);
+    nextValue = nextError.'*nextMatrix*nextError;
     metadata = struct('solverCallCount',conicCalls,'solverExitFlag',result.exitFlag, ...
         'conicSolverCallCount',conicCalls, ...
         'trajectorySolverCallCount',search.hardSolves, ...
@@ -110,8 +121,16 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     end
     metadata.runtime = struct('inputPreparationSeconds',preparationSeconds, ...
         'formulationSeconds',formulationSeconds,'solveSeconds',solveSeconds);
+    metadata.clfNextMatrix=nextMatrix;metadata.clfNextReferenceState=nextReference;
+    if isfield(cruise,'scheduled') && cruise.scheduled
+        metadata.referencePhaseIndex=cruise.index;
+        metadata.referencePhaseError=model.initialEgoState(1)-cruise.state(1);
+        metadata.referencePhaseRadius=cfg.encounter.referencePhaseRadius;
+        metadata.spatialCurvature=laneGeometry.curvature(model.initialEgoState(1),lane);
+        metadata.recursiveFeasibilityScope="admittedEncountersAndBoundedPhaseScheduledAffinePlant";
+    end
     data = hardEncounterBarrier.carriedData(prediction,program,prediction.stageCount);
-    controllerState = struct('version',33,'appliedInput',firstInput,'stateTime',model.stateTime, ...
+    controllerState = struct('version',34,'appliedInput',firstInput,'stateTime',model.stateTime, ...
         'identity',identity,'plan',predictedInput,'decision',result.decision, ...
         'predictedState',states,'stateErrorBound',prediction.initialErrorBound, ...
         'prediction',prediction,'stages',data.stages,'cellFrames',data.cellFrames, ...
@@ -129,8 +148,16 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     if ~explicitState,lastState=controllerState;end
 end
 
-function model = localFiniteModel(ego, lane, road, cfg)
-    projection = laneGeometry.project(ego.position, lane);
+function model = localFiniteModel(ego, lane, road, cfg, previousState)
+    stationHint=[];
+    if laneGeometry.isVaryingReference(lane)
+        stationHint=cfg.referenceSpeed*(ego.stateTime-cfg.clf.referenceEpoch);
+        if isstruct(previousState) && isfield(previousState,'predictedState') ...
+                && isfield(previousState,'identity') && isequaln(previousState.identity.lane,lane)
+            stationHint=previousState.predictedState(1,min(2,size(previousState.predictedState,2)));
+        end
+    end
+    projection = laneGeometry.project(ego.position, lane,stationHint);
     heading = atan2(sin(ego.yaw-projection.heading), cos(ego.yaw-projection.heading));
     [radius, chartValid] = stateUncertainty.toFrenet(ego.modelState, ego.stateErrorBound, lane);
     if any(ego.stateErrorBound) && (~chartValid || ~isfinite(ego.stateTime))

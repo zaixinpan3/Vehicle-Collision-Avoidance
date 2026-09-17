@@ -43,10 +43,19 @@ function inputs=localContinuation(model,count)
     retained=0;
     if ~isempty(carry),retained=min(count,size(carry.inputs,2));end
     for stage=1:count
+        if isfield(cruise,'scheduled') && cruise.scheduled
+            cruise=ltvBicycleModel.referenceAt(model,model.cruiseCertificate.index+stage-1);
+        end
         if stage<=retained
             input=carry.inputs(:,stage);
         else
-            input=cruise.input-cruise.gain*(x(2:6)-cruise.state(2:6));
+            if isfield(cruise,'scheduled') && cruise.scheduled
+                terminalModel=model;terminalModel.referencePhaseIndex=cruise.index;
+                terminal=hardEncounterBarrier.terminalCertificate(terminalModel);
+                input=terminal.input+terminal.feedback*(x-terminal.reference);
+            else
+                input=cruise.input-cruise.gain*(x(2:6)-cruise.state(2:6));
+            end
         end
         inputs(:,stage)=input;
         x=cruise.transition(1:6,:)*[x;input;1];
@@ -85,7 +94,9 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
         'minimumAnchorDistance',Inf,'normalSwitchCount',0, ...
         'used',false,'witnessPreserved',false);
     if inherited
-        cruise = model.carriedWitness.program.cruiseCertificate;
+        if ~laneGeometry.isVaryingReference(model.lane)
+            cruise = model.carriedWitness.program.cruiseCertificate;
+        end
         [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model);
     else
         if nargin<2,[prediction,anchor] = hardEncounterBarrier.predict(model,cruise);end
@@ -122,9 +133,13 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
             matrix=[matrix;difference(finiteRate,:);-difference(finiteRate,:)];
             physicalBound=[physicalBound;rate(finiteRate)+prior(finiteRate);rate(finiteRate)-prior(finiteRate)];
             labels=[labels;repmat("slew",2*nnz(finiteRate),1)];
-            mapped=terminal.modalMatrix*cruise.transition(2:6,7:8);
-            room=terminal.radius-terminal.comparison*terminal.radius-terminal.disturbanceSupport;
-            for mode=1:5
+            mapped=terminal.modalMatrix*cruise.transition(terminal.stateIndex,7:8);
+            nextRadius=terminal.radius;
+            if isfield(terminal,'nextRadius')
+                nextRadius=terminal.nextRadius;mapped=terminal.successorInputMap;
+            end
+            room=nextRadius-terminal.comparison*terminal.radius-terminal.disturbanceSupport;
+            for mode=1:numel(terminal.radius)
                 selected=3*mode-2:3*mode;
                 terminalCone.matrix(selected,:)=[zeros(1,2);-real(mapped(mode,:));-imag(mapped(mode,:))];
                 terminalCone.bound(selected)=[room(mode)-terminal.reserve; ...
@@ -158,34 +173,46 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
     matrix = [physicalMatrix;zeros(1,planCount),-1];
     bound = [bound;0];
     linearCount = numel(bound);
-    root = chol(cruise.matrix);
+    currentRoot = chol(cruise.matrix);
+    nextState=cruise.state;nextMatrix=cruise.matrix;
+    if isfield(cruise,'nextState'),nextState=cruise.nextState;nextMatrix=cruise.nextMatrix;end
+    root = chol(nextMatrix);
     trackingError = model.initialEgoState(2:6)-cruise.state(2:6);
     radius = model.initialFrenetErrorBound(2:6);
     contraction = 1-cruise.decayPerHold;
     middle = (contraction+cruise.contraction)/2;
-    stateMap = cruise.transition(2:6,2:6);
+    stateMap = cruise.transition(2:6,1:6);
     inputMap = cruise.transition(2:6,7:8);
-    drift = cruise.transition(2:6,:)*[cruise.state;cruise.input;1]-cruise.state(2:6);
-    nominalOffset = stateMap*trackingError-inputMap*cruise.input+drift;
+    nominalOffset = stateMap*model.initialEgoState+cruise.transition(2:6,9)-nextState(2:6);
     inputRoot = root*inputMap;
     numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach(1:2)));
-    coneRadius = sqrt(middle)*norm(root*trackingError)+numeric;
+    coneRadius = sqrt(middle)*norm(currentRoot*trackingError)+numeric;
     matrix = [matrix;zeros(1,planCount),-1;-inputRoot,zeros(5,planCount-1)];
     bound = [bound;coneRadius;root*nominalOffset;terminalCone.bound];
     matrix = [matrix;terminalCone.matrix,zeros(size(terminalCone.matrix,1),1)];
-    disturbance = sqrt(middle)*norm(abs(root)*radius) ...
-        +norm(abs(root*stateMap)*radius)+2*numeric;
+    disturbance = sqrt(middle)*norm(abs(currentRoot)*radius) ...
+        +norm(abs(root*stateMap)*model.initialFrenetErrorBound)+2*numeric;
     clf = struct('cruise',cruise,'initialValue',trackingError.'*cruise.matrix*trackingError, ...
         'decayPerHold',cruise.decayPerHold, ...
         'disturbanceBound',contraction/(contraction-middle)*disturbance^2, ...
         'normDisturbance',disturbance,'youngFactor',contraction/(contraction-middle));
-    % Future state performance uses the same cruise state and P certificate.
-    maps = reshape(permute(prediction.egoStateMatrix(2:6,:,2:end),[1,3,2]),[],planCount);
-    offsets = prediction.egoStateOffset(2:6,2:end)-cruise.state(2:6);
-    objectiveMap = reshape(pagemtimes(root,reshape(maps,5,count,planCount)),5*count,planCount);
-    objectiveOffset = reshape(root*offsets,[],1);
+    % Only the five path/velocity errors enter performance; phase is a hard
+    % model-alignment domain and a terminal certificate coordinate.
+    objectiveMap=zeros(5*count,planCount);objectiveOffset=zeros(5*count,1);
+    referenceStates=repmat(cruise.state,1,count+1);
+    referenceInputs=repmat(cruise.input,1,count);
+    referenceMatrices=repmat(cruise.matrix,1,1,count+1);
+    if isfield(prediction,'referenceStates')
+        referenceStates=prediction.referenceStates;referenceInputs=prediction.referenceInputs;
+        referenceMatrices=prediction.referenceMatrices;
+    end
+    for stage=1:count
+        rows=5*(stage-1)+(1:5);stageRoot=chol(referenceMatrices(:,:,stage+1));
+        objectiveMap(rows,:)=stageRoot*prediction.egoStateMatrix(2:6,:,stage+1);
+        objectiveOffset(rows)=stageRoot*(prediction.egoStateOffset(2:6,stage+1)-referenceStates(2:6,stage+1));
+    end
     weight = diag(repmat([cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight],count,1));
-    trim = repmat(cruise.input,count,1);
+    trim = referenceInputs(:);
     hessian = objectiveMap.'*objectiveMap+weight;
     linear = 2*(objectiveMap.'*objectiveOffset-weight*trim);
     % Keep the current CLF slack units and squared penalty unchanged.
@@ -202,6 +229,7 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
         'anchorPlan',anchor,'safetyBound',safetyBound,'inheritedFeasibleFamily',inherited, ...
         'cruiseCertificate',cruise,'clf',clf, ...
         'prediction',prediction,'inputWeight',diag(weight), ...
+        'referenceStates',referenceStates,'referenceInputs',referenceInputs,'referenceMatrices',referenceMatrices, ...
         'slackWeight',cfg.clf.relaxationWeight);
     program.terminalConePhysicalBound=terminalCone.bound;
     program.terminalConePhysicalBound(1:3:end)=program.terminalConePhysicalBound(1:3:end)+terminal.reserve;
@@ -321,6 +349,12 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     prediction.scheduleCurvature=prediction.scheduleCurvature(2:end);
     prediction.scheduleBrakingRatio=prediction.scheduleBrakingRatio(2:end);
     prediction.tireModels=prediction.tireModels(2:end);
+    if isfield(prediction,'referencePhaseIndex')
+        prediction.referencePhaseIndex=prediction.referencePhaseIndex+1;
+        prediction.referenceStates=prediction.referenceStates(:,2:end);
+        prediction.referenceInputs=prediction.referenceInputs(:,2:end);
+        prediction.referenceMatrices=prediction.referenceMatrices(:,:,2:end);
+    end
     keep=[prediction.cells.stage]>=2;
     prediction.cells=prediction.cells(keep);
     for index=1:numel(prediction.cells)

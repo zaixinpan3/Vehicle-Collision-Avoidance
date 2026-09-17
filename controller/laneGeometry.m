@@ -1,5 +1,5 @@
 classdef laneGeometry
-    %laneGeometry Polyline projection, Frenet poses, curvature and chart bounds.
+    %laneGeometry Smooth-reference projection, Frenet poses and certified charts.
 
     methods (Static)
         function [frame,nominal] = sweptCellFrame(model,tube,anchor)
@@ -12,7 +12,8 @@ classdef laneGeometry
         % Batch charts with individual station radii over one validated lane.
             cfg = model.cfg;
             nominal = cell(numel(tubes),1);
-            curved = isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0 ...
+            curved = isfield(model.lane,'referenceCurve') && (model.lane.referenceCurve.curvature~=0 ...
+                || laneGeometry.isVaryingReference(model.lane)) ...
                 && ~isempty(model.encounters);
             if curved
                 scale=1;if isfield(model,'poseTrustScale'),scale=model.poseTrustScale;end
@@ -62,6 +63,24 @@ classdef laneGeometry
             validateattributes(curve.heading, {'double'}, {'real','finite','scalar'});
             validateattributes(curve.curvature, {'double'}, {'real','finite','scalar'});
             validateattributes(curve.length, {'double'}, {'real','finite','scalar','positive'});
+            if isfield(curve,'curvatureProfile') && ~isempty(curve.curvatureProfile)
+                profile=curve.curvatureProfile;
+                validateattributes(profile,{'double'},{'2d','ncols',2,'finite','real'});
+                if size(profile,1)<2 || profile(1,1)~=0 || profile(end,1)~=curve.length ...
+                        || any(diff(profile(:,1))<=0)
+                    error("collisionAvoidanceController:invalidReferenceCurve", ...
+                        "The curvature profile must have increasing stations from zero through length.");
+                end
+                if ~isfield(curve,'continuation') || ~isscalar(string(curve.continuation)) ...
+                        || string(curve.continuation)~="constantCurvature"
+                    error("collisionAvoidanceController:invalidReferenceCurve", ...
+                        "A curvature profile requires explicit constantCurvature continuation.");
+                end
+                curve.curvature=profile(1,2);
+                curve.origin=curve.origin(:);
+                localProfileData(curve);
+                return;
+            end
             if abs(curve.curvature)*curve.length >= 2*pi
                 error("collisionAvoidanceController:invalidReferenceCurve", ...
                     "The finite arc must have less than one complete revolution.");
@@ -74,20 +93,27 @@ classdef laneGeometry
             validateattributes(center,{'double'},{'size',[3,1],'finite','real'});
             validateattributes(radius,{'double'},{'size',[3,1],'finite','real','nonnegative'});
             [position,heading]=laneGeometry.referencePose(center(1),center(2),curve);
+            [positionError,headingError]=laneGeometry.referenceErrorBound(center(1),curve);
             tangent=[cos(heading);sin(heading)];lateral=[-tangent(2);tangent(1)];
-            k=curve.curvature;
+            k=laneGeometry.referenceCurvature(center(1),curve);
+            [k0,k1]=laneGeometry.referenceCurvatureBounds(curve,center(1)-radius(1),center(1)+radius(1));
             jacobian=[(1-k*center(2))*tangent,lateral,zeros(2,4)];
             offset=position-jacobian(:,1:3)*center;
             yawRow=[k,0,1,0,0,0];yawOffset=heading-k*center(1);
             extent=abs(center(2))+radius(2);
-            remainder=abs(k)*(1+abs(k)*extent)*radius(1)^2/2 ...
-                +abs(k)*radius(1)*radius(2);
+            remainder=(k1*extent+k0*(1+k0*extent))*radius(1)^2/2 ...
+                +k0*radius(1)*radius(2)+positionError+extent*headingError;
+            yawRemainder=k1*radius(1)^2/2+headingError;
+            if isfield(curve,'curvatureProfile') && k0*extent>=1
+                error("collisionAvoidanceController:singularReferenceDomain", ...
+                    "The complete local pose domain must satisfy one minus absolute curvature times lateral extent greater than zero.");
+            end
             remainder=remainder+128*eps*(1+norm(position)+norm(offset)+norm(jacobian,'fro')*norm(abs(center)+radius));
             frame=struct('origin',position-tangent*center(1)-lateral*center(2), ...
                 'tangent',tangent,'lateral',lateral,'heading',heading,'segmentIndex',1, ...
                 'stationLower',center(1)-radius(1),'stationUpper',center(1)+radius(1), ...
-                'positionErrorBound',repmat(remainder,2,1),'headingErrorBound',0, ...
-                'referenceHeadingErrorBound',0,'positionMap',jacobian,'positionOffset',offset, ...
+                'positionErrorBound',repmat(remainder,2,1),'headingErrorBound',yawRemainder, ...
+                'referenceHeadingErrorBound',yawRemainder,'positionMap',jacobian,'positionOffset',offset, ...
                 'yawRow',yawRow,'yawOffset',yawOffset,'positionRemainder',remainder, ...
                 'domainCenter',center,'domainRadius',radius);
         end
@@ -104,7 +130,13 @@ classdef laneGeometry
             end
         end
 
-        function [position, heading] = referencePose(station, lateral, curve)
+        function [position, heading, positionError] = referencePose(station, lateral, curve)
+            if isfield(curve,'curvatureProfile') && ~isempty(curve.curvatureProfile)
+                [position,heading]=localProfilePose(station,lateral,curve);
+                if nargout>2,positionError=laneGeometry.referenceErrorBound(station,curve);end
+                return;
+            end
+            positionError=zeros(size(station));
             heading = curve.heading+curve.curvature*station;
             if curve.curvature == 0
                 position = curve.origin+[cos(curve.heading);sin(curve.heading)]*station;
@@ -115,7 +147,12 @@ classdef laneGeometry
             position = position+[-sin(heading);cos(heading)].*lateral;
         end
 
-        function projection = projectReferenceCurve(position, curve)
+        function projection = projectReferenceCurve(position, curve, stationHint)
+            if nargin<3,stationHint=[];end
+            if isfield(curve,'curvatureProfile') && ~isempty(curve.curvatureProfile)
+                projection=localProfileProjection(position,curve,stationHint);
+                return;
+            end
             if curve.curvature == 0
                 station = [cos(curve.heading),sin(curve.heading)]*(position-curve.origin);
             else
@@ -142,10 +179,12 @@ classdef laneGeometry
             tangent = [cos(heading);sin(heading)];
             lateral = [-sin(heading);cos(heading)];
             span = max(abs([lower,upper]-station));
-            turn = abs(curve.curvature)*span;
+            [k0,~]=laneGeometry.referenceCurvatureBounds(curve,lower,upper);
+            [positionError,headingError]=laneGeometry.referenceErrorBound(station,curve);
+            turn = k0*span+headingError;
             % Taylor's integral remainder for the centerline, plus rotation
             % of the lateral coordinate; each component is bounded by norm.
-            deviation = abs(curve.curvature)*span^2/2+lateralRadius*min(2,turn);
+            deviation = k0*span^2/2+lateralRadius*min(2,turn)+positionError;
             frame = struct("origin",point-tangent*station,"tangent",tangent, ...
                 "lateral",lateral,"heading",heading,"segmentIndex",1, ...
                 "stationLower",lower,"stationUpper",upper, ...
@@ -153,9 +192,14 @@ classdef laneGeometry
         end
 
         function [radius, valid] = referenceUncertainty(state, inputRadius, curve)
-            projection = laneGeometry.projectReferenceCurve(state(1:2),curve);
             distanceRadius = norm(inputRadius(1:2));
             radius = inputRadius;
+            if isfield(curve,'curvatureProfile') && ~isempty(curve.curvatureProfile)
+                valid=distanceRadius==0;
+                if ~valid,radius(1:3)=inf;end
+                return;
+            end
+            projection = laneGeometry.projectReferenceCurve(state(1:2),curve);
             if curve.curvature == 0
                 radius(1) = abs([cos(curve.heading),sin(curve.heading)])*inputRadius(1:2);
                 radius(2) = abs([-sin(curve.heading),cos(curve.heading)])*inputRadius(1:2);
@@ -174,7 +218,8 @@ classdef laneGeometry
             valid = all(isfinite(radius));
         end
 
-        function projection = project(position, lane)
+        function projection = project(position, lane, stationHint)
+            if nargin<3,stationHint=[];end
         % laneGeometry.project Project one point or columns of points onto a lane polyline.
         %
         % lane is the parsed centerline structure (segment starts, segments,
@@ -185,7 +230,7 @@ classdef laneGeometry
         % path coordinates (s, d) of the point.
 
             if isfield(lane, "referenceCurve")
-                projection = laneGeometry.projectReferenceCurve(reshape(position,2,[]),lane.referenceCurve);
+                projection = laneGeometry.projectReferenceCurve(reshape(position,2,[]),lane.referenceCurve,stationHint);
                 return;
             end
             if all(abs(lane.tangent-lane.tangent(1,:))<1e-12,'all')
@@ -243,7 +288,7 @@ classdef laneGeometry
         % station s. Stations beyond either end take the end segment's.
 
             if isfield(lane, "referenceCurve")
-                curvature = lane.referenceCurve.curvature+zeros(size(station));
+                curvature = laneGeometry.referenceCurvature(station,lane.referenceCurve);
                 return;
             end
             segmentIdx = find(lane.segmentStation <= double(station), 1, "last");
@@ -251,6 +296,45 @@ classdef laneGeometry
                 segmentIdx = 1;
             end
             curvature = lane.segmentCurvature(segmentIdx);
+        end
+
+        function varying = isVaryingReference(lane)
+            varying=isfield(lane,'referenceCurve') ...
+                && isfield(lane.referenceCurve,'curvatureProfile') ...
+                && ~isempty(lane.referenceCurve.curvatureProfile) ...
+                && any(lane.referenceCurve.curvatureProfile(:,2)~=lane.referenceCurve.curvatureProfile(1,2));
+        end
+
+        function [curvature,derivative] = referenceCurvature(station,curve)
+            curvature=curve.curvature+zeros(size(station));derivative=zeros(size(station));
+            if ~isfield(curve,'curvatureProfile') || isempty(curve.curvatureProfile),return;end
+            data=localProfileData(curve);
+            clipped=min(max(station,0),curve.length);
+            curvature=ppval(data.curvature,clipped);
+            curvature(station<=0)=curve.curvatureProfile(1,2);
+            curvature(station>=curve.length)=curve.curvatureProfile(end,2);
+            derivative=ppval(data.curvatureDerivative,clipped);
+            derivative(station<0 | station>curve.length)=0;
+        end
+
+        function [maximum,derivativeMaximum] = referenceCurvatureBounds(curve,lower,upper)
+            maximum=abs(curve.curvature);derivativeMaximum=0;
+            if ~isfield(curve,'curvatureProfile') || isempty(curve.curvatureProfile),return;end
+            data=localProfileData(curve);
+            maximum=localPolynomialBound(data.curvature,lower,upper);
+            derivativeMaximum=localPolynomialBound(data.curvatureDerivative,max(0,lower),min(curve.length,upper));
+            maximum=max(maximum,max(abs(laneGeometry.referenceCurvature([lower,upper],curve))));
+        end
+
+        function [positionError,headingError] = referenceErrorBound(station,curve)
+            positionError=zeros(size(station));headingError=positionError;
+            if ~isfield(curve,'curvatureProfile') || isempty(curve.curvatureProfile),return;end
+            data=localProfileData(curve);
+            index=discretize(min(max(station,0),curve.length),[-inf,data.position.breaks(2:end-1),inf]);
+            distance=max(-station,0)+max(station-curve.length,0);
+            headingError=data.headingError+128*eps*(1+abs(station).*abs(laneGeometry.referenceCurvature(station,curve)));
+            positionError=reshape(data.positionError(index),size(station))+distance.*headingError ...
+                +128*eps*(1+abs(station)+norm(curve.origin));
         end
 
         function frame = frameBounds(lane, station, radius, lateralRadius)
@@ -352,4 +436,161 @@ function frame = localFrame(lane, station, radius, lateralRadius)
         "heading", heading, "segmentIndex", segment, ...
         "stationLower", lower, "stationUpper", upper, ...
         "positionErrorBound", positionError, "headingErrorBound", headingError);
+end
+
+function data=localProfileData(curve)
+% The declared PCHIP curvature defines an arc-length parameterized path.
+% Position integrates exp(i*heading) by a polynomial exponential series.
+% Every cell carries the analytic exponential-series remainder and a
+% conservative floating-point allowance; quadrature tolerance is not proof.
+    persistent identity cached
+    key={curve.origin(:),curve.heading,curve.length,curve.curvatureProfile};
+    if isequaln(key,identity),data=cached;return;end
+    profile=curve.curvatureProfile;
+    curvature=pchip(profile(:,1),profile(:,2));
+    derivative=mkpp(curvature.breaks,curvature.coefs(:,1:3).*[3,2,1]);
+    headingCoefficients=zeros(curvature.pieces,5);heading=curve.heading;headingScale=abs(heading);
+    for index=1:curvature.pieces
+        row=[curvature.coefs(index,:)./[4,3,2,1],heading];
+        headingCoefficients(index,:)=row;
+        width=diff(curvature.breaks(index:index+1));
+        heading=polyval(row,width);
+        headingScale=headingScale+sum(abs(row(1:4)).*width.^(4:-1:1));
+    end
+    headingPolynomial=mkpp(curvature.breaks,headingCoefficients);
+    headingError=4096*eps*(1+headingScale);
+    breaks=0;coefficients=zeros(0,50);errors=zeros(1,0);
+    point=complex(curve.origin(1),curve.origin(2));accumulatedError=0;
+    for index=1:curvature.pieces
+        start=curvature.breaks(index);last=curvature.breaks(index+1);
+        polynomial=curvature.coefs(index,:);
+        while start<last
+            width=min(2,last-start);offset=start-curvature.breaks(index);
+            jet=[polyval(polynomial,offset),polyval(polyder(polynomial),offset), ...
+                polyval(polyder(polyder(polynomial)),offset),6*polynomial(1)];
+            angle=[0,jet.*width.^(1:4)./[1,2,6,24]];
+            while sum(abs(angle))>.25
+                width=width/2;
+                if start+width==start
+                    error("collisionAvoidanceController:invalidReferenceCurve", ...
+                        "The curvature profile cannot be resolved at floating-point station precision.");
+                end
+                angle=[0,jet.*width.^(1:4)./[1,2,6,24]];
+            end
+            total=zeros(1,49);term=1;total(1)=1;
+            for order=1:12
+                term=conv(term,1i*angle)/order;
+                total(1:numel(term))=total(1:numel(term))+term;
+            end
+            phase=ppval(headingPolynomial,start);
+            integral=width*exp(1i*phase)*total./(1:49);
+            normalized=[point,integral];
+            physical=normalized./width.^(0:49);
+            if any(~isfinite(physical))
+                error("collisionAvoidanceController:invalidReferenceCurve", ...
+                    "The curvature profile has numerically unresolved integration cells.");
+            end
+            coefficients(end+1,:)=real(fliplr(physical)); %#ok<AGROW>
+            coefficients(end+1,:)=imag(fliplr(physical)); %#ok<AGROW>
+            remainder=width*exp(sum(abs(angle)))*sum(abs(angle))^13/factorial(13);
+            roundoff=4096*eps*(1+abs(point)+sum(abs(integral)));
+            accumulatedError=accumulatedError+remainder+roundoff+width*headingError;
+            errors(end+1)=accumulatedError; %#ok<AGROW>
+            point=sum(normalized);start=start+width;breaks(end+1)=start; %#ok<AGROW>
+        end
+    end
+    position=mkpp(breaks,coefficients,2);
+    data=struct('curvature',curvature,'curvatureDerivative',derivative, ...
+        'heading',headingPolynomial,'headingError',headingError, ...
+        'position',position,'positionError',errors);
+    identity=key;cached=data;
+end
+
+function [position,heading]=localProfilePose(station,lateral,curve)
+    data=localProfileData(curve);shape=size(station);station=station(:).';
+    clipped=min(max(station,0),curve.length);
+    heading=ppval(data.heading,clipped);position=ppval(data.position,clipped);
+    outside=station<0 | station>curve.length;
+    if any(outside)
+        distance=station(outside)-clipped(outside);
+        curvature=laneGeometry.referenceCurvature(station(outside),curve);initialHeading=heading(outside);
+        turn=curvature.*distance;halfTurn=turn/2;
+        factor=ones(size(turn));nonzero=halfTurn~=0;
+        factor(nonzero)=sin(halfTurn(nonzero))./halfTurn(nonzero);
+        direction=initialHeading+halfTurn;
+        position(:,outside)=position(:,outside)+[cos(direction);sin(direction)].*(distance.*factor);
+        heading(outside)=initialHeading+turn;
+    end
+    position=position+[-sin(heading);cos(heading)].*reshape(lateral,1,[]);
+    heading=reshape(heading,shape);
+end
+
+function bound=localPolynomialBound(polynomial,lower,upper)
+    if lower>upper,bound=0;return;end
+    lower=max(lower,polynomial.breaks(1));upper=min(upper,polynomial.breaks(end));
+    if lower>upper,bound=0;return;end
+    bound=0;
+    for index=find(polynomial.breaks(1:end-1)<=upper & polynomial.breaks(2:end)>=lower)
+        lo=max(lower,polynomial.breaks(index))-polynomial.breaks(index);
+        hi=min(upper,polynomial.breaks(index+1))-polynomial.breaks(index);
+        row=polynomial.coefs(index,:);width=hi-lo;
+        if numel(row)==4
+            power=[polyval(row,lo),polyval(row(1:3).*[3,2,1],lo)*width, ...
+                (3*row(1)*lo+row(2))*width^2,row(1)*width^3];
+            bernstein=[power(1),power(1)+power(2)/3, ...
+                power(1)+2*power(2)/3+power(3)/3,sum(power)];
+        else
+            power=[polyval(row,lo),(2*row(1)*lo+row(2))*width,row(1)*width^2];
+            bernstein=[power(1),power(1)+power(2)/2,sum(power)];
+        end
+        bound=max(bound,max(abs(bernstein))+128*eps*(1+sum(abs(power))));
+    end
+    bound=bound+128*eps*(1+bound);
+end
+
+function projection=localProfileProjection(position,curve,stationHint)
+% A selected local projection branch, never a global self-intersection claim.
+    if nargin<3,stationHint=[];end
+    count=size(position,2);station=zeros(1,count);
+    data=localProfileData(curve);
+    for index=1:count
+        point=position(:,index);
+        if ~isempty(stationHint)
+            seed=stationHint(min(index,numel(stationHint)));
+        else
+            samples=data.position.breaks;
+            sampled=ppval(data.position,samples);
+            distance=sum((sampled-point).^2,1);
+            [~,nearest]=min(distance);seed=samples(nearest);
+            if nearest==1
+                seed=min(0,[cos(curve.heading),sin(curve.heading)]*(point-curve.origin));
+            elseif nearest==numel(samples)
+                lastHeading=ppval(data.heading,curve.length);
+                seed=curve.length+max(0,[cos(lastHeading),sin(lastHeading)]*(point-sampled(:,end)));
+            end
+        end
+        for iteration=1:30
+            [center,heading]=laneGeometry.referencePose(seed,0,curve);
+            tangent=[cos(heading);sin(heading)];normal=[-tangent(2);tangent(1)];
+            offset=center-point;k=laneGeometry.referenceCurvature(seed,curve);
+            denominator=1+k*(normal.'*offset);
+            if denominator<=.1
+                error("collisionAvoidanceController:ambiguousReferenceProjection", ...
+                    "The selected smooth-reference projection is outside its regular Frenet branch.");
+            end
+            step=(tangent.'*offset)/denominator;
+            seed=seed-min(max(step,-5),5);
+            if abs(step)<1e-11,break;end
+        end
+        [center,heading]=laneGeometry.referencePose(seed,0,curve);
+        [positionError,~]=laneGeometry.referenceErrorBound(seed,curve);
+        if abs([cos(heading),sin(heading)]*(center-point))>1e-8+positionError
+            error("collisionAvoidanceController:ambiguousReferenceProjection", ...
+                "A regular stationary projection could not be resolved on the selected reference branch.");
+        end
+        station(index)=seed;
+    end
+    [center,heading]=laneGeometry.referencePose(station,0,curve);
+    lateral=sum([-sin(heading);cos(heading)].*(position-center),1);
+    projection=struct('point',center,'heading',heading,'station',station,'lateralPosition',lateral);
 end
