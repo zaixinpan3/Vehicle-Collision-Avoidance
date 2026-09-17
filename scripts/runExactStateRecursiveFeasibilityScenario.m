@@ -21,6 +21,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.InitialTrackingError (5,1) double {mustBeFinite} = zeros(5,1)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
         options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 1
+        options.RoadCurvature (1,1) double {mustBeFinite} = 0
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
@@ -38,6 +39,26 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     if options.Scenario=="oncoming",truthTarget.center=[60;0;-8;0;0;0;pi;0];end
     if options.Scenario=="crossing",truthTarget.center=[15;-4;0;32;0;0;pi/2;0];end
     road = struct("centerline",[-100,0;2000,0]);
+    [cruiseState,cruiseInput] = ltvBicycleModel.cruiseEquilibrium(options.RoadCurvature,cfg);
+    if options.RoadCurvature~=0
+        assert(~options.UseRoadBoundaries, ...
+            'runExactStateRecursiveFeasibilityScenario:unsupportedCurvedBoundaries', ...
+            'This circular-arc experiment does not construct road boundaries.');
+        curve = struct('origin',[0;0],'heading',0,'curvature',options.RoadCurvature, ...
+            'length',min(8*options.SampleCount*h+100,1.9*pi/abs(options.RoadCurvature)));
+        road = struct('referenceCurve',curve, ...
+            'centerline',laneGeometry.referencePose(linspace(0,curve.length,201),0,curve).');
+        [point,heading] = laneGeometry.referencePose(15,0,curve);
+        truthTarget.center = [point;zeros(4,1);heading;0];
+        if options.Scenario=="oncoming"
+            [point,heading] = laneGeometry.referencePose(30,0,curve);
+            tangent = [cos(heading);sin(heading)];
+            truthTarget.center = [point+30*tangent;-8*tangent;zeros(2,1);heading+pi;0];
+        elseif options.Scenario=="crossing"
+            normal = [-sin(heading);cos(heading)];
+            truthTarget.center = [point-7.5*normal;4*normal;zeros(2,1);heading+pi/2;0];
+        end
+    end
     if options.UseRoadBoundaries
         boundary = struct("origin",zeros(2,1),"longitudinalDirection",[1;0], ...
             "lateralDirection",[0;1],"coefficients",[0;0;-5], ...
@@ -47,8 +68,13 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     end
     x = [0;0;0;8;0;0]+[0;options.InitialTrackingError];
     lane = [];previousState = [];previousInput = [];
+    if options.RoadCurvature~=0
+        x = cruiseState+[0;options.InitialTrackingError];
+        lane = road;
+    end
     count = options.SampleCount;
     states = nan(6,count+1);inputs=nan(2,count);seconds=nan(1,count);calls=zeros(1,count);
+    states(:,1)=x;
     supportGeometry=cell(1,count);admissionSearch=cell(1,count);runtimeBreakdown=cell(1,count);trajectoryCalls=zeros(1,count);restorationCalls=zeros(1,count);
     horizons=zeros(1,count);inherited=false(1,count);releases=false(1,count);terminalCommands=false(1,count);
     terminalOptimizations=false(1,count);replacements=false(1,count);approximate=false(1,count);
@@ -133,6 +159,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     attempted=executed+double(~isempty(failure));
     if ~options.UseRoadBoundaries,minimumRoad=NaN;end
     report=struct('scenario',options.Scenario,'configuration',originalCfg,'seed',options.Seed, ...
+        'roadCurvature',options.RoadCurvature,'road',road, ...
+        'cruiseState',cruiseState,'cruiseInput',cruiseInput, ...
+        'trackingError',states(2:6,1:executed+1)-cruiseState(2:6), ...
         'roadBoundariesEnabled',options.UseRoadBoundaries,'stateAndSlipBoundsEnforced',false, ...
         'solverFailureInjected',options.FailAfterAdmission, ...
         'sampleCount',count,'executedHolds',executed,'completed',isempty(failure), ...

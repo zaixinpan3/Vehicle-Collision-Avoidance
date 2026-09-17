@@ -1,0 +1,2754 @@
+{
+  "date": "2026-09-17",
+  "controllerBaselineCommit": "59b08ee07c50d11decbb7af68c0068efbe82e525",
+  "controllerAlgorithmChanged": false,
+  "main": {
+    "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+    "computationalThreads": 1,
+    "sampleTime": 0.1,
+    "referenceSpeed": 8,
+    "roadBoundariesEnabled": false,
+    "estimatorEnabled": false,
+    "seed": 20260912.0,
+    "startup": [
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 4316.1050000000005,
+        "medianFrameMilliseconds": 4316.1050000000005,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 4.3082 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/startup-1/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3294.278,
+        "medianFrameMilliseconds": 3294.278,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.2917 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/startup-2/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3264.26,
+        "medianFrameMilliseconds": 3264.26,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.2624 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/startup-3/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3239.668,
+        "medianFrameMilliseconds": 3239.668,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.238 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/startup-4/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3288.332,
+        "medianFrameMilliseconds": 3288.332,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.2828 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/startup-5/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3262.083,
+        "medianFrameMilliseconds": 3262.083,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.2604 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/startup-6/stationary-exact-state.mat"
+      }
+    ],
+    "trials": [
+      {
+        "scenario": "cruise",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 55.688,
+        "medianFrameMilliseconds": 7.835,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 1.0323296920095731e-05,
+        "finalTrackingError": [
+          1.0314817577065927e-05,
+          -1.0015654364897708e-09,
+          1.1352874551562309e-07,
+          9.298300976401386e-09,
+          9.38864966326669e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314817578003545e-05,
+          1.001565604757948e-09,
+          1.1352874551562309e-07,
+          9.29830265561371e-09,
+          9.388651217578925e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.01/periodic/cruise-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 104.99,
+        "medianFrameMilliseconds": 104.99,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.01/periodic/stationary-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "radiusMeters": 100,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 3297.7630000000004,
+          "medianFrameMilliseconds": 3297.7630000000004,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.2964 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.01/diagnostic/stationary-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "durationSeconds": 2.6,
+        "maximumFrameMilliseconds": 101.54199999999999,
+        "medianFrameMilliseconds": 7.924,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 13.251603208304909,
+        "maximumLateralError": 1.0080555685531428e-05,
+        "finalTrackingError": [
+          1.0080555685531428e-05,
+          8.893903537254833e-08,
+          1.1687293266504639e-07,
+          -1.7803109822467356e-07,
+          -1.5402717304380253e-07
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0080555685531428e-05,
+          8.751194717857708e-07,
+          1.2219361877896517e-07,
+          6.553281425708546e-07,
+          5.893202477680326e-07
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 2.6,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 25.2503, elapsed 0.10076 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.01/periodic/oncoming-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "radiusMeters": 100,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 26,
+          "durationSeconds": 2.6,
+          "maximumFrameMilliseconds": 5036.328,
+          "medianFrameMilliseconds": 8.225,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": 13.251603208304909,
+          "maximumLateralError": 1.0080555685531428e-05,
+          "finalTrackingError": [
+            1.0080555685531428e-05,
+            8.893903537254833e-08,
+            1.1687293266504639e-07,
+            -1.7803109822467356e-07,
+            -1.5402717304380253e-07
+          ],
+          "lastTwoSecondsMaximumError": [
+            1.0080555685531428e-05,
+            8.751194717857708e-07,
+            1.2219361877896517e-07,
+            6.553281425708546e-07,
+            5.893202477680326e-07
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 2.6,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (20 families, minimum normalized search deficit 19.8284, elapsed 5.0349 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.01/diagnostic/oncoming-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 101.55699999999999,
+        "medianFrameMilliseconds": 101.55699999999999,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 1699.4436, elapsed 0.10053 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.01/periodic/crossing-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "radiusMeters": 100,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 2974.6890000000003,
+          "medianFrameMilliseconds": 2974.6890000000003,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1229.6002, elapsed 2.9734 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.01/diagnostic/crossing-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "cruise",
+        "curvature": -0.01,
+        "radiusMeters": 100,
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 40.762,
+        "medianFrameMilliseconds": 7.7575,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 1.0323296920066241e-05,
+        "finalTrackingError": [
+          -1.0314817576139584e-05,
+          1.0015655041439864e-09,
+          1.1352874551562309e-07,
+          -9.298301004156961e-09,
+          -9.388649691022266e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314817578634984e-05,
+          1.0015656984330157e-09,
+          1.1352874551562309e-07,
+          9.298302641735923e-09,
+          9.388651217578925e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.01/periodic/cruise-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": -0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 107.658,
+        "medianFrameMilliseconds": 107.658,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 1617.471, elapsed 0.10678 s); solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.01/periodic/stationary-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "stationary",
+          "curvature": -0.01,
+          "radiusMeters": 100,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 3260.406,
+          "medianFrameMilliseconds": 3260.406,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.2588 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.01/diagnostic/stationary-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": -0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "durationSeconds": 2.6,
+        "maximumFrameMilliseconds": 101.316,
+        "medianFrameMilliseconds": 8.058,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 13.2516032083049,
+        "maximumLateralError": 1.008055568552449e-05,
+        "finalTrackingError": [
+          -1.008055568552449e-05,
+          -8.893903537254833e-08,
+          1.1687293266504639e-07,
+          1.7803109822467356e-07,
+          1.5402717304380253e-07
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.008055568552449e-05,
+          8.75119471784036e-07,
+          1.2219361877896517e-07,
+          6.553281425708546e-07,
+          5.893202477680326e-07
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 2.6,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 25.2503, elapsed 0.10056 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.01/periodic/oncoming-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "oncoming",
+          "curvature": -0.01,
+          "radiusMeters": 100,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 26,
+          "durationSeconds": 2.6,
+          "maximumFrameMilliseconds": 5034.164,
+          "medianFrameMilliseconds": 8.044,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": 13.2516032083049,
+          "maximumLateralError": 1.008055568552449e-05,
+          "finalTrackingError": [
+            -1.008055568552449e-05,
+            -8.893903537254833e-08,
+            1.1687293266504639e-07,
+            1.7803109822467356e-07,
+            1.5402717304380253e-07
+          ],
+          "lastTwoSecondsMaximumError": [
+            1.008055568552449e-05,
+            8.75119471784036e-07,
+            1.2219361877896517e-07,
+            6.553281425708546e-07,
+            5.893202477680326e-07
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 2.6,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (20 families, minimum normalized search deficit 19.8284, elapsed 5.0326 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.01/diagnostic/oncoming-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "crossing",
+        "curvature": -0.01,
+        "radiusMeters": 100,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 104.681,
+        "medianFrameMilliseconds": 104.681,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 1672.5063, elapsed 0.10375 s); solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.01/periodic/crossing-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "crossing",
+          "curvature": -0.01,
+          "radiusMeters": 100,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 3257.1259999999997,
+          "medianFrameMilliseconds": 3257.1259999999997,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1100.5841, elapsed 3.2553 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.01/diagnostic/crossing-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "cruise",
+        "curvature": 0.02,
+        "radiusMeters": 50,
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 23.354,
+        "medianFrameMilliseconds": 7.752,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 1.9155731426575423e-05,
+        "finalTrackingError": [
+          1.9139451803488333e-05,
+          -8.017896551554271e-09,
+          1.0493153723700743e-07,
+          6.651947836999739e-08,
+          6.338935115701716e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.91394518059846e-05,
+          8.017897495243842e-09,
+          1.0493153901336427e-07,
+          6.651947997982077e-08,
+          6.33893530443963e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.02/periodic/cruise-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.02,
+        "radiusMeters": 50,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 103.3,
+        "medianFrameMilliseconds": 103.3,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 4926.15, elapsed 0.10236 s); solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.02/periodic/stationary-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "stationary",
+          "curvature": 0.02,
+          "radiusMeters": 50,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 2923.2079999999996,
+          "medianFrameMilliseconds": 2923.2079999999996,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 3367.3272, elapsed 2.922 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.02/diagnostic/stationary-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0.02,
+        "radiusMeters": 50,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "durationSeconds": 2.6,
+        "maximumFrameMilliseconds": 101.233,
+        "medianFrameMilliseconds": 8.019,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 13.153486022026247,
+        "maximumLateralError": 1.870376550161361e-05,
+        "finalTrackingError": [
+          1.870376550161361e-05,
+          1.5872867290336878e-07,
+          1.1753151163418352e-07,
+          -2.7333885971314587e-07,
+          -2.412087387049233e-07
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.870376550161361e-05,
+          1.6228795828888976e-06,
+          1.3728205594532028e-07,
+          1.15215976281835e-06,
+          1.066263669247114e-06
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 2.6,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 542.989, elapsed 0.1005 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.02/periodic/oncoming-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "oncoming",
+          "curvature": 0.02,
+          "radiusMeters": 50,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 26,
+          "durationSeconds": 2.6,
+          "maximumFrameMilliseconds": 4206.632,
+          "medianFrameMilliseconds": 7.9430000000000005,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": 13.153486022026247,
+          "maximumLateralError": 1.870376550161361e-05,
+          "finalTrackingError": [
+            1.870376550161361e-05,
+            1.5872867290336878e-07,
+            1.1753151163418352e-07,
+            -2.7333885971314587e-07,
+            -2.412087387049233e-07
+          ],
+          "lastTwoSecondsMaximumError": [
+            1.870376550161361e-05,
+            1.6228795828888976e-06,
+            1.3728205594532028e-07,
+            1.15215976281835e-06,
+            1.066263669247114e-06
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 2.6,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (20 families, minimum normalized search deficit 298.6405, elapsed 4.2052 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.02/diagnostic/oncoming-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0.02,
+        "radiusMeters": 50,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 101.42,
+        "medianFrameMilliseconds": 101.42,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 5024.5344, elapsed 0.10058 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.02/periodic/crossing-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "crossing",
+          "curvature": 0.02,
+          "radiusMeters": 50,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 2913.492,
+          "medianFrameMilliseconds": 2913.492,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 3550.7886, elapsed 2.9121 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa-0.02/diagnostic/crossing-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "cruise",
+        "curvature": -0.02,
+        "radiusMeters": 50,
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 20.045,
+        "medianFrameMilliseconds": 7.671499999999999,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 1.9155731425643877e-05,
+        "finalTrackingError": [
+          -1.9139451804693966e-05,
+          8.01789658624874e-09,
+          1.0493153723700743e-07,
+          -6.651947792590818e-08,
+          -6.338935082395025e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.9139451805880517e-05,
+          8.017897203810298e-09,
+          1.0493153901336427e-07,
+          6.651948000757635e-08,
+          6.33893531554186e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.02/periodic/cruise-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": -0.02,
+        "radiusMeters": 50,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 101.68900000000001,
+        "medianFrameMilliseconds": 101.68900000000001,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 4926.15, elapsed 0.10083 s); solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.02/periodic/stationary-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "stationary",
+          "curvature": -0.02,
+          "radiusMeters": 50,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 2894.302,
+          "medianFrameMilliseconds": 2894.302,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 3367.3272, elapsed 2.8927 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.02/diagnostic/stationary-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": -0.02,
+        "radiusMeters": 50,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "durationSeconds": 2.6,
+        "maximumFrameMilliseconds": 101.515,
+        "medianFrameMilliseconds": 7.89,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 13.153486022026245,
+        "maximumLateralError": 1.8703765501658712e-05,
+        "finalTrackingError": [
+          -1.8703765501658712e-05,
+          -1.5872867294500215e-07,
+          1.1753151163418352e-07,
+          2.733388599074349e-07,
+          2.412087389269679e-07
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.8703765501658712e-05,
+          1.622879582892367e-06,
+          1.3728205594532028e-07,
+          1.15215976281835e-06,
+          1.066263669247114e-06
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 2.6,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 542.989, elapsed 0.1005 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.02/periodic/oncoming-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "oncoming",
+          "curvature": -0.02,
+          "radiusMeters": 50,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 26,
+          "durationSeconds": 2.6,
+          "maximumFrameMilliseconds": 4185.416,
+          "medianFrameMilliseconds": 7.815,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": 13.153486022026245,
+          "maximumLateralError": 1.8703765501658712e-05,
+          "finalTrackingError": [
+            -1.8703765501658712e-05,
+            -1.5872867294500215e-07,
+            1.1753151163418352e-07,
+            2.733388599074349e-07,
+            2.412087389269679e-07
+          ],
+          "lastTwoSecondsMaximumError": [
+            1.8703765501658712e-05,
+            1.622879582892367e-06,
+            1.3728205594532028e-07,
+            1.15215976281835e-06,
+            1.066263669247114e-06
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 2.6,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=2.6 s (Bounded support-family search ended without a hard certificate (20 families, minimum normalized search deficit 298.6405, elapsed 4.1842 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.02/diagnostic/oncoming-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "crossing",
+        "curvature": -0.02,
+        "radiusMeters": 50,
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 108.974,
+        "medianFrameMilliseconds": 108.974,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.02/periodic/crossing-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "crossing",
+          "curvature": -0.02,
+          "radiusMeters": 50,
+          "completed": false,
+          "passed": false,
+          "runtimeQualified": false,
+          "executedHolds": 0,
+          "durationSeconds": 0,
+          "maximumFrameMilliseconds": 2083.5020000000004,
+          "medianFrameMilliseconds": 2083.5020000000004,
+          "deadlineMisses": 1,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0,
+          "finalTrackingError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "lastTwoSecondsMaximumError": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": 0,
+          "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+          "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (8 families, minimum normalized search deficit 6665.5596, elapsed 2.0818 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/validation/kappa--0.02/diagnostic/crossing-exact-state.mat"
+        }
+      }
+    ],
+    "scope": "Exact declared affine plant and sensing; curved-reference trim; targets follow inertial straight lines; offline truth integration excluded from frame time",
+    "allRuntimeQualified": false
+  },
+  "recovery": {
+    "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+    "computationalThreads": 1,
+    "sampleTime": 0.1,
+    "referenceSpeed": 8,
+    "roadBoundariesEnabled": false,
+    "estimatorEnabled": false,
+    "seed": 20260912.0,
+    "startup": [
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 4371.1320000000005,
+        "medianFrameMilliseconds": 4371.1320000000005,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 4.3621 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/startup-1/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3392.859,
+        "medianFrameMilliseconds": 3392.859,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.3899 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/startup-2/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3334.5769999999998,
+        "medianFrameMilliseconds": 3334.5769999999998,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.3318 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/startup-3/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3293.844,
+        "medianFrameMilliseconds": 3293.844,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.2923 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/startup-4/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3329.975,
+        "medianFrameMilliseconds": 3329.975,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.3247 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/startup-5/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3313.902,
+        "medianFrameMilliseconds": 3313.902,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.3122 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/startup-6/stationary-exact-state.mat"
+      }
+    ],
+    "trials": [
+      {
+        "scenario": "cruise",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0.5,
+          0.02,
+          -1,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 163,
+        "durationSeconds": 16.3,
+        "maximumFrameMilliseconds": 322.423,
+        "medianFrameMilliseconds": 7.837000000000001,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0.5,
+        "finalTrackingError": [
+          1.0314813489505775e-05,
+          -1.0002335834591314e-09,
+          1.1352878814818723e-07,
+          9.295820030397195e-09,
+          9.386476984563075e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314813489505775e-05,
+          1.0002335834591314e-09,
+          1.1352881656989666e-07,
+          9.317012397702662e-09,
+          9.404122314204955e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 16.3,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=16.3 s (solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/kappa-0.01/periodic/cruise-exact-state.mat",
+        "offlineDiagnostic": {
+          "scenario": "cruise",
+          "curvature": 0.01,
+          "radiusMeters": 100,
+          "initialTrackingError": [
+            0.5,
+            0.02,
+            -1,
+            0,
+            0
+          ],
+          "completed": true,
+          "passed": true,
+          "runtimeQualified": false,
+          "executedHolds": 300,
+          "durationSeconds": 30,
+          "maximumFrameMilliseconds": 423.94300000000004,
+          "medianFrameMilliseconds": 7.804,
+          "deadlineMisses": 6,
+          "minimumSampledSeparationMargin": null,
+          "maximumLateralError": 0.5,
+          "finalTrackingError": [
+            1.0314817578017423e-05,
+            -1.0015650635242235e-09,
+            1.1352874551562309e-07,
+            9.298299505355878e-09,
+            9.388648330999061e-09
+          ],
+          "lastTwoSecondsMaximumError": [
+            1.0314817578017423e-05,
+            1.0015653965911309e-09,
+            1.1352874551562309e-07,
+            9.298302572346984e-09,
+            9.388651384112379e-09
+          ],
+          "allIssuedCommandsCertified": true,
+          "confirmedRelease": false,
+          "terminalCommands": 0,
+          "failureTime": null,
+          "failureIdentifier": "",
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/kappa-0.01/diagnostic/cruise-exact-state.mat"
+        }
+      },
+      {
+        "scenario": "cruise",
+        "curvature": -0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0.5,
+          0.02,
+          -1,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 38.92700000000001,
+        "medianFrameMilliseconds": 7.842,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0.5,
+        "finalTrackingError": [
+          -1.0314817580913543e-05,
+          1.0015649247463454e-09,
+          1.1352874551562309e-07,
+          -9.298302794391589e-09,
+          -9.388651162067774e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314817581559728e-05,
+          1.0015656221051827e-09,
+          1.1352874551562309e-07,
+          9.298303460525403e-09,
+          9.388651939223891e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/kappa--0.01/periodic/cruise-exact-state.mat"
+      },
+      {
+        "scenario": "cruise",
+        "curvature": 0.02,
+        "radiusMeters": 50,
+        "initialTrackingError": [
+          0.5,
+          0.02,
+          -1,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 22.709,
+        "medianFrameMilliseconds": 7.835,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0.5,
+        "finalTrackingError": [
+          1.9139451805164076e-05,
+          -8.017896731965513e-09,
+          1.049315354606506e-07,
+          6.651947859204199e-08,
+          6.338935165661752e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.9139451805164076e-05,
+          8.017896964418458e-09,
+          1.0493153723700743e-07,
+          6.651947906388678e-08,
+          6.338935215621788e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/kappa-0.02/periodic/cruise-exact-state.mat"
+      },
+      {
+        "scenario": "cruise",
+        "curvature": -0.02,
+        "radiusMeters": 50,
+        "initialTrackingError": [
+          0.5,
+          0.02,
+          -1,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 22.985,
+        "medianFrameMilliseconds": 7.77,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0.5,
+        "finalTrackingError": [
+          -1.9139451807665547e-05,
+          8.017896773598876e-09,
+          1.0493153723700743e-07,
+          -6.651947689895188e-08,
+          -6.338934993577183e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.9139451807679425e-05,
+          8.017896957479564e-09,
+          1.0493153901336427e-07,
+          6.651948009084308e-08,
+          6.33893530443963e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery/kappa--0.02/periodic/cruise-exact-state.mat"
+      }
+    ],
+    "scope": "Exact declared affine plant and sensing; curved-reference trim; targets follow inertial straight lines; offline truth integration excluded from frame time",
+    "allRuntimeQualified": false
+  },
+  "recoveryRepeat": {
+    "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+    "computationalThreads": 1,
+    "sampleTime": 0.1,
+    "referenceSpeed": 8,
+    "roadBoundariesEnabled": false,
+    "estimatorEnabled": false,
+    "seed": 20260912.0,
+    "startup": [
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 4344.705,
+        "medianFrameMilliseconds": 4344.705,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 4.3359 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery-repeat/startup-1/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3429.2400000000002,
+        "medianFrameMilliseconds": 3429.2400000000002,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.4263 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery-repeat/startup-2/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3346.287,
+        "medianFrameMilliseconds": 3346.287,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.344 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery-repeat/startup-3/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3354.301,
+        "medianFrameMilliseconds": 3354.301,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.3524 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery-repeat/startup-4/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3385.129,
+        "medianFrameMilliseconds": 3385.129,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.3795 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery-repeat/startup-5/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": false,
+        "passed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "durationSeconds": 0,
+        "maximumFrameMilliseconds": 3347.288,
+        "medianFrameMilliseconds": 3347.288,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0,
+        "finalTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "lastTwoSecondsMaximumError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (12 families, minimum normalized search deficit 1133.8045, elapsed 3.3458 s); solver exit flag -2: Clarabel status 2). No command was issued.",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery-repeat/startup-6/stationary-exact-state.mat"
+      }
+    ],
+    "trials": [
+      {
+        "scenario": "cruise",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0.5,
+          0.02,
+          -1,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 55.586000000000006,
+        "medianFrameMilliseconds": 7.893500000000001,
+        "deadlineMisses": 0,
+        "minimumSampledSeparationMargin": null,
+        "maximumLateralError": 0.5,
+        "finalTrackingError": [
+          1.0314817578017423e-05,
+          -1.0015650635242235e-09,
+          1.1352874551562309e-07,
+          9.298299505355878e-09,
+          9.388648330999061e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314817578017423e-05,
+          1.0015653965911309e-09,
+          1.1352874551562309e-07,
+          9.298302572346984e-09,
+          9.388651384112379e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": false,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/arc-controller-20260917/recovery-repeat/kappa-0.01/periodic/cruise-exact-state.mat"
+      }
+    ],
+    "scope": "Exact declared affine plant and sensing; curved-reference trim; targets follow inertial straight lines; offline truth integration excluded from frame time",
+    "allRuntimeQualified": true
+  },
+  "geometryAudit": [
+    {
+      "curvature": 0,
+      "steps": 16,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.536005493455832,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": -10.094334721270892,
+      "maximumCellChartPositionError": 0,
+      "finalCellChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartStationSpan": 21.302001348424707,
+      "minimumTerminalSocRadius": 0.36833852103022774,
+      "firstCellChartPositionError": [
+        0,
+        0
+      ]
+    },
+    {
+      "curvature": 0,
+      "steps": 24,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.536005493426005,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 9.413083946348692,
+      "maximumCellChartPositionError": 0,
+      "finalCellChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartStationSpan": 47.87949226846719,
+      "minimumTerminalSocRadius": 0.36833852103022774,
+      "firstCellChartPositionError": [
+        0,
+        0
+      ]
+    },
+    {
+      "curvature": 0,
+      "steps": 32,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.5360054933961775,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 34.13503788419631,
+      "maximumCellChartPositionError": 0,
+      "finalCellChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartStationSpan": 85.03032850623391,
+      "minimumTerminalSocRadius": 0.36833852103022774,
+      "firstCellChartPositionError": [
+        0,
+        0
+      ]
+    },
+    {
+      "curvature": 0,
+      "steps": 40,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.53600549336635,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 64.055199924045,
+      "maximumCellChartPositionError": 0,
+      "finalCellChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartStationSpan": 132.7214039882633,
+      "minimumTerminalSocRadius": 0.36833852103022774,
+      "firstCellChartPositionError": [
+        0,
+        0
+      ]
+    },
+    {
+      "curvature": 0,
+      "steps": 48,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.536005493336523,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 99.15729401946663,
+      "maximumCellChartPositionError": 0,
+      "finalCellChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartStationSpan": 190.91971629911964,
+      "minimumTerminalSocRadius": 0.36833852103022774,
+      "firstCellChartPositionError": [
+        0,
+        0
+      ]
+    },
+    {
+      "curvature": 0,
+      "steps": 56,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.536005493306695,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 139.42509508576475,
+      "maximumCellChartPositionError": 0,
+      "finalCellChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartStationSpan": 259.59236635683027,
+      "minimumTerminalSocRadius": 0.36833852103022774,
+      "firstCellChartPositionError": [
+        0,
+        0
+      ]
+    },
+    {
+      "curvature": 0,
+      "steps": 64,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.536005493276868,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 184.8424288404091,
+      "maximumCellChartPositionError": 0,
+      "finalCellChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartPositionError": [
+        0,
+        0
+      ],
+      "terminalChartStationSpan": 338.7065580893396,
+      "minimumTerminalSocRadius": 0.36833852103022774,
+      "firstCellChartPositionError": [
+        0,
+        0
+      ]
+    },
+    {
+      "curvature": 0.0025,
+      "steps": 16,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.282782038135503,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": -10.352400427949659,
+      "maximumCellChartPositionError": 0.7102892487242101,
+      "finalCellChartPositionError": [
+        0.7102892487242101,
+        0.7102892487242101
+      ],
+      "terminalChartPositionError": [
+        0.7102873107421939,
+        0.7102873107421939
+      ],
+      "terminalChartStationSpan": 21.640973381974234,
+      "minimumTerminalSocRadius": 0.3638920182966616,
+      "firstCellChartPositionError": [
+        0.02215679500694657,
+        0.02215679500694657
+      ]
+    },
+    {
+      "curvature": 0.0025,
+      "steps": 24,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 7.048995880181617,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 7.338344537612279,
+      "maximumCellChartPositionError": 3.5246588505428944,
+      "finalCellChartPositionError": [
+        3.5246588505428944,
+        3.5246588505428944
+      ],
+      "terminalChartPositionError": [
+        3.5246511082507883,
+        3.5246511082507883
+      ],
+      "terminalChartStationSpan": 49.093498907738336,
+      "minimumTerminalSocRadius": 0.3638920182966616,
+      "firstCellChartPositionError": [
+        0.04774184550450167,
+        0.04774184550450167
+      ]
+    },
+    {
+      "curvature": 0.0025,
+      "steps": 32,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 6.655700684066642,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 26.34826929783625,
+      "maximumCellChartPositionError": 11.074436798963808,
+      "finalCellChartPositionError": [
+        11.074436798963808,
+        11.074436798963808
+      ],
+      "terminalChartPositionError": [
+        11.074415322386125,
+        11.074415322386125
+      ],
+      "terminalChartStationSpan": 87.97925095462907,
+      "minimumTerminalSocRadius": 0.3638920182966616,
+      "firstCellChartPositionError": [
+        0.08303630936936036,
+        0.08303630936936036
+      ]
+    },
+    {
+      "curvature": 0.0025,
+      "steps": 40,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 5.985133847155503,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 43.212981487091724,
+      "maximumCellChartPositionError": 27.037431069694208,
+      "finalCellChartPositionError": [
+        27.037431069694208,
+        27.037431069694208
+      ],
+      "terminalChartPositionError": [
+        27.037382726194327,
+        27.037382726194327
+      ],
+      "terminalChartStationSpan": 138.55464839125798,
+      "minimumTerminalSocRadius": 0.3638920182966616,
+      "firstCellChartPositionError": [
+        0.12803621212413352,
+        0.12803621212413352
+      ]
+    },
+    {
+      "curvature": 0.0025,
+      "steps": 48,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 4.840094951457562,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 53.309524442781196,
+      "maximumCellChartPositionError": 56.23240911888219,
+      "finalCellChartPositionError": [
+        56.23240911888219,
+        56.23240911888219
+      ],
+      "terminalChartPositionError": [
+        56.232314157565966,
+        56.232314157565966
+      ],
+      "terminalChartStationSpan": 201.07575682989764,
+      "minimumTerminalSocRadius": 0.3638920182966616,
+      "firstCellChartPositionError": [
+        0.18273507844872328,
+        0.18273507844872328
+      ]
+    },
+    {
+      "curvature": 0.0025,
+      "steps": 56,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 3.2082746838473923,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": 50.80994727262366,
+      "maximumCellChartPositionError": 104.66567646310412,
+      "finalCellChartPositionError": [
+        104.66567646310412,
+        104.66567646310412
+      ],
+      "terminalChartPositionError": [
+        104.66550703463163,
+        104.66550703463163
+      ],
+      "terminalChartStationSpan": 275.7982145827284,
+      "minimumTerminalSocRadius": 0.3638920182966616,
+      "firstCellChartPositionError": [
+        0.24712393389037082,
+        0.24712393389037082
+      ]
+    },
+    {
+      "curvature": 0.0025,
+      "steps": 64,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -0.9301305802364688,
+      "impossibleCollisionRows": 9,
+      "exitBestBoxMargin": 28.63522974651565,
+      "maximumCellChartPositionError": 179.57732271027177,
+      "finalCellChartPositionError": [
+        179.57732271027177,
+        179.57732271027177
+      ],
+      "terminalChartPositionError": [
+        179.57704132205924,
+        179.57704132205924
+      ],
+      "terminalChartStationSpan": 362.9771587547967,
+      "minimumTerminalSocRadius": 0.3638920182966616,
+      "firstCellChartPositionError": [
+        0.3211913072133088,
+        0.3211913072133088
+      ]
+    },
+    {
+      "curvature": 0.01,
+      "steps": 16,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 5.773461851152243,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": -11.3288149518498,
+      "maximumCellChartPositionError": 3.0675921767658854,
+      "finalCellChartPositionError": [
+        3.0675921767658854,
+        3.0675921767658854
+      ],
+      "terminalChartPositionError": [
+        3.067584002437461,
+        3.067584002437461
+      ],
+      "terminalChartStationSpan": 22.61532723229933,
+      "minimumTerminalSocRadius": 0.35024520774300155,
+      "firstCellChartPositionError": [
+        0.0914935594240275,
+        0.0914935594240275
+      ]
+    },
+    {
+      "curvature": 0.01,
+      "steps": 24,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 2.514114103039006,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": -0.7056115202040303,
+      "maximumCellChartPositionError": 15.699662603150266,
+      "finalCellChartPositionError": [
+        15.699662603150266,
+        15.699662603150266
+      ],
+      "terminalChartPositionError": [
+        15.699629043170814,
+        15.699629043170814
+      ],
+      "terminalChartStationSpan": 52.60327781782383,
+      "minimumTerminalSocRadius": 0.35024520774300155,
+      "firstCellChartPositionError": [
+        0.19724709544852137,
+        0.19724709544852137
+      ]
+    },
+    {
+      "curvature": 0.01,
+      "steps": 32,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -12.838448826487806,
+      "impossibleCollisionRows": 303,
+      "exitBestBoxMargin": -4.418566243797649,
+      "maximumCellChartPositionError": 50.74520704176548,
+      "finalCellChartPositionError": [
+        50.74520704176548,
+        50.74520704176548
+      ],
+      "terminalChartPositionError": [
+        50.745111339237134,
+        50.745111339237134
+      ],
+      "terminalChartStationSpan": 96.51431014083538,
+      "minimumTerminalSocRadius": 0.35024520774300155,
+      "firstCellChartPositionError": [
+        0.34275245323939324,
+        0.34275245323939324
+      ]
+    },
+    {
+      "curvature": 0.01,
+      "steps": 40,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -76.53176209758585,
+      "impossibleCollisionRows": 864,
+      "exitBestBoxMargin": -40.98657009309477,
+      "maximumCellChartPositionError": 127.1897052659442,
+      "finalCellChartPositionError": [
+        127.1897052659442,
+        127.1897052659442
+      ],
+      "terminalChartPositionError": [
+        127.18948389631421,
+        127.18948389631421
+      ],
+      "terminalChartStationSpan": 155.4214962014195,
+      "minimumTerminalSocRadius": 0.35024520774300155,
+      "firstCellChartPositionError": [
+        0.527498934030794,
+        0.527498934030794
+      ]
+    },
+    {
+      "curvature": 0.01,
+      "steps": 48,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -224.47032556192593,
+      "impossibleCollisionRows": 1280,
+      "exitBestBoxMargin": -136.2027081104776,
+      "maximumCellChartPositionError": 271.08264898812854,
+      "finalCellChartPositionError": [
+        271.08264898812854,
+        271.08264898812854
+      ],
+      "terminalChartPositionError": [
+        271.08220252066343,
+        271.08220252066343
+      ],
+      "terminalChartStationSpan": 230.37629003684407,
+      "minimumTerminalSocRadius": 0.35024520774300155,
+      "firstCellChartPositionError": [
+        0.7508147538468507,
+        0.7508147538468507
+      ]
+    },
+    {
+      "curvature": 0.01,
+      "steps": 56,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -505.48421847572916,
+      "impossibleCollisionRows": 1828,
+      "exitBestBoxMargin": -323.78993135772225,
+      "maximumCellChartPositionError": 516.2018137421812,
+      "finalCellChartPositionError": [
+        516.2018137421812,
+        516.2018137421812
+      ],
+      "terminalChartPositionError": [
+        516.2009967085855,
+        516.2009967085855
+      ],
+      "terminalChartStationSpan": 322.4040406575932,
+      "minimumTerminalSocRadius": 0.35024520774300155,
+      "firstCellChartPositionError": [
+        1.011869796308723,
+        1.011869796308723
+      ]
+    },
+    {
+      "curvature": 0.01,
+      "steps": 64,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -913.2911011430866,
+      "impossibleCollisionRows": 2252,
+      "exitBestBoxMargin": -595.5644889670135,
+      "maximumCellChartPositionError": 854.2297238497532,
+      "finalCellChartPositionError": [
+        854.2297238497532,
+        854.2297238497532
+      ],
+      "terminalChartPositionError": [
+        854.229152663842,
+        854.229152663842
+      ],
+      "terminalChartStationSpan": 432.4996127121293,
+      "minimumTerminalSocRadius": 0.35024520774300155,
+      "firstCellChartPositionError": [
+        1.309679013824233,
+        1.309679013824233
+      ]
+    },
+    {
+      "curvature": 0.02,
+      "steps": 16,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": 1.441095729176439,
+      "impossibleCollisionRows": 0,
+      "exitBestBoxMargin": -13.110050545820327,
+      "maximumCellChartPositionError": 6.711103157323513,
+      "finalCellChartPositionError": [
+        6.711103157323513,
+        6.711103157323513
+      ],
+      "terminalChartPositionError": [
+        6.711085789006452,
+        6.711085789006452
+      ],
+      "terminalChartStationSpan": 23.802525598897603,
+      "minimumTerminalSocRadius": 0.33138101563482275,
+      "firstCellChartPositionError": [
+        0.19015681663510375,
+        0.19015681663510375
+      ]
+    },
+    {
+      "curvature": 0.02,
+      "steps": 24,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -22.514178565040044,
+      "impossibleCollisionRows": 394,
+      "exitBestBoxMargin": -15.698760905454698,
+      "maximumCellChartPositionError": 35.47366737812152,
+      "finalCellChartPositionError": [
+        35.47366737812152,
+        35.47366737812152
+      ],
+      "terminalChartPositionError": [
+        35.47359405301083,
+        35.47359405301083
+      ],
+      "terminalChartStationSpan": 56.91746224989254,
+      "minimumTerminalSocRadius": 0.33138101563482275,
+      "firstCellChartPositionError": [
+        0.40906357511069297,
+        0.40906357511069297
+      ]
+    },
+    {
+      "curvature": 0.02,
+      "steps": 32,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -105.95799094956286,
+      "impossibleCollisionRows": 876,
+      "exitBestBoxMargin": -62.46232387615099,
+      "maximumCellChartPositionError": 117.69626160928946,
+      "finalCellChartPositionError": [
+        117.69626160928946,
+        117.69626160928946
+      ],
+      "terminalChartPositionError": [
+        117.69604703217414,
+        117.69604703217414
+      ],
+      "terminalChartStationSpan": 106.97515743282852,
+      "minimumTerminalSocRadius": 0.33138101563482275,
+      "firstCellChartPositionError": [
+        0.7069917318458754,
+        0.7069917318458754
+      ]
+    },
+    {
+      "curvature": 0.02,
+      "steps": 40,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -326.10722529776586,
+      "impossibleCollisionRows": 1450,
+      "exitBestBoxMargin": -201.61410611983598,
+      "maximumCellChartPositionError": 301.226253556825,
+      "finalCellChartPositionError": [
+        301.226253556825,
+        301.226253556825
+      ],
+      "terminalChartPositionError": [
+        301.22574574817605,
+        301.22574574817605
+      ],
+      "terminalChartStationSpan": 175.91124344542015,
+      "minimumTerminalSocRadius": 0.33138101563482275,
+      "firstCellChartPositionError": [
+        1.0794270966239836,
+        1.0794270966239836
+      ]
+    },
+    {
+      "curvature": 0.02,
+      "steps": 48,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -612.776118237047,
+      "impossibleCollisionRows": 1893,
+      "exitBestBoxMargin": -383.03943207140276,
+      "maximumCellChartPositionError": 534.9566673505102,
+      "finalCellChartPositionError": [
+        534.9566673505102,
+        534.9566673505102
+      ],
+      "terminalChartPositionError": [
+        534.9562231371794,
+        534.9562231371794
+      ],
+      "terminalChartStationSpan": 265.50470588861737,
+      "minimumTerminalSocRadius": 0.33138101563482275,
+      "firstCellChartPositionError": [
+        1.520632523922987,
+        1.520632523922987
+      ]
+    },
+    {
+      "curvature": 0.02,
+      "steps": 56,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -981.1047756616964,
+      "impossibleCollisionRows": 2218,
+      "exitBestBoxMargin": -622.8285489878162,
+      "maximumCellChartPositionError": 833.5287616226412,
+      "finalCellChartPositionError": [
+        833.5287616226412,
+        833.5287616226412
+      ],
+      "terminalChartPositionError": [
+        833.5279046542335,
+        833.5279046542335
+      ],
+      "terminalChartStationSpan": 377.3473813500127,
+      "minimumTerminalSocRadius": 0.33138101563482275,
+      "firstCellChartPositionError": [
+        2.0237418586128415,
+        2.0237418586128415
+      ]
+    },
+    {
+      "curvature": 0.02,
+      "steps": 64,
+      "proposedSteps": 48,
+      "minimumCollisionRowBestBoxMargin": -1524.8247426092184,
+      "impossibleCollisionRows": 2524,
+      "exitBestBoxMargin": -992.4024754814243,
+      "maximumCellChartPositionError": 1266.5886311763513,
+      "finalCellChartPositionError": [
+        1266.5886311763513,
+        1266.5886311763513
+      ],
+      "terminalChartPositionError": [
+        1266.5871029069294,
+        1266.5871029069294
+      ],
+      "terminalChartStationSpan": 512.8165311881185,
+      "minimumTerminalSocRadius": 0.33138101563482275,
+      "firstCellChartPositionError": [
+        2.5808723630424497,
+        2.5808723630424497
+      ]
+    }
+  ],
+  "checks": {
+    "passed": 19,
+    "failed": 0,
+    "incomplete": 0,
+    "durationSeconds": 2.938834,
+    "codeDiagnostics": [
+      {
+        "id": "CFERR",
+        "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+        "fix": 0,
+        "line": 0,
+        "column": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "CFERR",
+        "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+        "fix": 0,
+        "line": 0,
+        "column": [
+          0,
+          0
+        ]
+      },
+      [
+        {
+          "id": "CFERR",
+          "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+          "fix": 0,
+          "line": 0,
+          "column": [
+            0,
+            0
+          ]
+        },
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 42,
+          "column": [
+            13,
+            17
+          ]
+        }
+      ],
+      {
+        "id": "CFERR",
+        "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+        "fix": 0,
+        "line": 0,
+        "column": [
+          0,
+          0
+        ]
+      }
+    ]
+  }
+}
