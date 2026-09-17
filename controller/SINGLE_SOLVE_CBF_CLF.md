@@ -1,6 +1,6 @@
-# Predictive safety with distance-dual convexification
+# Predictive safety with overlap-aware support search
 
-The format-31 controller retains a complete finite input plan, swept rectangle
+The format-32 controller retains a complete finite input plan, swept rectangle
 collision certificate, finite confirmed exit and a permanent terminal
 information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
@@ -28,18 +28,20 @@ or a nonlinear physical-vehicle claim.
    information-state set. Its feedback candidate proves nonemptiness; the
    optimizer chooses the command.
 
-An admitted active encounter uses distance-dual queries and one trajectory
-optimization of its retained or witness-preserving updated constraint family
-per frame. Fresh admission uses only distance-dual geometry. An overlapping or
-touching anchor has no positive-distance direction and stops admission before
-a trajectory solve; this is not a physical infeasibility conclusion. Finite
-branch enumeration, integer optimization and alternate initialization are absent.
-No prescribed lateral trajectory or maneuver side is used. Unavailable geometry,
-failed solving and failed independent hard-safety verification issue no command;
-a stored input or terminal law is never executed as a fallback.
+An admitted active encounter optimizes its inherited or witness-preserving
+updated convex family. Fresh admission may use several support-family,
+restoration and hard solves. Search deficits never authorize execution. A
+colliding numerical seed does not prevent constructing support half-spaces.
+Only a full hard certificate allows a command; failed solving or verification
+never dispatches a stored input or terminal law.
 
-Distance-dual details and the complete-witness replacement condition are in
-[DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
+The native solver uses an equivalent sparse stage realization. Exact duplicate
+left sides retain their strongest bound. Constraint generation adds omitted
+violated geometric rows until the full program is satisfied. These are
+numerical reductions of one problem, not softened execution constraints.
+The original condensed physical rows and terminal cones remain the independent
+acceptance authority. Complete-search and native-solve counts are distinct.
+See [SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
 
 ## Terminal set and sensing contract
 
@@ -80,7 +82,7 @@ The first-hold CLF and five terminal modal inequalities are SOC constraints. All
 collision, actuator and slew rows are hard. The absolute target
 exit deadline is preserved while any admitted target remains active.
 
-The returned format-31 state contains the plan, verified inherited affine
+The returned format-32 state contains the plan, verified inherited affine
 bounds and terminal cone, exact nominal nodes, uncertainty boxes, whole-hold
 geometry, stable target identities, common generator and permanent terminal
 certificate. Earlier state formats must be reset.

@@ -4,7 +4,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % Optimize the complete finite control plan and execute only its first hold.
 % Store the accepted prediction and terminal witness for next-frame transfer.
 % The terminal law is a mathematical continuation, never a runtime fallback.
-% Distance-dual geometry is the sole online collision convexification.
+% Analytic support families and internal feasibility restoration admit encounters.
 % Unavailable geometry or an unsuccessful solve returns no control command.
     persistent lastState
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
@@ -36,27 +36,11 @@ function [command, predictedInput, planningProblem, controllerState] = ...
         'accelerationBias',ego.longitudinalAccelerationBias);
     [model,carry] = hardEncounterBarrier.prepare(model,ego,observations,previousState,identity);
     preparationSeconds = toc(timer);
-    formulationSeconds=0;solveSeconds=0;conicCalls=0;distanceCalls=0;horizonAttempts=0;
-    solverCfg = cfg;
-    solverCfg.solver.workTimer = timer;
-    solverCfg.solver.workTimeLimit = cfg.solver.frameDeadlineSeconds;
-    while true
-        formulationTimer=tic;
-        [program,prediction,clf]=formulateAvoidanceProblem(model);
-        distanceCalls=distanceCalls+program.dualConvexification.distanceSolverCalls;
-        formulationSeconds=formulationSeconds+toc(formulationTimer);
-        solveTimer=tic;
-        result=solveHardCbfClf.constrained(program,solverCfg);
-        solveSeconds=solveSeconds+toc(solveTimer);
-        conicCalls=conicCalls+1;horizonAttempts=horizonAttempts+1;
-        if result.feasible || result.exitFlag~=-2 || ~isempty(carry) || isempty(model.encounters) ...
-                || model.horizonSteps>=4*cfg.controller.horizonSteps
-            break;
-        end
-        if toc(timer)>=cfg.solver.frameDeadlineSeconds,break;end
-        model.horizonSteps=min(4*cfg.controller.horizonSteps, ...
-            model.horizonSteps+max(1,ceil(cfg.controller.horizonSteps/2)));
-    end
+    solverCfg=cfg;solverCfg.solver.workTimer=timer;
+    solverCfg.solver.workTimeLimit=min(cfg.solver.frameDeadlineSeconds,cfg.solver.certificateSearchTimeLimit);
+    [program,prediction,clf,result,search]=localSearch(model,solverCfg,timer);
+    formulationSeconds=search.formulationSeconds;solveSeconds=search.solveSeconds;
+    conicCalls=search.nativeSolves;
     if ~result.feasible
         error("collisionAvoidanceController:optimizationFailed", ...
             "The predictive hard-safety, soft-CLF search failed at t=%.9g s (%s). No command was issued.", ...
@@ -84,10 +68,11 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     command.holdSeconds = model.sampleTime;
     nextError = cruise.transition(2:6,:)*[model.initialEgoState;firstInput;1]-cruise.state(2:6);
     nextValue = nextError.'*cruise.matrix*nextError;
-    metadata = struct('solverCallCount',conicCalls+distanceCalls,'solverExitFlag',result.exitFlag, ...
-        'conicSolverCallCount',conicCalls+distanceCalls, ...
-        'distanceSolverCallCount',distanceCalls,'trajectorySolverCallCount',conicCalls, ...
-        'horizonAttemptCount',horizonAttempts, ...
+    metadata = struct('solverCallCount',conicCalls,'solverExitFlag',result.exitFlag, ...
+        'conicSolverCallCount',conicCalls, ...
+        'trajectorySolverCallCount',search.hardSolves, ...
+        'restorationSolverCallCount',search.restorationSolves,'admissionSearch',search, ...
+        'horizonAttemptCount',search.horizonAttempts, ...
         'approximateSolveCertified',result.exitFlag==2, ...
         'solverMessage',result.message,'solverAlgorithm',"predictive hard-safety soft-CLF SOCP", ...
         'hasTarget',~isempty(model.encounters),'obstacleCbfRowCount',program.obstacleCbfRowCount, ...
@@ -97,12 +82,13 @@ function [command, predictedInput, planningProblem, controllerState] = ...
         'recursiveFeasibilityGuaranteed',true,'certificateSource',"constrainedOptimization", ...
         'recursiveFeasibilityScope',"admittedEncountersAndPermanentReferenceUnderDeclaredContracts", ...
         'stateAndSlipBoundsEnforced',false,'wholeHoldCertificate',true, ...
-        'dualConvexification',program.dualConvexification, ...
+        'supportGeometry',program.supportGeometry, ...
         'predictionContinuationRetained',true,'inheritedFeasibleFamily',program.inheritedFeasibleFamily, ...
         'terminalInvariantOptimization',program.terminalOptimization, ...
         'freshProblemContainsWitness',program.replacementContainsWitness, ...
         'measurementRadiusLimit',program.terminal.measurementRadiusLimit, ...
         'carriedWitnessAvailable',~isempty(carry), ...
+        'measurementContractChanged',model.measurementContractChanged, ...
         'terminalContinuationCertified',true,'terminalPolicyRole',"predictionCertificateOnly", ...
         'terminalActive',false,'fallbackUsed',false,'horizonSteps',prediction.stageCount, ...
         'confirmedRelease',~isempty(model.dischargedTargetKeys), ...
@@ -125,7 +111,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     metadata.runtime = struct('inputPreparationSeconds',preparationSeconds, ...
         'formulationSeconds',formulationSeconds,'solveSeconds',solveSeconds);
     data = hardEncounterBarrier.carriedData(prediction,program,prediction.stageCount);
-    controllerState = struct('version',31,'appliedInput',firstInput,'stateTime',model.stateTime, ...
+    controllerState = struct('version',32,'appliedInput',firstInput,'stateTime',model.stateTime, ...
         'identity',identity,'plan',predictedInput,'decision',result.decision, ...
         'predictedState',states,'stateErrorBound',prediction.initialErrorBound, ...
         'prediction',prediction,'stages',data.stages,'cellFrames',data.cellFrames, ...
@@ -258,4 +244,117 @@ function command = localCommand(firstInput, state, scheduleSpeed, scheduleCurvat
     command.axleNormalLoad = tire.staticNormalLoad;
     command.tireSideslipAngle = [frontSlipAngle; rearSlipAngle];
     command.frontWheelSteeringAngle = steeringAngle;
+end
+
+function [program,prediction,clf,result,search]=localSearch(model,cfg,timer)
+% Search iterates own no execution authority. Only the final hard program
+% can pass the common independent certificate gate in the caller.
+    search=struct('hardSolves',0,'restorationSolves',0,'nativeSolves',0,'familyAttempts',0, ...
+        'horizonAttempts',0,'formulationSeconds',0,'solveSeconds',0, ...
+        'normalizedDeficits',zeros(0,1),'deficitNames',strings(0,1), ...
+        'deficits',zeros(0,1),'deficitScales',zeros(0,1),'supportSectors',zeros(1,0), ...
+        'initialOverlappingMidpoints',0);
+    fresh=isempty(model.carriedWitness) && ~isempty(model.encounters);
+    if fresh
+        [position,heading]=laneGeometry.fromFrenet(model.initialEgoState,model.lane);
+        centers=reshape([model.encounters.center],8,[]);relative=position-centers(1:2,:);
+        % Initial relative position ranks the geometric sector. Symmetric
+        % configurations use a deterministic tie, with its opposite retained.
+        lateral=[-sin(heading),cos(heading)]*relative(1:2,:);
+        base=ones(1,numel(model.encounters));base(lateral<-1e-8)=-1;
+        model.supportSectors=base;
+    end
+    phase=tic;[program,prediction,clf]=formulateAvoidanceProblem(model);
+    search.formulationSeconds=toc(phase);search.horizonAttempts=1;
+    search.initialOverlappingMidpoints=program.supportGeometry.overlappingMidpoints;
+    result=struct('feasible',false,'exitFlag',-2,'message',"No hard-certified admission obtained.");
+    if ~fresh
+        % A negative SOC radius proves this open-loop uncertainty horizon
+        % empty before optimization. For initial target-free admission only,
+        % try a shorter certified horizon within the configured limits.
+        while isempty(model.carriedWitness) && isempty(model.encounters) ...
+                && any(program.terminalCone.bound(1:3:end)<0) ...
+                && model.horizonSteps>cfg.controller.minimumHorizonSteps ...
+                && toc(timer)<cfg.solver.workTimeLimit
+            model.horizonSteps=max(cfg.controller.minimumHorizonSteps,floor(model.horizonSteps/2));
+            phase=tic;[program,prediction,clf]=formulateAvoidanceProblem(model);
+            search.formulationSeconds=search.formulationSeconds+toc(phase);
+            search.horizonAttempts=search.horizonAttempts+1;
+        end
+        phase=tic;result=solveHardCbfClf.constrained(program,cfg);
+        search.solveSeconds=toc(phase);search.hardSolves=1;search.nativeSolves=localNativeCalls(result);return;
+    end
+    while true
+        initial=program;initialPrediction=prediction;
+        sectorCount=2^min(numel(model.encounters),20);
+        families=min(cfg.solver.admissionMaximumFamilies,2*sectorCount);
+        for family=1:families
+            if toc(timer)>=cfg.solver.workTimeLimit,break;end
+            model.supportSectors=base;indices=1:min(numel(model.encounters),20);
+            model.supportSectors(indices)=base(indices).*(1-2*bitget(mod(family-1,sectorCount),indices));
+            search.familyAttempts=search.familyAttempts+1;search.supportSectors=model.supportSectors;
+            program=initial;prediction=initialPrediction;
+            if family>sectorCount
+                phase=tic;model.exitDirections=-initial.completion.direction;
+                [program,prediction,clf]=formulateAvoidanceProblem(model);
+                search.formulationSeconds=search.formulationSeconds+toc(phase);
+            elseif family>1
+                phase=tic;
+                [normals,information]=avoidanceSafetyGeometry.supportNormals(model,prediction,program.anchorPlan,program.geometry.frames);
+                program.supportGeometry=information;
+                [program,prediction,clf]=formulateAvoidanceProblem(model,program,prediction,program.anchorPlan,normals);
+                search.formulationSeconds=search.formulationSeconds+toc(phase);
+            end
+            merit=Inf;
+            for iteration=0:cfg.solver.admissionMaximumIterations
+                if toc(timer)>=cfg.solver.workTimeLimit,break;end
+                % A colliding numerical anchor supplies no certificate; start its
+                % internal search with restoration, avoiding a predictably poor
+                % performance solve. Clear anchors try the hard problem first.
+                if iteration>0 || program.supportGeometry.overlappingMidpoints==0
+                    phase=tic;result=solveHardCbfClf.constrained(program,cfg);
+                    search.solveSeconds=search.solveSeconds+toc(phase);
+                    search.hardSolves=search.hardSolves+1;search.nativeSolves=search.nativeSolves+localNativeCalls(result);
+                    if result.feasible,return;end
+                    if result.exitFlag~=-2,return;end
+                end
+                if iteration==cfg.solver.admissionMaximumIterations,break;end
+                phase=tic;[restored,restoration]=solveHardCbfClf.restore(program,cfg);
+                search.solveSeconds=search.solveSeconds+toc(phase);
+                search.restorationSolves=search.restorationSolves+1;search.nativeSolves=search.nativeSolves+localNativeCalls(restored);
+                search.normalizedDeficits(end+1,1)=restored.normalizedDeficit;
+                search.deficits=restored.deficits;search.deficitScales=restoration.deficitScale;
+                search.deficitNames=restoration.deficitNames;
+                if ~restored.feasible,result=restored;break;end
+                if isfinite(merit) && restored.normalizedDeficit>=merit-1e-7*(1+merit),break;end
+                merit=restored.normalizedDeficit;
+                plan=restored.decision(1:program.layout.planCount);
+                phase=tic;
+                [normals,information]=avoidanceSafetyGeometry.supportNormals(model,prediction,plan,program.geometry.frames,program.geometry);
+                program.supportGeometry=information;
+                [program,prediction,clf]=formulateAvoidanceProblem(model,program,prediction,plan,normals);
+                search.formulationSeconds=search.formulationSeconds+toc(phase);
+            end
+        end
+        if toc(timer)>=cfg.solver.workTimeLimit || model.horizonSteps>=4*cfg.controller.horizonSteps,break;end
+        model.horizonSteps=min(4*cfg.controller.horizonSteps, ...
+            model.horizonSteps+max(1,ceil(cfg.controller.horizonSteps/2)));
+        model.supportSectors=base;
+        if isfield(model,'exitDirections'),model=rmfield(model,'exitDirections');end
+        phase=tic;[program,prediction,clf]=formulateAvoidanceProblem(model);
+        search.formulationSeconds=search.formulationSeconds+toc(phase);
+        search.horizonAttempts=search.horizonAttempts+1;
+    end
+    result.feasible=false;
+    residual=Inf;if ~isempty(search.normalizedDeficits),residual=min(search.normalizedDeficits);end
+    result.message="Bounded support-family search ended without a hard certificate (" ...
+        +string(search.familyAttempts)+" families, minimum normalized search deficit "+string(residual) ...
+        +", elapsed "+string(toc(timer))+" s); "+result.message;
+end
+
+function count=localNativeCalls(result)
+    count=1;
+    if isfield(result,'output') && isfield(result.output,'constraintGenerationSolves')
+        count=result.output.constraintGenerationSolves;
+    end
 end

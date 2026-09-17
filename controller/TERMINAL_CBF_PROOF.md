@@ -1,6 +1,6 @@
 # Recursive feasibility and encounter safety of the implemented controller
 
-This is the current format-31 proof. It replaces the previous stopping-tail
+This is the current format-32 proof. It replaces the previous stopping-tail
 argument. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
@@ -321,10 +321,10 @@ forces an unproved fresh admission of all remaining obligations**.
 The first-hold CLF cannot remove this candidate: for any finite hard-feasible
 input its cone can be satisfied by a finite nonnegative slack.
 
-### Distance-dual collision-row replacement
+### Support-direction collision-row replacement
 
-The controller may solve Li et al.'s distance dual at the carried anchor and
-propose new continuous separation normals. The resulting whole-hold rows
+The controller may use signed configuration-obstacle geometry at the carried
+anchor to propose new continuous support directions. The resulting whole-hold rows
 retain the complete footprint, uncertainty and truncation allowances.
 The same inherited suffix, completed with CLF slack, must satisfy every row
 and every cone of the proposed program before it is selected. Thus replacing
@@ -332,7 +332,7 @@ the collision rows preserves a concrete feasible continuation. When this
 check fails, the unchanged inherited program is optimized. Exit directions,
 absolute deadlines and terminal conditions are preserved. No normal-selection
 heuristic alone is used as a recursive-feasibility argument. See
-[DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
+[SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
 
 ### Fresh no-target performance horizon
 
@@ -347,14 +347,16 @@ and all CLF and terminal cones of the proposed new program**. Only a program con
 candidate may replace the inherited one. Otherwise the inherited program is
 used. This is pre-solve selection of an optimization problem, not selection
 of an actuator command after solver failure. An admitted retained family uses
-one trajectory optimization per sample, preceded by distance-dual geometry
-queries when targets are active. Fresh admission uses the same distance-dual
-method; no finite branch search remains. The theorem starts only after one
-complete convex program passes the original hard certificate. An overlapping
-initial anchor may prevent obtaining this first witness and lies outside that
-premise; recursive feasibility does not prove universal admission. Its affine
-family and terminal cones are inherited before any optional witness-preserving
-collision-row replacement. Format 31 rejects earlier stored certificates.
+one hard performance problem per sample, with optional witness-preserving
+geometry updates. Its sparse numerical solution can use several constraint-
+generation solves; all original physical rows and terminal cones are checked.
+Fresh admission uses bounded support-family and search-only feasibility
+restoration. The theorem starts only after a complete convex program passes
+the original hard certificate. Neither a finite direction at overlap nor a
+positive-deficit restoration solution supplies this premise. Recursive
+feasibility does not prove universal admission or numerical deadline success.
+The accepted affine family and terminal cones are inherited before optional
+geometry replacement. Format 32 rejects earlier stored certificates.
 
 ### Empty suffix after confirmed encounter completion
 
@@ -435,3 +437,19 @@ an invariant **information-state optimization**. Verified fresh horizons may
 replace either construction. This is the explicit hybrid counterpart of the
 terminal-extension argument; it does not assume that a stored plan belongs to
 an independently rebuilt problem merely because it is used as an initial guess.
+
+## Changed measurement contracts
+
+Format 32 treats an enlarged ego measurement enclosure limit as a new admission
+obligation. It conditions the actual successor against the carried prediction,
+but discards the old terminal certificate as authority for the larger future
+sensing bound. It rebuilds and independently verifies the complete problem.
+No successful continuation claim crosses that contract change automatically.
+Metadata records `measurementContractChanged` and the absence of an inherited
+feasible family. Failed new admission still issues no command. The unchanged-
+contract theorem above is not a guarantee against arbitrarily growing bounds.
+
+For target-free initial admission, the configured nominal performance horizon
+may be shortened, within `minimumHorizonSteps`, if only a shorter finite witness
+can reach the permanent terminal set. This changes the selected certificate
+horizon; it removes neither terminal membership nor predictive continuation.

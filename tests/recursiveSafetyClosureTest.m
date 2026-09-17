@@ -85,8 +85,11 @@ classdef recursiveSafetyClosureTest < matlab.unittest.TestCase
             [ego,road,cfg]=localFixture(zeros(6,1),0);
             [~,~,p,s]=collisionAvoidanceController(ego,[],road,cfg,[]);
             ego=localNext(ego,p,s);ego.controllerStateErrorBound=.001*ones(6,1);
-            testCase.verifyError(@() collisionAvoidanceController(ego,[],road,cfg,s), ...
-                'collisionAvoidanceController:changedMeasurementContract');
+            [~,~,next]=collisionAvoidanceController(ego,[],road,cfg,s);
+            testCase.verifyTrue(next.metadata.measurementContractChanged);
+            testCase.verifyFalse(next.metadata.inheritedFeasibleFamily);
+            testCase.verifyTrue(next.metadata.planCertified);
+            testCase.verifyGreaterThanOrEqual(next.metadata.measurementRadiusLimit,ego.controllerStateErrorBound);
         end
         function invariantOptimizationSurvivesAlternatingMeasurementErrors(testCase)
             result=localTerminalSequence();

@@ -3,9 +3,9 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-Fresh admission uses distance-dual geometry exclusively, followed by a hard
+Fresh admission uses analytic support families and search-only restoration, followed by a hard
 trajectory SOCP with a full input sequence and penalized first-hold CLF slack.
-Its format-31 state retains the complete prediction and terminal continuation.
+Its format-32 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -17,13 +17,13 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public target-array entry; distance-dual admission, one inherited-family solve per successor, complete witness storage, no command after failed search |
+| `collisionAvoidanceController.m` | Public target-array entry; support-family admission and restoration, one inherited-family solve per successor, complete witness storage, no command after failed search |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard swept/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
-| `avoidanceStageQp.m` | Sparse transcription with per-stage violation columns (`build`) and bound updates using explicit row maps (`updateBounds`) |
-| `solveHardCbfClf.m` | Convex trajectory solving (`constrained`) and independent verification (`certify`) |
-| `avoidanceSafetyGeometry.m` | Swept separation (`build`), online distance duals (`distanceDual`, `distanceDualNormals`), rectangle distance and shared numeric kernels |
+| `avoidanceStageQp.m` | Equivalent sparse stage transcription and exact duplicate-row reduction (`build`) |
+| `solveHardCbfClf.m` | Hard and search-only conic solving (`constrained`, `restore`), constraint generation and independent verification (`certify`) |
+| `avoidanceSafetyGeometry.m` | Swept separation (`build`), analytic support proposals (`supportDirection`, `supportNormals`), rectangle distance and shared numeric kernels |
 | `laneGeometry.m` | Polyline/arc projection, Frenet poses and chart bounds |
 | `ltvBicycleModel.m` | Held-input prediction, affine input-family swept prediction (`fixedPredict`), sampled cruise synthesis (`sampledCruise`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
@@ -41,24 +41,21 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-31 predictive certificate. The online path calls
+format-32 predictive certificate. The online path calls
 `formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained`. Fresh
-admission uses distance queries and a hard trajectory solve; an infeasible
-trajectory may be retried at a longer horizon by the same method. Accepted successors
-retain one feasible convex family, optionally replacing collision rows through
-a witness-preserving distance-dual update. No geometric maneuver template is generated. A valid active encounter inherits the accepted constraint family by
-eliminating the executed input. The terminal law is a mathematical witness;
-failed optimization never dispatches it or a stored input. New target admission requires a fresh certificate. After release, a fresh
-performance program must contain a verified feasible candidate; otherwise
-the old suffix or a free terminal invariant optimization is used before the
-single solve. The complete conditional proof is in TERMINAL_CBF_PROOF.md.
+admission uses bounded support sectors, whole-hold scoring, grouped-deficit
+restoration and final hard verification. Accepted successors retain the
+certified prediction and absolute exit deadline. New geometry must contain
+the complete inherited witness. The terminal law proves nonemptiness; it is
+never dispatched after solver failure. The conditional proof is in
+TERMINAL_CBF_PROOF.md.
 
-`avoidanceStageQp` and the general model/geometry kernels remain standalone
-research transcription and model utilities; they are not alternate execution
-paths. Nonlinear Fiala enclosure tools retain their separate model-study scope.
-The current online guarantee is the declared zero-residual affine plant only.
+`avoidanceStageQp.build` is now the sole online sparse realization, including
+restoration. Its obsolete slack/budget transcription has been removed.
+Nonlinear Fiala tools retain their separate study scope. The online guarantee
+remains the declared zero-residual held affine plant.
 
 Clear changed MATLAB functions/classes after updating a live session. Native
-kernels remain under the excluded `solver/` tree and do not need regeneration
-for this MATLAB orchestration change. `controllerSourceBudgetTest` enforces the
+kernels remain under the excluded `solver/` tree and must be regenerated with `scripts/buildAvoidanceGeometryKernel.m`
+after this support-kernel interface change. `controllerSourceBudgetTest` enforces the
 20-source upper limit.

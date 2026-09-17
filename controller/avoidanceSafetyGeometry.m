@@ -107,24 +107,21 @@ classdef avoidanceSafetyGeometry
                     "nominal",nominal,"targets",targets,"boundaries",boundaries, ...
                     "settings",[cfg.vehicle.length/2;cfg.vehicle.width/2;envelope(3); ...
                         envelope(2);cfg.collision.clearanceMargin], ...
-                    "duration",tube.duration,"degree",size(tube.offset,2)-1);
+                    "duration",tube.duration,"degree",size(tube.offset,2)-1, ...
+                    "normals",zeros(2,0));
+                if isfield(prediction,"separationNormals")
+                    data.normals=prediction.separationNormals{cellIndex};
+                    validateattributes(data.normals,{'double'},{'size',[2,numel(model.encounters)],'finite','real'});
+                    if any(abs(vecnorm(data.normals)-1)>1e-10)
+                        error("collisionAvoidanceController:invalidSeparationNormal","Separation normals must be unit vectors.");
+                    end
+                end
                 cellData{cellIndex} = data;
                 activeTargets{cellIndex} = active;
                 sourceLabels{cellIndex} = [targetLabels;boundaryLabels];
             end
             data = vertcat(cellData{:});
-            if isfield(prediction,"separationNormals")
-                allGeometricRows = repmat(localCellRows(cellData{1}, ...
-                    prediction.separationNormals{1}),numel(groups),1);
-                for cellIndex = 1:numel(groups)
-                    directions = prediction.separationNormals{cellIndex};
-                    validateattributes(directions,{'double'},{'size',[2,numel(model.encounters)],'finite','real'});
-                    if any(abs(vecnorm(directions)-1)>1e-10)
-                        error("collisionAvoidanceController:invalidSeparationNormal","Separation normals must be unit vectors.");
-                    end
-                    allGeometricRows(cellIndex) = localCellRows(cellData{cellIndex},directions);
-                end
-            elseif nativeGeometry
+            if nativeGeometry
                 allGeometricRows = avoidanceCellRowsKernelMex(data);
             else
                 allGeometricRows = avoidanceSafetyGeometry.cellRows(data);
@@ -181,69 +178,105 @@ classdef avoidanceSafetyGeometry
             geometry = struct("matrix", vertcat(groups.matrix), "physicalBound", vertcat(groups.physicalBound), ...
                 "safety", vertcat(groups.safety), "label", vertcat(groups.label), "stage", vertcat(groups.stage), ...
                 "frames", vertcat(frames{:}), "normals", {normalGroups},"local",vertcat(localGroups{:}), ...
-                "cellIndex",vertcat(groups.cellIndex));
+                "cellIndex",vertcat(groups.cellIndex),"cellData",vertcat(cellData{:}));
         end
 
-        function [normal,information] = distanceDual(egoPosition,egoYaw,targetPosition,targetYaw,halfDimensions,cfg)
-        % Li et al. (2023), equation 12, on the full configuration polygon.
-        % Overlap has zero ordinary distance and supplies no usable direction.
-            [signedDistance,~,~,outside]=avoidanceSafetyGeometry.rectangleDistance( ...
-                egoPosition,egoYaw,targetPosition,targetYaw,halfDimensions);
-            axes=[1,0,-1,0;0,1,0,-1];
-            egoRotation=localRotation(egoYaw);targetRotation=localRotation(targetYaw);
-            matrix=[egoRotation*axes,targetRotation*axes].';
-            bound=matrix*targetPosition+abs(matrix*egoRotation)*halfDimensions(1:2) ...
-                +abs(matrix*targetRotation)*halfDimensions(3:4);
-            residual=matrix*egoPosition-bound;
-            lambda=zeros(8,1);status=0;normal=zeros(2,1);
-            if outside
-                if exist("solveAvoidanceSocpMex","file")~=3
-                    addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','clarabel','matlab'));
-                end
-                [lambda,output]=solveAvoidanceSocpMex(sparse(8,8),-residual, ...
-                    sparse([-eye(8);zeros(1,8);-matrix.']),[zeros(8,1);1;0;0],[0;8;3], ...
-                    [cfg.solver.constraintTolerance,cfg.solver.optimalityTolerance,cfg.solver.maxIterations]);
-                status=output.status;
-                if any(status==[1,4]) && all(isfinite(lambda))
-                    % Numerical dual variables propose a direction only.
-                    % Full robust support rows independently establish safety.
-                    vector=matrix.'*lambda;
-                    if norm(vector)>1e-6,normal=vector/norm(vector);end
-                end
-            end
-            information=struct('available',norm(normal)>0,'distance',residual.'*lambda, ...
-                'signedDistance',signedDistance,'multipliers',lambda,'matrix',matrix, ...
-                'bound',bound,'nativeStatus',status,'nativeCalls',double(outside));
+        function [normal,information] = supportDirection(egoPosition,egoYaw,targetPosition,targetYaw,halfDimensions)
+        % A support direction remains meaningful at overlap and contact.
+            [vertices,faces,bounds]=localConfigurationObstacle(egoYaw,targetPosition,targetYaw,halfDimensions);
+            [distance,normal,outside]=localPointPolygonSignedDistance(egoPosition,vertices,faces,bounds);
+            support=max(normal.'*vertices);
+            gaps=faces*egoPosition-bounds;
+            tied=gaps>=max(gaps)-1e-9*(1+max(abs(bounds)));
+            information=struct('available',all(isfinite(normal)) && abs(norm(normal)-1)<1e-10, ...
+                'signedDistance',distance,'anchorSeparated',outside,'support',support, ...
+                'alternatives',faces(tied,:).');
         end
 
-        function [normals,information] = distanceDualNormals(model,prediction,plan,frames)
-        % Optimize continuous directions at the anchor's hold midpoints.
-        % These anchors are numerical coordinates, never tracking references.
+        function [normals,information] = supportNormals(model,prediction,plan,frames,geometry)
+        % Score whole-hold directions; a side sector selects a constraint family,
+        % never a prescribed trajectory or a passing time.
+            if nargin<5,geometry=[];end
             cells=prediction.cells;targets=numel(model.encounters);
-            normals=cell(numel(cells),1);available=true;overlaps=0;calls=0;
-            minimum=Inf;maximumGap=0;cfg=model.cfg;
+            normals=cell(numel(cells),1);available=true;overlaps=0;minimum=Inf;
+            switches=0;cfg=model.cfg;previous=zeros(2,targets);
+            sectors=zeros(1,targets);
+            if isfield(model,'supportSectors'),sectors=model.supportSectors;end
+            degree=size(cells(1).offset,2)-1;
+            weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
+            native=exist('avoidanceSupportKernelMex','file')==3;
             for index=1:numel(cells)
-                tube=cells(index);frame=frames(index);degree=size(tube.offset,2)-1;
-                weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
+                tube=cells(index);frame=frames(index);
+                if size(tube.offset,2)~=numel(weights)
+                    degree=size(tube.offset,2)-1;
+                    weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
+                end
                 points=reshape(pagemtimes(tube.map,plan),6,[])+tube.offset;
-                state=points*weights;
-                position=frame.origin+[frame.tangent,frame.lateral]*state(1:2);
+                state=points*weights;position=frame.origin+[frame.tangent,frame.lateral]*state(1:2);
                 yaw=frame.heading+state(3);normals{index}=zeros(2,targets);
                 for targetIndex=1:targets
                     target=model.encounters(targetIndex);
                     center=targetPrediction.finiteFlow(target,tube.start+tube.duration/2);
-                    [normal,dual]=avoidanceSafetyGeometry.distanceDual(position,yaw,center(1:2),center(7), ...
-                        [cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth],cfg);
-                    normals{index}(:,targetIndex)=normal;
-                    available=available && dual.available;calls=calls+dual.nativeCalls;
-                    overlaps=overlaps+double(dual.signedDistance<=0);
-                    minimum=min(minimum,dual.signedDistance);
-                    maximumGap=max(maximumGap,abs(dual.distance-max(dual.signedDistance,0)));
+                    dimensions=[cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth];
+                    if native
+                        [normal,query]=avoidanceSupportKernelMex(position,yaw,center(1:2),center(7),dimensions);
+                    else
+                        [normal,query]=avoidanceSafetyGeometry.supportDirection(position,yaw,center(1:2),center(7),dimensions);
+                    end
+                    candidates=[normal,query.alternatives,previous(:,targetIndex),frame.tangent,-frame.tangent];
+                    if sectors(targetIndex)~=0,candidates=[candidates,sectors(targetIndex)*frame.lateral];end
+                    if ~isempty(geometry)
+                        candidates=[candidates,geometry.normals{index}(:,targetIndex)];
+                    end
+                    valid=vecnorm(candidates)>.5;
+                    if sectors(targetIndex)~=0
+                        valid=valid & sectors(targetIndex)*(frame.lateral.'*candidates)>=-1e-10;
+                    end
+                    candidates=candidates(:,valid);
+                    [~,uniqueIndex]=unique(round(candidates.',12),'rows','stable');candidates=candidates(:,uniqueIndex);
+                    score=zeros(1,size(candidates,2));
+                    if ~isempty(geometry)
+                        data=geometry.cellData(index);data.nominal=points;
+                        data.targets=data.targets(targetIndex);data.boundaries=data.boundaries([]);
+                        batch=repmat(data,size(candidates,2),1);
+                        for option=1:numel(batch),batch(option).normals=candidates(:,option);end
+                        if exist('avoidanceCellRowsKernelMex','file')==3
+                            queries=avoidanceCellRowsKernelMex(batch);
+                        else
+                            queries=avoidanceSafetyGeometry.cellRows(batch);
+                        end
+                    end
+                    for option=1:size(candidates,2)
+                        direction=candidates(:,option);
+                        if isempty(geometry)
+                            support=targetPrediction.rectangleSupport(target.halfLength,target.halfWidth,direction,center(7),0) ...
+                                +targetPrediction.rectangleSupport(cfg.vehicle.length/2,cfg.vehicle.width/2,direction,yaw,0);
+                            score(option)=direction.'*(position-center(1:2))-support;
+                        else
+                            rows=queries(option);
+                            margin=rows.bound-rows.state*points-abs(rows.state)*tube.radius;
+                            reach=repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+                                max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],prediction.stageCount,1);
+                            support=reshape(pagemtimes(abs(tube.map),reach),6,[]);
+                            offset=rows.bound-rows.state*tube.offset-abs(rows.state)*tube.radius;
+                            scale=1+abs(offset)+abs(rows.state)*support;
+                            reserve=4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance)*scale;
+                            score(option)=min(margin-reserve,[],'all');
+                        end
+                    end
+                    best=max(score);tied=find(score>=best-1e-8*(1+abs(best)));
+                    preference=previous(:,targetIndex);
+                    if norm(preference)<.5,preference=frame.lateral;if sectors(targetIndex)<0,preference=-preference;end,end
+                    [~,choice]=max(preference.'*candidates(:,tied));normal=candidates(:,tied(choice));
+                    if index>1,switches=switches+double(norm(normal-previous(:,targetIndex))>1e-6);end
+                    normals{index}(:,targetIndex)=normal;previous(:,targetIndex)=normal;
+                    available=available && query.available;overlaps=overlaps+double(query.signedDistance<=0);
+                    minimum=min(minimum,query.signedDistance);
                 end
             end
             information=struct('available',available,'overlappingMidpoints',overlaps, ...
-                'distanceSolverCalls',calls,'minimumAnchorDistance',minimum, ...
-                'maximumDistanceGap',maximumGap,'used',false,'witnessPreserved',false);
+                'minimumAnchorDistance',minimum,'normalSwitchCount',switches, ...
+                'used',false,'witnessPreserved',false);
         end
 
         function [signedDistance, normal, supportValue, outside] = ...
@@ -306,6 +339,8 @@ function rows = localCellRows(data,prescribedNormals)
         centerEgo = origin+[tangent,lateral]*mean(nominal(1:2,:),2);
         if nargin > 1
             normal = prescribedNormals(:,index);
+        elseif isfield(data,'normals') && ~isempty(data.normals)
+            normal=data.normals(:,index);
         else
             [~,normal] = avoidanceSafetyGeometry.rectangleDistance(centerEgo,heading+mean(nominal(3,:)), ...
                 middle(1:2),middle(7),[halfLength;halfWidth;target.halfLength;target.halfWidth]);
@@ -398,10 +433,6 @@ function result = localProjectedRows(data)
         "physicalBound",physical(:), ...
         "safety",true(numel(physical),1),"label",repmat(labels,pointCount,1), ...
         "stage",repmat(tube.stage,numel(physical),1),"local",local);
-end
-
-function rotation=localRotation(angle)
-    rotation=[cos(angle),-sin(angle);sin(angle),cos(angle)];
 end
 
 function [vertices, faceNormal, faceBound] = ...

@@ -7,29 +7,35 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
 % not simulate delayed actuation or establish nonlinear-vehicle safety.
 % UseEstimator=false supplies exact states with the same physical range gate
 % for a controller-only comparison; it does not run or reset the observer.
-% Road boundaries are opt-in; model-domain constraints remain enabled.
+% Road boundaries are opt-in; state-domain margins are diagnostic only.
     arguments
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
         options.TargetInitialDistance (1,1) double {mustBePositive} = 100
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260913
         options.OutputDirectory (1,1) string = ""
+        options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
+        options.ReferenceSpeed (1,1) double {mustBePositive} = 10
+        options.TargetLateralPosition (1,1) double {mustBeFinite} = 0.8
+        options.ConfirmationRange (1,1) double {mustBePositive} = 30
+        options.Warmup (1,1) logical = false
         options.UseEstimator (1,1) logical = true
         options.UseRoadBoundaries (1,1) logical = false
     end
     root = fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'estimator'),fullfile(root,'solver','nrmm'));
-    cfg = collisionAvoidanceControllerConfig(struct('referenceSpeed',10, ...
+    cfg = collisionAvoidanceControllerConfig(struct('referenceSpeed',options.ReferenceSpeed, ...
         'controller',struct('sampleTime',0.1,'horizonSteps',16), ...
         'model',struct('lateralDomainRadius',4), ...
-        'solver',struct('certificateSearchTimeLimit',3,'frameDeadlineSeconds',0.1)));
+        'solver',struct('certificateSearchTimeLimit',3,'frameDeadlineSeconds',options.DeadlineSeconds)));
     estimator = estimatorControllerIntegrationConfig();
     estimator.randomSeed = options.Seed;
-    estimator.vehicle.targetSpeed = 10;
-    estimator.initialization.targetSpeedPrior = 10;
+    estimator.vehicle.targetSpeed = options.ReferenceSpeed;
+    estimator.sensor.radar.rangeMaximum=options.ConfirmationRange;
+    estimator.initialization.targetSpeedPrior = options.ReferenceSpeed;
     estimator.observer.ego.yaw.rearAxleDistance = cfg.vehicle.lr;
     estimator.observer.runtime.integrationStepMaximum = estimator.observer.runtime.samplePeriod;
-    targetFunction = @(t,~) localTarget(t,options.TargetInitialDistance);
-    truth = [0;0;0;10;0;0];
+    targetFunction = @(t,~) localTarget(t,options.TargetInitialDistance,options.ReferenceSpeed,options.TargetLateralPosition);
+    truth = [0;0;0;options.ReferenceSpeed;0;0];
     if options.UseEstimator
         [context,initialization] = nrmmEstimatorControllerAdapter('initialize',estimator,localTruth(truth),targetFunction);
     else
@@ -41,6 +47,11 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
             'coefficients',[0;0;-5],'parameterRange',[-100;2000],'safeSideSign',1);
         boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
         road.boundaries = boundaries;
+    end
+    preparation=struct('performed',false);
+    if options.Warmup
+        probe=cfg;probe.solver.frameDeadlineSeconds=5;
+        preparation=prepareCollisionAvoidancePipeline(localTruth(truth),road,probe,estimator);
     end
     count = options.SampleCount+1;
     time = (0:options.SampleCount)*cfg.controller.sampleTime;
@@ -78,7 +89,13 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         published(k) = ~isempty(targets);
         phase = tic;
         try
-            [command,~,problem,certificate] = collisionAvoidanceController(ego,targets,road,cfg,certificate);
+            remaining=options.DeadlineSeconds-toc(frameTimer);
+            if remaining<=0,error('collisionAvoidanceController:optimizationFailed','The observer exhausted the complete frame deadline.');end
+            frameCfg=cfg;frameCfg.solver.frameDeadlineSeconds=remaining;
+            [command,~,problem,certificate] = collisionAvoidanceController(ego,targets,road,frameCfg,certificate);
+            if toc(frameTimer)>options.DeadlineSeconds
+                error('collisionAvoidanceController:optimizationFailed','The complete estimator-controller frame exceeded its deadline.');
+            end
         catch exception
             controllerSeconds(k) = toc(phase);frameSeconds(k) = toc(frameTimer);
             failure = struct('identifier',string(exception.identifier),'message',string(exception.message),'time',time(k));
@@ -120,7 +137,7 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         'controllerSeconds',controllerSeconds(kept),'audit',{audits(kept)},'metadata',{metadata(kept)}, ...
         'egoEstimate',{egoEstimates(kept)},'targetEstimate',{targetEstimates(kept)}, ...
         'minimumRoadMargin',minimumRoadMargin,'minimumSeparationMargin',minimumSeparationMargin, ...
-        'configuration',cfg,'estimatorConfiguration',estimator,'options',options, ...
+        'configuration',cfg,'estimatorConfiguration',estimator,'options',options,'preparation',preparation, ...
         'scope',"Actual NRMM bounds, declared affine ego plant, fixed road; computation delay measured but not applied");
     if ~options.UseEstimator
         report.scope = "Exact states with a current 30 m range gate; declared affine ego plant; computation delay measured but not applied";
@@ -136,7 +153,7 @@ function state = localTruth(x)
     state=struct('position',x(1:2),'yawAngle',x(3),'longitudinalVelocity',x(4),'lateralVelocity',x(5),'yawRate',x(6));
 end
 
-function target = localTarget(time,distance)
-    target=struct('targetPositionInertial',[distance-10*time;0.8],'targetVelocityInertial',[-10;0], ...
+function target = localTarget(time,distance,speed,lateral)
+    target=struct('targetPositionInertial',[distance-speed*time;lateral],'targetVelocityInertial',[-speed;0], ...
         'targetAccelerationInertial',[0;0],'targetYawInertial',pi,'targetYawRate',0,'targetLength',4.8,'targetWidth',1.9);
 end

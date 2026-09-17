@@ -1,7 +1,7 @@
 # Predictive CBF and soft CLF controller
 
-Current implementation, September 16, 2026: the format-31 controller uses
-distance-dual convexification as its sole collision-convexification method. It
+Current implementation, September 16, 2026: the format-32 controller uses
+overlap-aware support geometry and feasibility restoration. It
 retains predictive continuation across active encounters, confirmed partial
 or full target release, and prediction exhaustion. The terminal information
 set uses the same held affine generator as online prediction. The CLF retains
@@ -14,23 +14,26 @@ constraints are removed; actuator amplitude and finite slew bounds remain.
 Geometry ranges follow actuator reachability. The terminal invariant set is
 synthesized from the same actuator limits, without hidden state/slip bounds.
 
-Admission has no selected maneuver side or prescribed lateral trajectory.
-Li et al.'s distance dual supplies continuous separating directions at computed
-anchor poses. Those directions enter the complete robust swept constraints;
-collision remains hard. See [DISTANCE_DUAL_CONVEXIFICATION.md](DISTANCE_DUAL_CONVEXIFICATION.md).
-Every fresh anchor midpoint must yield a valid distance-dual direction before
-the hard trajectory SOCP is built. Overlap/contact makes ordinary distance zero;
-unavailable initialization stops control without claiming physical infeasibility.
-No direction-grid enumeration, integer search or alternate initializer remains.
-The stationary and oncoming scenarios that previously depended on finite
-initialization must therefore be assessed afresh. No claim of global performance
-optimality or complete coverage of all physically safe trajectories is made.
+Fresh admission searches bounded geometric support families. An analytic signed
+configuration-obstacle query supplies a finite unit direction even at overlap
+or contact. A direction defines a safe half-space; it does not certify its
+anchor. Joint sector alternatives resolve symmetric ties consistently across
+holds. No lateral path, amplitude, passing time or avoidance acceleration is
+prescribed. Controls remain optimization variables.
+
+A colliding seed enters search-only feasibility restoration: minimize grouped,
+normalized collision, exit and terminal deficits with actuator limits hard.
+Whole-hold margin proposals update the geometry. A final hard-safety, soft-CLF
+solve removes every search deficit and passes independent physical verification.
+Bounded sector, exit-direction and horizon searches are incomplete; failure is
+not proof of physical infeasibility. See
+[SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
 
 After admission, first preserve the actual accepted constraint family: substitute the
 executed input in its affine family, retain the terminal cones and continuous
 swept enclosures, and condition successor information by inclusion. The
 resulting suffix supplies a feasible candidate for the next convex solve.
-New distance-dual collision rows may replace the inherited rows only after
+New support-direction collision rows may replace the inherited rows only after
 that same suffix passes every proposed hard row and CLF/terminal cone.
 Otherwise the inherited program remains the optimization problem.
 Confirmed removal deletes only that target's obligations. A fresh target-free
@@ -54,7 +57,7 @@ admission. Fresh target entry is a new feasibility obligation. The declared
 plant remains the zero-residual held affine model; separate nonlinear Fiala
 studies do not silently extend the online theorem.
 
-No command is issued after unavailable distance geometry, failed convex solving
+No command is issued after invalid geometry, failed convex solving
 or failed hard verification. Frame latency remains a separate requirement;
 allowing a longer offline search does not establish 100 ms operation.
 See [SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md) for the CLF derivation,

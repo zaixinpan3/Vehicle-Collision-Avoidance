@@ -8,6 +8,7 @@ classdef hardEncounterBarrier
             model.encounters = struct("key",{});
             model.confirmation = [];
             model.carriedWitness = [];
+            model.measurementContractChanged=false;
             model.measurementRadiusLimit = model.initialFrenetErrorBound;
             if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
                 curvature=abs(model.lane.referenceCurve.curvature);
@@ -26,7 +27,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=31
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=32
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -41,13 +42,17 @@ classdef hardEncounterBarrier
                         || ~isequal(ego.heldActuatorInput,stored.appliedInput)
                     error('collisionAvoidanceController:executionContractViolation','The next timestamp and issued held input are required.');
                 end
-                model.measurementRadiusLimit = stored.terminal.measurementRadiusLimit;
-                if any(model.initialFrenetErrorBound>model.measurementRadiusLimit+1e-12)
-                    error('collisionAvoidanceController:changedMeasurementContract', ...
-                        'Successor ego measurement bounds exceed the admitted sensing contract.');
+                measuredLimit=model.measurementRadiusLimit;
+                model.measurementContractChanged=any(model.initialFrenetErrorBound>stored.terminal.measurementRadiusLimit+1e-12);
+                model.measurementRadiusLimit=stored.terminal.measurementRadiusLimit;
+                if model.measurementContractChanged
+                    model.measurementRadiusLimit=max(measuredLimit,model.measurementRadiusLimit);
                 end
                 model.cruiseCertificate = stored.program.cruiseCertificate;
-                model.permanentTerminal = stored.terminal;
+                if ~model.measurementContractChanged,model.permanentTerminal = stored.terminal;end
+                % Enlarged bounds require a NEW complete certificate. The
+                % old prediction still conditions the actual successor, but
+                % does not prove the changed future sensing contract feasible.
                 if isfield(model.lane,'referenceCurve') && model.lane.referenceCurve.curvature~=0
                     period = 2*pi/abs(model.lane.referenceCurve.curvature);
                     model.initialEgoState(1) = model.initialEgoState(1)+period*round( ...
@@ -79,7 +84,7 @@ classdef hardEncounterBarrier
                     end
                 end
             end
-            changed = false;
+            changed = model.measurementContractChanged;
             active = cell(1,numel(measured));
             for index = 1:numel(measured)
                 target = measured(index);
@@ -187,7 +192,13 @@ classdef hardEncounterBarrier
                 direction=localExitDirection(center,frame,anchor);
                 trial=model;trial.encounters=target;
                 [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
-                if ~isempty(proposed),direction=proposed;end
+                if isfield(model,'exitDirections')
+                    direction=model.exitDirections(:,index);
+                    validateattributes(direction,{'double'},{'size',[2,1],'finite','real'});
+                    assert(abs(norm(direction)-1)<1e-10,'collisionAvoidanceController:invalidExitDirection','A unit exit direction is required.');
+                elseif ~isempty(proposed)
+                    direction=proposed;
+                end
                 [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
                 matrix(index,:)=row*finalMap;bound(index)=limit-row*finalOffset;
                 directions(:,index)=direction;rows(index,:)=row;limits(index)=limit;
@@ -478,7 +489,7 @@ function [count,inputs]=localCruiseAdmission(model)
     terminal=localTerminalSet(model);cfg=model.cfg;
     count=model.horizonSteps;maximum=4*count;
     inputs=zeros(2,maximum);x=model.initialEgoState;rho=model.initialFrenetErrorBound;
-    previous=model.previousInput;cruise=terminal.cruise;
+    previous=model.previousInput;cruise=terminal.cruise;feasibleCount=0;
     lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
     upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
     rate=model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
@@ -489,11 +500,13 @@ function [count,inputs]=localCruiseAdmission(model)
         x=cruise.transition(1:6,:)*[x;input;1];
         rho=abs(cruise.transition(1:6,1:6))*rho;
         [~,margin]=hardEncounterBarrier.terminalMembership(terminal,x,rho);
-        if index>=count && all(margin>4*terminal.reserve)
-            count=index;inputs=inputs(:,1:count);return;
+        if all(margin>4*terminal.reserve)
+            if index>=cfg.controller.minimumHorizonSteps,feasibleCount=index;end
+            if index>=count,count=index;inputs=inputs(:,1:count);return;end
         end
     end
-    count=maximum;inputs=inputs(:,1:count);
+    count=maximum;if feasibleCount>0,count=feasibleCount;end
+    inputs=inputs(:,1:count);
 end
 
 function [direction,steps,passing] = localEncounterProposal(model,range)

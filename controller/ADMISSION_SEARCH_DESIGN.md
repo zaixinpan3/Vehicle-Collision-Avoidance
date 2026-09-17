@@ -1,6 +1,6 @@
-# Planned overlap-aware admission search
+# Overlap-aware admission search design
 
-Status: proposed implementation design, September 16, 2026. This document changes no executable algorithm and makes no new feasibility, safety or runtime claim. It builds on the [initialization diagnosis](../report/DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md) and the [analytic-support ablation](../report/OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md).
+Status: implemented with bounded sector/exit/horizon search and equivalent sparse solves, September 16, 2026. The design requirements below distinguish search soundness from completeness; executed results are in [the implementation report](../report/OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md). It builds on the [initialization diagnosis](../report/DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md) and the [analytic-support ablation](../report/OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md).
 
 ## Objective and retained framework
 
@@ -103,6 +103,6 @@ Record both startup and steady operation. Any intentional preinitialization must
 
 Report proposal count, direction changes, restoration iterations, collision/exit/terminal deficits, final hard margins, solver calls, failed attempts and full-frame maximum latency. Distinguish invalid geometry, empty physical input set, positive residual after bounded search, selected-family infeasibility, deadline expiry and certificate rejection. A search failure is not automatically a proof of physical infeasibility.
 
-This is a staged implementation plan, not a claim that all stages have passed. Sequential convex methods can fail to refine an infeasible initialization, as explicitly discussed after Corollary III.1 in [GuSTO](https://arxiv.org/html/1903.00155v1). Neither universal avoidance feasibility nor a 100 ms worst-case guarantee follows from the design alone.
+This design does not imply that every validation case has passed. Sequential convex methods can fail to refine an infeasible initialization, as explicitly discussed after Corollary III.1 in [GuSTO](https://arxiv.org/html/1903.00155v1). Neither universal avoidance feasibility nor a 100 ms worst-case guarantee follows from the design alone.
 
-Research assistance: AI-assisted design synthesis checked against the current module interfaces, prior measured ablations and the cited primary sources. No new experiments were run for this design document.
+Research assistance: AI-assisted design synthesis checked against the current module interfaces, prior measured ablations and the cited primary sources. See the implementation report for experiments; the original design decision preceded those runs.

@@ -7,7 +7,7 @@ Baseline: `8a9344d3c796eb98d02eb2b747c90014638e661c`.
 
 The requested cleanup removes the hybrid solver. The only online collision
 convexification is now the distance-dual method documented in
-[the current design](../controller/DISTANCE_DUAL_CONVEXIFICATION.md).
+[current convexification documentation](../controller/SUPPORT_CONVEXIFICATION.md).
 
 Removed executable components:
 

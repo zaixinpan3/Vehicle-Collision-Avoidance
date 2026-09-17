@@ -410,10 +410,14 @@ classdef ltvBicycleModel
                     given = model.prescribedStages(stage);
                     a = given.continuousA;b = given.continuousB;c = given.continuousC;
                     tireModel = given.tireModel;
-                    processReserve = stateUncertainty.heldDisturbance(a,baseRate,h);
+                    if stage==1 || ~isequal(a,prediction.continuousA(:,:,stage-1)) ...
+                            || ~isequal(b,prediction.continuousB(:,:,stage-1)) ...
+                            || ~isequal(c,prediction.continuousC(:,stage-1))
+                        processReserve = stateUncertainty.heldDisturbance(a,baseRate,h);
+                        exact = expm(h*[a,b,c;zeros(3,9)]);
+                        executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound+processReserve;
+                    end
                     rate = baseRate;
-                    exact = expm(h*[a,b,c;zeros(3,9)]);
-                    executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound+processReserve;
                     prediction.scheduleSpeedProfile(stage) = given.speed;
                     prediction.scheduleBrakingRatio(stage) = given.brakingRatio;
                     prediction.scheduleCurvature(stage) = given.curvature;

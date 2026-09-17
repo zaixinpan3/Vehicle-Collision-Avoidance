@@ -29,7 +29,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,plan(:,1),AbsTol=0);
             testCase.verifyEqual(state.appliedInput,plan(:,1),AbsTol=0);
             testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
-            testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.distanceSolverCallCount);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.restorationSolverCallCount);
             testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
             testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
             testCase.verifyGreaterThan(size(state.plan,2),1);

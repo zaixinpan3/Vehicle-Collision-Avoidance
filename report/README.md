@@ -4,7 +4,7 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest estimator improvement: [Free-metric gain synthesis, paired noise reduction and response-lag tradeoff, September 16, 2026](NRMM_NOISE_REDUCTION_20260916.md).
 
-Latest implementation and validation: [Distance-dual-only control after removing finite-branch initialization, September 16, 2026](DISTANCE_DUAL_ONLY_RESULTS_20260916.md).
+Latest implementation and validation: [Overlap-aware admission, straight controller timing and remaining joint-certificate limits, September 16, 2026](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md).
 
 Latest runtime assessment: [Real-time feasibility, active-encounter bottlenecks and equivalent row-reduction benchmark, September 16, 2026](REALTIME_FEASIBILITY_20260916.md).
 
@@ -12,7 +12,7 @@ Latest diagnosis: [Stationary and oncoming distance-dual initialization failures
 
 Latest admission design review: [Overlap-aware support directions, temporal conflicts and hard-feasibility ablation, September 16, 2026](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md).
 
-Planned next implementation: [Overlap-aware admission search, grouped feasibility restoration and hard acceptance](../controller/ADMISSION_SEARCH_DESIGN.md). This is a design proposal, not an implemented or validated result.
+Implemented design: [Overlap-aware admission search, grouped feasibility restoration and hard acceptance](../controller/ADMISSION_SEARCH_DESIGN.md). See the implementation report for measured results and unresolved joint limits.
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
@@ -22,6 +22,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Overlap-aware admission, equivalent sparse solving, controller timing and joint uncertainty diagnosis | [OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md) |
 | Overlap-aware support proposal: valid constraint construction and remaining temporal/dynamic infeasibility | [OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md) |
 | NRMM derivative-noise reduction with retained continuous decay and paired validation | [NRMM_NOISE_REDUCTION_20260916.md](NRMM_NOISE_REDUCTION_20260916.md) |
 | Ordinary-distance degeneracy, first-admission failure and current hard-feasible witnesses | [DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md](DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md) |

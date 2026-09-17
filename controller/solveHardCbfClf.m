@@ -40,11 +40,88 @@ classdef solveHardCbfClf
 
         function solve = constrained(program,cfg)
             program = localCompactPlanarRows(program);
-            problem = struct('layout',struct('decisionCount',numel(program.q)),'stageProgram',program);
-            solve = localRunJointProgram(problem,cfg);
+            decisionCount=numel(program.q);
+            program=avoidanceStageQp.build(program);
+            problem = struct('layout',struct('decisionCount',decisionCount),'stageProgram',program);
+            solve = localGeneratedSolve(problem,cfg);
+        end
+
+        function [solve,restoration] = restore(program,cfg)
+        % Search-only deficits. This result is never an executable certificate.
+            n=program.layout.planCount;labels=program.physicalLabels;
+            soft=startsWith(labels,"collision:") | startsWith(labels,"road:") ...
+                | startsWith(labels,"exit:") | labels=="terminalEntry";
+            keys=labels;
+            geometric=numel(program.geometry.label);
+            keys(1:geometric)=keys(1:geometric)+":"+string(program.geometry.cellIndex);
+            [names,~,group]=unique(keys(soft),'stable');
+            count=numel(names);cones=numel(program.terminalCone.sizes);total=count+cones;
+            column=zeros(numel(labels),1);column(soft)=group;
+            charge=sparse(find(soft),column(soft),1,numel(labels),total);
+            matrix=[program.physicalMatrix(:,1:n),-charge;zeros(total,n),-eye(total)];
+            bound=[program.safetyBound;zeros(total,1)];
+            coneCharge=sparse(1:3:3*cones,count+(1:cones),-1,3*cones,total);
+            matrix=[matrix;program.terminalCone.matrix,coneCharge];
+            bound=[bound;program.terminalCone.bound];
+            scales=[repmat(cfg.vehicle.width+cfg.collision.clearanceMargin,count,1); ...
+                max(program.terminal.radius(:),sqrt(eps))];
+            restoration=struct('P',sparse(n+total,n+total),'q',[zeros(n,1);1./scales], ...
+                'A',sparse(matrix),'b',bound,'cones',[0;numel(labels)+total;program.terminalCone.sizes], ...
+                'anchorPlan',[program.anchorPlan;zeros(total,1)], ...
+                'deficitNames',[names;"terminalCone:"+string((1:cones).')], ...
+                'deficitScale',scales,'planCount',n, ...
+                'prediction',program.prediction,'geometry',program.geometry, ...
+                'cruiseCertificate',program.cruiseCertificate,'terminal',program.terminal, ...
+                'terminalOptimization',program.terminalOptimization, ...
+                'safetyBound',program.safetyBound,'restoration',true);
+            solve=solveHardCbfClf.constrained(restoration,cfg);
+            solve.deficits=inf(total,1);solve.normalizedDeficit=Inf;
+            if solve.feasible
+                solve.deficits=max(0,solve.decision(n+1:end));
+                solve.normalizedDeficit=sum(solve.deficits./scales);
+            end
         end
 
     end
+end
+
+function solve=localGeneratedSolve(problem,cfg)
+% Constraint generation solves the same convex program. Every omitted row
+% is checked against the complete returned decision before convergence.
+    full=problem.stageProgram;count=full.cones(2);equalities=full.cones(1);
+    if ~isfield(full,'retainedRows') || numel(full.geometry.label)<400 ...
+            || ~isempty(cfg.solver.jointFunction)
+        solve=localRunJointProgram(problem,cfg);return;
+    end
+    source=full.retainedRows(1:count);geometric=source<=numel(full.geometry.label);
+    active=~geometric;groups=full.geometry.cellIndex(source(geometric));
+    rows=find(geometric);anchor=full.anchorPlan;
+    residual=full.A(equalities+rows,:)*anchor-full.b(equalities+rows);
+    sorted=sortrows([groups,-residual,rows],[1,2]);
+    first=[true;diff(sorted(:,1))~=0];starts=find(first);
+    selected=unique([starts;min(starts+1,[starts(2:end)-1;size(sorted,1)])]);
+    active(sorted(selected,3))=true;
+    nativeCalls=0;
+    for iteration=1:12
+        selected=[(1:equalities).';equalities+find(active); ...
+            (equalities+count+1:numel(full.b)).'];
+        reduced=full;reduced.A=full.A(selected,:);reduced.b=full.b(selected);
+        reduced.cones(2)=nnz(active);trial=problem;trial.stageProgram=reduced;
+        solve=localRunJointProgram(trial,cfg);nativeCalls=nativeCalls+1;
+        if ~solve.feasible,break;end
+        value=full.A(equalities+(1:count),:)*solve.fullDecision-full.b(equalities+(1:count));
+        allowance=cfg.solver.constraintTolerance*(1+abs(full.b(equalities+(1:count))));
+        violated=~active & value>allowance;
+        if ~any(violated),break;end
+        % Add the worst row of each violated held-cell family. The original
+        % full verifier remains authoritative for physical safety.
+        rows=find(violated);groups=full.geometry.cellIndex(source(rows));
+        sorted=sortrows([groups,-value(rows),rows],[1,2]);
+        first=[true;diff(sorted(:,1))~=0];active(sorted(first,3))=true;
+        if iteration==12,solve.feasible=false;solve.message="Constraint generation did not close the complete program.";end
+    end
+    solve.output.constraintGenerationSolves=nativeCalls;
+    solve.output.generatedLinearRows=nnz(active);
 end
 
 function program = localCompactPlanarRows(program)

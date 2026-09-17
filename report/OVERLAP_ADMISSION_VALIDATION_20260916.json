@@ -1,0 +1,222 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "computationalThreads": 1,
+  "warmup": [
+    {
+      "completed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "minimumSampledSeparationMargin": 8.340758381567676,
+      "maximumFrameMilliseconds": 1280.2830000000001,
+      "deadlineMisses": 1,
+      "finalTrackingError": [
+        0.011194939862679776,
+        0.007053843054889803,
+        0.025159121033819787,
+        0.05895465043680658,
+        0.055298600168899356
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/startup-1/stationary-exact-state.mat"
+    },
+    {
+      "completed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "minimumSampledSeparationMargin": 8.340758381567676,
+      "maximumFrameMilliseconds": 160.726,
+      "deadlineMisses": 1,
+      "finalTrackingError": [
+        0.011194939862679776,
+        0.007053843054889803,
+        0.025159121033819787,
+        0.05895465043680658,
+        0.055298600168899356
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/startup-2/stationary-exact-state.mat"
+    },
+    {
+      "completed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "minimumSampledSeparationMargin": 8.340758381567676,
+      "maximumFrameMilliseconds": 151.137,
+      "deadlineMisses": 1,
+      "finalTrackingError": [
+        0.011194939862679776,
+        0.007053843054889803,
+        0.025159121033819787,
+        0.05895465043680658,
+        0.055298600168899356
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/startup-3/stationary-exact-state.mat"
+    },
+    {
+      "completed": true,
+      "runtimeQualified": true,
+      "executedHolds": 2,
+      "minimumSampledSeparationMargin": 8.340758381567676,
+      "maximumFrameMilliseconds": 89.848,
+      "deadlineMisses": 0,
+      "finalTrackingError": [
+        0.011194939862679776,
+        0.007053843054889803,
+        0.025159121033819787,
+        0.05895465043680658,
+        0.055298600168899356
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/startup-4/stationary-exact-state.mat"
+    },
+    {
+      "completed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "minimumSampledSeparationMargin": 8.340758381567676,
+      "maximumFrameMilliseconds": 110.33500000000001,
+      "deadlineMisses": 1,
+      "finalTrackingError": [
+        0.011194939862679776,
+        0.007053843054889803,
+        0.025159121033819787,
+        0.05895465043680658,
+        0.055298600168899356
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/startup-5/stationary-exact-state.mat"
+    },
+    {
+      "completed": true,
+      "runtimeQualified": true,
+      "executedHolds": 2,
+      "minimumSampledSeparationMargin": 8.340758381567676,
+      "maximumFrameMilliseconds": 86.00399999999999,
+      "deadlineMisses": 0,
+      "finalTrackingError": [
+        0.011194939862679776,
+        0.007053843054889803,
+        0.025159121033819787,
+        0.05895465043680658,
+        0.055298600168899356
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/startup-6/stationary-exact-state.mat"
+    }
+  ],
+  "controller": {
+    "stationary": {
+      "completed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "minimumSampledSeparationMargin": 0.05211946210188301,
+      "maximumFrameMilliseconds": 85.78,
+      "deadlineMisses": 0,
+      "finalTrackingError": [
+        5.0291629557620665e-20,
+        -1.3257925916911337e-20,
+        1.5884252135833776e-07,
+        6.610346512324338e-21,
+        6.216633196850127e-21
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/controller/stationary-exact-state.mat"
+    },
+    "oncoming": {
+      "completed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "minimumSampledSeparationMargin": 0.12114518251923984,
+      "maximumFrameMilliseconds": 64.418,
+      "deadlineMisses": 0,
+      "finalTrackingError": [
+        -3.710274947929767e-19,
+        2.780818813684025e-19,
+        1.5884252135833776e-07,
+        -7.707713216422814e-19,
+        -6.522690086899286e-19
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/controller/oncoming-exact-state.mat"
+    },
+    "crossing": {
+      "completed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "minimumSampledSeparationMargin": 9.301601160038942,
+      "maximumFrameMilliseconds": 15.459999999999999,
+      "deadlineMisses": 0,
+      "finalTrackingError": [
+        -2.83780078491738e-20,
+        -9.442450919213266e-25,
+        1.5884252135833776e-07,
+        -2.054120275419963e-24,
+        -1.7604621587904806e-24
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/controller/crossing-exact-state.mat"
+    },
+    "cruise": {
+      "completed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "minimumSampledSeparationMargin": null,
+      "maximumFrameMilliseconds": 16.241,
+      "deadlineMisses": 0,
+      "finalTrackingError": [
+        -2.8381929119991137e-20,
+        7.231419360299196e-25,
+        1.5884252135833776e-07,
+        5.405338834153592e-24,
+        5.202315595716925e-24
+      ],
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/controller/cruise-exact-state.mat"
+    }
+  },
+  "joint": {
+    "exactSensing": {
+      "completed": true,
+      "executedHolds": 300,
+      "failureTime": null,
+      "maximumFrameMilliseconds": 68.224,
+      "maximumObserverMilliseconds": 1.037,
+      "deadlineMisses": 0,
+      "failure": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/exact-sensing/joint-declared-plant.mat",
+      "minimumSampledSeparationMargin": 0.359271886403,
+      "allHoldsCertified": true
+    },
+    "functional": {
+      "completed": false,
+      "executedHolds": 28,
+      "failureTime": 2.8000000000000003,
+      "maximumFrameMilliseconds": 3052.551,
+      "maximumObserverMilliseconds": 67.581,
+      "deadlineMisses": 3,
+      "failure": "The predictive hard-safety, soft-CLF search failed at t=2.8 s (Bounded support-family search ended without a hard certificate (14 families, minimum normalized search deficit 62.0756, elapsed 3.0047 s); solver exit flag 0: The program work deadline expired before the native solve.). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/joint-functional/joint-declared-plant.mat"
+    },
+    "periodic": {
+      "completed": false,
+      "executedHolds": 28,
+      "failureTime": 2.8000000000000003,
+      "maximumFrameMilliseconds": 105.761,
+      "maximumObserverMilliseconds": 23.204,
+      "deadlineMisses": 1,
+      "failure": "The predictive hard-safety, soft-CLF search failed at t=2.8 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 85.7596, elapsed 0.081491 s); No hard-certified admission obtained.). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/admission-implementation-20260916/final-validation/joint-periodic/joint-declared-plant.mat"
+    }
+  },
+  "scope": "Declared affine plant; complete periodic frames; startup saved separately; no reused commands",
+  "regression": {
+    "passed": 621,
+    "failed": 0,
+    "incomplete": 0,
+    "seconds": 552.733011
+  },
+  "validationDate": "2026-09-16",
+  "physicalModel": "Declared zero-residual held affine ego plant",
+  "jointQualified": false
+}

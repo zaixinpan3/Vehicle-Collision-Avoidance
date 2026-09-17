@@ -1,8 +1,13 @@
-function [program,prediction,clf] = formulateAvoidanceProblem(model)
+function [program,prediction,clf] = formulateAvoidanceProblem(model,retained,prediction,anchor,normals)
 %formulateAvoidanceProblem Witness-preserving predictive CBF / soft CLF solve.
 % A fresh convexification may replace an inherited certificate only after
 % its known feasible candidate satisfies the COMPLETE new conic program.
 % This is formulation selection BEFORE the single optimizer invocation.
+    if nargin>1
+        [program,~,prediction]=localSupportGeometry(model,prediction,retained,anchor,normals);
+        program.anchorPlan=anchor;clf=retained.clf;
+        return;
+    end
     carry=model.carriedWitness;
     if isempty(carry)
         [program,prediction,clf]=localFormulate(model);
@@ -77,7 +82,7 @@ function [program,prediction,clf] = localFormulate(model)
     model.cruiseCertificate=cruise;
     inherited = ~isempty(model.carriedWitness);
     dual=struct('available',false,'overlappingMidpoints',0, ...
-        'distanceSolverCalls',0,'minimumAnchorDistance',Inf,'maximumDistanceGap',0, ...
+        'minimumAnchorDistance',Inf,'normalSwitchCount',0, ...
         'used',false,'witnessPreserved',false);
     if inherited
         cruise = model.carriedWitness.program.cruiseCertificate;
@@ -87,13 +92,9 @@ function [program,prediction,clf] = localFormulate(model)
         model.anchorPlan = anchor;
         if ~isempty(model.encounters)
             [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
-            [normals,dual]=avoidanceSafetyGeometry.distanceDualNormals(model,prediction,anchor,frames);
+            [normals,dual]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor,frames);
             if ~dual.available
-                error('collisionAvoidanceController:optimizationFailed', ...
-                    ['Distance-dual initialization is unavailable at t=%.9g s: ' ...
-                    '%d overlapping or touching anchor midpoints, minimum signed distance %.9g m. ' ...
-                    'No complete hard trajectory problem was solved and no command was issued.'], ...
-                    model.stateTime,dual.overlappingMidpoints,dual.minimumAnchorDistance);
+                error('collisionAvoidanceController:invalidSeparationNormal','A finite unit support direction is required.');
             end
             prediction.geometryAnchor=anchor;prediction.geometryFrames=frames;
             prediction.geometryNominal=nominal;prediction.separationNormals=normals;
@@ -179,7 +180,7 @@ function [program,prediction,clf] = localFormulate(model)
     % Future state performance uses the same cruise state and P certificate.
     maps = reshape(permute(prediction.egoStateMatrix(2:6,:,2:end),[1,3,2]),[],planCount);
     offsets = prediction.egoStateOffset(2:6,2:end)-cruise.state(2:6);
-    objectiveMap = kron(eye(count),root)*maps;
+    objectiveMap = reshape(pagemtimes(root,reshape(maps,5,count,planCount)),5*count,planCount);
     objectiveOffset = reshape(root*offsets,[],1);
     weight = diag(repmat([cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight],count,1));
     trim = repmat(cruise.input,count,1);
@@ -197,7 +198,9 @@ function [program,prediction,clf] = localFormulate(model)
         'physicalMatrix',physicalMatrix,'physicalBound',physicalBound, ...
         'physicalLabels',labels,'terminalCone',terminalCone, ...
         'anchorPlan',anchor,'safetyBound',safetyBound,'inheritedFeasibleFamily',inherited, ...
-        'cruiseCertificate',cruise);
+        'cruiseCertificate',cruise,'clf',clf, ...
+        'prediction',prediction,'inputWeight',diag(weight), ...
+        'slackWeight',cfg.clf.relaxationWeight);
     program.terminalConePhysicalBound=terminalCone.bound;
     program.terminalConePhysicalBound(1:3:end)=program.terminalConePhysicalBound(1:3:end)+terminal.reserve;
     if inherited
@@ -209,19 +212,23 @@ function [program,prediction,clf] = localFormulate(model)
     program.feasibleWitness=localCompleteSlack(program,anchor);
     if inherited,program.inheritedWitness=program.feasibleWitness;end
     if inherited && ~isempty(model.encounters)
-        [candidate,dual]=localDualGeometry(model,prediction,program,anchor);
+        [candidate,dual,candidatePrediction]=localSupportGeometry(model,prediction,program,anchor);
         if dual.available && localWitnessFeasible(candidate,localCompleteSlack(candidate,anchor))
-            program=candidate;dual.used=true;dual.witnessPreserved=true;
+            program=candidate;prediction=candidatePrediction;dual.used=true;dual.witnessPreserved=true;
         end
     end
-    program.dualConvexification=dual;
+    program.supportGeometry=dual;
 end
 
-function [candidate,information]=localDualGeometry(model,prediction,program,anchor)
+function [candidate,information,prediction]=localSupportGeometry(model,prediction,program,anchor,normals)
 % Rebuild only collision rows. The inherited terminal/exit conditions and
 % absolute completion deadline remain exactly as certified before this call.
-    [normals,information]=avoidanceSafetyGeometry.distanceDualNormals( ...
-        model,prediction,anchor,program.geometry.frames);
+    if nargin<5
+        [normals,information]=avoidanceSafetyGeometry.supportNormals( ...
+            model,prediction,anchor,program.geometry.frames);
+    else
+        information=program.supportGeometry;information.available=true;
+    end
     candidate=program;
     if ~information.available,return;end
     model.anchorPlan=anchor;prediction.geometryAnchor=anchor;
@@ -254,7 +261,8 @@ function [candidate,information]=localDualGeometry(model,prediction,program,anch
     for field=fields
         geometry.(field)=[geometry.(field)(collision,:);program.geometry.(field)(road,:)];
     end
-    candidate.geometry=geometry;candidate.obstacleCbfRowCount=nnz(collision);
+    candidate.prediction=prediction;candidate.geometry=geometry;candidate.obstacleCbfRowCount=nnz(collision);
+    candidate.supportGeometry=information;candidate.supportGeometry.used=true;
 end
 
 function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model)
@@ -272,6 +280,8 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     removed=ismember(labels,"collision:"+model.dischargedTargetKeys) ...
         | ismember(labels,"exit:"+model.dischargedTargetKeys);
     selected = any(matrix~=0,2) & ~removed;
+    geometric=numel(old.geometry.label);
+    selected(1:geometric)=old.geometry.stage>=2 & ~removed(1:geometric);
     physicalBound = old.physicalBound-old.physicalMatrix(:,1:2)*executed;
     bound = old.safetyBound-old.physicalMatrix(:,1:2)*executed;
     matrix = matrix(selected,:);physicalBound=physicalBound(selected);bound=bound(selected);
@@ -336,6 +346,7 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     geometry.frames=geometry.frames(keep);geometry.normals=geometry.normals(keep);
     geometry.normals=cellfun(@(normal) normal(:,retained),geometry.normals,UniformOutput=false);
     geometry.local=geometry.local(keep);
+    geometry.cellData=geometry.cellData(keep);
     for index=1:numel(geometry.local)
         local=geometry.local(index);
         rows=~ismember(local.nodeLabels,"collision:"+model.dischargedTargetKeys);
@@ -347,5 +358,7 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
         local.nodeInputRows=local.nodeInputRows(rows,:,:);
         local.nodeLimits=local.nodeLimits(rows,:);local.nodeLabels=local.nodeLabels(rows);
         local.stage=local.stage-1;geometry.local(index)=local;
+        geometry.cellData(index).targets=geometry.cellData(index).targets(retained);
+        geometry.cellData(index).normals=geometry.cellData(index).normals(:,retained);
     end
 end

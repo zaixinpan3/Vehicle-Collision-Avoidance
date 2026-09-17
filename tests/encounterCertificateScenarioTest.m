@@ -15,7 +15,7 @@ classdef encounterCertificateScenarioTest < matlab.unittest.TestCase
             testCase.verifyTrue(report.passed);
             testCase.verifyEqual(report.executedHolds,24);
             testCase.verifyEqual(report.trajectorySolverCallCount,ones(1,24));
-            testCase.verifyEqual(report.solverCallCount,1+report.distanceSolverCallCount);
+            testCase.verifyEqual(report.solverCallCount,1+report.restorationSolverCallCount);
             % This tests solve/continuation behavior, not an early recovery
             % deadline. The dedicated long cruise-recovery test checks tracking.
             testCase.verifyFalse(any(report.terminalCommands));
