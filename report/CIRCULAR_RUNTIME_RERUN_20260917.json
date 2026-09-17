@@ -1,0 +1,1813 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "computationalThreads": 1,
+  "sampleTime": 0.1,
+  "referenceSpeed": 8,
+  "roadBoundariesEnabled": false,
+  "estimatorEnabled": false,
+  "seed": 20260912.0,
+  "startup": [
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "durationSeconds": 0.2,
+      "maximumFrameMilliseconds": 427.296,
+      "medianFrameMilliseconds": 248.4515,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": 8.212659812815454,
+      "maximumLateralError": 0.016174531567736863,
+      "finalTrackingError": [
+        -0.016174531567736863,
+        -0.010262335205147462,
+        -0.033720636253469216,
+        -0.08143163174856313,
+        -0.07836295344442949
+      ],
+      "lastTwoSecondsMaximumError": [
+        0.016174531567736863,
+        0.010262335205147462,
+        0.033720636253469216,
+        0.08143163174856313,
+        0.07836295344442949
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/startup-1/stationary-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "durationSeconds": 0.2,
+      "maximumFrameMilliseconds": 210.301,
+      "medianFrameMilliseconds": 133.5305,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": 8.212659812815454,
+      "maximumLateralError": 0.016174531567736863,
+      "finalTrackingError": [
+        -0.016174531567736863,
+        -0.010262335205147462,
+        -0.033720636253469216,
+        -0.08143163174856313,
+        -0.07836295344442949
+      ],
+      "lastTwoSecondsMaximumError": [
+        0.016174531567736863,
+        0.010262335205147462,
+        0.033720636253469216,
+        0.08143163174856313,
+        0.07836295344442949
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/startup-2/stationary-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "durationSeconds": 0.2,
+      "maximumFrameMilliseconds": 179.99599999999998,
+      "medianFrameMilliseconds": 123.039,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": 8.212659812815454,
+      "maximumLateralError": 0.016174531567736863,
+      "finalTrackingError": [
+        -0.016174531567736863,
+        -0.010262335205147462,
+        -0.033720636253469216,
+        -0.08143163174856313,
+        -0.07836295344442949
+      ],
+      "lastTwoSecondsMaximumError": [
+        0.016174531567736863,
+        0.010262335205147462,
+        0.033720636253469216,
+        0.08143163174856313,
+        0.07836295344442949
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/startup-3/stationary-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "durationSeconds": 0.2,
+      "maximumFrameMilliseconds": 146.137,
+      "medianFrameMilliseconds": 98.43050000000001,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": 8.212659812815454,
+      "maximumLateralError": 0.016174531567736863,
+      "finalTrackingError": [
+        -0.016174531567736863,
+        -0.010262335205147462,
+        -0.033720636253469216,
+        -0.08143163174856313,
+        -0.07836295344442949
+      ],
+      "lastTwoSecondsMaximumError": [
+        0.016174531567736863,
+        0.010262335205147462,
+        0.033720636253469216,
+        0.08143163174856313,
+        0.07836295344442949
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/startup-4/stationary-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "durationSeconds": 0.2,
+      "maximumFrameMilliseconds": 154.53300000000002,
+      "medianFrameMilliseconds": 104.841,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": 8.212659812815454,
+      "maximumLateralError": 0.016174531567736863,
+      "finalTrackingError": [
+        -0.016174531567736863,
+        -0.010262335205147462,
+        -0.033720636253469216,
+        -0.08143163174856313,
+        -0.07836295344442949
+      ],
+      "lastTwoSecondsMaximumError": [
+        0.016174531567736863,
+        0.010262335205147462,
+        0.033720636253469216,
+        0.08143163174856313,
+        0.07836295344442949
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/startup-5/stationary-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": false,
+      "executedHolds": 2,
+      "durationSeconds": 0.2,
+      "maximumFrameMilliseconds": 142.893,
+      "medianFrameMilliseconds": 95.9825,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": 8.212659812815454,
+      "maximumLateralError": 0.016174531567736863,
+      "finalTrackingError": [
+        -0.016174531567736863,
+        -0.010262335205147462,
+        -0.033720636253469216,
+        -0.08143163174856313,
+        -0.07836295344442949
+      ],
+      "lastTwoSecondsMaximumError": [
+        0.016174531567736863,
+        0.010262335205147462,
+        0.033720636253469216,
+        0.08143163174856313,
+        0.07836295344442949
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/startup-6/stationary-exact-state.mat"
+    }
+  ],
+  "trials": [
+    {
+      "scenario": "cruise",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 45.29600000000001,
+      "medianFrameMilliseconds": 6.227,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 1.032329691914944e-05,
+      "finalTrackingError": [
+        1.0314817577319196e-05,
+        -1.0015654434286647e-09,
+        1.1352874551562309e-07,
+        9.298300976401386e-09,
+        9.38864966326669e-09
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.0314817578369571e-05,
+        1.0015656099621184e-09,
+        1.1352874551562309e-07,
+        9.29830265561371e-09,
+        9.388651217578925e-09
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/periodic/cruise-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 128.57299999999998,
+      "medianFrameMilliseconds": 128.57299999999998,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 0.27491, elapsed 0.12679 s); No hard-certified admission obtained.). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/periodic/stationary-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 174.428,
+        "medianFrameMilliseconds": 6.4895000000000005,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.17547054931284445,
+        "maximumLateralError": 2.4953975967453346,
+        "finalTrackingError": [
+          1.0314817577069396e-05,
+          -1.0015650114825192e-09,
+          1.1352874551562309e-07,
+          9.29830430707046e-09,
+          9.38865321598037e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.031481757813972e-05,
+          1.0015658771095337e-09,
+          1.1352874551562309e-07,
+          9.298307235283687e-09,
+          9.388655797248902e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/diagnostic/stationary-exact-state.mat"
+      }
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 97.856,
+      "medianFrameMilliseconds": 6.432500000000001,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": 0.2538519292520244,
+      "maximumLateralError": 2.9042082614560356,
+      "finalTrackingError": [
+        1.0314817574629508e-05,
+        -1.0015654347550473e-09,
+        1.1352874551562309e-07,
+        9.298300421289873e-09,
+        9.388649108155178e-09
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.0314817580861502e-05,
+        1.001566250075081e-09,
+        1.1352874551562309e-07,
+        9.298304834426396e-09,
+        9.388653576802852e-09
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": true,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/periodic/oncoming-exact-state.mat"
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 111.524,
+      "medianFrameMilliseconds": 111.524,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 9.235, elapsed 0.11025 s); No hard-certified admission obtained.). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/periodic/crossing-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 221.84300000000002,
+        "medianFrameMilliseconds": 6.473999999999999,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.21239218107347224,
+        "maximumLateralError": 4.793420663657733,
+        "finalTrackingError": [
+          1.0314817578216048e-05,
+          -1.0015654174078126e-09,
+          1.1352874729197993e-07,
+          9.298299019633305e-09,
+          9.388647886909851e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314817578487533e-05,
+          1.0015658337414468e-09,
+          1.1352874729197993e-07,
+          9.298304071148067e-09,
+          9.388652605357706e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/diagnostic/crossing-exact-state.mat"
+      }
+    },
+    {
+      "scenario": "cruise",
+      "curvature": -0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 31.201,
+      "medianFrameMilliseconds": 6.1370000000000005,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 1.0323296919104337e-05,
+      "finalTrackingError": [
+        -1.0314817575894988e-05,
+        1.0015655076134333e-09,
+        1.1352874551562309e-07,
+        -9.298300990279174e-09,
+        -9.388649691022266e-09
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.0314817578463246e-05,
+        1.0015656984330157e-09,
+        1.1352874551562309e-07,
+        9.298302641735923e-09,
+        9.388651217578925e-09
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/periodic/cruise-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": -0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 126.281,
+      "medianFrameMilliseconds": 126.281,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit 0.27486, elapsed 0.12502 s); No hard-certified admission obtained.). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/periodic/stationary-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "stationary",
+        "curvature": -0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 144.58599999999998,
+        "medianFrameMilliseconds": 6.286,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.17547661209470194,
+        "maximumLateralError": 2.4954203617824535,
+        "finalTrackingError": [
+          -1.03148175756608e-05,
+          1.001564876174088e-09,
+          1.1352874551562309e-07,
+          -9.298300546189964e-09,
+          -9.388649274688632e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314817579554388e-05,
+          1.001566173747248e-09,
+          1.1352874551562309e-07,
+          9.298306319349692e-09,
+          9.388654936826057e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/diagnostic/stationary-exact-state.mat"
+      }
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": -0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 88.249,
+      "medianFrameMilliseconds": 6.266,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": 0.2540362881471754,
+      "maximumLateralError": 2.9043915812544725,
+      "finalTrackingError": [
+        -1.0314817581638658e-05,
+        1.0015648692351942e-09,
+        1.1352874551562309e-07,
+        -9.29829917228897e-09,
+        -9.388647886909851e-09
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.0314817581638658e-05,
+        1.0015656429218645e-09,
+        1.1352874551562309e-07,
+        9.298304015636916e-09,
+        9.388652522090979e-09
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": true,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/periodic/oncoming-exact-state.mat"
+    },
+    {
+      "scenario": "crossing",
+      "curvature": -0.01,
+      "radiusMeters": 100,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 102.645,
+      "medianFrameMilliseconds": 102.645,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit Inf, elapsed 0.10151 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/periodic/crossing-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "crossing",
+        "curvature": -0.01,
+        "radiusMeters": 100,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 165.97899999999998,
+        "medianFrameMilliseconds": 6.24,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.19210212815616823,
+        "maximumLateralError": 4.803858369818302,
+        "finalTrackingError": [
+          -1.031481757736083e-05,
+          1.0015659534373667e-09,
+          1.1352874729197993e-07,
+          -9.298301781313079e-09,
+          -9.388650606956261e-09
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.0314817579906536e-05,
+          1.0015660262957526e-09,
+          1.1352874729197993e-07,
+          9.298305389537909e-09,
+          9.388653937625335e-09
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/diagnostic/crossing-exact-state.mat"
+      }
+    },
+    {
+      "scenario": "cruise",
+      "curvature": 0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 11.96,
+      "medianFrameMilliseconds": 6.0965,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 1.915573142664828e-05,
+      "finalTrackingError": [
+        1.913945180436437e-05,
+        -8.017896638290445e-09,
+        1.0493153723700743e-07,
+        6.65194778981526e-08,
+        6.33893507684391e-08
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.9139451805641125e-05,
+        8.017897294015919e-09,
+        1.0493153723700743e-07,
+        6.651947997982077e-08,
+        6.33893531554186e-08
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/periodic/cruise-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 102.434,
+      "medianFrameMilliseconds": 102.434,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit Inf, elapsed 0.10142 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/periodic/stationary-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "stationary",
+        "curvature": 0.02,
+        "radiusMeters": 50,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 168.02100000000002,
+        "medianFrameMilliseconds": 6.303999999999999,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.31766068284433646,
+        "maximumLateralError": 2.899464248249023,
+        "finalTrackingError": [
+          1.9139451807254418e-05,
+          -8.017896874212838e-09,
+          1.0493153723700743e-07,
+          6.65194755111731e-08,
+          6.33893486035042e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.9139451807407074e-05,
+          8.017896999112928e-09,
+          1.0493153723700743e-07,
+          6.651947931368696e-08,
+          6.338935226724018e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/diagnostic/stationary-exact-state.mat"
+      }
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 89.063,
+      "medianFrameMilliseconds": 6.3125,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": 0.44576919661084125,
+      "maximumLateralError": 3.0538490211968323,
+      "finalTrackingError": [
+        1.9139451803488333e-05,
+        -8.017896794415558e-09,
+        1.0493153723700743e-07,
+        6.651947648261824e-08,
+        6.338934949168262e-08
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.9139451803779767e-05,
+        8.017897342588176e-09,
+        1.0493153723700743e-07,
+        6.651947981328732e-08,
+        6.33893527113294e-08
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": true,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/periodic/oncoming-exact-state.mat"
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 102.463,
+      "medianFrameMilliseconds": 102.463,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit Inf, elapsed 0.10155 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/periodic/crossing-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "crossing",
+        "curvature": 0.02,
+        "radiusMeters": 50,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 243.40200000000002,
+        "medianFrameMilliseconds": 6.296,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.3534003073443346,
+        "maximumLateralError": 4.886331986740814,
+        "finalTrackingError": [
+          1.913945180483101e-05,
+          -8.017896794415558e-09,
+          1.049315354606506e-07,
+          6.651947662139612e-08,
+          6.338934949168262e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.913945180485009e-05,
+          8.017896794415558e-09,
+          1.0493153723700743e-07,
+          6.651947917490908e-08,
+          6.338935232275134e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/diagnostic/crossing-exact-state.mat"
+      }
+    },
+    {
+      "scenario": "cruise",
+      "curvature": -0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 11.674999999999999,
+      "medianFrameMilliseconds": 6.108499999999999,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 1.9155731426565015e-05,
+      "finalTrackingError": [
+        -1.9139451806185828e-05,
+        8.017896662576574e-09,
+        1.049315354606506e-07,
+        -6.651947889735332e-08,
+        -6.338935187866213e-08
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.9139451806185828e-05,
+        8.017896888090625e-09,
+        1.0493153723700743e-07,
+        6.651947997982077e-08,
+        6.33893530443963e-08
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/periodic/cruise-exact-state.mat"
+    },
+    {
+      "scenario": "stationary",
+      "curvature": -0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 102.965,
+      "medianFrameMilliseconds": 102.965,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit Inf, elapsed 0.1019 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/periodic/stationary-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "stationary",
+        "curvature": -0.02,
+        "radiusMeters": 50,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 165.727,
+        "medianFrameMilliseconds": 6.268,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.31698457630632904,
+        "maximumLateralError": 2.9051765149562505,
+        "finalTrackingError": [
+          -1.9139451805564797e-05,
+          8.017896572370953e-09,
+          1.0493153723700743e-07,
+          -6.651947662139612e-08,
+          -6.338934932514917e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.9139451805564797e-05,
+          8.017897210749192e-09,
+          1.0493153723700743e-07,
+          6.65194799520652e-08,
+          6.3389352933374e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/diagnostic/stationary-exact-state.mat"
+      }
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": -0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": true,
+      "passed": true,
+      "runtimeQualified": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "maximumFrameMilliseconds": 84.83,
+      "medianFrameMilliseconds": 6.28,
+      "deadlineMisses": 0,
+      "minimumSampledSeparationMargin": 0.4457951651960389,
+      "maximumLateralError": 3.0538723163770705,
+      "finalTrackingError": [
+        -1.9139451804138854e-05,
+        8.017896627882104e-09,
+        1.049315354606506e-07,
+        -6.651947909164235e-08,
+        -6.338935204519558e-08
+      ],
+      "lastTwoSecondsMaximumError": [
+        1.9139451804138854e-05,
+        8.017896981765693e-09,
+        1.0493153901336427e-07,
+        6.651948011859865e-08,
+        6.338935337746321e-08
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": true,
+      "terminalCommands": 0,
+      "failureTime": null,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/periodic/oncoming-exact-state.mat"
+    },
+    {
+      "scenario": "crossing",
+      "curvature": -0.02,
+      "radiusMeters": 50,
+      "initialTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "completed": false,
+      "passed": false,
+      "runtimeQualified": false,
+      "executedHolds": 0,
+      "durationSeconds": 0,
+      "maximumFrameMilliseconds": 102.76299999999999,
+      "medianFrameMilliseconds": 102.76299999999999,
+      "deadlineMisses": 1,
+      "minimumSampledSeparationMargin": null,
+      "maximumLateralError": 0,
+      "finalTrackingError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lastTwoSecondsMaximumError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "allIssuedCommandsCertified": true,
+      "confirmedRelease": false,
+      "terminalCommands": 0,
+      "failureTime": 0,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The predictive hard-safety, soft-CLF search failed at t=0 s (Bounded support-family search ended without a hard certificate (1 families, minimum normalized search deficit Inf, elapsed 0.10161 s); solver exit flag 0: Clarabel status 8). No command was issued.",
+      "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/periodic/crossing-exact-state.mat",
+      "offlineDiagnostic": {
+        "scenario": "crossing",
+        "curvature": -0.02,
+        "radiusMeters": 50,
+        "initialTrackingError": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "completed": true,
+        "passed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "maximumFrameMilliseconds": 418.456,
+        "medianFrameMilliseconds": 6.2684999999999995,
+        "deadlineMisses": 1,
+        "minimumSampledSeparationMargin": 0.558387353824466,
+        "maximumLateralError": 4.330722761392051,
+        "finalTrackingError": [
+          -1.9139451806499813e-05,
+          8.017896725026619e-09,
+          1.0493153723700743e-07,
+          -6.651947820346393e-08,
+          -6.338935104599486e-08
+        ],
+        "lastTwoSecondsMaximumError": [
+          1.9139451806499813e-05,
+          8.017896881151731e-09,
+          1.0493153723700743e-07,
+          6.651947898062005e-08,
+          6.338935204519558e-08
+        ],
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "terminalCommands": 0,
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/diagnostic/crossing-exact-state.mat"
+      }
+    }
+  ],
+  "scope": "Exact declared affine plant and sensing; curved-reference trim; targets follow inertial straight lines; offline truth integration excluded from frame time",
+  "allRuntimeQualified": false,
+  "testedCommit": "8f4fa087b91c1a231c615fe1d2114bea0b45cecd",
+  "recordedAt": "2026-09-17T16:46:34.873090-05:00",
+  "checks": {
+    "passed": 33,
+    "failed": 0,
+    "incomplete": 0,
+    "testFiles": [
+      "tests/circularArcExactStateScenarioTest.m",
+      "tests/constantCurvatureReferenceTest.m",
+      "tests/curvedPoseDomainTest.m",
+      "tests/avoidanceNativeGeometryTest.m",
+      "tests/bicycleNativeKernelTest.m"
+    ],
+    "log": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation.log",
+    "sequence": "Focused tests, then six discarded startup trials, then the 16-case experiment matrix, in one single-thread MATLAB process."
+  },
+  "completedTrialAudits": [
+    {
+      "curvature": 0.01,
+      "scenario": "cruise",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 45.29600000000001,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.009636,
+        "formulationSeconds": 0.025945,
+        "solveSeconds": 0.005648
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 16,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.999999945273425,
+      "maximumClfDissipationResidual": -8.807554601906025e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 51.411,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/periodic/cruise-exact-state.json",
+      "completedTrialJsonSha256": "92f17440e1dbe5de8b09a417a612e782fe605a2f4fa11320a46e47f4797425b1"
+    },
+    {
+      "curvature": 0.01,
+      "scenario": "stationary",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 53.23,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.008427,
+        "formulationSeconds": 0.074266,
+        "solveSeconds": 0.085046
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 5,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 48,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.206230052506729,
+      "maximumClfDissipationResidual": -4.494944090241437e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 251.74600000000004,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/diagnostic/stationary-exact-state.json",
+      "completedTrialJsonSha256": "0b8b242e00c41192dd5fd87f051e89e79135ffe09df7442a189f133ed5209c41"
+    },
+    {
+      "curvature": 0.01,
+      "scenario": "oncoming",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [
+        26
+      ],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 30.765,
+      "maximumFrameIndexZeroBased": 26,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.001712,
+        "formulationSeconds": 0.03782,
+        "solveSeconds": 0.054539
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 6,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 32,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.787495216687211,
+      "maximumClfDissipationResidual": -4.350479802497855e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 134.137,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/periodic/oncoming-exact-state.json",
+      "completedTrialJsonSha256": "2585819f0b17589147a405778b4b6511ac9037614eae5b5a867fa476c2fe9105"
+    },
+    {
+      "curvature": 0.01,
+      "scenario": "crossing",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 42.141,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.002567,
+        "formulationSeconds": 0.086973,
+        "solveSeconds": 0.128725
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 2,
+        "restorationSolves": 2,
+        "nativeSolves": 9,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 48,
+      "minimumLongitudinalSpeedMetersPerSecond": 6.456239876366812,
+      "maximumClfDissipationResidual": -4.496400723402551e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 249.399,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.01/diagnostic/crossing-exact-state.json",
+      "completedTrialJsonSha256": "3c4b5c2b9678d701a3ec6326a3f1d7b0bf2603d6d253f62a1b9a2d878b1221c3"
+    },
+    {
+      "curvature": -0.01,
+      "scenario": "cruise",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 31.201,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.023742,
+        "formulationSeconds": 0.005255,
+        "solveSeconds": 0.001226
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 16,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.999999945273425,
+      "maximumClfDissipationResidual": -8.807554601886662e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 31.937,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/periodic/cruise-exact-state.json",
+      "completedTrialJsonSha256": "8e0f8ddeebc160a60102645144fd4d60b8cf0bc1f75209472d025056372652d2"
+    },
+    {
+      "curvature": -0.01,
+      "scenario": "stationary",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 47.513,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.001726,
+        "formulationSeconds": 0.061112,
+        "solveSeconds": 0.07968700000000001
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 5,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 48,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.206242064854383,
+      "maximumClfDissipationResidual": -4.494942055699895e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 221.412,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/diagnostic/stationary-exact-state.json",
+      "completedTrialJsonSha256": "dc6961532a5fd8efb88bb4229352fdb73aa2e251a8d98c26782c0938f718e4d9"
+    },
+    {
+      "curvature": -0.01,
+      "scenario": "oncoming",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [
+        26
+      ],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 28.743000000000002,
+      "maximumFrameIndexZeroBased": 26,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.000706,
+        "formulationSeconds": 0.033243,
+        "solveSeconds": 0.053040000000000004
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 6,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 32,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.78444860128721,
+      "maximumClfDissipationResidual": -4.350939127721246e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 112.01899999999999,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/periodic/oncoming-exact-state.json",
+      "completedTrialJsonSha256": "fb3f8486a76457f03687c602375d9a20951552fbc8a35c99e70e7416a5e92a49"
+    },
+    {
+      "curvature": -0.01,
+      "scenario": "crossing",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 43.797999999999995,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.001699,
+        "formulationSeconds": 0.059387999999999996,
+        "solveSeconds": 0.103071
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 6,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 48,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.251851843388393,
+      "maximumClfDissipationResidual": -4.495991684449702e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 188.757,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.01/diagnostic/crossing-exact-state.json",
+      "completedTrialJsonSha256": "0926bbb44c660c90723a2f1872909b4ffd4e59af809cac374bcef393a0e6ad2b"
+    },
+    {
+      "curvature": 0.02,
+      "scenario": "cruise",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 11.96,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.005274,
+        "formulationSeconds": 0.004994,
+        "solveSeconds": 0.001179
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 16,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.999999648709122,
+      "maximumClfDissipationResidual": -8.210056755489408e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 11.892,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/periodic/cruise-exact-state.json",
+      "completedTrialJsonSha256": "a2a80c52b9fa1a0a55e393f45f49de20ecd029ad039927291d9dfb7ed64647a6"
+    },
+    {
+      "curvature": 0.02,
+      "scenario": "stationary",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 47.801,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.001674,
+        "formulationSeconds": 0.060405,
+        "solveSeconds": 0.104099
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 6,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 48,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.645879457005066,
+      "maximumClfDissipationResidual": -4.171771960558111e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 188.695,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/diagnostic/stationary-exact-state.json",
+      "completedTrialJsonSha256": "09a65c3384fd56d9bbc222c53559075b2d6cffa43a83b686d9deb317f0ef9211"
+    },
+    {
+      "curvature": 0.02,
+      "scenario": "oncoming",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [
+        26
+      ],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 27.312,
+      "maximumFrameIndexZeroBased": 26,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.000704,
+        "formulationSeconds": 0.035961,
+        "solveSeconds": 0.051039
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 6,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 32,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.269649797462275,
+      "maximumClfDissipationResidual": -4.176677044402133e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 120.542,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/periodic/oncoming-exact-state.json",
+      "completedTrialJsonSha256": "a24187954f9b0e7413abcf41dcdf5529616843a221c5c8231f38aa8432625829"
+    },
+    {
+      "curvature": 0.02,
+      "scenario": "crossing",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 41.814,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.001849,
+        "formulationSeconds": 0.085739,
+        "solveSeconds": 0.153477
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 2,
+        "restorationSolves": 2,
+        "nativeSolves": 10,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 48,
+      "minimumLongitudinalSpeedMetersPerSecond": 6.544159915987698,
+      "maximumClfDissipationResidual": -4.1776774849338605e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 233.874,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa-0.02/diagnostic/crossing-exact-state.json",
+      "completedTrialJsonSha256": "a3f3c7fc97692608b6b8ec6362716ceb5ee9da320dcc9d5a80f3431900d64c83"
+    },
+    {
+      "curvature": -0.02,
+      "scenario": "cruise",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 11.674999999999999,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.005106,
+        "formulationSeconds": 0.004936,
+        "solveSeconds": 0.001142
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 16,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.999999648709122,
+      "maximumClfDissipationResidual": -8.210056755472364e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 12.208,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/periodic/cruise-exact-state.json",
+      "completedTrialJsonSha256": "3ebb2c62e0c71c05244cfe802a330fb8935d3807de5d807b6d421df8e4a4e5fe"
+    },
+    {
+      "curvature": -0.02,
+      "scenario": "stationary",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 47.573,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.001696,
+        "formulationSeconds": 0.060861,
+        "solveSeconds": 0.101354
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 6,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 48,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.647467216977248,
+      "maximumClfDissipationResidual": -4.171761785984647e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 177.518,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/diagnostic/stationary-exact-state.json",
+      "completedTrialJsonSha256": "fe151edf744125905ed0883f97e0b9c6806147ae9c0616394a13f74a23b9c2c0"
+    },
+    {
+      "curvature": -0.02,
+      "scenario": "oncoming",
+      "completedTrialType": "strict",
+      "admissionFramesZeroBased": [
+        26
+      ],
+      "overdueFramesZeroBased": [],
+      "maximumNonAdmissionFrameMilliseconds": 27.053,
+      "maximumFrameIndexZeroBased": 26,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.000704,
+        "formulationSeconds": 0.032912,
+        "solveSeconds": 0.049886
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 6,
+        "familyAttempts": 1,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 32,
+      "minimumLongitudinalSpeedMetersPerSecond": 7.26935541596183,
+      "maximumClfDissipationResidual": -4.1781990947118376e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 128.42700000000002,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/periodic/oncoming-exact-state.json",
+      "completedTrialJsonSha256": "819b4fc15014ee5c3972bc270f95d0734e58778ee12b78ee5ca1e74eb1dce410"
+    },
+    {
+      "curvature": -0.02,
+      "scenario": "crossing",
+      "completedTrialType": "diagnostic",
+      "admissionFramesZeroBased": [
+        0
+      ],
+      "overdueFramesZeroBased": [
+        0
+      ],
+      "maximumNonAdmissionFrameMilliseconds": 56.047,
+      "maximumFrameIndexZeroBased": 0,
+      "maximumFrameBreakdown": {
+        "inputPreparationSeconds": 0.001728,
+        "formulationSeconds": 0.142992,
+        "solveSeconds": 0.26928799999999997
+      },
+      "maximumFrameSearch": {
+        "hardSolves": 2,
+        "restorationSolves": 3,
+        "nativeSolves": 14,
+        "familyAttempts": 2,
+        "horizonAttempts": 1
+      },
+      "maximumFrameHorizonSteps": 56,
+      "minimumLongitudinalSpeedMetersPerSecond": 5.557232468284101,
+      "maximumClfDissipationResidual": -4.03447306703178e-06,
+      "maximumSlewViolation": 0,
+      "baselineCompletedTrialMaximumMilliseconds": 240.573,
+      "completedTrialJson": "/home/zai/.cache/collisionAvoidance/circular-rerun-20260917/validation/kappa--0.02/diagnostic/crossing-exact-state.json",
+      "completedTrialJsonSha256": "7b3affba02bfa2c47b1f5598e912b64f8dc297785301f6a8d8c4519363960fcb"
+    }
+  ],
+  "outcome": "All 16 cases complete under either the strict or independent diagnostic budget; only 8 of 16 qualify against the 100 ms whole-frame requirement.",
+  "baselineComparisonScope": "Historical same-driver results, not a paired same-process runtime benchmark; the changed restoration path can produce a different certified trajectory."
+}

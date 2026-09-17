@@ -9,6 +9,8 @@ Latest implementation and validation: [Overlap-aware admission, straight control
 
 Latest runtime optimization: [Implementation-only frame-time reduction, strict oncoming qualification and the residual stationary-admission bottleneck, September 17, 2026](CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md).
 
+Latest circular controller validation: [Sixteen circular cases, eight strict 100 ms successes and remaining admission bottlenecks, September 17, 2026](CIRCULAR_RUNTIME_RERUN_20260917.md).
+
 Latest runtime assessment: [Real-time feasibility, active-encounter bottlenecks and equivalent row-reduction benchmark, September 16, 2026](REALTIME_FEASIBILITY_20260916.md).
 
 Latest diagnosis: [Stationary and oncoming distance-dual initialization failures and current feasible witnesses, September 16, 2026](DISTANCE_DUAL_INITIALIZATION_DIAGNOSIS_20260916.md).
@@ -25,6 +27,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Circular controller rerun: complete diagnostic avoidance/recovery, strict timing and crossing-search regression | [CIRCULAR_RUNTIME_RERUN_20260917.md](CIRCULAR_RUNTIME_RERUN_20260917.md) |
 | Implementation-only controller runtime reduction, strict oncoming qualification and residual restoration bottleneck | [CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md](CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md) |
 | Overlap-aware admission, equivalent sparse solving, controller timing and joint uncertainty diagnosis | [OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md) |
 | Overlap-aware support proposal: valid constraint construction and remaining temporal/dynamic infeasibility | [OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md) |
