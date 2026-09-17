@@ -173,6 +173,10 @@ function model = localFiniteModel(ego, lane, road, cfg, previousState)
         "initialFrenetErrorBound", radius, "longitudinalAccelerationBias", ego.longitudinalAccelerationBias, ...
         "previousInput", previousInput, ...
         "requiredMargin", 0,"confirmation",[]);
+    if laneGeometry.isVaryingReference(lane)
+        % One schedule lookup per frame; every phase query below reuses it.
+        model.referenceBank = ltvBicycleModel.referenceSchedule(model);
+    end
 end
 
 function cfg = localControllerConfiguration(userCfg)

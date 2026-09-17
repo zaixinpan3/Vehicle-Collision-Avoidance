@@ -19,6 +19,20 @@ pipeline timing measurements do not prove physical zero-latency execution.
 The dated sections below describe their identified earlier source versions;
 they are not current timing or certification claims.
 
+## Implementation-only runtime reduction (2026-09-17)
+
+The same programs are built and solved through cheaper code paths: batched
+pose charts, support-normal and target-flow evaluation; triplet assembly of the
+lifted dynamics, Hessian and restoration columns; projection-confirmed exact
+duplicate-row detection; a per-frame reference-bank handle; stored held flows
+of the scheduled stages; sparse assembly of the constraint matrix; and a
+regenerated projected-rows kernel that skips exactly-zero blocks. Constraint
+generation now adds up to sixteen violated rows per held-cell family per
+iteration. Startup probes exercise successor and in-range encounter paths.
+Measured effect and the remaining stationary-admission bottleneck (the
+degenerate restoration solve) are recorded in
+[the runtime optimization report](../report/CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md).
+
 ## Quadratic input and relaxation objective (2026-09-06)
 
 The current formulation minimizes normalized head input effort and squared

@@ -39,7 +39,7 @@ classdef ltvBicycleModel
                     'The sampled cruise generator must have an equilibrium and a contracting error map.');
             end
             stage = struct('continuousA',a,'continuousB',b,'continuousC',c,'tireModel',tire, ...
-                'speed',state(4),'brakingRatio',input(2),'curvature',curvature);
+                'speed',state(4),'brakingRatio',input(2),'curvature',curvature,'transition',flow);
             certificate = struct('state',state,'input',input,'gain',gain,'matrix',p, ...
                 'transition',flow,'closedLoop',closed,'contraction',contraction,'stage',stage, ...
                 'decayPerHold',cfg.clf.decreaseRateFraction*(1-contraction));
@@ -50,7 +50,13 @@ classdef ltvBicycleModel
         % Compile a finite sequence of declared affine holds and a constant tail.
         % This is reference preparation, not nonlinear flow certification. Each
         % changing trim's exact sampled defect is retained by terminal synthesis.
-            persistent key saved
+        % A model carrying referenceBank returns that compiled bank directly; the
+        % controller attaches it once per frame from this same cache.
+            if isfield(model,'referenceBank') && ~isempty(model.referenceBank)
+                bank=model.referenceBank;return;
+            end
+            persistent key saved stamp
+            if isempty(stamp),stamp=0;end
             cfg=model.cfg;curve=model.lane.referenceCurve;h=model.sampleTime;
             current=struct('curve',curve,'configuration',rmfield(cfg,'solver'), ...
                 'bias',model.longitudinalAccelerationBias,'sampleTime',h);
@@ -78,8 +84,9 @@ classdef ltvBicycleModel
                 % Preserve the nominal flow while adding its station Jacobian.
                 a(3,1)=-speed*curvatureRate;c(3)=c(3)-a(3,1)*station;
                 transition=expm(h*[a,b,c;zeros(3,9)]);
+                % The exact held flow travels with the stage so prediction reuses it.
                 stage=struct('continuousA',a,'continuousB',b,'continuousC',c,'tireModel',tire, ...
-                    'speed',state(4),'brakingRatio',input(2),'curvature',curvature);
+                    'speed',state(4),'brakingRatio',input(2),'curvature',curvature,'transition',transition);
                 certificates{index}=struct('state',state,'input',input,'stage',stage, ...
                     'transition',transition,'index',index,'scheduled',true, ...
                     'lateralRegularityRadius',lateralRegularityRadius); %#ok<AGROW>
@@ -112,8 +119,10 @@ classdef ltvBicycleModel
                 phase.referenceDefect=phase.transition(1:6,:)*[phase.state;phase.input;1]-phase.nextState;
                 certificates{j}=phase;pNext=p;
             end
+            stamp=stamp+1;
             bank=struct('certificates',{certificates},'tailIndex',count,'stepStation',stepStation, ...
-                'sampleTime',h,'key',current,'scope',"declaredScheduledAffinePlantWithBoundedPhase");
+                'sampleTime',h,'key',current,'stamp',stamp, ...
+                'scope',"declaredScheduledAffinePlantWithBoundedPhase");
             key=current;saved=bank;
         end
 
@@ -408,7 +417,11 @@ classdef ltvBicycleModel
             if isempty(schedule)
                 speed = model.initialEgoState(4);
                 station = model.initialEgoState(1)+(0:count)*h*speed;
-                curvature = arrayfun(@(value) laneGeometry.curvature(value, model.lane), station);
+                if isfield(model.lane,"referenceCurve")
+                    curvature = laneGeometry.curvature(station, model.lane);
+                else
+                    curvature = arrayfun(@(value) laneGeometry.curvature(value, model.lane), station);
+                end
                 ratio = (ltvBicycleModel.roadLoad(speed, cfg)/cfg.vehicle.m ...
                     -model.longitudinalAccelerationBias)/modifiedFialaTire.accelerationGain(cfg);
                 schedule = struct("speedProfile", repmat(speed, 1, count+1), ...
@@ -501,6 +514,8 @@ classdef ltvBicycleModel
             cells = cell(count, 1);
             tireModels = cell(count,1);
             priorOperatingPoint = [];
+            nativeInterval = exist("bicycleHeldIntervalKernelMex","file")==3;
+            storedTransition = prescribed && isfield(model.prescribedStages,"transition");
             for stage = 1:count
                 if prescribed
                     given = model.prescribedStages(stage);
@@ -510,7 +525,12 @@ classdef ltvBicycleModel
                             || ~isequal(b,prediction.continuousB(:,:,stage-1)) ...
                             || ~isequal(c,prediction.continuousC(:,stage-1))
                         processReserve = stateUncertainty.heldDisturbance(a,baseRate,h);
-                        exact = expm(h*[a,b,c;zeros(3,9)]);
+                        if storedTransition
+                            % The same expm(h*[a,b,c;0]) computed with the stage.
+                            exact = given.transition;
+                        else
+                            exact = expm(h*[a,b,c;zeros(3,9)]);
+                        end
                         executionReserve = abs(exact(1:6,1:6))*model.initialFrenetErrorBound+processReserve;
                     end
                     rate = baseRate;
@@ -572,7 +592,7 @@ classdef ltvBicycleModel
                 prediction.stageAffine(:, stage) = exact(1:6, 9);
                 heldMap = zeros(6, planCount);
                 heldMap(:, 2*stage-1:2*stage) = b;
-                if exist("bicycleHeldIntervalKernelMex","file")==3
+                if nativeInterval
                     stageTubes = bicycleHeldIntervalKernelMex(a,heldMap,c,map,offset,radius, ...
                         rate,h,cfg.encounter.taylorOrder,inputLimit,numericalRadius);
                 else

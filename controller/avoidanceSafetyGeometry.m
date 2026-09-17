@@ -67,6 +67,30 @@ classdef avoidanceSafetyGeometry
             cellData = cell(numel(groups),1);
             activeTargets = cell(numel(groups),1);
             sourceLabels = cell(numel(groups),1);
+            % Bounded target flows at every cell start, one batch per encounter.
+            encounterCount = numel(model.encounters);
+            cellStarts = reshape([prediction.cells.start],1,[]);
+            flowCenters = cell(encounterCount,1);flowRadii = cell(encounterCount,1);
+            baseTargets = repmat(targetTemplate,encounterCount,1);
+            targetLabels = strings(encounterCount,1);
+            for encounterIndex = 1:encounterCount
+                encounter = model.encounters(encounterIndex);
+                [flowCenters{encounterIndex},flowRadii{encounterIndex}] = ...
+                    targetPrediction.finiteFlow(encounter,cellStarts);
+                baseTargets(encounterIndex).halfLength = encounter.halfLength;
+                baseTargets(encounterIndex).halfWidth = encounter.halfWidth;
+                baseTargets(encounterIndex).contract.jerkBound = encounter.contract.jerkBound;
+                baseTargets(encounterIndex).contract.yawAccelerationBound = encounter.contract.yawAccelerationBound;
+                targetLabels(encounterIndex) = "collision:"+encounter.key;
+            end
+            activeAll = 1:encounterCount;
+            labelsPerCell = [targetLabels;boundaryLabels;"poseDomain";"referencePhaseDomain"];
+            reach = zeros(0,1);
+            if ~isempty(prediction.cells)
+                reach = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+                    max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))], ...
+                    size(prediction.cells(1).map,2)/2,1);
+            end
             for cellIndex = 1:numel(groups)
                 tube = prediction.cells(cellIndex);
                 if cachedFrames
@@ -81,25 +105,12 @@ classdef avoidanceSafetyGeometry
                         "The finite CLF certificate requires a continuous reference chart over every cell.");
                 end
                 frames{cellIndex} = frame;
-                active = [];
-                if ~isempty(model.encounters)
-                    active = 1:numel(model.encounters);
+                active = activeAll;
+                targets = baseTargets;
+                for targetIndex = 1:encounterCount
+                    targets(targetIndex).center = flowCenters{targetIndex}(:,cellIndex);
+                    targets(targetIndex).radius = flowRadii{targetIndex}(:,cellIndex);
                 end
-                targets = repmat(targetTemplate,numel(active),1);
-                targetLabels = strings(numel(active),1);
-                for targetIndex = 1:numel(active)
-                    originalIndex = active(targetIndex);
-                    encounter = model.encounters(originalIndex);
-                    target = targetTemplate;
-                    target.halfLength = encounter.halfLength;target.halfWidth = encounter.halfWidth;
-                    target.contract.jerkBound = encounter.contract.jerkBound;
-                    target.contract.yawAccelerationBound = encounter.contract.yawAccelerationBound;
-                    [target.center,target.radius] = targetPrediction.finiteFlow(encounter,tube.start);
-                    targets(targetIndex) = target;
-                    targetLabels(targetIndex) = "collision:"+encounter.key;
-                end
-                reach = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
-                    max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],size(tube.map,2)/2,1);
                 support = reshape(pagemtimes(abs(tube.map),reach),6,[]);
                 envelope = max(abs(tube.offset)+support+tube.radius,[],2);
                 [pose,domain]=laneGeometry.poseData(frame);
@@ -120,7 +131,7 @@ classdef avoidanceSafetyGeometry
                 end
                 cellData{cellIndex} = data;
                 activeTargets{cellIndex} = active;
-                sourceLabels{cellIndex} = [targetLabels;boundaryLabels;"poseDomain";"referencePhaseDomain"];
+                sourceLabels{cellIndex} = labelsPerCell;
             end
             data = vertcat(cellData{:});
             if nativeGeometry
@@ -222,21 +233,38 @@ classdef avoidanceSafetyGeometry
             switches=0;cfg=model.cfg;previous=zeros(2,targets);
             sectors=zeros(1,targets);
             if isfield(model,'supportSectors'),sectors=model.supportSectors;end
-            degree=size(cells(1).offset,2)-1;
-            weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
             native=exist('avoidanceSupportKernelMex','file')==3;
-            for index=1:numel(cells)
-                tube=cells(index);frame=frames(index);
+            nativeRows=exist('avoidanceCellRowsKernelMex','file')==3;
+            % Whole-hold midpoint poses and target centers of every cell in one
+            % batch; the per-cell values are identical to scalar evaluation.
+            cellCount=numel(cells);points=cell(cellCount,1);
+            states=zeros(6,cellCount);midTimes=zeros(1,cellCount);weights=zeros(0,1);
+            for index=1:cellCount
+                tube=cells(index);
                 if size(tube.offset,2)~=numel(weights)
                     degree=size(tube.offset,2)-1;
                     weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
                 end
-                points=reshape(pagemtimes(tube.map,plan),6,[])+tube.offset;
-                state=points*weights;[position,yaw]=laneGeometry.fromFrenet(state,model.lane);
+                points{index}=reshape(pagemtimes(tube.map,plan),6,[])+tube.offset;
+                states(:,index)=points{index}*weights;
+                midTimes(index)=tube.start+tube.duration/2;
+            end
+            [positions,yaws]=laneGeometry.fromFrenet(states,model.lane);
+            centers=cell(1,targets);
+            for targetIndex=1:targets
+                centers{targetIndex}=targetPrediction.finiteFlow(model.encounters(targetIndex),midTimes);
+            end
+            reach=repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
+                max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],prediction.stageCount,1);
+            reserveScale=4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance);
+            for index=1:cellCount
+                tube=cells(index);frame=frames(index);
+                position=positions(:,index);yaw=yaws(index);
+                if ~isempty(geometry),support=reshape(pagemtimes(abs(tube.map),reach),6,[]);end
                 normals{index}=zeros(2,targets);
                 for targetIndex=1:targets
                     target=model.encounters(targetIndex);
-                    center=targetPrediction.finiteFlow(target,tube.start+tube.duration/2);
+                    center=centers{targetIndex}(:,index);
                     dimensions=[cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth];
                     if native
                         [normal,query]=avoidanceSupportKernelMex(position,yaw,center(1:2),center(7),dimensions);
@@ -253,14 +281,20 @@ classdef avoidanceSafetyGeometry
                         valid=valid & sectors(targetIndex)*(frame.lateral.'*candidates)>=-1e-10;
                     end
                     candidates=candidates(:,valid);
-                    [~,uniqueIndex]=unique(round(candidates.',12),'rows','stable');candidates=candidates(:,uniqueIndex);
+                    % First occurrence of each direction after rounding, as
+                    % unique(...,'rows','stable') on the rounded columns.
+                    rounded=round(candidates,12);distinct=true(1,size(rounded,2));
+                    for option=2:numel(distinct)
+                        distinct(option)=~any(all(rounded(:,1:option-1)==rounded(:,option),1));
+                    end
+                    candidates=candidates(:,distinct);
                     score=zeros(1,size(candidates,2));
                     if ~isempty(geometry)
-                        data=geometry.cellData(index);data.nominal=points;
+                        data=geometry.cellData(index);data.nominal=points{index};
                         data.targets=data.targets(targetIndex);data.boundaries=data.boundaries([]);
                         batch=repmat(data,size(candidates,2),1);
                         for option=1:numel(batch),batch(option).normals=candidates(:,option);end
-                        if exist('avoidanceCellRowsKernelMex','file')==3
+                        if nativeRows
                             queries=avoidanceCellRowsKernelMex(batch);
                         else
                             queries=avoidanceSafetyGeometry.cellRows(batch);
@@ -275,13 +309,10 @@ classdef avoidanceSafetyGeometry
                         else
                             rows=queries(option);selected=rows.source==1;
                             rows.state=rows.state(selected,:);rows.bound=rows.bound(selected,:);
-                            margin=rows.bound-rows.state*points-abs(rows.state)*tube.radius;
-                            reach=repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
-                                max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],prediction.stageCount,1);
-                            support=reshape(pagemtimes(abs(tube.map),reach),6,[]);
+                            margin=rows.bound-rows.state*points{index}-abs(rows.state)*tube.radius;
                             offset=rows.bound-rows.state*tube.offset-abs(rows.state)*tube.radius;
                             scale=1+abs(offset)+abs(rows.state)*support;
-                            reserve=4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance)*scale;
+                            reserve=reserveScale*scale;
                             score(option)=min(margin-reserve,[],'all');
                         end
                     end
@@ -438,28 +469,30 @@ end
 
 function result = localProjectedRows(data)
 % Apply the same cell rows to condensed and local coordinates in one kernel.
+% Geometric rows carry no direct input or stage-start coefficients, so those
+% zero blocks are reported but never multiplied. Only plan columns the held
+% cell can depend on are multiplied; every other condensed column is exactly
+% zero because the cell map itself is zero there.
     tube = data.tube;
     stateRadius = data.stateRadius;pointCount = size(tube.offset,2);
     geometricRows = data.geometricRows;
     rowCount = size(geometricRows.state,1);
     stateRows = geometricRows.state;
-    inputRows = zeros(rowCount,2);
     limits = geometricRows.bound;
     labels = geometricRows.source;
     pointStateRows = repmat(stateRows,1,1,pointCount);
-    pointStartRows = zeros(size(pointStateRows));
-    pointInputRows = repmat(inputRows,1,1,pointCount);
-    mapped = pagemtimes(pointStateRows, tube.map)+pagemtimes(pointStartRows,tube.map(:,:,1));
-    for point = 1:pointCount
-        mapped(:, 2*tube.stage-1:2*tube.stage, point) = ...
-            mapped(:, 2*tube.stage-1:2*tube.stage, point)+pointInputRows(:,:,point);
+    pointStartRows = zeros(rowCount,6,pointCount);
+    pointInputRows = zeros(rowCount,2,pointCount);
+    mapped = zeros(rowCount,size(tube.map,2),pointCount);
+    active = find(any(any(tube.map~=0,1),3));
+    if ~isempty(active)
+        mapped(:,active,:) = pagemtimes(pointStateRows,tube.map(:,active,:));
     end
     uncertaintySupport = reshape(pagemtimes(abs(pointStateRows),reshape(stateRadius,6,1,pointCount)),[],pointCount);
-    uncertaintySupport = uncertaintySupport+reshape(pagemtimes(abs(pointStartRows),stateRadius(:,1)),[],pointCount);
     physical = limits-reshape(pagemtimes(pointStateRows,reshape(tube.offset,6,1,pointCount)),[],pointCount) ...
-        -reshape(pagemtimes(pointStartRows,tube.offset(:,1)),[],pointCount)-uncertaintySupport;
-    localState = pagemtimes(pointStateRows,tube.localStateMap)+pointStartRows;
-    localInput = pagemtimes(pointStateRows,tube.localInputMap)+pointInputRows;
+        -uncertaintySupport;
+    localState = pagemtimes(pointStateRows,tube.localStateMap);
+    localInput = pagemtimes(pointStateRows,tube.localInputMap);
     localBound = limits-reshape(pagemtimes(pointStateRows,reshape(tube.localOffset,6,1,pointCount)),[],pointCount)-uncertaintySupport;
     local = struct("stateMatrix",reshape(permute(localState,[1,3,2]),[],6), ...
         "inputMatrix",reshape(permute(localInput,[1,3,2]),[],2),"bound",localBound(:),"stage",tube.stage, ...

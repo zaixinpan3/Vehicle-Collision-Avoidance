@@ -170,7 +170,6 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
     safetyBound = bound;
     % Only the CLF has a slack column. Physical inequalities remain hard.
     physicalMatrix = [matrix,zeros(numel(bound),1)];
-    matrix = [physicalMatrix;zeros(1,planCount),-1];
     bound = [bound;0];
     linearCount = numel(bound);
     currentRoot = chol(cruise.matrix);
@@ -187,9 +186,12 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
     inputRoot = root*inputMap;
     numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach(1:2)));
     coneRadius = sqrt(middle)*norm(currentRoot*trackingError)+numeric;
-    matrix = [matrix;zeros(1,planCount),-1;-inputRoot,zeros(5,planCount-1)];
+    % The complete constraint matrix is assembled sparse from the dense
+    % physical rows and the small slack, CLF-cone and terminal-cone blocks.
+    tail = [zeros(1,planCount),-1;zeros(1,planCount),-1;-inputRoot,zeros(5,planCount-1); ...
+        terminalCone.matrix,zeros(size(terminalCone.matrix,1),1)];
+    matrix = [sparse(physicalMatrix);sparse(tail)];
     bound = [bound;coneRadius;root*nominalOffset;terminalCone.bound];
-    matrix = [matrix;terminalCone.matrix,zeros(size(terminalCone.matrix,1),1)];
     disturbance = sqrt(middle)*norm(abs(currentRoot)*radius) ...
         +norm(abs(root*stateMap)*model.initialFrenetErrorBound)+2*numeric;
     clf = struct('cruise',cruise,'initialValue',trackingError.'*cruise.matrix*trackingError, ...
@@ -216,10 +218,10 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
     hessian = objectiveMap.'*objectiveMap+weight;
     linear = 2*(objectiveMap.'*objectiveOffset-weight*trim);
     % Keep the current CLF slack units and squared penalty unchanged.
-    hessian = 2*blkdiag(hessian,cfg.clf.relaxationWeight);
+    hessian = 2*[hessian,zeros(planCount,1);zeros(1,planCount),cfg.clf.relaxationWeight];
     layout = struct('planIndex',1:planCount,'planCount',planCount,'horizonSteps',count, ...
         'decisionCount',planCount+1,'relaxationIndex',planCount+1);
-    program = struct('P',sparse(hessian),'q',[linear;0],'A',sparse(matrix),'b',bound, ...
+    program = struct('P',sparse(hessian),'q',[linear;0],'A',matrix,'b',bound, ...
         'cones',[0;linearCount;6;terminalCone.sizes],'decisionRadius',reach, ...
         'obstacleCbfRowCount',nnz(startsWith(geometry.label,"collision:")), ...
         'geometry',geometry,'terminal',terminal,'completion',completion,'layout',layout, ...
@@ -306,8 +308,12 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     columns = 3:old.layout.planCount;
     matrix = old.physicalMatrix(:,columns);
     labels=old.physicalLabels;
-    removed=ismember(labels,"collision:"+model.dischargedTargetKeys) ...
-        | ismember(labels,"exit:"+model.dischargedTargetKeys);
+    discharging=~isempty(model.dischargedTargetKeys);
+    removed=false(numel(labels),1);
+    if discharging
+        removed=ismember(labels,"collision:"+model.dischargedTargetKeys) ...
+            | ismember(labels,"exit:"+model.dischargedTargetKeys);
+    end
     selected = any(matrix~=0,2) & ~removed;
     geometric=numel(old.geometry.label);
     selected(1:geometric)=old.geometry.stage>=2 & ~removed(1:geometric);
@@ -371,7 +377,10 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
         prediction.cells(index)=tube;
     end
     geometry=old.geometry;
-    selected=geometry.stage>=2 & ~ismember(geometry.label,"collision:"+model.dischargedTargetKeys);
+    selected=geometry.stage>=2;
+    if discharging
+        selected=selected & ~ismember(geometry.label,"collision:"+model.dischargedTargetKeys);
+    end
     geometry.physicalBound=geometry.physicalBound(selected)-geometry.matrix(selected,1:2)*executed;
     geometry.matrix=geometry.matrix(selected,columns);
     geometry.stage=geometry.stage(selected)-1;geometry.label=geometry.label(selected);
@@ -384,16 +393,18 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     geometry.cellData=geometry.cellData(keep);
     for index=1:numel(geometry.local)
         local=geometry.local(index);
-        rows=~ismember(local.nodeLabels,"collision:"+model.dischargedTargetKeys);
-        expanded=repmat(rows,size(local.nodeStateRows,3),1);
-        local.stateMatrix=local.stateMatrix(expanded,:);
-        local.inputMatrix=local.inputMatrix(expanded,:);local.bound=local.bound(expanded);
-        local.nodeStateRows=local.nodeStateRows(rows,:,:);
-        local.nodeStartStateRows=local.nodeStartStateRows(rows,:,:);
-        local.nodeInputRows=local.nodeInputRows(rows,:,:);
-        local.nodeLimits=local.nodeLimits(rows,:);local.nodeLabels=local.nodeLabels(rows);
+        if discharging
+            rows=~ismember(local.nodeLabels,"collision:"+model.dischargedTargetKeys);
+            expanded=repmat(rows,size(local.nodeStateRows,3),1);
+            local.stateMatrix=local.stateMatrix(expanded,:);
+            local.inputMatrix=local.inputMatrix(expanded,:);local.bound=local.bound(expanded);
+            local.nodeStateRows=local.nodeStateRows(rows,:,:);
+            local.nodeStartStateRows=local.nodeStartStateRows(rows,:,:);
+            local.nodeInputRows=local.nodeInputRows(rows,:,:);
+            local.nodeLimits=local.nodeLimits(rows,:);local.nodeLabels=local.nodeLabels(rows);
+            geometry.cellData(index).targets=geometry.cellData(index).targets(retained);
+            geometry.cellData(index).normals=geometry.cellData(index).normals(:,retained);
+        end
         local.stage=local.stage-1;geometry.local(index)=local;
-        geometry.cellData(index).targets=geometry.cellData(index).targets(retained);
-        geometry.cellData(index).normals=geometry.cellData(index).normals(:,retained);
     end
 end

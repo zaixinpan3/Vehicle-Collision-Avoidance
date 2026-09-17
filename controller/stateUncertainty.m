@@ -283,15 +283,16 @@ classdef stateUncertainty
         % off-diagonal entries. Its exponential bounds the absolute state transition,
         % so the integral covers coupling between all continuous disturbance channels.
 
-            validateattributes(continuousA, {'double'}, {'real', 'finite', 'square'});
-            validateattributes(sampleTime, {'double'}, {'real', 'finite', 'scalar', 'positive'});
-            validateattributes(rateRadius, {'double'}, ...
-                {'real', 'finite', 'nonnegative', 'numel', size(continuousA, 1)});
             count = size(continuousA, 1);
+            validateattributes(rateRadius, {'double'}, ...
+                {'real', 'finite', 'nonnegative', 'numel', count});
             radius = zeros(count, 1);
             if ~any(rateRadius)
+                % A zero rate integrates to zero for every generator.
                 return;
             end
+            validateattributes(continuousA, {'double'}, {'real', 'finite', 'square'});
+            validateattributes(sampleTime, {'double'}, {'real', 'finite', 'scalar', 'positive'});
             comparison = abs(continuousA);
             comparison(1:count+1:end) = diag(continuousA);
             transition = expm(sampleTime*[comparison, rateRadius(:); zeros(1, count+1)]);

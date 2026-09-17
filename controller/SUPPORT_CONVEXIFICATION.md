@@ -94,10 +94,13 @@ in these coordinates; input cost remains relative to the CLF operating point.
 Exact duplicate left sides retain only their tightest bound.
 
 For larger geometry programs, numerical constraint generation starts with the
-most violated rows of each hold, separately grouping collision and local-domain
-rows, and retains all nongeometric hard rows and cones.
-Every returned decision is checked against all omitted inequalities, and
-violated rows are added. The loop cannot accept an unfinished working set.
+two most violated rows of each hold, separately grouping collision, local-domain
+and phase rows, and retains all nongeometric hard rows and cones.
+Every returned decision is checked against all omitted inequalities, and up to
+sixteen violated rows per group join the working set before the next native
+solve. These counts only trade native solves against program size; the
+converged decision satisfies the same complete row set. The loop cannot accept
+an unfinished working set.
 The independent original-program verifier remains unchanged. Restoration uses
 the same transcription and checks its omitted deficit-adjusted inequalities.
 

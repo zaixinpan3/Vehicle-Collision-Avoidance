@@ -17,18 +17,17 @@ classdef laneGeometry
                 && ~isempty(model.encounters);
             if curved
                 scale=1;if isfield(model,'poseTrustScale'),scale=model.poseTrustScale;end
-                frames=repmat(laneGeometry.localPoseFrame(model.lane.referenceCurve,zeros(3,1), ...
-                    model.cfg.controller.poseTrustRadius),numel(tubes),1);
+                centers=zeros(3,numel(tubes));radii=centers;
                 for index=1:numel(tubes)
                     tube=tubes(index);
                     values=reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
                     nominal{index}=values;
                     lower=min(values(1:3,:)-tube.radius(1:3,:),[],2);
                     upper=max(values(1:3,:)+tube.radius(1:3,:),[],2);
-                    center=(lower+upper)/2;
-                    radius=(upper-lower)/2+scale*cfg.controller.poseTrustRadius;
-                    frames(index)=laneGeometry.localPoseFrame(model.lane.referenceCurve,center,radius);
+                    centers(:,index)=(lower+upper)/2;
+                    radii(:,index)=(upper-lower)/2+scale*cfg.controller.poseTrustRadius;
                 end
+                frames=laneGeometry.localPoseFrames(model.lane.referenceCurve,centers,radii);
                 return;
             end
             station = zeros(numel(tubes),1);extent = station;lateralExtent = station;
@@ -92,30 +91,49 @@ classdef laneGeometry
         % A first-order pose map certified on a hard box in [s,d,e_psi].
             validateattributes(center,{'double'},{'size',[3,1],'finite','real'});
             validateattributes(radius,{'double'},{'size',[3,1],'finite','real','nonnegative'});
-            [position,heading]=laneGeometry.referencePose(center(1),center(2),curve);
-            [positionError,headingError]=laneGeometry.referenceErrorBound(center(1),curve);
-            tangent=[cos(heading);sin(heading)];lateral=[-tangent(2);tangent(1)];
-            k=laneGeometry.referenceCurvature(center(1),curve);
-            [k0,k1]=laneGeometry.referenceCurvatureBounds(curve,center(1)-radius(1),center(1)+radius(1));
-            jacobian=[(1-k*center(2))*tangent,lateral,zeros(2,4)];
-            offset=position-jacobian(:,1:3)*center;
-            yawRow=[k,0,1,0,0,0];yawOffset=heading-k*center(1);
-            extent=abs(center(2))+radius(2);
-            remainder=(k1*extent+k0*(1+k0*extent))*radius(1)^2/2 ...
-                +k0*radius(1)*radius(2)+positionError+extent*headingError;
-            yawRemainder=k1*radius(1)^2/2+headingError;
-            if isfield(curve,'curvatureProfile') && k0*extent>=1
-                error("collisionAvoidanceController:singularReferenceDomain", ...
-                    "The complete local pose domain must satisfy one minus absolute curvature times lateral extent greater than zero.");
+            frame=laneGeometry.localPoseFrames(curve,center,radius);
+        end
+
+        function frames = localPoseFrames(curve,centers,radii)
+        % The localPoseFrame of every column of centers and radii. The
+        % reference pose, curvature and chart error of all boxes are evaluated
+        % in one batch; each frame equals its single-column evaluation.
+            validateattributes(centers,{'double'},{'nrows',3,'finite','real'});
+            validateattributes(radii,{'double'},{'size',size(centers),'finite','real','nonnegative'});
+            count=size(centers,2);
+            [positions,headings]=laneGeometry.referencePose(centers(1,:),centers(2,:),curve);
+            [positionErrors,headingErrors]=laneGeometry.referenceErrorBound(centers(1,:),curve);
+            curvatures=laneGeometry.referenceCurvature(centers(1,:),curve);
+            profile=isfield(curve,'curvatureProfile');
+            cells=cell(count,1);
+            for index=1:count
+                center=centers(:,index);radius=radii(:,index);
+                position=positions(:,index);heading=headings(index);
+                positionError=positionErrors(index);headingError=headingErrors(index);
+                tangent=[cos(heading);sin(heading)];lateral=[-tangent(2);tangent(1)];
+                k=curvatures(index);
+                [k0,k1]=laneGeometry.referenceCurvatureBounds(curve,center(1)-radius(1),center(1)+radius(1));
+                jacobian=[(1-k*center(2))*tangent,lateral,zeros(2,4)];
+                offset=position-jacobian(:,1:3)*center;
+                yawRow=[k,0,1,0,0,0];yawOffset=heading-k*center(1);
+                extent=abs(center(2))+radius(2);
+                remainder=(k1*extent+k0*(1+k0*extent))*radius(1)^2/2 ...
+                    +k0*radius(1)*radius(2)+positionError+extent*headingError;
+                yawRemainder=k1*radius(1)^2/2+headingError;
+                if profile && k0*extent>=1
+                    error("collisionAvoidanceController:singularReferenceDomain", ...
+                        "The complete local pose domain must satisfy one minus absolute curvature times lateral extent greater than zero.");
+                end
+                remainder=remainder+128*eps*(1+norm(position)+norm(offset)+norm(jacobian,'fro')*norm(abs(center)+radius));
+                cells{index}=struct('origin',position-tangent*center(1)-lateral*center(2), ...
+                    'tangent',tangent,'lateral',lateral,'heading',heading,'segmentIndex',1, ...
+                    'stationLower',center(1)-radius(1),'stationUpper',center(1)+radius(1), ...
+                    'positionErrorBound',repmat(remainder,2,1),'headingErrorBound',yawRemainder, ...
+                    'referenceHeadingErrorBound',yawRemainder,'positionMap',jacobian,'positionOffset',offset, ...
+                    'yawRow',yawRow,'yawOffset',yawOffset,'positionRemainder',remainder, ...
+                    'domainCenter',center,'domainRadius',radius);
             end
-            remainder=remainder+128*eps*(1+norm(position)+norm(offset)+norm(jacobian,'fro')*norm(abs(center)+radius));
-            frame=struct('origin',position-tangent*center(1)-lateral*center(2), ...
-                'tangent',tangent,'lateral',lateral,'heading',heading,'segmentIndex',1, ...
-                'stationLower',center(1)-radius(1),'stationUpper',center(1)+radius(1), ...
-                'positionErrorBound',repmat(remainder,2,1),'headingErrorBound',yawRemainder, ...
-                'referenceHeadingErrorBound',yawRemainder,'positionMap',jacobian,'positionOffset',offset, ...
-                'yawRow',yawRow,'yawOffset',yawOffset,'positionRemainder',remainder, ...
-                'domainCenter',center,'domainRadius',radius);
+            frames=vertcat(cells{:});
         end
 
         function [pose,domain] = poseData(frame)

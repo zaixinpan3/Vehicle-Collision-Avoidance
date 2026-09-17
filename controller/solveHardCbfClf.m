@@ -58,7 +58,8 @@ classdef solveHardCbfClf
             count=numel(names);cones=numel(program.terminalCone.sizes);total=count+cones;
             column=zeros(numel(labels),1);column(soft)=group;
             charge=sparse(find(soft),column(soft),1,numel(labels),total);
-            matrix=[program.physicalMatrix(:,1:n),-charge;zeros(total,n),-eye(total)];
+            % The physical rows are already stored sparse in the program matrix.
+            matrix=[program.A(1:numel(labels),1:n),-charge;sparse(total,n),-speye(total)];
             bound=[program.safetyBound;zeros(total,1)];
             coneCharge=sparse(1:3:3*cones,count+(1:cones),-1,3*cones,total);
             matrix=[matrix;program.terminalCone.matrix,coneCharge];
@@ -102,10 +103,13 @@ function solve=localGeneratedSolve(problem,cfg)
     active=~geometric;groups=rowGroups(source(geometric));
     rows=find(geometric);anchor=full.anchorPlan;
     residual=full.A(equalities+rows,:)*anchor-full.b(equalities+rows);
-    sorted=sortrows([groups,-residual,rows],[1,2]);
-    first=[true;diff(sorted(:,1))~=0];starts=find(first);
-    selected=unique([starts;min(starts+1,[starts(2:end)-1;size(sorted,1)])]);
-    active(sorted(selected,3))=true;
+    % Start from the most binding rows of every held-cell family; up to
+    % growthPerGroup violated rows of a family then join the working set per
+    % iteration. The converged decision satisfies the same complete row set
+    % whatever these counts; they only trade native solves against program
+    % size. The original full verifier remains authoritative for physical safety.
+    initialPerGroup=2;growthPerGroup=16;
+    active(localWorstRows(groups,residual,rows,initialPerGroup))=true;
     nativeCalls=0;
     for iteration=1:12
         selected=[(1:equalities).';equalities+find(active); ...
@@ -118,15 +122,21 @@ function solve=localGeneratedSolve(problem,cfg)
         allowance=cfg.solver.constraintTolerance*(1+abs(full.b(equalities+(1:count))));
         violated=~active & value>allowance;
         if ~any(violated),break;end
-        % Add the worst row of each violated held-cell family. The original
-        % full verifier remains authoritative for physical safety.
-        rows=find(violated);groups=rowGroups(source(rows));
-        sorted=sortrows([groups,-value(rows),rows],[1,2]);
-        first=[true;diff(sorted(:,1))~=0];active(sorted(first,3))=true;
+        rows=find(violated);
+        active(localWorstRows(rowGroups(source(rows)),value(rows),rows,growthPerGroup))=true;
         if iteration==12,solve.feasible=false;solve.message="Constraint generation did not close the complete program.";end
     end
     solve.output.constraintGenerationSolves=nativeCalls;
     solve.output.generatedLinearRows=nnz(active);
+end
+
+function rows=localWorstRows(groups,value,rows,perGroup)
+% The perGroup most violated rows (largest value) of every group present.
+    if isempty(rows),return;end
+    sorted=sortrows([groups(:),-value(:),rows(:)],[1,2]);
+    first=[true;diff(sorted(:,1))~=0];starts=find(first);
+    rank=(1:size(sorted,1)).'-starts(cumsum(first));
+    rows=sorted(rank<perGroup,3);
 end
 
 function program = localCompactPlanarRows(program)

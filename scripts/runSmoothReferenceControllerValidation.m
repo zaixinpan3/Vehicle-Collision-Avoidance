@@ -57,9 +57,13 @@ function report=localTrial(name,scenario,count,deadline,directory)
     try
         ltvBicycleModel.referenceSchedule(model);
         compileSeconds=toc(setupTimer);
-        target=localTarget(scenario,0,curve);
+        % Startup probes use the scenario's declared target at its first sample
+        % inside the perception range, so the encounter admission paths are
+        % compiled before periodic sampling; the probes issue no command.
+        [target,probeTime]=localProbeTarget(scenario,curve,ego,count,h);
         startupCfg=cfg;startupCfg.solver.frameDeadlineSeconds=5;startupCfg.solver.certificateSearchTimeLimit=5;
         preparation=prepareCollisionAvoidanceController(ego,road,startupCfg,target);
+        preparation.probeTargetTime=probeTime;
         if scenario=="cruise",preparation.cruiseProbes=localCruiseProbes(ego,road,startupCfg);end
     catch exception
         compileSeconds=toc(setupTimer);setupFailure=exception;
@@ -147,16 +151,33 @@ function report=localTrial(name,scenario,count,deadline,directory)
 end
 
 function probes=localCruiseProbes(ego,road,cfg)
-    probes=struct('seconds',zeros(1,3),'certified',false(1,3),'failureIdentifier',strings(1,3));
+% Discarded target-free startup probes. Each fresh probe is followed by two
+% chained calls on its own declared successor so that the carried-witness
+% cruise path is compiled before the first periodic sample.
+    probes=struct('seconds',zeros(1,3),'certified',false(1,3),'failureIdentifier',strings(1,3), ...
+        'successorSeconds',zeros(3,2),'successorFailureIdentifier',strings(3,2));
     for repetition=1:3
         timer=tic;
         try
-            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            [~,~,problem,stored]=collisionAvoidanceController(ego,[],road,cfg,[]);
             probes.certified(repetition)=problem.metadata.planCertified;
         catch exception
             probes.failureIdentifier(repetition)=string(exception.identifier);
         end
         probes.seconds(repetition)=toc(timer);
+        if strlength(probes.failureIdentifier(repetition))>0,continue;end
+        for step=1:2
+            timer=tic;
+            try
+                lane=problem.model.lane;h=problem.model.sampleTime;
+                successor=localEgo(stored.predictedState(:,2),problem.model.stateTime+h,stored.appliedInput,lane);
+                [~,~,problem,stored]=collisionAvoidanceController(successor,[],road,cfg,stored);
+            catch exception
+                probes.successorFailureIdentifier(repetition,step)=string(exception.identifier);
+            end
+            probes.successorSeconds(repetition,step)=toc(timer);
+            if strlength(probes.successorFailureIdentifier(repetition,step))>0,break;end
+        end
     end
 end
 
@@ -178,6 +199,18 @@ function ego=localEgo(state,time,input,lane)
         'yawRate',state(6),'stateTime',time,'heldActuatorInput',input, ...
         'controllerStateErrorBound',zeros(6,1), ...
         'perception',struct('time',time,'range',16,'completeWithinRange',true));
+end
+
+function [target,probeTime]=localProbeTarget(scenario,curve,ego,count,h)
+% The declared target at its first sample within the initial perception range.
+    probeTime=NaN;target=localTarget(scenario,0,curve);
+    if isempty(target),return;end
+    for sample=0:count
+        candidate=localTarget(scenario,sample*h,curve);
+        if norm(candidate.targetPositionInertial-ego.position)<=ego.perception.range
+            target=candidate;probeTime=sample*h;return;
+        end
+    end
 end
 
 function target=localTarget(scenario,time,curve)

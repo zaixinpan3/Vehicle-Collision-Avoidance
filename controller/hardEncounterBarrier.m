@@ -152,9 +152,12 @@ classdef hardEncounterBarrier
                 if isempty(model.encounters),carry.completion.active=false;end
             end
             model.horizonSteps = max(cfg.controller.horizonSteps,cfg.controller.minimumHorizonSteps);
+            % Departure proposals of this frame, reused by the completion rows.
+            model.encounterProposals = cell(1,numel(model.encounters));
             for index = 1:numel(model.encounters)
                 trial = model;trial.encounters=model.encounters(index);
-                [~,steps,~] = localEncounterProposal(trial,model.confirmation.range);
+                [direction,steps,~] = localEncounterProposal(trial,model.confirmation.range);
+                model.encounterProposals{index} = direction;
                 model.horizonSteps = max(model.horizonSteps,steps);
             end
             if isfield(model,'exitDeadline')
@@ -222,8 +225,12 @@ classdef hardEncounterBarrier
                     relative=center(1:2)-position;
                     if norm(relative)>sqrt(eps),direction=relative/norm(relative);end
                 end
-                trial=model;trial.encounters=target;
-                [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
+                if isfield(model,'encounterProposals') && numel(model.encounterProposals)==count
+                    proposed=model.encounterProposals{index};
+                else
+                    trial=model;trial.encounters=target;
+                    [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
+                end
                 if isfield(model,'exitDirections')
                     direction=model.exitDirections(:,index);
                     validateattributes(direction,{'double'},{'size',[2,1],'finite','real'});
@@ -263,11 +270,12 @@ classdef hardEncounterBarrier
         function outside = observedExterior(model,target,completion)
             z = model.initialEgoState;
             rho = model.initialFrenetErrorBound;
-            frame = laneGeometry.frameBounds(model.lane,z(1), ...
-                max(model.cfg.controller.stationTrustRadius,rho(1)),abs(z(2))+rho(2));
             if isfield(model.lane,'referenceCurve') && (laneGeometry.isVaryingReference(model.lane) ...
                     || model.lane.referenceCurve.curvature~=0)
                 frame=laneGeometry.localPoseFrame(model.lane.referenceCurve,z(1:3),rho(1:3));
+            else
+                frame = laneGeometry.frameBounds(model.lane,z(1), ...
+                    max(model.cfg.controller.stationTrustRadius,rho(1)),abs(z(2))+rho(2));
             end
             direction = localExitDirection(target.center,frame,z);
             if ~isempty(model.confirmation.exitDirection)
@@ -572,7 +580,8 @@ function terminal=localScheduledTerminalSet(model)
         current=ltvBicycleModel.sampledCruise(model);index=current.index;
     end
     persistent savedKey saved
-    key={bank.key,model.measurementRadiusLimit,cfg.solver.constraintTolerance};
+    % The bank stamp identifies the compiled schedule within this session.
+    key={bank.stamp,model.measurementRadiusLimit,cfg.solver.constraintTolerance};
     if isempty(savedKey) || ~isequaln(savedKey,key)
         saved=localScheduledTerminalFamily(model,bank);
         savedKey=key;
@@ -750,6 +759,7 @@ function [count,inputs]=localCruiseAdmission(model)
         if isfield(terminal,'scheduled') && terminal.scheduled
             nextModel=terminal.scheduleModel;
             nextModel.referencePhaseIndex=terminal.index+1;
+            if isfield(model,'referenceBank'),nextModel.referenceBank=model.referenceBank;end
             terminal=localTerminalSet(nextModel);cruise=terminal.cruise;
         end
         [~,margin]=hardEncounterBarrier.terminalMembership(terminal,x,rho);

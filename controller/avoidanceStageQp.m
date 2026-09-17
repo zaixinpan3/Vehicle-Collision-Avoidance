@@ -10,16 +10,20 @@ classdef avoidanceStageQp
             anchor=program.anchorPlan(1:n);
             centers=prediction.egoStateOffset+reshape( ...
                 pagemtimes(prediction.egoStateMatrix,anchor),6,[]);
-            dynamics=sparse(6*count,total);rhs=zeros(6*count,1);
-            for stage=1:count
-                rows=6*(stage-1)+(1:6);inputs=2*stage-1:2*stage;
-                dynamics(rows,indices(:,stage))=eye(6);
-                dynamics(rows,inputs)=-prediction.stageMatrixB(:,:,stage);
-                if stage>1
-                    dynamics(rows,indices(:,stage-1))=-prediction.stageMatrixA(:,:,stage);
-                end
-                rhs(rows)=-prediction.stageMatrixB(:,:,stage)*anchor(inputs);
-            end
+            % Stage dynamics x_k - A_k x_{k-1} - B_k u_k = B_k*anchor_k, assembled
+            % from triplets in one sparse call.
+            stageRows=reshape(1:6*count,6,count);
+            [blockRow,blockColumn]=ndgrid(1:6,1:6);
+            [inputRow,inputColumn]=ndgrid(1:6,1:2);
+            inputRows=stageRows(inputRow(:),:);
+            inputColumns=inputColumn(:)+2*((1:count)-1);
+            inputValues=-reshape(prediction.stageMatrixB,12,count);
+            stateRows=stageRows(blockRow(:),2:count);
+            stateColumns=indices(blockColumn(:),1:count-1);
+            stateValues=-reshape(prediction.stageMatrixA(:,:,2:count),36,max(count-1,0));
+            dynamics=sparse([stageRows(:);inputRows(:);stateRows(:)],[indices(:);inputColumns(:);stateColumns(:)], ...
+                [ones(6*count,1);inputValues(:);stateValues(:)],6*count,total);
+            rhs=-reshape(pagemtimes(prediction.stageMatrixB,reshape(anchor,2,1,count)),6*count,1);
             geometric=numel(program.geometry.label);cursor=0;
             rowBlocks=cell(numel(program.geometry.local),1);columnBlocks=rowBlocks;valueBlocks=rowBlocks;
             bound=program.b;
@@ -37,9 +41,11 @@ classdef avoidanceStageQp
                     +program.safetyBound(rows)-program.geometry.physicalBound(rows);
             end
             assert(cursor==geometric,'avoidanceStageQp:geometryRows','Inconsistent stage row mapping.');
-            geometricMatrix=sparse(vertcat(rowBlocks{:}),vertcat(columnBlocks{:}), ...
-                vertcat(valueBlocks{:}),geometric,total);
-            geometricMatrix(:,n+1:original)=program.A(1:geometric,n+1:original);
+            % Extra decision columns of the geometric rows (deficit charges of a
+            % restoration program) join the triplets instead of a sparse assignment.
+            [extraRow,extraColumn,extraValue]=find(program.A(1:geometric,n+1:original));
+            geometricMatrix=sparse([vertcat(rowBlocks{:});extraRow],[vertcat(columnBlocks{:});n+extraColumn], ...
+                [vertcat(valueBlocks{:});extraValue],geometric,total);
             matrix=[geometricMatrix;program.A(geometric+1:end,:),sparse(size(program.A,1)-geometric,6*count)];
             % The terminal modal cone acts on the final state. Its stored RHS
             % and numerical reserve are transferred without reconstruction.
@@ -53,13 +59,18 @@ classdef avoidanceStageQp
             if isfield(program,'restoration') && program.restoration
                 hessian=blkdiag(program.P,sparse(6*count,6*count));linear=[program.q;zeros(6*count,1)];
             else
-                blocks=cell(count,1);stateLinear=zeros(6,count);
+                % Stage blocks 2*blkdiag(0,P_k) on the lifted state columns,
+                % assembled from triplets in one sparse call.
+                values=zeros(36,count);stateLinear=zeros(6,count);
                 for stage=1:count
-                    p=program.referenceMatrices(:,:,stage+1);blocks{stage}=2*blkdiag(0,p);
+                    p=program.referenceMatrices(:,:,stage+1);block=zeros(6);block(2:6,2:6)=2*p;
+                    values(:,stage)=block(:);
                     stateLinear(2:6,stage)=2*p*(centers(2:6,stage+1)-program.referenceStates(2:6,stage+1));
                 end
-                hessian=blkdiag(2*spdiags(program.inputWeight,0,n,n), ...
-                    2*program.slackWeight,sparse(blkdiag(blocks{:})));
+                [blockRow,blockColumn]=ndgrid(1:6,1:6);
+                stateRows=indices(blockRow(:),:);stateColumns=indices(blockColumn(:),:);
+                hessian=sparse([1:n,n+1,stateRows(:).'],[1:n,n+1,stateColumns(:).'], ...
+                    [2*program.inputWeight(:).',2*program.slackWeight,values(:).'],total,total);
                 linear=[-2*program.inputWeight.*program.referenceInputs(:);0;stateLinear(:)];
             end
             lifted.P=hessian;lifted.q=linear;
@@ -81,13 +92,23 @@ end
 function retained=localDistinctRows(matrix,bound)
 % Identical left sides need only their tightest RHS. No coefficients are
 % rounded; the complete original rows remain in the independent verifier.
-    count=numel(bound);[column,row,value]=find(matrix.');
-    lengths=accumarray(row,1,[count,1]);width=max([lengths;0]);
-    signature=zeros(count,2*width+1);signature(:,1)=lengths;
-    ordinal=(1:numel(value)).'-repelem(cumsum(lengths)-lengths,lengths);
-    signature(sub2ind(size(signature),row,2*ordinal))=column;
-    signature(sub2ind(size(signature),row,2*ordinal+1))=value;
-    [~,~,group]=unique(signature,'rows');
+% Two fixed projections propose candidate groups; an exact comparison of
+% the complete rows confirms every merge, so a projection collision can only
+% retain a duplicate, never drop a distinct row.
+    count=numel(bound);
+    if count==0,retained=zeros(0,1);return;end
+    columns=(1:size(matrix,2)).';
+    projection=matrix*[cos(columns),sin(2*columns)];
+    [~,~,group]=unique(projection,'rows');
     ordered=sortrows([group,bound,(1:count).'],[1,2,3]);
-    retained=sort(ordered([true;diff(ordered(:,1))~=0],3));
+    rows=ordered(:,3);
+    candidate=[false;diff(ordered(:,1))==0];
+    duplicate=false(count,1);
+    if any(candidate)
+        transposed=matrix.';
+        later=rows(candidate);earlier=rows([candidate(2:end);false]);
+        difference=transposed(:,later)-transposed(:,earlier);
+        duplicate(candidate)=~any(difference,1).';
+    end
+    retained=sort(rows(~duplicate));
 end
