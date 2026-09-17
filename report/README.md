@@ -12,6 +12,8 @@ Latest diagnosis: [Stationary and oncoming distance-dual initialization failures
 
 Latest admission design review: [Overlap-aware support directions, temporal conflicts and hard-feasibility ablation, September 16, 2026](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md).
 
+Planned next implementation: [Overlap-aware admission search, grouped feasibility restoration and hard acceptance](../controller/ADMISSION_SEARCH_DESIGN.md). This is a design proposal, not an implemented or validated result.
+
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
 Latest failure analysis: [Single-hold infeasibility, shared uncertainty and passing geometry](SINGLE_HOLD_INFEASIBILITY_ANALYSIS_20260915.md).
