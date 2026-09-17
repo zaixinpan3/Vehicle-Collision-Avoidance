@@ -73,6 +73,7 @@ function report=localTrial(name,scenario,count,deadline,directory)
     tracking=nan(5,count+1);tracking(:,1)=0;certified=false(1,count);inherited=false(1,count);
     released=false(1,count);runtime=cell(1,count);search=cell(1,count);clfSlack=nan(1,count);
     failure=setupFailure;stored=[];executed=0;attempted=0;minimumSeparation=inf;maximumSlew=0;
+    minimumNodeSeparation=inf;
     for sample=1:count
         if ~isempty(failure),break;end
         time=(sample-1)*h;frameTimer=tic;attempted=sample;
@@ -105,6 +106,9 @@ function report=localTrial(name,scenario,count,deadline,directory)
                     truth.targetPositionInertial,truth.targetHeadingInertial, ...
                     [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.target.defaultLength/2;cfg.target.defaultWidth/2]);
                 minimumSeparation=min(minimumSeparation,separation-cfg.collision.clearanceMargin);
+                if fraction==0 || fraction==1
+                    minimumNodeSeparation=min(minimumNodeSeparation,separation-cfg.collision.clearanceMargin);
+                end
             end
         end
         state=value(1:6);heldInput=command.actuatorInput;states(:,sample+1)=state;executed=sample;
@@ -122,9 +126,10 @@ function report=localTrial(name,scenario,count,deadline,directory)
         'admissionSearch',{search(1:executed)},'clfSlack',clfSlack(1:executed), ...
         'hardCertificateVerified',certified(1:executed),'inheritedFeasibleFamily',inherited(1:executed), ...
         'confirmedRelease',released(1:executed),'minimumSampledSeparationMargin',minimumSeparation, ...
+        'minimumNodeSeparationMargin',minimumNodeSeparation, ...
         'maximumSlewViolation',maximumSlew,'failureIdentifier',"",'failureMessage',"", ...
         'failureTime',NaN,'failureContext',struct('state',state,'heldInput',heldInput,'attemptedFrame',attempted), ...
-        'scope',"Exact immutable reference-phase affine plant; sampled physical clearance is a diagnostic; hard swept certificate controls acceptance");
+        'scope',"Exact immutable reference-phase affine plant; the hard certificate covers the hold nodes; the 11-point sampled clearance is an inter-node physical diagnostic");
     if isempty(setupFailure)
         failureReference=ltvBicycleModel.referenceAt(model,executed+1);
         report.failureContext.phaseStation=failureReference.state(1);
@@ -145,8 +150,8 @@ function report=localTrial(name,scenario,count,deadline,directory)
     end
     save(fullfile(directory,'smooth-reference-trial.mat'),'report');
     localSaveJson(report,fullfile(directory,'smooth-reference-trial.json'));
-    fprintf('%s/%s: %d/%d holds; clearance %.6g m; phase error %.6g m; max frame %.3f ms; %s\n', ...
-        name,scenario,executed,count,minimumSeparation,report.maximumStationPhaseError, ...
+    fprintf('%s/%s: %d/%d holds; clearance %.6g m (nodes %.6g m); phase error %.6g m; max frame %.3f ms; %s\n', ...
+        name,scenario,executed,count,minimumSeparation,minimumNodeSeparation,report.maximumStationPhaseError, ...
         report.maximumFrameMilliseconds,report.failureIdentifier);
 end
 

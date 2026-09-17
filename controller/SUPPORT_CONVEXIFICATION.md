@@ -1,5 +1,7 @@
 # Overlap-aware support convexification
 
+> Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+
 Controller format 33, September 17, 2026.
 
 ## Geometric contract

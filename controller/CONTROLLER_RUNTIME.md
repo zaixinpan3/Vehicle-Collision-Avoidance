@@ -19,6 +19,18 @@ pipeline timing measurements do not prove physical zero-latency execution.
 The dated sections below describe their identified earlier source versions;
 they are not current timing or certification claims.
 
+## Hold-node certificate (2026-09-17, later the same day)
+
+By project decision the online safety rows are now imposed at the hold nodes
+of the exact sampled affine plant instead of on all Bernstein coefficients of
+a whole-hold enclosure ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
+Each held command contributes one certified node, so the geometry row count
+falls from about 12.6 rows per coefficient times 25 coefficients per hold to
+12.6 rows per hold, the held-interval kernel leaves the online path, and the
+condensed matrices shrink accordingly. Inter-node states are not enclosed.
+Measurements are in
+[the node certificate report](../report/NODE_CERTIFICATE_ADOPTION_20260917.md).
+
 ## Implementation-only runtime reduction (2026-09-17)
 
 The same programs are built and solved through cheaper code paths: batched

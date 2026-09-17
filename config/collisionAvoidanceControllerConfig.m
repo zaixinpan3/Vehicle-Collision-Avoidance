@@ -40,6 +40,9 @@ function cfg = localDefaults()
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);
     cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
+    % taylorOrder is the minimum order of the offline whole-hold enclosures
+    % (terminal family synthesis, fixedPredict audits). The online certificate
+    % is evaluated at the hold nodes and does not use it.
     cfg.encounter = struct("taylorOrder",6, ...
         "numericalMargin",1.0e-6,"maximumCarriedMargin",1.0,"inputRateWeight",0.02, ...
         "referencePhaseRadius",2.0);

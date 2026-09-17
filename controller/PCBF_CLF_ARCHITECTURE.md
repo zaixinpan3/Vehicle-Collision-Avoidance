@@ -1,5 +1,7 @@
 # Predictive CBF and soft CLF controller
 
+> Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+
 Current implementation, September 17, 2026: the format-33 controller uses
 overlap-aware support geometry and feasibility restoration. It
 retains predictive continuation across active encounters, confirmed partial

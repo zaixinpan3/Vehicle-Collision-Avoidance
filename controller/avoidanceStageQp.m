@@ -34,9 +34,10 @@ classdef avoidanceStageQp
                 if stage>1
                     columns=[columns,indices(:,stage-1).'];coefficients=[coefficients,localRows.stateMatrix];
                 end
+                % find returns row vectors for a one-row cell; keep columns.
                 [r,c,v]=find(coefficients);
                 rowBlocks{cellIndex}=reshape(rows(r),[],1);
-                columnBlocks{cellIndex}=reshape(columns(c),[],1);valueBlocks{cellIndex}=v;
+                columnBlocks{cellIndex}=reshape(columns(c),[],1);valueBlocks{cellIndex}=reshape(v,[],1);
                 bound(rows)=localRows.bound-localRows.stateMatrix*centers(:,stage) ...
                     +program.safetyBound(rows)-program.geometry.physicalBound(rows);
             end
@@ -44,8 +45,8 @@ classdef avoidanceStageQp
             % Extra decision columns of the geometric rows (deficit charges of a
             % restoration program) join the triplets instead of a sparse assignment.
             [extraRow,extraColumn,extraValue]=find(program.A(1:geometric,n+1:original));
-            geometricMatrix=sparse([vertcat(rowBlocks{:});extraRow],[vertcat(columnBlocks{:});n+extraColumn], ...
-                [vertcat(valueBlocks{:});extraValue],geometric,total);
+            geometricMatrix=sparse([vertcat(rowBlocks{:});extraRow(:)],[vertcat(columnBlocks{:});n+extraColumn(:)], ...
+                [vertcat(valueBlocks{:});extraValue(:)],geometric,total);
             matrix=[geometricMatrix;program.A(geometric+1:end,:),sparse(size(program.A,1)-geometric,6*count)];
             % The terminal modal cone acts on the final state. Its stored RHS
             % and numerical reserve are transferred without reconstruction.

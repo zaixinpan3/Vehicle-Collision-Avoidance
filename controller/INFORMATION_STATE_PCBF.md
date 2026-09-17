@@ -1,5 +1,7 @@
 # Information-state safe MPC with finite encounter completion
 
+> Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+
 > Historical design: the current online algorithm is [the single-solve sampled CBF–CLF controller](SINGLE_SOLVE_CBF_CLF.md). Its one-hold guarantee does not use the continuation architecture analyzed below.
 
 September 15, 2026. The full-horizon policy retains certificate format 22;

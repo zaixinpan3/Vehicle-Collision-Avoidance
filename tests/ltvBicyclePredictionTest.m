@@ -10,14 +10,26 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
     end
 
     methods (Test)
-        function everyStageRetainsACompleteUncertainHeldTube(testCase)
+        function everyStageRetainsItsCertifiedNode(testCase)
             model = localModel();
             model.initialFrenetErrorBound = [.01;.01;.001;.02;.01;.005];
             prediction = ltvBicycleModel.finitePredict(model,[]);
-            testCase.verifyEqual(unique([prediction.cells.stage]),1:model.horizonSteps);
+            testCase.verifyEqual([prediction.cells.stage],1:model.horizonSteps);
             testCase.verifyGreaterThan(prediction.egoStateErrorBound(:,end),zeros(6,1));
-            testCase.verifyGreaterThan(arrayfun(@(cell) size(cell.offset,2),prediction.cells),2);
-            testCase.verifyEqual(sum([prediction.cells.duration]),model.horizonSteps*model.sampleTime,AbsTol=1e-12);
+            testCase.verifyEqual(arrayfun(@(cell) size(cell.offset,2),prediction.cells).',ones(1,model.horizonSteps));
+            testCase.verifyEqual([prediction.cells.time],(1:model.horizonSteps)*model.sampleTime,AbsTol=1e-12);
+            testCase.verifyEqual([prediction.cells.duration],zeros(1,model.horizonSteps),AbsTol=0);
+            for stage = 1:model.horizonSteps
+                cell = prediction.cells(stage);
+                testCase.verifyEqual(cell.map,prediction.egoStateMatrix(:,:,stage+1),AbsTol=0);
+                testCase.verifyEqual(cell.offset,prediction.egoStateOffset(:,stage+1),AbsTol=0);
+                testCase.verifyEqual(cell.radius,prediction.egoStateErrorBound(:,stage+1),AbsTol=0);
+                testCase.verifyEqual(cell.localStateMap,prediction.stageMatrixA(:,:,stage),AbsTol=0);
+                testCase.verifyEqual(cell.localInputMap,prediction.stageMatrixB(:,:,stage),AbsTol=0);
+                testCase.verifyEqual(cell.localOffset,prediction.stageAffine(:,stage),AbsTol=0);
+                testCase.verifyGreaterThanOrEqual(cell.radius, ...
+                    abs(prediction.stageMatrixA(:,:,stage))*prediction.egoStateErrorBound(:,stage));
+            end
         end
 
         function futureDisturbancesStayInsideEveryCertifiedNode(testCase)

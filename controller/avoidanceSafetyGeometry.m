@@ -372,6 +372,8 @@ end
 
 function rows = localCellRows(data,prescribedNormals)
 % Numeric obstacle/road support construction shared by MATLAB and native code.
+% One nominal column is a certified node evaluated at the target's node-time
+% set; several columns are Bernstein coefficients of a whole-hold enclosure.
     frame = data.frame;origin = frame(1:2);tangent = frame(3:4);lateral = frame(5:6);
     heading = frame(7);positionError = frame(8:9);headingError = frame(10);
     stationRange = frame(11:12).';
@@ -400,16 +402,24 @@ function rows = localCellRows(data,prescribedNormals)
         end
         normals(:,index) = normal;
         degree = data.degree;
-        positionPolynomial = [target.center(1:2),target.center(3:4),target.center(5:6)/2,zeros(2,degree-2)];
-        radiusPolynomial = [target.radius(1:2),target.radius(3:4),target.radius(5:6)/2, ...
-            target.contract.jerkBound/6,zeros(2,degree-3)];
-        transform = stateUncertainty.bernsteinTransform(degree,data.duration);
-        if pointCount==1,transform = transform(1,:);end
-        targetPosition = positionPolynomial*transform.';
-        targetRadius = radiusPolynomial*transform.';
-        [endCenter,endRadius] = targetPrediction.finiteFlow(target,data.duration);
-        yawCenter = (target.center(7)+endCenter(7))/2;
-        yawRadius = abs(endCenter(7)-target.center(7))/2+endRadius(7);
+        if pointCount==1
+            % Node certificate: the target's bounded set at the node time.
+            targetPosition = target.center(1:2);
+            targetRadius = target.radius(1:2);
+            yawCenter = target.center(7);
+            yawRadius = target.radius(7);
+        else
+            % Whole-hold enclosure: Bernstein coefficients of the bounded flow.
+            positionPolynomial = [target.center(1:2),target.center(3:4),target.center(5:6)/2,zeros(2,degree-2)];
+            radiusPolynomial = [target.radius(1:2),target.radius(3:4),target.radius(5:6)/2, ...
+                target.contract.jerkBound/6,zeros(2,degree-3)];
+            transform = stateUncertainty.bernsteinTransform(degree,data.duration);
+            targetPosition = positionPolynomial*transform.';
+            targetRadius = radiusPolynomial*transform.';
+            [endCenter,endRadius] = targetPrediction.finiteFlow(target,data.duration);
+            yawCenter = (target.center(7)+endCenter(7))/2;
+            yawRadius = abs(endCenter(7)-target.center(7))/2+endRadius(7);
+        end
         targetSupport = targetPrediction.rectangleSupport(target.halfLength,target.halfWidth,normal,yawCenter,yawRadius);
         yawCenter=heading;yawExtent=headingDomain+headingError;
         positionCharge=abs(normal).'*positionError;

@@ -7,6 +7,8 @@ Latest estimator evaluation: [Multi-scenario campaign, September 17, 2026](NRMM_
 
 Latest implementation and validation: [Overlap-aware admission, straight controller timing and remaining joint-certificate limits, September 16, 2026](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md).
 
+Latest certificate change: [Hold-node safety certificate: semantics, inter-node diagnostic and frame times, September 17, 2026](NODE_CERTIFICATE_ADOPTION_20260917.md).
+
 Latest runtime optimization: [Implementation-only frame-time reduction, strict oncoming qualification and the residual stationary-admission bottleneck, September 17, 2026](CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md).
 
 Latest circular controller validation: [Sixteen circular cases, eight strict 100 ms successes and remaining admission bottlenecks, September 17, 2026](CIRCULAR_RUNTIME_RERUN_20260917.md).
@@ -28,6 +30,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 | Report | File |
 | --- | --- |
 | Circular controller rerun: complete diagnostic avoidance/recovery, strict timing and crossing-search regression | [CIRCULAR_RUNTIME_RERUN_20260917.md](CIRCULAR_RUNTIME_RERUN_20260917.md) |
+| Hold-node safety certificate adoption: semantics, inter-node clearance diagnostic and frame times | [NODE_CERTIFICATE_ADOPTION_20260917.md](NODE_CERTIFICATE_ADOPTION_20260917.md) |
 | Implementation-only controller runtime reduction, strict oncoming qualification and residual restoration bottleneck | [CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md](CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md) |
 | Overlap-aware admission, equivalent sparse solving, controller timing and joint uncertainty diagnosis | [OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md) |
 | Overlap-aware support proposal: valid constraint construction and remaining temporal/dynamic infeasibility | [OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md) |

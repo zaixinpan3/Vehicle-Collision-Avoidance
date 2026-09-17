@@ -24,7 +24,7 @@ classdef wholeHoldActuatorConstraintsTest < matlab.unittest.TestCase
             testCase.verifyFalse(problem.metadata.stateAndSlipBoundsEnforced);
         end
 
-        function everyPredictionIntervalCoversExactlyOneHeldCommand(testCase)
+        function everyPredictionNodeCoversExactlyOneHeldCommand(testCase)
             [ego,cfg]=localFixture();
             target=struct('trackId',1,'targetPositionInertial',[12;4], ...
                 'targetVelocityInertial',[20;0],'targetAccelerationInertial',[0;0], ...
@@ -33,8 +33,9 @@ classdef wholeHoldActuatorConstraintsTest < matlab.unittest.TestCase
                 'jerkBound',[0;0],'yawAccelerationBound',0));
             [~,~,problem]=collisionAvoidanceController(ego,target,[-100,0;2000,0],cfg,[]);
             testCase.verifyNumElements(problem.prediction.cells,problem.prediction.stageCount);
-            testCase.verifyEqual([problem.prediction.cells.duration], ...
-                .1*ones(1,problem.prediction.stageCount),AbsTol=0);
+            testCase.verifyEqual([problem.prediction.cells.time], ...
+                .1*(1:problem.prediction.stageCount),AbsTol=1e-12);
+            testCase.verifyEqual([problem.prediction.cells.stage],1:problem.prediction.stageCount);
             testCase.verifyFalse(any(ismember(problem.program.physicalLabels,["modelDomain","tireSlip"])));
             testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
         end

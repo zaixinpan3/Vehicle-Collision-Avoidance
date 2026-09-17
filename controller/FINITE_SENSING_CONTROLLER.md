@@ -1,5 +1,7 @@
 # Complete finite-sensing encounter controller
 
+> Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+
 Current-scope note, September 11, 2026: finite perception is no longer part of
 the controller problem. The active version-18 exact scheduled-model controller
 uses one persistent target and an invariant terminal continuation. This document

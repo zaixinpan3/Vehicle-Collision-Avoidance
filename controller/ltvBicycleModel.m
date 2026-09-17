@@ -409,7 +409,11 @@ classdef ltvBicycleModel
         end
 
         function prediction = finitePredict(model, schedule)
-        %finitePredict A finite held-input witness, without an appended rest tail.
+        %finitePredict A finite held-input witness certified at its hold nodes.
+        % Every held command has one certified node: the exact sampled affine
+        % transition of the plan-affine state, its interval-hull uncertainty box
+        % with the held process reserve, and a floating-point allowance. States
+        % between two nodes are not enclosed; see NODE_SAMPLED_CERTIFICATE.md.
             cfg = model.cfg;
             count = model.horizonSteps;
             planCount = 2*count;
@@ -514,8 +518,9 @@ classdef ltvBicycleModel
             cells = cell(count, 1);
             tireModels = cell(count,1);
             priorOperatingPoint = [];
-            nativeInterval = exist("bicycleHeldIntervalKernelMex","file")==3;
             storedTransition = prescribed && isfield(model.prescribedStages,"transition");
+            operations = planCount+42;
+            gamma = operations*eps/(1-operations*eps);
             for stage = 1:count
                 if prescribed
                     given = model.prescribedStages(stage);
@@ -590,27 +595,27 @@ classdef ltvBicycleModel
                 prediction.stageMatrixA(:, :, stage) = exact(1:6, 1:6);
                 prediction.stageMatrixB(:, :, stage) = exact(1:6, 7:8);
                 prediction.stageAffine(:, stage) = exact(1:6, 9);
-                heldMap = zeros(6, planCount);
-                heldMap(:, 2*stage-1:2*stage) = b;
-                if nativeInterval
-                    stageTubes = bicycleHeldIntervalKernelMex(a,heldMap,c,map,offset,radius, ...
-                        rate,h,cfg.encounter.taylorOrder,inputLimit,numericalRadius);
-                else
-                    stageTubes = stateUncertainty.heldInterval(a,heldMap,c,map,offset,radius, ...
-                        rate,h,cfg.encounter.taylorOrder,inputLimit,numericalRadius);
-                end
-                tube = stageTubes;
-                tube.localInputMap = tube.localInputMap(:,2*stage-1:2*stage,:);
-                tube.stage = stage;
-                tube.start = (stage-1)*h;
-                tube.duration = h;
-                degree = size(tube.offset,2)-1;
-                tube.time = tube.start+(0:degree)*h/degree;
+                % The certified node of this hold: exact sampled transition of
+                % the plan-affine state; the box is the interval hull of the
+                % previous box plus the held process reserve; the arithmetic
+                % allowance is charged to the enclosure, not to a solve tolerance.
+                stateMap = exact(1:6,1:6);inputMap = exact(1:6,7:8);affine = exact(1:6,9);
+                nodeMap = stateMap*map;
+                nodeMap(:,2*stage-1:2*stage) = nodeMap(:,2*stage-1:2*stage)+inputMap;
+                nodeOffset = stateMap*offset+affine;
+                magnitude = abs(stateMap)*(abs(map)*inputLimit+abs(offset))+abs(inputMap)*inputLimit(1:2)+abs(affine);
+                arithmetic = 16*gamma*(1+magnitude);
+                nodeNumerical = abs(stateMap)*numericalRadius+arithmetic;
+                nodeRadius = abs(stateMap)*radius+processReserve+arithmetic;
+                tube = struct("map",nodeMap,"offset",nodeOffset,"radius",nodeRadius, ...
+                    "numericalRadius",nodeNumerical,"localStateMap",stateMap,"localInputMap",inputMap, ...
+                    "localOffset",affine,"endMap",nodeMap,"endOffset",nodeOffset,"endRadius",nodeRadius, ...
+                    "endNumericalRadius",nodeNumerical,"stage",stage,"start",stage*h,"duration",0,"time",stage*h);
                 cells{stage} = tube;
-                map = tube.endMap;
-                offset = tube.endOffset;
-                radius = tube.endRadius;
-                numericalRadius = tube.endNumericalRadius;
+                map = nodeMap;
+                offset = nodeOffset;
+                radius = nodeRadius;
+                numericalRadius = nodeNumerical;
                 prediction.egoStateMatrix(:, :, stage+1) = map;
                 prediction.egoStateOffset(:, stage+1) = offset;
                 prediction.egoStateErrorBound(:, stage+1) = radius;

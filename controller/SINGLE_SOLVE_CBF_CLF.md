@@ -1,8 +1,10 @@
 # Predictive safety with overlap-aware support search
 
-The format-34 controller retains a complete finite input plan, swept rectangle
-collision certificate, finite confirmed exit and a permanent terminal
-information-state set. Both the predictor and terminal set use the same
+> Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+
+The format-34 controller retains a complete finite input plan, a rectangle
+collision certificate at every hold node, finite confirmed exit and a permanent
+terminal information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
 on the CLF/LQR trim; the first-hold CLF has a nonnegative squared-penalty slack.
 The target high-gain observer is unchanged.

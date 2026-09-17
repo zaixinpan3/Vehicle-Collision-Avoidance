@@ -370,9 +370,9 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
         tube.endOffset=tube.endOffset+tube.endMap(:,1:2)*executed;
         tube.endMap=tube.endMap(:,columns);
         tube.stage=tube.stage-1;
-        % Each certificate is one complete hold. Reconstruct its clock from
-        % the integer stage; repeated subtraction can create negative zero.
-        tube.start=(tube.stage-1)*model.sampleTime;
+        % Each certificate is one hold node. Reconstruct its clock from the
+        % integer stage; repeated subtraction can create negative zero.
+        tube.start=tube.stage*model.sampleTime;
         tube.time=tube.start+linspace(0,tube.duration,numel(tube.time));
         prediction.cells(index)=tube;
     end

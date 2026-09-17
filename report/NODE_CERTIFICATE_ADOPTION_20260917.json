@@ -1,0 +1,851 @@
+{
+  "date": "2026-09-17",
+  "outcome": "completed",
+  "scope": "Hold-node safety certificate of the predictive hard-safety soft-CLF controller on the exact declared scheduled affine plant; rows certified at 0.1 s nodes only; the 11-point sampled clearance is an inter-node physical diagnostic, not a certificate; no worst-case execution-time claim.",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "computationalThreads": 1,
+  "sampleTime": 0.1,
+  "referenceSpeed": 8,
+  "requestedHolds": 300,
+  "roadBoundariesEnabled": false,
+  "estimatorEnabled": false,
+  "allCompleted": true,
+  "allRuntimeQualified": true,
+  "trials": [
+    {
+      "path": "sBend",
+      "scenario": "cruise",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.390139,
+      "maximumFrameMilliseconds": 12.753,
+      "medianFrameMilliseconds": 6.91,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": null,
+      "minimumNodeSeparationMargin": null,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 1.28125103250349e-06,
+      "maximumStationPhaseError": 0.001618062768073969,
+      "finalTrackingError": [
+        -1.8609461852805572e-08,
+        1.2357962073336998e-12,
+        -7.847804538663183e-06,
+        -1.4694937806325185e-13,
+        -1.2833805808652986e-13
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumLateralOffsetMeters": 0.00398570360263948,
+      "minimumLongitudinalSpeed": 7.999846574435465,
+      "framesAbove100Milliseconds": 0,
+      "framesAbove50Milliseconds": 0,
+      "percentile95FrameMilliseconds": 7.317,
+      "slowestFrameIndex": 135,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.000793,
+        "formulationSeconds": 0.010178,
+        "solveSeconds": 0.001345
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.010178,
+        "solveSeconds": 0.001345,
+        "supportSectors": [],
+        "initialOverlappingMidpoints": 0
+      },
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.060692,
+        "callSeconds": [],
+        "attemptedCalls": 0,
+        "discardedCommandCount": 0,
+        "probeCertified": [],
+        "failureIdentifier": [],
+        "allProbesCertified": false,
+        "successorProbeSeconds": [],
+        "successorFailureIdentifier": [],
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes and their declared successors; no commands applied",
+        "probeTargetTime": null,
+        "cruiseProbes": {
+          "seconds": [
+            1.178506,
+            0.025021,
+            0.012367
+          ],
+          "certified": [
+            true,
+            true,
+            true
+          ],
+          "failureIdentifier": [
+            "",
+            "",
+            ""
+          ],
+          "successorSeconds": [
+            [
+              0.051882,
+              0.018741
+            ],
+            [
+              0.089296,
+              0.012553
+            ],
+            [
+              0.013912,
+              0.007873
+            ]
+          ],
+          "successorFailureIdentifier": [
+            [
+              "",
+              ""
+            ],
+            [
+              "",
+              ""
+            ],
+            [
+              "",
+              ""
+            ]
+          ]
+        }
+      },
+      "strictTiming": {
+        "path": "sBend",
+        "scenario": "cruise",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000508,
+        "maximumFrameMilliseconds": 11.674,
+        "medianFrameMilliseconds": 6.908,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": null,
+        "minimumNodeSeparationMargin": null,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 1.28125103250349e-06,
+        "maximumStationPhaseError": 0.001618062768073969,
+        "finalTrackingError": [
+          -1.8609461852805572e-08,
+          1.2357962073336998e-12,
+          -7.847804538663183e-06,
+          -1.4694937806325185e-13,
+          -1.2833805808652986e-13
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null,
+        "maximumLateralOffsetMeters": 0.00398570360263948,
+        "minimumLongitudinalSpeed": 7.999846574435465,
+        "framesAbove100Milliseconds": 0,
+        "framesAbove50Milliseconds": 0,
+        "percentile95FrameMilliseconds": 7.19,
+        "slowestFrameIndex": 10,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.001312,
+          "formulationSeconds": 0.008151,
+          "solveSeconds": 0.001714
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 0,
+          "nativeSolves": 1,
+          "familyAttempts": 0,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.008151,
+          "solveSeconds": 0.001714,
+          "supportSectors": [],
+          "initialOverlappingMidpoints": 0
+        }
+      }
+    },
+    {
+      "path": "transition",
+      "scenario": "cruise",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.069069,
+      "maximumFrameMilliseconds": 9.494000000000002,
+      "medianFrameMilliseconds": 6.933,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": null,
+      "minimumNodeSeparationMargin": null,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 1.7107356448803346e-07,
+      "maximumStationPhaseError": 0.001544186653717361,
+      "finalTrackingError": [
+        -5.67880431046764e-05,
+        -4.954192375783428e-09,
+        -9.143963195512583e-06,
+        -1.9457440036951823e-07,
+        -3.642574460394066e-07
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumLateralOffsetMeters": 0.0019184003849833046,
+      "minimumLongitudinalSpeed": 7.999975600541757,
+      "framesAbove100Milliseconds": 0,
+      "framesAbove50Milliseconds": 0,
+      "percentile95FrameMilliseconds": 7.263,
+      "slowestFrameIndex": 245,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.001425,
+        "formulationSeconds": 0.006226,
+        "solveSeconds": 0.00134
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.006226,
+        "solveSeconds": 0.00134,
+        "supportSectors": [],
+        "initialOverlappingMidpoints": 0
+      },
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.043074,
+        "callSeconds": [],
+        "attemptedCalls": 0,
+        "discardedCommandCount": 0,
+        "probeCertified": [],
+        "failureIdentifier": [],
+        "allProbesCertified": false,
+        "successorProbeSeconds": [],
+        "successorFailureIdentifier": [],
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes and their declared successors; no commands applied",
+        "probeTargetTime": null,
+        "cruiseProbes": {
+          "seconds": [
+            0.299055,
+            0.007148,
+            0.006938
+          ],
+          "certified": [
+            true,
+            true,
+            true
+          ],
+          "failureIdentifier": [
+            "",
+            "",
+            ""
+          ],
+          "successorSeconds": [
+            [
+              0.007931,
+              0.00767
+            ],
+            [
+              0.006849,
+              0.007045
+            ],
+            [
+              0.006939,
+              0.007029
+            ]
+          ],
+          "successorFailureIdentifier": [
+            [
+              "",
+              ""
+            ],
+            [
+              "",
+              ""
+            ],
+            [
+              "",
+              ""
+            ]
+          ]
+        }
+      },
+      "strictTiming": {
+        "path": "transition",
+        "scenario": "cruise",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000449,
+        "maximumFrameMilliseconds": 9.661,
+        "medianFrameMilliseconds": 6.9555,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": null,
+        "minimumNodeSeparationMargin": null,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 1.7107356448803346e-07,
+        "maximumStationPhaseError": 0.001544186653717361,
+        "finalTrackingError": [
+          -5.67880431046764e-05,
+          -4.954192375783428e-09,
+          -9.143963195512583e-06,
+          -1.9457440036951823e-07,
+          -3.642574460394066e-07
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null,
+        "maximumLateralOffsetMeters": 0.0019184003849833046,
+        "minimumLongitudinalSpeed": 7.999975600541757,
+        "framesAbove100Milliseconds": 0,
+        "framesAbove50Milliseconds": 0,
+        "percentile95FrameMilliseconds": 7.278,
+        "slowestFrameIndex": 67,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.001051,
+          "formulationSeconds": 0.006041,
+          "solveSeconds": 0.001854
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 0,
+          "nativeSolves": 1,
+          "familyAttempts": 0,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.006041,
+          "solveSeconds": 0.001854,
+          "supportSectors": [],
+          "initialOverlappingMidpoints": 0
+        }
+      }
+    },
+    {
+      "path": "asymmetric",
+      "scenario": "cruise",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.046381,
+      "maximumFrameMilliseconds": 7.782,
+      "medianFrameMilliseconds": 6.6915,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": null,
+      "minimumNodeSeparationMargin": null,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 3.8429794371741544e-07,
+      "maximumStationPhaseError": 0.0007340723833877405,
+      "finalTrackingError": [
+        -4.240754680695523e-09,
+        7.062194347468414e-14,
+        -2.936218913340838e-06,
+        2.630340783764381e-15,
+        2.35904180246356e-15
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumLateralOffsetMeters": 0.0033828015740926722,
+      "minimumLongitudinalSpeed": 7.999654370780058,
+      "framesAbove100Milliseconds": 0,
+      "framesAbove50Milliseconds": 0,
+      "percentile95FrameMilliseconds": 7.03,
+      "slowestFrameIndex": 46,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.000857,
+        "formulationSeconds": 0.005136,
+        "solveSeconds": 0.001343
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 0,
+        "nativeSolves": 1,
+        "familyAttempts": 0,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.005136,
+        "solveSeconds": 0.001343,
+        "supportSectors": [],
+        "initialOverlappingMidpoints": 0
+      },
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.04359,
+        "callSeconds": [],
+        "attemptedCalls": 0,
+        "discardedCommandCount": 0,
+        "probeCertified": [],
+        "failureIdentifier": [],
+        "allProbesCertified": false,
+        "successorProbeSeconds": [],
+        "successorFailureIdentifier": [],
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes and their declared successors; no commands applied",
+        "probeTargetTime": null,
+        "cruiseProbes": {
+          "seconds": [
+            0.28728,
+            0.007095,
+            0.006999
+          ],
+          "certified": [
+            true,
+            true,
+            true
+          ],
+          "failureIdentifier": [
+            "",
+            "",
+            ""
+          ],
+          "successorSeconds": [
+            [
+              0.007381,
+              0.007128
+            ],
+            [
+              0.006941,
+              0.006936
+            ],
+            [
+              0.006886,
+              0.006935
+            ]
+          ],
+          "successorFailureIdentifier": [
+            [
+              "",
+              ""
+            ],
+            [
+              "",
+              ""
+            ],
+            [
+              "",
+              ""
+            ]
+          ]
+        }
+      },
+      "strictTiming": {
+        "path": "asymmetric",
+        "scenario": "cruise",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000329,
+        "maximumFrameMilliseconds": 7.418,
+        "medianFrameMilliseconds": 6.666,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": null,
+        "minimumNodeSeparationMargin": null,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 3.8429794371741544e-07,
+        "maximumStationPhaseError": 0.0007340723833877405,
+        "finalTrackingError": [
+          -4.240754680695523e-09,
+          7.062194347468414e-14,
+          -2.936218913340838e-06,
+          2.630340783764381e-15,
+          2.35904180246356e-15
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null,
+        "maximumLateralOffsetMeters": 0.0033828015740926722,
+        "minimumLongitudinalSpeed": 7.999654370780058,
+        "framesAbove100Milliseconds": 0,
+        "framesAbove50Milliseconds": 0,
+        "percentile95FrameMilliseconds": 6.936,
+        "slowestFrameIndex": 0,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.00162,
+          "formulationSeconds": 0.004094,
+          "solveSeconds": 0.001321
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 0,
+          "nativeSolves": 1,
+          "familyAttempts": 0,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.004094,
+          "solveSeconds": 0.001321,
+          "supportSectors": [],
+          "initialOverlappingMidpoints": 0
+        }
+      }
+    },
+    {
+      "path": "sBend",
+      "scenario": "stationary",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.049755,
+      "maximumFrameMilliseconds": 67.125,
+      "medianFrameMilliseconds": 7.4990000000000006,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": 0.13158894550275158,
+      "minimumNodeSeparationMargin": 0.13215065082471056,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 0.0005618537666540651,
+      "maximumStationPhaseError": 0.6717362263152182,
+      "finalTrackingError": [
+        -1.3430684043996976e-07,
+        -2.8140505276478793e-11,
+        -0.0009072549830220211,
+        1.6864282101070414e-13,
+        1.47119763656396e-13
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumLateralOffsetMeters": 2.4458523187792234,
+      "minimumLongitudinalSpeed": 6.945608061717249,
+      "framesAbove100Milliseconds": 0,
+      "framesAbove50Milliseconds": 1,
+      "percentile95FrameMilliseconds": 14.828,
+      "slowestFrameIndex": 0,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.001334,
+        "formulationSeconds": 0.028066,
+        "solveSeconds": 0.035958000000000004
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 4,
+        "familyAttempts": 1,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.028066,
+        "solveSeconds": 0.035958000000000004,
+        "supportSectors": -1,
+        "initialOverlappingMidpoints": 12
+      },
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 1.016302,
+        "callSeconds": [
+          0.587228,
+          0.09396,
+          0.077051
+        ],
+        "attemptedCalls": 3,
+        "discardedCommandCount": 3,
+        "probeCertified": [
+          true,
+          true,
+          true
+        ],
+        "failureIdentifier": [
+          "",
+          "",
+          ""
+        ],
+        "allProbesCertified": true,
+        "successorProbeSeconds": [
+          [
+            0.064041,
+            0.04537
+          ],
+          [
+            0.037688,
+            0.017973
+          ],
+          [
+            0.031379,
+            0.017548
+          ]
+        ],
+        "successorFailureIdentifier": [
+          [
+            "",
+            ""
+          ],
+          [
+            "",
+            ""
+          ],
+          [
+            "",
+            ""
+          ]
+        ],
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes and their declared successors; no commands applied",
+        "probeTargetTime": 0
+      },
+      "strictTiming": {
+        "path": "sBend",
+        "scenario": "stationary",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000992,
+        "maximumFrameMilliseconds": 64.587,
+        "medianFrameMilliseconds": 7.358,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": 0.13158894550275158,
+        "minimumNodeSeparationMargin": 0.13215065082471056,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 0.0005618537666540651,
+        "maximumStationPhaseError": 0.6717362263152182,
+        "finalTrackingError": [
+          -1.3430684043996976e-07,
+          -2.8140505276478793e-11,
+          -0.0009072549830220211,
+          1.6864282101070414e-13,
+          1.47119763656396e-13
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null,
+        "maximumLateralOffsetMeters": 2.4458523187792234,
+        "minimumLongitudinalSpeed": 6.945608061717249,
+        "framesAbove100Milliseconds": 0,
+        "framesAbove50Milliseconds": 1,
+        "percentile95FrameMilliseconds": 12.546,
+        "slowestFrameIndex": 0,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.002757,
+          "formulationSeconds": 0.027011,
+          "solveSeconds": 0.033955
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 1,
+          "nativeSolves": 4,
+          "familyAttempts": 1,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.027011,
+          "solveSeconds": 0.033955,
+          "supportSectors": -1,
+          "initialOverlappingMidpoints": 12
+        }
+      }
+    },
+    {
+      "path": "sBend",
+      "scenario": "oncoming",
+      "completed": true,
+      "passed": true,
+      "executedHolds": 300,
+      "durationSeconds": 30,
+      "coldReferenceCompilationSeconds": 0.000516,
+      "maximumFrameMilliseconds": 37.424,
+      "medianFrameMilliseconds": 7.3585,
+      "deadlineMisses": 0,
+      "runtimeQualified": true,
+      "minimumSampledSeparationMargin": 0.11670406660328175,
+      "minimumNodeSeparationMargin": 0.14763311111596233,
+      "maximumSlewViolation": 0,
+      "maximumSpatialScheduleCurvatureDifference": 0.0006950933270134622,
+      "maximumStationPhaseError": 0.8828651026106655,
+      "finalTrackingError": [
+        -3.880261696581533e-08,
+        -1.4279463566533699e-10,
+        -0.0009904926035355643,
+        1.6293971116056995e-12,
+        1.420545871503521e-12
+      ],
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumLateralOffsetMeters": 2.5483434572385284,
+      "minimumLongitudinalSpeed": 6.839943115128353,
+      "framesAbove100Milliseconds": 0,
+      "framesAbove50Milliseconds": 0,
+      "percentile95FrameMilliseconds": 8.036,
+      "slowestFrameIndex": 26,
+      "slowestFrameBreakdown": {
+        "inputPreparationSeconds": 0.002406,
+        "formulationSeconds": 0.019236,
+        "solveSeconds": 0.012447
+      },
+      "slowestFrameSearch": {
+        "hardSolves": 1,
+        "restorationSolves": 1,
+        "nativeSolves": 2,
+        "familyAttempts": 1,
+        "horizonAttempts": 1,
+        "formulationSeconds": 0.019236,
+        "solveSeconds": 0.012447,
+        "supportSectors": -1,
+        "initialOverlappingMidpoints": 6
+      },
+      "preparation": {
+        "performed": true,
+        "elapsedSeconds": 0.147312,
+        "callSeconds": [
+          0.016576,
+          0.01355,
+          0.013313
+        ],
+        "attemptedCalls": 3,
+        "discardedCommandCount": 3,
+        "probeCertified": [
+          true,
+          true,
+          true
+        ],
+        "failureIdentifier": [
+          "",
+          "",
+          ""
+        ],
+        "allProbesCertified": true,
+        "successorProbeSeconds": [
+          [
+            0.011116,
+            0.010469
+          ],
+          [
+            0.01071,
+            0.010287
+          ],
+          [
+            0.010666,
+            0.010461
+          ]
+        ],
+        "successorFailureIdentifier": [
+          [
+            "",
+            ""
+          ],
+          [
+            "",
+            ""
+          ],
+          [
+            "",
+            ""
+          ]
+        ],
+        "computationalThreads": 1,
+        "nativeRolloutAvailable": true,
+        "nativeLinearizationAvailable": true,
+        "nativeGeometryAvailable": true,
+        "scope": "Before periodic sampling; explicitly supplied target probes and their declared successors; no commands applied",
+        "probeTargetTime": 5.6000000000000005
+      },
+      "strictTiming": {
+        "path": "sBend",
+        "scenario": "oncoming",
+        "completed": true,
+        "passed": true,
+        "executedHolds": 300,
+        "durationSeconds": 30,
+        "coldReferenceCompilationSeconds": 0.000295,
+        "maximumFrameMilliseconds": 37.806,
+        "medianFrameMilliseconds": 7.35,
+        "deadlineMisses": 0,
+        "runtimeQualified": true,
+        "minimumSampledSeparationMargin": 0.11670406660328175,
+        "minimumNodeSeparationMargin": 0.14763311111596233,
+        "maximumSlewViolation": 0,
+        "maximumSpatialScheduleCurvatureDifference": 0.0006950933270134622,
+        "maximumStationPhaseError": 0.8828651026106655,
+        "finalTrackingError": [
+          -3.880261696581533e-08,
+          -1.4279463566533699e-10,
+          -0.0009904926035355643,
+          1.6293971116056995e-12,
+          1.420545871503521e-12
+        ],
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "failureTime": null,
+        "maximumLateralOffsetMeters": 2.5483434572385284,
+        "minimumLongitudinalSpeed": 6.839943115128353,
+        "framesAbove100Milliseconds": 0,
+        "framesAbove50Milliseconds": 0,
+        "percentile95FrameMilliseconds": 8.252,
+        "slowestFrameIndex": 26,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.001287,
+          "formulationSeconds": 0.022999,
+          "solveSeconds": 0.012623
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 1,
+          "nativeSolves": 2,
+          "familyAttempts": 1,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.022999,
+          "solveSeconds": 0.012623,
+          "supportSectors": -1,
+          "initialOverlappingMidpoints": 6
+        }
+      }
+    }
+  ],
+  "previousWholeHoldCertificate": {
+    "source": "report/CONTROLLER_RUNTIME_OPTIMIZATION_20260917.json (300 holds, same protocol)",
+    "maximumFrameMilliseconds": {
+      "sBend/cruise": 18.79,
+      "transition/cruise": 11.943,
+      "asymmetric/cruise": 11.463,
+      "sBend/stationary": 176.055,
+      "sBend/oncoming": 91.14
+    },
+    "strictHolds": {
+      "sBend/stationary": 0,
+      "sBend/oncoming": 300
+    },
+    "sampledClearanceAboveMargin": {
+      "sBend/stationary": 0.244167,
+      "sBend/oncoming": 0.350159
+    },
+    "coefficientsPerHold": "25 to 26",
+    "physicalRowsStationaryAdmission": 15490
+  },
+  "checks": {
+    "affectedTestClasses": {
+      "passed": 138,
+      "failed": 0
+    },
+    "nativeGeometryParityIncludingNodeCells": "passed",
+    "fullSuite": {
+      "passed": 666,
+      "failed": 0,
+      "incomplete": 0
+    },
+    "gitDiffCheck": "passed"
+  },
+  "rawArtifacts": "/home/zai/.cache/collisionAvoidance/node-certificate-20260917/"
+}
