@@ -4,6 +4,8 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest straight and circular validation: [Twenty hold-node cases, two inter-node clearance shortfalls and one admission deadline failure, September 18, 2026](STRAIGHT_CIRCULAR_RERUN_20260918.md).
 
+Latest runtime profiling: [Repeated admission geometry, restoration/native solves and overwritten normal proposals, September 18, 2026](CONTROLLER_RUNTIME_HOTSPOTS_20260918.md).
+
 Latest estimator improvement: [Free-metric gain synthesis, paired noise reduction and response-lag tradeoff, September 16, 2026](NRMM_NOISE_REDUCTION_20260916.md).
 Latest estimator evaluation: [Multi-scenario campaign, September 17, 2026](NRMM_ESTIMATOR_SCENARIOS_20260917.md).
 
@@ -35,6 +37,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Current runtime hotspots: clean frame replays, coarse component probes and repeated admission work | [CONTROLLER_RUNTIME_HOTSPOTS_20260918.md](CONTROLLER_RUNTIME_HOTSPOTS_20260918.md) |
 | Straight and circular node-certificate rerun: 17/20 strict successes, inter-node clearance audit and final cruise recovery | [STRAIGHT_CIRCULAR_RERUN_20260918.md](STRAIGHT_CIRCULAR_RERUN_20260918.md) |
 | Circular controller rerun: complete diagnostic avoidance/recovery, strict timing and crossing-search regression | [CIRCULAR_RUNTIME_RERUN_20260917.md](CIRCULAR_RUNTIME_RERUN_20260917.md) |
 | Estimator-in-the-loop admission failure: published-bound diagnosis, fresh-admission probes and ego/target bound sweeps | [ESTIMATOR_IN_THE_LOOP_ADMISSION_20260917.md](ESTIMATOR_IN_THE_LOOP_ADMISSION_20260917.md) |
