@@ -2,6 +2,8 @@
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
+Latest straight and circular validation: [Twenty hold-node cases, two inter-node clearance shortfalls and one admission deadline failure, September 18, 2026](STRAIGHT_CIRCULAR_RERUN_20260918.md).
+
 Latest estimator improvement: [Free-metric gain synthesis, paired noise reduction and response-lag tradeoff, September 16, 2026](NRMM_NOISE_REDUCTION_20260916.md).
 Latest estimator evaluation: [Multi-scenario campaign, September 17, 2026](NRMM_ESTIMATOR_SCENARIOS_20260917.md).
 
@@ -33,6 +35,7 @@ Each report states its experiment date and scope. Earlier results describe the r
 
 | Report | File |
 | --- | --- |
+| Straight and circular node-certificate rerun: 17/20 strict successes, inter-node clearance audit and final cruise recovery | [STRAIGHT_CIRCULAR_RERUN_20260918.md](STRAIGHT_CIRCULAR_RERUN_20260918.md) |
 | Circular controller rerun: complete diagnostic avoidance/recovery, strict timing and crossing-search regression | [CIRCULAR_RUNTIME_RERUN_20260917.md](CIRCULAR_RUNTIME_RERUN_20260917.md) |
 | Estimator-in-the-loop admission failure: published-bound diagnosis, fresh-admission probes and ego/target bound sweeps | [ESTIMATOR_IN_THE_LOOP_ADMISSION_20260917.md](ESTIMATOR_IN_THE_LOOP_ADMISSION_20260917.md) |
 | 50 ms control period trial on the S-bend: cruise qualifies, admission frames double | [CONTROL_PERIOD_50MS_20260917.md](CONTROL_PERIOD_50MS_20260917.md) |
