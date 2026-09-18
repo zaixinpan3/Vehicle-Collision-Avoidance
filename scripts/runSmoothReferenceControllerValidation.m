@@ -10,13 +10,16 @@ function summary=runSmoothReferenceControllerValidation(options)
         options.IncludeEncounters (1,1) logical = true
         options.Paths (1,:) string {mustBeMember(options.Paths,["sBend","transition","asymmetric"])} = ["sBend","transition","asymmetric"]
         options.DiagnosticDeadlineSeconds (1,1) double {mustBeFinite,mustBePositive} = 5
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = .1
+        options.HorizonSeconds (1,1) double {mustBeFinite,mustBePositive} = 1.6
     end
     root=fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'solver','bicycle'));
     if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
     previousThreads=maxNumCompThreads(1);
     cleanup=onCleanup(@()maxNumCompThreads(previousThreads));
-    summary=struct('matlabVersion',string(version),'sampleTime',.1,'referenceSpeed',8, ...
+    summary=struct('matlabVersion',string(version),'sampleTime',options.SampleTime, ...
+        'horizonSteps',round(options.HorizonSeconds/options.SampleTime),'referenceSpeed',8, ...
         'computationalThreads',1,'roadBoundariesEnabled',false,'estimatorEnabled',false, ...
         'requestedHolds',options.SampleCount,'trials',{{}}, ...
         'scope',"Exact declared scheduled affine plant and exact ego/target states; physical pose follows spatial PCHIP curvature; no nonlinear vehicle claim; offline audits excluded from frame timing");
@@ -27,10 +30,11 @@ function summary=runSmoothReferenceControllerValidation(options)
     for index=1:numel(names)
         name=names(index);scenario=scenarios(index);
         directory=fullfile(options.OutputDirectory,name,scenario,"diagnostic");
-        trial=localTrial(name,scenario,options.SampleCount,options.DiagnosticDeadlineSeconds,directory);
+        timing=struct('sampleTime',options.SampleTime,'horizonSteps',round(options.HorizonSeconds/options.SampleTime));
+        trial=localTrial(name,scenario,options.SampleCount,options.DiagnosticDeadlineSeconds,directory,timing);
         if options.RunStrictTiming
             directory=fullfile(options.OutputDirectory,name,scenario,"periodic");
-            trial.strictTiming=localTrial(name,scenario,options.SampleCount,.1,directory);
+            trial.strictTiming=localTrial(name,scenario,options.SampleCount,options.SampleTime,directory,timing);
         end
         summary.trials{end+1}=trial;
         localSaveJson(summary,fullfile(options.OutputDirectory,'smooth-reference-summary.json'));
@@ -40,10 +44,12 @@ function summary=runSmoothReferenceControllerValidation(options)
     localSaveJson(summary,fullfile(options.OutputDirectory,'smooth-reference-summary.json'));
 end
 
-function report=localTrial(name,scenario,count,deadline,directory)
+function report=localTrial(name,scenario,count,deadline,directory,timing)
+% The strict trial uses the sample period as its whole-frame deadline; the
+% cruise horizon keeps the same duration in seconds when the period changes.
     if ~isfolder(directory),mkdir(directory);end
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'controller',struct('sampleTime',.1,'minimumHorizonSteps',1), ...
+        'controller',struct('sampleTime',timing.sampleTime,'horizonSteps',timing.horizonSteps,'minimumHorizonSteps',1), ...
         'solver',struct('frameDeadlineSeconds',deadline,'certificateSearchTimeLimit',deadline)));
     h=cfg.controller.sampleTime;curve=localCurve(name);road=struct('referenceCurve',curve);
     [state,heldInput]=ltvBicycleModel.cruiseEquilibrium(curve.curvature,cfg);

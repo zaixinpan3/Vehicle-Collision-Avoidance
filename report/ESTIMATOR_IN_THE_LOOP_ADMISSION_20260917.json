@@ -1,0 +1,675 @@
+{
+  "date": "2026-09-17",
+  "outcome": "joint closed loop failed at first target publication; cause diagnosed",
+  "scope": "Declared affine ego plant, NRMM estimator with synthetic bounded-noise sensors, straight road without boundaries, oncoming target from 100 m at 10 m/s, 30 m radar range, 0.1 s holds, deadline 0.1 s; hold-node certificate; fresh-admission probes are open-loop diagnostics.",
+  "exactStateRun": {
+    "executedHolds": 300,
+    "completed": true,
+    "minimumSampledSeparationMarginMeters": -0.0188,
+    "maximumFrameMilliseconds": 46.7,
+    "medianFrameMilliseconds": 6.1,
+    "admissionFrameIndex": 37,
+    "admissionFrameMilliseconds": 34.1,
+    "minimumSpeed": 8.716,
+    "maximumLateralOffsetMeters": 1.607,
+    "publishedFrames": 30,
+    "maximumHorizonSteps": 40
+  },
+  "estimatorRun": {
+    "executedHolds": 36,
+    "completed": false,
+    "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+    "failureTime": 3.6,
+    "normalizedDeficit": 83.9334,
+    "maximumFrameMilliseconds": 101.9,
+    "medianFrameMilliseconds": 15.9,
+    "observerMedianMilliseconds": 8.9,
+    "observerMaximumMilliseconds": 17.1,
+    "egoBoundAtFailure": [
+      0.0757,
+      0.0757,
+      0.048,
+      0.0892,
+      0.4966,
+      0.0015
+    ],
+    "targetBoundAtFailure": {
+      "position": [
+        0.19053,
+        1.4478
+      ],
+      "velocity": [
+        4.9953,
+        20.136
+      ],
+      "acceleration": [
+        2.4713,
+        2.6013
+      ],
+      "yaw": 3.1416,
+      "yawRate": 0.086781
+    },
+    "targetVelocityErrorAtFailure": 0.149
+  },
+  "freshAdmissionProbes": [
+    {
+      "time": 3.6,
+      "rangeMeters": 28.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.882,
+      "targetPositionBound": [
+        0.191,
+        1.445
+      ],
+      "targetVelocityBound": [
+        5.0,
+        20.14
+      ],
+      "targetYawBound": 3.14,
+      "targetVelocityError": 0.149,
+      "normalizedDeficit": 85.98
+    },
+    {
+      "time": 3.7,
+      "rangeMeters": 26.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.253,
+      "targetPositionBound": [
+        0.156,
+        1.348
+      ],
+      "targetVelocityBound": [
+        1.78,
+        16.68
+      ],
+      "targetYawBound": 3.14,
+      "targetVelocityError": 0.03,
+      "normalizedDeficit": 26.13
+    },
+    {
+      "time": 3.8,
+      "rangeMeters": 24.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.225,
+      "targetPositionBound": [
+        0.18,
+        1.272
+      ],
+      "targetVelocityBound": [
+        1.42,
+        10.4
+      ],
+      "targetYawBound": 1.37,
+      "targetVelocityError": 0.171,
+      "normalizedDeficit": 6.38
+    },
+    {
+      "time": 3.9,
+      "rangeMeters": 22.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.218,
+      "targetPositionBound": [
+        0.146,
+        1.191
+      ],
+      "targetVelocityBound": [
+        1.14,
+        7.62
+      ],
+      "targetYawBound": 0.8,
+      "targetVelocityError": 0.108,
+      "normalizedDeficit": 2.701
+    },
+    {
+      "time": 4.0,
+      "rangeMeters": 20.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.44,
+      "targetPositionBound": [
+        0.17,
+        1.103
+      ],
+      "targetVelocityBound": [
+        1.16,
+        5.98
+      ],
+      "targetYawBound": 0.59,
+      "targetVelocityError": 0.015,
+      "normalizedDeficit": 1.919
+    },
+    {
+      "time": 4.1,
+      "rangeMeters": 18.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.428,
+      "targetPositionBound": [
+        0.168,
+        1.006
+      ],
+      "targetVelocityBound": [
+        1.15,
+        5.03
+      ],
+      "targetYawBound": 0.47,
+      "targetVelocityError": 0.093,
+      "normalizedDeficit": 1.873
+    },
+    {
+      "time": 4.2,
+      "rangeMeters": 16.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.421,
+      "targetPositionBound": [
+        0.162,
+        0.86
+      ],
+      "targetVelocityBound": [
+        1.18,
+        4.29
+      ],
+      "targetYawBound": 0.39,
+      "targetVelocityError": 0.121,
+      "normalizedDeficit": 1.353
+    },
+    {
+      "time": 4.3,
+      "rangeMeters": 14.1,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.416,
+      "targetPositionBound": [
+        0.152,
+        0.775
+      ],
+      "targetVelocityBound": [
+        1.13,
+        3.79
+      ],
+      "targetYawBound": 0.33,
+      "targetVelocityError": 0.077,
+      "normalizedDeficit": 1.752
+    },
+    {
+      "time": 4.4,
+      "rangeMeters": 12.1,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.377,
+      "targetPositionBound": [
+        0.182,
+        0.705
+      ],
+      "targetVelocityBound": [
+        1.2,
+        3.45
+      ],
+      "targetYawBound": 0.29,
+      "targetVelocityError": 0.077,
+      "normalizedDeficit": 2.716
+    },
+    {
+      "time": 4.5,
+      "rangeMeters": 10.1,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "attemptSeconds": 1.374,
+      "targetPositionBound": [
+        0.179,
+        0.619
+      ],
+      "targetVelocityBound": [
+        1.14,
+        3.28
+      ],
+      "targetYawBound": 0.27,
+      "targetVelocityError": 0.032,
+      "normalizedDeficit": 4.403
+    },
+    {
+      "time": 4.6,
+      "rangeMeters": 8.2,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.001,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.683
+    },
+    {
+      "time": 4.7,
+      "rangeMeters": 6.4,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.001,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 1.235
+    },
+    {
+      "time": 4.8,
+      "rangeMeters": 4.8,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.575
+    },
+    {
+      "time": 4.9,
+      "rangeMeters": 3.3,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 1.6
+    },
+    {
+      "time": 5.0,
+      "rangeMeters": 2.4,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 1.674
+    },
+    {
+      "time": 5.1,
+      "rangeMeters": 2.7,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.708
+    },
+    {
+      "time": 5.2,
+      "rangeMeters": 4.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.15
+    },
+    {
+      "time": 5.3,
+      "rangeMeters": 5.6,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.562
+    },
+    {
+      "time": 5.4,
+      "rangeMeters": 7.4,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.604
+    },
+    {
+      "time": 5.5,
+      "rangeMeters": 9.2,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.495
+    },
+    {
+      "time": 5.6,
+      "rangeMeters": 11.1,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.349
+    },
+    {
+      "time": 5.7,
+      "rangeMeters": 13.0,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.099
+    },
+    {
+      "time": 5.8,
+      "rangeMeters": 14.9,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.012
+    },
+    {
+      "time": 5.9,
+      "rangeMeters": 16.8,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.145
+    },
+    {
+      "time": 6.0,
+      "rangeMeters": 18.8,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.22
+    },
+    {
+      "time": 6.1,
+      "rangeMeters": 20.7,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.184
+    },
+    {
+      "time": 6.2,
+      "rangeMeters": 22.7,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.209
+    },
+    {
+      "time": 6.3,
+      "rangeMeters": 24.6,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.165
+    },
+    {
+      "time": 6.4,
+      "rangeMeters": 26.6,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.124
+    },
+    {
+      "time": 6.5,
+      "rangeMeters": 28.5,
+      "certified": false,
+      "failureIdentifier": "collisionAvoidanceController:unavailableEstimatorBound",
+      "attemptSeconds": 0.0,
+      "targetPositionBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetVelocityBound": [
+        Infinity,
+        Infinity
+      ],
+      "targetYawBound": Infinity,
+      "targetVelocityError": 0.053
+    }
+  ],
+  "minimumRadarSamples8FirstFrameVelocityBound": [
+    29.99,
+    20.34
+  ],
+  "egoBoundSensitivity": {
+    "frameTime": 3.6,
+    "targetBound": "position 0.2 m, velocity 0, acceleration 0, yaw 0.05 rad, jerk 0",
+    "cases": [
+      {
+        "case": "zero",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.0,
+        "yawBoxAfter36StagesRad": 0.0
+      },
+      {
+        "case": "estimator",
+        "certified": false,
+        "normalizedDeficit": 1.116,
+        "lateralBoxAfter36StagesMeters": 1.925,
+        "yawBoxAfter36StagesRad": 0.05
+      },
+      {
+        "case": "position only",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.076,
+        "yawBoxAfter36StagesRad": 0.0
+      },
+      {
+        "case": "yaw only",
+        "certified": false,
+        "normalizedDeficit": 1.071,
+        "lateralBoxAfter36StagesMeters": 1.728,
+        "yawBoxAfter36StagesRad": 0.048
+      },
+      {
+        "case": "speed only",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.0,
+        "yawBoxAfter36StagesRad": 0.0
+      },
+      {
+        "case": "lateral velocity only",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.119,
+        "yawBoxAfter36StagesRad": 0.002
+      },
+      {
+        "case": "yaw rate only",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.002,
+        "yawBoxAfter36StagesRad": 0.0
+      },
+      {
+        "case": "estimator x0.5",
+        "certified": false,
+        "normalizedDeficit": 0.03302,
+        "lateralBoxAfter36StagesMeters": 0.962,
+        "yawBoxAfter36StagesRad": 0.025
+      },
+      {
+        "case": "estimator x0.25",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.481,
+        "yawBoxAfter36StagesRad": 0.013
+      },
+      {
+        "case": "estimator x0.1",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.192,
+        "yawBoxAfter36StagesRad": 0.005
+      },
+      {
+        "case": "estimator without lateral velocity",
+        "certified": false,
+        "normalizedDeficit": 1.067,
+        "lateralBoxAfter36StagesMeters": 1.806,
+        "yawBoxAfter36StagesRad": 0.048
+      },
+      {
+        "case": "estimator without yaw and lateral velocity",
+        "certified": true,
+        "normalizedDeficit": null,
+        "lateralBoxAfter36StagesMeters": 0.078,
+        "yawBoxAfter36StagesRad": 0.0
+      }
+    ]
+  },
+  "targetBoundSensitivity": {
+    "egoBound": "estimator x 0.1",
+    "result": "all 54 combinations (velocity 0-3 m/s, acceleration 0-2 m/s^2, yaw 0.05-1 rad) certified; the plan with velocity 3, acceleration 2, yaw 1 leaves the lane by 12.2 m without road boundaries"
+  },
+  "rawArtifacts": "/home/zai/.cache/collisionAvoidance/estimator-in-the-loop-20260917/"
+}

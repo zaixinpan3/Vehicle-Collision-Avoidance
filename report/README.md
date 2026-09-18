@@ -7,6 +7,10 @@ Latest estimator evaluation: [Multi-scenario campaign, September 17, 2026](NRMM_
 
 Latest implementation and validation: [Overlap-aware admission, straight controller timing and remaining joint-certificate limits, September 16, 2026](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md).
 
+Latest joint experiment: [Estimator-in-the-loop avoidance blocked by published bounds: diagnosis and admissibility sweeps, September 17, 2026](ESTIMATOR_IN_THE_LOOP_ADMISSION_20260917.md).
+
+Latest period trial: [50 ms control period: cruise fits, admission frames double, September 17, 2026](CONTROL_PERIOD_50MS_20260917.md).
+
 Latest certificate change: [Hold-node safety certificate: semantics, inter-node diagnostic and frame times, September 17, 2026](NODE_CERTIFICATE_ADOPTION_20260917.md).
 
 Latest runtime optimization: [Implementation-only frame-time reduction, strict oncoming qualification and the residual stationary-admission bottleneck, September 17, 2026](CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md).
@@ -30,6 +34,8 @@ Each report states its experiment date and scope. Earlier results describe the r
 | Report | File |
 | --- | --- |
 | Circular controller rerun: complete diagnostic avoidance/recovery, strict timing and crossing-search regression | [CIRCULAR_RUNTIME_RERUN_20260917.md](CIRCULAR_RUNTIME_RERUN_20260917.md) |
+| Estimator-in-the-loop admission failure: published-bound diagnosis, fresh-admission probes and ego/target bound sweeps | [ESTIMATOR_IN_THE_LOOP_ADMISSION_20260917.md](ESTIMATOR_IN_THE_LOOP_ADMISSION_20260917.md) |
+| 50 ms control period trial on the S-bend: cruise qualifies, admission frames double | [CONTROL_PERIOD_50MS_20260917.md](CONTROL_PERIOD_50MS_20260917.md) |
 | Hold-node safety certificate adoption: semantics, inter-node clearance diagnostic and frame times | [NODE_CERTIFICATE_ADOPTION_20260917.md](NODE_CERTIFICATE_ADOPTION_20260917.md) |
 | Implementation-only controller runtime reduction, strict oncoming qualification and residual restoration bottleneck | [CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md](CONTROLLER_RUNTIME_OPTIMIZATION_20260917.md) |
 | Overlap-aware admission, equivalent sparse solving, controller timing and joint uncertainty diagnosis | [OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md](OVERLAP_ADMISSION_IMPLEMENTATION_20260916.md) |

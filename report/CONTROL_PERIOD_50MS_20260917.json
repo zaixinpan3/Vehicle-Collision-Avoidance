@@ -1,0 +1,182 @@
+{
+  "date": "2026-09-17",
+  "outcome": "not qualified at 0.05 s",
+  "scope": "S-bend profile, 8 m/s, 600 holds of 0.05 s, cruise horizon 1.6 s (32 stages), one thread, hold-node certificate; strict trials use the 0.05 s period as the frame deadline; no worst-case execution-time claim.",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "sampleTime": 0.05,
+  "horizonSteps": 32,
+  "allCompleted": true,
+  "allRuntimeQualified": false,
+  "referencePeriod0p1sMaximumFrameMilliseconds": {
+    "cruise": 12.753,
+    "stationary": 67.125,
+    "oncoming": 37.424
+  },
+  "trials": [
+    {
+      "path": "sBend",
+      "scenario": "cruise",
+      "diagnostic": {
+        "executedHolds": 600,
+        "maximumFrameMilliseconds": 18.893,
+        "medianFrameMilliseconds": 11.405000000000001,
+        "framesAbove50Milliseconds": 0,
+        "framesAbove25Milliseconds": 0,
+        "slowestFrameIndex": 477,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.000831,
+          "formulationSeconds": 0.014694,
+          "solveSeconds": 0.002485
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 0,
+          "nativeSolves": 1,
+          "familyAttempts": 0,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.014694,
+          "solveSeconds": 0.002485,
+          "supportSectors": [],
+          "initialOverlappingMidpoints": 0
+        },
+        "minimumSampledSeparationMargin": null,
+        "minimumNodeSeparationMargin": null,
+        "maximumStationPhaseError": 0.0013094892960623383,
+        "failureIdentifier": "",
+        "failureTime": null,
+        "passed": true
+      },
+      "periodic": {
+        "executedHolds": 600,
+        "maximumFrameMilliseconds": 16.297,
+        "medianFrameMilliseconds": 11.438,
+        "framesAbove50Milliseconds": 0,
+        "framesAbove25Milliseconds": 0,
+        "slowestFrameIndex": 219,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.001069,
+          "formulationSeconds": 0.011457,
+          "solveSeconds": 0.002645
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 0,
+          "nativeSolves": 1,
+          "familyAttempts": 0,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.011457,
+          "solveSeconds": 0.002645,
+          "supportSectors": [],
+          "initialOverlappingMidpoints": 0
+        },
+        "minimumSampledSeparationMargin": null,
+        "minimumNodeSeparationMargin": null,
+        "maximumStationPhaseError": 0.0013094892960623383,
+        "failureIdentifier": "",
+        "failureTime": null,
+        "passed": true
+      }
+    },
+    {
+      "path": "sBend",
+      "scenario": "stationary",
+      "diagnostic": {
+        "executedHolds": 600,
+        "maximumFrameMilliseconds": 125.388,
+        "medianFrameMilliseconds": 11.993500000000001,
+        "framesAbove50Milliseconds": 1,
+        "framesAbove25Milliseconds": 24,
+        "slowestFrameIndex": 0,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.001699,
+          "formulationSeconds": 0.05767800000000001,
+          "solveSeconds": 0.063382
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 1,
+          "nativeSolves": 4,
+          "familyAttempts": 1,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.05767800000000001,
+          "solveSeconds": 0.063382,
+          "supportSectors": -1,
+          "initialOverlappingMidpoints": 24
+        },
+        "minimumSampledSeparationMargin": 0.13108341555050934,
+        "minimumNodeSeparationMargin": 0.13117113779009593,
+        "maximumStationPhaseError": 0.17714253680982495,
+        "failureIdentifier": "",
+        "failureTime": null,
+        "passed": true
+      },
+      "periodic": {
+        "executedHolds": 0,
+        "maximumFrameMilliseconds": 56.248,
+        "medianFrameMilliseconds": 56.248,
+        "framesAbove50Milliseconds": 1,
+        "framesAbove25Milliseconds": 1,
+        "slowestFrameIndex": 0,
+        "slowestFrameBreakdown": null,
+        "slowestFrameSearch": null,
+        "minimumSampledSeparationMargin": null,
+        "minimumNodeSeparationMargin": null,
+        "maximumStationPhaseError": 0,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureTime": 0,
+        "passed": false
+      }
+    },
+    {
+      "path": "sBend",
+      "scenario": "oncoming",
+      "diagnostic": {
+        "executedHolds": 600,
+        "maximumFrameMilliseconds": 79.645,
+        "medianFrameMilliseconds": 12.229500000000002,
+        "framesAbove50Milliseconds": 1,
+        "framesAbove25Milliseconds": 2,
+        "slowestFrameIndex": 52,
+        "slowestFrameBreakdown": {
+          "inputPreparationSeconds": 0.002844,
+          "formulationSeconds": 0.037971000000000005,
+          "solveSeconds": 0.034489
+        },
+        "slowestFrameSearch": {
+          "hardSolves": 1,
+          "restorationSolves": 1,
+          "nativeSolves": 3,
+          "familyAttempts": 1,
+          "horizonAttempts": 1,
+          "formulationSeconds": 0.037971000000000005,
+          "solveSeconds": 0.034489,
+          "supportSectors": -1,
+          "initialOverlappingMidpoints": 13
+        },
+        "minimumSampledSeparationMargin": 0.15295465896892035,
+        "minimumNodeSeparationMargin": 0.1550040255580405,
+        "maximumStationPhaseError": 0.5071030142503972,
+        "failureIdentifier": "",
+        "failureTime": null,
+        "passed": true
+      },
+      "periodic": {
+        "executedHolds": 52,
+        "maximumFrameMilliseconds": 64.937,
+        "medianFrameMilliseconds": 11.806000000000001,
+        "framesAbove50Milliseconds": 1,
+        "framesAbove25Milliseconds": 1,
+        "slowestFrameIndex": 52,
+        "slowestFrameBreakdown": null,
+        "slowestFrameSearch": null,
+        "minimumSampledSeparationMargin": 13.21156219000319,
+        "minimumNodeSeparationMargin": 13.21156219000319,
+        "maximumStationPhaseError": 0.000272846147801431,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+        "failureTime": 2.6,
+        "passed": false
+      }
+    }
+  ],
+  "rawArtifacts": "/home/zai/.cache/collisionAvoidance/control-period-50ms-20260917/"
+}
