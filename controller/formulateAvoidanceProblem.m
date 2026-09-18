@@ -1,13 +1,7 @@
-function [program,prediction,clf] = formulateAvoidanceProblem(model,retained,prediction,anchor,normals)
-%formulateAvoidanceProblem Witness-preserving predictive CBF / soft CLF solve.
-% A fresh convexification may replace an inherited certificate only after
-% its known feasible candidate satisfies the COMPLETE new conic program.
-% This is formulation selection BEFORE the single optimizer invocation.
-    if nargin>1
-        [program,~,prediction]=localSupportGeometry(model,prediction,retained,anchor,normals);
-        program.anchorPlan=anchor;clf=retained.clf;
-        return;
-    end
+function [program,prediction,clf] = formulateAvoidanceProblem(model)
+%formulateAvoidanceProblem One convexification about the shifted nominal.
+% Retain prediction/terminal continuation, but always use the newly computed
+% nominal directions. A changed family is not automatically recursively feasible.
     carry=model.carriedWitness;
     if isempty(carry)
         [program,prediction,clf]=localFormulate(model);
@@ -33,7 +27,6 @@ function [program,prediction,clf] = formulateAvoidanceProblem(model,retained,pre
         model.initializationPlan=localContinuation(model,1);
         [program,prediction,clf]=localFormulate(model);
     end
-    program.replacementContainsWitness=false;
 end
 
 function inputs=localContinuation(model,count)
@@ -81,7 +74,7 @@ function accepted=localWitnessFeasible(program,witness)
     end
 end
 
-function [program,prediction,clf] = localFormulate(model,prediction,anchor,proposedNormals)
+function [program,prediction,clf] = localFormulate(model)
 %formulateAvoidanceProblem Predictive hard safety with a soft sampled CLF.
 % Optimize the complete input sequence and the first-hold CLF norm slack.
 % The finite target exit and invariant road terminal set are hard constraints.
@@ -90,7 +83,7 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
     if isempty(cruise),cruise=ltvBicycleModel.sampledCruise(model);end
     model.cruiseCertificate=cruise;
     inherited = ~isempty(model.carriedWitness);
-    dual=struct('available',false,'overlappingMidpoints',0, ...
+    dual=struct('available',false,'overlappingNodes',0, ...
         'minimumAnchorDistance',Inf,'normalSwitchCount',0, ...
         'used',false,'witnessPreserved',false);
     if inherited
@@ -99,12 +92,11 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
         end
         [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model);
     else
-        if nargin<2,[prediction,anchor] = hardEncounterBarrier.predict(model,cruise);end
+        [prediction,anchor] = hardEncounterBarrier.predict(model,cruise);
         model.anchorPlan = anchor;
         if ~isempty(model.encounters)
             [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
-            [normals,dual]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor,frames);
-            if nargin>=4,normals=proposedNormals;end
+            [normals,dual]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor);
             if ~dual.available
                 error('collisionAvoidanceController:invalidSeparationNormal','A finite unit support direction is required.');
             end
@@ -228,7 +220,8 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
         'clfNumericalReserve',numeric, ...
         'physicalMatrix',physicalMatrix,'physicalBound',physicalBound, ...
         'physicalLabels',labels,'terminalCone',terminalCone, ...
-        'anchorPlan',anchor,'safetyBound',safetyBound,'inheritedFeasibleFamily',inherited, ...
+        'anchorPlan',anchor,'safetyBound',safetyBound,'inheritedPredictionFamily',inherited, ...
+        'inheritedFeasibleFamily',inherited, ...
         'cruiseCertificate',cruise,'clf',clf, ...
         'prediction',prediction,'inputWeight',diag(weight), ...
         'referenceStates',referenceStates,'referenceInputs',referenceInputs,'referenceMatrices',referenceMatrices, ...
@@ -245,29 +238,24 @@ function [program,prediction,clf] = localFormulate(model,prediction,anchor,propo
     if inherited,program.inheritedWitness=program.feasibleWitness;end
     if inherited && ~isempty(model.encounters)
         [candidate,dual,candidatePrediction]=localSupportGeometry(model,prediction,program,anchor);
-        if dual.available && localWitnessFeasible(candidate,localCompleteSlack(candidate,anchor))
-            program=candidate;prediction=candidatePrediction;dual.used=true;dual.witnessPreserved=true;
+        if ~dual.available
+            error('collisionAvoidanceController:invalidSeparationNormal','A finite unit support direction is required.');
         end
+        dual.witnessPreserved=localWitnessFeasible(candidate,localCompleteSlack(candidate,anchor));
+        program=candidate;prediction=candidatePrediction;dual.used=true;
+        program.replacementContainsWitness=dual.witnessPreserved;
+        program.inheritedFeasibleFamily=dual.witnessPreserved;
     end
     program.supportGeometry=dual;
 end
 
-function [candidate,information,prediction]=localSupportGeometry(model,prediction,program,anchor,normals)
-% Rebuild only collision rows. The inherited terminal/exit conditions and
-% absolute completion deadline remain exactly as certified before this call.
-    if nargin<5
-        [normals,information]=avoidanceSafetyGeometry.supportNormals( ...
-            model,prediction,anchor,program.geometry.frames);
-    else
-        information=program.supportGeometry;information.available=true;
-    end
+function [candidate,information,prediction]=localSupportGeometry(model,prediction,program,anchor)
+% Recompute node normals on the carried nominal. Preserve the stored chart,
+% dynamics, terminal set and absolute deadline. Do not select old directions
+% when the new convexification excludes the shifted witness.
+    [normals,information]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor);
     candidate=program;
     if ~information.available,return;end
-    if ~program.inheritedFeasibleFamily && isfield(program.geometry.frames,'positionMap')
-        [candidate,prediction]=localFormulate(model,prediction,anchor,normals);
-        information=candidate.supportGeometry;
-        return;
-    end
     model.anchorPlan=anchor;prediction.geometryAnchor=anchor;
     prediction.geometryFrames=program.geometry.frames;
     prediction.geometryNominal=cell(numel(prediction.cells),1);

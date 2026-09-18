@@ -1,5 +1,10 @@
 # Controller runtime and numerical implementation
 
+Current policy update (September 18, 2026): format 35 removes restoration,
+branch search and constraint-generation solve loops. The measurements below
+precede that algorithm change. See [SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md)
+and the latest single-convexification report for current behavior.
+
 Version 21 uses a finite encounter witness, current observation confirmation,
 a non-postponable active exit deadline, and a target-independent road terminal
 law. Only zero physical collision/road violation can authorize execution.

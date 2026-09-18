@@ -1,134 +1,96 @@
-# Overlap-aware support convexification
+# Single convexification on the shifted nominal
 
-> Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+Controller format 35, September 18, 2026.
 
-Controller format 33, September 17, 2026.
+## Online algorithm
 
-## Geometric contract
+The controller shifts the previous accepted input/state prediction by one
+100 ms hold. During an unchanged active encounter its remaining horizon
+counts down to the stored absolute exit deadline. It does not reset that
+deadline or discard the terminal continuation. A newly admitted target uses
+the shifted old controls as a numerical seed, without treating them as a
+certificate for the new target. The seed repeats the last stored input once;
+if a longer horizon is needed, its remaining inputs are the reference trim.
+Without a previous solution, initialization uses cruise continuation.
 
-For a unit direction `n`, a configuration obstacle `C`, and required clearance
-`m`, `n'*p >= support(C,n)+m` is a sufficient separation inequality. Its
-construction does not require the numerical anchor to satisfy it. The analytic
-rectangle-polygon query returns a signed clearance, a unit support direction,
-and tied face alternatives separately. Overlap and contact are admissible
-search inputs; neither is a safe executable configuration.
+At each predicted node, evaluate the nominal ego Cartesian position and yaw
+from the exact reference geometry, and evaluate the nominal target rectangle
+at the same time. Obtain one signed configuration-obstacle distance normal.
+Fix all these normals, construct the complete hard-safety/soft-CLF SOCP, and
+call the trajectory solver once. There is no maneuver sector, branch
+enumeration, direction-candidate scoring, feasibility restoration, horizon
+retry after infeasibility, or working-set sequence of native solves.
 
-The finite search ranks joint geometric sectors from the current relative
-positions, retaining opposite alternatives. Within each sector, midpoint,
-tied-face, previous-cell, road-axis and retained directions are candidates.
-Restoration updates score the minimum conservative reserved clearance across
-all Bernstein/support rows of a whole hold. There is no prescribed vehicle
-trajectory, lateral amplitude, acceleration target or passing time. These
-sectors and candidate directions are an incomplete inner search, not an exact
-finite partition of the original nonconvex safe set.
+The geometric query has deterministic polygon tie-breaking. This is a local
+geometric convention; it does not impose a common passing side across nodes
+or prescribe any ego trajectory. Different nodes can return incompatible
+half-spaces. A finite normal at overlap is not a feasibility guarantee.
 
-## Certified circular pose maps
+## Relation to Li et al. (2023)
 
-For a constant-curvature reference and a local anchor $(s_0,d_0)$, define
-$\Delta s=s-s_0$, $\Delta d=d-d_0$. The Cartesian position approximation is
+Guoqiang Li, Xudong Zhang, Hongliang Guo, Basilio Lenzo and Ningyuan Guo,
+*Real-Time Optimal Trajectory Planning for Autonomous Driving with Collision
+Avoidance Using Convex Optimization*, Automotive Innovation 6, 481--491,
+[DOI 10.1007/s42154-023-00222-7](https://doi.org/10.1007/s42154-023-00222-7),
+Sections 3.1--3.2, equations (9)--(13).
 
-$$
-p_{\rm aff}=c(s_0)+d_0n(s_0)+(1-\kappa d_0)t(s_0)\Delta s+n(s_0)\Delta d.
-$$
+The adopted architecture computes geometry from a nominal trajectory and
+then fixes it for the trajectory optimization. For a configuration obstacle
+C, outside C the analytic closest-point normal supplies the same supporting
+hyperplane as the Euclidean distance dual. No per-node conic solve is needed
+for these rectangles. At overlap/contact the implementation uses the analytic
+signed-distance support normal; ordinary unsigned-distance duality can return
+zero there. This is an explicit extension of the paper's direction step.
 
-On $|\Delta s|\le r_s$, $|\Delta d|\le r_d$, write $D=|d_0|+r_d$.
-The Euclidean Taylor remainder is bounded by
+Equation (13) of the paper permits collision slack. This implementation retains
+hard collision rows and only the existing CLF slack. It also retains the
+bicycle study plant, rectangle uncertainty charges, curved pose domains and
+finite-exit/invariant-terminal certificate. It is therefore an adaptation of
+the convexification sequence, not a reproduction of every paper assumption
+or its reported performance.
 
-$$
-E_p=\tfrac12|\kappa|(1+|\kappa|D)r_s^2+|\kappa|r_s r_d,
-$$
+For any unit n, the inequality
 
-plus an arithmetic reserve. A unit collision/exit direction is charged $E_p$.
-The affine heading $\theta(s_0)+\kappa(s-s_0)+e_\psi$ is exact for a circle.
-Rectangle support majorants use that same affine heading and its domain;
-station and heading are not treated as independent orientation errors.
-Geometric unit tangent/normal vectors remain separate from the position
-Jacobian. Direction proposals and nominal distances use exact circular poses.
+    n' * pE >= support(C, n) + clearance
 
-Every Bernstein coefficient, including its propagated radius, must satisfy
-six hard inequalities for the local box in $(s,d,e_\psi)$. Convex hull
-containment then establishes domain validity over the entire unchanged hold.
-These inequalities have no restoration slack. Internal working sets may omit
-rows temporarily, but no completed solve or executable certificate can omit
-their full check. Terminal exterior membership uses the final cell's map and
-six additional hard endpoint-domain rows. Current observation release must
-also lie inside the chosen map's domain.
+certifies separation. The anchor need not satisfy it for the inequality to be
+constructible. Existence of a solution satisfying all such inequalities,
+actuator limits and completion conditions is a separate question.
 
-Fresh admission centers each domain on the numerical anchor's enclosed hold,
-with configurable extra radii `controller.poseTrustRadius = [2;4;0.5]` in m,
-m and rad. Additional bounded families expand those radii. Reanchoring updates
-collision geometry, hard domains and terminal exit rows together; it does not
-prescribe a trajectory. An inherited family retains its old maps/domains and
-absolute completion deadline. Optional normal replacement must preserve the
-complete carried witness, including the domain and terminal rows.
+## Curved geometry and hard verification
 
-This extension covers analytic constant-curvature encounters without physical
-road boundaries. It does not add variable-curvature models, correlated-set
-conditioning or a new road-constrained terminal set.
+Exact nominal curved poses select directions. Local affine position/yaw maps,
+certified remainder charges and hard local pose domains construct convex
+rows. Accepted active continuations retain their original charts and model
+generators. The finite exit direction/deadline and terminal cones are retained;
+normal recomputation changes collision geometry only. Fresh straight-reference
+exit proposals retain the existing relative-motion completion calculation;
+curved exit proposals use the exact nominal endpoint. Neither is enumerated.
 
-## Admission and restoration
+All current safety rows certify hold nodes, not the inter-node continuous
+motion. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+The complete original physical rows, terminal cones and sampled CLF cone are
+independently checked before returning a command. No failed or uncertified
+solve executes a stored control or terminal feedback policy.
 
-Clear seeds attempt the hard problem first. Colliding seeds start with
-restoration. Collision deficits are shared by each hold-target pair; exit and
-terminal-entry rows and each terminal cone receive search-only deficits.
-Physical input/slew limits, affine dynamics and local pose-domain rows remain
-hard. The sum of squared normalized deficits is minimized without a competing
-cruise or input objective. This makes zero the same hard-feasibility target as
-the former linear deficit objective and improves numerical behavior in curved
-searches; positive values still have no execution authority. The optional
-lexicographic proximity objective is not needed by this implementation.
+## Recursive feasibility scope
 
-After restoration, controls update the support geometry. A new hard problem
-restores the original cruise/trim/CLF objective and removes every search
-deficit. Stagnation changes the joint sector, fresh exit direction or finite
-horizon under one shared budget. No relaxed search iterate is an executable
-witness. A native success flag is insufficient: the complete original physical
-rows, physical terminal cones and reserved soft-CLF cone must pass independent
-verification. Failure and timeout issue no command.
+The stored prediction and invariant terminal construction still certify a
+finite continuation. However, recomputing directions may exclude its shifted
+witness because nominal distance and robust affine support bounds are
+different criteria. The controller always selects the newly computed normals,
+as requested; it does not fall back to the old geometry when inclusion fails.
 
-## Equivalent sparse solution
+`supportGeometry.witnessPreserved` and `shiftedWitnessContained` report a
+complete current-program inclusion check. `inheritedPredictionFamily` reports
+retained generators and charts. `inheritedFeasibleFamily` is true only when
+the shifted witness also satisfies the new complete program. None of these
+observations proves that every future direction update preserves feasibility.
 
-Auxiliary stage deviations satisfy the fixed held-model transitions. Collision
-rows use each hold's starting state and input; the terminal modal cones use the
-last state. Eliminating auxiliaries recovers the condensed program within its
-numerical model tolerances. The future-state quadratic cost is block diagonal
-in these coordinates; input cost remains relative to the CLF operating point.
-Exact duplicate left sides retain only their tightest bound.
-
-For larger geometry programs, numerical constraint generation starts with the
-two most violated rows of each hold, separately grouping collision, local-domain
-and phase rows, and retains all nongeometric hard rows and cones.
-Every returned decision is checked against all omitted inequalities, and up to
-sixteen violated rows per group join the working set before the next native
-solve. These counts only trade native solves against program size; the
-converged decision satisfies the same complete row set. The loop cannot accept
-an unfinished working set.
-The independent original-program verifier remains unchanged. Restoration uses
-the same transcription and checks its omitted deficit-adjusted inequalities.
-
-## Continuation and limits
-
-Admitted encounters retain their original generators, swept enclosures,
-terminal cones and absolute exit deadline. Optional replacement geometry must
-contain the complete known suffix witness. Confirmed target removal only
-removes that target's obligations. The terminal law remains a mathematical
-continuation, never an executable fallback.
-
-For target-free initialization, a shorter horizon within configured limits
-can retain a verified terminal entry when a longer open-loop uncertainty tube
-has a negative terminal-cone radius. Enlarged measurement bounds trigger a new
-complete admission and new terminal sensing contract. They do not inherit
-recursive feasibility under the old bound; the old prediction only conditions
-the actual successor. Empty intersections still indicate inconsistent data.
-
-The high-gain target observer, predictive CBF, soft squared-slack CLF and
-zero-residual held affine model are retained. Safety after successful admission
-is conditional on the documented motion, observation and execution contracts.
-Neither global admission completeness, nonlinear physical-vehicle safety,
-asymptotic convergence with persistent CLF slack, nor a worst-case 100 ms
-execution bound follows from this search algorithm.
-
-Native support and geometry kernels are built by
-`scripts/buildAvoidanceGeometryKernel.m`; generated artifacts stay in the
-excluded `solver/` tree. The old ordinary-distance query and obsolete
-initialization diagnostic driver have been removed.
+Consequently, `recursiveFeasibilityGuaranteed` is false while an encounter is
+active. Target-free witness-preserving horizon renewal and invariant one-hold
+optimization retain their existing conditional guarantee. The conditional
+active-encounter theorem in [TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md)
+requires inclusion at every future update as an additional premise. This
+implementation does not establish that premise automatically. A failed
+single convexification is not evidence of unavoidable physical collision.

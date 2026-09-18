@@ -76,7 +76,7 @@ nodes only.
   for offline audits. The native kernels were regenerated.
 - `formulateAvoidanceProblem.localShift` reconstructs the node clock as
   `stage*h` when the executed hold is eliminated.
-- The lifted transcription, constraint generation, restoration, terminal
+- The lifted transcription, single complete solve, terminal
   rows, CLF and certificate are unchanged; they consume the same row
   structures with one point per cell.
 - `stateUncertainty.heldInterval` and `ltvBicycleModel.fixedPredict` remain

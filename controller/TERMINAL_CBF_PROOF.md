@@ -2,13 +2,18 @@
 
 > Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 
-This is the current format-34 proof. It replaces the previous stopping-tail
-argument. The implemented terminal certificate uses the **same held affine
+This is the format-35 conditional continuation proof. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
 `formulateAvoidanceProblem`, and `solveHardCbfClf.certify` implement the objects
 below. Numerical tests validate the implementation; the induction below, not
-simulation duration, establishes the recursive statement.
+simulation duration, establishes the recursive statement when all premises hold.
+
+**Active-encounter limitation:** format 35 always recomputes support directions
+on the shifted nominal and never selects old collision geometry on failure.
+Premise 7 below is therefore an additional condition, not an established
+property of every online frame. Metadata does not claim automatic recursive
+feasibility during active encounters. Target-free continuation is unchanged.
 
 ## 1. Statement and declared scope
 
@@ -45,6 +50,12 @@ collision and permanent actuator-amplitude/slew constraints, provided that:
    cone verification. To execute an indefinitely safe physical sequence, a
    valid solve must also finish before each actuation deadline. Mathematical
    nonemptiness does not imply numerical completion within 100 ms.
+
+7. At every active-encounter update, the newly fixed normal family contains
+   the shifted feasible witness (or another explicitly verified feasible
+   candidate). Nominal closest-distance normals do not automatically imply
+   this robust-row inclusion. The controller reports the current check, but
+   does not enforce this premise across all future updates.
 
 These are explicit model/sensing/admission conditions, not claims about arbitrary
 unseen traffic or a nonlinear physical vehicle. The target high-gain observer
@@ -337,15 +348,16 @@ input its cone can be satisfied by a finite nonnegative slack.
 
 ### Support-direction collision-row replacement
 
-The controller may use signed configuration-obstacle geometry at the carried
-anchor to propose new continuous support directions. The resulting whole-hold rows
-retain the complete footprint, uncertainty and truncation allowances.
-The same inherited suffix, completed with CLF slack, must satisfy every row
-and every cone of the proposed program before it is selected. Thus replacing
-the collision rows preserves a concrete feasible continuation. When this
-check fails, the unchanged inherited program is optimized. Exit directions,
-absolute deadlines and terminal conditions are preserved. No normal-selection
-heuristic alone is used as a recursive-feasibility argument. See
+The controller computes signed configuration-obstacle normals at every node
+of the shifted nominal and always uses them in the new convex program.
+Footprint, uncertainty and affine-map remainder allowances remain hard.
+Checking the shifted suffix against all rows and cones establishes feasibility
+of this particular update when successful. When that check fails, the new
+program is still solved once; no old-family selection occurs. A successful
+hard-certified result supplies a new finite continuation, but it does not
+prove that the following direction update will be feasible. Thus the
+induction requires premise 7. Exit directions, absolute deadlines and
+terminal conditions remain inherited. See
 [SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
 
 ### Fresh no-target performance horizon
@@ -361,16 +373,12 @@ and all CLF and terminal cones of the proposed new program**. Only a program con
 candidate may replace the inherited one. Otherwise the inherited program is
 used. This is pre-solve selection of an optimization problem, not selection
 of an actuator command after solver failure. An admitted retained family uses
-one hard performance problem per sample, with optional witness-preserving
-geometry updates. Its sparse numerical solution can use several constraint-
-generation solves; all original physical rows and terminal cones are checked.
-Fresh admission uses bounded support-family and search-only feasibility
-restoration. The theorem starts only after a complete convex program passes
-the original hard certificate. Neither a finite direction at overlap nor a
-positive-deficit restoration solution supplies this premise. Recursive
-feasibility does not prove universal admission or numerical deadline success.
-The accepted affine family and terminal cones are inherited before optional
-geometry replacement. Format 33 rejects earlier stored certificates.
+one hard performance problem and one native solve per sample. Independent
+verification checks every physical row and terminal cone. There are no
+support-family, restoration, horizon-retry or constraint-generation loops.
+The theorem starts from a hard-certified plan and, for active encounters,
+requires premise 7 at every update. It proves neither universal admission nor
+numerical completion before a deadline. Format 35 rejects earlier states.
 
 ### Empty suffix after confirmed encounter completion
 

@@ -16,7 +16,6 @@ classdef laneGeometry
                 || laneGeometry.isVaryingReference(model.lane)) ...
                 && ~isempty(model.encounters);
             if curved
-                scale=1;if isfield(model,'poseTrustScale'),scale=model.poseTrustScale;end
                 centers=zeros(3,numel(tubes));radii=centers;
                 for index=1:numel(tubes)
                     tube=tubes(index);
@@ -25,7 +24,7 @@ classdef laneGeometry
                     lower=min(values(1:3,:)-tube.radius(1:3,:),[],2);
                     upper=max(values(1:3,:)+tube.radius(1:3,:),[],2);
                     centers(:,index)=(lower+upper)/2;
-                    radii(:,index)=(upper-lower)/2+scale*cfg.controller.poseTrustRadius;
+                    radii(:,index)=(upper-lower)/2+cfg.controller.poseTrustRadius;
                 end
                 frames=laneGeometry.localPoseFrames(model.lane.referenceCurve,centers,radii);
                 return;

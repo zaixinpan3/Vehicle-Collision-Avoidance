@@ -1,5 +1,7 @@
 # Experiment reports
 
+Latest controller policy: [Shifted nominal, one convex solve, and straight/circular validation](SHIFTED_NOMINAL_SINGLE_SOLVE_20260918.md). Branch search and restoration are removed; admission and guarantee limitations are recorded explicitly.
+
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
 Latest straight and circular validation: [Twenty hold-node cases, two inter-node clearance shortfalls and one admission deadline failure, September 18, 2026](STRAIGHT_CIRCULAR_RERUN_20260918.md).
@@ -27,7 +29,7 @@ Latest diagnosis: [Stationary and oncoming distance-dual initialization failures
 
 Latest admission design review: [Overlap-aware support directions, temporal conflicts and hard-feasibility ablation, September 16, 2026](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md).
 
-Implemented design: [Overlap-aware admission search, grouped feasibility restoration and hard acceptance](../controller/ADMISSION_SEARCH_DESIGN.md). See the implementation report for measured results and unresolved joint limits.
+Current convexification: [Shifted nominal directions and one hard solve](../controller/SUPPORT_CONVEXIFICATION.md). The former admission search has been removed. Dated reports below retain their historical findings.
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 

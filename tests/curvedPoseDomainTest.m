@@ -23,7 +23,7 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             testCase.verifyEqual(norm(frame.tangent),1,AbsTol=1e-14);
         end
 
-        function anOverlappingCircularSeedObtainsAHardCertificate(testCase,curvature)
+        function aClearCircularSeedRetainsHardPoseDomains(testCase,curvature)
             [~,~,problem]=localAdmission(curvature);
             domain=problem.program.physicalLabels=="poseDomain" | problem.program.physicalLabels=="terminalPoseDomain";
             testCase.verifyTrue(problem.metadata.planCertified);
@@ -45,21 +45,23 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(discrepancy,1e-10);
         end
 
-        function restorationCannotRelaxAnImpossiblePoseDomain(testCase)
+        function anImpossiblePoseDomainCannotBeRelaxed(testCase)
             [~,~,problem]=localAdmission(.01);
             program=localImpossibleDomain(problem.program);
-            restored=solveHardCbfClf.restore(program,problem.model.cfg);
-            testCase.verifyFalse(restored.feasible);
+            solved=solveHardCbfClf.constrained(program,problem.model.cfg);
+            testCase.verifyFalse(solved.feasible);
         end
 
-        function sparseRealizationPreservesCircularDomainAndRestorationRows(testCase)
+        function sparseRealizationPreservesCircularDomainRows(testCase)
             [~,~,problem]=localAdmission(.02);
-            [~,restoration]=solveHardCbfClf.restore(problem.program,problem.model.cfg);
-            for program={problem.program,restoration}
-                [rowError,costError]=localRealizationErrors(program{1});
-                testCase.verifyLessThan(rowError,problem.model.cfg.solver.constraintTolerance);
-                testCase.verifyLessThan(costError,1e-7);
-            end
+            [rowError,costError]=localRealizationErrors(problem.program);
+            testCase.verifyLessThan(rowError,problem.model.cfg.solver.constraintTolerance);
+            testCase.verifyLessThan(costError,1e-7);
+        end
+
+        function anOverlappingCircularSeedReportsItsSingleFamilyFailure(testCase,curvature)
+            testCase.verifyError(@()localAdmission(curvature,0), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
 
         function departureCannotUseAMapOutsideItsCertifiedDomain(testCase)
@@ -110,7 +112,8 @@ function [rowError,costError]=localRealizationErrors(program)
     costError=abs(diff(cost(:,1))-diff(cost(:,2)));
 end
 
-function [ego,target,problem,stored,road,cfg]=localAdmission(curvature)
+function [ego,target,problem,stored,road,cfg]=localAdmission(curvature,lateral)
+    if nargin<2,lateral=-5*sign(curvature);end
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('sampleTime',.1,'minimumHorizonSteps',1), ...
         'solver',struct('frameDeadlineSeconds',30,'certificateSearchTimeLimit',30)));
     curve=struct('origin',[0;0],'heading',0,'curvature',curvature,'length',150);
@@ -118,7 +121,7 @@ function [ego,target,problem,stored,road,cfg]=localAdmission(curvature)
     z=ltvBicycleModel.cruiseEquilibrium(curvature,cfg);
     ego=struct('position',[0;0],'yaw',z(3),'speed',z(4),'lateralVelocity',z(5),'yawRate',z(6),'stateTime',0, ...
         'perception',struct('time',0,'range',16,'completeWithinRange',true));
-    [position,heading]=laneGeometry.referencePose(15,0,curve);
+    [position,heading]=laneGeometry.referencePose(15,lateral,curve);
     target=struct('trackId',1,'targetPositionInertial',position,'targetVelocityInertial',[0;0], ...
         'targetAccelerationInertial',[0;0],'targetHeadingInertial',heading,'targetYawRate',0, ...
         'predictionMotion',struct('kind',"finite-sensing-motion-v1",'jerkBound',[0;0],'yawAccelerationBound',0));
@@ -144,9 +147,10 @@ function gap=localPhysicalResidualGap(problem)
 end
 
 function program=localImpossibleDomain(program)
-    program.physicalMatrix(end+1,:)=0;
-    program.physicalBound(end+1,1)=-1;program.safetyBound(end+1,1)=-1;
-    program.physicalLabels(end+1,1)="poseDomain";
+    row=program.cones(2);
+    program.A=[program.A(1:row,:);sparse(1,size(program.A,2));program.A(row+1:end,:)];
+    program.b=[program.b(1:row);-1;program.b(row+1:end)];
+    program.cones(2)=row+1;
 end
 
 function [next,witness]=localSuccessor(ego,target,first,stored,road,cfg)

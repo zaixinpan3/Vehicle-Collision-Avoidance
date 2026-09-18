@@ -8,6 +8,7 @@ classdef hardEncounterBarrier
             model.encounters = struct("key",{});
             model.confirmation = [];
             model.carriedWitness = [];
+            model.nominalSource = "cruiseInitialization";
             model.measurementContractChanged=false;
             model.measurementRadiusLimit = model.initialFrenetErrorBound;
             if isfield(model.lane,'referenceCurve') && ~laneGeometry.isVaryingReference(model.lane) ...
@@ -28,7 +29,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=34
+                if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=35
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
@@ -171,6 +172,7 @@ classdef hardEncounterBarrier
             end
             if ~isempty(stored)
                 model.initializationPlan = [stored.plan(:,2:end),stored.plan(:,end)];
+                model.nominalSource = "shiftedPreviousSolution";
             elseif isempty(model.encounters)
                 [model.horizonSteps,model.initializationPlan]=localCruiseAdmission(model);
             end
@@ -231,11 +233,7 @@ classdef hardEncounterBarrier
                     trial=model;trial.encounters=target;
                     [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
                 end
-                if isfield(model,'exitDirections')
-                    direction=model.exitDirections(:,index);
-                    validateattributes(direction,{'double'},{'size',[2,1],'finite','real'});
-                    assert(abs(norm(direction)-1)<1e-10,'collisionAvoidanceController:invalidExitDirection','A unit exit direction is required.');
-                elseif ~isempty(proposed) && ~isfield(frame,'positionMap')
+                if ~isempty(proposed) && ~isfield(frame,'positionMap')
                     direction=proposed;
                 end
                 [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);

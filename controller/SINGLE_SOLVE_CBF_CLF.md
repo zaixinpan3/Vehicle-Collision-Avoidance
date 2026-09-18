@@ -1,49 +1,37 @@
-# Predictive safety with overlap-aware support search
+# Predictive safety with one shifted-nominal convexification
 
 > Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 
-The format-34 controller retains a complete finite input plan, a rectangle
+The format-35 controller retains a complete finite input plan, a rectangle
 collision certificate at every hold node, finite confirmed exit and a permanent
 terminal information-state set. Both the predictor and terminal set use the same
 admitted held affine cruise generator. Physical input effort remains centered
 on the CLF/LQR trim; the first-hold CLF has a nonnegative squared-penalty slack.
 The target high-gain observer is unchanged.
 
-The complete mathematical proof and its precise premises are in
-[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md). The guarantee covers admitted
-encounters, partial/full confirmed release, prediction exhaustion and
-indefinite target-free operation under the declared model, sensing and
-admission contracts. `recursiveFeasibilityGuaranteed=true` has this conditional
-scope, explicitly published in metadata. It is not a 100 ms runtime guarantee
-or a nonlinear physical-vehicle claim.
+The geometric algorithm and its relation to Li et al. (2023) are specified in
+[SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
 
 ## Actual next-frame optimization
 
-1. Retain the accepted hard affine family, terminal SOC, generators and swept
-   enclosures. Substitute the executed input to obtain its feasible suffix.
-2. After confirmed target release, delete only that target's collision and exit
-   rows. Retain the permanent certificate and any remaining target obligations.
-3. A fresh target-free performance horizon may replace the suffix only when
-   a concrete candidate satisfies every row and all cones of that new problem.
-4. If the suffix is exhausted and no longer replacement is certified, solve
-   a free one-hold constrained optimization inside the invariant terminal
-   information-state set. Its feedback candidate proves nonemptiness; the
-   optimizer chooses the command.
+1. Shift the stored prediction by one hold and preserve its generators,
+   charts, terminal certificate and absolute exit deadline.
+2. Compute one analytic signed-distance direction per nominal node/target.
+   Fix these directions for the entire current optimization.
+3. Solve the complete hard-safety/soft-CLF SOCP once, then independently
+   certify its solution. Exact duplicate-row reduction and sparse lifting
+   remain; branch search, restoration and constraint generation are removed.
+4. On confirmed release, remove that target's obligations. Target-free horizon
+   renewal retains its witness inclusion check. At exhaustion, a free
+   invariant one-hold optimization continues; terminal feedback is not issued.
 
-An admitted active encounter optimizes its inherited or witness-preserving
-updated convex family. Fresh admission may use several support-family,
-restoration and hard solves. Search deficits never authorize execution. A
-colliding numerical seed does not prevent constructing support half-spaces.
-Only a full hard certificate allows a command; failed solving or verification
-never dispatches a stored input or terminal law.
-
-The native solver uses an equivalent sparse stage realization. Exact duplicate
-left sides retain their strongest bound. Constraint generation adds omitted
-violated geometric rows until the full program is satisfied. These are
-numerical reductions of one problem, not softened execution constraints.
-The original condensed physical rows and terminal cones remain the independent
-acceptance authority. Complete-search and native-solve counts are distinct.
-See [SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
+Recomputed active collision rows can exclude the old witness. The reported
+`shiftedWitnessContained` tests the current update, while
+`recursiveFeasibilityGuaranteed` is false during active encounters. It remains
+true for target-free continuation under the declared contracts. Retaining a
+finite predictive certificate alone does not prove feasibility of every new
+normal family. The active theorem requires the additional premise stated in
+[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md).
 
 ## Terminal set and sensing contract
 
@@ -66,8 +54,8 @@ The permanent reference is an analytically continued straight line or constant-
 curvature curve with no physical road boundaries, matching the current
 no-road-boundary experiment specification. Actuator amplitude/slew and the
 collision/terminal certificates are hard, including the local pose-domain
-rows required to validate the circular affine geometry. Those domains move
-with fresh search anchors and are retained by accepted continuations; they
+rows required to validate the circular affine geometry. Those domains are centered
+on fresh nominal anchors and are retained by accepted continuations; they
 are not physical road or tire-slip constraints. Finite
 centerline samples and analytic arc length no longer cause projection clipping
 at their display endpoints. Curved station measurements unwrap about the
@@ -88,8 +76,8 @@ The first-hold CLF and five terminal modal inequalities are SOC constraints. All
 collision, actuator and slew rows are hard. The absolute target
 exit deadline is preserved while any admitted target remains active.
 
-The returned format-34 state contains the plan, verified inherited affine
-bounds and terminal cone, exact nominal nodes, uncertainty boxes, whole-hold
+The returned format-35 state contains the plan, verified inherited affine
+bounds and terminal cone, exact nominal nodes, uncertainty boxes, hold-node
 geometry, stable target identities, common generator and permanent terminal
 certificate. Earlier state formats must be reset.
 
@@ -151,8 +139,9 @@ For any finite physical input satisfying the hard constraints, a finite
 nonnegative slack can satisfy the CLF cone. Thus the CLF no longer excludes a
 physically feasible input merely because it would increase tracking error.
 Hard obstacle and actuator constraints can still conflict at new
-admission. After admission, the predictive and invariant-set construction
-establishes successor feasibility; CLF slack preserves that feasible family.
+admission. The predictive and invariant-set construction supplies a feasible suffix
+in the retained family. Recomputed active collision rows must additionally
+contain a feasible candidate; CLF slack cannot repair incompatible hard rows.
 A failed numerical solve still stops control.
 
 The exact-state driver saves the optimized slack, its dissipation allowance,
@@ -180,8 +169,8 @@ The normalized objective tolerance remains 1e-7. Safety depends on a verified
 feasible solution, not exact objective minimization. Physical feasibility uses
 its separate tolerance and independent safety reserves.
 
-`frameDeadlineSeconds` is shared by admission preparation and all search
-solves. Numerical solver time limits do not preempt MATLAB preparation or
+`frameDeadlineSeconds` is shared by admission preparation and the single
+solve. Numerical solver time limits do not preempt MATLAB preparation or
 operating-system scheduling; the actual frame time remains independently
 measured against the control hold. An offline diagnostic search budget does
 not change that real-time requirement.

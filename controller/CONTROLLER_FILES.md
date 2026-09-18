@@ -3,11 +3,11 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-Fresh admission uses analytic support families and search-only restoration, followed by a hard
+Every frame fixes support directions on the shifted nominal and solves one hard
 trajectory SOCP with a full input sequence and penalized first-hold CLF slack. Since
 2026-09-17 the safety rows are certified at the hold nodes only
 ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
-Its format-34 state retains the complete prediction and terminal continuation.
+Its format-35 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
 Related operations stay in the module that owns their responsibility.
 
@@ -19,12 +19,12 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public target-array entry; support-family admission and restoration, one inherited-family solve per successor, complete witness storage, no command after failed search |
+| `collisionAvoidanceController.m` | Public target-array entry; shifted-nominal direction construction and one complete convex solve per frame, complete witness storage, no command after failed search |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Equivalent sparse stage transcription and exact duplicate-row reduction (`build`) |
-| `solveHardCbfClf.m` | Hard and search-only conic solving (`constrained`, `restore`), constraint generation and independent verification (`certify`) |
+| `solveHardCbfClf.m` | One complete conic solve (`constrained`) and independent verification (`certify`) |
 | `avoidanceSafetyGeometry.m` | Node separation rows (`build`; multi-point cells keep the whole-hold Bernstein path for offline audits), analytic support proposals (`supportDirection`, `supportNormals`), rectangle distance and shared numeric kernels |
 | `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and certified local chart bounds |
 | `ltvBicycleModel.m` | Held-input node prediction (`finitePredict`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
@@ -43,17 +43,17 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-34 predictive certificate. The online path calls
-`formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained`. Fresh
-admission uses bounded support sectors, node scoring, grouped-deficit
-restoration and final hard verification. Accepted successors retain the
-certified prediction and absolute exit deadline. New geometry must contain
-the complete inherited witness. The terminal law proves nonemptiness; it is
-never dispatched after solver failure. The conditional proof is in
-TERMINAL_CBF_PROOF.md.
+format-35 predictive certificate. The online path calls
+`formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained` once.
+Accepted successors retain their prediction, terminal set and absolute exit
+deadline. Node normals are recomputed from the shifted nominal without
+branch search. Inclusion of the shifted witness is reported, not enforced by
+selecting old geometry. Active-encounter recursive feasibility therefore
+requires an additional inclusion premise; see SUPPORT_CONVEXIFICATION.md.
+The terminal law is never dispatched after solver failure.
 
-`avoidanceStageQp.build` is now the sole online sparse realization, including
-restoration. Its obsolete slack/budget transcription has been removed.
+`avoidanceStageQp.build` is the sole online sparse realization. Restoration
+and constraint-generation solve loops have been removed.
 Nonlinear Fiala tools retain their separate study scope. The online guarantee
 remains the declared zero-residual held affine plant.
 

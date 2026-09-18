@@ -42,8 +42,7 @@ classdef avoidanceStageQp
                     +program.safetyBound(rows)-program.geometry.physicalBound(rows);
             end
             assert(cursor==geometric,'avoidanceStageQp:geometryRows','Inconsistent stage row mapping.');
-            % Extra decision columns of the geometric rows (deficit charges of a
-            % restoration program) join the triplets instead of a sparse assignment.
+            % Append the CLF slack column, which is zero in physical geometry rows.
             [extraRow,extraColumn,extraValue]=find(program.A(1:geometric,n+1:original));
             geometricMatrix=sparse([vertcat(rowBlocks{:});extraRow(:)],[vertcat(columnBlocks{:});n+extraColumn(:)], ...
                 [vertcat(valueBlocks{:});extraValue(:)],geometric,total);
@@ -57,23 +56,19 @@ classdef avoidanceStageQp
             rows=size(matrix,1)-3*modeCount+1:size(matrix,1);
             matrix(rows,1:n)=0;matrix(rows,indices(:,end))=terminalMap;
             bound(rows)=bound(rows)+terminalMap*(prediction.egoStateOffset(:,end)-centers(:,end));
-            if isfield(program,'restoration') && program.restoration
-                hessian=blkdiag(program.P,sparse(6*count,6*count));linear=[program.q;zeros(6*count,1)];
-            else
-                % Stage blocks 2*blkdiag(0,P_k) on the lifted state columns,
-                % assembled from triplets in one sparse call.
-                values=zeros(36,count);stateLinear=zeros(6,count);
-                for stage=1:count
-                    p=program.referenceMatrices(:,:,stage+1);block=zeros(6);block(2:6,2:6)=2*p;
-                    values(:,stage)=block(:);
-                    stateLinear(2:6,stage)=2*p*(centers(2:6,stage+1)-program.referenceStates(2:6,stage+1));
-                end
-                [blockRow,blockColumn]=ndgrid(1:6,1:6);
-                stateRows=indices(blockRow(:),:);stateColumns=indices(blockColumn(:),:);
-                hessian=sparse([1:n,n+1,stateRows(:).'],[1:n,n+1,stateColumns(:).'], ...
-                    [2*program.inputWeight(:).',2*program.slackWeight,values(:).'],total,total);
-                linear=[-2*program.inputWeight.*program.referenceInputs(:);0;stateLinear(:)];
+            % Stage blocks 2*blkdiag(0,P_k) on the lifted state columns,
+            % assembled from triplets in one sparse call.
+            values=zeros(36,count);stateLinear=zeros(6,count);
+            for stage=1:count
+                p=program.referenceMatrices(:,:,stage+1);block=zeros(6);block(2:6,2:6)=2*p;
+                values(:,stage)=block(:);
+                stateLinear(2:6,stage)=2*p*(centers(2:6,stage+1)-program.referenceStates(2:6,stage+1));
             end
+            [blockRow,blockColumn]=ndgrid(1:6,1:6);
+            stateRows=indices(blockRow(:),:);stateColumns=indices(blockColumn(:),:);
+            hessian=sparse([1:n,n+1,stateRows(:).'],[1:n,n+1,stateColumns(:).'], ...
+                [2*program.inputWeight(:).',2*program.slackWeight,values(:).'],total,total);
+            linear=[-2*program.inputWeight.*program.referenceInputs(:);0;stateLinear(:)];
             lifted.P=hessian;lifted.q=linear;
             linearCount=program.cones(2);
             retained=localDistinctRows(matrix(1:linearCount,:),bound(1:linearCount));

@@ -1,5 +1,5 @@
 classdef avoidanceSafetyGeometry
-    %avoidanceSafetyGeometry Swept separation, normal optimization and footprint distances.
+    %avoidanceSafetyGeometry Node separation, nominal support normals and footprint distances.
 
     methods (Static)
         function rows = cellRows(data)
@@ -224,109 +224,49 @@ classdef avoidanceSafetyGeometry
                 'alternatives',faces(tied,:).');
         end
 
-        function [normals,information] = supportNormals(model,prediction,plan,frames,geometry)
-        % Score whole-hold directions; a side sector selects a constraint family,
-        % never a prescribed trajectory or a passing time.
-            if nargin<5,geometry=[];end
+        function [normals,information] = supportNormals(model,prediction,plan)
+        % One analytic signed-distance direction at each nominal hold node.
+        % No sector, alternate direction scoring, or trajectory modification.
+        % At overlap the oracle returns an outward support normal, not a
+        % claim that the nominal itself already separates the rectangles.
             cells=prediction.cells;targets=numel(model.encounters);
-            normals=cell(numel(cells),1);available=true;overlaps=0;minimum=Inf;
-            switches=0;cfg=model.cfg;previous=zeros(2,targets);
-            sectors=zeros(1,targets);
-            if isfield(model,'supportSectors'),sectors=model.supportSectors;end
-            native=exist('avoidanceSupportKernelMex','file')==3;
-            nativeRows=exist('avoidanceCellRowsKernelMex','file')==3;
-            % Whole-hold midpoint poses and target centers of every cell in one
-            % batch; the per-cell values are identical to scalar evaluation.
-            cellCount=numel(cells);points=cell(cellCount,1);
-            states=zeros(6,cellCount);midTimes=zeros(1,cellCount);weights=zeros(0,1);
-            for index=1:cellCount
+            count=numel(cells);normals=cell(count,1);
+            available=true;overlaps=0;minimum=Inf;switches=0;
+            previous=zeros(2,targets);states=zeros(6,count);
+            times=reshape([cells.start],1,[]);
+            for index=1:count
                 tube=cells(index);
-                if size(tube.offset,2)~=numel(weights)
-                    degree=size(tube.offset,2)-1;
-                    weights=arrayfun(@(k)nchoosek(degree,k),0:degree).'/2^degree;
-                end
-                points{index}=reshape(pagemtimes(tube.map,plan),6,[])+tube.offset;
-                states(:,index)=points{index}*weights;
-                midTimes(index)=tube.start+tube.duration/2;
+                assert(tube.duration==0 && size(tube.offset,2)==1, ...
+                    'collisionAvoidanceController:invalidNormalNode', ...
+                    'The online nominal requires one state per hold node.');
+                states(:,index)=tube.map*plan+tube.offset;
             end
             [positions,yaws]=laneGeometry.fromFrenet(states,model.lane);
             centers=cell(1,targets);
             for targetIndex=1:targets
-                centers{targetIndex}=targetPrediction.finiteFlow(model.encounters(targetIndex),midTimes);
+                centers{targetIndex}=targetPrediction.finiteFlow(model.encounters(targetIndex),times);
             end
-            reach=repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
-                max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],prediction.stageCount,1);
-            reserveScale=4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance);
-            for index=1:cellCount
-                tube=cells(index);frame=frames(index);
-                position=positions(:,index);yaw=yaws(index);
-                if ~isempty(geometry),support=reshape(pagemtimes(abs(tube.map),reach),6,[]);end
+            native=exist('avoidanceSupportKernelMex','file')==3;
+            for index=1:count
                 normals{index}=zeros(2,targets);
                 for targetIndex=1:targets
-                    target=model.encounters(targetIndex);
-                    center=centers{targetIndex}(:,index);
-                    dimensions=[cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth];
+                    target=model.encounters(targetIndex);center=centers{targetIndex}(:,index);
+                    dimensions=[model.cfg.vehicle.length/2;model.cfg.vehicle.width/2; ...
+                        target.halfLength;target.halfWidth];
                     if native
-                        [normal,query]=avoidanceSupportKernelMex(position,yaw,center(1:2),center(7),dimensions);
+                        [normal,query]=avoidanceSupportKernelMex(positions(:,index),yaws(index),center(1:2),center(7),dimensions);
                     else
-                        [normal,query]=avoidanceSafetyGeometry.supportDirection(position,yaw,center(1:2),center(7),dimensions);
+                        [normal,query]=avoidanceSafetyGeometry.supportDirection(positions(:,index),yaws(index),center(1:2),center(7),dimensions);
                     end
-                    candidates=[normal,query.alternatives,previous(:,targetIndex),frame.tangent,-frame.tangent];
-                    if sectors(targetIndex)~=0,candidates=[candidates,sectors(targetIndex)*frame.lateral];end
-                    if ~isempty(geometry)
-                        candidates=[candidates,geometry.normals{index}(:,targetIndex)];
-                    end
-                    valid=vecnorm(candidates)>.5;
-                    if sectors(targetIndex)~=0
-                        valid=valid & sectors(targetIndex)*(frame.lateral.'*candidates)>=-1e-10;
-                    end
-                    candidates=candidates(:,valid);
-                    % First occurrence of each direction after rounding, as
-                    % unique(...,'rows','stable') on the rounded columns.
-                    rounded=round(candidates,12);distinct=true(1,size(rounded,2));
-                    for option=2:numel(distinct)
-                        distinct(option)=~any(all(rounded(:,1:option-1)==rounded(:,option),1));
-                    end
-                    candidates=candidates(:,distinct);
-                    score=zeros(1,size(candidates,2));
-                    if ~isempty(geometry)
-                        data=geometry.cellData(index);data.nominal=points{index};
-                        data.targets=data.targets(targetIndex);data.boundaries=data.boundaries([]);
-                        batch=repmat(data,size(candidates,2),1);
-                        for option=1:numel(batch),batch(option).normals=candidates(:,option);end
-                        if nativeRows
-                            queries=avoidanceCellRowsKernelMex(batch);
-                        else
-                            queries=avoidanceSafetyGeometry.cellRows(batch);
-                        end
-                    end
-                    for option=1:size(candidates,2)
-                        direction=candidates(:,option);
-                        if isempty(geometry)
-                            support=targetPrediction.rectangleSupport(target.halfLength,target.halfWidth,direction,center(7),0) ...
-                                +targetPrediction.rectangleSupport(cfg.vehicle.length/2,cfg.vehicle.width/2,direction,yaw,0);
-                            score(option)=direction.'*(position-center(1:2))-support;
-                        else
-                            rows=queries(option);selected=rows.source==1;
-                            rows.state=rows.state(selected,:);rows.bound=rows.bound(selected,:);
-                            margin=rows.bound-rows.state*points{index}-abs(rows.state)*tube.radius;
-                            offset=rows.bound-rows.state*tube.offset-abs(rows.state)*tube.radius;
-                            scale=1+abs(offset)+abs(rows.state)*support;
-                            reserve=reserveScale*scale;
-                            score(option)=min(margin-reserve,[],'all');
-                        end
-                    end
-                    best=max(score);tied=find(score>=best-1e-8*(1+abs(best)));
-                    preference=previous(:,targetIndex);
-                    if norm(preference)<.5,preference=frame.lateral;if sectors(targetIndex)<0,preference=-preference;end,end
-                    [~,choice]=max(preference.'*candidates(:,tied));normal=candidates(:,tied(choice));
+                    normals{index}(:,targetIndex)=normal;
                     if index>1,switches=switches+double(norm(normal-previous(:,targetIndex))>1e-6);end
-                    normals{index}(:,targetIndex)=normal;previous(:,targetIndex)=normal;
-                    available=available && query.available;overlaps=overlaps+double(query.signedDistance<=0);
+                    previous(:,targetIndex)=normal;
+                    available=available && query.available;
+                    overlaps=overlaps+double(query.signedDistance<=0);
                     minimum=min(minimum,query.signedDistance);
                 end
             end
-            information=struct('available',available,'overlappingMidpoints',overlaps, ...
+            information=struct('available',available,'overlappingNodes',overlaps, ...
                 'minimumAnchorDistance',minimum,'normalSwitchCount',switches, ...
                 'used',false,'witnessPreserved',false);
         end

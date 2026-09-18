@@ -59,7 +59,8 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             ego.stateTime=.1;ego.perception.time=.1;ego.heldActuatorInput=stored.appliedInput;
             target.targetPositionInertial=target.targetPositionInertial+.1*target.targetVelocityInertial;
             [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,stored);
-            testCase.verifyTrue(next.metadata.inheritedFeasibleFamily);
+            testCase.verifyTrue(next.program.inheritedPredictionFamily);
+            testCase.verifyEqual(next.metadata.inheritedFeasibleFamily,next.metadata.shiftedWitnessContained);
             testCase.verifyEqual([next.prediction.cells.stage],1:first.prediction.stageCount-1);
             testCase.verifyEqual([next.prediction.cells.time],.1*(1:first.prediction.stageCount-1),AbsTol=1e-12);
             distance=localNodeDistances(next);

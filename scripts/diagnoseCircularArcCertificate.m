@@ -3,7 +3,7 @@ function items = diagnoseCircularArcCertificate(options)
 % For each original inequality A*U<=b, b+abs(A)*inputRadius is its largest
 % possible margin over an OUTER actuator box. A negative value proves this
 % row infeasible; a positive value does not prove the full program feasible.
-% Directions are the default support family, not an exhaustive search.
+% Directions are fixed on the cruise nominal; no branch search is performed.
     arguments
         options.OutputFile (1,1) string = ""
     end
@@ -23,7 +23,7 @@ function items = diagnoseCircularArcCertificate(options)
         [model,~]=hardEncounterBarrier.prepare(model,ego,observations,[],struct());
         proposed=model.horizonSteps;
         for steps=[16,24,32,40,48,56,64]
-            model.horizonSteps=steps;model.supportSectors=1;
+            model.horizonSteps=steps;
             [program,~]=formulateAvoidanceProblem(model);
             a=program.physicalMatrix(:,program.layout.planIndex);b=program.physicalBound;
             reach=program.decisionRadius;

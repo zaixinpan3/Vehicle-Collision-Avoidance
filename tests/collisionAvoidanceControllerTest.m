@@ -31,7 +31,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
             testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.restorationSolverCallCount);
             testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
-            testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyEqual(problem.metadata.recursiveFeasibilityGuaranteed,~targetPresent);
             testCase.verifyGreaterThan(size(state.plan,2),1);
             testCase.verifyTrue(problem.metadata.predictionContinuationRetained);
             testCase.verifyTrue(state.terminal.targetIndependent);
@@ -53,11 +53,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
-            if failedStatus==-2
-                testCase.verifyGreaterThan(localFailureHook('count',[]),1);
-            else
-                testCase.verifyEqual(localFailureHook('count',[]),1);
-            end
+            testCase.verifyEqual(localFailureHook('count',[]),1);
         end
         function malformedSolvedResultsRaiseAnError(testCase,badDecision)
             [ego,target,road,cfg]=localFixture(false);

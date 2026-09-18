@@ -1,52 +1,33 @@
 # Predictive CBF and soft CLF controller
 
-> Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+The format-35 controller uses one convexification on the shifted previous
+nominal trajectory and one complete native SOCP solve per frame. At each
+hold node it computes an analytic rectangle support direction and fixes it
+for the solve. The first frame uses cruise initialization. There is no
+passing-side selection, branch enumeration, feasibility restoration or
+post-solve direction iteration.
 
-Current implementation, September 17, 2026: the format-33 controller uses
-overlap-aware support geometry and feasibility restoration. It
-retains predictive continuation across active encounters, confirmed partial
-or full target release, and prediction exhaustion. The terminal information
-set uses the same held affine generator as online prediction. The CLF retains
-its squared slack penalty, and input effort remains relative to the certificate
-operating input. The high-gain target observer is unchanged.
+The predictive continuation, fixed active-encounter exit deadline, invariant
+terminal set, actuator amplitude/slew limits, curved pose domains and squared
+CLF slack penalty remain. Input effort is relative to the CLF/LQR operating
+input. The observer is unchanged. No physical road boundaries are enabled
+in the current validation scenarios. The declared plant is the exact sampled
+held affine model, with zero process residual.
 
-Each held command has one complete Bernstein certificate, with adaptive
-polynomial order and no internal time subdivision. State-box and tire-slip
-constraints are removed; actuator amplitude and finite slew bounds remain.
-Active circular encounters use local affine pose maps with hard whole-hold
-validity domains. These domains certify the geometric approximation; they are
-not physical road boundaries or nonlinear plant-validity claims. Straight and
-target-free geometry retains actuator reachability. The terminal invariant set is
-synthesized from the same actuator limits, without hidden state/slip bounds.
+Every returned command passes independent hard-row, terminal-cone and CLF
+verification. A solver failure or deadline miss issues no command. The
+terminal feedback remains a prediction certificate only.
 
-Fresh admission searches bounded geometric support families. An analytic signed
-configuration-obstacle query supplies a finite unit direction even at overlap
-or contact. A direction defines a safe half-space; it does not certify its
-anchor. Joint sector alternatives resolve symmetric ties consistently across
-holds. No lateral path, amplitude, passing time or avoidance acceleration is
-prescribed. Controls remain optimization variables.
+A newly computed normal family can exclude the old feasible continuation.
+The controller reports that inclusion result and does not claim an automatic
+active-encounter recursive-feasibility guarantee. Target-free continuation
+retains its conditional guarantee. See
+[the convexification policy and paper comparison](SUPPORT_CONVEXIFICATION.md),
+[the conditional proof](TERMINAL_CBF_PROOF.md) and
+[CLF details](SINGLE_SOLVE_CBF_CLF.md).
 
-A colliding seed enters search-only feasibility restoration: minimize grouped,
-squared normalized collision, exit and terminal deficits with actuator limits
-and local pose domains hard.
-Whole-hold margin proposals update the geometry. A final hard-safety, soft-CLF
-solve removes every search deficit and passes independent physical verification.
-Bounded sector, exit-direction and horizon searches are incomplete; failure is
-not proof of physical infeasibility. See
-[SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
-
-After admission, first preserve the actual accepted constraint family: substitute the
-executed input in its affine family, retain the terminal cones and continuous
-swept enclosures, and condition successor information by inclusion. The
-resulting suffix supplies a feasible candidate for the next convex solve.
-New support-direction collision rows may replace the inherited rows only after
-that same suffix passes every proposed hard row and CLF/terminal cone.
-Otherwise the inherited program remains the optimization problem.
-Confirmed removal deletes only that target's obligations. A fresh target-free
-horizon may replace the suffix only when a full feasible witness is retained.
-At prediction exhaustion, the permanent invariant-set optimization still
-chooses its control freely. A terminal policy is a mathematical witness and
-never an executed fallback.
+Safety is certified at 100 ms hold nodes only; no continuous-time safety
+claim is made between them. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 
 ```matlab
 cfg = collisionAvoidanceControllerConfig();
@@ -55,17 +36,7 @@ certificate = [];
     collisionAvoidanceController(ego, targets, road, cfg, certificate);
 ```
 
-Supply timestamped complete circular perception, stable target identifiers,
-finite motion bounds, and the actual previous held input. The conditional
-recursive-feasibility proof and sensing/model assumptions are in
-[TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md). It applies after complete
-admission. Fresh target entry is a new feasibility obligation. The declared
-plant remains the zero-residual held affine model; separate nonlinear Fiala
-studies do not silently extend the online theorem.
-
-No command is issued after invalid geometry, failed convex solving
-or failed hard verification. Frame latency remains a separate requirement;
-allowing a longer offline search does not establish 100 ms operation.
-See [SINGLE_SOLVE_CBF_CLF.md](SINGLE_SOLVE_CBF_CLF.md) for the CLF derivation,
-terminal details and certificate interface, and the dated reports under
-`report/` for executed experiments.
+Supply timestamped ego measurements, complete current perception declarations,
+stable target identities, bounded target-motion contracts and the actual
+previous held actuator input. Reset stored certificates from earlier formats.
+Dated experiment outcomes and limitations belong under `report/`.
