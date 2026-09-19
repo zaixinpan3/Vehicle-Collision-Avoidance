@@ -6,7 +6,7 @@ Experiment results, validation reports, runtime analyses, and recorded implement
 
 Latest straight and circular validation: [Single-convexification retest: twenty baseline cases, five perturbed cruise recoveries and a refined inter-node clearance audit, September 18, 2026](STRAIGHT_CIRCULAR_SINGLE_SOLVE_RETEST_20260918.md).
 
-Latest runtime profiling: [Repeated admission geometry, restoration/native solves and overwritten normal proposals, September 18, 2026](CONTROLLER_RUNTIME_HOTSPOTS_20260918.md).
+Latest runtime profiling: [Current single-solve controller: warm formulation/solver costs, first-use latency and profiling isolation, September 18, 2026](SINGLE_SOLVE_RUNTIME_PROFILE_20260918.md).
 
 Latest estimator improvement: [Free-metric gain synthesis, paired noise reduction and response-lag tradeoff, September 16, 2026](NRMM_NOISE_REDUCTION_20260916.md).
 Latest estimator evaluation: [Multi-scenario campaign, September 17, 2026](NRMM_ESTIMATOR_SCENARIOS_20260917.md).
