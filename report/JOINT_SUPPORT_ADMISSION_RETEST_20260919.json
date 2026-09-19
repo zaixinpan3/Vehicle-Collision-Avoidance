@@ -1,0 +1,1580 @@
+{
+  "testedCommit": "8529584774ffd17b2cae7d2fb18aac219b2fde13",
+  "currentEntrySnapshot": {
+    "capturedAt": "2026-09-19T00:43:24.954693-05:00",
+    "baseCommit": "8529584774ffd17b2cae7d2fb18aac219b2fde13",
+    "manifest": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-source-manifest.json",
+    "manifestSha256": "95c68782b2c3d4017319e75cabf296bb9f887235c6194d746935dbd42085e90a",
+    "patch": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-source.patch",
+    "patchSha256": "165c8caf8b9825e1d8703f0c4b63e1363b46ef12e7439f9e7f2d79f7ea862d75",
+    "version": 37
+  },
+  "initialRegressionTests": {
+    "passed": 63,
+    "failed": 0,
+    "incomplete": 0
+  },
+  "snapshotRegressionTests": {
+    "passed": 19,
+    "failed": 0,
+    "incomplete": 0
+  },
+  "counts": {
+    "offlineCases": 15,
+    "offlineCompleted": 15,
+    "offlineIssuedHolds": 4500,
+    "priorFailedAdmissionsResolved": 13,
+    "sampledClearancePassed": 13,
+    "periodicCompleted": 1,
+    "periodicFailedAdmissions": 14
+  },
+  "activeSuccessorTiming": {
+    "count": 505,
+    "medianSeconds": 0.016191,
+    "maximumSeconds": 0.085474,
+    "over100Milliseconds": 0
+  },
+  "targetFreeContinuationTiming": {
+    "count": 3958,
+    "medianSeconds": 0.004509,
+    "maximumSeconds": 0.029309,
+    "over100Milliseconds": 0
+  },
+  "admissionTiming": {
+    "count": 16,
+    "medianSeconds": 0.8663894999999999,
+    "maximumSeconds": 5.93581,
+    "over100Milliseconds": 14
+  },
+  "otherTransitionTiming": {
+    "count": 21,
+    "medianSeconds": 0.005347,
+    "maximumSeconds": 0.03716,
+    "over100Milliseconds": 0
+  },
+  "allOfflineFrameTiming": {
+    "count": 4500,
+    "medianSeconds": 0.004526,
+    "maximumSeconds": 5.93581,
+    "over100Milliseconds": 14
+  },
+  "maximumJointResidual": -6.895471031187483e-05,
+  "maximumShiftedJointResidual": -6.895471031187483e-05,
+  "maximumFinalTwoSecondsError": [
+    1.9139451807098293e-05,
+    2.4148832208220616e-08,
+    1.5884252135833776e-07,
+    1.7561323517600869e-07,
+    1.587504507849502e-07
+  ],
+  "trials": [
+    {
+      "scenario": "stationary",
+      "curvature": 0,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.99965,
+        "minimumNodeSeparationMargin": 0.00022339096569223837,
+        "minimumSampledSeparationMargin": -0.024101843397543565,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/stationary-0/stationary-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.112342,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/stationary-0/stationary-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 0.99965,
+          "conicCalls": 3,
+          "restorationCalls": 2,
+          "starts": 1
+        }
+      ],
+      "activeSuccessorCount": 37,
+      "activeSuccessorMaximumSeconds": 0.085474,
+      "minimumNodeMargin": 0.00022339096569223837,
+      "minimumSampledMargin": -0.024101843397543565,
+      "minimumSampledBodyGap": 0.22589815660245643,
+      "sampledClearancePassed": false,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        3.669463022441225e-18,
+        1.5528590675732493e-18,
+        1.5884252135833776e-07,
+        3.454483533489255e-18,
+        2.941045860962778e-18
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.179607,
+        "minimumNodeSeparationMargin": 7.04783176294077e-05,
+        "minimumSampledSeparationMargin": -0.06359837287881076,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/oncoming-0/oncoming-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.104745,
+        "minimumNodeSeparationMargin": 13.349999612555678,
+        "minimumSampledSeparationMargin": 13.349999612555678,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/oncoming-0/oncoming-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 26,
+          "timeSeconds": 2.6,
+          "frameSeconds": 0.179607,
+          "conicCalls": 9,
+          "restorationCalls": 8,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 24,
+      "activeSuccessorMaximumSeconds": 0.023148,
+      "minimumNodeMargin": 7.04783176294077e-05,
+      "minimumSampledMargin": -0.06359837287881076,
+      "minimumSampledBodyGap": 0.18640162712118924,
+      "sampledClearancePassed": false,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        4.100877354321865e-17,
+        8.91399203405172e-18,
+        1.5884252135833776e-07,
+        1.0232049885047526e-17,
+        8.958003723680898e-18
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.027211,
+        "minimumNodeSeparationMargin": 9.269691160084129,
+        "minimumSampledSeparationMargin": 9.269691160084129,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/crossing-0/crossing-exact-state.mat"
+      },
+      "periodic": {
+        "completed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.01425,
+        "minimumNodeSeparationMargin": 9.269691160084129,
+        "minimumSampledSeparationMargin": 9.269691160084129,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/crossing-0/crossing-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 0.027211,
+          "conicCalls": 1,
+          "restorationCalls": 0,
+          "starts": 0
+        }
+      ],
+      "activeSuccessorCount": 6,
+      "activeSuccessorMaximumSeconds": 0.008026,
+      "minimumNodeMargin": 9.269691160084129,
+      "minimumSampledMargin": 9.269691160084129,
+      "minimumSampledBodyGap": 9.519691160084129,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        2.8380906431284075e-20,
+        4.794524919532139e-24,
+        1.5884252135833776e-07,
+        1.7545039003149346e-23,
+        1.614475795137672e-23
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 1.675965,
+        "minimumNodeSeparationMargin": 0.10009452871097824,
+        "minimumSampledSeparationMargin": 0.09767370144710436,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/stationary-0.01/stationary-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.109113,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/stationary-0.01/stationary-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 1.675965,
+          "conicCalls": 40,
+          "restorationCalls": 39,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 41,
+      "activeSuccessorMaximumSeconds": 0.045852,
+      "minimumNodeMargin": 0.10009452871097824,
+      "minimumSampledMargin": 0.09767370144710436,
+      "minimumSampledBodyGap": 0.34767370144710436,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.0314817585291118e-05,
+        1.001566041908264e-09,
+        1.1352874551562309e-07,
+        9.298307679372897e-09,
+        9.388656657671746e-09
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.01,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.559702,
+        "minimumNodeSeparationMargin": 0.0964957802687903,
+        "minimumSampledSeparationMargin": 0.0600475729601056,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/oncoming-0.01/oncoming-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.100615,
+        "minimumNodeSeparationMargin": 13.25160320830491,
+        "minimumSampledSeparationMargin": 13.25160320830491,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/oncoming-0.01/oncoming-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 26,
+          "timeSeconds": 2.6,
+          "frameSeconds": 0.559702,
+          "conicCalls": 24,
+          "restorationCalls": 23,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 24,
+      "activeSuccessorMaximumSeconds": 0.023855,
+      "minimumNodeMargin": 0.0964957802687903,
+      "minimumSampledMargin": 0.0600475729601056,
+      "minimumSampledBodyGap": 0.3100475729601056,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.0314817577693897e-05,
+        1.0015659933360066e-09,
+        1.1352874373926625e-07,
+        9.298304348703823e-09,
+        9.388652716380008e-09
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.01,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 4.649472,
+        "minimumNodeSeparationMargin": 0.10437789778110518,
+        "minimumSampledSeparationMargin": 0.09635623197999499,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/crossing-0.01/crossing-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.103016,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/crossing-0.01/crossing-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 4.649472,
+          "conicCalls": 126,
+          "restorationCalls": 125,
+          "starts": 3
+        }
+      ],
+      "activeSuccessorCount": 41,
+      "activeSuccessorMaximumSeconds": 0.041124,
+      "minimumNodeMargin": 0.10437789778110518,
+      "minimumSampledMargin": 0.09635623197999499,
+      "minimumSampledBodyGap": 0.346356231979995,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.0314817580759153e-05,
+        1.001566144256949e-09,
+        1.1352874373926625e-07,
+        9.298303946247977e-09,
+        9.388652660868857e-09
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": -0.01,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 1.37683,
+        "minimumNodeSeparationMargin": 0.09364874476372259,
+        "minimumSampledSeparationMargin": 0.08960134566239086,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/stationary--0.01/stationary-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.109686,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/stationary--0.01/stationary-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 1.37683,
+          "conicCalls": 34,
+          "restorationCalls": 33,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 43,
+      "activeSuccessorMaximumSeconds": 0.039338,
+      "minimumNodeMargin": 0.09364874476372259,
+      "minimumSampledMargin": 0.08960134566239086,
+      "minimumSampledBodyGap": 0.33960134566239086,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.0314817582104431e-05,
+        1.0015660991541386e-09,
+        1.1352874373926625e-07,
+        9.29830468177073e-09,
+        9.388653604558428e-09
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": -0.01,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.495959,
+        "minimumNodeSeparationMargin": 0.09713822297675645,
+        "minimumSampledSeparationMargin": 0.0438236583233782,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/oncoming--0.01/oncoming-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.100899,
+        "minimumNodeSeparationMargin": 13.251603208304903,
+        "minimumSampledSeparationMargin": 13.251603208304903,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/oncoming--0.01/oncoming-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 26,
+          "timeSeconds": 2.6,
+          "frameSeconds": 0.495959,
+          "conicCalls": 21,
+          "restorationCalls": 20,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 24,
+      "activeSuccessorMaximumSeconds": 0.024463,
+      "minimumNodeMargin": 0.09713822297675645,
+      "minimumSampledMargin": 0.0438236583233782,
+      "minimumSampledBodyGap": 0.2938236583233782,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.0314817577414606e-05,
+        1.0015656672079931e-09,
+        1.1352874373926625e-07,
+        9.29830309970292e-09,
+        9.388651661668135e-09
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": -0.01,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 3.588134,
+        "minimumNodeSeparationMargin": 0.09368877899739014,
+        "minimumSampledSeparationMargin": 0.08840620888598244,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/crossing--0.01/crossing-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.103093,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/crossing--0.01/crossing-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 3.588134,
+          "conicCalls": 94,
+          "restorationCalls": 93,
+          "starts": 3
+        }
+      ],
+      "activeSuccessorCount": 40,
+      "activeSuccessorMaximumSeconds": 0.03748,
+      "minimumNodeMargin": 0.09368877899739014,
+      "minimumSampledMargin": 0.08840620888598244,
+      "minimumSampledBodyGap": 0.33840620888598244,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.0314817579292444e-05,
+        1.0015657019024626e-09,
+        1.1352874373926625e-07,
+        9.298302711124862e-09,
+        9.388651384112379e-09
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.02,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.826023,
+        "minimumNodeSeparationMargin": 0.20189469020589706,
+        "minimumSampledSeparationMargin": 0.1989679171969081,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/stationary-0.02/stationary-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.101272,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/stationary-0.02/stationary-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 0.826023,
+          "conicCalls": 21,
+          "restorationCalls": 20,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 41,
+      "activeSuccessorMaximumSeconds": 0.038125,
+      "minimumNodeMargin": 0.20189469020589706,
+      "minimumSampledMargin": 0.1989679171969081,
+      "minimumSampledBodyGap": 0.4489679171969081,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.9139451807098293e-05,
+        8.017897158707488e-09,
+        1.0493153723700743e-07,
+        6.651947950797599e-08,
+        6.338935260030709e-08
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.02,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.443575,
+        "minimumNodeSeparationMargin": 0.19686474666665543,
+        "minimumSampledSeparationMargin": 0.18145490790352642,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/oncoming-0.02/oncoming-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.107354,
+        "minimumNodeSeparationMargin": 13.153486022026263,
+        "minimumSampledSeparationMargin": 13.153486022026263,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/oncoming-0.02/oncoming-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 26,
+          "timeSeconds": 2.6,
+          "frameSeconds": 0.443575,
+          "conicCalls": 19,
+          "restorationCalls": 18,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 24,
+      "activeSuccessorMaximumSeconds": 0.023814,
+      "minimumNodeMargin": 0.19686474666665543,
+      "minimumSampledMargin": 0.18145490790352642,
+      "minimumSampledBodyGap": 0.4314549079035264,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.91394518058996e-05,
+        8.01789703033795e-09,
+        1.0493153723700743e-07,
+        6.651947997982077e-08,
+        6.33893531554186e-08
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.02,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 4.689786,
+        "minimumNodeSeparationMargin": 0.21828249995686716,
+        "minimumSampledSeparationMargin": 0.21135963085924353,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/crossing-0.02/crossing-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.103094,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/crossing-0.02/crossing-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 4.689786,
+          "conicCalls": 124,
+          "restorationCalls": 123,
+          "starts": 3
+        },
+        {
+          "frameZeroBased": 224,
+          "timeSeconds": 22.400000000000002,
+          "frameSeconds": 0.022994,
+          "conicCalls": 1,
+          "restorationCalls": 0,
+          "starts": 0
+        }
+      ],
+      "activeSuccessorCount": 53,
+      "activeSuccessorMaximumSeconds": 0.03713,
+      "minimumNodeMargin": 0.21828249995686716,
+      "minimumSampledMargin": 0.21135963085924353,
+      "minimumSampledBodyGap": 0.46135963085924353,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 2,
+      "finalTwoSecondsMaximumError": [
+        1.912576797422766e-05,
+        2.4148832208220616e-08,
+        1.0513031334369316e-07,
+        1.7561323517600869e-07,
+        1.587504507849502e-07
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": -0.02,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.906756,
+        "minimumNodeSeparationMargin": 0.17299647958064124,
+        "minimumSampledSeparationMargin": 0.17192763714761777,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/stationary--0.02/stationary-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.101508,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/stationary--0.02/stationary-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 0.906756,
+          "conicCalls": 22,
+          "restorationCalls": 21,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 44,
+      "activeSuccessorMaximumSeconds": 0.037411,
+      "minimumNodeMargin": 0.17299647958064124,
+      "minimumSampledMargin": 0.17192763714761777,
+      "minimumSampledBodyGap": 0.4219276371476178,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.9139451804777233e-05,
+        8.01789725932145e-09,
+        1.0493153723700743e-07,
+        6.651948081248804e-08,
+        6.338935365501897e-08
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": -0.02,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.394151,
+        "minimumNodeSeparationMargin": 0.19926297864497072,
+        "minimumSampledSeparationMargin": 0.14234133360978263,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/oncoming--0.02/oncoming-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.105883,
+        "minimumNodeSeparationMargin": 13.153486022026263,
+        "minimumSampledSeparationMargin": 13.153486022026263,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/oncoming--0.02/oncoming-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 26,
+          "timeSeconds": 2.6,
+          "frameSeconds": 0.394151,
+          "conicCalls": 17,
+          "restorationCalls": 16,
+          "starts": 2
+        }
+      ],
+      "activeSuccessorCount": 24,
+      "activeSuccessorMaximumSeconds": 0.024211,
+      "minimumNodeMargin": 0.19926297864497072,
+      "minimumSampledMargin": 0.14234133360978263,
+      "minimumSampledBodyGap": 0.3923413336097826,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.9139451806532773e-05,
+        8.01789706503242e-09,
+        1.0493153723700743e-07,
+        6.651947967450944e-08,
+        6.338935276684055e-08
+      ],
+      "allIssuedCertified": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": -0.02,
+      "offline": {
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 5.93581,
+        "minimumNodeSeparationMargin": 0.16863267936655268,
+        "minimumSampledSeparationMargin": 0.16863267936655268,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-offline/crossing--0.02/crossing-exact-state.mat"
+      },
+      "periodic": {
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.10579,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/current-periodic/crossing--0.02/crossing-exact-state.mat"
+      },
+      "admissions": [
+        {
+          "frameZeroBased": 0,
+          "timeSeconds": 0,
+          "frameSeconds": 5.93581,
+          "conicCalls": 138,
+          "restorationCalls": 137,
+          "starts": 3
+        }
+      ],
+      "activeSuccessorCount": 39,
+      "activeSuccessorMaximumSeconds": 0.046946,
+      "minimumNodeMargin": 0.16863267936655268,
+      "minimumSampledMargin": 0.16863267936655268,
+      "minimumSampledBodyGap": 0.4186326793665527,
+      "sampledClearancePassed": true,
+      "confirmedReleases": 1,
+      "finalTwoSecondsMaximumError": [
+        1.913945180617195e-05,
+        8.017897016460163e-09,
+        1.049315354606506e-07,
+        6.651947970226502e-08,
+        6.338935248928479e-08
+      ],
+      "allIssuedCertified": true
+    }
+  ],
+  "initialCommitOffline": {
+    "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+    "seed": 20260912.0,
+    "sampleTime": 0.1,
+    "sampleCount": 300,
+    "deadlineSeconds": 30,
+    "searchTimeLimitSeconds": 30,
+    "scope": "Exact sampled affine plant, exact sensing, no road boundaries; offline algorithm study",
+    "trials": [
+      {
+        "method": "jointSupport",
+        "scenario": "stationary",
+        "curvature": 0,
+        "completed": true,
+        "sampledClearancePassed": false,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.00022339096569223837,
+        "minimumSampledSeparationMargin": -0.024101843397543565,
+        "maximumJointViolation": -9.590945390192118e-05,
+        "maximumShiftedJointViolation": -9.590945390280936e-05,
+        "restorationSolves": 2,
+        "maximumConicCalls": 3,
+        "maximumFrameSeconds": 0.994465,
+        "medianFrameSeconds": 0.0046565,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -1.8450158116694408e-19,
+          1.0602905894219738e-20,
+          1.5884252135833776e-07,
+          4.003551521604245e-20,
+          3.2450818538221544e-20
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-stationary-0"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "oncoming",
+        "curvature": 0,
+        "completed": true,
+        "sampledClearancePassed": false,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 7.04783176294077e-05,
+        "minimumSampledSeparationMargin": -0.06359837287881076,
+        "maximumJointViolation": -7.047761661960195e-05,
+        "maximumShiftedJointViolation": -0.0009123962528470031,
+        "restorationSolves": 8,
+        "maximumConicCalls": 9,
+        "maximumFrameSeconds": 0.208762,
+        "medianFrameSeconds": 0.0046064999999999995,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -5.60307543878833e-19,
+          3.676176809629589e-19,
+          1.5884252135833776e-07,
+          -9.817217042226572e-19,
+          -8.314354329040751e-19
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-oncoming-0"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "crossing",
+        "curvature": 0,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 9.269691160084129,
+        "minimumSampledSeparationMargin": 9.269691160084129,
+        "maximumJointViolation": -9.269690274928003,
+        "maximumShiftedJointViolation": -9.269690274928003,
+        "restorationSolves": 0,
+        "maximumConicCalls": 1,
+        "maximumFrameSeconds": 0.019524,
+        "medianFrameSeconds": 0.004563,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -2.8380906431284075e-20,
+          -8.444362987120276e-25,
+          1.5884252135833776e-07,
+          5.750522341992227e-24,
+          5.462846199047644e-24
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-crossing-0"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.10009452871097824,
+        "minimumSampledSeparationMargin": 0.09767370144710436,
+        "maximumJointViolation": -9.091567299890357e-05,
+        "maximumShiftedJointViolation": -9.091567299890357e-05,
+        "restorationSolves": 39,
+        "maximumConicCalls": 40,
+        "maximumFrameSeconds": 1.6659,
+        "medianFrameSeconds": 0.00472,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          1.0314817582527704e-05,
+          -1.001566005479071e-09,
+          1.1352874196290941e-07,
+          9.298301031912537e-09,
+          9.388649718777842e-09
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-stationary-0.01"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "oncoming",
+        "curvature": 0.01,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.0964957802687903,
+        "minimumSampledSeparationMargin": 0.0600475729601056,
+        "maximumJointViolation": -6.999152817810383e-05,
+        "maximumShiftedJointViolation": -7.211963389552878e-05,
+        "restorationSolves": 23,
+        "maximumConicCalls": 24,
+        "maximumFrameSeconds": 0.561677,
+        "medianFrameSeconds": 0.00455,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          1.0314817577693897e-05,
+          -1.0015650617895e-09,
+          1.1352874373926625e-07,
+          9.2983016425352e-09,
+          9.388650273889354e-09
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-oncoming-0.01"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.10437789778110518,
+        "minimumSampledSeparationMargin": 0.09635623197999499,
+        "maximumJointViolation": -6.897307479558634e-05,
+        "maximumShiftedJointViolation": -6.897307479514225e-05,
+        "restorationSolves": 125,
+        "maximumConicCalls": 126,
+        "maximumFrameSeconds": 4.527364,
+        "medianFrameSeconds": 0.004492,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          1.0314817577791041e-05,
+          -1.0015653063855101e-09,
+          1.1352874373926625e-07,
+          9.29829917228897e-09,
+          9.388648108954456e-09
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-crossing-0.01"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "stationary",
+        "curvature": -0.01,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.09364874476372259,
+        "minimumSampledSeparationMargin": 0.08960134566239086,
+        "maximumJointViolation": -7.593456055499104e-05,
+        "maximumShiftedJointViolation": -9.722742644013849e-05,
+        "restorationSolves": 33,
+        "maximumConicCalls": 34,
+        "maximumFrameSeconds": 1.342135,
+        "medianFrameSeconds": 0.0045165,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -1.0314817579194432e-05,
+          1.00156603496937e-09,
+          1.1352874373926625e-07,
+          -9.298301753557503e-09,
+          -9.388650606956261e-09
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-stationary--0.01"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "oncoming",
+        "curvature": -0.01,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.09713822297675645,
+        "minimumSampledSeparationMargin": 0.0438236583233782,
+        "maximumJointViolation": -6.998980567907154e-05,
+        "maximumShiftedJointViolation": -9.01282598708697e-05,
+        "restorationSolves": 20,
+        "maximumConicCalls": 21,
+        "maximumFrameSeconds": 0.478729,
+        "medianFrameSeconds": 0.00449,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -1.0314817577414606e-05,
+          1.001564995870008e-09,
+          1.1352874373926625e-07,
+          -9.29830094864581e-09,
+          -9.388649774288993e-09
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-oncoming--0.01"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "crossing",
+        "curvature": -0.01,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.09368877899739014,
+        "minimumSampledSeparationMargin": 0.08840620888598244,
+        "maximumJointViolation": -6.896317708138255e-05,
+        "maximumShiftedJointViolation": -6.896317708138255e-05,
+        "restorationSolves": 93,
+        "maximumConicCalls": 94,
+        "maximumFrameSeconds": 3.356631,
+        "medianFrameSeconds": 0.004474,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -1.0314817576993936e-05,
+          1.0015652786299345e-09,
+          1.1352874373926625e-07,
+          -9.298300393534298e-09,
+          -9.388648941621724e-09
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-crossing--0.01"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "stationary",
+        "curvature": 0.02,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.20189469020589706,
+        "minimumSampledSeparationMargin": 0.1989679171969081,
+        "maximumJointViolation": -9.083724389036263e-05,
+        "maximumShiftedJointViolation": -9.084390972802225e-05,
+        "restorationSolves": 20,
+        "maximumConicCalls": 21,
+        "maximumFrameSeconds": 0.83917,
+        "medianFrameSeconds": 0.0045475,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          1.913945180559949e-05,
+          -8.017897085849102e-09,
+          1.049315354606506e-07,
+          6.651947836999739e-08,
+          6.338935126803946e-08
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-stationary-0.02"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "oncoming",
+        "curvature": 0.02,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.19686474666665543,
+        "minimumSampledSeparationMargin": 0.18145490790352642,
+        "maximumJointViolation": -7.001979630150146e-05,
+        "maximumShiftedJointViolation": -0.00035680424058304183,
+        "restorationSolves": 18,
+        "maximumConicCalls": 19,
+        "maximumFrameSeconds": 0.449895,
+        "medianFrameSeconds": 0.0044975,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          1.91394518058996e-05,
+          -8.017896784007217e-09,
+          1.049315354606506e-07,
+          6.651947828673066e-08,
+          6.338935126803946e-08
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-oncoming-0.02"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "crossing",
+        "curvature": 0.02,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.21828249995686716,
+        "minimumSampledSeparationMargin": 0.21135963085924353,
+        "maximumJointViolation": -6.900260916520295e-05,
+        "maximumShiftedJointViolation": -6.901125090941207e-05,
+        "restorationSolves": 123,
+        "maximumConicCalls": 124,
+        "maximumFrameSeconds": 4.748946,
+        "medianFrameSeconds": 0.00449,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          1.912576797422766e-05,
+          -4.3469717408983755e-09,
+          1.0511056736106639e-07,
+          6.090988599605218e-08,
+          5.8302618177741294e-08
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-crossing-0.02"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "stationary",
+        "curvature": -0.02,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.17299647958064124,
+        "minimumSampledSeparationMargin": 0.17192763714761777,
+        "maximumJointViolation": -8.70472160436897e-05,
+        "maximumShiftedJointViolation": -8.70472160436897e-05,
+        "restorationSolves": 21,
+        "maximumConicCalls": 22,
+        "maximumFrameSeconds": 0.895239,
+        "medianFrameSeconds": 0.004512,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -1.913945180458121e-05,
+          8.017896711148831e-09,
+          1.049315354606506e-07,
+          -6.651947720426321e-08,
+          -6.338935021332759e-08
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-stationary--0.02"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "oncoming",
+        "curvature": -0.02,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.19926297864497072,
+        "minimumSampledSeparationMargin": 0.14234133360978263,
+        "maximumJointViolation": -6.995630805395336e-05,
+        "maximumShiftedJointViolation": -8.357933499336667e-05,
+        "restorationSolves": 16,
+        "maximumConicCalls": 17,
+        "maximumFrameSeconds": 0.393497,
+        "medianFrameSeconds": 0.004471,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -1.913945180538612e-05,
+          8.017896988704587e-09,
+          1.049315354606506e-07,
+          -6.651947878633102e-08,
+          -6.338935171212867e-08
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-oncoming--0.02"
+      },
+      {
+        "method": "jointSupport",
+        "scenario": "crossing",
+        "curvature": -0.02,
+        "completed": true,
+        "sampledClearancePassed": true,
+        "executedHolds": 300,
+        "minimumNodeSeparationMargin": 0.16863267936655268,
+        "minimumSampledSeparationMargin": 0.16863267936655268,
+        "maximumJointViolation": -6.895471031187483e-05,
+        "maximumShiftedJointViolation": -6.895471031187483e-05,
+        "restorationSolves": 137,
+        "maximumConicCalls": 138,
+        "maximumFrameSeconds": 5.932158,
+        "medianFrameSeconds": 0.004498500000000001,
+        "allIssuedCommandsCertified": true,
+        "confirmedRelease": true,
+        "finalTrackingError": [
+          -1.913945180617195e-05,
+          8.017896447470862e-09,
+          1.049315354606506e-07,
+          -6.651947970226502e-08,
+          -6.338935248928479e-08
+        ],
+        "failureTime": null,
+        "failureIdentifier": "",
+        "failureMessage": "",
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/offline/jointSupport-crossing--0.02"
+      }
+    ]
+  },
+  "initialCommitPeriodic": {
+    "startup": [
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "method": "jointSupport",
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 2,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 2.515903,
+        "minimumNodeSeparationMargin": 8.212641113075646,
+        "minimumSampledSeparationMargin": 8.212641113075646,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/startup-1/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "method": "jointSupport",
+        "completed": true,
+        "runtimeQualified": false,
+        "executedHolds": 2,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 1.65227,
+        "minimumNodeSeparationMargin": 8.212641113075646,
+        "minimumSampledSeparationMargin": 8.212641113075646,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/startup-2/stationary-exact-state.mat"
+      }
+    ],
+    "periodic": [
+      {
+        "scenario": "stationary",
+        "curvature": 0,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.122171,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/stationary-0/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.102438,
+        "minimumNodeSeparationMargin": 13.349999612555678,
+        "minimumSampledSeparationMargin": 13.349999612555678,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/oncoming-0/oncoming-exact-state.mat"
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0,
+        "method": "jointSupport",
+        "completed": true,
+        "runtimeQualified": true,
+        "executedHolds": 300,
+        "failureTime": null,
+        "failureMessage": "",
+        "maximumFrameSeconds": 0.030783,
+        "minimumNodeSeparationMargin": 9.269691160084129,
+        "minimumSampledSeparationMargin": 9.269691160084129,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/crossing-0/crossing-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.113923,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/stationary-0.01/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0.01,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.108357,
+        "minimumNodeSeparationMargin": 13.25160320830491,
+        "minimumSampledSeparationMargin": 13.25160320830491,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/oncoming-0.01/oncoming-exact-state.mat"
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.102473,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/crossing-0.01/crossing-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": -0.01,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.115507,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/stationary--0.01/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": -0.01,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.107222,
+        "minimumNodeSeparationMargin": 13.251603208304903,
+        "minimumSampledSeparationMargin": 13.251603208304903,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/oncoming--0.01/oncoming-exact-state.mat"
+      },
+      {
+        "scenario": "crossing",
+        "curvature": -0.01,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.101815,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/crossing--0.01/crossing-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.02,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.10808,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/stationary-0.02/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0.02,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.107165,
+        "minimumNodeSeparationMargin": 13.153486022026263,
+        "minimumSampledSeparationMargin": 13.153486022026263,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/oncoming-0.02/oncoming-exact-state.mat"
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0.02,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.101939,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/crossing-0.02/crossing-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": -0.02,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.10725,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/stationary--0.02/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": -0.02,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.107724,
+        "minimumNodeSeparationMargin": 13.153486022026263,
+        "minimumSampledSeparationMargin": 13.153486022026263,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/oncoming--0.02/oncoming-exact-state.mat"
+      },
+      {
+        "scenario": "crossing",
+        "curvature": -0.02,
+        "method": "jointSupport",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).). No command was issued.",
+        "maximumFrameSeconds": 0.107687,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/periodic/crossing--0.02/crossing-exact-state.mat"
+      }
+    ],
+    "baseline": [
+      {
+        "scenario": "oncoming",
+        "curvature": 0,
+        "method": "fixedNormal",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 26,
+        "failureTime": 2.6,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=2.6 s (solver exit flag -2: Clarabel status 2). No command was issued.",
+        "maximumFrameSeconds": 0.014509,
+        "minimumNodeSeparationMargin": 13.349999612555678,
+        "minimumSampledSeparationMargin": 13.349999612555678,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/baseline/oncoming-0/oncoming-exact-state.mat"
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "method": "fixedNormal",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (solver exit flag -2: Clarabel status 2). No command was issued.",
+        "maximumFrameSeconds": 0.018842,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/baseline/stationary-0.01/stationary-exact-state.mat"
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "method": "fixedNormal",
+        "completed": false,
+        "runtimeQualified": false,
+        "executedHolds": 0,
+        "failureTime": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (solver exit flag -2: Clarabel status 2). No command was issued.",
+        "maximumFrameSeconds": 0.015913,
+        "minimumNodeSeparationMargin": null,
+        "minimumSampledSeparationMargin": null,
+        "artifact": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919/baseline/crossing-0.01/crossing-exact-state.mat"
+      }
+    ]
+  },
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919"
+}
