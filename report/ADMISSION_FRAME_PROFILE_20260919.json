@@ -1,0 +1,518 @@
+{
+  "recordedAt": "2026-09-19T03:13:08.402017-05:00",
+  "testedCommit": "0bac5eecb7fcdcd83c3347e5cea1e11a396aded3",
+  "hardware": "AMD Ryzen 7 7800X3D desktop, MATLAB R2026a singleCompThread; native max_threads=1",
+  "originalFrame": {
+    "repetition": 2,
+    "scenario": "crossing",
+    "curvature": 0.02,
+    "frameZeroBased": 0,
+    "timeSeconds": 0.0,
+    "category": "admission",
+    "frameSeconds": 4.653899,
+    "solveSeconds": 2.643075,
+    "formulationSeconds": 1.809439,
+    "preparationSeconds": 0.000919,
+    "conicCalls": 124,
+    "horizonSteps": 48,
+    "nodeCertified": "1",
+    "otherSeconds": 0.2004659999999996
+  },
+  "cleanReplay": {
+    "warmups": 2,
+    "samplesSeconds": [
+      4.717721,
+      4.680097,
+      4.7559,
+      4.707558,
+      4.686704
+    ],
+    "medianSeconds": 4.707558,
+    "minimumSeconds": 4.680097,
+    "maximumSeconds": 4.7559
+  },
+  "instrumentedReplay": {
+    "warmups": 2,
+    "samplesSeconds": [
+      4.780346,
+      4.723838,
+      4.830455,
+      4.782495,
+      4.819082
+    ],
+    "representativeRepetition": 4,
+    "representativeSeconds": 4.782495,
+    "runtime": {
+      "inputPreparationSeconds": 0.002443,
+      "formulationSeconds": 1.8524759999999991,
+      "solveSeconds": 2.6928
+    },
+    "componentsInclusiveSeconds": {
+      "initialFormulation": 0.014499,
+      "certify": 0.1660530000000001,
+      "verifyJoint": 0.16612899999999983,
+      "start": 0.0,
+      "distinctRows": 0.016644999999999993,
+      "stageBuild": 0.111988,
+      "jointConic": 1.8229019999999998,
+      "reduceProgram": 0.012279000000000003,
+      "native": 2.656970999999999,
+      "inputSeconds": 0.0007245990000000001,
+      "setupSeconds": 0.12594535099999998,
+      "iterationCallSeconds": 2.525657451,
+      "outputAndFreeSeconds": 0.0024044680000000003,
+      "defaultSolve": 2.683291,
+      "solveConic": 2.6913920000000005,
+      "verifyBase": 0.018705000000000003,
+      "otherFrameSeconds": 0.23477600000000098,
+      "nativeBoundarySeconds": 0.0022391309999991726,
+      "solveOutsideNativeSeconds": 0.035829000000001,
+      "supportBuildOutsideStageSeconds": 1.7109139999999998,
+      "formulationOutsideJointConicSeconds": 0.029573999999999323
+    },
+    "counts": {
+      "initialFormulation": 1,
+      "certify": 372,
+      "verifyJoint": 248,
+      "start": 3,
+      "distinctRows": 124,
+      "stageBuild": 124,
+      "jointConic": 124,
+      "reduceProgram": 124,
+      "native": 124,
+      "defaultSolve": 124,
+      "solveConic": 124,
+      "verifyBase": 123
+    },
+    "starts": {
+      "1": {
+        "jointConicSeconds": 0.8821430000000003,
+        "solveConicSeconds": 1.08404,
+        "nativeCalls": 60,
+        "nativeSeconds": 1.067608,
+        "medianNativeIterations": 22.0,
+        "conicAndBuildSeconds": 1.9661830000000002
+      },
+      "2": {
+        "jointConicSeconds": 0.8792370000000003,
+        "solveConicSeconds": 1.5375280000000004,
+        "nativeCalls": 60,
+        "nativeSeconds": 1.520899,
+        "medianNativeIterations": 33.0,
+        "conicAndBuildSeconds": 2.4167650000000007
+      },
+      "3": {
+        "jointConicSeconds": 0.06152199999999999,
+        "solveConicSeconds": 0.06982400000000001,
+        "nativeCalls": 4,
+        "nativeSeconds": 0.068464,
+        "medianNativeIterations": 25.0,
+        "conicAndBuildSeconds": 0.13134600000000002
+      }
+    },
+    "nativeMedianSeconds": 0.01925,
+    "nativeMaximumSeconds": 0.028499,
+    "nativeStatuses": {
+      "1": 122,
+      "4": 2
+    },
+    "restorationProgram": {
+      "variables": 1163,
+      "rows": 2453,
+      "nonzeros": 9079,
+      "cones": 201
+    },
+    "hardProgram": {
+      "variables": 1162,
+      "rows": 2451,
+      "nonzeros": 9028,
+      "cones": 201
+    }
+  },
+  "search": {
+    "baseSolves": 0,
+    "restorationSolves": 123,
+    "hardSolves": 1,
+    "horizonAttempts": 1,
+    "initialOverlappingNodes": 8,
+    "histories": [
+      {
+        "start": 1,
+        "iterations": 60,
+        "initialViolation": 3.366418430518223,
+        "finalViolation": 2.863720535804208,
+        "lastDecrease": 0.00023849918618967791,
+        "lastStallThreshold": 3.8639590349903976e-07,
+        "history": [
+          3.366418430518223,
+          2.894846460926281,
+          2.8790959143042456,
+          2.878166014040812,
+          2.8777955437204845,
+          2.877488428941357,
+          2.8772136188923354,
+          2.876952454338535,
+          2.8766912905619417,
+          2.876430133652865,
+          2.8761695721649327,
+          2.8759122764373846,
+          2.875655139554864,
+          2.8753979888140986,
+          2.8751408365254636,
+          2.874883696563003,
+          2.8746267084568626,
+          2.8743702088277057,
+          2.8741137249428257,
+          2.873857246654323,
+          2.8736007543257447,
+          2.8733442611578965,
+          2.8730877706907476,
+          2.872831893078156,
+          2.872577690047777,
+          2.8723235045505824,
+          2.8720693424021344,
+          2.8718153272999447,
+          2.8715616645885973,
+          2.871307958386931,
+          2.871054248987276,
+          2.8708005673873065,
+          2.87054687568253,
+          2.8702932891546014,
+          2.8700423434072095,
+          2.8697915920495403,
+          2.869542071803747,
+          2.8692942856906987,
+          2.869047043049989,
+          2.8687997919620365,
+          2.86855252918821,
+          2.8683055954938173,
+          2.868060685165216,
+          2.867815797806445,
+          2.8675720224399988,
+          2.8673291387655553,
+          2.867087054768047,
+          2.8668451847773193,
+          2.866603316066368,
+          2.8663614466159135,
+          2.8661196022936846,
+          2.865877722967098,
+          2.8656358688390426,
+          2.8653940200428405,
+          2.8651522015748734,
+          2.86491302663105,
+          2.864674535933,
+          2.864436038533985,
+          2.8641975297572073,
+          2.8639590349903976,
+          2.863720535804208
+        ]
+      },
+      {
+        "start": 2,
+        "iterations": 60,
+        "initialViolation": 5.81446461716857,
+        "finalViolation": 0.09639133370971041,
+        "lastDecrease": 0.000713703441737934,
+        "lastStallThreshold": 1.0971050371514483e-07,
+        "history": [
+          5.81446461716857,
+          0.9945623501729086,
+          0.286669230796396,
+          0.2023178608191349,
+          0.1775663870617032,
+          0.1627352424167408,
+          0.15438310254510085,
+          0.14793769708125712,
+          0.14601300348047816,
+          0.14475239434037598,
+          0.14354631107435897,
+          0.14197870650581668,
+          0.14083170566071046,
+          0.1396944599327281,
+          0.1385657556065325,
+          0.13744532292751432,
+          0.13633402060156885,
+          0.13523361060618622,
+          0.1341416586351396,
+          0.13305823541024586,
+          0.13198340879652037,
+          0.1309172363626463,
+          0.12985978166068768,
+          0.1288110989101361,
+          0.1277712403563276,
+          0.12674025339703854,
+          0.12571818333466322,
+          0.12470507114790162,
+          0.123700954527288,
+          0.12270586794760362,
+          0.1217198428166084,
+          0.12074290586064083,
+          0.11977508178639894,
+          0.11881639203074122,
+          0.11786685411561514,
+          0.11692648302935214,
+          0.11599529019549436,
+          0.11507328366814228,
+          0.11416047011298878,
+          0.11325685197243128,
+          0.1123624297908503,
+          0.11147725574999277,
+          0.1106012719371796,
+          0.10973446494562931,
+          0.10887682361964156,
+          0.1080283341723851,
+          0.10718906745360289,
+          0.10635926429881802,
+          0.10553854994423094,
+          0.1047268992317678,
+          0.10392428705382105,
+          0.10313068622441456,
+          0.10234606625187602,
+          0.10157052950862532,
+          0.10080425644216738,
+          0.10004684528668249,
+          0.09929825771131305,
+          0.09855845504132098,
+          0.09782739744578638,
+          0.09710503715144835,
+          0.09639133370971041
+        ]
+      },
+      {
+        "start": 3,
+        "iterations": 3,
+        "initialViolation": 8.58958290095182,
+        "finalViolation": 0,
+        "lastDecrease": 1.0026576724448144,
+        "lastStallThreshold": 2.0026576724448145e-07,
+        "history": [
+          8.58958290095182,
+          4.648483242392479,
+          1.0026576724448144,
+          0
+        ]
+      }
+    ]
+  },
+  "matlabProfile": {
+    "frameSeconds": 5.311814,
+    "functions": [
+      {
+        "name": "replayAdmission",
+        "calls": 1,
+        "inclusiveSeconds": 5.324942,
+        "selfSeconds": 0.013700000000000934
+      },
+      {
+        "name": "collisionAvoidanceController",
+        "calls": 1,
+        "inclusiveSeconds": 5.311241999999999,
+        "selfSeconds": 0.002498999999999363
+      },
+      {
+        "name": "collisionAvoidanceController>localSolve",
+        "calls": 1,
+        "inclusiveSeconds": 5.265658,
+        "selfSeconds": 0.00020500000000023277
+      },
+      {
+        "name": "solveHardCbfClf>solveHardCbfClf.joint",
+        "calls": 1,
+        "inclusiveSeconds": 5.209072,
+        "selfSeconds": 0.0001129999999998077
+      },
+      {
+        "name": "solveHardCbfClf>localJointSearch",
+        "calls": 1,
+        "inclusiveSeconds": 5.208959,
+        "selfSeconds": 0.011505999999999794
+      },
+      {
+        "name": "solveHardCbfClf>localSolveConic",
+        "calls": 124,
+        "inclusiveSeconds": 2.686478,
+        "selfSeconds": 0.0017430000000002721
+      },
+      {
+        "name": "solveHardCbfClf>localRunJointProgram",
+        "calls": 124,
+        "inclusiveSeconds": 2.684735,
+        "selfSeconds": 0.003291000000000377
+      },
+      {
+        "name": "solveHardCbfClf>localDefaultSolve",
+        "calls": 124,
+        "inclusiveSeconds": 2.6779409999999997,
+        "selfSeconds": 0.013786000000000076
+      },
+      {
+        "name": "solveAvoidanceSocpMex",
+        "calls": 124,
+        "inclusiveSeconds": 2.6510269999999996,
+        "selfSeconds": 2.6510269999999996
+      },
+      {
+        "name": "avoidanceStageQp>avoidanceStageQp.joint",
+        "calls": 124,
+        "inclusiveSeconds": 2.19926,
+        "selfSeconds": 0.0006390000000005003
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic",
+        "calls": 124,
+        "inclusiveSeconds": 2.1986209999999997,
+        "selfSeconds": 1.0427299999999997
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic/pad",
+        "calls": 170374,
+        "inclusiveSeconds": 0.4499389999999999,
+        "selfSeconds": 0.4499389999999999
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic/shapeSupport",
+        "calls": 12152,
+        "inclusiveSeconds": 0.42640800000000006,
+        "selfSeconds": 0.23549500000000007
+      },
+      {
+        "name": "solveHardCbfClf>solveHardCbfClf.certify",
+        "calls": 372,
+        "inclusiveSeconds": 0.231864,
+        "selfSeconds": 0.03178599999999998
+      },
+      {
+        "name": "solveHardCbfClf>localVerifyJointPoint",
+        "calls": 248,
+        "inclusiveSeconds": 0.22754900000000003,
+        "selfSeconds": 0.0072630000000000194
+      },
+      {
+        "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.certifyJoint",
+        "calls": 249,
+        "inclusiveSeconds": 0.200078,
+        "selfSeconds": 0.04951200000000003
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic/absoluteSupport",
+        "calls": 6076,
+        "inclusiveSeconds": 0.18964,
+        "selfSeconds": 0.10136999999999999
+      },
+      {
+        "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.jointResidual",
+        "calls": 376,
+        "inclusiveSeconds": 0.186432,
+        "selfSeconds": 0.025062999999999974
+      },
+      {
+        "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.jointValue",
+        "calls": 18424,
+        "inclusiveSeconds": 0.15593,
+        "selfSeconds": 0.04345600000000001
+      },
+      {
+        "name": "avoidanceStageQp>avoidanceStageQp.build",
+        "calls": 124,
+        "inclusiveSeconds": 0.13068600000000002,
+        "selfSeconds": 0.10579000000000002
+      },
+      {
+        "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.supportValue",
+        "calls": 36851,
+        "inclusiveSeconds": 0.11249899999999999,
+        "selfSeconds": 0.022731
+      },
+      {
+        "name": "targetPrediction>targetPrediction.rectangleSupport",
+        "calls": 36853,
+        "inclusiveSeconds": 0.090417,
+        "selfSeconds": 0.090417
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic/row",
+        "calls": 48606,
+        "inclusiveSeconds": 0.062782,
+        "selfSeconds": 0.062782
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic/addCone",
+        "calls": 24180,
+        "inclusiveSeconds": 0.057402999999999996,
+        "selfSeconds": 0.057402999999999996
+      },
+      {
+        "name": "formulateAvoidanceProblem",
+        "calls": 1,
+        "inclusiveSeconds": 0.056381,
+        "selfSeconds": 0.00015600000000000336
+      },
+      {
+        "name": "formulateAvoidanceProblem>localFormulate",
+        "calls": 1,
+        "inclusiveSeconds": 0.056225,
+        "selfSeconds": 0.004677000000000001
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic/addLinear",
+        "calls": 30502,
+        "inclusiveSeconds": 0.050199999999999995,
+        "selfSeconds": 0.050199999999999995
+      },
+      {
+        "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.yawHull",
+        "calls": 12028,
+        "inclusiveSeconds": 0.044932,
+        "selfSeconds": 0.044932
+      },
+      {
+        "name": "avoidanceSafetyGeometry>localJointAllowance",
+        "calls": 249,
+        "inclusiveSeconds": 0.029255,
+        "selfSeconds": 0.026545
+      },
+      {
+        "name": "avoidanceStageQp>localJointConic/allocate",
+        "calls": 36208,
+        "inclusiveSeconds": 0.019395,
+        "selfSeconds": 0.019395
+      },
+      {
+        "name": "avoidanceStageQp>localDistinctRows",
+        "calls": 124,
+        "inclusiveSeconds": 0.018785000000000003,
+        "selfSeconds": 0.006877000000000003
+      },
+      {
+        "name": "solveHardCbfClf>localVerifyBasePoint",
+        "calls": 123,
+        "inclusiveSeconds": 0.016383,
+        "selfSeconds": 0.000962000000000001
+      }
+    ],
+    "timingCaution": "Instrumented inclusive times are nested, must not be added as disjoint phases, and are not clean real-time measurements."
+  },
+  "checks": {
+    "exactDecisionAcrossAll11Replays": true,
+    "exactViolationHistoryAcrossAll11Replays": true,
+    "originalCommandAndCallCountMatched": true,
+    "frozenSourceHashesVerified": 89,
+    "unchangedProductionBinaryHashesVerified": 103
+  },
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/admission-hotspot-20260919",
+  "artifactHashes": {
+    "fixture.mat": "beefa11208976ef8885021e1ac35e4578d28fb18d0c4278f049ee6d8b1418ba2",
+    "runner/replayAdmission.m": "842706245ce4f9697260cab71c8b75abc5497e19b16a64e3bb5172fa876a1f58",
+    "runner/admissionTiming.m": "f3676bd4165994a8f4f9e61a1f1f78262f5c1a39487955bc30bb3aa4270c4585",
+    "runner/buildProbe.m": "459bb6ebd24177009a135e28028db139dac7f3dbccf4cc9771c410e63e82b7b2",
+    "instrument.py": "71934ab56e6b3667b3154ac93b3e0ea85b146f502b82868b88541434ec8fad07",
+    "clean-result.mat": "b36bc6288ada438fc758cf98cd4f22329b393e8211f598cef0a09d476495379a",
+    "timed-result.mat": "3ff2a8a1cc7fa4a84f5ac54671c074d7cb6372f3c547c3aa9fee80bfd3bbc218",
+    "profile.mat": "3e734364fec1d610b4d66170b481293fd2d7bfe88a0564baa384359362cb5560",
+    "clean-result.json": "d99ce5367ef35b492206feda1ad431a814b8076be06ef0e0f1b5422d9751709d",
+    "timed-result.json": "7facbf3628802ec63c6fc01d77178bd22f7121ff0f5ce68303deecb074163f1a",
+    "profile-functions.json": "87e682df3c4c17a5da47c3217748d109d2519c82ff1f412f268c23aede6d6124",
+    "native/profileAvoidanceNativeMex.cpp": "5c6fec1dd9283f32477efd1b589480fbfa3c4e29dcf956b73391062474500f19",
+    "native/profileAvoidanceNativeMex.mexa64": "559e5c1795797b6ab93a52d5832eb9cd948b7c9c7c82b3aefb87debaf6dd195b"
+  }
+}
