@@ -39,7 +39,7 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             testCase.verifyEqual(avoidanceCellRowsKernelMex(data),avoidanceSafetyGeometry.cellRows(data),AbsTol=1e-10);
         end
 
-        function theAffineRowsUpperBoundThePhysicalRectangleResidual(testCase,curvature)
+        function jointSupportUpperBoundsThePhysicalRectangleResidual(testCase,curvature)
             [~,~,problem]=localAdmission(curvature);
             discrepancy=localPhysicalResidualGap(problem);
             testCase.verifyLessThanOrEqual(discrepancy,1e-10);
@@ -59,9 +59,13 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             testCase.verifyLessThan(costError,1e-7);
         end
 
-        function anOverlappingCircularSeedReportsItsSingleFamilyFailure(testCase,curvature)
-            testCase.verifyError(@()localAdmission(curvature,0), ...
-                'collisionAvoidanceController:optimizationFailed');
+        function anOverlappingCircularSeedRestoresAHardCertificate(testCase,curvature)
+            [~,~,problem]=localAdmission(curvature,0);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyGreaterThan(problem.metadata.restorationSolverCallCount,0);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
+            testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
+                -problem.program.physicalBound),0);
         end
 
         function departureCannotUseAMapOutsideItsCertifiedDomain(testCase)
@@ -135,11 +139,14 @@ function gap=localPhysicalResidualGap(problem)
     points=frame.domainCenter+frame.domainRadius.*[s(:).';d(:).';e(:).'];
     states=[points;zeros(3,size(points,2))];
     [position,heading]=laneGeometry.fromFrenet(states,problem.model.lane);
-    target=data.targets(1);rows=avoidanceSafetyGeometry.cellRows(data);selected=rows.source==1;
-    conservative=max(rows.state(selected,:)*states-rows.bound(selected,1),[],1);
+    target=data.targets(1);certificate=problem.program.jointCertificate;
+    selected=find([certificate.records.stage]==index & ~[certificate.records.isExit],1);
+    record=certificate.records(selected);angle=certificate.angles(selected);
+    conservative=zeros(1,size(points,2));
     targetSupport=targetPrediction.rectangleSupport(target.halfLength,target.halfWidth,normal,target.center(7),0);
     physical=zeros(1,size(points,2));
     for k=1:numel(physical)
+        conservative(k)=avoidanceSafetyGeometry.jointValue(record,states(:,k),angle);
         egoSupport=targetPrediction.rectangleSupport(cfg.vehicle.length/2,cfg.vehicle.width/2,normal,heading(k),0);
         physical(k)=egoSupport+targetSupport+cfg.collision.clearanceMargin-normal.'*(position(:,k)-target.center(1:2));
     end

@@ -31,7 +31,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
             testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.restorationSolverCallCount);
             testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
-            testCase.verifyEqual(problem.metadata.recursiveFeasibilityGuaranteed,~targetPresent);
+            testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
             testCase.verifyGreaterThan(size(state.plan,2),1);
             testCase.verifyTrue(problem.metadata.predictionContinuationRetained);
             testCase.verifyTrue(state.terminal.targetIndependent);
@@ -48,11 +48,14 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyTrue(active.program.completion.active);
             testCase.verifyEqual(empty.metadata.clfOperatingInput,active.metadata.clfOperatingInput);
         end
-        function failedStatusesNeverIssueAnUncertifiedCommand(testCase,failedStatus)
+        function failedImprovementReturnsOnlyTheVerifiedIncumbent(testCase,failedStatus)
             [ego,target,road,cfg]=localFixture(true);
             localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:optimizationFailed');
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.certifiedIncumbentUsed);
+            testCase.verifyEqual(problem.metadata.solverExitFlag,failedStatus);
+            testCase.verifyEqual(command.actuatorInput,problem.program.anchorPlan(1:2),AbsTol=0);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyEqual(localFailureHook('count',[]),1);
         end
         function malformedSolvedResultsRaiseAnError(testCase,badDecision)

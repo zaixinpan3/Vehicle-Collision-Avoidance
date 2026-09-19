@@ -1,20 +1,19 @@
 # Joint trajectory and separation certificates
 
-The selectable `jointSupport` research policy optimizes the input sequence and
+The controller optimizes the input sequence and
 one separation angle per target/node, including each target's terminal exit
 angle. It restores feasibility before admission and carries the complete
-accepted certificate into subsequent frames. The default `fixedNormal` policy
-remains available as the experimental baseline. This implementation certifies
+accepted certificate into subsequent frames. Joint support is the sole
+controller algorithm; there is no certificate-method selector. It certifies
 **hold nodes of the declared zero-residual sampled affine plant**. It does not
 certify the space traversed between nodes or a real-time admission deadline.
 
 ```matlab
-cfg = collisionAvoidanceControllerConfig(struct( ...
-    'controller', struct('certificateMethod', "jointSupport")));
+cfg = collisionAvoidanceControllerConfig();
 ```
 
-Use a new controller state when changing policy. Joint certificates use stored
-state format 36; the baseline uses format 35. The public controller interface,
+Start with an empty saved state after upgrading. Certificates use stored
+state format 37; earlier formats are rejected. The public controller interface,
 actuator limits, terminal continuation, sensing contracts and soft CLF remain.
 The actual paired results and reproduction commands are in
 [the September 19 report](../report/JOINT_SUPPORT_CERTIFICATES_20260919.md).
@@ -22,9 +21,9 @@ The actual paired results and reproduction commands are in
 ## Research assessment
 
 The proposed distinction between search feasibility and executable safety is
-valid. Inspection of the baseline confirmed that `formulateAvoidanceProblem`
-installs a new fixed-normal family even when it excludes the shifted witness.
-The joint policy bypasses that replacement and preserves the admitted occupied
+valid. Inspection of the retired baseline showed that it installed a new
+fixed-normal family even when that family excluded the shifted witness.
+That replacement branch has been removed. The controller preserves the admitted occupied
 sets, charts, angular directions, terminal set and absolute exit deadline.
 
 Li, Zhang, Guo, Lenzo and Guo's *Real-Time Optimal Trajectory Planning for
@@ -241,4 +240,6 @@ certificate for a complete hold enclosure and is outside this change.
   admission, uncertain multiple targets, suffix preservation and deadlines.
 
 The implementation adds no core source file or third-party dependency. Its
-twenty-file source budget and baseline behavior tests remain in force.
+twenty-file source budget remains in force. `certificateContinuationTest`
+checks default joint admission, suffix containment, changed sensing contracts,
+rejection of older saved states and target-free renewal.

@@ -35,7 +35,7 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             end
         end
 
-        function collisionRowsUseTheTargetSetAtEachNodeTime(testCase)
+        function collisionCertificatesUseTheTargetSetAtEachNodeTime(testCase)
             [ego,target,cfg,road]=localFixture();
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             geometry=problem.program.geometry;encounter=problem.model.encounters(1);
@@ -47,7 +47,10 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
                 testCase.verifyEqual(data.duration,0,AbsTol=0);
                 testCase.verifyEqual(data.degree,0,AbsTol=0);
             end
-            testCase.verifyEqual(numel(unique(geometry.cellIndex)),numel(problem.prediction.cells));
+            records=problem.program.jointCertificate.records;
+            collision=records(~[records.isExit]);
+            testCase.verifyEqual([collision.stage],1:problem.prediction.stageCount);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
         function theCarriedNodesShiftByOneHold(testCase)

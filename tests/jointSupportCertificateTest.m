@@ -12,9 +12,9 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function certificateMethodMustBeAnExactSupportedName(testCase)
+        function aRemovedCertificateSelectorIsRejected(testCase)
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
-                'controller',struct('certificateMethod',"joint"))), ...
+                'controller',struct('certificateMethod',"jointSupport"))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
 
@@ -207,7 +207,6 @@ end
 
 function [ego,target,road,cfg]=localControllerFixture()
     [ego,target,road,cfg]=encounterTestFixture.crossing();
-    cfg.controller.certificateMethod="jointSupport";
     cfg.solver.frameDeadlineSeconds=60;cfg.solver.certificateSearchTimeLimit=60;
 end
 

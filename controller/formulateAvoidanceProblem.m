@@ -1,7 +1,7 @@
 function [program,prediction,clf] = formulateAvoidanceProblem(model)
 %formulateAvoidanceProblem Common convex base and separation certificates.
-% fixedNormal recomputes a nominal slice. jointSupport retains inherited
-% occupied sets and directions and delegates convexification to the solver.
+% Retain inherited occupied sets and directions, and delegate joint trajectory
+% and support-angle convexification to the solver.
     carry=model.carriedWitness;
     if isempty(carry)
         [program,prediction,clf]=localFormulate(model);
@@ -236,55 +236,10 @@ function [program,prediction,clf] = localFormulate(model)
     program.terminalOptimization=isfield(model,'terminalOptimization') && model.terminalOptimization;
     program.feasibleWitness=localCompleteSlack(program,anchor);
     if inherited,program.inheritedWitness=program.feasibleWitness;end
-    if inherited && ~isempty(model.encounters) && cfg.controller.certificateMethod=="fixedNormal"
-        [candidate,dual,candidatePrediction]=localSupportGeometry(model,prediction,program,anchor);
-        if ~dual.available
-            error('collisionAvoidanceController:invalidSeparationNormal','A finite unit support direction is required.');
-        end
-        dual.witnessPreserved=localWitnessFeasible(candidate,localCompleteSlack(candidate,anchor));
-        program=candidate;prediction=candidatePrediction;dual.used=true;
-        program.replacementContainsWitness=dual.witnessPreserved;
-        program.inheritedFeasibleFamily=dual.witnessPreserved;
-    end
     program.supportGeometry=dual;
-    if cfg.controller.certificateMethod=="jointSupport" && ~isempty(model.encounters)
+    if ~isempty(model.encounters)
         program=avoidanceSafetyGeometry.jointProgram(program,model);
     end
-end
-
-function [candidate,information,prediction]=localSupportGeometry(model,prediction,program,anchor)
-% Recompute node normals on the carried nominal. Preserve the stored chart,
-% dynamics, terminal set and absolute deadline. Do not select old directions
-% when the new convexification excludes the shifted witness.
-    [normals,information]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor);
-    candidate=program;
-    if ~information.available,return;end
-    model.anchorPlan=anchor;prediction.geometryAnchor=anchor;
-    prediction.geometryFrames=program.geometry.frames;
-    prediction.geometryNominal=cell(numel(prediction.cells),1);
-    for index=1:numel(prediction.cells)
-        tube=prediction.cells(index);
-        prediction.geometryNominal{index}=reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
-    end
-    prediction.separationNormals=normals;
-    geometry=avoidanceSafetyGeometry.build(model,prediction);
-    collision=startsWith(geometry.label,"collision:");
-    keep=(numel(program.geometry.label)+1:numel(program.physicalLabels)).';
-    matrix=[geometry.matrix;program.physicalMatrix(keep,program.layout.planIndex)];
-    physicalBound=[geometry.physicalBound;program.physicalBound(keep)];
-    option=geometry.matrix;physical=geometry.physicalBound;
-    scale=1+abs(physical)+abs(option)*program.decisionRadius;
-    reserve=4*max(model.cfg.encounter.numericalMargin,model.cfg.solver.constraintTolerance) ...
-        *scale.*any(option~=0,2);
-    bound=[physical-reserve;program.safetyBound(keep)];
-    candidate.physicalMatrix=[matrix,zeros(numel(bound),1)];
-    candidate.physicalBound=physicalBound;candidate.safetyBound=bound;
-    candidate.physicalLabels=[geometry.label;program.physicalLabels(keep)];
-    first=program.cones(2)+1;
-    candidate.A=sparse([candidate.physicalMatrix;zeros(1,program.layout.planCount),-1;program.A(first:end,:)]);
-    candidate.b=[bound;0;program.b(first:end)];candidate.cones(2)=numel(bound)+1;
-    candidate.prediction=prediction;candidate.geometry=geometry;candidate.obstacleCbfRowCount=nnz(collision);
-    candidate.supportGeometry=information;candidate.supportGeometry.used=true;
 end
 
 function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model)

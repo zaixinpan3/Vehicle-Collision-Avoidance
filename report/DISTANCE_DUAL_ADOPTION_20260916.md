@@ -39,7 +39,7 @@ SOCP and retains full ego/target rectangles and uncertainty support. State
 boxes, tire-slip bounds, road boundaries in these scenarios, internal time
 subdivision and fallback commands are not added. The high-gain observer is
 unchanged. The complete derivation and recursion argument are in
-[current convexification documentation](../controller/SUPPORT_CONVEXIFICATION.md).
+[current convexification documentation](https://github.com/zaixinpan3/Vehicle-Collision-Avoidance/blob/8529584774ffd17b2cae7d2fb18aac219b2fde13/controller/SUPPORT_CONVEXIFICATION.md).
 
 `avoidanceSafetyGeometry.distanceDual` solves an eight-variable SOCP for the
 exact fixed-orientation Minkowski configuration polygon. Its normal is

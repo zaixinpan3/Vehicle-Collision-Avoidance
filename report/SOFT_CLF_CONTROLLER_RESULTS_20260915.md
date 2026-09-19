@@ -35,7 +35,7 @@ Positive slack can permit a tracking-error increase. Penalization alone does
 not prove zero slack or unconditional asymptotic convergence. Metadata and
 the exact-state experiment report slack, its dissipation allowance, the
 slack-dependent residual, and the unrelaxed residual separately. The full
-derivation is in [SINGLE_SOLVE_CBF_CLF.md](../controller/SINGLE_SOLVE_CBF_CLF.md).
+derivation is in [SINGLE_SOLVE_CBF_CLF.md](https://github.com/zaixinpan3/Vehicle-Collision-Avoidance/blob/8529584774ffd17b2cae7d2fb18aac219b2fde13/controller/SINGLE_SOLVE_CBF_CLF.md).
 Guarantees remain conditional on successful solves, the declared affine plant,
 valid information boxes and execution assumptions. No recursive-feasibility
 or nonlinear physical-vehicle guarantee is added.

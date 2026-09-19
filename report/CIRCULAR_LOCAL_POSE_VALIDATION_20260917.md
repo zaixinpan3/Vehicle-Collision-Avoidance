@@ -47,7 +47,7 @@ Controller state format is 33; old stored states must be reset. Rebuild the
 changed native geometry payload with
 `scripts/buildAvoidanceGeometryKernel.m`; generated solver artifacts remain
 outside the commit. The mathematical argument is updated in
-[SUPPORT_CONVEXIFICATION.md](../controller/SUPPORT_CONVEXIFICATION.md) and
+[SUPPORT_CONVEXIFICATION.md](https://github.com/zaixinpan3/Vehicle-Collision-Avoidance/blob/8529584774ffd17b2cae7d2fb18aac219b2fde13/controller/SUPPORT_CONVEXIFICATION.md) and
 [TERMINAL_CBF_PROOF.md](../controller/TERMINAL_CBF_PROOF.md).
 
 ## Experiments and limitations

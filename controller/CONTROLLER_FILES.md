@@ -3,15 +3,13 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-The default `fixedNormal` policy fixes support directions on the shifted nominal and solves one hard
-trajectory SOCP with a full input sequence and penalized first-hold CLF slack. Since
-2026-09-17 the safety rows are certified at the hold nodes only
+The controller jointly optimizes trajectories and separation angles with
+unexecuted admission restoration and subsequent hard SOCP improvement. The
+accepted complete certificate supplies the next frame's feasible incumbent.
+Safety is certified at the hold nodes only
 ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
-Its format-35 state retains the complete prediction and terminal continuation.
-See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
-The selectable [joint-support research policy](JOINT_SUPPORT_CERTIFICATES.md)
-adds angular/support variables, unexecuted restoration and retained verified
-incumbents inside these same modules, with state format 36.
+Its format-37 state retains directions, occupied sets, prediction and terminal
+continuation. See [the algorithm and guarantees](JOINT_SUPPORT_CERTIFICATES.md).
 Related operations stay in the module that owns their responsibility.
 
 The count includes every source file under `controller/`, including future
@@ -22,13 +20,13 @@ Do not move controller helpers into those directories to evade the limit.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public target-array entry; shifted-nominal direction construction and one complete convex solve per frame, complete witness storage, no command after failed search |
+| `collisionAvoidanceController.m` | Public target-array entry; joint admission and certified improvement, complete witness storage and full-frame deadline enforcement |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
-| `avoidanceStageQp.m` | Equivalent sparse stage transcription and exact duplicate-row reduction (`build`) |
-| `solveHardCbfClf.m` | One complete conic solve (`constrained`) and independent verification (`certify`) |
-| `avoidanceSafetyGeometry.m` | Node separation rows (`build`; multi-point cells keep the whole-hold Bernstein path for offline audits), analytic support proposals (`supportDirection`, `supportNormals`), rectangle distance and shared numeric kernels |
+| `avoidanceStageQp.m` | Sparse base transcription (`build`) and stage-local angular/support majorants (`joint`) |
+| `solveHardCbfClf.m` | Convex base solving (`constrained`), joint restoration/improvement (`joint`) and independent verification (`certify`) |
+| `avoidanceSafetyGeometry.m` | Joint occupied-set records, support functions, exact residuals and certification; chart construction, signed-distance initialization and offline geometry kernels |
 | `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and certified local chart bounds |
 | `ltvBicycleModel.m` | Held-input node prediction (`finitePredict`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
@@ -45,20 +43,18 @@ Do not move controller helpers into those directories to evade the limit.
 
 ## Current interfaces and scope
 
-For the default baseline, the public controller signature is unchanged. Its fourth output is a
-format-35 predictive certificate. The online path calls
-`formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained` once.
-Accepted successors retain their prediction, terminal set and absolute exit
-deadline. Node normals are recomputed from the shifted nominal without
-branch search. Inclusion of the shifted witness is reported, not enforced by
-selecting old geometry. Active-encounter recursive feasibility therefore
-requires an additional inclusion premise; see SUPPORT_CONVEXIFICATION.md.
-The terminal law is never dispatched after solver failure.
+The public controller signature is unchanged. Its fourth output is a
+format-37 predictive certificate. `formulateAvoidanceProblem(model)` retains
+the convex dynamics/terminal base and attaches collision and exit certificates.
+Accepted successors preserve their angles, occupied sets, charts, prediction,
+terminal set and absolute exit deadline. Touching majorants contain that full
+shifted witness under unchanged contracts. The terminal law is never dispatched
+after solver failure.
 
 `avoidanceStageQp.build` supplies the common sparse base. Its `joint` method
-adds stage-local support and angle epigraphs for the research policy.
-`solveHardCbfClf.joint` owns that policy's restoration and hard-improvement loop;
-the default baseline continues to use a single `constrained` call.
+adds stage-local support and angle epigraphs.
+`solveHardCbfClf.joint` owns restoration and hard improvement. Target-free
+frames solve only the common convex base with a single `constrained` call.
 Nonlinear Fiala tools retain their separate study scope. The online guarantee
 remains the declared zero-residual held affine plant.
 

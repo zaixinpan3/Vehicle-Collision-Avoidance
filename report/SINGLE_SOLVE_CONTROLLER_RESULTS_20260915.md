@@ -20,7 +20,7 @@ approaches, the joint hard problem becomes infeasible and the simulation ends.
 No recursive-feasibility, all-future target, or physical safe-stop claim remains.
 
 The complete constraints and conditional proof are in
-[Single-solve sampled CBF–CLF controller](../controller/SINGLE_SOLVE_CBF_CLF.md).
+[Single-solve sampled CBF–CLF controller](https://github.com/zaixinpan3/Vehicle-Collision-Avoidance/blob/8529584774ffd17b2cae7d2fb18aac219b2fde13/controller/SINGLE_SOLVE_CBF_CLF.md).
 The obstacle approximation encloses footprints by circumdisks, chooses one
 geometric direction per hold, enforces a robust sampled barrier decrease, and
 retains Bernstein inequalities for intersample separation. Circumdisks and

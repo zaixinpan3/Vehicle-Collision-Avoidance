@@ -2,6 +2,11 @@
 
 Date: September 19, 2026. Project B: Collision Avoidance.
 
+Historical experiment revision: `8529584774ffd17b2cae7d2fb18aac219b2fde13`.
+The paired results and commands below describe that revision. Joint support
+subsequently became the sole algorithm; current usage is documented in
+[JOINT_SUPPORT_CERTIFICATES.md](../controller/JOINT_SUPPORT_CERTIFICATES.md).
+
 The selectable `jointSupport` policy completes all nine tested straight/circular
 encounters over 120 holds, compared with two completions for the default
 `fixedNormal` baseline. All 1,080 final joint-policy commands have independently

@@ -2,18 +2,19 @@
 
 > Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 
-This is the format-35 conditional continuation proof. The implemented terminal certificate uses the **same held affine
+This is the format-37 conditional continuation proof. The implemented terminal certificate uses the **same held affine
 plant** as the online predictor. Its feedback is a feasible prediction candidate;
 it is never an actuator fallback. `hardEncounterBarrier`,
 `formulateAvoidanceProblem`, and `solveHardCbfClf.certify` implement the objects
 below. Numerical tests validate the implementation; the induction below, not
 simulation duration, establishes the recursive statement when all premises hold.
 
-**Active-encounter limitation:** format 35 always recomputes support directions
-on the shifted nominal and never selects old collision geometry on failure.
-Premise 7 below is therefore an additional condition, not an established
-property of every online frame. Metadata does not claim automatic recursive
-feasibility during active encounters. Target-free continuation is unchanged.
+**Active encounters:** the complete shifted certificate includes its occupied
+sets and separation angles. Touching support majorants establish premise 7
+under unchanged contracts, as derived in
+[JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md). This proves
+subproblem nonemptiness after admission, not global admission or timely
+numerical completion. Target-free continuation uses the same terminal proof.
 
 ## 1. Statement and declared scope
 
@@ -46,16 +47,15 @@ collision and permanent actuator-amplitude/slew constraints, provided that:
    Centerline samples / analytic arc length describe the reference;
    they are not physical end-of-road barriers. Smooth profiles additionally require
    the hard reference-phase domain and the verified six-dimensional terminal family.
-6. A returned numerical solution passes the independent hard-row and terminal
-   cone verification. To execute an indefinitely safe physical sequence, a
-   valid solve must also finish before each actuation deadline. Mathematical
+6. A returned candidate passes independent physical-row, nonlinear support,
+   CLF and terminal-cone verification. This may be an improved solution or a
+   reverified incumbent. Command acceptance must finish before each actuation deadline. Mathematical
    nonemptiness does not imply numerical completion within 100 ms.
 
-7. At every active-encounter update, the newly fixed normal family contains
-   the shifted feasible witness (or another explicitly verified feasible
-   candidate). Nominal closest-distance normals do not automatically imply
-   this robust-row inclusion. The controller reports the current check, but
-   does not enforce this premise across all future updates.
+7. Every active-encounter update retains the shifted occupied sets, angles,
+   charts and numerical bounds, and constructs a touching majorant at that
+   complete witness. This inclusion is implemented, rather than imposed as
+   an extra assumption on newly chosen fixed normals.
 
 These are explicit model/sensing/admission conditions, not claims about arbitrary
 unseen traffic or a nonlinear physical vehicle. The target high-gain observer
@@ -126,7 +126,7 @@ $p+1$ and may therefore exceed the configured minimum Taylor order.
 On a straight reference the geometry uses the actuator-reachable tube to
 bound station, lateral displacement and heading. Active circular encounters
 instead use the certified local pose map and exact affine yaw described in
-[SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md). Six hard box rows on
+[JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md). Six hard box rows on
 every uncertain Bernstein coefficient establish whole-hold validity of the
 Taylor remainder and footprint majorant. They constrain only the selected
 convex approximation domain, not road width or tire slip. The terminal exit
@@ -306,11 +306,12 @@ shrinkage is used when certifying the finite plan.
 ## 4. Complete finite encounter witness
 
 An accepted witness stores its input sequence, exact affine node maps,
-uncertainty enclosures, whole-hold Bernstein tubes, geometry, physical row labels,
+uncertainty enclosures, occupied sets and angles, charts, physical row labels,
 terminal cones, finite exit directions/deadline, and common cruise generator.
-The hard affine family is `M U <= b`. It includes collision separation,
-actuator bounds, slew and robust terminal-entry/exit rows.
-The terminal SOCs are also stored. Safety constraints have no slack. The
+The hard affine base is `M U <= b`. It includes actuator bounds, slew,
+chart domains and robust terminal-entry rows. Nonlinear support certificates
+enforce collision separation and sensing-range exit; they are stored together
+with the terminal SOCs. Executable safety constraints have no slack. The
 first-hold CLF has an unbounded nonnegative norm slack with a squared cost.
 
 Target finite-flow tubes include the admitted Cartesian jerk and yaw-
@@ -331,13 +332,13 @@ substitute it in every stored affine row and terminal cones:
  M_+ U^+\le b-M_0u_0. \tag{9}
 \]
 
-Do the identical substitution in the exact node maps and swept enclosures.
+Do the identical substitution in the exact node maps and uncertainty enclosures.
 The accepted suffix is feasible by substitution. Rows concerning only the
 already executed prefix may be removed. There is no additional tightening,
 relinearization, chart change or normal reselection in this inherited family.
 Conditioning only restricts the covered physical states.
 
-Confirmed release removes `collision:<key>` and `exit:<key>` rows for that
+Confirmed release removes collision and exit certificate records for that
 key. The remaining input/slew/terminal obligations stay intact.
 Completion directions are indexed by stable target keys. Removing an obligation
 cannot invalidate the old suffix. In particular, **partial release no longer
@@ -346,19 +347,18 @@ forces an unproved fresh admission of all remaining obligations**.
 The first-hold CLF cannot remove this candidate: for any finite hard-feasible
 input its cone can be satisfied by a finite nonnegative slack.
 
-### Support-direction collision-row replacement
+### Complete-certificate convexification
 
-The controller computes signed configuration-obstacle normals at every node
-of the shifted nominal and always uses them in the new convex program.
-Footprint, uncertainty and affine-map remainder allowances remain hard.
-Checking the shifted suffix against all rows and cones establishes feasibility
-of this particular update when successful. When that check fails, the new
-program is still solved once; no old-family selection occurs. A successful
-hard-certified result supplies a new finite continuation, but it does not
-prove that the following direction update will be feasible. Thus the
-induction requires premise 7. Exit directions, absolute deadlines and
+The inherited occupied sets cover the conditioned successor sets. For the
+same inherited angle, their support residual cannot increase. Thus the
+accepted suffix and angles remain feasible. A convex majorant that equals
+the nonlinear residual at that full witness contains the witness, establishing
+premise 7 and nonemptiness of the next hard SOCP. Both collision and exit
+angles remain free in the improvement solve. Numerical acceptance verifies
+the true support residuals and the base constraints independently, and can
+retain the certified incumbent if improvement fails. Absolute deadlines and
 terminal conditions remain inherited. See
-[SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
+[JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
 
 ### Fresh no-target performance horizon
 

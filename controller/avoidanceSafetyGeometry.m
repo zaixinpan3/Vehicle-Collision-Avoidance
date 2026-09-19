@@ -217,7 +217,7 @@ classdef avoidanceSafetyGeometry
         % These independent position/yaw enclosures are fixed at admission;
         % conditioning never replaces them with a larger product enclosure.
             inherited=program.inheritedPredictionFamily;
-            if inherited && isfield(model.carriedWitness.program,'jointCertificate')
+            if inherited
                 certificate=model.carriedWitness.program.jointCertificate;
                 keep=[certificate.records.stage]>1 & ...
                     ~ismember(string({certificate.records.key}),model.dischargedTargetKeys);

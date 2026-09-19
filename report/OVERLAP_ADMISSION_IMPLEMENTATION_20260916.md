@@ -179,7 +179,7 @@ partial target release, curved continuation and the core source budget remain
 part of the repository regression suite.
 
 The current mathematical scope is documented in
-[SUPPORT_CONVEXIFICATION.md](../controller/SUPPORT_CONVEXIFICATION.md) and
+[SUPPORT_CONVEXIFICATION.md](https://github.com/zaixinpan3/Vehicle-Collision-Avoidance/blob/8529584774ffd17b2cae7d2fb18aac219b2fde13/controller/SUPPORT_CONVEXIFICATION.md) and
 [TERMINAL_CBF_PROOF.md](../controller/TERMINAL_CBF_PROOF.md). The complete regression result was **621 passed, zero failed, zero incomplete**
 in 552.733 s. The full command was
 `matlab -batch "results=runtests('tests'); assertSuccess(results)"`; the executed

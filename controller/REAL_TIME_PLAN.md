@@ -1,6 +1,6 @@
 # Real-time plan for the information-state PCBF controller
 
-> Historical design: the current online algorithm is [the single-solve sampled CBF–CLF controller](SINGLE_SOLVE_CBF_CLF.md). Its one-hold guarantee does not use the continuation architecture analyzed below.
+> Historical design: the current online algorithm is [joint trajectory/support optimization](JOINT_SUPPORT_CERTIFICATES.md). The current certificate and its scope supersede the design analyzed below.
 
 Current implementation: [format-24 hard-constrained optimization without a
 runtime checker](SAMPLED_BACKUP_CBF_CLF.md), September 15, 2026. The

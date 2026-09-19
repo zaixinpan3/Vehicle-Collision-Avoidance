@@ -40,7 +40,7 @@ requirement. The final experiments below retain both limitations explicitly.
 The implementation uses the existing controller modules. No historical
 executable variant or alternate controller is added. The current algorithm,
 CLF equations and guarantee limits are documented in
-[the controller contract](../controller/SINGLE_SOLVE_CBF_CLF.md).
+[the controller contract](https://github.com/zaixinpan3/Vehicle-Collision-Avoidance/blob/8529584774ffd17b2cae7d2fb18aac219b2fde13/controller/SINGLE_SOLVE_CBF_CLF.md).
 
 ## Feasibility argument and remaining scope
 

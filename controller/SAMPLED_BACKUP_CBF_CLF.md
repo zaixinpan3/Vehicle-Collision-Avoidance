@@ -1,6 +1,6 @@
 # Hard-constrained backup CBF and cruise CLF
 
-> Historical design: the current online algorithm is [the single-solve sampled CBF–CLF controller](SINGLE_SOLVE_CBF_CLF.md). Its one-hold guarantee does not use the continuation architecture analyzed below.
+> Historical design: the current online algorithm is [joint trajectory/support optimization](JOINT_SUPPORT_CERTIFICATES.md). The current certificate and its scope supersede the design analyzed below.
 
 September 15, 2026. Certificate format 24 replaces format 23's prescribed
 rollout checker with a **two-variable hard-constrained optimizer**. No

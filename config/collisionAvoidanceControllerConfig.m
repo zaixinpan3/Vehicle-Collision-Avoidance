@@ -34,12 +34,12 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % Signed support geometry defines the collision convexification. Continuations
-    % retain one convex program; the terminal policy remains a certificate only.
+    % Joint support certificates define collision and encounter-exit constraints.
+    % Continuations retain the complete certificate, including its directions.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
-        "poseTrustRadius",[2;4;0.5],"certificateMethod","fixedNormal");
-    % jointSupport is an experimental admission/continuation method. Step
+        "poseTrustRadius",[2;4;0.5]);
+    % Admission restoration and certified continuation use the same method. Step
     % radii are metres and radians; restoration slack is never executable.
     cfg.jointCertificate = struct("maximumIterations",60,"maximumStarts",5, ...
         "positionStep",4.0,"angleStep",0.5,"proximalWeight",1.0e-3, ...
@@ -192,10 +192,6 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
-    if ~isscalar(string(cfg.controller.certificateMethod)) ...
-            || ~any(string(cfg.controller.certificateMethod)==["fixedNormal","jointSupport"])
-        error('collisionAvoidanceController:invalidConfiguration','Unknown separation certificate method.');
-    end
     for name = ["maximumIterations","maximumStarts"]
         validateattributes(cfg.jointCertificate.(name),{'double'}, ...
             {'scalar','real','finite','integer','positive'});

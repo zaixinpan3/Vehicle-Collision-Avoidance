@@ -25,19 +25,22 @@ its box,
 
 1. the ego rectangle and the target's bounded reachable set at time `t_k` are
    separated by the selected support half-space by at least the clearance
-   margin (collision rows),
+   margin (joint support certificates),
 2. the state lies in the local Frenet chart domain of that node (pose-domain
    rows) and, for scheduled references, within the reference phase band and the
    lateral regularity radius (phase rows),
 3. the terminal node `N` lies in the modal terminal set and satisfies the
-   finite-exit row (unchanged),
+   finite-exit support certificate,
 
 together with the actuator amplitude and slew rows on the held inputs and the
-soft first-hold CLF cone (unchanged). Recursive feasibility is inherited node
-by node: the shifted plan satisfies rows at nodes `2, ..., N` because they
-were certified in the previous frame, and the terminal set's invariance
-supplies node `N+1`. The independent certificate (`solveHardCbfClf.certify`)
-checks exactly these rows on the returned decision.
+soft first-hold CLF cone. The current joint formulation also optimizes each
+certificate's unit direction. Under unchanged contracts, the shifted plan
+and its retained directions certify nodes `2, ..., N`; touching majorants
+contain that complete witness in the next optimization. The active horizon
+shrinks toward the fixed exit deadline. After confirmed release, terminal
+invariance supplies target-free continuation. The independent verifier
+(`solveHardCbfClf.certify`) checks physical rows, cones and the true nonlinear
+support residuals. See [JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
 
 ## What is not certified
 
@@ -59,7 +62,6 @@ polynomial enclosure of the exact flow with a 1e-11 truncation remainder. At
 rows for a 48-hold admission; the node certificate imposes the same row
 families once per node. The whole-hold statements in
 `INFORMATION_STATE_PCBF.md`, `TERMINAL_CBF_PROOF.md`,
-`SINGLE_SOLVE_CBF_CLF.md`, `SUPPORT_CONVEXIFICATION.md`,
 `CURVED_CRUISE_CERTIFICATE.md` and `LTV_BICYCLE_MODEL.md` now hold at the
 nodes only.
 
@@ -76,9 +78,10 @@ nodes only.
   for offline audits. The native kernels were regenerated.
 - `formulateAvoidanceProblem.localShift` reconstructs the node clock as
   `stage*h` when the executed hold is eliminated.
-- The lifted transcription, single complete solve, terminal
-  rows, CLF and certificate are unchanged; they consume the same row
-  structures with one point per cell.
+- `avoidanceSafetyGeometry.jointProgram` uses those node enclosures to build
+  collision and exit records with angular decisions. `avoidanceStageQp.joint`
+  constructs their support majorants. Admission may require several conic
+  solves; a certified active successor needs only one hard improvement.
 - `stateUncertainty.heldInterval` and `ltvBicycleModel.fixedPredict` remain
   for the scheduled terminal-family synthesis (whose whole-hold phase
   condition is stronger than the node condition and therefore still valid)

@@ -1,10 +1,10 @@
 # Curved-road cruise working point and CLF certificate
 
-Current direction-policy scope (September 18, 2026): format 35 retains the
-reference/terminal ingredients described here but always recomputes collision
-normals on the shifted nominal. Active-encounter recursive feasibility also
-requires the new family's witness inclusion; this is no longer enforced by
-selecting old geometry. See [SUPPORT_CONVEXIFICATION.md](SUPPORT_CONVEXIFICATION.md).
+Current certificate scope (September 19, 2026): format 37 retains the
+reference/terminal ingredients described here together with the accepted
+occupied sets and separation angles. Touching majorants at the complete
+shifted witness preserve subproblem feasibility under unchanged contracts.
+See [JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
 
 > Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 

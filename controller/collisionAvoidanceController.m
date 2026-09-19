@@ -6,9 +6,8 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % plant, not between nodes (NODE_SAMPLED_CERTIFICATE.md).
 % Store the accepted prediction and terminal witness for next-frame transfer.
 % The terminal law is a mathematical continuation, never a runtime fallback.
-% fixedNormal uses one nominal-direction solve. The jointSupport research
-% policy restores free-angle certificates, then retains verified incumbents.
-% Neither policy executes an unverified trajectory or restoration iterate.
+% Joint support optimization restores free-angle certificates, then retains
+% verified incumbents. Restoration iterates are never executable commands.
     persistent lastState
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -147,7 +146,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
         end
     end
     data = hardEncounterBarrier.carriedData(prediction,program,prediction.stageCount);
-    controllerState = struct('version',35+double(cfg.controller.certificateMethod=="jointSupport"), ...
+    controllerState = struct('version',37, ...
         'appliedInput',firstInput,'stateTime',model.stateTime, ...
         'identity',identity,'plan',predictedInput,'decision',result.decision, ...
         'predictedState',states,'stateErrorBound',prediction.initialErrorBound, ...
@@ -296,8 +295,8 @@ function command = localCommand(firstInput, state, scheduleSpeed, scheduleCurvat
 end
 
 function [program,prediction,clf,result,search]=localSolve(model,cfg)
-% Both policies use the same convex dynamics, CLF and terminal base. Only
-% jointSupport replaces directional slices with variable-angle certificates.
+% Active encounters add variable-angle certificates to the convex base.
+% Without encounters, only the common dynamics, CLF and terminal solve remains.
     phase=tic;
     [program,prediction,clf]=formulateAvoidanceProblem(model);
     formulationSeconds=toc(phase);
@@ -313,5 +312,5 @@ function [program,prediction,clf,result,search]=localSolve(model,cfg)
         'familyAttempts',0,'horizonAttempts',1, ...
         'formulationSeconds',formulationSeconds,'solveSeconds',toc(phase), ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
-        'policy',"shiftedNominalSingleSolve");
+        'policy',"jointSupport");
 end

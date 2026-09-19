@@ -1,8 +1,9 @@
-classdef shiftedNominalConvexificationTest < matlab.unittest.TestCase
-    %shiftedNominalConvexificationTest One nominal-based convex solve and hard acceptance.
+classdef certificateContinuationTest < matlab.unittest.TestCase
+    %certificateContinuationTest Joint admission, shifted certificates and hard acceptance.
     properties (TestParameter)
         geometry=struct('aligned',[12;0;0;0], ...
             'rotated',[8;5;.6;-.3],'corner',[5.2;2.1;0;0]);
+        previousVersion={30,35,36};
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -52,7 +53,7 @@ classdef shiftedNominalConvexificationTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.program.physicalMatrix(:,end),zeros(numel(problem.program.physicalBound),1),AbsTol=0);
         end
 
-        function updatingDirectionsKeepsTheCertifiedSuffixAndExitDeadline(testCase)
+        function shiftingTheCompleteCertificateKeepsTheSuffixAndExitDeadline(testCase)
             [ego,target,cfg,road]=localFixture();
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             x=stored.predictedState(:,2);
@@ -67,7 +68,11 @@ classdef shiftedNominalConvexificationTest < matlab.unittest.TestCase
                 pagemtimes(next.prediction.egoStateMatrix,witness),6,[]);
             testCase.verifyEqual(nominal,stored.predictedState(:,2:end),AbsTol=1e-10);
             testCase.verifyEqual(next.metadata.nominalSource,"shiftedPreviousSolution");
-            testCase.verifyLessThan(localNormalError(next),1e-10);
+            retained=first.program.jointCertificate;
+            angles=retained.angles([retained.records.stage]>1);
+            testCase.verifyEqual(next.metadata.admissionSearch.initialCertificateAngles,angles,AbsTol=0);
+            shiftedResidual=avoidanceSafetyGeometry.jointResidual(next.program,[witness;0],angles);
+            testCase.verifyLessThanOrEqual(max(shiftedResidual),0);
             testCase.verifyEqual(next.metadata.solverCallCount,1);
             testCase.verifyTrue(next.metadata.supportGeometry.used);
             testCase.verifyTrue(next.metadata.supportGeometry.witnessPreserved);
@@ -82,33 +87,38 @@ classdef shiftedNominalConvexificationTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(updates,0);
         end
 
-        function overlappingStraightStationarySeedCanBeSolvedWithoutRestoration(testCase)
+        function overlappingStraightStationarySeedIsRestoredBeforeAdmission(testCase)
             [ego,target,cfg,road]=localFixture();target=localRejectedTarget(target,"stationary");
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
+            testCase.verifyGreaterThan(problem.metadata.restorationSolverCallCount,0);
             testCase.verifyGreaterThan(problem.metadata.admissionSearch.initialOverlappingNodes,0);
-            testCase.verifyEqual(problem.metadata.solverCallCount,1);
+            testCase.verifyGreaterThan(problem.metadata.solverCallCount,1);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision-problem.program.physicalBound),0);
             testCase.verifyEqual(command.actuatorInput,problem.inputPlan(:,1),AbsTol=0);
             testCase.verifyFalse(problem.metadata.fallbackUsed);
         end
 
-        function anInfeasibleOncomingConvexificationDoesNotRetry(testCase)
+        function oncomingAdmissionSearchesForAHardCertificate(testCase)
             [ego,target,cfg,road]=localFixture();target=localRejectedTarget(target,"oncoming");
             localCountedSolve('reset',[]);cfg.solver.jointFunction=@localCountedSolve;
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:optimizationFailed');
-            testCase.verifyEqual(localCountedSolve('count',[]),1);
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyGreaterThan(problem.metadata.restorationSolverCallCount,0);
+            testCase.verifyEqual(localCountedSolve('count',[]),problem.metadata.solverCallCount);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
-        function initialDirectionsComeOnlyFromTheNominalRectangles(testCase)
+        function admissionOptimizesTheInitialSeparationDirections(testCase)
             [ego,target,cfg,road]=localFixture();target=localRejectedTarget(target,"stationary");
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyLessThan(localNormalError(problem),1e-10);
+            increment=problem.program.jointCertificate.angles ...
+                -problem.metadata.admissionSearch.initialCertificateAngles;
+            testCase.verifyGreaterThan(norm(atan2(sin(increment),cos(increment))),1e-3);
             testCase.verifyEqual(problem.metadata.nominalSource,"cruiseInitialization");
-            testCase.verifyEqual(problem.metadata.admissionSearch.familyAttempts,0);
-            testCase.verifyFalse(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyEqual(problem.metadata.convexificationPolicy,"jointSupport");
         end
 
         function newTargetUsesTheShiftedPreviousControlsAsItsNominal(testCase)
@@ -122,8 +132,8 @@ classdef shiftedNominalConvexificationTest < matlab.unittest.TestCase
             shifted=stored.plan(:,2:end);n=min(numel(shifted),next.program.layout.planCount);
             testCase.verifyEqual(next.program.anchorPlan(1:n),shifted(1:n).',AbsTol=0);
             testCase.verifyFalse(next.metadata.inheritedFeasibleFamily);
-            testCase.verifyEqual(next.metadata.solverCallCount,1);
-            testCase.verifyLessThan(localNormalError(next),1e-10);
+            testCase.verifyTrue(next.metadata.planCertified);
+            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
         end
 
         function sparseRealizationPreservesAllRowsAndTheObjective(testCase)
@@ -134,7 +144,7 @@ classdef shiftedNominalConvexificationTest < matlab.unittest.TestCase
             testCase.verifyLessThan(costError,1e-7);
         end
 
-        function aRejectedSingleSolveCannotIssueACommand(testCase)
+        function failedAdmissionCannotIssueACommand(testCase)
             [ego,target,cfg,road]=localFixture();target=localRejectedTarget(target,"stationary");
             cfg.solver.jointFunction=@localRejectHard;
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
@@ -174,10 +184,10 @@ classdef shiftedNominalConvexificationTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(next.metadata.measurementRadiusLimit,ego.controllerStateErrorBound);
         end
 
-        function aPreviousFormatCertificateIsNotImported(testCase)
+        function aPreviousFormatCertificateIsNotImported(testCase,previousVersion)
             [ego,target,cfg,road]=localFixture();
             [~,~,~,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            stored.version=30;
+            stored.version=previousVersion;
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,stored), ...
                 'collisionAvoidanceController:invalidControllerState');
         end
@@ -241,18 +251,6 @@ function [rowError,costError]=localLiftErrors(program)
             .5*augmented.'*lifted.P*augmented+lifted.q.'*augmented];
     end
     costError=abs(diff(values(:,1))-diff(values(:,2)));
-end
-
-function error=localNormalError(problem)
-    error=0;cfg=problem.model.cfg;
-    for index=1:numel(problem.prediction.cells)
-        tube=problem.prediction.cells(index);state=tube.map*problem.program.anchorPlan+tube.offset;
-        [position,yaw]=laneGeometry.fromFrenet(state,problem.model.lane);
-        target=problem.model.encounters(1);center=targetPrediction.finiteFlow(target,tube.time);
-        [~,expected]=avoidanceSafetyGeometry.rectangleDistance(position,yaw,center(1:2),center(7), ...
-            [cfg.vehicle.length/2;cfg.vehicle.width/2;target.halfLength;target.halfWidth]);
-        error=max(error,norm(problem.program.geometry.normals{index}(:,1)-expected));
-    end
 end
 
 function result=localCountedSolve(action,program)

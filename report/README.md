@@ -1,14 +1,16 @@
 # Experiment reports
 
-Latest research implementation: [Joint trajectory/support certificates, admission restoration and retained feasibility](JOINT_SUPPORT_CERTIFICATES_20260919.md). The selectable `jointSupport` policy is compared with the default `fixedNormal` baseline. Admission latency and inter-node clearance limitations remain explicit.
+Current controller: [Joint trajectory/support certificates](../controller/JOINT_SUPPORT_CERTIFICATES.md) are the sole algorithm. The method selector and fixed-normal execution path have been removed. Admission latency and inter-node clearance limitations remain explicit.
 
-Default controller baseline: [Shifted nominal, one convex solve, and straight/circular validation](SHIFTED_NOMINAL_SINGLE_SOLVE_20260918.md).
+Latest implementation validation: [Remove the legacy algorithm and rerun joint admission/continuation](JOINT_SUPPORT_ONLY_20260919.md).
+
+Research comparison before removal: [Joint admission, retained feasibility and nine straight/circular trials](JOINT_SUPPORT_CERTIFICATES_20260919.md).
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest straight and circular validation: [Single-convexification retest: twenty baseline cases, five perturbed cruise recoveries and a refined inter-node clearance audit, September 18, 2026](STRAIGHT_CIRCULAR_SINGLE_SOLVE_RETEST_20260918.md).
+Historical fixed-normal validation: [Single-convexification retest: twenty cases, five perturbed cruise recoveries and a refined inter-node clearance audit, September 18, 2026](STRAIGHT_CIRCULAR_SINGLE_SOLVE_RETEST_20260918.md).
 
-Latest runtime profiling: [Current single-solve controller: warm formulation/solver costs, first-use latency and profiling isolation, September 18, 2026](SINGLE_SOLVE_RUNTIME_PROFILE_20260918.md).
+Historical runtime profiling: [Single-solve controller: warm formulation/solver costs, first-use latency and profiling isolation, September 18, 2026](SINGLE_SOLVE_RUNTIME_PROFILE_20260918.md).
 
 Latest estimator improvement: [Free-metric gain synthesis, paired noise reduction and response-lag tradeoff, September 16, 2026](NRMM_NOISE_REDUCTION_20260916.md).
 Latest estimator evaluation: [Multi-scenario campaign, September 17, 2026](NRMM_ESTIMATOR_SCENARIOS_20260917.md).
@@ -31,7 +33,7 @@ Latest diagnosis: [Stationary and oncoming distance-dual initialization failures
 
 Latest admission design review: [Overlap-aware support directions, temporal conflicts and hard-feasibility ablation, September 16, 2026](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md).
 
-Current convexifications: [Default fixed-normal baseline](../controller/SUPPORT_CONVEXIFICATION.md) and [joint-support research policy](../controller/JOINT_SUPPORT_CERTIFICATES.md). Dated reports below retain their historical findings.
+Current formulation: [Joint support certificates](../controller/JOINT_SUPPORT_CERTIFICATES.md). Dated reports below retain their historical findings.
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 
