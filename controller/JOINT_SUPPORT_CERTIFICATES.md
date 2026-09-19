@@ -81,7 +81,13 @@ f(x,\theta)=d+\rho_p+h_{B_E}(n(\theta-\psi(x)))
  -n(\theta)^\top r(x).
 \]
 
-The certificate is \(f\le0\). It implies that every pair of points in the
+For collision records, \(d=0\): no physical clearance offset is imposed.
+The tightened solve and independent arithmetic allowance enforce strictly
+positive separation of the declared occupied sets. The removed
+`collision.clearanceMargin` setting is not replaced by another physical buffer.
+Position/yaw uncertainty, chart remainders and numerical reserves remain.
+
+The physical certificate is \(f\le0\). It implies that every pair of points in the
 occupied enclosures is separated by at least \(d\). Positive-clearance
 separation of compact convex sets has such a unit normal, although the chosen
 enclosures themselves may be conservative. Exit records use a point ego body

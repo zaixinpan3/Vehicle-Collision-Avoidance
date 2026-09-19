@@ -2,7 +2,9 @@
 
 Current controller: [Joint trajectory/support certificates](../controller/JOINT_SUPPORT_CERTIFICATES.md) are the sole algorithm. The method selector and fixed-normal execution path have been removed. Admission latency and inter-node clearance limitations remain explicit.
 
-Latest implementation validation: [Remove the legacy algorithm and rerun joint admission/continuation](JOINT_SUPPORT_ONLY_20260919.md).
+Latest implementation validation: [Remove the fixed physical clearance buffer; fifteen trials expose two inter-node collisions](NO_CLEARANCE_BUFFER_VALIDATION_20260919.md).
+
+Previous implementation validation: [Remove the legacy algorithm and rerun joint admission/continuation](JOINT_SUPPORT_ONLY_20260919.md).
 
 Research comparison before removal: [Joint admission, retained feasibility and nine straight/circular trials](JOINT_SUPPORT_CERTIFICATES_20260919.md).
 

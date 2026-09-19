@@ -115,12 +115,12 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
             [position,heading]=laneGeometry.fromFrenet(flowed(1:6),lane);
             if options.UseRoadBoundaries
                 lateralSupport=cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
-                minimumRoadMargin=min(minimumRoadMargin,5-abs(position(2))-lateralSupport-cfg.collision.clearanceMargin);
+                minimumRoadMargin=min(minimumRoadMargin,5-abs(position(2))-lateralSupport);
             end
             target=targetFunction(time(k)+elapsed,[]);
             separation=avoidanceSafetyGeometry.rectangleDistance(position,heading,target.targetPositionInertial,pi, ...
                 [cfg.vehicle.length/2;cfg.vehicle.width/2;target.targetLength/2;target.targetWidth/2]);
-            minimumSeparationMargin=min(minimumSeparationMargin,separation-cfg.collision.clearanceMargin);
+            minimumSeparationMargin=min(minimumSeparationMargin,separation);
         end
         truth=[position;heading;flowed(4:6)];executedHolds=executedHolds+1;
         if mod(k,25)==0

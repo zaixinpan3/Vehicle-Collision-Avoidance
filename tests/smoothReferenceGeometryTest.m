@@ -108,7 +108,7 @@ function [gap,yawRemainder]=localPhysicalResidualGap()
     data=struct('frame',[frame.origin;frame.tangent;frame.lateral;frame.heading;frame.positionErrorBound; ...
         frame.headingErrorBound;frame.stationLower;frame.stationUpper],'pose',pose,'domain',domain, ...
         'nominal',repmat([36;1;.1;8;0;0],1,8),'targets',target,'boundaries',repmat(boundary,0,1), ...
-        'settings',[2.5;1;.8;4;.25],'duration',.1,'degree',7,'normals',normal);
+        'settings',[2.5;1;.8;4],'duration',.1,'degree',7,'normals',normal);
     rows=avoidanceSafetyGeometry.cellRows(data);selected=rows.source==1;
     [s,d,e]=ndgrid(linspace(33,39,17),linspace(.3,1.7,7),linspace(-.1,.3,9));
     state=[s(:).';d(:).';e(:).';zeros(3,numel(s))];
@@ -117,7 +117,7 @@ function [gap,yawRemainder]=localPhysicalResidualGap()
     targetSupport=targetPrediction.rectangleSupport(2.5,1,normal,.2,0);
     egoSupport=2.5*abs(normal.'*[cos(heading);sin(heading)]) ...
         +abs(normal.'*[-sin(heading);cos(heading)]);
-    physical=egoSupport+targetSupport+.25-normal.'*(position-target.center(1:2));
+    physical=egoSupport+targetSupport-normal.'*(position-target.center(1:2));
     conservative=max(rows.state(selected,:)*state-rows.bound(selected,1),[],1);
     gap=max(physical-conservative);yawRemainder=frame.headingErrorBound;
 end

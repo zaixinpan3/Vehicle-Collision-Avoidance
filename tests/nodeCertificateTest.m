@@ -14,7 +14,8 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             [distance,nodes]=localNodeDistances(problem);
-            testCase.verifyGreaterThanOrEqual(distance,cfg.collision.clearanceMargin-1e-9);
+            testCase.verifyGreaterThan(distance,0);
+            testCase.verifyLessThan(min(distance),.25);
             testCase.verifyEqual(size(nodes,2),problem.prediction.stageCount);
         end
 
@@ -67,7 +68,7 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual([next.prediction.cells.stage],1:first.prediction.stageCount-1);
             testCase.verifyEqual([next.prediction.cells.time],.1*(1:first.prediction.stageCount-1),AbsTol=1e-12);
             distance=localNodeDistances(next);
-            testCase.verifyGreaterThanOrEqual(distance,cfg.collision.clearanceMargin-1e-9);
+            testCase.verifyGreaterThan(distance,0);
         end
 
         function metadataDeclaresTheNodeSampling(testCase)

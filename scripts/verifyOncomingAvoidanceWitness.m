@@ -49,7 +49,7 @@ function summary = verifyOncomingAvoidanceWitness(options)
             targetSupport=targetPrediction.rectangleSupport(targetSize(1),targetSize(2),normal,pi,0);
             allowance=1e-10*(1+norm(center(1:2))+norm(targetCenter));
             margin=normal.'*(center(1:2)-targetCenter)-abs(normal).'*(radius(1:2)+targetRadius) ...
-                -egoSupport-targetSupport-cfg.collision.clearanceMargin-allowance;
+                -egoSupport-targetSupport-allowance;
             clearance=min(clearance,margin);
             domain=min([domain;box(2:6,1)-lower;upper-box(2:6,2)]);
             slip=min(slip,localSlipMargin(box,cfg));
@@ -68,7 +68,7 @@ function summary = verifyOncomingAvoidanceWitness(options)
     for index=1:size(fine,2)
         target=source.target.targetPositionInertial+[-8;0]*times(index);
         sampledClearance=min(sampledClearance,avoidanceSafetyGeometry.rectangleDistance( ...
-            fine(1:2,index),fine(3,index),target,pi,[egoSize;targetSize])-cfg.collision.clearanceMargin);
+            fine(1:2,index),fine(3,index),target,pi,[egoSize;targetSize]));
     end
     finalBox=nan(6,2);exitMargin=-Inf;
     if sequence.completedSamples>0

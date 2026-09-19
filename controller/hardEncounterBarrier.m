@@ -29,7 +29,7 @@ classdef hardEncounterBarrier
             model.exitSteps = zeros(0,1);
             model.dischargedTargetKeys = strings(1,0);
             if ~isempty(stored)
-                expectedVersion=37;
+                expectedVersion=38;
                 if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=expectedVersion
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
@@ -87,8 +87,8 @@ classdef hardEncounterBarrier
                     'confirmationDelay',0,'observationContract',"currentCompleteObservationAtConfirmationSample");
                 body = hypot(cfg.vehicle.length,cfg.vehicle.width)/2;
                 for index = 1:numel(measured)
-                    if ego.perception.range<=body+hypot(measured(index).halfLength,measured(index).halfWidth)+cfg.collision.clearanceMargin
-                        error('collisionAvoidanceController:invalidConfirmationRegion','The perception range must exceed both footprints plus clearance.');
+                    if ego.perception.range<=body+hypot(measured(index).halfLength,measured(index).halfWidth)
+                        error('collisionAvoidanceController:invalidConfirmationRegion','The perception range must exceed the sum of both footprint circumradii.');
                     end
                 end
             end
@@ -793,8 +793,7 @@ function [direction,steps,passing] = localEncounterProposal(model,range)
     closestTime = -relative.'*velocity/speed^2;
     miss = norm(relative+closestTime*velocity);
     [~,radius] = targetPrediction.finiteFlow(target,closestTime);
-    body = hypot(cfg.vehicle.length,cfg.vehicle.width)/2+hypot(target.halfLength,target.halfWidth) ...
-        +cfg.collision.clearanceMargin;
+    body = hypot(cfg.vehicle.length,cfg.vehicle.width)/2+hypot(target.halfLength,target.halfWidth);
     uncertainty = norm(radius(1:2))+norm(model.initialFrenetErrorBound(1:2));
     passing = miss<=body+uncertainty;
     approachesRegion = norm(relative)>range && miss<=range+hypot(target.halfLength,target.halfWidth)+uncertainty;

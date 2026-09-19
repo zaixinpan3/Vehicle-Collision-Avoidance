@@ -119,7 +119,7 @@ classdef avoidanceSafetyGeometry
                     "pose",pose,"domain",domain, ...
                     "nominal",nominal,"targets",targets,"boundaries",boundaries, ...
                     "settings",[cfg.vehicle.length/2;cfg.vehicle.width/2;envelope(3); ...
-                        envelope(2);cfg.collision.clearanceMargin], ...
+                        envelope(2)], ...
                     "duration",tube.duration,"degree",size(tube.offset,2)-1, ...
                     "normals",zeros(2,0));
                 if isfield(prediction,"separationNormals")
@@ -238,7 +238,7 @@ classdef avoidanceSafetyGeometry
                         records{end+1,1}=localJointRecord(data.targets(target), ...
                             model.encounters(target).key,tube.stage,program.geometry.frames(index), ...
                             tube.radius,[model.cfg.vehicle.length;model.cfg.vehicle.width]/2, ...
-                            model.cfg.collision.clearanceMargin,false); %#ok<AGROW>
+                            0,false); %#ok<AGROW>
                         normal=program.geometry.normals{index}(:,target);
                         angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
                     end
@@ -494,7 +494,7 @@ function rows = localCellRows(data,prescribedNormals)
     yawOffset=pose(15);yawRow=pose(16:21).';
     localDomain=data.domain(1)>0;
     settings = data.settings;halfLength = settings(1);halfWidth = settings(2);
-    headingDomain = settings(3);lateralDomain = settings(4);clearanceMargin = settings(5);
+    headingDomain = settings(3);lateralDomain = settings(4);
     nominal = data.nominal;pointCount = size(nominal,2);
     targetCount = numel(data.targets);boundaryCount = numel(data.boundaries);
     maximumRows = 12*(targetCount+boundaryCount)+6;
@@ -547,7 +547,7 @@ function rows = localCellRows(data,prescribedNormals)
         rowCount = numel(egoSupport);selected = count+(1:rowCount);
         state(selected,:) = repmat(-normal.'*positionMap,rowCount,1)+headingSlope*yawRow;
         bound(selected,:) = normal.'*positionOffset-normal.'*targetPosition-abs(normal).'*targetRadius ...
-            -targetSupport-egoSupport-headingSlope*(yawOffset-yawCenter)-clearanceMargin ...
+            -targetSupport-egoSupport-headingSlope*(yawOffset-yawCenter) ...
             -positionCharge-abs(headingSlope)*headingError;
         source(selected) = index;count = count+rowCount;
     end
@@ -568,7 +568,7 @@ function rows = localCellRows(data,prescribedNormals)
         end
         normal = boundary.safeSideSign*boundary.lateralDirection;
         slope = max(abs(2*boundary.coefficients(1)*range+boundary.coefficients(2)));
-        clearance = (clearanceMargin+boundary.normalDistanceErrorBound)*hypot(1,slope);
+        clearance = boundary.normalDistanceErrorBound*hypot(1,slope);
         [egoSupport,headingSlope] = targetPrediction.rectangleSupportMajorant(normal,heading, ...
             halfLength,halfWidth,mean(nominal(3,:)),headingDomain+headingError);
         rowCount = numel(egoSupport);selected = count+(1:rowCount);

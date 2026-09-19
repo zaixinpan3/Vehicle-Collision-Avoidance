@@ -24,8 +24,9 @@ The certified predicate is: for every node `k = 1, ..., N` and every state in
 its box,
 
 1. the ego rectangle and the target's bounded reachable set at time `t_k` are
-   separated by the selected support half-space by at least the clearance
-   margin (joint support certificates),
+   strictly separated by the selected support half-space after uncertainty
+   and numerical allowances (joint support certificates; no added physical
+   clearance buffer),
 2. the state lies in the local Frenet chart domain of that node (pose-domain
    rows) and, for scheduled references, within the reference phase band and the
    lateral regularity radius (phase rows),
@@ -48,8 +49,8 @@ Nothing is claimed about the state between two consecutive nodes. Within one
 hold the ego moves about `v h` along its path (0.8 m at 8 m/s), the relative
 position to a moving target changes by up to the sum of the speeds times `h`,
 and the heading changes by the yaw rate times `h`. Two rectangles that are
-separated at both nodes can, in principle, touch between them. The clearance
-margin is not a bound on this inter-node motion. The controller reports
+separated at both nodes can, in principle, touch between them. The numerical
+reserve is not a bound on this inter-node motion. The controller reports
 `metadata.wholeHoldCertificate = false` and
 `metadata.certificateSampling = "holdNodes"`; the smooth-reference validation
 records the node clearance and, separately, an 11-point inter-node sampled

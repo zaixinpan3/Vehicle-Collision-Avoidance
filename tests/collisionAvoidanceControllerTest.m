@@ -332,7 +332,7 @@ function [minimum,residual]=localBarrierResidual(problem,command)
         center=targetPrediction.finiteFlow(target,time);
         distance=avoidanceSafetyGeometry.rectangleDistance(position,heading,center(1:2),center(7), ...
             [model.cfg.vehicle.length/2;model.cfg.vehicle.width/2;target.halfLength;target.halfWidth]);
-        minimum=min(minimum,distance-model.cfg.collision.clearanceMargin);
+        minimum=min(minimum,distance);
     end
     residual=max(problem.program.physicalMatrix*problem.decision-problem.program.physicalBound);
 end

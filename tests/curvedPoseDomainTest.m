@@ -148,7 +148,7 @@ function gap=localPhysicalResidualGap(problem)
     for k=1:numel(physical)
         conservative(k)=avoidanceSafetyGeometry.jointValue(record,states(:,k),angle);
         egoSupport=targetPrediction.rectangleSupport(cfg.vehicle.length/2,cfg.vehicle.width/2,normal,heading(k),0);
-        physical(k)=egoSupport+targetSupport+cfg.collision.clearanceMargin-normal.'*(position(:,k)-target.center(1:2));
+        physical(k)=egoSupport+targetSupport-normal.'*(position(:,k)-target.center(1:2));
     end
     gap=max(physical-conservative);
 end

@@ -127,7 +127,7 @@ A sufficient affine exit inequality for a fixed unit direction `n` is
 For Cartesian boxes the support term is `abs(n)'*(rTargetPosition+rEgoPosition)`;
 Frenet chart and reference-point errors must also be included in this project.
 Choose `R_exit` above the sensing threshold with its roundoff margin and above
-the sum of the body circumradii plus collision clearance. This certifies the
+the sum of the body circumradii. This certifies the
 whole position set outside the range ball. It does not prescribe the target's
 lane or limit where it may travel. A center outside the ball alone is
 insufficient.

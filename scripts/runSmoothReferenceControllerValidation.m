@@ -111,9 +111,9 @@ function report=localTrial(name,scenario,count,deadline,directory,timing)
                 separation=avoidanceSafetyGeometry.rectangleDistance(position,heading, ...
                     truth.targetPositionInertial,truth.targetHeadingInertial, ...
                     [cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.target.defaultLength/2;cfg.target.defaultWidth/2]);
-                minimumSeparation=min(minimumSeparation,separation-cfg.collision.clearanceMargin);
+                minimumSeparation=min(minimumSeparation,separation);
                 if fraction==0 || fraction==1
-                    minimumNodeSeparation=min(minimumNodeSeparation,separation-cfg.collision.clearanceMargin);
+                    minimumNodeSeparation=min(minimumNodeSeparation,separation);
                 end
             end
         end
@@ -143,7 +143,7 @@ function report=localTrial(name,scenario,count,deadline,directory,timing)
         report.failureContext.actualSpatialCurvature=laneGeometry.referenceCurvature(state(1),curve);
         report.failureContext.scheduledCurvature=failureReference.stage.curvature;
     end
-    report.passed=report.completed && all(certified(1:executed)) && minimumSeparation>=-1e-8 && maximumSlew<=1e-8;
+    report.passed=report.completed && all(certified(1:executed)) && minimumSeparation>0 && maximumSlew<=1e-8;
     report.deadlineMisses=nnz(seconds(1:attempted)>h);
     report.maximumFrameMilliseconds=1000*max([0,seconds(1:attempted)]);
     report.medianFrameMilliseconds=1000*median(seconds(1:attempted));

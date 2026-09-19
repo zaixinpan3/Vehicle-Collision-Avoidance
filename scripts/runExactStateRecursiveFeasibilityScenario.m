@@ -5,8 +5,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
 % Geometry and CLF measurements below are offline experimental diagnostics;
 % they do not accept, reject, repair, or select a controller command.
 % Road boundaries are opt-in. State-domain margins are diagnostics only.
-% Collision acceptance requires a strictly positive sampled body gap; the
-% configured planning clearance is reported separately as a buffer diagnostic.
+% Collision acceptance requires a strictly positive sampled body gap.
+% Separation-margin fields report physical gap without an added clearance.
     arguments
         options.Scenario (1,1) string {mustBeMember(options.Scenario,["stationary","oncoming","crossing","cruise"])} = "stationary"
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 120
@@ -151,14 +151,14 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
                 targetState=localTargetTruth(truthTarget,time+fraction*h);
                 separation=avoidanceSafetyGeometry.rectangleDistance(position,heading,targetState(1:2),targetState(7), ...
                     [cfg.vehicle.length/2;cfg.vehicle.width/2;truthTarget.halfLength;truthTarget.halfWidth]);
-                minimumSeparation=min(minimumSeparation,separation-cfg.collision.clearanceMargin);
+                minimumSeparation=min(minimumSeparation,separation);
                 if fraction==0 || fraction==1
-                    minimumNodeSeparation=min(minimumNodeSeparation,separation-cfg.collision.clearanceMargin);
+                    minimumNodeSeparation=min(minimumNodeSeparation,separation);
                 end
             end
             if options.UseRoadBoundaries
                 support=cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
-                minimumRoad=min(minimumRoad,5-abs(position(2))-support-cfg.collision.clearanceMargin);
+                minimumRoad=min(minimumRoad,5-abs(position(2))-support);
             end
             minimumDomain=min(minimumDomain,localDomainMargin(value(1:6),cfg));
         end
@@ -203,10 +203,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'egoErrorBound',options.EgoErrorBound,'targetErrorBound',options.TargetErrorBound, ...
         'targetMotion',truthTarget,'recursiveFeasibilityGuaranteed',executed>0 && all(recursive(1:executed)), ...
         'scope',"Predictive finite encounter and road-terminal witness; failed optimization ends execution");
-    report.minimumSampledBodyGap=minimumSeparation+cfg.collision.clearanceMargin;
-    report.minimumNodeBodyGap=minimumNodeSeparation+cfg.collision.clearanceMargin;
+    report.minimumSampledBodyGap=minimumSeparation;
+    report.minimumNodeBodyGap=minimumNodeSeparation;
     report.sampledCollisionFree=report.minimumSampledBodyGap>0;
-    report.configuredClearanceMaintained=minimumSeparation>=0;
     report.collisionAcceptanceCriterion="Sampled signed body gap strictly greater than zero";
     report.passed=report.completed && report.sampledCollisionFree ...
         && (~options.UseRoadBoundaries || minimumRoad>=-1e-8) ...
@@ -221,8 +220,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         report.failureTime=executed*h;
     end
     localSave(report,options);
-    fprintf('%s: %d/%d holds; body gap %.6g m; buffer margin %.6g m; road %.6g m; max frame %.3f ms\n', ...
-        options.Scenario,executed,count,report.minimumSampledBodyGap,minimumSeparation, ...
+    fprintf('%s: %d/%d holds; body gap %.6g m; road %.6g m; max frame %.3f ms\n', ...
+        options.Scenario,executed,count,report.minimumSampledBodyGap, ...
         minimumRoad,1000*report.runtime.maximumSeconds);
     if ~isempty(failure),rethrow(failure);end
 end

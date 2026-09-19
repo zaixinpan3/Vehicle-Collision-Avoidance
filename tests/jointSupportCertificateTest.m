@@ -2,6 +2,7 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
     %jointSupportCertificateTest Joint certificates and unexecuted restoration.
     properties (TestParameter)
         yawRadius=struct('fixed',0,'interval',.12,'full',pi);
+        nonpositiveGap=struct('contact',0,'overlap',-.01);
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -12,6 +13,26 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function aSmallPositiveBodyGapPassesTheHardVerifier(testCase)
+            program=localGapProgram(.01);
+            accepted=solveHardCbfClf.certify(program,[.1;0;1]);
+            residual=avoidanceSafetyGeometry.jointResidual(accepted,[.1;0;1],0);
+            testCase.verifyEqual(residual,-.01,AbsTol=1e-12);
+        end
+
+        function contactAndOverlapCannotPassTheHardVerifier(testCase,nonpositiveGap)
+            program=localGapProgram(nonpositiveGap);
+            testCase.verifyError(@()solveHardCbfClf.certify(program,[.1;0;1]), ...
+                'collisionAvoidanceController:optimizationFailed');
+        end
+
+        function uncertainOverlapStillRejectsANominallyPositiveGap(testCase)
+            program=localGapProgram(.01);
+            program.jointCertificate.records.positionBall=.02;
+            testCase.verifyError(@()solveHardCbfClf.certify(program,[.1;0;1]), ...
+                'collisionAvoidanceController:optimizationFailed');
+        end
+
         function aRemovedCertificateSelectorIsRejected(testCase)
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
                 'controller',struct('certificateMethod',"jointSupport"))), ...
@@ -144,6 +165,12 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:optimizationFailed');
         end
     end
+end
+
+function program=localGapProgram(gap)
+    program=localSquare();
+    program.prediction.egoStateOffset(1,:)=1+gap;
+    program.jointCertificate.records.clearance=0;
 end
 
 function [actual,expected,solved]=localSupportComparison(yawRadius)
