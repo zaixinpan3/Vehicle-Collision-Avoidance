@@ -4,7 +4,7 @@ Latest controller policy: [Shifted nominal, one convex solve, and straight/circu
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
-Latest straight and circular validation: [Twenty hold-node cases, two inter-node clearance shortfalls and one admission deadline failure, September 18, 2026](STRAIGHT_CIRCULAR_RERUN_20260918.md).
+Latest straight and circular validation: [Single-convexification retest: twenty baseline cases, five perturbed cruise recoveries and a refined inter-node clearance audit, September 18, 2026](STRAIGHT_CIRCULAR_SINGLE_SOLVE_RETEST_20260918.md).
 
 Latest runtime profiling: [Repeated admission geometry, restoration/native solves and overwritten normal proposals, September 18, 2026](CONTROLLER_RUNTIME_HOTSPOTS_20260918.md).
 
