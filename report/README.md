@@ -4,6 +4,8 @@ Current controller: [Joint trajectory/support certificates](../controller/JOINT_
 
 Latest period change: [50 ms prediction nodes, input holds and control updates; matched-duration runtime and collision rerun](CONTROL_PERIOD_50MS_20260919.md).
 
+Admission design review: [Affine control sections and forbidden-interval computation: verified conditions and integration limits](AFFINE_SECTION_ADMISSION_REVIEW_20260919.md). This is a research assessment, not an implemented controller change.
+
 Bounded-admission implementation and 100 ms comparison: [One geometric initialization, global homogeneous support majorants, and hard-domain screening](BOUNDED_ADMISSION_20260919.md).
 
 Previous admission profile: [Extract the 4.654 s frame; 120 unsuccessful restoration iterations dominate admission](ADMISSION_FRAME_PROFILE_20260919.md).
