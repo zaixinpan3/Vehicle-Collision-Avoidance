@@ -1,11 +1,16 @@
 # Controller runtime and numerical implementation
 
-Current algorithm (September 19, 2026): format 37 uses joint support
-certificates exclusively. Admission uses bounded conic restoration; active
-successors start from a verified shifted certificate and attempt one hard
-improvement. Target-free frames solve the convex base. See
-[the formulation](JOINT_SUPPORT_CERTIFICATES.md) and
-[the measured admission/continuation limits](../report/JOINT_SUPPORT_CERTIFICATES_20260919.md).
+Current algorithm (September 19, 2026): format 39 uses homogeneous joint
+support majorants. Fresh admission uses one projected geometric initialization
+and at most three conic solves by default, counting any required base solve.
+A hard-verified admission witness is issued without a second performance
+optimization. Active successors attempt one hard improvement containing the
+complete shifted certificate; target-free frames solve the convex base.
+Hard pose-domain support bounds screen only globally redundant collision
+majorants; the original records remain independently checked. Sparse widths
+are allocated once. There is no multi-start or route-enumeration loop. See
+[the derivation](JOINT_SUPPORT_CERTIFICATES.md) and
+[the measured results and remaining limits](../report/BOUNDED_ADMISSION_20260919.md).
 The dated measurements below describe earlier implementations.
 
 Historical version 21 used a finite encounter witness, current observation confirmation,

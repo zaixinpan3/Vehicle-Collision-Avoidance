@@ -1,8 +1,10 @@
 # Predictive CBF and soft CLF controller
 
-The format-37 controller jointly optimizes the input sequence and separation
-angles, including terminal encounter-exit angles. New encounters use bounded
-sequential conic restoration before hard admission. An accepted certificate
+The format-39 controller jointly optimizes the input sequence and separation
+angles, including terminal encounter-exit angles. New encounters use one
+projected geometric initialization and at most three
+conic admission solves by default. Independently verified admission witnesses
+are issued directly; subsequent frames optimize performance. An accepted certificate
 is shifted with its complete geometry; one hard SOCP can then improve it.
 Joint support is the sole algorithm. Target-free frames solve its convex
 dynamics/CLF/terminal base directly.

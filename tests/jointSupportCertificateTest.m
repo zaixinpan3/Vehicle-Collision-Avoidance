@@ -69,26 +69,30 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(result.decision(conic.slackIndex),.2001,AbsTol=2e-7);
         end
 
-        function aSecondFreeAngleStartFindsTheSquareEscape(testCase)
+        function oneProjectedInitializationFindsTheSquareEscape(testCase)
             [program,cfg]=localSquare();
             [accepted,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
             testCase.verifyTrue(result.feasible);
-            testCase.verifyEqual(search.familyAttempts,2);
+            testCase.verifyEqual(search.familyAttempts,1);
+            testCase.verifyLessThanOrEqual(search.nativeSolves,cfg.jointCertificate.maximumAdmissionSolves);
+            testCase.verifyTrue(search.issuedAdmissionWitness);
             testCase.verifyGreaterThan(result.decision(1),1.1);
             testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...
                 accepted,result.decision,accepted.jointCertificate.angles)),0);
         end
 
         function positiveRestorationSlackCannotAuthorizeACommand(testCase)
-            [program,cfg]=localSquare();cfg.jointCertificate.maximumStarts=1;
+            [program,cfg]=localSquare();program.b(1)=.5;program.physicalBound(1)=.5;
+            cfg.jointCertificate.maximumAdmissionSolves=1;
             [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
             testCase.verifyFalse(result.feasible);
             testCase.verifyEmpty(result.decision);
             testCase.verifyEqual(search.hardSolves,0);
+            testCase.verifyLessThanOrEqual(search.nativeSolves,cfg.jointCertificate.maximumAdmissionSolves);
         end
 
         function restorationCannotAdoptAnActuatorInfeasibleCenter(testCase)
-            [program,cfg]=localSquare();cfg.jointCertificate.maximumStarts=1;
+            [program,cfg]=localSquare();
             cfg.solver.jointFunction=@localUnsafeRestoration;
             [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
             testCase.verifyFalse(result.feasible);
@@ -117,8 +121,72 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.metadata.conicSolverCallCount,1);
             testCase.verifyLessThanOrEqual(max(values),0);
             testCase.verifyEqual(stored.completion.deadline,old.completion.deadline,AbsTol=0);
-            testCase.verifyGreaterThan(max(abs(sin(first.program.jointCertificate.angles ...
-                -first.metadata.admissionSearch.initialCertificateAngles))),.1);
+            testCase.verifyLessThanOrEqual(first.metadata.solverCallCount,3);
+        end
+
+        function obsoleteRestartAndStepSettingsAreRejected(testCase)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
+                'jointCertificate',struct('maximumStarts',2))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
+                'jointCertificate',struct('positionStep',4))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
+
+        function aDirectionProposalDoesNotModifyTheNominalPlan(testCase)
+            [program,~]=localSquare();initial=program;
+            angles=avoidanceSafetyGeometry.admissionAngles(program,program.feasibleWitness);
+            testCase.verifyEqual(program,initial);
+            testCase.verifyEqual(angles,pi/2,AbsTol=1e-9);
+        end
+
+        function aSafeEscapeMayExceedTheMajorantPositionScale(testCase)
+            [program,cfg]=localSquare();
+            program.jointCertificate.records.targetHalfSize=[5;5];
+            program.b(1)=8;program.physicalBound(1)=8;
+            program.safetyBound(1)=8;program.decisionRadius(1)=8;
+            [accepted,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
+            testCase.verifyTrue(result.feasible);
+            testCase.verifyGreaterThan(result.decision(1),cfg.jointCertificate.positionScale);
+            testCase.verifyLessThanOrEqual(search.nativeSolves,cfg.jointCertificate.maximumAdmissionSolves);
+            testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...
+                accepted,result.decision,accepted.jointCertificate.angles)),0);
+        end
+
+        function compactRoundoffEnclosuresContainTheOriginalTargetUncertainty(testCase)
+            [radius,minimumGap]=localCompactUncertainty();
+            testCase.verifyEqual(radius,0,AbsTol=0);
+            testCase.verifyGreaterThanOrEqual(minimumGap,-1e-14);
+        end
+
+        function aDomainWideSeparationProofRetainsTheOriginalSafetyRecord(testCase)
+            [program,cfg]=localSquare();
+            program.jointCertificate.records.positionOffset=[10;0];
+            program.geometry.frames.domainCenter=[.9;0;0];
+            program.geometry.frames.domainRadius=[0;2;0];
+            conic=avoidanceStageQp.joint(program,program.feasibleWitness,0,false,0,cfg);
+            [accepted,result]=solveHardCbfClf.joint(program,struct(),cfg);
+            testCase.verifyEqual(conic.domainCertifiedRecords,1);
+            testCase.verifyTrue(result.feasible);
+            testCase.verifyNumElements(accepted.jointCertificate.records,1);
+            accepted.jointCertificate.angles=pi;
+            testCase.verifyError(@()solveHardCbfClf.certify(accepted,result.decision), ...
+                'collisionAvoidanceController:optimizationFailed');
+        end
+
+        function nominalClearanceDoesNotProveSeparationThroughoutTheDomain(testCase)
+            [program,cfg]=localSquare();
+            program.geometry.frames.domainCenter=[.9;1;0];
+            program.geometry.frames.domainRadius=[0;1;0];
+            point=[1.5;0;1];program.feasibleWitness=point;
+            program.jointCertificate.angles=pi/2;
+            conic=avoidanceStageQp.joint(program,point,pi/2,false,0,cfg);
+            [accepted,result]=solveHardCbfClf.joint(program,struct(),cfg);
+            testCase.verifyEmpty(conic.domainCertifiedRecords);
+            testCase.verifyTrue(result.feasible);
+            testCase.verifyGreaterThan(result.decision(1),1.1);
+            testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...
+                accepted,result.decision,accepted.jointCertificate.angles)),0);
         end
 
         function interruptedImprovementReturnsOnlyTheVerifiedIncumbent(testCase)
@@ -191,12 +259,12 @@ function [minimumGap,touchingError]=localCheckMajorants()
     record.positionBall=.02;record.yawRow=[0,0,1,0,0,0];
     gaps=zeros(2000,1);errors=zeros(2000,1);
     for index=1:numel(gaps)
-        state=randn(stream,6,1);angle=6*randn(stream);delta=randn(stream,6,1);
-        delta(1:2)=delta(1:2)/max(1,norm(delta(1:2)));newAngle=angle+2*randn(stream);
+        state=randn(stream,6,1);angle=6*randn(stream);delta=10*randn(stream,6,1);
+        coordinate=5*randn(stream);newAngle=angle+atan(coordinate);
         actual=avoidanceSafetyGeometry.jointValue(record,state+delta,newAngle);
-        majorant=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state+delta,newAngle,3);
-        gaps(index)=majorant-actual;
-        errors(index)=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state,angle,3) ...
+        majorant=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state+delta,coordinate,3);
+        gaps(index)=majorant-hypot(1,coordinate)*actual;
+        errors(index)=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state,0,3) ...
             -avoidanceSafetyGeometry.jointValue(record,state,angle);
     end
     minimumGap=min(gaps);touchingError=max(abs(errors));
@@ -209,8 +277,27 @@ function record=localRecord()
         'targetYaw',0,'targetYawRadius',0,'generators',zeros(2,0),'positionBall',0,'clearance',.1);
 end
 
+function [radius,minimumGap]=localCompactUncertainty()
+    [ego,target,road,cfg]=localControllerFixture();
+    target.targetYawErrorBound=1e-10;
+    target.targetPositionInertialErrorBound=[1e-10;2e-10];
+    [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+    record=problem.program.jointCertificate.records(1);radius=record.targetYawRadius;
+    angles=linspace(-pi,pi,101);gaps=zeros(size(angles));
+    for index=1:numel(angles)
+        normal=[cos(angles(index));sin(angles(index))];
+        argument=[cos(angles(index)-record.targetYaw);sin(angles(index)-record.targetYaw)];
+        original=avoidanceSafetyGeometry.supportValue(record.targetHalfSize,1e-10,argument) ...
+            +abs(normal).'*target.targetPositionInertialErrorBound;
+        compact=avoidanceSafetyGeometry.supportValue(record.targetHalfSize,record.targetYawRadius,argument) ...
+            +record.positionBall+sum(abs(record.generators.'*normal));
+        gaps(index)=compact-original;
+    end
+    minimumGap=min(gaps);
+end
+
 function [program,cfg]=localSquare()
-    cfg=collisionAvoidanceControllerConfig();cfg.jointCertificate.maximumStarts=2;
+    cfg=collisionAvoidanceControllerConfig();
     offset=repmat([.9;0;0;1;0;0],1,2);map=zeros(6,2,2);map(2,1,2)=1;
     b=zeros(6,2);b(2,1)=1;
     prediction=struct('stageCount',1,'egoStateOffset',offset,'egoStateMatrix',map, ...

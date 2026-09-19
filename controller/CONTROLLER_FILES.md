@@ -4,7 +4,8 @@ The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
 The controller jointly optimizes trajectories and separation angles with
-unexecuted admission restoration and subsequent hard SOCP improvement. The
+one geometric initialization, bounded admission search and subsequent hard
+SOCP performance improvement. The
 accepted complete certificate supplies the next frame's feasible incumbent.
 Safety is certified at the hold nodes only
 ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
@@ -24,8 +25,8 @@ Do not move controller helpers into those directories to evade the limit.
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
-| `avoidanceStageQp.m` | Sparse base transcription (`build`) and stage-local angular/support majorants (`joint`) |
-| `solveHardCbfClf.m` | Convex base solving (`constrained`), joint restoration/improvement (`joint`) and independent verification (`certify`) |
+| `avoidanceStageQp.m` | Sparse base transcription (`build`) and stage-local homogeneous support majorants (`joint`) |
+| `solveHardCbfClf.m` | Convex base solving (`constrained`), bounded admission/continuation improvement (`joint`) and independent verification (`certify`) |
 | `avoidanceSafetyGeometry.m` | Joint occupied-set records, support functions, exact residuals and certification; chart construction, signed-distance initialization and offline geometry kernels |
 | `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and certified local chart bounds |
 | `ltvBicycleModel.m` | Held-input node prediction (`finitePredict`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
@@ -52,8 +53,8 @@ shifted witness under unchanged contracts. The terminal law is never dispatched
 after solver failure.
 
 `avoidanceStageQp.build` supplies the common sparse base. Its `joint` method
-adds stage-local support and angle epigraphs.
-`solveHardCbfClf.joint` owns restoration and hard improvement. Target-free
+adds stage-local support and tangent-coordinate epigraphs.
+`solveHardCbfClf.joint` owns single-initialization admission and hard continuation improvement. Target-free
 frames solve only the common convex base with a single `constrained` call.
 Nonlinear Fiala tools retain their separate study scope. The online guarantee
 remains the declared zero-residual held affine plant.

@@ -2,8 +2,9 @@
 
 The controller optimizes the input sequence and
 one separation angle per target/node, including each target's terminal exit
-angle. It restores feasibility before admission and carries the complete
-accepted certificate into subsequent frames. Joint support is the sole
+angle. Fresh admission uses one geometric initialization and at most three
+conic solves by default. A fully verified admission witness is issued directly;
+subsequent frames improve its performance within the carried certificate. Joint support is the sole
 controller algorithm; there is no certificate-method selector. It certifies
 **hold nodes of the declared zero-residual sampled affine plant**. It does not
 certify the space traversed between nodes or a real-time admission deadline.
@@ -13,10 +14,10 @@ cfg = collisionAvoidanceControllerConfig();
 ```
 
 Start with an empty saved state after upgrading. Certificates use stored
-state format 37; earlier formats are rejected. The public controller interface,
+state format 39; earlier formats are rejected. The public controller interface,
 actuator limits, terminal continuation, sensing contracts and soft CLF remain.
 The actual paired results and reproduction commands are in
-[the September 19 report](../report/JOINT_SUPPORT_CERTIFICATES_20260919.md).
+[the bounded-admission report](../report/BOUNDED_ADMISSION_20260919.md).
 
 ## Research assessment
 
@@ -98,119 +99,201 @@ arguments, including zero. It does not mistake a nonunit affine argument for a
 unit direction. `jointResidual` reconstructs states from the input sequence and
 evaluates the exact interval-yaw support independently of solver epigraphs.
 
-## Touching convex majorant
+## A homogeneous global majorant
 
-Let \(t(\theta)=(-\sin\theta,\cos\theta)^\top\). For any real increment,
+At an anchor $(x_0,\theta_0)$ write $n_0=n(\theta_0)$,
+$t_0=(-n_{0,2},n_{0,1})$, $r_0=c+Px_0$, $\Delta r=P(x-x_0)$ and
+$\Delta\psi=w^\top(x-x_0)$. Optimize a **tangent coordinate** $a\in\mathbb R$:
 
 \[
-\|n(\alpha+\delta)-n(\alpha)-t(\alpha)\delta\|_2\le\tfrac12\delta^2.
+\widetilde n=n_0+a t_0,\qquad
+\ell=\|\widetilde n\|_2=\sqrt{1+a^2}\ge1,\qquad
+\theta=\theta_0+\arctan a.
 \]
 
-Support functions of radius-\(R\) sets are \(R\)-Lipschitz. Therefore
-\(h_B(n+t\delta)+R\delta^2/2\) is a convex upper bound touching
-\(h_B(n(\alpha+\delta))\) at zero. No differentiation through a selected
-rectangle corner is needed.
+The vector can never be zero. Its magnitude is immaterial to separation, and
+its normalized direction is precisely $n(\theta)$. The physical certificate
+still stores unit angles; `angleIndex` identifies tangent-coordinate decision
+columns in the conic interface, **not additive angle increments**.
 
-At a center \((x^\ell,\theta^\ell)\), define
-\(\Delta r=P\Delta x\), \(\Delta\psi=w^\top\Delta x\), and use the hard
-step domain \(\|\Delta r\|_2\le R_{\rm step}\).
-Set \(R_r=\|r^\ell\|_2+R_{\rm step}\), \(\eta=1/R_{\rm step}>0\),
-\(R_E=\|a_E\|_2\), \(R_O=\|a_O\|_2\), and
-\(R_U=\sum_j\|G_j\|_2\). The upper bound used by the conic builder is
+Let $b\le0$ be the inherited or initial numerical bound on the physical
+residual. Positive homogeneity gives the equivalent certificate
 
 \[
 \begin{aligned}
-\widehat f^\ell={}&d+\rho_p+h_{B_E}(a_e)+h_{B_O}(a_o)+\|G^\top a_u\|_1
- -(n^\ell)^\top r^\ell-(n^\ell)^\top\Delta r
- -(t^\ell)^\top r^\ell\Delta\theta\\
-&+\tfrac12\{R_E(\Delta\theta-\Delta\psi)^2
- +(R_O+R_U+R_r+\eta^{-1})(\Delta\theta)^2
- +\eta\|\Delta r\|_2^2\},
+F=\ell(f-b)={}&(d+\rho_p-b)\ell
++h_{B_E}(R(-\psi)\widetilde n)
++h_{B_O}(R(-\phi)\widetilde n)\\
+&+\|G^\top\widetilde n\|_1
+-\widetilde n^\top(r_0+\Delta r)\le0.
 \end{aligned}
 \]
 
-where \(a_e,a_o,a_u\) are the respective first-order unit-circle arguments.
-The relative-position cross term is bounded by Young's inequality; its
-remaining angular remainder is charged against \(R_r\). Thus
-\(f\le\widehat f^\ell\) on the declared step domain and
-\(f(x^\ell,\theta^\ell)=\widehat f^\ell(x^\ell,\theta^\ell)\).
-The chart-error disk contributes the exact constant \(\rho_p\), since the
-physical normal is always unit length.
-
-The four rectangle vertices lie on a common radius-\(R\) circle. After their
-yaw arcs are expanded, the remaining angular gaps have chord inequalities
-\(Dy\le b\). Their convex hull is
-\(B=\{y:\|y\|_2\le R,\ Dy\le b\}\). For nondegenerate rectangles,
-strong duality gives
+The target and position-uncertainty supports now have **affine arguments**.
+They need no unit-circle Taylor remainder depending on target distance.
+For the ego, set $n_E=R(-\psi_0)n_0$, $t_E=R(-\psi_0)t_0$, and
+$v_E=n_E+t_E(a-\Delta\psi)$. The rotation remainder satisfies globally
 
 \[
-h_B(v)=\min_{\lambda\ge0}\ b^\top\lambda+R\|v-D^\top\lambda\|_2.
+\|R(-\psi)\widetilde n-v_E\|_2
+\le\tfrac12(\Delta\psi)^2+|a\Delta\psi|
+\le\tfrac12a^2+(\Delta\psi)^2.
 \]
 
-This is an exact support epigraph, including zero yaw width and a full-circle
-hull. The implementation uses cheaper absolute-value epigraphs for zero yaw
-width and skips point bodies. Quadratic upper bounds use ordinary SOCs via
-\(\|(z-1,\sqrt2 L\Delta)\|_2\le z+1\), equivalent to
-\(z\ge\|L\Delta\|_2^2/2\). All new couplings are local to a stage.
-
-## Admission and its limits
-
-The convex base \(\mathcal D\) includes dynamics, actuator and slew limits,
-pose/reference domains, the soft CLF and the hard terminal cones. Fixed
-collision and exit slices are removed. If the nominal is outside this base,
-solve the base first; a failed base solve is reported separately.
-
-Certificate residual bounds \(b_i\le0\) initially include inward numerical
-reserves. Within one start, restoration solves
+The support function is $R_E=\|a_E\|_2$-Lipschitz, also for an interval-yaw
+hull. For any $\eta>0$, the remaining position-direction bilinear term has
+another global, touching convex bound:
 
 \[
-\min_{q,s}\ s+\tfrac12\|q-q^\ell\|_M^2,
-\quad q\in\mathcal D,\quad
-\widehat f_i^\ell(q)\le b_i+s,\quad 0\le s\le s^\ell.
+-a\,t_0^\top\Delta r
+\le\tfrac14\left(\sqrt\eta\,t_0^\top\Delta r-a/\sqrt\eta\right)^2.
 \]
 
-Here \(s^\ell=\max(0,\max_i[f_i(q^\ell)-b_i])\). The zero increment is
-feasible because of touching, and comparison with it gives monotone violation
-and a proximal-step bound for exact solves. The implementation independently
-checks the physical base constraints before adopting an intermediate center,
-and re-evaluates the true nonlinear residual. Invalid or violation-increasing
-proposals are discarded; insufficient decrease ends that start. It records a separate violation history
-for each start. This is not a global monotonicity claim across restarts.
-
-The square example demonstrates a real obstruction. With
-\(r=(0.9,y)\), \(0\le y\le2\), \(K=[-1,1]^2\), \(d=0.1\), and
-\((y^0,\theta^0)=(0,0)\), this majorant becomes
+Subtracting the left side from the right gives the nonnegative square
+$(\sqrt\eta\,t_0^\top\Delta r+a/\sqrt\eta)^2/4$. Therefore the implemented
+majorant is
 
 \[
-\widehat f^0=0.2+|\Delta\theta|
- +\tfrac12(\sqrt2+R_r+\eta^{-1})(\Delta\theta)^2
- +\tfrac12\eta y^2.
+\begin{aligned}
+\widehat F={}&(d+\rho_p-b)\sqrt{1+a^2}
++h_{B_E}(v_E)+h_{B_O}(R(-\phi)\widetilde n)
++\|G^\top\widetilde n\|_1\\
+&-n_0^\top(r_0+\Delta r)-a\,t_0^\top r_0
++\tfrac12R_E\bigl(a^2+2(\Delta\psi)^2\bigr)\\
+&+\tfrac14\left(\sqrt\eta\,t_0^\top\Delta r-a/\sqrt\eta\right)^2.
+\end{aligned}
 \]
 
-The monotone cap at its initial violation forces \(y=\Delta\theta=0\),
-although the upward safe escape exists. A test reproduces this stalled,
-feasible subproblem. The implementation permits at most five deterministic
-angle initializations: the nominal directions, then common lateral positive,
-lateral negative, forward and backward collision angles in the first chart.
-Exit angles remain free decisions initialized from the nominal exit geometry.
-Every start uses the same feasible base point and freely variable angles.
-These are bounded local searches, not a complete enumeration of joint branches;
-they do not establish global admission or finite-time convergence.
+It is convex, $F\le\widehat F$ globally, and equality holds at the anchor.
+`positionScale` selects $\eta=1/\texttt{positionScale}$; it does **not** limit
+displacement. The former 4 m position and 0.5 rad angle trust bounds are
+removed because this derivation does not need them. The certified pose/chart
+domains, dynamics, actuator and slew limits and terminal constraints remain
+hard. Each subproblem covers the open directional hemisphere about its
+anchor; it is still a local inner approximation, not the complete nonconvex set.
 
-Settings live in `cfg.jointCertificate`: `maximumIterations`, `maximumStarts`,
-`positionStep` (metres), `angleStep` (radians), `proximalWeight` and
-`stallTolerance`. The solver search budget and full-frame deadline still apply.
+`jointMajorant` evaluates this expression at $b=0$ for diagnostics; it bounds
+$\ell f$, not the unscaled unit residual. The conic builder includes $-b\ell$.
+Support epigraphs use absolute values for fixed rectangles and the exact
+interval-yaw hull dual otherwise. The disk norm and the positive quadratic
+terms use ordinary second-order cones. All couplings remain stage-local.
+
+## Remove only majorants made redundant by a hard pose domain
+
+For a curved chart the convex base already imposes a hard box
+$|q-q_c|\le r_q$ on $q=(s,d,e_\psi)$. When the position map is
+$r=c+P_q q$ (no velocity columns), a fixed unit direction $n_0$ has the
+following support bound over the **entire** admitted box:
+
+\[
+\begin{aligned}
+\overline f={}&d+\rho_p+\|a_E\|_2
++h_{B_O}(R(-\phi)n_0)+\|G^\top n_0\|_1\\
+&-n_0^\top(c+P_q q_c)+|P_q^\top n_0|^\top r_q.
+\end{aligned}
+\]
+
+The ego circumradius bounds every possible orientation, including its yaw
+uncertainty. If this bound, with an outward arithmetic allowance, is at most
+the stored bound $b$, then $f(x,\theta_0)\le b$ for **every** state in the
+convex base. The conic builder fixes that record's tangent coordinate to zero
+with an equality and omits its redundant support epigraphs and majorant.
+Exit records are never screened. Without a hard pose box, screening is not
+used. A merely safe nominal point is insufficient.
+
+This can only enlarge the feasible set projected onto the trajectory
+coordinates, relative to retaining those same majorants: any base-feasible
+trajectory already satisfies the omitted physical constraint using the fixed
+direction. All original occupied-set records and unit-support residuals remain
+in the independent acceptance check and carried certificate. No target is
+released or safety obligation shortened by this calculation. Hard pose-domain
+rows remain enforced during restoration, and are themselves independently
+verified. The same test is repeated against the inherited domain on continuation.
+
+The builder precomputes its final sparse width and auxiliary-variable count.
+This avoids repeated width expansion; it is a separate, algebraically exact
+implementation improvement. Preallocation alone was checked against complete
+conic matrices, vectors, cone partitions and metadata for fixed and uncertain
+footprints, restoration and hard-performance programs.
+
+## Compact numerical enclosures
+
+Very small positive uncertainty widths must not be silently set to zero.
+At **fresh record construction only**, a zonotope whose circumscribing-disk
+radius $\sum_j\|G_j\|_2$ is at most the configured numerical tolerance is
+replaced by that outward disk. A yaw interval can likewise be replaced by a
+fixed-yaw rectangle plus a disk of radius
+$\|a\|_2\min(2,r_\psi)$ when this charge is below the same tolerance.
+An outward arithmetic allowance is added to each nonzero charge.
+
+These are conservative occupied-set inclusions, not deleted uncertainty and
+not a new physical clearance offset. The added disks join `positionBall`;
+larger uncertainties retain their original supports. The resulting enclosure
+is independently verified and stored at admission, then inherited unchanged.
+This avoids introducing a complete interval-yaw dual for widths on the order
+of $10^{-10}$ rad without losing the touching property during continuation.
+
+## One geometric initialization and a bounded search
+
+A single hard restriction about an overlapping cruise prediction can be empty
+even when another restriction admits an escape. For example, with relative
+center $(0.9,y)$, $0\le y\le2$, square obstacle $[-1,1]^2$, clearance $0.1$ and
+initial direction $(1,0)$, both the old angular majorant and the new homogeneous
+majorant have a positive minimum at the stationary anchor. The physical point
+$(y,\theta)=(1.2,\pi/2)$ is nevertheless safe. Removing road boundaries cannot
+remove this local-convexification obstruction.
+
+`admissionAngles` generates **one** coherent initialization per encounter:
+
+1. Retain nominal controls and states exactly. For a target with violated
+   nominal certificates, obtain an orientation from the nominal relative
+   displacement across the prediction window, transverse to the first chart.
+   Initial relative position breaks a near-zero motion tie; exact symmetry
+   uses a deterministic reference-coordinate tie rule.
+2. Project each nominal relative position into the support half-space for
+   that orientation, using the actual footprint/uncertainty support and
+   numerical bound. Query the rectangle oracle at these geometric points to
+   obtain a coherent schedule of initial directions.
+3. Discard the projected points. They are not a vehicle rollout, reference,
+   dynamic constraint, prescribed lateral displacement or maneuver timing.
+   The controls and directions remain optimization decisions. Exit directions
+   retain their own nominal initialization and are optimized jointly.
+
+There is no alternative-start loop, route enumeration or search over a list of
+left/right/forward/backward initializations. The orientation rule is a heuristic
+for finding a useful convex family; it is not a completeness theorem. Multiple
+targets still share one coupled trajectory solve.
+
+The convex base $\mathcal D$ contains hard dynamics, actuator/slew, chart and
+terminal constraints plus the soft CLF. If the initial point is outside this
+base, one base solve is charged to the same admission call budget. Search then
+solves $\widehat F_i\le e$, $e\ge0$, minimizing $e$ plus a small proximal term.
+At a base-feasible anchor, the current exact maximum violation provides a
+feasible deficit. The exact unit-support violations are recomputed after each
+candidate, and only nonincreasing progress is retained.
+
+`maximumAdmissionSolves` defaults to **3**, counting a base solve if needed.
+There is one initialization, no horizon retry and no mandatory performance
+solve after a candidate passes complete hard verification. Continuation uses
+one hard performance solve containing its verified shifted witness. Search
+failure means no certificate was found in this bounded local search, not
+physical inevitability of collision or a global infeasibility result.
+
+The native iteration limit, shared search clock and full-frame acceptance
+deadline still apply. A bound on optimization calls is not a wall-clock WCET
+proof; timings and success rates must be measured separately.
 
 ## Hard acceptance and continuation
 
-No restoration slack appears in an issued command or a stored accepted plan.
-Acceptance reconstructs the trajectory and checks all base physical rows,
-terminal/CLF cones and exact support residuals with roundoff allowances. Solver
-status alone is insufficient. Once accepted, one hard joint SOCP improves the
-verified point. If this solve fails, times out or produces an invalid point,
-only the independently reverified incumbent may be returned. Metadata reports
-`retainedCertifiedIncumbent` and preserves the actual solver failure status.
-Exceeding the complete frame deadline still prohibits command issuance.
+Search deficits never authorize execution. Acceptance reconstructs the input
+trajectory and independently checks every physical base row, terminal/CLF
+cone and exact nonlinear unit-support residual with arithmetic allowances.
+A search iterate may be issued only when these original hard checks pass;
+its auxiliary conic deficit is neither a physical safety relaxation nor part
+of the stored control plan. The next frame improves the ordinary performance
+objective. An already certified continuation can be retained if its attempted
+improvement fails, with the actual numerical status reported. The complete
+frame deadline still prohibits late command issuance.
 
 The accepted record contains the input plan, angles, occupied-set parameters,
 charts, dynamics, terminal witness, absolute exit time and numerical bounds.
@@ -237,12 +320,12 @@ certificate for a complete hold enclosure and is outside this change.
   hulls, exact nonlinear residuals, majorant evaluation and verification.
 - `avoidanceStageQp`: sparse stage lifting, angular/support variables and SOC
   majorants. The original dynamics and terminal blocks remain sparse.
-- `solveHardCbfClf`: base feasibility, bounded restoration, hard improvement,
+- `solveHardCbfClf`: base feasibility, bounded single-initialization admission, hard continuation improvement,
   physical acceptance and the certified-incumbent interface.
 - `formulateAvoidanceProblem` and `hardEncounterBarrier`: preserve and shift
   the entire certificate; collision and exit angles share the same method.
 - `jointSupportCertificateTest`: homogeneous/interval support, 2,000 seeded
-  majorant checks, the stalled square escape, unsafe base rejection, hard
+  majorant checks, global majorants beyond the former trust domain, projected square escape, unsafe base rejection, hard
   admission, uncertain multiple targets, suffix preservation and deadlines.
 
 The implementation adds no core source file or third-party dependency. Its

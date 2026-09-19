@@ -238,7 +238,7 @@ classdef avoidanceSafetyGeometry
                         records{end+1,1}=localJointRecord(data.targets(target), ...
                             model.encounters(target).key,tube.stage,program.geometry.frames(index), ...
                             tube.radius,[model.cfg.vehicle.length;model.cfg.vehicle.width]/2, ...
-                            0,false); %#ok<AGROW>
+                            0,false,model.cfg.solver.constraintTolerance); %#ok<AGROW>
                         normal=program.geometry.normals{index}(:,target);
                         angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
                     end
@@ -249,7 +249,8 @@ classdef avoidanceSafetyGeometry
                         program.prediction.stageCount*model.sampleTime);
                     records{end+1,1}=localJointRecord(item,item.key,program.prediction.stageCount, ...
                         program.completion.frame,program.prediction.initialErrorBound(:,end), ...
-                        zeros(2,1),model.confirmation.range+model.cfg.encounter.numericalMargin,true); %#ok<AGROW>
+                        zeros(2,1),model.confirmation.range+model.cfg.encounter.numericalMargin, ...
+                        true,model.cfg.solver.constraintTolerance); %#ok<AGROW>
                     normal=-program.completion.direction(:,target);
                     angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
                 end
@@ -316,24 +317,65 @@ classdef avoidanceSafetyGeometry
                 -normal.'*(record.positionOffset+record.positionMap*state);
         end
 
-        function value = jointMajorant(record,state0,angle0,state,angle,positionStep)
-        % Touching bound on a declared relative-position step ball.
-            delta=angle-angle0;dr=record.positionMap*(state-state0);
-            assert(norm(dr)<=positionStep+1e-10,'avoidanceSafetyGeometry:stepDomain', ...
-                'The relative-position increment exceeds its certified domain.');
+        function value = jointMajorant(record,state0,angle0,state,coordinate,positionScale)
+        % Global convex bound on sqrt(1+coordinate^2) times the unit residual.
+        % The physical angle is angle0+atan(coordinate); the coordinate itself
+        % is not an angle. Position scale selects a bound, not a step domain.
+            dr=record.positionMap*(state-state0);
             r=record.positionOffset+record.positionMap*state0;
             dyaw=record.yawRow*(state-state0);yaw=record.yawOffset+record.yawRow*state0;
             n=[cos(angle0);sin(angle0)];t=[-n(2);n(1)];
             egoAngle=angle0-yaw;targetAngle=angle0-record.targetYaw;
-            ae=[cos(egoAngle);sin(egoAngle)]+[-sin(egoAngle);cos(egoAngle)]*(delta-dyaw);
-            ao=[cos(targetAngle);sin(targetAngle)]+[-sin(targetAngle);cos(targetAngle)]*delta;
-            eta=1/positionStep;
-            curvature=norm(record.targetHalfSize)+sum(vecnorm(record.generators))+norm(r)+positionStep+1/eta;
-            value=record.clearance+record.positionBall ...
+            ae=[cos(egoAngle);sin(egoAngle)]+[-sin(egoAngle);cos(egoAngle)]*(coordinate-dyaw);
+            ao=[cos(targetAngle);sin(targetAngle)]+[-sin(targetAngle);cos(targetAngle)]*coordinate;
+            eta=1/positionScale;
+            value=(record.clearance+record.positionBall)*hypot(1,coordinate) ...
                 +avoidanceSafetyGeometry.supportValue(record.egoHalfSize,record.egoYawRadius,ae) ...
                 +avoidanceSafetyGeometry.supportValue(record.targetHalfSize,record.targetYawRadius,ao) ...
-                +sum(abs(record.generators.'*(n+t*delta)))-n.'*r-n.'*dr-t.'*r*delta ...
-                +.5*(norm(record.egoHalfSize)*(delta-dyaw)^2+curvature*delta^2+eta*(dr.'*dr));
+                +sum(abs(record.generators.'*(n+t*coordinate)))-n.'*(r+dr)-t.'*r*coordinate ...
+                +.5*norm(record.egoHalfSize)*(coordinate^2+2*dyaw^2) ...
+                +.25*(sqrt(eta)*(t.'*dr)-coordinate/sqrt(eta))^2;
+        end
+
+        function angles = admissionAngles(program,point)
+        % Generate one coherent geometric initialization without changing the
+        % nominal controls or prescribing a vehicle trajectory. Projection is
+        % used only to query support directions; no projected pose is executed.
+            certificate=program.jointCertificate;records=certificate.records;
+            angles=certificate.angles;
+            values=avoidanceSafetyGeometry.jointResidual(program,point,angles);
+            states=localJointStates(program,point(program.layout.planIndex));
+            heading=program.geometry.frames(1).heading;
+            lateral=[-sin(heading);cos(heading)];
+            native=exist('avoidanceSupportKernelMex','file')==3;
+            for key=unique(string({records.key}))
+                indices=find(string({records.key})==key & ~[records.isExit]);
+                if isempty(indices) || all(values(indices)<=certificate.upperBound(indices)),continue;end
+                first=records(indices(1));last=records(indices(end));
+                firstRelative=first.positionOffset+first.positionMap*states(:,first.stage+1);
+                lastRelative=last.positionOffset+last.positionMap*states(:,last.stage+1);
+                score=lateral.'*(lastRelative-firstRelative);
+                allowance=64*eps*(1+norm(firstRelative)+norm(lastRelative));
+                if abs(score)<=allowance,score=lateral.'*(lastRelative+firstRelative);end
+                if abs(score)<=allowance,score=1;end % Deterministic symmetry tie.
+                direction=sign(score)*lateral;directionAngle=atan2(direction(2),direction(1));
+                for index=indices
+                    item=records(index);state=states(:,item.stage+1);
+                    relative=item.positionOffset+item.positionMap*state;
+                    yaw=item.yawOffset+item.yawRow*state;
+                    deficit=avoidanceSafetyGeometry.jointValue(item,state,directionAngle) ...
+                        -certificate.upperBound(index);
+                    projected=relative+direction*max(0,deficit);
+                    dimensions=[item.egoHalfSize;item.targetHalfSize];
+                    if native
+                        [normal,~]=avoidanceSupportKernelMex(projected,yaw,zeros(2,1),item.targetYaw,dimensions);
+                    else
+                        [normal,~]=avoidanceSafetyGeometry.supportDirection( ...
+                            projected,yaw,zeros(2,1),item.targetYaw,dimensions);
+                    end
+                    angles(index)=atan2(normal(2),normal(1));
+                end
+            end
         end
 
         function value = supportValue(halfSize,yawRadius,vector)
@@ -628,7 +670,7 @@ function result = localProjectedRows(data)
         "stage",repmat(tube.stage,numel(physical),1),"local",local);
 end
 
-function record=localJointRecord(target,key,stage,frame,rho,egoHalfSize,clearance,isExit)
+function record=localJointRecord(target,key,stage,frame,rho,egoHalfSize,clearance,isExit,numericalTolerance)
     [pose,domain]=laneGeometry.poseData(frame);
     positionMap=reshape(pose(3:14),2,6);yawRow=pose(16:21).';
     generators=[positionMap*diag(rho),diag(target.radius(1:2))];
@@ -646,6 +688,20 @@ function record=localJointRecord(target,key,stage,frame,rho,egoHalfSize,clearanc
         'targetHalfSize',[target.halfLength;target.halfWidth], ...
         'targetYaw',target.center(7),'targetYawRadius',target.radius(7), ...
         'generators',generators,'positionBall',positionBall,'clearance',clearance);
+    % Preserve the complete tiny numerical enclosure as one outward disk.
+    radius=sum(vecnorm(record.generators));
+    if radius>0 && radius<=numericalTolerance
+        record.positionBall=record.positionBall+radius+16*eps(max(1,radius));
+        record.generators=zeros(2,0);
+    end
+    radius=norm(record.egoHalfSize)*min(2,record.egoYawRadius);
+    if radius>0 && radius<=numericalTolerance
+        record.positionBall=record.positionBall+radius+16*eps(max(1,radius));record.egoYawRadius=0;
+    end
+    radius=norm(record.targetHalfSize)*min(2,record.targetYawRadius);
+    if radius>0 && radius<=numericalTolerance
+        record.positionBall=record.positionBall+radius+16*eps(max(1,radius));record.targetYawRadius=0;
+    end
 end
 
 function states=localJointStates(program,plan)

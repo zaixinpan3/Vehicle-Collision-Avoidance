@@ -94,9 +94,11 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
     program.anchorPlan=point(program.layout.planIndex);
     base=avoidanceStageQp.build(program);
     records=program.jointCertificate.records;count=numel(records);
-    baseCount=numel(base.q);angleIndex=baseCount+(1:count);total=baseCount+count;
+    baseCount=numel(base.q);angleIndex=baseCount+(1:count);cursor=baseCount+count;
+    fixed=localDomainCertificate(program,angles);
+    total=cursor+double(restoration)+localAuxiliaryCount(records(~fixed));
     slackIndex=[];
-    if restoration,total=total+1;slackIndex=total;end
+    if restoration,slackIndex=allocate(1);end
     equalityCount=base.cones(1);linearCount=base.cones(2);
     linearRows={base.A(equalityCount+(1:linearCount),:)};
     linearBounds={base.b(equalityCount+(1:linearCount))};
@@ -107,8 +109,9 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
         addLinear(row(slackIndex,-1),0);
         addLinear(row(slackIndex,1),violation);
     end
-    step=cfg.jointCertificate.positionStep;eta=1/step;
+    eta=1/cfg.jointCertificate.positionScale;
     for index=1:count
+        if fixed(index),continue;end
         item=records(index);stateIndex=base.stateIndex(:,item.stage).';
         state=base.stateCenter(:,item.stage+1);theta=angles(index);
         normal=[cos(theta);sin(theta)];tangent=[-normal(2);normal(1)];
@@ -128,28 +131,34 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
         next=absoluteSupport(item.generators.'*normal,item.generators.'*tangent*pad(angleRow), ...
             ones(size(item.generators,2),1));
         support=pad(support)+next;
-        % z >= .5 ||L Delta||^2, with the exact touching curvature bound.
-        curvature=norm(item.targetHalfSize)+sum(vecnorm(item.generators))+norm(relative)+step+1/eta;
-        quadratic=[sqrt(norm(item.egoHalfSize))*(pad(angleRow)-pad(yawRow)); ...
-            sqrt(curvature)*pad(angleRow);sqrt(eta)*pad(positionMap)];
+        % The nonunit direction n+t*a is never zero. Its homogeneous support
+        % avoids a position-dependent unit-circle remainder. The bilinear
+        % term -a*t'*dr has the global touching bound (sqrt(eta)*t'*dr-
+        % a/sqrt(eta))^2/4. No artificial position/angle step bound is needed.
+        egoRadius=norm(item.egoHalfSize);
+        quadratic=[sqrt(egoRadius)*pad(angleRow);sqrt(2*egoRadius)*pad(yawRow); ...
+            sqrt(eta/2)*tangent.'*pad(positionMap)-sqrt(1/(2*eta))*pad(angleRow)];
         z=allocate(1);zrow=row(z,1);
         addCone([1;-1;zeros(size(quadratic,1),1)], ...
             [zrow;zrow;sqrt(2)*pad(quadratic)]);
-        inequality=pad(support)+zrow-normal.'*pad(positionMap)-tangent.'*relative*pad(angleRow);
+        diskRadius=item.clearance+item.positionBall-program.jointCertificate.upperBound(index);
+        disk=allocate(1);diskRow=row(disk,1);
+        addCone([0;diskRadius;0],[diskRow;sparse(1,total);diskRadius*pad(angleRow)]);
+        inequality=pad(support)+pad(zrow)+diskRow-normal.'*pad(positionMap)-tangent.'*relative*pad(angleRow);
         if restoration,inequality(slackIndex)=inequality(slackIndex)-1;end
-        addLinear(inequality,program.jointCertificate.upperBound(index) ...
-            -item.clearance-item.positionBall+normal.'*relative);
-        addLinear([pad(angleRow);-pad(angleRow)],repmat(cfg.jointCertificate.angleStep,2,1));
-        addCone([step;0;0],[sparse(1,total);pad(positionMap)]);
+        addLinear(inequality,normal.'*relative);
     end
+    assert(cursor==total,'avoidanceStageQp:jointLayout','Inconsistent auxiliary-variable count.');
     rows=cellfun(@pad,linearRows,UniformOutput=false);
     cones=cellfun(@pad,coneRows,UniformOutput=false);
+    fixedCount=nnz(fixed);
+    fixedRows=sparse(1:fixedCount,angleIndex(fixed),ones(1,fixedCount),fixedCount,total);
     conic=struct('P',sparse(total,total),'q',zeros(total,1), ...
-        'A',[pad(base.A(1:equalityCount,:));vertcat(rows{:});vertcat(cones{:})], ...
-        'b',[base.b(1:equalityCount);vertcat(linearBounds{:});vertcat(coneBounds{:})], ...
-        'cones',[equalityCount;sum(cellfun(@numel,linearBounds));coneSizes], ...
+        'A',[pad(base.A(1:equalityCount,:));fixedRows;vertcat(rows{:});vertcat(cones{:})], ...
+        'b',[base.b(1:equalityCount);zeros(fixedCount,1);vertcat(linearBounds{:});vertcat(coneBounds{:})], ...
+        'cones',[equalityCount+fixedCount;sum(cellfun(@numel,linearBounds));coneSizes], ...
         'anchorPlan',program.anchorPlan,'angleIndex',angleIndex,'slackIndex',slackIndex, ...
-        'primaryCount',numel(program.q));
+        'primaryCount',numel(program.q),'domainCertifiedRecords',find(fixed));
     if restoration
         conic.q(slackIndex)=1;
     else
@@ -163,10 +172,14 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
     conic.P(angleIndex,angleIndex)=weight*speye(count);
 
     function indices=allocate(number)
-        indices=total+(1:number);total=total+number;
+        indices=cursor+(1:number);cursor=cursor+number;
     end
     function out=pad(in)
-        out=[in,sparse(size(in,1),total-size(in,2))];
+        if size(in,2)==total
+            out=in;
+        else
+            out=[in,sparse(size(in,1),total-size(in,2))];
+        end
     end
     function out=row(indices,values)
         out=sparse(ones(size(indices)),indices,values,1,total);
@@ -179,7 +192,12 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
         coneSizes(end+1,1)=numel(offset);
     end
     function support=absoluteSupport(offset,map,weights)
-        number=numel(offset);indices=allocate(number);
+        active=offset~=0 | any(map~=0,2);
+        active=active & weights(:)~=0;
+        offset=offset(active);map=map(active,:);weights=weights(active);
+        number=numel(offset);
+        if number==0,support=sparse(1,total);return;end
+        indices=allocate(number);
         selector=sparse(1:number,indices,ones(1,number),number,total);
         addLinear([pad(map)-selector;-pad(map)-selector],[-offset;offset]);
         support=row(indices,weights(:).');
@@ -196,6 +214,49 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
         bottom(:,multipliers)=bottom(:,multipliers)-bodyRadius*directions.';
         addCone([0;bodyRadius*offset],[top;bottom]);
         addLinear(sparse(1:numel(bounds),multipliers,-ones(1,numel(bounds)),numel(bounds),total),zeros(numel(bounds),1));
+    end
+end
+
+function fixed=localDomainCertificate(program,angles)
+% A circumscribed ego disk and hard pose box prove these directions safe
+% throughout the entire convex base. Original records remain in verification.
+    records=program.jointCertificate.records;fixed=false(numel(records),1);
+    for index=1:numel(records)
+        item=records(index);
+        if item.isExit,continue;end
+        frame=program.geometry.frames(item.stage);
+        if ~isfield(frame,'domainCenter') || any(item.positionMap(:,4:6)~=0,'all'),continue;end
+        normal=[cos(angles(index));sin(angles(index))];
+        row=normal.'*item.positionMap(:,1:3);
+        center=item.positionOffset+item.positionMap(:,1:3)*frame.domainCenter;
+        support=norm(item.egoHalfSize)+avoidanceSafetyGeometry.supportValue( ...
+            item.targetHalfSize,item.targetYawRadius, ...
+            [cos(angles(index)-item.targetYaw);sin(angles(index)-item.targetYaw)]) ...
+            +sum(abs(item.generators.'*normal))+item.clearance+item.positionBall;
+        bound=support-normal.'*center+abs(row)*frame.domainRadius;
+        allowance=128*eps*(1+support+abs(normal).'*abs(center)+abs(row)*frame.domainRadius);
+        fixed(index)=bound+allowance<=program.jointCertificate.upperBound(index);
+    end
+end
+
+function count=localAuxiliaryCount(records)
+% Allocate the final sparse width once. This changes no coefficient or cone.
+    count=0;
+    for index=1:numel(records)
+        item=records(index);
+        count=count+2+nnz(any(item.generators~=0,1));
+        dimensions=[item.egoHalfSize,item.targetHalfSize];
+        radii=[item.egoYawRadius,item.targetYawRadius];
+        for body=1:2
+            halfSize=dimensions(:,body);
+            if all(halfSize==0),continue;end
+            if radii(body)==0
+                count=count+nnz(halfSize);
+            else
+                [~,bounds]=avoidanceSafetyGeometry.yawHull(halfSize,radii(body));
+                count=count+numel(bounds)+1;
+            end
+        end
     end
 end
 

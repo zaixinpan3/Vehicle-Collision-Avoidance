@@ -39,10 +39,11 @@ function cfg = localDefaults()
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);
-    % Admission restoration and certified continuation use the same method. Step
-    % radii are metres and radians; restoration slack is never executable.
-    cfg.jointCertificate = struct("maximumIterations",60,"maximumStarts",5, ...
-        "positionStep",4.0,"angleStep",0.5,"proximalWeight",1.0e-3, ...
+    % One geometric initialization and a bounded admission solve count.
+    % positionScale (metres) scales a global majorant; it is not a step bound.
+    % A search deficit never authorizes execution without hard verification.
+    cfg.jointCertificate = struct("maximumAdmissionSolves",3, ...
+        "positionScale",4.0,"proximalWeight",1.0e-3, ...
         "stallTolerance",1.0e-7);
     cfg.collision = struct("cbfRate",2.0);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
@@ -124,8 +125,8 @@ function cfg = localDefaults()
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
     % Each convex subproblem calls the hook with (phase,program), P/q/A/b/cones
-    % and lifted coordinates. Each frame calls it once with the complete
-    % fixed-normal convex program; a hook must honor its feasibility status.
+    % and lifted coordinates. Admission uses the bounded call count above;
+    % continuation uses one solve. A hook must honor its feasibility status.
     % constraintTolerance enters the pre-solve physical row reserves.
     % frameDeadlineSeconds is a complete controller-frame acceptance deadline.
     % A finite exit may require more stages than the performance window.
@@ -192,15 +193,14 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
-    for name = ["maximumIterations","maximumStarts"]
+    for name = "maximumAdmissionSolves"
         validateattributes(cfg.jointCertificate.(name),{'double'}, ...
             {'scalar','real','finite','integer','positive'});
     end
-    for name = ["positionStep","angleStep","proximalWeight","stallTolerance"]
+    for name = ["positionScale","proximalWeight","stallTolerance"]
         validateattributes(cfg.jointCertificate.(name),{'double'}, ...
             {'scalar','real','finite','positive'});
     end
-    validateattributes(cfg.jointCertificate.maximumStarts,{'double'},{'<=',5});
     validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
