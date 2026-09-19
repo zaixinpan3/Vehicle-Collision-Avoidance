@@ -35,7 +35,7 @@ Covariant Ego--Target Estimation and Conditional Control Analysis}
 funding acknowledgments must be completed before submission. This manuscript
 is a research draft based on the accompanying MATLAB repository.}}
 
-\markboth{Draft Manuscript---August 2026}%
+\markboth{Draft Manuscript---September 2026}%
 {Author Name(s): Covariant Ego--Target Estimation}
 
 \hypersetup{
@@ -56,31 +56,26 @@ safety guarantees, state estimation}
 This paper develops a measured-input estimator and a predictive controller
 for lane keeping with vehicle collision avoidance. The estimator retains
 the ego-motion-aware nonlinear relative motion model of the prior
-high-gain design but not its differentiated coordinates: the measured
-acceleration and yaw rate remain exogenous inputs, so the ego observer
-stays at the order of its own kinematics and the target relative position,
-velocity and acceleration form a covariant third-order chain, and neither
-zero ego jerk nor zero ego yaw acceleration is assumed. Inverting the
-kinematic single-track relation under a declared mismatch bound estimates
-the ego sideslip pointwise and turns the GNSS course into a yaw
-pseudo-measurement with an exactly computed circular radius, which
-replaces the course-as-yaw identification without adding a sideslip state.
-The target injection solves a normalized observer LMI whose metric a
-unique Lyapunov identity fixes, and a two-multiplier dissipation
-inequality certifies its decay against analytic global Lipschitz constants.
-All stage couplings being feedforward, a lower-triangular Metzler
-comparison system yields a linear copositive ISS certificate, closed-form
-ultimate radii without a small-gain condition, and the online error
-enclosure the controller consumes. The controller solves one quadratic
-program per sample on a scheduled Frenet bicycle integrated exactly under
-held inputs: rectangle separation, quadratic road boundaries, actuator,
-slip-domain and state-domain rows are hard at every node of a horizon
-terminating in a certified rest set. The objective combines input effort
-with squared relaxation of a continuous-time control Lyapunov condition
-obtained from the cruise Riccati equation. A shifted candidate gives
-recursive feasibility without a second optimization. The estimation
-theorem is continuous-time; the control certificate covers prediction
-nodes of the declared model.
+high-gain design but not its differentiated ego coordinates: measured
+acceleration and yaw rate remain exogenous inputs, so neither zero ego
+jerk nor zero ego yaw acceleration is assumed. A direct body-velocity
+measurement follows from GNSS speed and the kinematic single-track
+relation under a bounded mismatch. Combining the shared gyro error before
+bounding it gives a two-stage velocity--target ISS certificate; a parallel
+yaw observer supplies orientation for inertial reconstruction. The target
+injection retains its normalized observer LMI, while a free Lyapunov
+metric and two Lipschitz multipliers certify decay at a lower bandwidth.
+The controller jointly optimizes the input sequence and separation angles
+in one convex inner restriction of the held affine bicycle model. A soft
+sampled CLF governs tracking, and hard node-separation, actuator, slew,
+chart and terminal constraints govern acceptance. The terminal set is a
+robust modal cruise set reached by a fixed encounter-exit deadline.
+Retaining the complete shifted certificate makes compatible successor
+subproblems feasible. Synthetic trials quantify the estimator's reduction
+in derivative noise and distinguish controller admission, node safety and
+inter-node collision. The estimation theorem is continuous-time; the
+control certificate is conditional on the declared sampled plant and does
+not establish whole-hold safety or timely admission of every encounter.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -197,19 +192,21 @@ however, does not guarantee that a collision-free optimization remains feasible
 under repeated receding-horizon updates, particularly when state-estimation
 uncertainty is considered.
 
-Rather than construct another predictive CBF, we carry the safe
-continuation itself as controller state. Lane keeping enters only as a
-relaxed continuous-time CLF condition whose squared relaxation is penalized
-alongside input effort, every geometric and physical requirement is hard at each
-prediction node, and the horizon terminates in a rest set separated from
-the obstacle's complete future occupancy. The shifted stored plan is then
-a feasible witness for the next sample, which gives recursive feasibility
-without a second optimization or a degraded fallback. Section~\ref{sec:estimator}
-develops the estimator and its error enclosure,
-Section~\ref{sec:control} the controller that consumes it, and
-Section~\ref{sec:results} the synthesized design and closed-loop trials.
-The estimation theorem is continuous-time; the control certificate covers
-prediction nodes of the declared model.
+We carry the safe continuation itself as controller state. The input plan,
+occupied-set enclosures and separating directions are retained together,
+so a convex majorant touching at the shifted certificate contains a
+feasible witness for the next sample. Lane keeping enters through a soft
+sampled CLF and a quadratic tracking objective. Collision separation,
+actuator limits and terminal membership remain hard. The terminal
+condition combines exit from the current sensing region by a fixed
+deadline with a robust invariant cruise set, and a current observation
+must confirm target release. This construction gives conditional
+recursive feasibility after admission; a single convex restriction need
+not admit every feasible encounter. Section~\ref{sec:estimator} develops
+the estimator and its error enclosure, Section~\ref{sec:control} the
+controller that consumes it, and Section~\ref{sec:results} the synthesized
+design and recorded trials. The estimation theorem is continuous-time;
+the control certificate covers prediction nodes of the declared model.
 
 \section{System Overview}
 
@@ -230,7 +227,8 @@ We consider an ego vehicle traveling on a road whose drivable surface is
 bounded by road curbs. A nominal cruise path is supplied as known route
 geometry, while other vehicles travel within
 or enter the sensed road environment, as illustrated in
-Fig.~\ref{fig:driving_environment}. No particular road shape is assumed. The ego vehicle is equipped with a global
+Fig.~\ref{fig:driving_environment}. The reference may be straight, circular,
+or a declared smooth curvature profile. The ego vehicle is equipped with a global
 navigation satellite system (GNSS) receiver for global position and velocity
 measurements and with an inertial measurement unit (IMU) and a gyroscope
 for body-frame
@@ -246,8 +244,13 @@ risk, the system coordinates steering and longitudinal actuation to maintain
 collision separation while keeping the ego-vehicle footprint within the
 curb-defined drivable surface, and subsequently returns the vehicle to the
 nominal path and prescribed speed once the risk has been resolved. Thus, the
-curb-defined road boundary is a hard safety constraint, whereas the
-nominal path and reference speed are recoverable nominal objectives.
+curb-defined road boundary is a physical constraint of the intended system,
+whereas the nominal path and reference speed are recoverable nominal
+objectives. The controller developed below addresses the reference-following
+and vehicle-separation part of this problem. Its terminal construction
+currently requires a domain without physical road boundaries; the curb
+perception module therefore does not yet close that part of the safety
+argument.
 
 \begin{figure*}[!t]
     \centering
@@ -292,23 +295,29 @@ the body-to-inertial rotation, the position kinematics are
 The body-frame force and moment balances are
 \begin{equation}
     \begin{aligned}
-    m_E\dot v_{x,E}&=F_{x,E}+m_Ev_{y,E}\dot\psi_E,\\
-    m_E\dot v_{y,E}&=F_{yf}+F_{yr}-m_Ev_{x,E}\dot\psi_E,\\
-    I_{z,E}\ddot\psi_E&=l_{f,E}F_{yf}-l_{r,E}F_{yr},
+    m_E\dot v_{x,E}&=F_{xf}^{b}+F_{xr}-F_R(v_{x,E})
+        +m_Ev_{y,E}\dot\psi_E+m_Eb,\\
+    m_E\dot v_{y,E}&=F_{yf}^{b}+F_{yr}-m_Ev_{x,E}\dot\psi_E,\\
+    I_{z,E}\ddot\psi_E&=l_{f,E}F_{yf}^{b}-l_{r,E}F_{yr},
     \end{aligned}
     \label{eq:bicycle_model}
 \end{equation}
-with the slip convention and modified Fiala forces
+where $[F_{xf}^{b},F_{yf}^{b}]^{\trans}
+=R(\delta_F)[F_{xf},F_{yf}]^{\trans}$ rotates the front wheel forces into
+the body frame, $F_R$ is passive road load, and $b$ is a declared
+longitudinal acceleration bias. The slip convention and modified Fiala
+forces are
 \begin{equation}
     \begin{aligned}
-    \alpha_f&=\frac{v_{y,E}+l_{f,E}\dot\psi_E}{v_{x,E}}-\delta_F,
+    \alpha_f&=\operatorname{atan2}(v_{y,E}+l_{f,E}\dot\psi_E,v_\tau)-\delta_F,
     & F_{yf}&=\Phi_f(\alpha_f;Q_f),\\
-    \alpha_r&=\frac{v_{y,E}-l_{r,E}\dot\psi_E}{v_{x,E}},
+    \alpha_r&=\operatorname{atan2}(v_{y,E}-l_{r,E}\dot\psi_E,v_\tau),
     & F_{yr}&=\Phi_r(\alpha_r;Q_r).
     \end{aligned}
     \label{eq:tire_forces}
 \end{equation}
-For axle \(i\in\{f,r\}\), let \(t=\tan\alpha\), \(C_i>0\) be its
+Here $v_\tau=\max(v_{x,E},v_{\rm f})$ with $v_{\rm f}>0$ regularizes
+only the tire denominator. For axle \(i\in\{f,r\}\), let \(t=\tan\alpha\), \(C_i>0\) be its
 nominal cornering stiffness, and \(Q_i=\eta_i\mu_iF_{zi}\). Following
 \cite{FahmyGhanyBaumann2018}, Section II-A, equations (7), (11) and (13),
 \begin{equation}
@@ -346,8 +355,9 @@ Fig.~\ref{fig:ego_obstacle_frames} are
     \gamma_E=\psi_E+\beta_E .
     \label{eq:yaw_from_course}
 \end{equation}
-The obstacle vehicle obeys the same model with subscript \(C\) and its
-own inputs, which are not available to the ego vehicle.
+The obstacle vehicle has its own unobserved inputs. The tracker uses the
+relative kinematics of Section~\ref{subsec:targetTracker}; the controller
+propagates its admitted bounded-motion set independently of the ego tire model.
 
 \begin{figure*}[!t]
     \centering
@@ -363,7 +373,9 @@ own inputs, which are not available to the ego vehicle.
     constraint. The nominal cruise path, taken from an existing route
     map, and road boundary define the nominal objective and safety constraint,
     respectively, used by the predictive controller to compute steering and
-    longitudinal actuation commands.}
+    longitudinal actuation commands. The road-boundary branch shows the
+    intended interface; the current terminal certificate requires a domain
+    without physical road boundaries.}
     \label{fig:architecture}
 \end{figure*}
 
@@ -380,12 +392,12 @@ estimate is accompanied by a componentwise error enclosure, valid under
 the declared sensor, model and operating-domain premises, with which the
 controller tightens its own constraints. The enclosure bounds the current
 estimate; propagating it over the prediction horizon is the controller's
-own obligation. Because the road boundary describes the environment
-rather than vehicle motion, it is supplied directly by the perception module
-to the controller, and the known nominal path enters the same way. At each
+own obligation. The road-boundary branch represents the intended perception interface;
+physical boundary constraints remain outside the current terminal
+certificate. The known nominal path supplies the control reference. At each
 sampling instant, the
-controller constructs the nominal objective and safety constraints from these
-geometric quantities, the estimated motion states, their enclosures, and the
+controller constructs the nominal objective and safety constraints from the
+reference geometry, estimated motion states, their enclosures, and the
 prescribed reference speed, solves one convex program, checks its result
 independently, and issues steering and longitudinal actuation commands to
 the ego vehicle.
@@ -582,9 +594,10 @@ and each tracked point follows the Kalman update
 \section{Estimator Design}
 \label{sec:estimator}
 
-The ego observer is designed first and the target tracker second, since the
-relative-position measurement can be propagated only once the ego motion
-entering its dynamics is estimated. The measurements are
+The ego body-velocity observer is designed first and the target tracker
+second. Their dynamics form a two-stage cascade; the parallel yaw observer
+and inertial position output are used for reconstruction and do not feed
+this cascade. The measurements are
 \begin{equation}
     \begin{aligned}
     \bm y_p&=\bm p_E+\bm n_p, &\quad
@@ -608,11 +621,13 @@ therefore assumes both vanish; here \(\bm a_m\) and \(u_3\) remain
 exogenous inputs of every stage and nothing is differentiated. Their yaw
 observer reads the course as the yaw, which
 \(\gamma_E=\psi_E+\beta_E\) makes exact only at \(\beta_E=0\); here the
-same relation eliminates \(\beta_E\) through a certified inversion.
+same relation supplies a direct body-velocity measurement and, when
+informative, a certified heading correspondence for the parallel yaw observer.
 
 \begin{assumption}
 \label{asm:ego}
-\(0<V_E|_{\min}\leq V_E\leq V_E|_{\max}\) and
+\(0\leq V_E|_{\min}\leq V_E\leq V_E|_{\max}\),
+$v_{x,E}\geq V_E\cos\beta_{\rm dom}$, and
 \(|\dot\psi_E|\leq\bar\omega_E\).
 \end{assumption}
 
@@ -684,72 +699,115 @@ excludes the origin, so \(\bm v_E\) lies in its tangent cone and
 \(\gamma_E=\psi_E+\beta_E\) yields \eqref{eq:course_certificate}.
 \end{IEEEproof}
 
-The observer therefore carries no sideslip state; where an estimate of
-\(\beta_E\) is needed downstream, \(\hat\beta\) serves.
+The correspondence is used only where these informativeness conditions
+hold. Otherwise it supplies the whole circle as a yaw enclosure. Neither
+case changes the body-velocity innovation developed next, which remains
+defined at standstill.
 
 \subsection{Ego Observers}
 \label{subsec:egoObserver}
 
-With \(J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]\),
-\(\nabla_uz=\dot z+uJz\), and \(\bm v^E=R(\psi_E)^{\trans}\bm v_E\),
+With $J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$,
+$\nabla_u\bm z=\dot{\bm z}+uJ\bm z$, and
+$\bm v^E=R(\psi_E)^{\trans}\bm v_E$, define
 \begin{equation}
-    \begin{aligned}
-    \dot{\hat\psi}_E&=u_3+k_\psi\operatorname{wrap}(y_F-\hat\psi_E),\\
-    \nabla_{u_3}\hat{\bm v}^E&=\bm a_m
-        +k_v\bigl(R(\hat\psi_E)^{\trans}\bm v_m-\hat{\bm v}^E\bigr),\\
-    \dot{\hat{\bm p}}_E&=R(\hat\psi_E)\hat{\bm v}^E
-        +k_p(\bm y_p-\hat{\bm p}_E).
-    \end{aligned}
+    \begin{gathered}
+    \phi(V,w)=\sqrt{\max\{V^2-w^2,V^2\cos^2\beta_{\rm dom}\}},\\
+    \bm y_v=[\phi(V_m,l_{r,E}u_3),\ l_{r,E}u_3]^{\trans},\\
+    \nabla_{u_3}\hat{\bm v}^E=\bm a_m+k_v(\bm y_v-\hat{\bm v}^E).
+    \end{gathered}
     \label{eq:ego_observer}
 \end{equation}
-Let \(e_\psi=\psi_E-\hat\psi_E\) on a compatible lift and
-\(\bm e_v=\bm v^E-\hat{\bm v}^E\).
+On the true forward cone, $\phi(V_E,v_{y,E})=v_{x,E}$. The extension
+remains defined for every measured speed, including zero, and its lateral
+component is not clipped. Thus
+$y_{v,2}-v_{y,E}=l_{r,E}(d_\omega+d_{\rm st})$.
 
 \begin{lemma}
 \label{lem:egoRows}
-If
+Let $\bm e_v=\hat{\bm v}^E-\bm v^E$, $k_v>0$, and
 \begin{equation}
-    B_\psi=\max\{|e_\psi(0)|,\;B_F+\bar n_g/k_\psi\},
-    \qquad B_\psi+B_F<\pi,
-    \label{eq:yaw_chart_condition}
+    \begin{split}
+    C_\omega(k)=\max_{V\in\{V_E|_{\min},V_E|_{\max}\}}
+    \Bigl[(V\sin\beta_{\rm dom}+kl_{r,E}\tan\beta_{\rm dom})^2\\
+        +(kl_{r,E}-V\cos\beta_{\rm dom})^2\Bigr]^{1/2}.
+    \end{split}
+    \label{eq:common_gyro_bound}
 \end{equation}
-then \(|e_\psi(t)|\leq B_\psi\) for all \(t\geq0\) and
+Under Assumptions~\ref{asm:ego}--\ref{asm:singleTrack},
 \begin{equation}
-    \begin{aligned}
-    D^+|e_\psi|&\leq-k_\psi|e_\psi|+\bar n_g+k_\psi B_F,\\
-    D^+\normtwo{\bm e_v}&\leq-k_v\normtwo{\bm e_v}
-        +k_vV_E|_{\max}|e_\psi|+\bar\delta_v,
-    \end{aligned}
+    \begin{gathered}
+    D^+\normtwo{\bm e_v}\leq-k_v\normtwo{\bm e_v}+\bar\delta_v,\\
+    \bar\delta_v=\bar n_a+k_v\sec\beta_{\rm dom}\,\bar n_v
+      +C_\omega(k_v)\bar n_g
+      +k_vl_{r,E}\sec\beta_{\rm dom}\,\bar d_{\rm st}.
+    \end{gathered}
     \label{eq:ego_rows}
 \end{equation}
-with \(\bar\delta_v=\bar n_a+V_E|_{\max}\bar n_g+k_v\bar n_v\).
 \end{lemma}
 
 \begin{IEEEproof}
-Inside the chart \(\operatorname{wrap}(y_F-\hat\psi_E)=e_\psi+d_F\) with
-\(|d_F|\leq B_F\), so \(\dot e_\psi=-k_\psi(e_\psi+d_F)+d_\omega\) and the
-first row follows; at \(|e_\psi|=B_\psi\) its right-hand side is
-nonpositive, so the chart is forward invariant and a first-exit argument
-closes the induction. For the velocity, \(\nabla_{\dot\psi_E}\bm v^E=\bm a_E\)
-and \eqref{eq:ego_observer} give
+Put $\nu=V_m-V_E$, so $|\nu|\leq\bar n_v$. Integrating the
+piecewise derivatives of $\phi$ along the segment between
+$(V_E,v_{y,E})$ and $(V_m,l_{r,E}u_3)$ gives
 \begin{equation}
-    \dot{\bm e}_v=-u_3J\bm e_v+d_\omega J\bm v^E+(\bm a_E-\bm a_m)
-    -k_v\bigl(R(\hat\psi_E)^{\trans}\bm v_m-\hat{\bm v}^E\bigr).
+    \begin{gathered}
+    \bm y_v-\bm v^E=\alpha\bm e_1\nu
+        +l_{r,E}\bm g(\zeta)(d_\omega+d_{\rm st}),\\
+    \bm g(\zeta)=[-\zeta,1]^{\trans},\\
+    \cos\beta_{\rm dom}\leq\alpha\leq\sec\beta_{\rm dom},\qquad
+    |\zeta|\leq\tan\beta_{\rm dom}.
+    \end{gathered}
+    \label{eq:velocity_measurement_error}
+\end{equation}
+Continuity covers branch crossings and the origin. Substituting before
+taking norms yields
+\begin{equation}
+    \begin{split}
+    \dot{\bm e}_v={}&(-k_vI-u_3J)\bm e_v+\bm n_a+k_v\alpha\bm e_1\nu\\
+        &+(k_vl_{r,E}\bm g(\zeta)-J\bm v^E)d_\omega
+          +k_vl_{r,E}\bm g(\zeta)d_{\rm st}.
+    \end{split}
     \label{eq:velocity_error_derivation}
 \end{equation}
-Writing \(R(\hat\psi_E)^{\trans}\bm v_m
-=R(e_\psi)\bm v^E+R(\hat\psi_E)^{\trans}\bm n_v\) gives
-\(R(\hat\psi_E)^{\trans}\bm v_m-\hat{\bm v}^E
-=\bm e_v+(R(e_\psi)-I)\bm v^E+R(\hat\psi_E)^{\trans}\bm n_v\), and
-\(\normtwo{(R(e_\psi)-I)\bm v^E}\leq V_E|_{\max}|e_\psi|\). Since \(J\) is
-skew, \(\bm e_v^{\trans}J\bm e_v=0\) and the term \(-u_3J\bm e_v\) drops
-from \(D^+\normtwo{\bm e_v}\).
+The common gyro column has components
+$[v_{y,E}-k_vl_{r,E}\zeta,\ k_vl_{r,E}-v_{x,E}]^{\trans}$.
+Maximizing its norm over $\zeta$ and the forward cone, then using
+convexity of its squared bound in speed, gives
+\eqref{eq:common_gyro_bound}. The rotation is skew and contributes zero
+to the norm derivative. The remaining terms give \eqref{eq:ego_rows}.
 \end{IEEEproof}
 
-The position stage is downstream of \eqref{eq:ego_rows}:
+The same gyro error enters measurement and propagation. Bounding those
+terms separately would discard their cancellation; no statistical
+independence is used in Lemma~\ref{lem:egoRows}. In particular, yaw error
+does not enter the velocity comparison.
+
+Yaw and inertial position are estimated in parallel:
 \begin{equation}
-    \norminf{\bm e_p}\leq\bar n_p
-    +\bigl(\norminf{\bm e_v}+V_E|_{\max}\norminf{e_\psi}\bigr)/k_p .
+    \begin{aligned}
+    \dot{\hat\psi}_E&=u_3+\chi_m k_\psi
+        \operatorname{wrap}(y_F-\hat\psi_E),\\
+    \dot{\hat{\bm p}}_E&=\bm v_m+k_p(\bm y_p-\hat{\bm p}_E),
+    \end{aligned}
+    \label{eq:parallel_outputs}
+\end{equation}
+where $\chi_m=1$ only when the course correspondence is informative.
+On a compatible innovation chart the yaw error obeys its usual
+gyro-plus-heading comparison; during uninformative intervals only gyro
+propagation is available. An independent orientation set $\Psi$ is
+propagated with the gyro-error integral and intersected with each
+informative circular arc from Lemma~\ref{lem:course}. Disconnected
+components are retained, and the published bound is
+$B_\psi=\sup_{\theta\in\Psi}d_{S^1}(\hat\psi_E,\theta)$ about the
+actual observer estimate. An empty intersection invalidates orientation
+outputs; it does not reset the observer. The position error
+\(\bm e_p=\hat{\bm p}_E-\bm p_E\) satisfies
+\begin{equation}
+    \begin{gathered}
+    D^+\normtwo{\bm e_p}\leq-k_p\normtwo{\bm e_p}+\bar n_v+k_p\bar n_p,\\
+    \limsup_{t\to\infty}\normtwo{\bm e_p}\leq\bar n_p+\bar n_v/k_p.
+    \end{gathered}
     \label{eq:position_error_bound}
 \end{equation}
 
@@ -871,16 +929,11 @@ LMI in \((\tilde P,\bm Y=\tilde P\bm l,\gamma)\),
     \end{gathered}
     \label{eq:target_lmi}
 \end{equation}
-an \(\alpha\)-stability region with a bounded-real radar-to-state gain, and
-the unique solution of
+an $\alpha$-stability region with a bounded-real radar-to-state gain.
+The metric $P$ used to certify the nonlinear observer is chosen separately.
+For the estimate-minus-truth target error $\bm e_T$, set
 \begin{equation}
-    A_l^{\trans}P+PA_l=-I
-    \label{eq:lyapunov_identity}
-\end{equation}
-fixes a dimensionless metric independent of the scaling of
-\eqref{eq:target_lmi}. For the target error \(\bm e_T\) set
-\begin{equation}
-    \bm\epsilon=\diag(\omega^2I_2,\omega I_2,I_2)\bm e_T,
+    \bm\epsilon=\diag(I_2,\omega^{-1}I_2,\omega^{-2}I_2)\bm e_T,
     \qquad
     W_T=\sqrt{\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon}.
     \label{eq:target_metric}
@@ -888,11 +941,14 @@ fixes a dimensionless metric independent of the scaling of
 
 \begin{lemma}
 \label{lem:dissipation}
-Let \(\bm b_P=P\bm e_3\), let \(t_q,t_s>0\), and let
+Let $P\succ0$, \(\bm b_P=P\bm e_3\), \(t_q,t_s>0\), and
 \begin{equation}
-    M=\omega I-t_q\frac{L_q^2}{\omega^2}\bm e_2\bm e_2^{\trans}
-    -t_sL_s^2\bm e_3\bm e_3^{\trans}
-    -(t_q^{-1}+t_s^{-1})\bm b_P\bm b_P^{\trans}.
+    \begin{aligned}
+    M={}&-\omega(A_l^{\trans}P+PA_l)
+       -t_q\frac{L_q^2}{\omega^2}\bm e_2\bm e_2^{\trans}\\
+       &-t_sL_s^2\bm e_3\bm e_3^{\trans}
+       -(t_q^{-1}+t_s^{-1})\bm b_P\bm b_P^{\trans}.
+    \end{aligned}
     \label{eq:dissipation_matrix}
 \end{equation}
 If \(M\succeq2\lambda_TP\) then \(\dot W_T\leq-\lambda_TW_T\) in the
@@ -903,55 +959,45 @@ absence of exogenous error inputs.
 In the coordinate \(\bm\epsilon\) the injection block becomes
 \(\omega A_l\otimes I_2\), and the common rotation \(-u_3(I_3\otimes J)\)
 is skew and contributes zero to
-\(\tfrac{d}{dt}\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon\). By
-\eqref{eq:lyapunov_identity} the injection contributes
-\(-\omega\normtwo{\bm\epsilon}^2\). Splitting
-\(\Delta\Phi=\Delta\Phi_q+\Delta\Phi_s\) and applying
-\eqref{eq:global_lipschitz} with the scaling \eqref{eq:target_metric} gives
-\(\normtwo{\Delta\Phi_q}\leq(L_q/\omega)\normtwo{\bm\epsilon_2}\) and
-\(\normtwo{\Delta\Phi_s}\leq L_s\normtwo{\bm\epsilon_3}\); each enters the
-derivative through \(2\bm\epsilon^{\trans}\bm b_P\otimes I_2\). Applying
+\(\tfrac{d}{dt}\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon\). The injection contributes
+$\omega\bm\epsilon^{\trans}[(A_l^{\trans}P+PA_l)\otimes I_2]\bm\epsilon$.
+Splitting $\Delta\Phi/\omega^2$ into its velocity and acceleration
+increments, \eqref{eq:global_lipschitz} gives respective bounds
+$(L_q/\omega)\normtwo{\bm\epsilon_2}$ and
+$L_s\normtwo{\bm\epsilon_3}$. Each enters the derivative through
+$2\bm\epsilon^{\trans}(\bm b_P\otimes I_2)$. Applying
 \(2\bm z^{\trans}\bm d\leq\normtwo{\bm z}^2/t+t\normtwo{\bm d}^2\) once per
 channel gives
-\(\tfrac{d}{dt}W_T^2\leq-\bm\epsilon^{\trans}M\bm\epsilon
+\(\tfrac{d}{dt}W_T^2\leq-\bm\epsilon^{\trans}(M\otimes I_2)\bm\epsilon
 \leq-2\lambda_TW_T^2\).
 \end{IEEEproof}
 
 \subsection{Cascade ISS}
 \label{subsec:cascade}
 
-All stage couplings are feedforward. With
-\(\bm h=[\omega^2\rho_{\max},\;\omega b,\;S]^{\trans}\), Cauchy--Schwarz in
-the metric \eqref{eq:target_metric} gives the directional coefficients
+All core couplings are feedforward. With
+$\bm h=[\rho_{\max},\ b/\omega,\ S/\omega^2]^{\trans}$,
+Cauchy--Schwarz in the metric \eqref{eq:target_metric} gives
 \begin{equation}
     \begin{gathered}
-    g_{Tv}=\omega^2\sqrt{P_{11}},\qquad
-    g_R=\omega^3\sqrt{\bm l^{\trans}P\bm l},\\
+    g_{Tv}=\sqrt{P_{11}},\qquad
+    g_R=\omega\sqrt{\bm l^{\trans}P\bm l},\\
     g_\omega=\sqrt{\bm h^{\trans}|P|\bm h},\qquad
-    g_\Phi=\sqrt{P_{33}},
+    g_\Phi=\sqrt{P_{33}}/\omega^2,
     \end{gathered}
     \label{eq:target_disturbance_coefficients}
 \end{equation}
-\(|P|\) entrywise. Relaxing constant \(A\) and \(\kappa\) to declared rate
-bounds adds the physical jerk
-\(\dot A\bm e+\dot\kappa V^2J\bm e\), that is, a forcing of magnitude at
-most \(\bar\nu_\Phi=(\bar{\dot A}^2+b^4\bar{\dot\kappa}^2)^{1/2}\) in the
-last chain equation only. Stacking \eqref{eq:ego_rows}, Lemma~\ref{lem:dissipation}
-and \eqref{eq:target_disturbance_coefficients},
+where $|P|$ is entrywise. Declared scalar-acceleration and curvature rates
+add a forcing bounded by
+$\bar\nu_\Phi=(\bar{\dot A}^2+b^4\bar{\dot\kappa}^2)^{1/2}$ to the last
+chain equation. Lemmas~\ref{lem:egoRows} and \ref{lem:dissipation} give
 \begin{equation}
     \begin{gathered}
-    \bm\chi=\bigl[|e_\psi|\;\;\normtwo{\bm e_v}\;\;W_T\bigr]^{\trans},
-    \qquad D^+\bm\chi\leq H\bm\chi+\bm d,\\
-    H=\begin{bmatrix}
-    -k_\psi&0&0\\
-    k_vV_E|_{\max}&-k_v&0\\
-    0&g_{Tv}&-\lambda_T
-    \end{bmatrix},\\
-    \bm d=\begin{bmatrix}
-    \bar n_g+k_\psi B_F\\
-    \bar\delta_v\\
-    g_\omega\bar n_g+g_R\bar n_R+g_\Phi\bar\nu_\Phi
-    \end{bmatrix}.
+    \bm\chi=[\normtwo{\bm e_v},\ W_T]^{\trans},\qquad
+    D^+\bm\chi\leq H\bm\chi+\bm d,\\
+    H=\begin{bmatrix}-k_v&0\\g_{Tv}&-\lambda_T\end{bmatrix},\qquad
+    \bm d=\begin{bmatrix}\bar\delta_v\\
+    g_\omega\bar n_g+g_R\bar n_R+g_\Phi\bar\nu_\Phi\end{bmatrix}.
     \end{gathered}
     \label{eq:cascade_comparison}
 \end{equation}
@@ -959,72 +1005,86 @@ and \eqref{eq:target_disturbance_coefficients},
 \begin{theorem}[Cascade ISS]
 \label{thm:cascadeISS}
 Let Assumptions~\ref{asm:ego}--\ref{asm:singleTrack}, the hypotheses of
-Lemmas~\ref{lem:course}--\ref{lem:dissipation}, the operating set
-\eqref{eq:target_domain} and the declared sensor and model-error bounds
-hold, with \(k_\psi,k_v,k_p>0\). Then \(H\) is Metzler and Hurwitz,
-\(\bm c=-H^{-\trans}\bm 1>0\) satisfies \(\bm c^{\trans}H=-\bm 1^{\trans}\)
-so that \(V_c=\bm c^{\trans}\bm\chi\) is a linear copositive ISS Lyapunov
-function, any \(\bm z_0\geq\bm\chi(0)\) gives the componentwise bound
+Lemmas~\ref{lem:egoRows}, \ref{lem:lipschitz} and \ref{lem:dissipation},
+the true target domain \eqref{eq:target_domain} and the declared continuous
+sensor and model-error bounds hold, with $k_v,\lambda_T>0$. Then $H$ is
+Metzler and Hurwitz, and $\bm c=-H^{-\trans}\bm 1>0$ gives the linear
+copositive ISS function $V_c=\bm c^{\trans}\bm\chi$. For any
+$\bm z_0\geq\bm\chi(0)$,
 \begin{equation}
     \bm\chi(t)\leq\bm z(t)
-    =e^{Ht}\bm z_0+\int_0^te^{H(t-\tau)}\bm d\,d\tau,
+    =e^{Ht}\bm z_0+\int_0^t e^{H(t-\tau)}\bm d\,d\tau,
     \label{eq:comparison_solution}
 \end{equation}
-and \(\limsup_{t\to\infty}\bm\chi(t)\leq-H^{-1}\bm d\). Componentwise,
+and $\limsup_{t\to\infty}\bm\chi(t)\leq-H^{-1}\bm d$. The physical
+component bounds are
 \begin{equation}
-    \normtwo{\bm e_{T,i}}\leq c_iW_T,
-    \quad
-    \bm c_T=\diag(\omega^{-2},\omega^{-1},1)\sqrt{\diag(P^{-1})} .
+    \normtwo{\bm e_{T,i}}\leq c_iW_T,\qquad
+    \bm c_T=\diag(1,\omega,\omega^2)\sqrt{\diag(P^{-1})}.
     \label{eq:component_extraction}
 \end{equation}
 \end{theorem}
 
 \begin{IEEEproof}
-\(H\) has nonnegative off-diagonal entries and is lower triangular with
-negative diagonal, hence Metzler and Hurwitz, so \(e^{Ht}\geq0\) and the
-differential comparison inequality gives \eqref{eq:comparison_solution};
-letting \(t\to\infty\) and using \(-H^{-1}\geq0\) gives the limit and
-\(\bm c>0\). Then
-\(D^+V_c\leq\bm c^{\trans}H\bm\chi+\bm c^{\trans}\bm d
-=-\bm 1^{\trans}\bm\chi+\bm c^{\trans}\bm d\), which is negative whenever
-\(\bm 1^{\trans}\bm\chi>\bm c^{\trans}\bm d\). Inequality
-\eqref{eq:component_extraction} is the ellipsoid support of
-\(\bm e_i\) in the metric \(P\otimes I_2\) after undoing the scaling
-\eqref{eq:target_metric}.
+$H$ is lower triangular with negative diagonal and nonnegative
+off-diagonal entries. Thus $e^{Ht}\geq0$ and $-H^{-1}\geq0$, which give
+\eqref{eq:comparison_solution}, the ultimate bound and $\bm c>0$.
+Since $\bm c^{\trans}H=-\bm1^{\trans}$,
+$D^+V_c\leq-\bm1^{\trans}\bm\chi+\bm c^{\trans}\bm d$.
+Equation~\eqref{eq:component_extraction} is the ellipsoid support in
+$P\otimes I_2$ after undoing the position normalization.
 \end{IEEEproof}
 
-The yaw row of \(\bm d\) carries only \(B_F\) from
-Lemma~\ref{lem:course}, where reading the course as a yaw would carry
-\(\beta_E|_{\max}\), and the velocity row carries \(\bar n_a\) rather than
-a bound on \(\dot{\bm a}_E\). Triangularity of \(H\) removes both the
-small-gain condition and an auxiliary comparison Lyapunov equation.
+The core contains two ego-velocity states and six states per target. Its
+certificate requires neither informative yaw measurements nor a yaw
+innovation chart. The shared gyro also couples the two core stages;
+\eqref{eq:cascade_comparison} uses a triangular norm bound and does not
+claim to retain all cross-stage cancellations. Orientation and position
+remain separately certified outputs.
 
 \subsection{Gain Selection}
 \label{subsec:gainSelection}
 
-Each radius in \(-H^{-1}\bm d\) has the form \(\beta+\alpha/k\) in its own
-scalar gain and no interior minimum, so a settling preference replaces an
-optimum. With the transit time
-\(T_{\rm dom}=\rho_{\max}/(V_E|_{\max}+V_C|_{\max})\),
+With $T_{\rm dom}=\rho_{\max}/(V_E|_{\max}+V_C|_{\max})$, the scalar
+gain preference is
 \begin{equation}
-    \min_{k>0}k
-    \ \ \text{s.t.}\ \ e^{-kT_{\rm dom}}\leq0.05
-    \ \Longrightarrow\
-    k_\psi=k_v=k_p=\frac{\log20}{T_{\rm dom}} .
+    \min_{k>0}k\quad\text{s.t.}\quad e^{-kT_{\rm dom}}\leq0.05,
+    \qquad k_\psi=k_v=k_p=\frac{\log20}{T_{\rm dom}}.
     \label{eq:scalar_gain_rule}
 \end{equation}
-The bandwidth \(\omega\) minimizes the largest component of
-\(-H^{-1}\bm d\) normalized by the declared physical scale of that
-component, subject to \(\lambda_T\geq1/T_{\rm dom}\) and
-\(\omega>1\,\mathrm s^{-1}\). No sample period enters
-\eqref{eq:scalar_gain_rule} or the search.
+This is a transit-time preference, not an optimum of the common-error
+bound in \eqref{eq:ego_rows}. Increasing $k_v$ changes the combined gyro
+coefficient and need not improve that bound.
+
+For each candidate $\omega>1\,\mathrm{s}^{-1}$, fix
+$\lambda_T=1/T_{\rm dom}$ and minimize $\operatorname{tr}P$ over
+$P\succeq I$ and $t_q,t_s>0$ subject to
+\begin{equation}
+    \begin{bmatrix}
+    Z&P\bm e_3&P\bm e_3\\
+    \bm e_3^{\trans}P&-t_q&0\\
+    \bm e_3^{\trans}P&0&-t_s
+    \end{bmatrix}\preceq0,
+    \label{eq:free_metric_lmi}
+\end{equation}
+where
+$Z=\omega(A_l^{\trans}P+PA_l)+2\lambda_TP
++\diag(0,t_qL_q^2/\omega^2,t_sL_s^2)$.
+Its Schur complement is Lemma~\ref{lem:dissipation}. The normalization
+fixes the homogeneous scale while leaving the metric free; the recovered
+matrix is checked in the original inequality with numerical reserves.
+A bracketed scalar search then minimizes the largest ultimate physical
+component bound, obtained from \eqref{eq:component_extraction}, divided
+by its declared domain scale. This gives a feasible local bandwidth
+selection, not a global joint optimum. Neither simulation errors nor the
+sensor sample period enter the design.
 
 \subsection{Enclosure Supplied to the Controller}
 \label{subsec:enclosure}
 
-The controller of Section~\ref{sec:control} requires a valid radius at
-every instant, not an asymptotic one. Both are supplied by the same
-comparison system: \eqref{eq:comparison_solution} holds for all \(t\), so
+The controller of Section~\ref{sec:control} requires a transient radius
+at each observation. For the continuous observer, the same comparison
+system supplies it: \eqref{eq:comparison_solution} holds for all \(t\), so
 \eqref{eq:component_extraction} gives
 
 \begin{corollary}
@@ -1032,20 +1092,20 @@ comparison system: \eqref{eq:comparison_solution} holds for all \(t\), so
 Under the hypotheses of Theorem~\ref{thm:cascadeISS} and any
 \(\bm z_0\geq\bm\chi(0)\),
 \begin{equation}
-    \normtwo{\bm\rho(t)-\hat{\bm\rho}(t)}\leq B_\rho(t):=c_1z_3(t),
-    \quad c_1=\omega^{-2}\sqrt{(P^{-1})_{11}},
+    \normtwo{\bm\rho(t)-\hat{\bm\rho}(t)}\leq B_\rho(t):=c_1z_2(t),
+    \quad c_1=\sqrt{(P^{-1})_{11}},
     \label{eq:relative_position_bound}
 \end{equation}
-and \(\limsup_{t\to\infty}B_\rho\leq c_1(-H^{-1}\bm d)_3\). An initial
+and \(\limsup_{t\to\infty}B_\rho\leq c_1(-H^{-1}\bm d)_2\). An initial
 metric bound follows from componentwise initial bounds \(\bm b_{T0}\) as
 \(W_T(0)\leq\bigl((D\bm b_{T0})^{\trans}|P|(D\bm b_{T0})\bigr)^{1/2}\) with
-\(D=\diag(\omega^2,\omega,1)\).
+\(D=\diag(1,\omega^{-1},\omega^{-2})\).
 \end{corollary}
 
 Inertial reconstruction of the relative vector costs one further yaw term,
 \begin{equation}
     \normtwo{\bm p_C-\bm p_E-R(\hat\psi_E)\hat{\bm\rho}}
-    \leq B_\rho+2\bar R\sin\frac{\min(z_1,\pi)}2 ,
+    \leq B_\rho+2\bar R\sin\frac{\min(B_\psi,\pi)}2 ,
     \label{eq:inertial_relative_bound}
 \end{equation}
 \(\bar R=\min(\rho_{\max},\normtwo{\hat{\bm\rho}})\), and the analogous
@@ -1054,414 +1114,492 @@ rotation bounds convert the remaining components of
 enclosures \(\bm b_E(t)\), \(\bm b_T(t)\) that the controller reads. These
 certify the current estimate; they are not predictions of future observer
 output, and their propagation over the control horizon is the controller's
-own obligation, treated in Section~\ref{subsec:uncertainty}.
+own obligation, treated in Section~\ref{subsec:uncertainty}. The digital
+runtime additionally accounts for held measurements, radar prediction and
+outages in a separate finite-time enclosure. The continuous ISS theorem
+does not establish exponential stability of the sampled RK4 realization
+or a directed-rounding certificate for its computed bounds.
 
 \section{Control Design}
 \label{sec:control}
 
-One convex program is solved per sample. Its decision is a complete input
-sequence reaching a certified rest configuration, plus one nonnegative
-scalar relaxing a continuous-time CLF condition. Collision, road,
-actuator, tire and domain requirements are hard; the objective combines
-input effort over the performance horizon with squared CLF relaxation.
+One convex program is solved per sample. Its decisions are the complete
+input sequence, one nonnegative sampled-CLF slack, and the separating
+angles of the active encounter. Collision, actuator, slew, chart and
+terminal requirements are hard. The accepted plan and its geometric
+certificate are retained together for the next sample.
 
 \subsection{Prediction Model}
 \label{subsec:frenetModel}
 
 Let
 \begin{equation}
-    \bm x=[s,\,d,\,e_\psi,\,v_x,\,v_y,\,r]^{\trans},
-    \qquad
+    \bm x=[s,\,d,\,e_\psi,\,v_x,\,v_y,\,r]^{\trans},\qquad
     \bm u=[\delta_F,\,\beta]^{\trans},
     \label{eq:frenet_state}
 \end{equation}
-with \(s,d\) the station and signed lateral offset on the nominal path and
-\(e_\psi\) the heading error relative to its tangent. For a scheduled speed
-\(\bar v\geq0\) and curvature \(\kappa\), write \(\bar r=\kappa\bar v\) and
-\(v_\tau=\max(\bar v,v_{\rm f})\) with \(v_{\rm f}>0\) a tire-denominator
-floor. At \(\bar v_y=0\), use
-\(\bar\delta_F=\arctan(L\kappa)\bar v/v_\tau\) and compute
-\(\bar\alpha_i\) from \eqref{eq:tire_forces} with \(v_x=v_\tau\),
-\(r=\bar r\). Define the constant acceleration scale
-\(g_\beta=\sum_i\mu_iF_{zi}/m_E\), equal to \(\mu g\) when both axles
-have the same coefficient. The nominal ratio is obtained from
-\(\beta_j^{\rm ref}=((\bar v_{j+1}-\bar v_j)/T_s+F_R(\bar v_j)/m_E-b)/g_\beta\).
-For derivative evaluation only, clip this anchor to
-\([-1+\varepsilon_\beta,1-\varepsilon_\beta]\), where
-\(\varepsilon_\beta=\sqrt{\epsilon_{\rm mach}}\); the optimization retains
-its declared input endpoints. Each axle's nominal force is
-\(\bar\beta_j\mu_iF_{zi}\), and road load is modeled separately.
-Holding static loads and \(v_\tau\) fixed, define
+where $s,d$ are station and signed lateral offset, and $e_\psi$ is heading
+relative to the path tangent. At curvature $\kappa$, the exact Frenet
+kinematics are
 \begin{equation}
     \begin{aligned}
-    k_i&=\left.\frac{\partial\Phi_i}{\partial\alpha}\right|_{\bar\alpha_i,\bar\beta},
-    & h_i&=\left.\frac{\partial\Phi_i}{\partial\beta}\right|_{\bar\alpha_i,\bar\beta},\\
-    d_i&=\Phi_i(\bar\alpha_i,\bar\beta)-k_i\bar\alpha_i-h_i\bar\beta,
-    & K_i&=-k_i,\\
-    F_{yi}^{\rm lin}&=k_i\alpha_i+h_i\beta+d_i .
+    \dot s&=\frac{v_x\cos e_\psi-v_y\sin e_\psi}{1-\kappa d},\\
+    \dot d&=v_x\sin e_\psi+v_y\cos e_\psi,\qquad
+    \dot e_\psi=r-\kappa\dot s.
     \end{aligned}
-    \label{eq:fiala_tangent}
+    \label{eq:frenet_kinematics}
 \end{equation}
-In adhesion, with \(t_i=\tan\bar\alpha_i\),
-\(\bar\eta=\sqrt{1-\bar\beta^2}\) and
-\(q_i=C_i|t_i|/(3\mu_iF_{zi}\bar\eta)\),
+Together with \eqref{eq:bicycle_model}--\eqref{eq:fiala_force}, these
+define the nonlinear vector field $f_\kappa(\bm x,\bm u)$. Passive
+flat-road load in still air is
 \begin{equation}
-    \begin{aligned}
-    k_i&=-C_i(1-q_i)^2\sec^2\bar\alpha_i,\\
-    h_i&=C_it_iq_i(1-2q_i/3)\bar\beta/\bar\eta^2 .
-    \end{aligned}
-    \label{eq:fiala_derivatives}
-\end{equation}
-In saturation, \(k_i=0\) and
-\(h_i=\mu_iF_{zi}\bar\beta\operatorname{sgn}(\bar\alpha_i)/\bar\eta\).
-At zero slip, \(K_i=C_i\), \(h_i=d_i=0\). The beta derivative carries
-braking--steering coupling directly into the QP. The approximation is local
-in \((\alpha,\beta)\); the tire-speed denominator remains scheduled.
-
-The scheduled affine dynamics
-\(\dot{\bm x}=A^c\bm x+B^c\bm u+\bm c^c\) are
-\begin{equation}
-    \begin{aligned}
-    \dot s&=v_x+\kappa\bar vd, \qquad
-    \dot d=\bar ve_\psi+v_y,\\
-    \dot e_\psi&=r-\kappa v_x-\kappa^2\bar vd,\\
-    \dot v_x&=g_\beta\beta-\widehat F_R(v_x;\bar v)/m_E+\bar rv_y+b,\\
-    \dot v_y&=-\bar rv_x-\frac{c_0}{m_Ev_\tau}v_y
-        -\Bigl(\frac{c_1}{m_Ev_\tau}+\bar v\Bigr)r\\
-        &\qquad+\frac{K_f}{m_E}\delta_F+\frac{h_f+h_r}{m_E}\beta+\bar r\bar v+\frac{d_f+d_r}{m_E},\\
-    \dot r&=-\frac{c_1}{I_{z,E}v_\tau}v_y
-        -\frac{c_2}{I_{z,E}v_\tau}r\\
-        &\qquad+\frac{l_{f,E}K_f}{I_{z,E}}\delta_F
-        +\frac{l_{f,E}h_f-l_{r,E}h_r}{I_{z,E}}\beta\\
-        &\qquad+\frac{l_{f,E}d_f-l_{r,E}d_r}{I_{z,E}},
-    \end{aligned}
-    \label{eq:scheduled_bicycle}
-\end{equation}
-with \(c_0=K_f+K_r\), \(c_1=l_{f,E}K_f-l_{r,E}K_r\),
-\(c_2=l_{f,E}^2K_f+l_{r,E}^2K_r\), and \(b\) a declared constant
-longitudinal acceleration bias. The signed ratio maps to total commanded force \(m_Eg_\beta\beta\). Passive flat-road load in
-still air is
-\begin{equation}
-    \begin{aligned}
-    F_R(v)&=\tfrac12\rho_{\rm air}C_dA_fv|v|\\
-        &\quad+m_Eg(q_0+q_1|v|+q_4|v|^4)\tanh(v/v_{\rm tr}),\\
-    \widehat F_R(v;\bar v)&=F_R(\bar v)+F_R'(\bar v)(v-\bar v),
-    \end{aligned}
+    \begin{split}
+    F_R(v)={}&\tfrac12\rho_{\rm air}C_dA_fv|v|\\
+       &+m_Eg(q_0+q_1|v|+q_4|v|^4)\tanh(v/v_{\rm tr}),
+    \end{split}
     \label{eq:road_load}
 \end{equation}
-where the nonnegative rolling coefficients and positive transition speed
-are declared model parameters. This reduced model excludes dynamic wheel
-inertia, slip-dependent rolling moments, aerodynamic pitch, wind and grade.
-The CLF and held-flow predictor use the same affine expansion.
-Confining \(v_{\rm f}\) to the tire
-denominators keeps the kinematic rows exact at \(\bar v=0\), which
-Lemma~\ref{lem:rest} requires.
+with nonnegative rolling coefficients and $v_{\rm tr}>0$. The model
+uses static axle loads and excludes wheel inertia, wind, grade and dynamic
+load transfer.
+
+At prescribed longitudinal speed $v_*$, the steady turn satisfies
+\begin{equation}
+    \begin{gathered}
+    d_*=0,\qquad e_{\psi,*}=-\operatorname{atan2}(v_{y,*},v_*),\\
+    r_*=\kappa\sqrt{v_*^2+v_{y,*}^2}.
+    \end{gathered}
+    \label{eq:cruise_trim}
+\end{equation}
+The three force and moment balances determine $v_{y,*},\delta_{F,*}$ and
+$\beta_*$. Front wheel forces are rotated into the body frame before
+solving these balances. The resulting operating point defines
+\begin{equation}
+    \begin{gathered}
+    A^c=D_xf_\kappa(\bm x_*,\bm u_*),\qquad
+    B^c=D_uf_\kappa(\bm x_*,\bm u_*),\\
+    \bm c^c=f_\kappa(\bm x_*,\bm u_*)-A^c\bm x_*-B^c\bm u_*,\\
+    \dot{\bm x}=A^c\bm x+B^c\bm u+\bm c^c.
+    \end{gathered}
+    \label{eq:scheduled_bicycle}
+\end{equation}
+The Fiala and road-load Jacobians retain both steering and signed-ratio
+couplings. Derivative anchors lie strictly inside $|\beta|<1$; the input
+constraints retain their declared endpoints.
 
 Each stage is integrated exactly under its held input,
 \begin{equation}
     \begin{bmatrix}A_j&B_j&\bm c_j\\0&I_2&0\\0&0&1\end{bmatrix}
-    =\exp\!\left(T_s\begin{bmatrix}A^c_j&B^c_j&\bm c^c_j\\0&0&0\\0&0&0\end{bmatrix}
-    \right),
+    =\exp\!\left(T_s\begin{bmatrix}A^c_j&B^c_j&\bm c^c_j\\0&0&0\\0&0&0\end{bmatrix}\right),
     \label{eq:held_flow}
 \end{equation}
-so \(\bm x_{j+1}=A_j\bm x_j+B_j\bm u_j+\bm c_j\), \(j=0,\dots,M-1\), and the
-condensed map is \(\bm x_j=F_j\bm U+\bm f_j\) with
-\(\bm U=[\bm u_0^{\trans},\dots,\bm u_{M-1}^{\trans}]^{\trans}\).
+so $\bm x_{j+1}=A_j\bm x_j+B_j\bm u_j+\bm c_j$ and
+$\bm x_j=F_j\bm U+\bm f_j$, with
+$\bm U=[\bm u_0^{\trans},\ldots,\bm u_{N-1}^{\trans}]^{\trans}$.
+A straight or constant-curvature reference uses one generator. A declared
+smooth profile uses an immutable phase-indexed sequence and a
+constant-curvature tail. The sampled reference defect is retained, and
+replanning does not change the generators of an inherited certificate.
+The certified plant is this held affine model with zero process residual;
+linearization alone does not establish inclusion of the nonlinear vehicle.
 
 \subsection{Stage Constraints}
 \label{subsec:hardRows}
 
-Every stage carries the actuator box \(|\delta_F|\leq\delta_{\max}\),
-\(-1\leq\beta_{\min}\leq\beta\leq\beta_{\max}\leq1\), the selected slip-angle model-domain rows
-\(|\alpha_f|\leq\bar\alpha_f\), \(|\alpha_r|\leq\bar\alpha_r\) on the slip
-angles of \eqref{eq:tire_forces} evaluated at \(v_\tau\), and the domain
-rows \(0\leq v_x\leq v_{\max}\), \(|d|\leq d_{\max}\),
-\(|e_\psi|\leq e_{\max}\), \(s\in[\underline s_j,\bar s_j]\).
+Every held input satisfies
+\begin{equation}
+    \begin{gathered}
+    |\delta_F|\leq\delta_{\max},\qquad
+    -1\leq\beta_{\min}\leq\beta\leq\beta_{\max}\leq1,\\
+    |\bm u_j-\bm u_{j-1}|\leq T_s\dot{\bm u}_{\max},
+    \end{gathered}
+    \label{eq:actuator_rows}
+\end{equation}
+where $\bm u_{-1}$ is the actual previous input and infinite rate limits
+omit the corresponding rows. Pose-domain rows keep each uncertain node
+inside its certified Cartesian chart. Smooth references additionally
+require a bounded station-phase error and $1-\kappa(s)d>0$ throughout the
+declared reference domain.
 
-The slip limits are below \(\pi/2\) and define the chosen model domain;
-they do not certify friction feasibility or a bound on the Fiala tangent
-error. The ratio input influences both longitudinal force and the local lateral force
-through \eqref{eq:fiala_tangent}. No separate front/rear friction
-circles, polygon facets, utilization checks or load-transfer limits are
-imposed. The affine tangent can depart from the nonlinear force envelope
-away from its operating point, so the certificate remains conditional on
-the declared scheduled model and any justified residual bounds.
+These chart requirements are distinct from physical road edges. The
+current terminal construction requires a reference without physical road
+boundaries. It imposes no additional speed, tire-slip or friction-circle
+constraints. Consequently a feasible affine prediction does not certify
+the nonlinear tire envelope away from its operating point. Such a claim
+would require a justified model-residual enclosure and compatible terminal
+conditions.
 
-\subsection{Terminal Rest}
+\subsection{Terminal Continuation}
 \label{subsec:terminal}
 
-The horizon \(M=N+N_b\) extends the performance length \(N\) by a
-continuation long enough to reach zero scheduled speed. Every one of the
-\(M\) stages carries both inputs and the constraints of
-Section~\ref{subsec:hardRows}; no reduced backup model is used.
+Let $S\bm x=[d,e_\psi,v_x,v_y,r]^{\trans}$,
+$\bm e=S(\bm x-\bm x_*)$, $F_e=A_{2:6,2:6}$ and $G_e=B_{2:6,:}$.
+For a constant reference,
+\begin{equation}
+    \bm e^+=F_e\bm e+G_e(\bm u-\bm u_*)+\bm d_*,\qquad
+    F_c=F_e-G_eK,
+    \label{eq:terminal_error_flow}
+\end{equation}
+where $K$ is the discrete Riccati feedback and $\bm d_*$ is the actual
+sampled trim residual, including its numerical error. With a nonsingular
+modal basis $T$, write $W_m=T^{-1}$ and define
+\begin{equation}
+    \mathcal Z=\{\bm e\in\R^5:|W_m\bm e|\leq\bm a\},\qquad
+    \bm a>0.
+    \label{eq:modal_terminal_set}
+\end{equation}
+Complex conjugate modes are retained, so each absolute value is a complex
+magnitude and each row is an ordinary second-order cone. Let
+$\bar{\bm r}$ bound future tracking-coordinate measurement error and set
+\begin{equation}
+    C\geq|W_mF_cT|,\qquad
+    \bm d_f=|W_mG_eK|\bar{\bm r}+|W_m\bm d_*|.
+    \label{eq:terminal_forcing}
+\end{equation}
+Synthesis verifies $C\bm a+\bm d_f\leq\bm a-2\epsilon_f\bm1$,
+together with actuator-amplitude and slew support inequalities.
 
 \begin{lemma}
-\label{lem:rest}
-At \(\bar v=0\), every
-\(\bm x_R=[s_R,\,d_R,\,e_{\psi,R},\,0,\,0,\,0]^{\trans}\) is a fixed point
-of \eqref{eq:scheduled_bicycle} under \(\bm\pi_R=[0,\,-b/g_\beta]^{\trans}\), for
-any curvature \(\kappa\).
+\label{lem:terminal}
+If these inequalities hold, the hypothetical held feedback
+$\bm\kappa(\hat{\bm e})=\bm u_*-K\hat{\bm e}$ keeps the true error in
+$\mathcal Z$ under $\hat{\bm e}=\bm e+\bm\nu$,
+$|\bm\nu|\leq\bar{\bm r}$. The previous input and admissibility of the
+first feedback transition are part of the terminal information state.
 \end{lemma}
 
 \begin{IEEEproof}
-At \(\bar v=0\) and \(v_x=v_y=r=0\) the first three rows of
-\eqref{eq:scheduled_bicycle} vanish identically, \(\bar r=0\) removes the
-remaining velocity couplings, \(F_R(0)=0\) gives \(\dot v_x=g_\beta\beta+b=0\) at \(\beta=-b/g_\beta\), and
-\(\dot v_y=\dot r=0\) at \(\delta_F=0\), since every retained term is
-proportional to \(v_y\) or \(r\).
+The true successor is $F_c\bm e-G_eK\bm\nu+\bm d_*$, hence its modal
+magnitudes are at most $C\bm a+\bm d_f$. For a freely optimized input
+$\bm u=\bm\kappa(\hat{\bm e})+\bm v$, impose
+\begin{equation}
+    |W_mG_e\bm v|\leq\bm a-C\bm a-\bm d_f-\epsilon_f\bm1.
+    \label{eq:terminal_successor_cone}
+\end{equation}
+Let $H_u=[I;-I]$ and let $\bm b_h$ be the actuator box shifted by trim
+and reduced by its numerical reserve. The rows
+\begin{equation}
+    H_u\bm v\leq\bm b_h-|H_uKT|\bm a-|H_uK|\bar{\bm r}
+    \label{eq:terminal_input_support}
+\end{equation}
+ensure amplitude admissibility. With $J_u=I+KG_e$, define
+\begin{equation}
+    \bm s_u=|K(I-F_c)T|\bm a
+      +( |J_uK|+|K| )\bar{\bm r}+|K\bm d_*|.
+    \label{eq:terminal_rate_support}
+\end{equation}
+The next hypothetical feedback differs from the current input by
+$K(I-F_c)\bm e+J_uK\bm\nu-J_u\bm v-K\bm\nu^+-K\bm d_*$.
+Thus $\pm J_u\bm v\leq T_s\dot{\bm u}_{\max}-\bm s_u$, together
+with current slew, guarantees the next transition. Synthesis makes
+$\bm v=0$ feasible in all these rows. Every accepted $\bm v$ preserves
+true-state membership and the next feedback candidate's admissibility.
 \end{IEEEproof}
 
-Consequently the rest step may be appended indefinitely, and the finite
-program carries an infinite-horizon meaning. Because the resting vehicle
-does not move, the terminal separation row must hold against the target's
-\emph{complete} future occupancy \(\mathcal O_\infty\), not against its
-position at one instant: with \(\sigma_{\mathcal O}(\bm n)\) the support of
-the nominal complete-future center trajectory and \(R_T\) the target
-circumradius,
-\begin{equation}
-    \bm n^{\trans}\bm p_{E,M}
-    \geq\sigma_{\mathcal O}(\bm n)+R_T
-    +\sigma_E(\bm n)+\epsilon,
-    \label{eq:terminal_separation}
-\end{equation}
-for the selected \(\bm n\), where \(\sigma_E\) is the resting ego rectangle
-support. Directions along which the target retains persistent velocity or
-acceleration uncertainty have \(\sigma_{\mathcal O}=+\infty\) and cannot
-certify rest; a finite error radius at the rest time is never substituted
-for \(\sigma_{\mathcal O}\).
-
-\subsection{Node Separation Rows}
-\label{subsec:geometry}
-
-Separation is imposed in Cartesian space. Over the station interval of node
-\(j\) the affine chart of the path polyline satisfies
+Entry from the finite plan with terminal center $\bm z_N$ and radius
+$\bm\rho_N$ requires
 \begin{equation}
     \begin{gathered}
-    \bm p=\bm o_j+\bm t_js+\bm m_jd+\bm r_p,
-    \qquad \psi=\theta_j+e_\psi+r_\psi,\\
-    |\bm r_p|\leq\bm b_{p,j},\qquad |r_\psi|\leq b_{\psi,j},
+    |W_mS(\bm z_N-\bm x_*)|+|W_mS|\bm\rho_N
+        \leq\bm a-\epsilon_f\bm1,\\
+    |\bm u_*-KS(\bm z_N-\bm x_*)-\bm u_{N-1}|
+        +|KS|\bm\rho_N\leq T_s\dot{\bm u}_{\max}.
     \end{gathered}
+    \label{eq:terminal_entry}
+\end{equation}
+The invariant object includes true-state membership in $\mathcal Z$ and
+the conditioned measurement set; a rectangular outer hull need not itself
+be invariant. Velocity uncertainty is therefore admitted without forcing
+every terminal state to rest. After encounter completion, the terminal
+law supplies a feasible candidate to a one-hold optimization whose input
+remains free.
+
+For a smooth reference, the terminal family also includes station phase.
+The six-dimensional indexed sets satisfy
+$C_j\bm a_j+\bm d_{f,j}\leq\bm a_{j+1}-\bm\epsilon_{f,j}$, with
+reference defects, cross-stage gains, slew and phase-domain supports
+included. The final constant-curvature set is invariant under reference
+station translation. The same induction then applies to this declared
+family; arbitrary changes of reference are new obligations.
+
+\subsection{Joint Node Separation}
+\label{subsec:geometry}
+
+Separation is imposed in Cartesian space. At each node a certified chart
+gives an affine relative center and ego yaw,
+\begin{equation}
+    \bm r(\bm x)=\bm c_p+P_p\bm x,\qquad
+    \psi(\bm x)=\psi_0+\bm w^{\trans}\bm x.
     \label{eq:affine_chart}
 \end{equation}
-where \(\bm b_{p,j}\) and \(b_{\psi,j}\) are computed rather than assumed:
-the chart error is affine on each rectangle formed by an intersecting
-polyline segment and the admitted lateral range, so its extrema occur at
-those rectangles' corners, and \(b_{\psi,j}\) is the largest wrapped
-segment-heading difference over the interval.
+Let $B_E,B_T$ be the convex hulls of the ego and target rectangles over
+their yaw-error intervals, expressed about their nominal orientations.
+Position uncertainty is enclosed by $G[-1,1]^m$ and a chart-error disk of
+radius $\rho_p$. With $\bm n(\theta)=[\cos\theta,\sin\theta]^{\trans}$
+and fixed target yaw center $\phi$, define
+\begin{equation}
+    \begin{split}
+    f(\bm x,\theta)={}&d_c+\rho_p
+       +h_{B_E}(\bm n(\theta-\psi(\bm x)))\\
+       &+h_{B_T}(\bm n(\theta-\phi))
+       +\|G^{\trans}\bm n(\theta)\|_1
+       -\bm n(\theta)^{\trans}\bm r(\bm x).
+    \end{split}
+    \label{eq:collision_residual}
+\end{equation}
+Here $h_B$ denotes support. For collision records $d_c=0$: there is no
+additional physical clearance buffer. Numerical reserves enforce strictly
+positive separation after independent verification. Uncertainty and chart
+remainders remain part of the occupied sets. The lifted-certificate
+viewpoint is consistent with exact convex-body separation
+\cite{ZhangLinigerBorrelli2018}; optimizing trajectory and direction
+together remains nonconvex.
 
 \begin{lemma}
 \label{lem:separationRow}
-Let \(\bm n\) be a fixed unit inertial normal, \(\sigma_E(\psi)\) the ego
-rectangle support in direction \(-\bm n\), \(L\) an interval Lipschitz
-constant of \(\sigma_E\) over the admitted heading range,
-\(\bar\sigma_{E,j}=\sigma_E(\theta_j+\bar e_{\psi,j})\), and
-\(\sigma_{T,j}\) the target support in direction \(\bm n\) inflated by its
-predicted position and orientation uncertainty. If
+At an anchor $(\bm x^0,\theta^0)$, put
+$\Delta\bm r=P_p\Delta\bm x$, $\Delta\psi=\bm w^{\trans}\Delta\bm x$,
+$\bm t(\theta)=[-\sin\theta,\cos\theta]^{\trans}$, and impose
+$\normtwo{\Delta\bm r}\leq R_{\rm step}$.
+Let $R_E,R_T$ be body circumradii,
+$R_U=\sum_i\normtwo{G_i}$, $R_r=\normtwo{\bm r^0}+R_{\rm step}$,
+and $\eta=1/R_{\rm step}$. Define the affine arguments
 \begin{equation}
-    \begin{split}
-    \underline g_j=\bm n^{\trans}(\bm p_{E,j}-\bm p_{T,j})
-    -\sigma_{T,j}-\bar\sigma_{E,j}\\
-    -L\bigl|e_{\psi,j}-\bar e_{\psi,j}\bigr|-\epsilon_j\geq0,
-    \end{split}
-    \label{eq:collision_row}
+    \begin{aligned}
+    \bm a_E&=\bm n(\theta^0-\psi^0)
+           +\bm t(\theta^0-\psi^0)(\Delta\theta-\Delta\psi),\\
+    \bm a_T&=\bm n(\theta^0-\phi)+\bm t(\theta^0-\phi)\Delta\theta,\\
+    \bm a_U&=\bm n^0+\bm t^0\Delta\theta.
+    \end{aligned}
+    \label{eq:support_arguments}
 \end{equation}
-with \(\epsilon_j\) the clearance margin plus
-\(|\bm n|^{\trans}\bm b_{p,j}\) plus the directional support of the state
-enclosure, then the two oriented rectangles are separated at node \(j\).
-Both signs of the absolute value are affine rows in \(\bm U\).
+Then the convex function
+\begin{equation}
+    \begin{aligned}
+    \widehat f^0={}&d_c+\rho_p+h_{B_E}(\bm a_E)+h_{B_T}(\bm a_T)
+        +\|G^{\trans}\bm a_U\|_1\\
+       &-(\bm n^0)^{\trans}\bm r^0-(\bm n^0)^{\trans}\Delta\bm r
+          -(\bm t^0)^{\trans}\bm r^0\Delta\theta\\
+       &+\tfrac12 R_E(\Delta\theta-\Delta\psi)^2
+          +\tfrac12\eta\normtwo{\Delta\bm r}^2\\
+       &+\tfrac12(R_T+R_U+R_r+\eta^{-1})(\Delta\theta)^2
+    \end{aligned}
+    \label{eq:collision_majorant}
+\end{equation}
+satisfies $f\leq\widehat f^0$ on the step domain, with equality at the
+anchor.
 \end{lemma}
 
-Road boundaries are quadratic graphs \(y_{\rm b}(x)\) on finite parameter
-ranges. Over the admitted parameter interval \([\underline x_j,\bar x_j]\)
-of the ego footprint, \(\max y_{\rm b}\) is attained at an endpoint or at
-the single stationary point \(-c_1/(2c_2)\), so one supporting halfspace of
-the form \eqref{eq:collision_row} covers the whole footprint exactly; no
-sampling of the boundary is involved. A boundary contributes a row only at
-nodes whose entire admitted range lies inside its parameter range.
+\begin{IEEEproof}
+The unit circle satisfies
+$\normtwo{\bm n(\alpha+\xi)-\bm n(\alpha)-\bm t(\alpha)\xi}
+\leq\xi^2/2$. A radius-$R$ body's support is $R$-Lipschitz, giving
+the ego, target and zonotope remainders. The center remainder is at most
+$R_r(\Delta\theta)^2/2$, and Young's inequality bounds the cross term by
+$(\eta\normtwo{\Delta\bm r}^2+\eta^{-1}(\Delta\theta)^2)/2$.
+All remainders vanish at the anchor.
+\end{IEEEproof}
 
-\subsection{Relaxed Continuous-Time CLF}
+For a nondegenerate rectangle, the yaw hull is the intersection of its
+circumdisk and the chord halfspaces left by its rotated vertex arcs:
+$B=\{\bm y:\normtwo{\bm y}\leq R,D\bm y\leq\bm b\}$.
+Strong duality gives the exact support epigraph
+\begin{equation}
+    h_B(\bm v)=\min_{\bm\lambda\geq0}
+       \bm b^{\trans}\bm\lambda+R\normtwo{\bm v-D^{\trans}\bm\lambda}.
+    \label{eq:yaw_support_dual}
+\end{equation}
+Zero-width yaw intervals use the rectangle's absolute-value support.
+These epigraphs and the quadratic terms in \eqref{eq:collision_majorant}
+have second-order cone representations.
+
+Each target also has a terminal exit record: use a point ego body and
+$d_c=R_{\rm sensing}+\epsilon_{\rm encounter}$ in
+\eqref{eq:collision_residual}. The resulting halfspace places the entire
+target footprint outside the sensing disk by a stored absolute deadline.
+The active horizon shrinks toward this deadline. A sound current scan or
+current conditioned enclosure must confirm release; prediction alone does
+not remove a target, and release does not prove it can never return.
+
+\subsection{Relaxed Sampled CLF}
 \label{subsec:clf}
 
-Let \(S\bm x=[d,\,e_\psi,\,v_x,\,v_y,\,r]^{\trans}\) and let \(\bm r_0\) be
-the steady cruise of \eqref{eq:scheduled_bicycle} at the local curvature,
-obtained from the moment balance \(F_{yf}=l_{r,E}m_E\bar vr_0/L\),
-\(F_{yr}=l_{f,E}m_E\bar vr_0/L\) with \(r_0=\kappa v_{\rm ref}\); the rear
-slip fixes \(v_{y,0}\), the front slip fixes \(\delta_{F,0}\), and
-\(a_0=-b-v_{y,0}r_0\). Put
+Let $P=R^{\trans}R\succ0$ be the discrete Riccati metric for
+\eqref{eq:terminal_error_flow}, normalized by a positive scalar, and let
 \begin{equation}
-    \bm e=S\bm x-\bm r_0,\qquad V(\bm x)=\bm e^{\trans}P\bm e .
+    V(\bm e)=\bm e^{\trans}P\bm e,\qquad
+    F_c^{\trans}PF_c\preceq q_0P,\qquad q_0<1.
     \label{eq:clf_definition}
 \end{equation}
-With \(A_e,B_e\) the \(S\)-block of \(A^c,B^c\) at \(\kappa=0\),
-\(\bar v=v_{\rm ref}\), and weights \(Q\succ0\), \(R\succ0\), let
-\((P,K)\) solve the Riccati equation, so that
+For $0<\varsigma<1$, set $c=1-\varsigma(1-q_0)$ and
+$a=(c+q_0)/2<c$. The first held input satisfies
 \begin{equation}
-    (A_e-B_eK)^{\trans}P+P(A_e-B_eK)=-(Q+K^{\trans}RK)=:-W,
-    \label{eq:riccati}
-\end{equation}
-and set \(\alpha=\varsigma\lambda_{\min}(W,P)>0\),
-\(\varsigma\in(0,1]\). Both \(P\) and \(\alpha\) are independent of \(T_s\).
-Freezing \(\bm r_0\) and \(P\), the Lie derivatives at the current
-scheduled point are
-\begin{equation}
-    L_fV=2\bm e_0^{\trans}PS(A^c\bm x_0+\bm c^c),
-    \qquad
-    L_gV=2\bm e_0^{\trans}PSB^c,
-    \label{eq:lie_derivatives}
-\end{equation}
-and the performance row, in the form of \cite{AmesXuGrizzleTabuada2017}, is
-\begin{equation}
-    L_fV+L_gV\bm u_0\leq-\alpha V(\bm x_0)+\delta,\qquad\delta\geq0 .
+    \begin{gathered}
+    \hat{\bm e}^+=F_e\hat{\bm e}+G_e(\bm u_0-\bm u_*)+\bm d_*,\\
+    \normtwo{R\hat{\bm e}^+}
+      \leq\sqrt a\normtwo{R\hat{\bm e}}+\epsilon_{\rm num}+\delta,
+    \qquad\delta\geq0.
+    \end{gathered}
     \label{eq:clf_row}
 \end{equation}
+For $\bm e=\hat{\bm e}+\bm\eta$, $|\bm\eta|\leq\bm r_e$, put
+$\sigma=\sqrt a\normtwo{|R|\bm r_e}
++\normtwo{|RF_e|\bm r_e}+2\epsilon_{\rm num}$.
+The triangle inequality followed by Young's inequality gives
+\begin{equation}
+    \begin{gathered}
+    V(\bm e^+)\leq cV(\bm e)+B+S_\delta,\\
+    B=\frac{c\sigma^2}{c-a},\qquad
+    S_\delta=\frac{c}{c-a}\delta(2\sigma+\delta).
+    \end{gathered}
+    \label{eq:sampled_dissipation}
+\end{equation}
+Positive slack permits $V$ to increase. Strict decrease follows when
+$B+S_\delta<(1-c)V$; if a uniformly bounded allowance $\bar E$ exists
+along an indefinitely feasible constant-reference sequence, then
+$\limsup V\leq\bar E/(1-c)$. A positive slack penalty alone proves
+neither that allowance nor asymptotic recovery. For scheduled references,
+the cone uses the next reference and $P_{j+1}$ on its left and $P_j$ on
+its right, with the full affine reference defect included.
 
 \subsection{The Program}
 \label{subsec:program}
 
-Collecting the stage constraints, terminal conditions, separation rows and \eqref{eq:clf_row},
+Let $\mathcal D$ collect the affine dynamics, actuator and chart rows,
+terminal constraints and \eqref{eq:clf_row}. With anchor
+$q^0=(\bm U^0,\delta^0,\bm\theta^0)$, solve
 \begin{equation}
     \begin{aligned}
-    \min_{\bm U,\;\delta\geq0}\quad&T_s\sum_{j=0}^{N-1}\bm u_j^{\trans}R_u\bm u_j+\rho\delta^2\\
-    \text{s.t.}\quad
-    &\bm x_{j+1}=A_j\bm x_j+B_j\bm u_j+\bm c_j,\\
-    &G_j\bm x_j+H_j\bm u_j\leq h_j, && j<M,\\
-    &\underline g_{\ell j}(\bm U)\geq0, && \forall\,\ell,j,\\
-    &(v_x,v_y,r)_M=0,\qquad \bm u_{M-1}=\bm\pi_R,\\
-    &L_fV+L_gV\bm u_0\leq-\alpha V+\delta .
+    \min_{q\in\mathcal D}\quad&
+      \sum_{j=1}^{N}\bm e_j^{\trans}P_j\bm e_j
+      +\sum_{j=0}^{N-1}(\bm u_j-\bm u_{*,j})^{\trans}
+          R_u(\bm u_j-\bm u_{*,j})\\
+      &+\rho\delta^2+\tfrac{\mu}{2}\normtwo{D_q(q-q^0)}^2\\
+    \text{s.t.}\quad&\widehat f_i^0(q)\leq b_i\leq0,\qquad\forall i,\\
+      &\normtwo{\Delta\bm r_i}\leq R_{\rm step},\quad
+        |\Delta\theta_i|\leq\Theta_{\rm step}.
     \end{aligned}
     \label{eq:controller_program}
 \end{equation}
-Here \(N\) is the performance horizon, \(R_u\succ0\) is a diagonal
-input-effort weight and \(\rho>0\). No input reference, continuation
-regularization or safety slack is introduced. The stages \(N,\dots,M-1\)
-provide the safe continuation without a performance penalty. The resulting
-program is a convex QP with positive quadratic weights on the head inputs
-and relaxation. A finite \(\rho\) trades input effort against CLF violation;
-it need not select zero relaxation whenever zero relaxation is feasible.
-The applied head inputs and relaxation are unique on a fixed convex feasible
-domain, although the unpenalized continuation can remain nonunique. Thus
-positive definiteness of the complete Hessian, assumed by the regularity
-argument in \cite{AmesXuGrizzleTabuada2017}, is not asserted. All geometric
-and physical rows remain hard independently of these performance weights.
+Here $R_u\succ0$, $\rho>0$, and the small proximal weight $\mu>0$
+scales input and slack displacements by $D_q$, with unit angle scale.
+Tracking and input effort cover the complete horizon, and input effort is
+relative to the force-balanced trim. The $b_i$ contain the retained
+numerical reserves. The only slack is the performance variable $\delta$.
+The joint program is a convex SOCP with quadratic objective.
+
+An existing encounter uses its shifted complete certificate as the
+anchor. Fresh admission uses the available nominal plan and geometric
+directions. There is one hard convex restriction, without restoration,
+alternate angle initializations or a second performance solve. The
+restriction may be empty even when the original nonconvex problem has a
+solution. Failure therefore means that no certificate was obtained in
+this restriction, not that collision is unavoidable.
+
+The independent verifier reconstructs the trajectory from the input plan
+and checks physical rows, terminal and CLF cones, and the original
+nonlinear residuals \eqref{eq:collision_residual}. Solver status alone
+does not authorize execution. A failed improvement may retain a
+separately verified incumbent; fresh failure without an incumbent issues
+no command. The complete frame must meet its acceptance deadline in
+either case. One solve per frame bounds the number of optimization calls,
+not their worst-case elapsed time.
 
 \subsection{Recursive Feasibility}
 \label{subsec:feasibility}
 
-Controller state is the accepted pair \((\bm U^\star,\text{schedule})\).
-At the next sample the shifted candidate
+Controller state contains the accepted plan, occupied sets, angles,
+charts, generators, numerical reserves, terminal witness and absolute
+exit deadline. After applying $\bm u_0^\star$, the candidate is the
+remaining suffix,
 \begin{equation}
-    \tilde{\bm U}=[\bm u_1^\star,\dots,\bm u_{M-1}^\star,\bm\pi_R],
+    \widetilde{\bm U}=[(\bm u_1^\star)^{\trans},\ldots,
+        (\bm u_{N-1}^\star)^{\trans}]^{\trans},\qquad
+    \widetilde{\bm\theta}=\operatorname{shift}(\bm\theta^\star).
     \label{eq:shifted_candidate}
 \end{equation}
-with the schedule shifted verbatim and extended by \(\bar v=0\), is checked
-against the new program before it is solved.
+No new tail is appended while an encounter retains its exit deadline.
 
 \begin{proposition}
 \label{prop:recursive}
-Assume feasible initial admission; exact execution of
-\eqref{eq:held_flow}; a shifted schedule; unchanged applicable road
-coverage; and target prediction consistent under the shift with
-\(\mathcal O_\infty\) contained. Then \(\tilde{\bm U}\) is feasible for the
-next instance of \eqref{eq:controller_program}, and feasibility is
-preserved for all subsequent samples.
+Assume feasible initial admission, exact execution of \eqref{eq:held_flow},
+sound measurements within their admitted bounds, unchanged model,
+reference and sensing contracts, and target motion inside its admitted
+finite-flow sets. Suppose every new or enlarged obligation admits a new
+certificate and release is currently confirmed by the stored deadline.
+Then retaining the complete certificate and using its touching majorants
+makes each compatible successor subproblem nonempty. Every accepted
+command satisfies the certified node and held-input constraints.
 \end{proposition}
 
 \begin{IEEEproof}
-Shifting the schedule verbatim makes the stage data of overlapping stages
-identical, so stages \(1,\dots,M-1\) of the previous solution satisfy the
-same \((G_j,H_j,h_j)\) and the same \(\underline g_{\ell j}\) as stages
-\(0,\dots,M-2\) of the new instance. The appended stage is the rest step:
-by Lemma~\ref{lem:rest} it reproduces \(\bm x_R\) exactly, so its domain,
-actuator and slip-domain rows are those already verified at stage \(M-1\), and
-\eqref{eq:terminal_separation} holds at the same point because
-\(\sigma_{\mathcal O}\) bounds the complete future occupancy and is
-therefore shift-invariant. Finally \(\delta\) is unbounded above and only
-lower bounded by \(0\), so \eqref{eq:clf_row} admits \(\tilde{\bm u}_0\)
-with \(\delta=\max(0,L_fV+L_gV\tilde{\bm u}_0+\alpha V)\). Hence
-\((\tilde{\bm U},\delta)\) is feasible, and induction gives the claim.
+Substituting the executed input in every stored row, state map and cone
+leaves the accepted suffix feasible. Conditioning narrows the covered
+sets, and confirmed release only removes the corresponding target's
+obligations. For each remaining inherited angle, narrowing an occupied
+set cannot increase its support residual. Lemma~\ref{lem:separationRow}
+touches at this complete feasible suffix, so it lies in the next convex
+restriction, including the zero-displacement step domain. A finite
+nonnegative $\delta$ always completes its CLF cone.
+
+After confirmed release, a restored performance horizon replaces the
+inherited one only if a concrete candidate passes every constraint of the
+new program. Otherwise the suffix is retained. When it is exhausted,
+\eqref{eq:terminal_entry} and Lemma~\ref{lem:terminal} supply a feasible
+candidate to the terminal one-hold optimization. Every accepted input
+preserves the next candidate's membership and slew admissibility.
+Induction gives conditional nonemptiness. Independent acceptance verifies
+the stated physical constraints at every executed step.
 \end{IEEEproof}
 
-Because \(\tilde{\bm U}\) is feasible and verified independently, a solver
-failure requires no second optimization and no relaxation of a safety row:
-the command is either an accepted optimizer or \(\tilde{\bm u}_1\). The
-guarantee is confined to the prediction nodes of \eqref{eq:held_flow}: it
-says nothing about the intervals between them, for which a fixed-separator
-margin \(T_s(\bar V_E+\bar V_T+R_E\bar\omega_E+R_T\bar\omega_T)\) would be
-sufficient but conservative.
+The proposition concerns physical feasible sets and their touching
+restrictions in exact arithmetic. Numerical reserve transfer and
+independent verification implement the acceptance condition; they do not
+guarantee timely numerical completion. The certificate covers prediction
+nodes only. Two rectangles may be separated at both endpoints and
+intersect during the held input, as the trials below demonstrate.
 
 \subsection{State Uncertainty}
 \label{subsec:uncertainty}
 
-The enclosure of Corollary~\ref{cor:enclosure} enters as an initial box
-\(\bm x_0\in\bm z_0+[-\bm r_0,\bm r_0]\). Under the declared continuous
-derivative-error bound \(\bar{\bm w}\) and the stored open-loop input,
+The controller receives a current box
+$\bm x_0\in\bm z_0+[-\bm\rho_0,\bm\rho_0]$. For its zero-residual
+declared plant, propagation is
 \begin{equation}
-    \bm r_{j+1}=|A_j|\bm r_j+\bm d_j,
-    \quad
-    \bm d_j=\left[\exp\!\left(T_s
-    \begin{bmatrix}M_j&\bar{\bm w}\\0&0\end{bmatrix}\right)
-    \right]_{1:6,\,7},
+    \bm z_{j+1}=A_j\bm z_j+B_j\bm u_j+\bm c_j,\qquad
+    \bm\rho_{j+1}=|A_j|\bm\rho_j+\bm a_j,
     \label{eq:box_propagation}
 \end{equation}
-where \(M_j\) is the Metzler comparison matrix of \(A^c_j\)
-(\(M_{ii}=A^c_{ii}\), \(M_{ik}=|A^c_{ik}|\), \(i\neq k\)), so that
-\(|e^{A^c_j\tau}|\leq e^{M_j\tau}\) entrywise and \(\bm d_j\) dominates the
-integrated forcing, including its transport into other channels. Each
-affine row is tightened by its own support,
+where $\bm a_j$ is an arithmetic allowance. An affine row is tightened by
+its support,
 \begin{equation}
-    G_j\bm z_j+H_j\bm u_j+|G_j|\bm r_j\leq h_j ,
+    G_j\bm z_j+H_j\bm u_j+|G_j|\bm\rho_j\leq\bm h_j.
     \label{eq:robust_row}
 \end{equation}
-which is sufficient since \(G_j(\bm x_j-\bm z_j)\leq|G_j|\bm r_j\) and
-assumes no independence between components. Between samples containment is
-maintained by intersection rather than by an assumed observer contraction:
-with \(\bm\Delta=\hat{\bm x}-\bm z^-\) and the new enclosure
-\(\hat{\bm x}+[-\bm b,\bm b]\),
+Target tubes propagate the admitted position, velocity, acceleration,
+yaw and yaw-rate sets with Cartesian jerk and yaw-acceleration bounds.
+They predict finite future occupancy; a current observer radius is not
+substituted for that prediction.
+
+At the next observation, let $\bm\Delta=\hat{\bm x}-\bm z^-$ and let
+$\hat{\bm x}+[-\bm b,\bm b]$ be the new measurement set. About the
+retained center, compute
 \begin{equation}
     \begin{gathered}
-    \underline{\bm\eta}=\max(-\bm r^-,\bm\Delta-\bm b),\quad
-    \overline{\bm\eta}=\min(\bm r^-,\bm\Delta+\bm b),\\
-    \bm r^{+}=\min\bigl(\bm r^-,
-        \max(|\underline{\bm\eta}|,|\overline{\bm\eta}|)\bigr),
+    \underline{\bm\eta}=\max(-\bm\rho^-,\bm\Delta-\bm b),\qquad
+    \overline{\bm\eta}=\min(\bm\rho^-,\bm\Delta+\bm b),\\
+    \bm\rho^+=\min\{\bm\rho^-,
+         \max(|\underline{\bm\eta}|,|\overline{\bm\eta}|)\}.
     \end{gathered}
     \label{eq:box_intersection}
 \end{equation}
-which satisfies
-\(\mathcal P\cap\mathcal E\subseteq\bm z^-+[-\bm r^+,\bm r^+]\subseteq\mathcal P\)
-about the retained nominal center.
-
-\begin{proposition}
-\label{prop:terminalBox}
-Let \(\bar{\bm w}=0\) and let the propagated terminal radius satisfy
-\((\bm r_M)_{4:6}=0\). Then \(\mathcal X_R=\bm x_R+[-\bm r_M,\bm r_M]\) is
-invariant under \(\bm\pi_R\), and Proposition~\ref{prop:recursive} holds
-with \eqref{eq:robust_row} in place of the nominal rows. If instead
-\((\bm r_M)_4=\varepsilon>0\), no input sequence renders
-\((v_x)_M=0\) for the whole set.
-\end{proposition}
-
-\begin{IEEEproof}
-At \(\bar v=0\) and zero velocity radii, \(A_R\) restricted to pose
-perturbations is the identity and \(\bm d_R=0\), so
-\(|A_R|\bm r_M+\bm d_R=\bm r_M\) and every point of \(\mathcal X_R\) is
-fixed by Lemma~\ref{lem:rest}; the terminal rows of
-Sections~\ref{subsec:terminal}--\ref{subsec:geometry} certify the set
-because they are already tightened by \(|G|\bm r_M\). For the converse, on
-a straight schedule \(v_{x,k+1}=v_{x,k}+T_sa_k+bT_s\), so two admissible
-initial speeds differing by \(2\varepsilon\) differ by \(2\varepsilon\)
-under every common input sequence and cannot both vanish; moreover the
-symmetric interval about zero violates \(v_x\geq0\).
-\end{IEEEproof}
-
-Proposition~\ref{prop:terminalBox} delimits the supported class exactly:
-pose uncertainty is admitted, velocity uncertainty at the terminal stage is
-not. Removing that restriction requires an ancillary feedback tube, in
-which the applied input \(\bm u=\bm v+K(\hat{\bm x}-\bm z)\) makes the
-error recursion \(\bm d^+=(A+BK)\bm d-BK\bm e+\bm w\) and the
-measurement term \(-BK\bm e\) must be enclosed
-\cite{KohlerMullerAllgower2021}, together with a physically specified
-brake-and-hold mode and a target-motion contract that keeps
-\(\sigma_{\mathcal O}\) finite.
+A nonempty intersection contains the truth and its symmetric outer box
+stays inside the inherited box. No hypothetical future measurement
+contraction is used in the finite plan. An inconsistent observation or an
+enlarged sensing bound requires rejection or new admission. The modal
+terminal construction admits bounded velocity error, but neither it nor
+the estimator's continuous theorem certifies arbitrary model mismatch,
+missed detections or new unseen traffic.
 
 \section{Results}
 \label{sec:results}
@@ -1469,278 +1607,248 @@ brake-and-hold mode and a target-motion contract that keeps
 \subsection{Synthesized Design}
 \label{subsec:designResults}
 
-The declared premises are \(V_E\in[5,20]\)\,m/s, \(\bar\omega_E=0.30\)\,rad/s;
-\(V_C\in[10,20]\)\,m/s, \(A_{\max}=2\)\,m/s\(^2\), \(\beta_{\max}=0.015\)\,rad,
-\(l_{r,C}=1.6\)\,m, \(\rho_{\max}=50\)\,m; \(l_{r,E}=1.45\)\,m,
-\(\beta_{\rm dom}=0.05\)\,rad, \(\bar d_{\rm st}=0.02\)\,rad/s; and
-\(\bar n_p=0.12\)\,m, \(\bar n_v=0.02\)\,m/s, \(\bar n_a=0.05\)\,m/s\(^2\),
-\(\bar n_g=0.002\)\,rad/s, \(\bar n_R=0.12\)\,m. Hence
-\(\Omega_{\max}=0.1875\)\,rad/s, \(S=4.2499\)\,m/s\(^2\) and
-\(T_{\rm dom}=1.25\)\,s.
+The estimator premises are $V_E\in[5,20]$\,m/s,
+$\bar\omega_E=0.30$\,rad/s; $V_C\in[10,20]$\,m/s,
+$A_{\max}=2$\,m/s$^2$, $\beta_{\max}=0.015$\,rad,
+$l_{r,C}=1.6$\,m, $\rho_{\max}=50$\,m; $l_{r,E}=1.45$\,m,
+$\beta_{\rm dom}=0.05$\,rad, $\bar d_{\rm st}=0.02$\,rad/s; and
+$\bar n_p=0.12$\,m, $\bar n_v=0.02$\,m/s,
+$\bar n_a=0.05$\,m/s$^2$, $\bar n_g=0.002$\,rad/s and
+$\bar n_R=0.12$\,m. Thus $\Omega_{\max}=0.1875$\,rad/s,
+$S=4.2499$\,m/s$^2$ and $T_{\rm dom}=1.25$\,s.
 
-Lemma~\ref{lem:course} is uniformly informative on this domain, with
-\(B_F\leq0.0108\)\,rad, of which \(0.0040\)\,rad is the velocity-direction
-term and \(0.0068\)\,rad the sideslip term. The identification
-\(\beta_E\equiv0\) would instead give \(0.0040+0.05=0.054\)\,rad.
+Rule~\eqref{eq:scalar_gain_rule} gives
+$k_\psi=k_v=k_p=2.3966$\,s$^{-1}$, while
+Lemma~\ref{lem:lipschitz} gives $L_q=0.8011$\,s$^{-2}$ and
+$L_s=0.8708$\,s$^{-1}$. The normalized injection is
+$\bm l=[4.5756,7.9010,4.7805]^{\trans}$.
+Freeing the metric in \eqref{eq:free_metric_lmi} reduces the selected
+bandwidth from $6.4431$ to $2.5910$\,s$^{-1}$ at the same required decay
+$\lambda_T=0.8$\,s$^{-1}$. The physical innovation gains become
+$[l_1\omega,l_2\omega^2,l_3\omega^3]=[11.8555,53.0434,83.1565]$,
+and the continuous relative-position ultimate bound becomes $2.2072$\,m,
+compared with $5.7599$\,m for the preceding fixed-metric design of the
+same direct-velocity observer. This bound is distinct from the online
+digital enclosure and from observed tracking error.
 
-Rule \eqref{eq:scalar_gain_rule} gives
-\(k_\psi=k_v=k_p=2.3966\)\,s\(^{-1}\). Lemma~\ref{lem:lipschitz} evaluates
-to \(L_q=0.8011\)\,s\(^{-1}\), \(L_s=0.8708\)\,s\(^{-1}\). The LMI
-\eqref{eq:target_lmi} returns
-\(\bm l=[4.5756,\,7.9010,\,4.7805]^{\trans}\), normalized poles
-\(\{-1.3429,-1.6163,-1.6163\}\), and \eqref{eq:lyapunov_identity} gives
-\(P=\bigl[\begin{smallmatrix}46.04&-28.49&15.72\\-28.49&28.49&-22.10\\
-15.72&-22.10&22.10\end{smallmatrix}\bigr]\). The bandwidth search returns
-\(\omega=6.4431\)\,s\(^{-1}\) with the constraint \(\lambda_T\geq1/T_{\rm dom}\)
-active, hence \([l_1\omega,l_2\omega^2,l_3\omega^3]=[29.48,\,328.00,\,1278.66]\),
-multipliers \((t_q,t_s)=(79.07,\,2.365)\) and \(\lambda_T=0.8000\)\,s\(^{-1}\)
-in Lemma~\ref{lem:dissipation}. Then
+For the free-metric design, the numerical comparison is
 \begin{equation}
-    H=\begin{bmatrix}
-    -2.3966&0&0\\47.932&-2.3966&0\\0&56.216&-0.8000
-    \end{bmatrix},
-    \quad
-    \bm d=\begin{bmatrix}0.0280\\0.1379\\127.47\end{bmatrix},
+    H=\begin{bmatrix}-2.3966&0\\4.2972&-0.8000\end{bmatrix},\qquad
+    \bm d=\begin{bmatrix}0.20066\\4.96511\end{bmatrix}.
     \label{eq:numeric_comparison}
 \end{equation}
-with \(\bm c=[595.18,\,29.74,\,1.25]^{\trans}\) and the radii of
-Table~\ref{tab:ultimate}.
+The resulting body-velocity and independent position ultimate radii are
+0.08373\,m/s and 0.12835\,m. The target velocity and acceleration radii
+are 12.729\,m/s and 30.263\,m/s$^2$; in particular, the latter exceeds
+the target acceleration domain. These worst-case values remain too broad
+to represent typical estimation accuracy.
+
+The paired gain comparison uses identical truth, sensor draws and initial
+conditions, with ten seeds (71--80), 12\,s trials and errors evaluated
+after the first 2\,s. Synchronized measurements arrive at 50\,Hz, except
+for the 25\,Hz case, and the maximum RK4 step is 0.005\,s. The changing
+motion case adds a smooth acceleration and curvature transition at 6\,s.
+Table~\ref{tab:estimatorComparison} reports means of the per-seed RMSEs;
+the noise-free row is one paired trial. Both designs use the same NRMM
+and digital realization, so the comparison isolates the gain synthesis.
 
 \begin{table}[!t]
-\caption{Ultimate radii \(-H^{-1}\bm d\) of Theorem~\ref{thm:cascadeISS}.}
-\label{tab:ultimate}
+\caption{Paired estimator RMSE with fixed and free Lyapunov metrics.}
+\label{tab:estimatorComparison}
 \centering
-\begin{tabular}{lrl}
+\small
+\begin{tabular}{llrrr}
 \toprule
-Quantity & Radius & Unit\\
+Case & Metric & Position & Velocity & Accel.\\
+     & & (m) & (m/s) & (m/s$^2$)\\
 \midrule
-Ego yaw \(|e_\psi|\)                        & 0.0117 & rad\\
-Ego body velocity \(\normtwo{\bm e_v}\)     & 0.2908 & m/s\\
-Ego inertial position \(\normtwo{\bm e_p}\) & 0.3387 & m\\
-Relative position \(B_\rho\)                & 6.267  & m\\
-Target velocity \(\normtwo{\bm e_q}\)       & 58.53  & m/s\\
-Target acceleration \(\normtwo{\bm e_s}\)   & 292.9  & m/s\(^2\)\\
+Noise, 50 Hz & Fixed & 0.04762 & 0.4820 & 1.828\\
+             & Free  & 0.02946 & 0.1214 & 0.185\\
+Changing motion & Fixed & 0.04625 & 0.4443 & 1.602\\
+                & Free  & 0.02994 & 0.1325 & 0.310\\
+Noise, 25 Hz & Fixed & 0.07152 & 0.7145 & 2.672\\
+             & Free  & 0.04285 & 0.1772 & 0.267\\
+Noise-free & Fixed & 0.000008 & 0.01506 & 0.00571\\
+           & Free  & 0.000123 & 0.01531 & 0.00645\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The ego radii are directly usable. The two higher target derivatives are
-not: their certified radii exceed the domain \eqref{eq:target_domain} they
-bound, so in Corollary~\ref{cor:enclosure} those components are dominated
-by the domain caps. The gap between a worst-case radius and a typical error
-is also large: the measured relative-position root-mean-square error at
-50\,Hz is \(0.0479\)\,m against \(B_\rho=6.267\)\,m.
+At 50\,Hz the noisy velocity and acceleration RMSE fall by 74.82\% and
+89.90\%, respectively. The noise-free errors increase slightly, and
+changing-target response is slower. In a separate eleven-scenario
+campaign with fresh seeds 101--110, the nominal relative-position RMSE
+is $0.02980\pm0.00183$\,m, velocity RMSE is
+$0.1231\pm0.0070$\,m/s, and acceleration RMSE is
+$0.1873\pm0.0102$\,m/s$^2$, where the deviations are across ten seeds.
+Curvature-response lag is approximately 0.6\,s. A one-second radar outage
+produces a worst position error of 0.3315\,m and an enclosure radius up
+to 87.7\,m; the five shorter 0.2\,s gaps have a worst position error of
+0.1250\,m. These results quantify the bandwidth and outage tradeoffs.
 
-Containment was checked over 32 deterministic 12\,s trials spanning three
-noise seeds, five cases and two envelope choices. Every recorded sample of
-every trial satisfied \eqref{eq:relative_position_bound}. The mean radius
-is \(0.832\)\,m at 50\,Hz and \(1.489\)\,m at 25\,Hz when finite ego
-acceleration envelopes are declared, and \(1.694\)\,m and \(3.215\)\,m from
-the speed and yaw-rate domains alone; a one-second radar dropout raises the
-mean to \(2.53\)\,m and the trial maximum to \(34.2\)\,m.
-
-Against the differentiated-companion baseline of
-\cite{SharmaAlaiRajamani2026} on identical truth, noise draws and timing,
-the five-seed mean errors at 50\,Hz are
-\(0.0469\)\,m, \(0.480\)\,m/s and \(1.82\)\,m/s\(^2\) in relative position,
-velocity and acceleration, against \(0.0935\)\,m, \(2.72\)\,m/s and
-\(29.6\)\,m/s\(^2\); under a one-second dropout the position errors are
-\(0.240\)\,m and \(2.85\)\,m. The mean acceleration peak over the first two
-seconds falls from \(346\) to \(34.4\)\,m/s\(^2\).
+All 55,701 exported samples in the 101-trial campaign lie inside their
+published relative-position enclosures. This includes the deliberate
+case with twice the declared sensor noise, for which empirical
+containment is not a certified property because the noise premise fails.
+The nominal mean enclosure is approximately 1.76\,m, well above its
+typical error. The observations establish neither a sampled exponential
+stability theorem nor validation on real sensors.
 
 \subsection{Closed Loop}
-
-The physical experiments in this subsection predate the modified Fiala and signed-ratio input
-revision. They used the earlier linear-cornering controller and its former
-constraint set. These retained results diagnose that earlier implementation;
-they do not validate the revised tire model or establish its physical
-performance. New plant experiments are required for that purpose.
-
 \label{subsec:controlResults}
 
-The recorded trials and fixed-state diagnostics preceding the quadratic
-comparison below use the preceding
-relaxation-only objective, without input cost. They motivate the quadratic
-objective in \eqref{eq:controller_program}; they are not measurements of that
-updated objective.
+The controller records distinguish the current single-restriction policy
+from its preceding joint-support admission search. The latter used
+feasibility restoration and multiple initializations at admission, followed
+by one hard improvement on compatible successors. Its September 19
+campaigns supply the physical-gap and timing measurements below. Those
+admission results do not validate the current policy's success rate: the
+single restriction in \eqref{eq:controller_program} can reject an
+encounter that the preceding search admitted.
 
-Four deterministic 10\,s trials were run against a 14-degree-of-freedom
-passenger-vehicle plant: a crossing-target avoidance and its target-free
-counterfactual, on a straight road and a 400\,m arc. Parameters were
-\(T_s=0.05\)\,s, \(N=24\), \(N_b=74\), \(v_{\rm ref}=15\)\,m/s, target
-speed 8\,m/s acquired at 50\,m, \(4.8\times1.9\)\,m rectangles, boundaries
-at \(\pm6\)\,m, \(\epsilon=0.25\)\,m. The estimator was bypassed, isolating
-the controller.
+Fifteen deterministic trials combine straight motion and curvatures
+$\kappa=\pm0.01,\pm0.02$\,m$^{-1}$ with stationary, oncoming and
+crossing targets. Each requests 300 held inputs at $T_s=0.1$\,s,
+$v_{\rm ref}=8$\,m/s and sensing radius 16\,m, with seed 20260912.
+The ego plant is the declared exact affine model, sensing is exact, and
+process residual and target jerk are zero. No physical road boundaries
+or estimator are active. Offline search and frame budgets are 30\,s;
+these trials therefore study the algorithm without establishing timely
+execution at the physical hold period.
 
-Both counterfactuals reached contact and both avoidance runs stayed
-separated. The minimum sampled separating-axis clearance was \(1.462\)\,m
-(straight) and \(1.837\)\,m (arc), the minimum road margin \(7.022\)\,m and
-\(6.915\)\,m, and the largest violation of any row of
-\eqref{eq:controller_program} was \(1.02\times10^{-6}\). All 800 calls
-returned an accepted plan; none used \(\tilde{\bm U}\), and none exceeded
-the 50\,ms period, with medians of \(23\)--\(32\)\,ms.
+With no added physical clearance buffer, all fifteen trials numerically
+complete and all 4,500 commands pass their hard node certificates.
+Eleven equally spaced physical checks per hold nevertheless detect
+intersection in the straight stationary and oncoming cases. The other
+thirteen cases retain positive sampled body gap. Table~\ref{tab:nodeGap}
+reports the two failures and an independent 1,001-point audit of each
+worst hold. All four rectangle edge-normal projections overlap at the
+reported negative minima, confirming physical intersection.
 
 \begin{table}[!t]
-\caption{Cruise-recovery errors, maximum over every sample in
-\([9,10]\)\,s.}
-\label{tab:recovery}
+\caption{Node separation and inter-node collision without an added buffer.}
+\label{tab:nodeGap}
 \centering
-\begin{tabular}{lrrrc}
+\begin{tabular}{lrrr}
 \toprule
-Scene & Speed & Lateral & Heading & Recovery\\
-      & (m/s) & (m) & (rad) & \\
+Target & Minimum node & 11-point & Dense hold\\
+       & gap (m) & gap (m) & gap (m)\\
 \midrule
-Straight & 0.2368 & 0.2165 & 0.02683 & Fail\\
-Arc      & 0.2320 & 0.2413 & 0.02266 & Fail\\
-Limit    & 0.5    & 0.2    & 0.02    & \\
+Stationary & $7.9880\times10^{-5}$ & $-0.22537$ & $-0.23385$\\
+Oncoming & $6.9076\times10^{-5}$ & $-0.05927$ & $-0.05942$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Recovery inside \([9,10]\)\,s was not achieved
-(Table~\ref{tab:recovery}): the speed criterion passes and the two pose
-criteria fail, although both final poses lie inside the tolerances.
-Extending the same two trials to 30\,s on an unchanged controller, the
-window \([25,30]\)\,s does meet all three tolerances, with maxima
-\(0.2599\)\,m/s, \(0.0300\)\,m, \(0.00768\)\,rad on the straight road and
-\(0.2630\)\,m/s, \(0.1639\)\,m, \(0.01453\)\,rad on the arc. Passing these finite windows does not establish nominal invariance or
-asymptotic convergence. Replaying the trials
-and probing alternative plans at fixed measured states isolates three
-mechanisms, all in the performance layer.
+The dense minima occur at 1.5254\,s and 3.7631\,s, inside holds whose
+two endpoint gaps are positive. The twelve circular trials have a
+smallest observed gap of 0.01429\,m, but finite physical samples do not
+prove continuous-time noncollision in those cases either. Thus numerical
+completion, node certification and physical collision avoidance are
+different outcomes.
 
-At the fixed reference \(P\) splits as
-\(V=P_{vv}(v_x-v_{\rm ref})^2+V_{\rm lat}\), and \eqref{eq:clf_row}
-constrains only the sum. At straight-road \(t=7.2\)\,s,
-\begin{equation}
-    \begin{gathered}
-    \dot V_{\rm speed}=-8.4837,\qquad
-    \dot V_{\rm lat}=+1.1918,\\
-    \dot V=-7.2918\leq-6.0489,
-    \end{gathered}
-    \label{eq:clf_split}
-\end{equation}
-so the lateral energy grows at zero relaxation. This is not a solver
-artifact: linear programs minimizing \(\dot V_{\rm lat}\) at twelve probed
-states in the earlier controller return a positive minimum at each, and adding a hard
-\(\dot V_{\rm lat}\leq-\alpha V_{\rm lat}\) at \(\delta=0\) is infeasible
-at five of the twelve. Next, with \(\bm r_0\) and \(P\) frozen at both
-nodes,
-\begin{equation}
-    V(\bm e+\Delta\bm e)-V(\bm e)
-    =2\bm e^{\trans}P\Delta\bm e+\Delta\bm e^{\trans}P\Delta\bm e ,
-    \label{eq:quadratic_increment}
-\end{equation}
-and \eqref{eq:clf_row} bounds neither the quadratic term nor the
-flow--tangent gap; over twenty recovery calls the predicted \(V\) increases
-in six straight and nine arc calls despite \(\delta=0\) throughout. Last,
-all twenty inputs attain the optimum \(\delta=0\) while the optimal set
-stays wide: at arc \(t=9.7\)\,s the feasible first steering angle spans
-\([-0.0673,+0.0518]\)\,rad, and a certified zero-slack alternative predicts
-\(V_{\rm lat}=0.0276\) where the applied plan predicts \(0.0351\).
+A separate warmed timing campaign repeats all fifteen cases twice after
+900 excluded warmup holds. It uses MATLAB R2026a on an AMD Ryzen 7
+7800X3D with one computational thread and the profiler disabled. Frame
+time includes input construction, the complete controller, all solves
+and independent acceptance; plant propagation and physical audits are
+outside that timer. The solve-phase timer includes its transcription and
+solver-interface overhead. Table~\ref{tab:controllerRuntime} separates
+the principal frame categories.
 
-Proposition~\ref{prop:recursive} was exercised by denying every solver
-result after the first sample. In an oncoming-target scenario at 15\,m/s
-with \(N=12\), the controller runs on \(\tilde{\bm U}\) through rest and
-three samples beyond: over 90 states the minimum rectangle clearance is
-\(0.3176\)\,m for \(\epsilon=0.25\)\,m, the maximum deviation between the
-shifted stored state and the recomputed one is \(9.95\times10^{-14}\), and
-the terminal velocity residual is \(9.40\times10^{-13}\). With the eight
-vertices of a \([0.1\,\mathrm m,0.1\,\mathrm m,0.001\,\mathrm{rad}]\) pose
-box and exact velocity channels, the case admitted by
-Proposition~\ref{prop:terminalBox}, the maximum excess of a true state
-beyond \eqref{eq:box_propagation} over 81 samples is
-\(6.94\times10^{-17}\).
+\begin{table}[!t]
+\caption{Preceding joint-support search: warmed complete-frame time.}
+\label{tab:controllerRuntime}
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Frame category & Count & Median (ms) & Maximum (ms)\\
+\midrule
+Active continuation & 986 & 15.816 & 48.790\\
+Target-free continuation & 7940 & 4.480 & 6.470\\
+Admission & 32 & 655.210 & 4653.899\\
+\bottomrule
+\end{tabular}
+\end{table}
 
+All 986 active continuations use one conic solve and finish within
+100\,ms. Their solve-phase median and maximum are 6.164 and 22.768\,ms.
+By contrast, 27 of 32 admissions exceed 100\,ms. Ten initial target-free
+frames and 32 release transitions complete the 9,000-frame record;
+the two straight inter-node collisions recur in each repetition. These
+are observed timings for the preceding search, not a worst-case execution
+bound or measurements of the current single-restriction admission.
 
-\subsubsection{Joint quadratic objective}
-The objective in \eqref{eq:controller_program} was then evaluated in two
-30\,s avoidance trials with the same physical configurations and an
-extended road. All 1200 commands completed without fallback or sampled
-contact. Minimum sampled SAT margins were 1.0883\,m and 1.5109\,m.
-In the complete 9--10\,s window, maximum speed errors were 0.65785 and
-0.72103\,m/s, exceeding 0.5\,m/s; lateral/heading errors were
-0.000705\,m/0.000194\,rad and 0.11377\,m/0.006580\,rad, satisfying
-both pose limits. All three limits hold from 9.40\,s through 30\,s.
+The current restriction preserves trajectory and angle decisions while
+removing the repeated admission solves. Its local nature remains
+essential. For relative center $(0.9,y)$, $0\leq y\leq2$, square
+obstacle $[-1,1]^2$ and a 0.1\,m separation requirement, the anchor
+$(y,\theta)=(0,0)$ gives a strictly positive majorant for every admissible
+increment, although $(1.2,\pi/2)$ satisfies the original separation
+condition. This geometric counterexample, also encoded in the regression
+tests, shows why one convex restriction cannot be assigned a global
+admission guarantee. The 0.1\,m requirement belongs to that illustrative
+example and is not a controller clearance setting.
 
-In 25--30\,s, acceleration-step RMS decreases from 8.4179 to
-0.000199\,m/s$^2$ (straight) and from 8.7075 to 0.30146\,m/s$^2$ (arc).
-Straight lateral/heading errors approach numerical zero, but the speed
-retains a mean error of $-0.1774$\,m/s. Arc lateral/heading RMS falls
-from 0.089892\,m/0.006616\,rad to 0.042872\,m/0.001600\,rad, while
-steering-step RMS increases from 0.012272 to 0.015457\,rad. The objective
-therefore reduces large acceleration swings without eliminating all
-oscillation or proving exact nominal recovery.
-
-Each trial has one call above the 50\,ms period: 109.440 and 73.950\,ms,
-at the first target-visible sample. Formulation/witness construction takes
-67.684 and 47.461\,ms; QP solution takes 11.655 and 12.058\,ms.
-The all-call deadline criterion fails. These trials bypass the estimator,
-reuse earlier nominal trials only as historical scenario counterfactuals,
-and establish neither intersample safety nor asymptotic convergence.
+The available estimator-in-the-loop record is partial and predates the
+joint-support revision: on the declared affine plant it completes 36
+holds, then stops at 3.6\,s at the first frame after target acquisition.
+It does not validate closed-loop avoidance by the current combined
+algorithm. Earlier 14-degree-of-freedom plant trials use a different
+controller and are not evidence for the present affine-plant certificate.
 
 \section{Discussion}
 \label{sec:discussion}
 
-The two designs are certified at different levels. Theorem~\ref{thm:cascadeISS}
-is a continuous-time statement with explicit premises, and its cost is
-visible in Table~\ref{tab:ultimate}: worst-case radii and typical accuracy
-differ by two orders of magnitude, and for \(\bm e_q\), \(\bm e_s\) the
-radius exceeds the domain it bounds. Sampling, held measurements and
-integration defects are outside it and are handled by the separate
-finite-time argument that produces
-\eqref{eq:relative_position_bound}; uniform exponential stability of the
-hybrid observer is not claimed.
+The two certificates act at different levels. Theorem~\ref{thm:cascadeISS}
+is continuous-time and concerns the velocity--target core. Keeping yaw
+outside that cascade removes its chart conditions from core stability,
+while orientation remains necessary for inertial reconstruction. The free
+metric permits lower target bandwidth at the same certified decay floor;
+the paired trials show reduced derivative noise together with increased
+maneuver lag. The large difference between observed errors and published
+enclosures remains relevant to controller admission.
 
-Proposition~\ref{prop:recursive} is conditional on exact arithmetic and
-exact execution of \eqref{eq:held_flow}, and its scope is the prediction
-nodes. Proposition~\ref{prop:terminalBox} shows the uncertainty class is
-not merely narrow by implementation but bounded by the terminal condition
-itself, so a feedback tube and a hold mode, not a larger margin, are what
-would extend it.
+Proposition~\ref{prop:recursive} preserves a complete admitted
+certificate under compatible updates. It does not imply that the initial
+convex restriction is nonempty, that an unseen target can always be
+admitted, or that a numerical answer arrives before the actuator deadline.
+The modal terminal set supports bounded velocity uncertainty, but its
+current reference domain excludes physical road boundaries and requires
+the declared zero-residual affine plant.
 
-The historical performance diagnosis in
-\eqref{eq:clf_split}--\eqref{eq:quadratic_increment} identifies a
-longitudinal--lateral trade and the gap between instantaneous and sampled
-decrease. The joint quadratic objective removes the flat head-input cost
-and improves measured pose recovery, but speed bias, arc input switching
-and first-detection runtime peaks remain. Separate relaxed sampled
-conditions are a possible further design: prior feasibility probes rule
-out an unrelaxed split, and exact sampled conditions are quadratically
-constrained \cite{TaylorDorobantuYueTabuadaAmes2021}. Their feasibility
-and closed-loop benefit require separate validation.
+The sampled CLF bounds the actual one-step Lyapunov change with its
+slack-dependent allowance. It therefore avoids interpreting a
+continuous-time derivative row as sampled dissipation. Positive slack
+still permits tracking error to grow. Likewise, joint separation at the
+nodes does not cover motion within a hold: the observed straight-road
+intersections are consistent with the certificate's stated scope. A
+whole-hold occupied-set certificate, successful admission within the
+execution period, and a complete estimator--controller experiment remain
+necessary before claiming physical closed-loop collision avoidance.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-Retaining the measured acceleration and yaw rate as exogenous inputs keeps
-the ego observer at the order of its own kinematics and the target states
-in the covariant chain \eqref{eq:target_chain}, which removes the zero-jerk
-and zero-yaw-acceleration assumptions of the differentiated design.
-Lemma~\ref{lem:course} replaces the course-as-yaw identification by an
-inversion of the kinematic single-track relation with a computed circular
-radius, so no sideslip state is carried; on the declared domain it reduces
-the yaw measurement radius from \(0.054\) to \(0.0108\)\,rad. The target
-injection follows from the LMI \eqref{eq:target_lmi} and the identity
-\eqref{eq:lyapunov_identity}, and Lemma~\ref{lem:dissipation} certifies its
-decay against the analytic constants of Lemma~\ref{lem:lipschitz}. All
-couplings being feedforward, Theorem~\ref{thm:cascadeISS} gives closed-form
-radii from a Metzler comparison system without a small-gain condition, and
-Corollary~\ref{cor:enclosure} supplies the enclosure the controller reads.
+Retaining measured acceleration and yaw rate as exogenous inputs removes
+the zero-jerk and zero-yaw-acceleration assumptions of the differentiated
+ego design. The direct velocity measurement in \eqref{eq:ego_observer}
+keeps the common gyro error in one column and yields the two-stage
+comparison of Theorem~\ref{thm:cascadeISS}. A parallel yaw observer and
+orientation set supply inertial reconstruction. The free-metric target
+certificate retains the covariant NRMM and its analytic Lipschitz bounds;
+in the paired nominal trials it reduces velocity and acceleration RMSE
+by 74.82\% and 89.90\%, respectively, at the cost of a slower response.
 
-The controller solves \eqref{eq:controller_program} once per sample:
-oriented-rectangle separation, quadratic road boundaries, actuator, tire
-and domain rows are hard at every node of a horizon terminating in the rest
-set of Lemma~\ref{lem:rest}, separated from the target's complete future
-occupancy. Input effort and squared CLF relaxation form the objective. The shifted
-candidate \eqref{eq:shifted_candidate} makes Proposition~\ref{prop:recursive}
-hold without a second optimization or a fallback command, and
-Proposition~\ref{prop:terminalBox} delimits the admissible state
-uncertainty exactly.
-
-Open questions are an intersample extension of the node-wise certificate,
-a terminal policy admitting velocity uncertainty, and a sampled Lyapunov
-condition that shortens the settling time measured in
-Section~\ref{subsec:controlResults}.
+The controller jointly optimizes the trajectory and separating angles in
+\eqref{eq:controller_program}, with a soft sampled CLF and hard node,
+actuator, slew, chart and terminal conditions. A fixed encounter-exit
+deadline and robust modal cruise set replace infinite-future rest
+separation. Retaining the complete shifted certificate gives conditional
+recursive subproblem feasibility without a second optimization. Initial
+admission, timely numerical completion and inter-node safety remain
+separate requirements; the recorded physical audits demonstrate why the
+last cannot be inferred from positive node gaps.
 
 \section*{Data and Code Availability}
 
@@ -1770,8 +1878,8 @@ statements before submission.
 
 This draft was prepared with assistance from a generative AI system for
 repository analysis, literature organization, original prose drafting,
-LaTeX formatting, and consistency checks. The quantitative values were
-reproduced from the project code and tests. The authors remain responsible
+LaTeX formatting, and consistency checks. The quantitative values are drawn from the versioned experiment records
+and checked against their numerical exports. The authors remain responsible
 for verifying every equation, citation, result, interpretation, and
 submission declaration.
 

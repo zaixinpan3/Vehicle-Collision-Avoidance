@@ -1,0 +1,148 @@
+{
+  "recordedAt": "2026-09-19T11:02:13.995692-05:00",
+  "scope": "Manuscript algorithm synchronization; no production-code changes or new simulations.",
+  "initialHead": "32617fc75a25dce6b0b8e54e4d6744f209fce9fe",
+  "methodVersion": "Inspected format-39 working-tree controller; committed free-metric direct-velocity estimator.",
+  "methodSourceSha256": {
+    "estimator/OBSERVER_ISS_THEORY.md": "b32add76411fe0f2c482f25a060bb1e0c44e5e2022a0a63e45cb816561431299",
+    "estimator/synthesizeNrmmObserverGains.m": "8697b7b460b7ea2c9c434ae3542d5cbaf3ac11cd2fe7d4669012f93ab20b103a",
+    "estimator/synthesizeTargetTrackerCertificate.m": "74a00654062d3f17fedf497b296c67b9cde02fb8db4cf3a8b63e0f41220eefbe",
+    "estimator/nrmmObserverVectorField.m": "1e33e5a98eab23a720fbc40e495590456a0477755dcaaaeda208966ea105d9da",
+    "estimator/nrmmObserverCertificate.m": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308",
+    "controller/JOINT_SUPPORT_CERTIFICATES.md": "ff0f9ffa13c4b8618c91923d7eb8b892358572ed985dda6462ba13ad5949f730",
+    "controller/solveHardCbfClf.m": "210d43dcae944852abbb1a6b3da46c66bef321173f3feb9a1b60a7942bffc857",
+    "controller/avoidanceStageQp.m": "299369c8010ca59e23fd7d78c51b02761458788d6c7d84e2ba2ae5e77be81607",
+    "controller/formulateAvoidanceProblem.m": "212e10a3e61d07026903ef8c119345810c6e10cfdf23c7c2a45e6f48189bf7ed",
+    "controller/hardEncounterBarrier.m": "cf136b5aa86539f9348101d5667635cbf0de8f371c66065dfd8eda40843e59e4",
+    "controller/ltvBicycleModel.m": "fb496561840d9fef1b0cba3cf460dab0189eeee3ae65198c4938ebd9f54859d5",
+    "config/collisionAvoidanceControllerConfig.m": "97119d8bb3451f7b36d638dfce774c2d74512ba8020c705248e9c002c0e67bb0"
+  },
+  "numericalEvidence": {
+    "report/NRMM_NOISE_REDUCTION_TRIALS_20260916.csv": "20f250559bb484b1fb4b3b8efc80567bd7a0e9b3ec9adeea8e59824cbf6f79f1",
+    "report/NRMM_ESTIMATOR_SCENARIOS_20260917.csv": "f696cdea07e2aded98006b43b42f6a0896acabaaceea764a418b0e4eaf0795d1",
+    "report/NO_CLEARANCE_BUFFER_VALIDATION_20260919.json": "adb4bcfaa928b83f7c91553e144caf1698d896b4c135d976968e0ccee7dca6ad",
+    "report/CONTROLLER_RUNTIME_RETEST_20260919.json": "db26e48b9f2ebca785b639ea8c3233418de43d8b559abb99183734b18389cd42"
+  },
+  "checks": {
+    "outcome": "passed",
+    "newSimulations": 0,
+    "newMatlabTests": 0,
+    "freeMetricDissipationMinimumEigenvalue": 1.000136034450673e-06,
+    "commonGyroCoefficient": 16.541632253482206,
+    "velocityDisturbanceBound": 0.20066291357446647,
+    "targetPhysicalUltimateBounds": [
+      2.207163303494423,
+      12.72895056112891,
+      30.26332541563942
+    ],
+    "pairedTrialCount": 62,
+    "pairedRmseMeans": {
+      "retained-noise": {
+        "baseline-high-gain": [
+          0.04761668842546214,
+          0.4819701326695986,
+          1.8275718718499232
+        ],
+        "structured-high-gain": [
+          0.029455274660547603,
+          0.12137670662617484,
+          0.1846027133289168
+        ]
+      },
+      "varying-noise": {
+        "baseline-high-gain": [
+          0.04624502753272479,
+          0.44432678406934983,
+          1.602453425798433
+        ],
+        "structured-high-gain": [
+          0.02993951756153767,
+          0.13252529525693588,
+          0.3095123786023457
+        ]
+      },
+      "retained-noise-25Hz": {
+        "baseline-high-gain": [
+          0.07152257357196104,
+          0.71449908084875,
+          2.6720548726707576
+        ],
+        "structured-high-gain": [
+          0.042847337547702126,
+          0.17719282251760923,
+          0.2665219154358971
+        ]
+      },
+      "retained-noise-free": {
+        "baseline-high-gain": [
+          7.918250255126136e-06,
+          0.015064105847330369,
+          0.005706414727331231
+        ],
+        "structured-high-gain": [
+          0.00012256153939922562,
+          0.015312185506523877,
+          0.006450728990559867
+        ]
+      }
+    },
+    "nominalReductionPercent": [
+      38.14085852136466,
+      74.81655015552981,
+      89.89901758872792
+    ],
+    "controllerNodeCertifiedCommands": 4500,
+    "sampledCollisionFreeCases": 13,
+    "sampledCollisionCases": 2,
+    "timingClassifiedFrames": 9000,
+    "admissionsOver100ms": 27,
+    "uniqueLabels": 116,
+    "resolvedCitationKeys": 28,
+    "perceptionPreservedByteIdentical": true,
+    "introductionLiteraturePreservedByteIdentical": true
+  },
+  "latex": {
+    "pages": 14,
+    "unresolvedReferences": 0,
+    "unresolvedCitations": 0,
+    "overfullBoxes": 0,
+    "revisedPagesVisuallyInspected": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ]
+  },
+  "patchPasses": [
+    {
+      "blocks_total": 149,
+      "blocks_touched": 25,
+      "blocks_preserved_byte_identical": 124,
+      "preserved_ratio": 0.8322
+    },
+    {
+      "blocks_total": 151,
+      "blocks_touched": 53,
+      "blocks_preserved_byte_identical": 98,
+      "preserved_ratio": 0.649
+    }
+  ],
+  "newCitation": {
+    "key": "ZhangLinigerBorrelli2018",
+    "source": "https://arxiv.org/abs/1711.03449v3",
+    "fullText": "https://arxiv.org/html/1711.03449",
+    "scope": "Section 4, exact lifted convex-body separation; not this project angular majorant."
+  },
+  "auditDirectory": "/home/zai/.cache/collisionAvoidance/manuscript-sync-20260919",
+  "deliberateExclusions": [
+    "Concurrent controller/configuration/script/test changes",
+    "Root instructions and README files",
+    "Existing untracked figures and manuscript PDF",
+    "External dependencies and native binaries",
+    "Other untracked material"
+  ]
+}
