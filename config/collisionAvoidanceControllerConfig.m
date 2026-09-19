@@ -40,12 +40,10 @@ function cfg = localDefaults()
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);
-    % One geometric initialization and a bounded admission solve count.
-    % positionScale (metres) scales a global majorant; it is not a step bound.
-    % A search deficit never authorizes execution without hard verification.
-    cfg.jointCertificate = struct("maximumAdmissionSolves",3, ...
-        "positionScale",4.0,"proximalWeight",1.0e-3, ...
-        "stallTolerance",1.0e-7);
+    % Fresh admission is one signed section with bounded geometric work.
+    cfg.admission = struct("normalCount",32,"amplitudeCells",16,"performanceIterations",32);
+    % Global majorant scaling for one inherited performance improvement.
+    cfg.jointCertificate = struct("positionScale",4.0,"proximalWeight",1.0e-3);
     cfg.collision = struct("cbfRate",2.0);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
     % (terminal family synthesis, fixedPredict audits). The online certificate
@@ -194,11 +192,11 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
-    for name = "maximumAdmissionSolves"
-        validateattributes(cfg.jointCertificate.(name),{'double'}, ...
+    for name = ["normalCount","amplitudeCells","performanceIterations"]
+        validateattributes(cfg.admission.(name),{'double'}, ...
             {'scalar','real','finite','integer','positive'});
     end
-    for name = ["positionScale","proximalWeight","stallTolerance"]
+    for name = ["positionScale","proximalWeight"]
         validateattributes(cfg.jointCertificate.(name),{'double'}, ...
             {'scalar','real','finite','positive'});
     end

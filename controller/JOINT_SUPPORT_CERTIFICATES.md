@@ -1,23 +1,24 @@
 # Joint trajectory and separation certificates
 
-The controller optimizes the input sequence and
-one separation angle per target/node, including each target's terminal exit
-angle. Fresh admission uses one geometric initialization and at most three
-conic solves by default. A fully verified admission witness is issued directly;
-subsequent frames improve its performance within the carried certificate. Joint support is the sole
-controller algorithm; there is no certificate-method selector. It certifies
-**hold nodes of the declared zero-residual sampled affine plant**. It does not
-certify the space traversed between nodes or a real-time admission deadline.
+Fresh admission restricts the input sequence to one signed affine section
+and computes its certifiable amplitudes using a finite support dictionary.
+Inherited performance improvement optimizes the input sequence and one
+separation angle per target/node, including terminal exit angles, in one SOCP.
+Every issued plan passes the original hard physical verification. There is no
+restoration solver or method selector. The certificate covers **hold nodes of
+the declared zero-residual sampled affine plant**, not the space between nodes
+or a real-time deadline.
 
 ```matlab
 cfg = collisionAvoidanceControllerConfig();
 ```
 
-Start with an empty saved state after upgrading. Certificates use stored
-state format 39; earlier formats are rejected. The public controller interface,
-actuator limits, terminal continuation, sensing contracts and soft CLF remain.
-The actual paired results and reproduction commands are in
-[the bounded-admission report](../report/BOUNDED_ADMISSION_20260919.md).
+Start with an empty saved state after upgrading to format 40. The public
+interface, actuator limits, terminal continuation, sensing contracts and soft
+CLF remain. The [affine-section review](../report/AFFINE_SECTION_ADMISSION_REVIEW_20260919.md)
+states the mathematical prerequisites;
+[the implementation report](../report/AFFINE_SECTION_ADMISSION_20260919.md)
+records the measured runtime and admission-capability tradeoff.
 
 ## Research assessment
 
@@ -207,14 +208,14 @@ trajectory already satisfies the omitted physical constraint using the fixed
 direction. All original occupied-set records and unit-support residuals remain
 in the independent acceptance check and carried certificate. No target is
 released or safety obligation shortened by this calculation. Hard pose-domain
-rows remain enforced during restoration, and are themselves independently
+rows remain hard in both scalar admission and continuation, and are independently
 verified. The same test is repeated against the inherited domain on continuation.
 
 The builder precomputes its final sparse width and auxiliary-variable count.
 This avoids repeated width expansion; it is a separate, algebraically exact
 implementation improvement. Preallocation alone was checked against complete
 conic matrices, vectors, cone partitions and metadata for fixed and uncertain
-footprints, restoration and hard-performance programs.
+footprints and hard-performance programs.
 
 ## Compact numerical enclosures
 
@@ -233,64 +234,97 @@ is independently verified and stored at admission, then inherited unchanged.
 This avoids introducing a complete interval-yaw dual for widths on the order
 of $10^{-10}$ rad without losing the touching property during continuation.
 
-## One geometric initialization and a bounded search
+## One signed control section and finite interval computation
 
-A single hard restriction about an overlapping cruise prediction can be empty
-even when another restriction admits an escape. For example, with relative
-center $(0.9,y)$, $0\le y\le2$, square obstacle $[-1,1]^2$, clearance $0.1$ and
-initial direction $(1,0)$, both the old angular majorant and the new homogeneous
-majorant have a positive minimum at the stationary anchor. The physical point
-$(y,\theta)=(1.2,\pi/2)$ is nevertheless safe. Removing road boundaries cannot
-remove this local-convexification obstruction.
+For fresh admission, retain the nominal input sequence $U_0$ and restrict
+candidate inputs to $U(\alpha)=U_0+\alpha v$. Both amplitude signs are available.
+The section is deliberately incomplete; an empty section is not evidence of
+physical inevitability of collision.
 
-`admissionAngles` generates **one** coherent initialization per encounter:
+Choose the target with the largest violated nominal support certificate and
+the first, middle and last violated stages for that target. The nominal
+relative motion defines a transverse displacement direction in the first
+pose chart. A stationary relative-motion tie uses the chart lateral axis.
+Compute one minimum-energy input deformation that produces unit displacements
+in that direction at the selected stages, a final correction to the terminal
+reference and a compatible last-input correction. At a trim origin the latter
+corrections are zero. If nominal geometry is already clear but the base witness
+is invalid, the single direction corrects terminal state/input error instead.
+The positive quadratic metric combines the
+existing actuator effort weights with input differences weighted by
+`encounter.inputRateWeight/sampleTime^2`. A scaled small SVD supplies a
+least-norm deformation; all actual constraints are subsequently checked even
+if these design equalities are rank deficient. The rule chooses no amplitude
+or left/right route. It does restrict the control-sequence shape and the
+relative steering/braking timing; that loss of freedom is explicit.
 
-1. Retain nominal controls and states exactly. For a target with violated
-   nominal certificates, obtain an orientation from the nominal relative
-   displacement across the prediction window, transverse to the first chart.
-   Initial relative position breaks a near-zero motion tie; exact symmetry
-   uses a deterministic reference-coordinate tie rule.
-2. Project each nominal relative position into the support half-space for
-   that orientation, using the actual footprint/uncertainty support and
-   numerical bound. Query the rectangle oracle at these geometric points to
-   obtain a coherent schedule of initial directions.
-3. Discard the projected points. They are not a vehicle rollout, reference,
-   dynamic constraint, prescribed lateral displacement or maneuver timing.
-   The controls and directions remain optimization decisions. Exit directions
-   retain their own nominal initialization and are optimized jointly.
+Propagate the origin and direction through the declared affine stages. Actuator,
+slew, chart and terminal linear rows reduce to scalar half-lines. A terminal
+modal cone has a fixed radius and becomes an interval obtained by projecting
+its affine center onto the scalar direction. A negative radius is rejected
+before squaring. Their intersection is the hard base interval $I_0$.
 
-There is no alternative-start loop, route enumeration or search over a list of
-left/right/forward/backward initializations. The orientation rule is a heuristic
-for finding a useful convex family; it is not a completeness theorem. Multiple
-targets still share one coupled trajectory solve.
+Partition $I_0$ into `admission.amplitudeCells` uniform closed cells (default
+16). This refines geometry on the **same** control line; it does not create new
+control modes or solver starts. For each cell, bound the entire affine nominal
+yaw range plus its stored uncertainty. Position maps, target yaw/position
+uncertainty and pose-chart remainders retain the original certificate scope.
+Use `admission.normalCount` unit directions (default 32), uniformly spaced and
+rotated by the initial chart heading. The vectorized analytic rectangle support
+checks both yaw endpoints and any interior support maximizer.
 
-The convex base $\mathcal D$ contains hard dynamics, actuator/slew, chart and
-terminal constraints plus the soft CLF. If the initial point is outside this
-base, one base solve is charged to the same admission call budget. Search then
-solves $\widehat F_i\le e$, $e\ge0$, minimizing $e$ plus a small proximal term.
-At a base-feasible anchor, the current exact maximum violation provides a
-feasible deficit. The exact unit-support violations are recomputed after each
-candidate, and only nonincreasing progress is retained.
+For each collision or exit record and a fixed amplitude cell, the reserved
+support inequalities take the form
 
-`maximumAdmissionSolves` defaults to **3**, counting a base solve if needed.
-There is one initialization, no horizon retry and no mandatory performance
-solve after a candidate passes complete hard verification. Continuation uses
-one hard performance solve containing its verified shifted witness. Search
-failure means no certificate was found in this bounded local search, not
-physical inevitability of collision or a global infeasibility result.
+\[
+\exists \ell:\quad a_{i\ell}\alpha\ge b_{i\ell}.
+\]
 
-The native iteration limit, shared search clock and full-frame acceptance
-deadline still apply. A bound on optimization calls is not a wall-clock WCET
-proof; timings and success rates must be measured separately.
+Their complement is the open interval
+
+\[
+I_i=\bigcap_\ell\{\alpha:a_{i\ell}\alpha<b_{i\ell}\}.
+\]
+
+Constant rows are handled explicitly. Sort and subtract these open intervals
+from the amplitude cell; touching excluded intervals preserve their common
+endpoint. Each cell yields at most $R+1$ closed components for $R$ records.
+With $C$ amplitude cells and $L$ normals, geometric work is
+$O(C(RL+R\log R))$, excluding prediction, basis construction, objective and
+verification. Shared cell endpoints may appear twice without changing safety.
+The selected numerical candidate is moved inward where possible and must pass
+independent original constraints; endpoint arithmetic alone never authorizes
+execution.
+
+Restrict the original quadratic performance objective to the line. Eliminate
+only the first-hold CLF slack through
+$\delta(\alpha)=\max(0,\|a+b\alpha\|-c)$, where $c\ge0$. The resulting objective
+is convex. A fixed `admission.performanceIterations` derivative bisection
+(default 32) locates an approximate unconstrained minimizer on $I_0$; project
+it onto each certified component and choose the best scalar cost. The iteration
+limit affects performance accuracy, not the requirement for a hard certificate.
+No collision or terminal slack is introduced.
+
+A successful restricted admission needs no conic solve. If the initial nominal
+already passes the complete verifier, one ordinary hard performance improvement
+is permitted. Inherited successors also attempt one such improvement while
+retaining the verified incumbent. Empty base, terminal exclusion, collision
+exclusion, exit exclusion and independent-verification failure are distinct
+admission outcomes. Search failure terminates without an issued command.
+
+The common full affine sensitivity maps and canonical condensed objective are
+still constructed for compatibility with the complete inherited family. The
+scalar search propagates its two trajectories and accumulates its objective
+directly; its improvement is not a claim that all preparation is linear in the
+horizon. Finite loop counts and observed desktop timings are not a WCET proof.
 
 ## Hard acceptance and continuation
 
-Search deficits never authorize execution. Acceptance reconstructs the input
+A scalar candidate never authorizes execution by itself. Acceptance reconstructs the input
 trajectory and independently checks every physical base row, terminal/CLF
 cone and exact nonlinear unit-support residual with arithmetic allowances.
-A search iterate may be issued only when these original hard checks pass;
-its auxiliary conic deficit is neither a physical safety relaxation nor part
-of the stored control plan. The next frame improves the ordinary performance
+A candidate may be issued only when these original hard checks pass.
+The CLF is the only softened physical optimization condition. The next frame improves the ordinary performance
 objective. An already certified continuation can be retained if its attempted
 improvement fails, with the actual numerical status reported. The complete
 frame deadline still prohibits late command issuance.
@@ -320,13 +354,15 @@ certificate for a complete hold enclosure and is outside this change.
   hulls, exact nonlinear residuals, majorant evaluation and verification.
 - `avoidanceStageQp`: sparse stage lifting, angular/support variables and SOC
   majorants. The original dynamics and terminal blocks remain sparse.
-- `solveHardCbfClf`: base feasibility, bounded single-initialization admission, hard continuation improvement,
+- `solveHardCbfClf`: scalar interval admission, hard continuation improvement,
   physical acceptance and the certified-incumbent interface.
 - `formulateAvoidanceProblem` and `hardEncounterBarrier`: preserve and shift
   the entire certificate; collision and exit angles share the same method.
 - `jointSupportCertificateTest`: homogeneous/interval support, 2,000 seeded
-  majorant checks, global majorants beyond the former trust domain, projected square escape, unsafe base rejection, hard
+  majorant checks, global majorants beyond the former trust domain, hard
   admission, uncertain multiple targets, suffix preservation and deadlines.
+- `affinePlanAdmissionTest`: scalar half-lines, modal balls, open interval
+  subtraction, complete yaw support, zero-conic admission and hard rejection.
 
 The implementation adds no core source file or third-party dependency. Its
 twenty-file source budget remains in force. `certificateContinuationTest`

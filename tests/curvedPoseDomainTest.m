@@ -59,10 +59,10 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             testCase.verifyLessThan(costError,1e-7);
         end
 
-        function anOverlappingCircularSeedRestoresAHardCertificate(testCase,curvature)
+        function anOverlappingCircularSeedFindsAHardScalarCertificate(testCase,curvature)
             [~,~,problem]=localAdmission(curvature,0);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(problem.metadata.restorationSolverCallCount,0);
+            testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
             testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
                 -problem.program.physicalBound),0);

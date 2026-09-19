@@ -1,13 +1,14 @@
 # Predictive CBF and soft CLF controller
 
-The format-39 controller jointly optimizes the input sequence and separation
-angles, including terminal encounter-exit angles. New encounters use one
-projected geometric initialization and at most three
-conic admission solves by default. Independently verified admission witnesses
-are issued directly; subsequent frames optimize performance. An accepted certificate
-is shifted with its complete geometry; one hard SOCP can then improve it.
-Joint support is the sole algorithm. Target-free frames solve its convex
-dynamics/CLF/terminal base directly.
+The format-40 controller admits a new encounter using one signed affine
+control section and forbidden-amplitude interval subtraction. A fixed support
+dictionary and fixed yaw enclosures on amplitude cells bound the geometric
+work. The scalar objective retains input effort and squared CLF slack.
+An independently verified admission witness is issued directly. A nominal
+already carrying a complete certificate, or a shifted accepted certificate,
+can be improved with one hard joint trajectory/support SOCP. Target-free frames
+solve the convex dynamics/CLF/terminal base. There is no restoration solver,
+route catalog, method selector or executable backup controller.
 
 The predictive continuation, fixed active-encounter exit deadline, invariant
 terminal set, actuator amplitude/slew limits, curved pose domains and squared

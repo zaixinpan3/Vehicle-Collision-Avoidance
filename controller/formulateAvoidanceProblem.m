@@ -205,12 +205,11 @@ function [program,prediction,clf] = localFormulate(model)
         objectiveMap(rows,:)=stageRoot*prediction.egoStateMatrix(2:6,:,stage+1);
         objectiveOffset(rows)=stageRoot*(prediction.egoStateOffset(2:6,stage+1)-referenceStates(2:6,stage+1));
     end
-    weight = diag(repmat([cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight],count,1));
-    trim = referenceInputs(:);
-    hessian = objectiveMap.'*objectiveMap+weight;
-    linear = 2*(objectiveMap.'*objectiveOffset-weight*trim);
-    % Keep the current CLF slack units and squared penalty unchanged.
-    hessian = 2*[hessian,zeros(planCount,1);zeros(1,planCount),cfg.clf.relaxationWeight];
+    inputWeight=repmat([cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight],count,1);
+    weight=spdiags(inputWeight,0,planCount,planCount);
+    hessian=objectiveMap.'*objectiveMap+weight;
+    linear=2*(objectiveMap.'*objectiveOffset-weight*referenceInputs(:));
+    hessian=2*[hessian,zeros(planCount,1);zeros(1,planCount),cfg.clf.relaxationWeight];
     layout = struct('planIndex',1:planCount,'planCount',planCount,'horizonSteps',count, ...
         'decisionCount',planCount+1,'relaxationIndex',planCount+1);
     program = struct('P',sparse(hessian),'q',[linear;0],'A',matrix,'b',bound, ...
@@ -223,7 +222,7 @@ function [program,prediction,clf] = localFormulate(model)
         'anchorPlan',anchor,'safetyBound',safetyBound,'inheritedPredictionFamily',inherited, ...
         'inheritedFeasibleFamily',inherited, ...
         'cruiseCertificate',cruise,'clf',clf, ...
-        'prediction',prediction,'inputWeight',diag(weight), ...
+        'prediction',prediction,'inputWeight',inputWeight, ...
         'referenceStates',referenceStates,'referenceInputs',referenceInputs,'referenceMatrices',referenceMatrices, ...
         'slackWeight',cfg.clf.relaxationWeight);
     program.terminalConePhysicalBound=terminalCone.bound;

@@ -1,10 +1,12 @@
 # Experiment reports
 
-Current controller: [Joint trajectory/support certificates](../controller/JOINT_SUPPORT_CERTIFICATES.md) are the sole algorithm. The method selector and fixed-normal execution path have been removed. Admission latency and inter-node clearance limitations remain explicit.
+Current controller: [Scalar admission and inherited joint-support continuation](../controller/JOINT_SUPPORT_CERTIFICATES.md). One signed control section replaces admission restoration; inherited performance improvement retains one hard SOCP and the verified incumbent. Restricted admission failures and inter-node clearance limitations remain explicit.
+
+Latest implementation: [Affine-section admission: fixed interval computation, 50 ms straight/circular rerun and capability tradeoff](AFFINE_SECTION_ADMISSION_20260919.md).
 
 Latest period change: [50 ms prediction nodes, input holds and control updates; matched-duration runtime and collision rerun](CONTROL_PERIOD_50MS_20260919.md).
 
-Admission design review: [Affine control sections and forbidden-interval computation: verified conditions and integration limits](AFFINE_SECTION_ADMISSION_REVIEW_20260919.md). This is a research assessment, not an implemented controller change.
+Admission design review: [Affine control sections and forbidden-interval computation: verified conditions and integration limits](AFFINE_SECTION_ADMISSION_REVIEW_20260919.md). This preceding review records the design conditions; the implementation and measured outcomes are in the new report above.
 
 Bounded-admission implementation and 100 ms comparison: [One geometric initialization, global homogeneous support majorants, and hard-domain screening](BOUNDED_ADMISSION_20260919.md).
 

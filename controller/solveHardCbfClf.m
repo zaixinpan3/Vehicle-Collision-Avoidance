@@ -42,7 +42,7 @@ classdef solveHardCbfClf
         end
 
         function [program,result,search] = joint(program,model,cfg)
-        % Restoration is unexecuted. Only a separately verified incumbent can
+        % Only a separately verified scalar plan or inherited incumbent can
         % leave this method, including when an improvement solve is stopped.
             [program,result,search]=localJointSearch(program,model,cfg);
         end
@@ -55,92 +55,205 @@ classdef solveHardCbfClf
             solve = localRunJointProgram(problem,cfg);
         end
 
+        function [decision,angles,information] = admitSection(program,cfg)
+            origin=program.anchorPlan;count=program.layout.planCount;
+            records=program.jointCertificate.records;
+            angles=program.jointCertificate.angles;decision=[];
+            information=struct('status',"noDirection",'baseInterval',[], ...
+                'safeIntervals',zeros(0,2),'amplitude',NaN,'basisResidual',NaN, ...
+                'normalCount',cfg.admission.normalCount,'amplitudeCells',cfg.admission.amplitudeCells);
+            if ~localSectionTimeAvailable(cfg),information.status="searchTimeLimit";return;end
+            states=localStates(program.prediction,origin);
+            [direction,information.basisResidual]=localDirection(program,cfg,states);
+            if isempty(direction),return;end
+            slope=localDirections(program.prediction,direction);
+            physical=program.physicalMatrix(:,1:count);
+            interval=solveHardCbfClf.linearInterval(physical*direction, ...
+                program.safetyBound-physical*origin,[-Inf,Inf]);
+            information.status="emptyLinearBase";
+            if isempty(interval),return;end
+            center=program.terminalCone.bound-program.terminalCone.matrix*origin;
+            tangent=-program.terminalCone.matrix*direction;
+            for first=1:3:numel(center)
+                assert(tangent(first)==0,'affinePlanAdmission:variableConeTop', ...
+                    'Terminal modal cones must have a constant radius.');
+                interval=solveHardCbfClf.ballInterval(center(first+(1:2)), ...
+                    tangent(first+(1:2)),center(first),interval);
+                if isempty(interval),information.status="emptyTerminalBase";return;end
+            end
+            if any(~isfinite(interval)),information.status="unboundedParameter";return;end
+            information.baseInterval=interval;
+            dictionary=program.geometry.frames(1).heading+2*pi*(0:cfg.admission.normalCount-1)/cfg.admission.normalCount;
+            normals=[cos(dictionary);sin(dictionary)];
+            total=numel(records);relative=zeros(total,2);relativeSlope=relative;
+            yaw=zeros(total,1);yawSlope=yaw;egoSizes=zeros(total,2);egoRadius=yaw;
+            targetSizes=egoSizes;targetYaw=yaw;targetRadius=yaw;constant=yaw;
+            generatorSupport=zeros(total,numel(dictionary));
+            for index=1:total
+                item=records(index);state=states(:,item.stage+1);delta=slope(:,item.stage+1);
+                relative(index,:)=(item.positionOffset+item.positionMap*state).';
+                relativeSlope(index,:)=(item.positionMap*delta).';
+                yaw(index)=item.yawOffset+item.yawRow*state;yawSlope(index)=item.yawRow*delta;
+                egoSizes(index,:)=item.egoHalfSize.';egoRadius(index)=item.egoYawRadius;
+                targetSizes(index,:)=item.targetHalfSize.';targetYaw(index)=item.targetYaw;
+                targetRadius(index)=item.targetYawRadius;
+                constant(index)=item.clearance+item.positionBall-program.jointCertificate.upperBound(index);
+                generatorSupport(index,:)=sum(abs(item.generators.'*normals),1);
+            end
+            fixed=constant+generatorSupport+solveHardCbfClf.rectangleSupports( ...
+                targetSizes,targetRadius,dictionary-targetYaw)-relative*normals;
+            coefficient=relativeSlope*normals;
+            boundaries=linspace(interval(1),interval(2),cfg.admission.amplitudeCells+1);
+            groups=cell(cfg.admission.amplitudeCells,1);collisionComponents=0;
+            for cellIndex=1:cfg.admission.amplitudeCells
+                if ~localSectionTimeAvailable(cfg),information.status="searchTimeLimit";return;end
+                domain=boundaries(cellIndex:cellIndex+1);middle=mean(domain);radius=diff(domain)/2;
+                limits=fixed+solveHardCbfClf.rectangleSupports(egoSizes, ...
+                    egoRadius+abs(yawSlope)*radius,dictionary-yaw-yawSlope*middle);
+                % Charge evaluation and endpoint arithmetic before subtraction.
+                limits=limits+256*eps*(1+abs(limits)+abs(coefficient)*max(abs(domain)));
+                ratio=limits./coefficient;
+                lower=ratio;lower(coefficient>=0)=-Inf;lower=max(lower,[],2);
+                upper=ratio;upper(coefficient<=0)=Inf;upper=min(upper,[],2);
+                alwaysSafe=any(coefficient==0 & limits<=0,2);
+                keep=~alwaysSafe & lower<upper;
+                collision=keep & ~[records.isExit].';
+                collisionIntervals=solveHardCbfClf.subtractIntervals(domain,[lower(collision),upper(collision)]);
+                collisionComponents=collisionComponents+size(collisionIntervals,1);
+                groups{cellIndex}=solveHardCbfClf.subtractIntervals(domain,[lower(keep),upper(keep)]);
+            end
+            intervals=vertcat(groups{:});information.safeIntervals=intervals;
+            if isempty(intervals)
+                information.status="collisionExcluded";
+                if collisionComponents>0,information.status="exitExcluded";end
+                return;
+            end
+            [quadratic,linear,clfCenter,clfSlope,clfRadius]=localObjective(program,origin,direction,states,slope);
+            left=interval(1);right=interval(2);
+            for iteration=1:cfg.admission.performanceIterations
+                middle=(left+right)/2;value=clfCenter+clfSlope*middle;length=norm(value);
+                derivative=2*quadratic*middle+linear;
+                if length>clfRadius && length>0
+                    derivative=derivative+2*program.slackWeight*(length-clfRadius)*(clfSlope.'*value)/length;
+                end
+                if derivative>0,right=middle;else,left=middle;end
+            end
+            inward=64*eps*(1+max(abs(intervals),[],2));
+            lower=min(intervals(:,1)+inward,mean(intervals,2));
+            upper=max(intervals(:,2)-inward,mean(intervals,2));
+            candidates=min(max((left+right)/2,lower),upper);
+            slack=max(0,vecnorm(clfCenter+clfSlope*candidates.',2,1).'-clfRadius);
+            costs=quadratic*candidates.^2+linear*candidates+program.slackWeight*slack.^2;
+            [~,selected]=min(costs);amplitude=candidates(selected);
+            plan=origin+amplitude*direction;
+            decision=[plan;slack(selected)+64*eps*(1+slack(selected)+norm(clfCenter+clfSlope*amplitude))];
+            chosen=states+amplitude*slope;
+            % Select a certifying dictionary direction at the chosen witness.
+            actual=constant+generatorSupport+solveHardCbfClf.rectangleSupports( ...
+                targetSizes,targetRadius,dictionary-targetYaw) ...
+                +solveHardCbfClf.rectangleSupports(egoSizes,egoRadius,dictionary-yaw-yawSlope*amplitude) ...
+                -(relative+amplitude*relativeSlope)*normals;
+            [~,indices]=min(actual,[],2);angles=dictionary(indices).';
+            if size(angles,2)>1,angles=angles.';end
+            information.status="candidate";information.amplitude=amplitude;
+            information.maximumYaw= max(abs(chosen(3,:)));
+        end
+
+        function interval = linearInterval(coefficient,bound,interval)
+            if isempty(interval),return;end
+            if any(~isfinite(coefficient)) || any(~isfinite(bound)) ...
+                    || any(coefficient==0 & bound<0)
+                interval=[];return;
+            end
+            positive=coefficient>0;negative=coefficient<0;
+            interval=[max([interval(1);bound(negative)./coefficient(negative)]), ...
+                min([interval(2);bound(positive)./coefficient(positive)])];
+            if interval(1)>interval(2),interval=[];end
+        end
+
+        function interval = ballInterval(center,direction,radius,interval)
+            if isempty(interval),return;end
+            if radius<0 || ~isfinite(radius) || any(~isfinite([center;direction]))
+                interval=[];return;
+            end
+            length=norm(direction);
+            if length==0
+                if norm(center)>radius,interval=[];end
+                return;
+            end
+            unit=direction/length;middle=-(unit.'*center)/length;
+            distance=norm(center+middle*direction);
+            if distance>radius,interval=[];return;end
+            halfWidth=sqrt(max(0,(radius-distance)*(radius+distance)))/length;
+            interval=[max(interval(1),middle-halfWidth),min(interval(2),middle+halfWidth)];
+            if interval(1)>interval(2),interval=[];end
+        end
+
+        function intervals = subtractIntervals(domain,forbidden)
+            % The forbidden intervals are open: touching endpoints survive.
+            forbidden=sortrows(forbidden,1);intervals=zeros(size(forbidden,1)+1,2);
+            cursor=domain(1);count=0;
+            for index=1:size(forbidden,1)
+                lower=forbidden(index,1);upper=forbidden(index,2);
+                if lower>=upper || upper<=cursor || lower>domain(2),continue;end
+                if lower>=cursor
+                    count=count+1;intervals(count,:)=[cursor,min(lower,domain(2))];
+                end
+                cursor=max(cursor,upper);
+                if cursor>domain(2),break;end
+            end
+            if cursor<=domain(2),count=count+1;intervals(count,:)=[cursor,domain(2)];end
+            intervals=intervals(1:count,:);
+        end
+
+        function support = rectangleSupports(halfSize,radius,angle)
+            % Analytic maximum over the complete yaw interval, row by row.
+            long=halfSize(:,1);wide=halfSize(:,2);circumradius=hypot(long,wide);
+            first=angle-radius;last=angle+radius;
+            support=max(long.*abs(cos(first))+wide.*abs(sin(first)), ...
+                long.*abs(cos(last))+wide.*abs(sin(last)));
+            peak=atan2(wide,long);
+            distance=min(abs(mod(angle-peak+pi/2,pi)-pi/2),abs(mod(angle+peak+pi/2,pi)-pi/2));
+            support=max(support,circumradius.*(distance<=radius+32*eps*(1+abs(angle))));
+            support=support+32*eps*(1+circumradius);
+        end
     end
 end
 
 function [program,result,search]=localJointSearch(program,~,cfg)
-% One geometric initialization, bounded feasibility search, then hard checking.
-% A verified admission plan can be issued directly. Continuation still solves
-% one performance problem containing its complete certified incumbent.
+% Fresh admission searches one scalar section. Continuation retains its witness.
     search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
         'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
-        'policy',"boundedJointSupport",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
+        'policy',"affineSectionAdmission",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
         'issuedAdmissionWitness',false,'initialCertificateAngles',program.jointCertificate.angles);
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
     [admitted,accepted]=localVerifyJointPoint(program,point,angles);
-    if admitted,program=localRefreshBounds(accepted);end
-    if ~admitted
-        % Dynamics, actuator, chart, CLF and terminal constraints stay hard.
-        value=program.b-program.A*point;
-        if ~localConesContain(value,program.cones)
-            phase=tic;result=solveHardCbfClf.constrained(program,cfg);
-            search.solveSeconds=toc(phase);search.baseSolves=1;search.nativeSolves=1;
-            if ~result.feasible
-                result.message="Joint convex base failed: "+result.message;return;
-            end
-            point=result.decision;
-            [baseSafe,base]=localVerifyBasePoint(program,point);
-            if ~baseSafe
-                result.feasible=false;result.message="Joint convex base failed independent verification.";return;
-            end
-            program.safetyBound=base.safetyBound;program.terminalCone=base.terminalCone;
-            program=localRefreshBounds(program);
-        end
-        phase=tic;angles=avoidanceSafetyGeometry.admissionAngles(program,point);
-        search.formulationSeconds=search.formulationSeconds+toc(phase);
-        search.initialCertificateAngles=angles;search.familyAttempts=1;
-        values=avoidanceSafetyGeometry.jointResidual(program,point,angles);
-        violation=max([0;values-program.jointCertificate.upperBound]);history=violation;
-        for iteration=1:(cfg.jointCertificate.maximumAdmissionSolves-search.nativeSolves)
+    if ~program.inheritedPredictionFamily && ~admitted
+        phase=tic;
+        [point,angles,search.section]=solveHardCbfClf.admitSection(program,cfg);
+        search.formulationSeconds=toc(phase);search.familyAttempts=1;
+        if ~isempty(point)
             [admitted,accepted]=localVerifyJointPoint(program,point,angles);
-            if admitted,program=localRefreshBounds(accepted);break;end
-            if ~localJointTimeAvailable(cfg),break;end
-            phase=tic;conic=avoidanceStageQp.joint(program,point,angles,true,violation,cfg);
-            search.formulationSeconds=search.formulationSeconds+toc(phase);
-            phase=tic;trial=localSolveConic(conic,cfg);
-            search.solveSeconds=search.solveSeconds+toc(phase);
-            search.restorationSolves=search.restorationSolves+1;search.nativeSolves=search.nativeSolves+1;
-            if ~trial.feasible,break;end
-            candidate=trial.decision(1:conic.primaryCount);
-            [baseSafe,base]=localVerifyBasePoint(program,candidate);
-            if ~baseSafe,break;end
-            nextAngles=angles+atan(trial.decision(conic.angleIndex));
-            values=avoidanceSafetyGeometry.jointResidual(program,candidate,nextAngles);
-            nextViolation=max([0;values-program.jointCertificate.upperBound]);
-            if ~isfinite(nextViolation) || nextViolation>violation+128*eps*(1+violation),break;end
-            program.safetyBound=base.safetyBound;program.terminalCone=base.terminalCone;
-            program=localRefreshBounds(program);
-            point=candidate;angles=nextAngles;history(end+1)=nextViolation; %#ok<AGROW>
-            [admitted,accepted]=localVerifyJointPoint(program,point,angles);
-            if admitted,program=localRefreshBounds(accepted);break;end
-            if violation-nextViolation<=cfg.jointCertificate.stallTolerance*(1+violation),break;end
-            violation=nextViolation;
+            if ~admitted,search.section.status="independentVerificationFailed";end
         end
-        search.violationHistory={history};
-    end
-    if ~admitted
-        result=localEmptySolve();
-        result.message="Bounded admission found no hard-certified plan in its selected local family (stall, solve or time limit).";
-        return;
-    end
-    if search.nativeSolves>0
-        % Original nonlinear supports and every hard constraint were checked.
-        % A second solve is unnecessary for safety; performance is improved
-        % on the next frame within this accepted certificate family.
-        program=accepted;
-        if search.restorationSolves>0,result=trial;end
-        result.decision=point;
-        result.message="Issued an independently verified admission witness.";
+        if ~admitted
+            result=localEmptySolve();
+            result.message="Scalar admission found no hard-certified plan: "+search.section.status;
+            return;
+        end
+        program=accepted;result=localEmptySolve();result.decision=point;result.feasible=true;
+        result.exitFlag=1;result.message="Issued an independently verified scalar-admission witness.";
         search.issuedAdmissionWitness=true;
     else
-        program.jointCertificate.angles=angles;incumbent=point;
-        phase=tic;conic=avoidanceStageQp.joint(program,point,angles,false,0,cfg);
-        search.formulationSeconds=search.formulationSeconds+toc(phase);
-        phase=tic;trial=localSolveConic(conic,cfg);
-        search.solveSeconds=search.solveSeconds+toc(phase);
-        search.hardSolves=1;search.nativeSolves=search.nativeSolves+1;
-        improved=false;
+        if ~admitted
+            result=localEmptySolve();result.message="The inherited witness failed independent verification.";return;
+        end
+        program=localRefreshBounds(accepted);incumbent=point;
+        phase=tic;conic=avoidanceStageQp.joint(program,point,angles,cfg);
+        search.formulationSeconds=toc(phase);
+        phase=tic;trial=localSolveConic(conic,cfg);search.solveSeconds=toc(phase);
+        search.hardSolves=1;search.nativeSolves=1;improved=false;
         if trial.feasible
             point=trial.decision(1:conic.primaryCount);
             nextAngles=angles+atan(trial.decision(conic.angleIndex));
@@ -172,31 +285,9 @@ function [accepted,candidate]=localVerifyJointPoint(program,point,angles)
     end
 end
 
-function [accepted,candidate]=localVerifyBasePoint(program,point)
-    candidate=rmfield(program,'jointCertificate');accepted=false;
-    try
-        candidate=solveHardCbfClf.certify(candidate,point);accepted=true;
-    catch exception
-        if ~strcmp(exception.identifier,'collisionAvoidanceController:optimizationFailed'),rethrow(exception);end
-    end
-end
-
 function program=localRefreshBounds(program)
     program.b(1:numel(program.safetyBound))=program.safetyBound;
     program.b(end-numel(program.terminalCone.bound)+1:end)=program.terminalCone.bound;
-end
-
-function available=localJointTimeAvailable(cfg)
-    available=~isfield(cfg.solver,'workTimer') || ~isfinite(cfg.solver.workTimeLimit) ...
-        || toc(cfg.solver.workTimer)<cfg.solver.workTimeLimit;
-end
-
-function contained=localConesContain(value,cones)
-    equality=cones(1);cursor=equality+cones(2);
-    contained=all(isfinite(value)) && all(value(1:equality)==0) && all(value(equality+1:cursor)>=0);
-    for size=cones(3:end).'
-        block=value(cursor+(1:size));contained=contained && block(1)>=norm(block(2:end));cursor=cursor+size;
-    end
 end
 
 function program = localCompactPlanarRows(program)
@@ -411,4 +502,82 @@ function solve = localEmptySolve()
     solve = struct("decision", zeros(0, 1), "fullDecision", zeros(0, 1), ...
         "exitFlag", -999, "output", struct(), "feasible", false, ...
         "message", "");
+end
+
+function states=localStates(prediction,inputs)
+    count=prediction.stageCount;states=zeros(6,count+1);
+    states(:,1)=prediction.egoStateOffset(:,1);
+    for stage=1:count
+        states(:,stage+1)=prediction.stageMatrixA(:,:,stage)*states(:,stage) ...
+            +prediction.stageMatrixB(:,:,stage)*inputs(2*stage-1:2*stage)+prediction.stageAffine(:,stage);
+    end
+end
+
+function states=localDirections(prediction,inputs)
+    count=prediction.stageCount;states=zeros(6,count+1);
+    for stage=1:count
+        states(:,stage+1)=prediction.stageMatrixA(:,:,stage)*states(:,stage) ...
+            +prediction.stageMatrixB(:,:,stage)*inputs(2*stage-1:2*stage);
+    end
+end
+
+function [direction,residual]=localDirection(program,cfg,states)
+    records=program.jointCertificate.records;
+    values=avoidanceSafetyGeometry.jointResidual(program,program.feasibleWitness,program.jointCertificate.angles);
+    values([records.isExit])=-Inf;
+    [~,critical]=max(values-program.jointCertificate.upperBound);
+    selected=find(string({records.key}).'==records(critical).key & ~[records.isExit].' ...
+        & values>program.jointCertificate.upperBound);
+    count=program.layout.planCount;maps=program.prediction.egoStateMatrix;
+    if isempty(selected)
+        index=program.terminal.stateIndex;
+        constraint=[maps(index,:,end);zeros(2,count)];
+        constraint(end-1:end,end-1:end)=eye(2);
+        desired=[program.terminal.reference(index)-states(index,end); ...
+            program.terminal.input-program.anchorPlan(end-1:end)];
+    else
+        stages=[records(selected).stage];first=min(stages);last=max(stages);
+        samples=unique([first,round((first+last)/2),last]);
+        initial=records(selected(1));final=records(selected(end));
+        travel=final.positionOffset+final.positionMap*states(:,final.stage+1) ...
+            -initial.positionOffset-initial.positionMap*states(:,initial.stage+1);
+        transverse=initial.positionMap(:,1:2)\[-travel(2);travel(1)];
+        if norm(transverse)<=64*eps*(1+norm(travel)),transverse=[0;1];end
+        transverse=transverse/norm(transverse);
+        constraint=[reshape(permute(maps(1:2,:,samples+1),[1,3,2]),[],count);maps(:,:,end);zeros(2,count)];
+        constraint(end-1:end,end-1:end)=eye(2);
+        terminalChange=zeros(6,1);index=program.terminal.stateIndex;
+        terminalChange(index)=program.terminal.reference(index)-states(index,end);
+        desired=[repmat(transverse,numel(samples),1);terminalChange; ...
+            program.terminal.input-program.anchorPlan(end-1:end)];
+    end
+    scale=max(vecnorm(constraint,2,2),eps);constraint=constraint./scale;desired=desired./scale;
+    difference=speye(count)-spdiags(ones(count,1),-2,count,count);
+    metric=spdiags(program.inputWeight,0,count,count) ...
+        +cfg.encounter.inputRateWeight/cfg.controller.sampleTime^2*(difference.'*difference);
+    root=chol(metric);map=constraint/root;
+    direction=root\(pinv(full(map))*desired);
+    residual=norm(constraint*direction-desired,Inf);
+    if any(~isfinite(direction)) || norm(direction)==0,direction=[];end
+end
+
+function [quadratic,linear,center,slope,radius]=localObjective(program,origin,direction,states,stateSlope)
+    quadratic=sum(program.inputWeight.*direction.^2);
+    linear=2*sum(program.inputWeight.*(origin-program.referenceInputs(:)).*direction);
+    for stage=1:program.prediction.stageCount
+        error=states(2:6,stage+1)-program.referenceStates(2:6,stage+1);
+        change=stateSlope(2:6,stage+1);matrix=program.referenceMatrices(:,:,stage+1);
+        quadratic=quadratic+change.'*matrix*change;
+        linear=linear+2*error.'*matrix*change;
+    end
+    first=program.cones(2)+1;
+    value=program.b(first:first+5)-program.A(first:first+5,:)*[origin;0];
+    delta=-program.A(first:first+5,:)*[direction;0];
+    assert(delta(1)==0 && value(1)>=0,'affinePlanAdmission:invalidClf','The CLF norm radius must be fixed and nonnegative.');
+    center=value(2:end);slope=delta(2:end);radius=value(1);
+end
+
+function available=localSectionTimeAvailable(cfg)
+    available=~isfield(cfg.solver,'workTimer') || ~isfinite(cfg.solver.workTimeLimit) ...
+        || toc(cfg.solver.workTimer)<cfg.solver.workTimeLimit;
 end

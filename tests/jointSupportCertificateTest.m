@@ -1,5 +1,5 @@
 classdef jointSupportCertificateTest < matlab.unittest.TestCase
-    %jointSupportCertificateTest Joint certificates and unexecuted restoration.
+    %jointSupportCertificateTest Joint certificates and inherited performance solves.
     properties (TestParameter)
         yawRadius=struct('fixed',0,'interval',.12,'full',pi);
         nonpositiveGap=struct('contact',0,'overlap',-.01);
@@ -59,54 +59,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyLessThan(touchingError,1e-11);
         end
 
-        function squareExampleRestorationCanBeFeasibleAndStalled(testCase)
-            [program,cfg]=localSquare();point=[0;0;1];
-            conic=avoidanceStageQp.joint(program,point,0,true,.2001,cfg);
-            result=solveHardCbfClf.constrained(conic,cfg);
-            testCase.verifyTrue(result.feasible);
-            testCase.verifyEqual(result.decision(1),0,AbsTol=2e-4);
-            testCase.verifyEqual(result.decision(conic.angleIndex),0,AbsTol=2e-4);
-            testCase.verifyEqual(result.decision(conic.slackIndex),.2001,AbsTol=2e-7);
-        end
-
-        function oneProjectedInitializationFindsTheSquareEscape(testCase)
-            [program,cfg]=localSquare();
-            [accepted,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
-            testCase.verifyTrue(result.feasible);
-            testCase.verifyEqual(search.familyAttempts,1);
-            testCase.verifyLessThanOrEqual(search.nativeSolves,cfg.jointCertificate.maximumAdmissionSolves);
-            testCase.verifyTrue(search.issuedAdmissionWitness);
-            testCase.verifyGreaterThan(result.decision(1),1.1);
-            testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...
-                accepted,result.decision,accepted.jointCertificate.angles)),0);
-        end
-
-        function positiveRestorationSlackCannotAuthorizeACommand(testCase)
-            [program,cfg]=localSquare();program.b(1)=.5;program.physicalBound(1)=.5;
-            cfg.jointCertificate.maximumAdmissionSolves=1;
-            [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
-            testCase.verifyFalse(result.feasible);
-            testCase.verifyEmpty(result.decision);
-            testCase.verifyEqual(search.hardSolves,0);
-            testCase.verifyLessThanOrEqual(search.nativeSolves,cfg.jointCertificate.maximumAdmissionSolves);
-        end
-
-        function restorationCannotAdoptAnActuatorInfeasibleCenter(testCase)
-            [program,cfg]=localSquare();
-            cfg.solver.jointFunction=@localUnsafeRestoration;
-            [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
-            testCase.verifyFalse(result.feasible);
-            testCase.verifyNumElements(search.violationHistory{1},1);
-        end
-
-        function anEmptyConvexBaseDoesNotLaunchRestoration(testCase)
-            [program,cfg]=localSquare();program.b(1)=-1;program.physicalBound(1)=-1;
-            [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
-            testCase.verifyFalse(result.feasible);
-            testCase.verifyEqual(search.baseSolves,1);
-            testCase.verifyEqual(search.restorationSolves,0);
-        end
-
         function oncomingAdmissionOptimizesDirectionsAndRetainsItsSuffix(testCase)
             [first,next,old,stored]=localOncoming(false);
             keep=[old.program.jointCertificate.records.stage]>1;
@@ -115,7 +67,8 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             values=avoidanceSafetyGeometry.jointResidual(next.program, ...
                 suffix(:),oldAngles);
             testCase.verifyTrue(first.metadata.planCertified);
-            testCase.verifyGreaterThan(first.metadata.restorationSolverCallCount,0);
+            testCase.verifyEqual(first.metadata.restorationSolverCallCount,0);
+            testCase.verifyEqual(first.metadata.solverCallCount,0);
             testCase.verifyTrue(next.metadata.shiftedWitnessContained);
             testCase.verifyEqual(next.metadata.admissionSearch.initialCertificateAngles,oldAngles,AbsTol=0);
             testCase.verifyEqual(next.metadata.conicSolverCallCount,1);
@@ -133,26 +86,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidConfiguration');
         end
 
-        function aDirectionProposalDoesNotModifyTheNominalPlan(testCase)
-            [program,~]=localSquare();initial=program;
-            angles=avoidanceSafetyGeometry.admissionAngles(program,program.feasibleWitness);
-            testCase.verifyEqual(program,initial);
-            testCase.verifyEqual(angles,pi/2,AbsTol=1e-9);
-        end
-
-        function aSafeEscapeMayExceedTheMajorantPositionScale(testCase)
-            [program,cfg]=localSquare();
-            program.jointCertificate.records.targetHalfSize=[5;5];
-            program.b(1)=8;program.physicalBound(1)=8;
-            program.safetyBound(1)=8;program.decisionRadius(1)=8;
-            [accepted,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
-            testCase.verifyTrue(result.feasible);
-            testCase.verifyGreaterThan(result.decision(1),cfg.jointCertificate.positionScale);
-            testCase.verifyLessThanOrEqual(search.nativeSolves,cfg.jointCertificate.maximumAdmissionSolves);
-            testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...
-                accepted,result.decision,accepted.jointCertificate.angles)),0);
-        end
-
         function compactRoundoffEnclosuresContainTheOriginalTargetUncertainty(testCase)
             [radius,minimumGap]=localCompactUncertainty();
             testCase.verifyEqual(radius,0,AbsTol=0);
@@ -162,9 +95,10 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
         function aDomainWideSeparationProofRetainsTheOriginalSafetyRecord(testCase)
             [program,cfg]=localSquare();
             program.jointCertificate.records.positionOffset=[10;0];
+            program.feasibleWitness=[.1;0;1];program.anchorPlan=[.1;0];
             program.geometry.frames.domainCenter=[.9;0;0];
             program.geometry.frames.domainRadius=[0;2;0];
-            conic=avoidanceStageQp.joint(program,program.feasibleWitness,0,false,0,cfg);
+            conic=avoidanceStageQp.joint(program,program.feasibleWitness,0,cfg);
             [accepted,result]=solveHardCbfClf.joint(program,struct(),cfg);
             testCase.verifyEqual(conic.domainCertifiedRecords,1);
             testCase.verifyTrue(result.feasible);
@@ -180,7 +114,7 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             program.geometry.frames.domainRadius=[0;1;0];
             point=[1.5;0;1];program.feasibleWitness=point;
             program.jointCertificate.angles=pi/2;
-            conic=avoidanceStageQp.joint(program,point,pi/2,false,0,cfg);
+            conic=avoidanceStageQp.joint(program,point,pi/2,cfg);
             [accepted,result]=solveHardCbfClf.joint(program,struct(),cfg);
             testCase.verifyEmpty(conic.domainCertifiedRecords);
             testCase.verifyTrue(result.feasible);
@@ -301,7 +235,7 @@ function [program,cfg]=localSquare()
     offset=repmat([.9;0;0;1;0;0],1,2);map=zeros(6,2,2);map(2,1,2)=1;
     b=zeros(6,2);b(2,1)=1;
     prediction=struct('stageCount',1,'egoStateOffset',offset,'egoStateMatrix',map, ...
-        'stageMatrixA',eye(6),'stageMatrixB',b,'cells',struct('stage',1));
+        'stageMatrixA',eye(6),'stageMatrixB',b,'stageAffine',zeros(6,1),'cells',struct('stage',1));
     physical=[1,0,0;-1,0,0;0,1,0;0,-1,0];bound=[2;0;1;1];
     geometry=struct('label',strings(0,1),'local',struct('stage',{}),'physicalBound',zeros(0,1), ...
         'normals',{{[1;0]}},'cellData',struct('normals',[1;0]),'frames',struct('heading',0));
@@ -337,11 +271,6 @@ end
 function result=localTimeout(~,program)
     result=struct('decision',100*ones(numel(program.q),1),'exitFlag',0, ...
         'output',struct('message',"Simulated optimizer timeout with an unsafe iterate."));
-end
-
-function result=localUnsafeRestoration(~,program)
-    decision=zeros(numel(program.q),1);decision(1:3)=[1.2;10;1];decision(program.angleIndex)=pi/2;
-    result=struct('decision',decision,'exitFlag',1,'output',struct());
 end
 
 function [first,next,oldAngles]=localUncertainTargets()

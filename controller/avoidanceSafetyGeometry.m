@@ -337,47 +337,6 @@ classdef avoidanceSafetyGeometry
                 +.25*(sqrt(eta)*(t.'*dr)-coordinate/sqrt(eta))^2;
         end
 
-        function angles = admissionAngles(program,point)
-        % Generate one coherent geometric initialization without changing the
-        % nominal controls or prescribing a vehicle trajectory. Projection is
-        % used only to query support directions; no projected pose is executed.
-            certificate=program.jointCertificate;records=certificate.records;
-            angles=certificate.angles;
-            values=avoidanceSafetyGeometry.jointResidual(program,point,angles);
-            states=localJointStates(program,point(program.layout.planIndex));
-            heading=program.geometry.frames(1).heading;
-            lateral=[-sin(heading);cos(heading)];
-            native=exist('avoidanceSupportKernelMex','file')==3;
-            for key=unique(string({records.key}))
-                indices=find(string({records.key})==key & ~[records.isExit]);
-                if isempty(indices) || all(values(indices)<=certificate.upperBound(indices)),continue;end
-                first=records(indices(1));last=records(indices(end));
-                firstRelative=first.positionOffset+first.positionMap*states(:,first.stage+1);
-                lastRelative=last.positionOffset+last.positionMap*states(:,last.stage+1);
-                score=lateral.'*(lastRelative-firstRelative);
-                allowance=64*eps*(1+norm(firstRelative)+norm(lastRelative));
-                if abs(score)<=allowance,score=lateral.'*(lastRelative+firstRelative);end
-                if abs(score)<=allowance,score=1;end % Deterministic symmetry tie.
-                direction=sign(score)*lateral;directionAngle=atan2(direction(2),direction(1));
-                for index=indices
-                    item=records(index);state=states(:,item.stage+1);
-                    relative=item.positionOffset+item.positionMap*state;
-                    yaw=item.yawOffset+item.yawRow*state;
-                    deficit=avoidanceSafetyGeometry.jointValue(item,state,directionAngle) ...
-                        -certificate.upperBound(index);
-                    projected=relative+direction*max(0,deficit);
-                    dimensions=[item.egoHalfSize;item.targetHalfSize];
-                    if native
-                        [normal,~]=avoidanceSupportKernelMex(projected,yaw,zeros(2,1),item.targetYaw,dimensions);
-                    else
-                        [normal,~]=avoidanceSafetyGeometry.supportDirection( ...
-                            projected,yaw,zeros(2,1),item.targetYaw,dimensions);
-                    end
-                    angles(index)=atan2(normal(2),normal(1));
-                end
-            end
-        end
-
         function value = supportValue(halfSize,yawRadius,vector)
         % Positively homogeneous support, including the zero vector.
             value=norm(vector)*targetPrediction.rectangleSupport( ...

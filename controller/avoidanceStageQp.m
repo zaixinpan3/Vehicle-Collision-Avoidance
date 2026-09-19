@@ -1,9 +1,9 @@
 classdef avoidanceStageQp
     %avoidanceStageQp Equivalent sparse realization of the certified plan.
     methods (Static)
-        function conic=joint(program,point,angles,restoration,violation,cfg)
+        function conic=joint(program,point,angles,cfg)
         % Lift the support majorants onto the same sparse stage variables.
-            conic=localJointConic(program,point,angles,restoration,violation,cfg);
+            conic=localJointConic(program,point,angles,cfg);
         end
 
         function lifted=build(program)
@@ -90,25 +90,19 @@ classdef avoidanceStageQp
     end
 end
 
-function conic=localJointConic(program,point,angles,restoration,violation,cfg)
+function conic=localJointConic(program,point,angles,cfg)
     program.anchorPlan=point(program.layout.planIndex);
     base=avoidanceStageQp.build(program);
     records=program.jointCertificate.records;count=numel(records);
     baseCount=numel(base.q);angleIndex=baseCount+(1:count);cursor=baseCount+count;
     fixed=localDomainCertificate(program,angles);
-    total=cursor+double(restoration)+localAuxiliaryCount(records(~fixed));
-    slackIndex=[];
-    if restoration,slackIndex=allocate(1);end
+    total=cursor+localAuxiliaryCount(records(~fixed));
     equalityCount=base.cones(1);linearCount=base.cones(2);
     linearRows={base.A(equalityCount+(1:linearCount),:)};
     linearBounds={base.b(equalityCount+(1:linearCount))};
     coneRows={base.A(equalityCount+linearCount+1:end,:)};
     coneBounds={base.b(equalityCount+linearCount+1:end)};
     coneSizes=base.cones(3:end);
-    if restoration
-        addLinear(row(slackIndex,-1),0);
-        addLinear(row(slackIndex,1),violation);
-    end
     eta=1/cfg.jointCertificate.positionScale;
     for index=1:count
         if fixed(index),continue;end
@@ -145,7 +139,6 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
         disk=allocate(1);diskRow=row(disk,1);
         addCone([0;diskRadius;0],[diskRow;sparse(1,total);diskRadius*pad(angleRow)]);
         inequality=pad(support)+pad(zrow)+diskRow-normal.'*pad(positionMap)-tangent.'*relative*pad(angleRow);
-        if restoration,inequality(slackIndex)=inequality(slackIndex)-1;end
         addLinear(inequality,normal.'*relative);
     end
     assert(cursor==total,'avoidanceStageQp:jointLayout','Inconsistent auxiliary-variable count.');
@@ -157,13 +150,9 @@ function conic=localJointConic(program,point,angles,restoration,violation,cfg)
         'A',[pad(base.A(1:equalityCount,:));fixedRows;vertcat(rows{:});vertcat(cones{:})], ...
         'b',[base.b(1:equalityCount);zeros(fixedCount,1);vertcat(linearBounds{:});vertcat(coneBounds{:})], ...
         'cones',[equalityCount+fixedCount;sum(cellfun(@numel,linearBounds));coneSizes], ...
-        'anchorPlan',program.anchorPlan,'angleIndex',angleIndex,'slackIndex',slackIndex, ...
+        'anchorPlan',program.anchorPlan,'angleIndex',angleIndex, ...
         'primaryCount',numel(program.q),'domainCertifiedRecords',find(fixed));
-    if restoration
-        conic.q(slackIndex)=1;
-    else
-        conic.P(1:baseCount,1:baseCount)=base.P;conic.q(1:baseCount)=base.q;
-    end
+    conic.P(1:baseCount,1:baseCount)=base.P;conic.q(1:baseCount)=base.q;
     weight=cfg.jointCertificate.proximalWeight;
     primary=1:numel(point);scale=[program.decisionRadius;1];
     diagonal=weight./max(scale,1e-3).^2;

@@ -8,17 +8,24 @@ larger computation budget are explicitly separate. See
 continuation and collision results. The generic controller configuration already
 used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
 
-Current algorithm (September 19, 2026): format 39 uses homogeneous joint
-support majorants. Fresh admission uses one projected geometric initialization
-and at most three conic solves by default, counting any required base solve.
-A hard-verified admission witness is issued without a second performance
-optimization. Active successors attempt one hard improvement containing the
-complete shifted certificate; target-free frames solve the convex base.
-Hard pose-domain support bounds screen only globally redundant collision
-majorants; the original records remain independently checked. Sparse widths
-are allocated once. There is no multi-start or route-enumeration loop. See
-[the derivation](JOINT_SUPPORT_CERTIFICATES.md) and
-[the measured results and remaining limits](../report/BOUNDED_ADMISSION_20260919.md).
+Current algorithm (September 19, 2026): format 40 replaces admission restoration
+with one signed affine control section, 16 amplitude geometry cells, 32 support
+directions and 32 scalar objective iterations. A restricted admission candidate
+passes the independent physical verifier before execution and needs no conic
+solve. An already certified nominal, or an inherited successor, attempts one
+joint-support performance improvement while retaining its verified incumbent.
+There is no route/start enumeration or restoration slack. The fixed geometric
+work restricts admissibility; empty intervals are reported as search failure.
+
+The scalar trajectory and objective are accumulated directly. Full sensitivity
+maps and the canonical condensed objective remain for compatibility with the
+stored complete certificate, so total preparation is not claimed linear in
+horizon length. No solver binary rebuild is required. See
+[the derivation](JOINT_SUPPORT_CERTIFICATES.md) and the
+[design review](../report/AFFINE_SECTION_ADMISSION_REVIEW_20260919.md).
+The [implemented 50 ms rerun](../report/AFFINE_SECTION_ADMISSION_20260919.md)
+records faster matched admissions, four rejected curved crossings and increased
+continuation latency; seven of fifteen strict trials qualify.
 The dated measurements below describe earlier implementations.
 
 Historical version 21 used a finite encounter witness, current observation confirmation,

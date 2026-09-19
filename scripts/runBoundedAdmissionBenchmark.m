@@ -17,7 +17,7 @@ function summary=runBoundedAdmissionBenchmark(options)
     if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
     oldThreads=maxNumCompThreads(1);cleanup=onCleanup(@()maxNumCompThreads(oldThreads));
     profile off;
-    summary=struct('method',"boundedJointSupport",'sampleCount',options.SampleCount, ...
+    summary=struct('method',"affineSectionAdmission",'sampleCount',options.SampleCount, ...
         'sampleTime',options.SampleTime,'horizonSeconds',options.HorizonSeconds, ...
         'repetitions',options.Repetitions,'replayFixture',options.ReplayFixture, ...
         'matlabVersion',string(version),'replays',{{}},'campaigns',{{}},'strict',{{}});
@@ -29,6 +29,7 @@ function summary=runBoundedAdmissionBenchmark(options)
         data=load(options.ReplayFixture,'ego','target','road','cfg');
         defaults=collisionAvoidanceControllerConfig();
         data.cfg.jointCertificate=defaults.jointCertificate;
+        data.cfg.admission=defaults.admission;
         data.cfg.controller.sampleTime=options.SampleTime;
         data.cfg.controller.horizonSteps=ceil(options.HorizonSeconds/options.SampleTime);
         save(fullfile(options.OutputDirectory,'current-fixture.mat'),'-struct','data');

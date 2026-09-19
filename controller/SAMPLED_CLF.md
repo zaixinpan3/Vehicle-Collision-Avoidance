@@ -1,6 +1,7 @@
 # Soft sampled CLF and its dissipation bound
 
-The joint-support controller optimizes a full finite input plan and a
+The controller optimizes a scalar restriction at fresh admission and a full
+finite input plan during inherited performance improvement, together with a
 nonnegative first-hold CLF norm slack. Physical input effort is centered on
 the CLF/LQR operating input. For N holds its objective is
 
@@ -9,8 +10,8 @@ the CLF/LQR operating input. For N holds its objective is
 \sum_{i=0}^{N-1}(u_i-u_{*,i})^\top W(u_i-u_{*,i})+w_\delta\delta^2.
 \]
 
-The CLF slack is separate from the unexecuted restoration variable used by
-[joint support admission](JOINT_SUPPORT_CERTIFICATES.md). Collision, actuator,
+The CLF is the only softened constraint in
+[scalar admission and joint continuation](JOINT_SUPPORT_CERTIFICATES.md). Collision, actuator,
 slew, chart and terminal constraints remain hard at command acceptance.
 [TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md) specifies continuation and
 sensing assumptions. [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)
