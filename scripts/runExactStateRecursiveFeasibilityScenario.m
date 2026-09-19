@@ -22,12 +22,16 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
         options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 1
         options.RoadCurvature (1,1) double {mustBeFinite} = 0
+        options.CertificateMethod (1,1) string {mustBeMember(options.CertificateMethod,["fixedNormal","jointSupport"])} = "fixedNormal"
+        options.SearchTimeLimitSeconds (1,1) double {mustBePositive} = 5
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8, ...
-        "controller",struct("sampleTime",0.1,"minimumHorizonSteps",options.MinimumHorizonSteps),"model",struct("lateralDomainRadius",4), ...
-        "solver",struct("frameDeadlineSeconds",options.DeadlineSeconds)));
+        "controller",struct("sampleTime",0.1,"minimumHorizonSteps",options.MinimumHorizonSteps, ...
+        "certificateMethod",options.CertificateMethod),"model",struct("lateralDomainRadius",4), ...
+        "solver",struct("frameDeadlineSeconds",options.DeadlineSeconds, ...
+        "certificateSearchTimeLimit",options.SearchTimeLimitSeconds)));
     originalCfg = cfg;
     stream = RandStream("mt19937ar",Seed=options.Seed);
     h = cfg.controller.sampleTime;
@@ -80,6 +84,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     terminalOptimizations=false(1,count);replacements=false(1,count);approximate=false(1,count);
     verified=false(1,count);recursive=false(1,count);
     inheritedViolation=nan(1,count);terminalMargin=nan(1,count);
+    jointViolation=nan(1,count);shiftedJointViolation=nan(1,count);minimumNodeSeparation=inf;
     clfResidual=nan(1,count);clfValue=nan(1,count);cbfRows=zeros(1,count);
     clfSlack=nan(1,count);clfSlackBound=nan(1,count);clfUnrelaxedResidual=nan(1,count);
     minimumSeparation=inf;minimumRoad=inf;minimumDomain=inf;maximumSlew=0;
@@ -115,10 +120,17 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         approximate(sample)=metadata.approximateSolveCertified;
         verified(sample)=metadata.postSolveCertificationPerformed;
         recursive(sample)=metadata.recursiveFeasibilityGuaranteed;
+        if isfield(problem.program,'jointCertificate')
+            jointViolation(sample)=max(metadata.jointCertificateResidual);
+        end
         % Offline audits do not authorize or reject a command.
         if inherited(sample)
             oldDecision=[problem.carriedWitness.inputs(:);0];
             inheritedViolation(sample)=max(problem.program.physicalMatrix*oldDecision-problem.program.physicalBound);
+            if isfield(problem.program,'jointCertificate')
+                shiftedJointViolation(sample)=max(avoidanceSafetyGeometry.jointResidual( ...
+                    problem.program,oldDecision,metadata.admissionSearch.initialCertificateAngles));
+            end
         end
         cone=reshape(problem.program.terminalConePhysicalBound ...
             -problem.program.terminalCone.matrix*problem.decision(problem.program.layout.planIndex),3,[]);
@@ -139,6 +151,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
                 separation=avoidanceSafetyGeometry.rectangleDistance(position,heading,targetState(1:2),targetState(7), ...
                     [cfg.vehicle.length/2;cfg.vehicle.width/2;truthTarget.halfLength;truthTarget.halfWidth]);
                 minimumSeparation=min(minimumSeparation,separation-cfg.collision.clearanceMargin);
+                if fraction==0 || fraction==1
+                    minimumNodeSeparation=min(minimumNodeSeparation,separation-cfg.collision.clearanceMargin);
+                end
             end
             if options.UseRoadBoundaries
                 support=cfg.vehicle.length/2*abs(sin(heading))+cfg.vehicle.width/2*abs(cos(heading));
@@ -176,6 +191,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'verifiedReplacement',replacements(1:executed),'approximateSolveCertified',approximate(1:executed), ...
         'hardCertificateVerified',verified(1:executed), ...
         'inheritedWitnessViolation',inheritedViolation(1:executed),'terminalMembershipMargin',terminalMargin(1:executed), ...
+        'jointSeparationViolation',jointViolation(1:executed),'shiftedJointSeparationViolation',shiftedJointViolation(1:executed), ...
+        'minimumNodeSeparationMargin',minimumNodeSeparation, ...
         'clfValue',clfValue(1:executed),'clfDissipationResidual',clfResidual(1:executed), ...
         'clfSlack',clfSlack(1:executed),'clfSlackDissipationBound',clfSlackBound(1:executed), ...
         'clfUnrelaxedDissipationResidual',clfUnrelaxedResidual(1:executed), ...

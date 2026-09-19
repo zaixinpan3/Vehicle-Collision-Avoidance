@@ -1,5 +1,10 @@
 # Predictive safety with one shifted-nominal convexification
 
+This document describes the default `fixedNormal` baseline. The selectable
+`jointSupport` research implementation has free separation angles, unexecuted
+restoration and complete-certificate continuation; see
+[JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
+
 > Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 
 The format-35 controller retains a complete finite input plan, a rectangle

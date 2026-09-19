@@ -1,0 +1,261 @@
+classdef jointSupportCertificateTest < matlab.unittest.TestCase
+    %jointSupportCertificateTest Joint certificates and unexecuted restoration.
+    properties (TestParameter)
+        yawRadius=struct('fixed',0,'interval',.12,'full',pi);
+    end
+    methods (TestClassSetup)
+        function addPaths(testCase)
+            root=fileparts(fileparts(mfilename('fullpath')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'tests')));
+        end
+    end
+    methods (Test)
+        function certificateMethodMustBeAnExactSupportedName(testCase)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
+                'controller',struct('certificateMethod',"joint"))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
+
+        function supportIsHomogeneousIncludingZero(testCase,yawRadius)
+            value=avoidanceSafetyGeometry.supportValue([2.4;.95],yawRadius,[.3;-.7]);
+            scaled=avoidanceSafetyGeometry.supportValue([2.4;.95],yawRadius,3*[.3;-.7]);
+            zero=avoidanceSafetyGeometry.supportValue([2.4;.95],yawRadius,zeros(2,1));
+            testCase.verifyEqual(scaled,3*value,AbsTol=1e-12);
+            testCase.verifyEqual(zero,0,AbsTol=0);
+        end
+
+        function intervalYawConicSupportMatchesAnalyticMaximum(testCase,yawRadius)
+            [actual,expected,solved]=localSupportComparison(yawRadius);
+            testCase.verifyTrue(solved);
+            testCase.verifyEqual(actual,expected,AbsTol=2e-6);
+        end
+
+        function majorantsTouchAndBoundRobustSeparation(testCase)
+            [minimumGap,touchingError]=localCheckMajorants();
+            testCase.verifyGreaterThanOrEqual(minimumGap,-1e-11);
+            testCase.verifyLessThan(touchingError,1e-11);
+        end
+
+        function squareExampleRestorationCanBeFeasibleAndStalled(testCase)
+            [program,cfg]=localSquare();point=[0;0;1];
+            conic=avoidanceStageQp.joint(program,point,0,true,.2001,cfg);
+            result=solveHardCbfClf.constrained(conic,cfg);
+            testCase.verifyTrue(result.feasible);
+            testCase.verifyEqual(result.decision(1),0,AbsTol=2e-4);
+            testCase.verifyEqual(result.decision(conic.angleIndex),0,AbsTol=2e-4);
+            testCase.verifyEqual(result.decision(conic.slackIndex),.2001,AbsTol=2e-7);
+        end
+
+        function aSecondFreeAngleStartFindsTheSquareEscape(testCase)
+            [program,cfg]=localSquare();
+            [accepted,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
+            testCase.verifyTrue(result.feasible);
+            testCase.verifyEqual(search.familyAttempts,2);
+            testCase.verifyGreaterThan(result.decision(1),1.1);
+            testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...
+                accepted,result.decision,accepted.jointCertificate.angles)),0);
+        end
+
+        function positiveRestorationSlackCannotAuthorizeACommand(testCase)
+            [program,cfg]=localSquare();cfg.jointCertificate.maximumStarts=1;
+            [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
+            testCase.verifyFalse(result.feasible);
+            testCase.verifyEmpty(result.decision);
+            testCase.verifyEqual(search.hardSolves,0);
+        end
+
+        function restorationCannotAdoptAnActuatorInfeasibleCenter(testCase)
+            [program,cfg]=localSquare();cfg.jointCertificate.maximumStarts=1;
+            cfg.solver.jointFunction=@localUnsafeRestoration;
+            [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
+            testCase.verifyFalse(result.feasible);
+            testCase.verifyNumElements(search.violationHistory{1},1);
+        end
+
+        function anEmptyConvexBaseDoesNotLaunchRestoration(testCase)
+            [program,cfg]=localSquare();program.b(1)=-1;program.physicalBound(1)=-1;
+            [~,result,search]=solveHardCbfClf.joint(program,struct(),cfg);
+            testCase.verifyFalse(result.feasible);
+            testCase.verifyEqual(search.baseSolves,1);
+            testCase.verifyEqual(search.restorationSolves,0);
+        end
+
+        function oncomingAdmissionOptimizesDirectionsAndRetainsItsSuffix(testCase)
+            [first,next,old,stored]=localOncoming(false);
+            keep=[old.program.jointCertificate.records.stage]>1;
+            oldAngles=old.program.jointCertificate.angles(keep);
+            suffix=old.plan(:,2:end);
+            values=avoidanceSafetyGeometry.jointResidual(next.program, ...
+                suffix(:),oldAngles);
+            testCase.verifyTrue(first.metadata.planCertified);
+            testCase.verifyGreaterThan(first.metadata.restorationSolverCallCount,0);
+            testCase.verifyTrue(next.metadata.shiftedWitnessContained);
+            testCase.verifyEqual(next.metadata.admissionSearch.initialCertificateAngles,oldAngles,AbsTol=0);
+            testCase.verifyEqual(next.metadata.conicSolverCallCount,1);
+            testCase.verifyLessThanOrEqual(max(values),0);
+            testCase.verifyEqual(stored.completion.deadline,old.completion.deadline,AbsTol=0);
+            testCase.verifyGreaterThan(max(abs(sin(first.program.jointCertificate.angles ...
+                -first.metadata.admissionSearch.initialCertificateAngles))),.1);
+        end
+
+        function interruptedImprovementReturnsOnlyTheVerifiedIncumbent(testCase)
+            [~,next,old,stored]=localOncoming(true);
+            testCase.verifyTrue(next.metadata.certifiedIncumbentUsed);
+            testCase.verifyEqual(next.metadata.certificateSource,"retainedCertifiedIncumbent");
+            testCase.verifyEqual(next.metadata.solverExitFlag,0);
+            testCase.verifyEqual(stored.plan,old.plan(:,2:end),AbsTol=0);
+            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
+        end
+
+        function boundedPoseAndYawUseHardSupportCertificates(testCase)
+            [ego,target,road,cfg]=localControllerFixture();
+            ego.controllerStateErrorBound=1e-4*ones(6,1);
+            target.targetYawErrorBound=.12;target.targetPositionInertialErrorBound=[.02;.03];
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
+            testCase.verifyEqual(problem.program.jointCertificate.records(1).targetYawRadius,.12,AbsTol=1e-10);
+        end
+
+        function conditioningTwoUncertainTargetsPreservesTheirCertificates(testCase)
+            [first,next,oldAngles]=localUncertainTargets();
+            testCase.verifyTrue(first.metadata.planCertified);
+            testCase.verifyEqual(unique(string({next.program.jointCertificate.records.key})), ...
+                sort(first.program.completion.keys));
+            testCase.verifyEqual(next.metadata.admissionSearch.initialCertificateAngles,oldAngles,AbsTol=0);
+            testCase.verifyTrue(next.metadata.shiftedWitnessContained);
+            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
+        end
+
+        function scheduledDynamicsAndFiniteSlewKeepTheShiftedCertificate(testCase)
+            [first,next,stored]=localScheduledPair();
+            testCase.verifyTrue(next.metadata.shiftedWitnessContained);
+            testCase.verifyEqual(next.metadata.referencePhaseIndex,first.metadata.referencePhaseIndex+1);
+            testCase.verifyEqual(next.metadata.recursiveFeasibilityScope,"shiftedCompleteCertificateUnderUnchangedContracts");
+            testCase.verifyLessThanOrEqual(abs(next.inputPlan(:,1)-stored.appliedInput),[.05;.1]+1e-10);
+            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
+        end
+
+        function aFrameDeadlineStillRejectsACertifiedIncumbent(testCase)
+            [ego,target,road,cfg]=localControllerFixture();cfg.solver.frameDeadlineSeconds=1e-9;
+            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
+        end
+    end
+end
+
+function [actual,expected,solved]=localSupportComparison(yawRadius)
+    cfg=collisionAvoidanceControllerConfig();halfSize=[2.4;.95];vector=[.3;-.7];
+    [d,b,r]=avoidanceSafetyGeometry.yawHull(halfSize,yawRadius);m=numel(b);
+    program=struct('P',sparse(m+1,m+1),'q',[1;zeros(m,1)], ...
+        'A',sparse([zeros(m,1),-eye(m);-1,b.';zeros(2,1),r*d.']), ...
+        'b',[zeros(m+1,1);r*vector],'cones',[0;m;3]);
+    result=solveHardCbfClf.constrained(program,cfg);
+    actual=result.decision(1);expected=avoidanceSafetyGeometry.supportValue(halfSize,yawRadius,vector);
+    solved=result.feasible;
+end
+
+function [minimumGap,touchingError]=localCheckMajorants()
+    stream=RandStream('mt19937ar',Seed=20260919);record=localRecord();
+    record.egoHalfSize=[2.4;.95];record.egoYawRadius=.13;record.targetHalfSize=[2.2;.9];
+    record.targetYawRadius=.21;record.targetYaw=-.4;record.generators=[.2,0,.1;0,.3,.05];
+    record.positionBall=.02;record.yawRow=[0,0,1,0,0,0];
+    gaps=zeros(2000,1);errors=zeros(2000,1);
+    for index=1:numel(gaps)
+        state=randn(stream,6,1);angle=6*randn(stream);delta=randn(stream,6,1);
+        delta(1:2)=delta(1:2)/max(1,norm(delta(1:2)));newAngle=angle+2*randn(stream);
+        actual=avoidanceSafetyGeometry.jointValue(record,state+delta,newAngle);
+        majorant=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state+delta,newAngle,3);
+        gaps(index)=majorant-actual;
+        errors(index)=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state,angle,3) ...
+            -avoidanceSafetyGeometry.jointValue(record,state,angle);
+    end
+    minimumGap=min(gaps);touchingError=max(abs(errors));
+end
+
+function record=localRecord()
+    record=struct('key',"toy",'stage',1,'isExit',false,'positionMap',[eye(2),zeros(2,4)], ...
+        'positionOffset',zeros(2,1),'yawRow',zeros(1,6),'yawOffset',0, ...
+        'egoHalfSize',zeros(2,1),'egoYawRadius',0,'targetHalfSize',[1;1], ...
+        'targetYaw',0,'targetYawRadius',0,'generators',zeros(2,0),'positionBall',0,'clearance',.1);
+end
+
+function [program,cfg]=localSquare()
+    cfg=collisionAvoidanceControllerConfig();cfg.jointCertificate.maximumStarts=2;
+    offset=repmat([.9;0;0;1;0;0],1,2);map=zeros(6,2,2);map(2,1,2)=1;
+    b=zeros(6,2);b(2,1)=1;
+    prediction=struct('stageCount',1,'egoStateOffset',offset,'egoStateMatrix',map, ...
+        'stageMatrixA',eye(6),'stageMatrixB',b,'cells',struct('stage',1));
+    physical=[1,0,0;-1,0,0;0,1,0;0,-1,0];bound=[2;0;1;1];
+    geometry=struct('label',strings(0,1),'local',struct('stage',{}),'physicalBound',zeros(0,1), ...
+        'normals',{{[1;0]}},'cellData',struct('normals',[1;0]),'frames',struct('heading',0));
+    program=struct('P',speye(3),'q',zeros(3,1),'A',sparse([physical;0,0,-1;zeros(6,3)]), ...
+        'b',[bound;0;100;zeros(5,1)],'cones',[0;5;6],'decisionRadius',[2;1], ...
+        'anchorPlan',zeros(2,1),'feasibleWitness',[0;0;1],'physicalMatrix',physical, ...
+        'physicalBound',bound,'safetyBound',bound,'physicalLabels',repmat("actuator",4,1), ...
+        'layout',struct('planIndex',1:2,'planCount',2,'decisionCount',3,'relaxationIndex',3), ...
+        'terminalCone',struct('matrix',zeros(0,2),'bound',zeros(0,1)), ...
+        'terminalConePhysicalBound',zeros(0,1),'terminal',struct('modalMatrix',zeros(0,1),'stateIndex',4), ...
+        'terminalOptimization',false,'clfNumericalReserve',1e-6,'prediction',prediction,'geometry',geometry, ...
+        'referenceMatrices',repmat(eye(5),1,1,2),'referenceStates',offset,'referenceInputs',zeros(2,1), ...
+        'inputWeight',ones(2,1),'slackWeight',1,'inheritedPredictionFamily',false, ...
+        'supportGeometry',struct('overlappingNodes',1),'completion',struct('keys',"toy"), ...
+        'jointCertificate',struct('records',localRecord(),'angles',0,'upperBound',-1e-4));
+end
+
+function [ego,target,road,cfg]=localControllerFixture()
+    [ego,target,road,cfg]=encounterTestFixture.crossing();
+    cfg.controller.certificateMethod="jointSupport";
+    cfg.solver.frameDeadlineSeconds=60;cfg.solver.certificateSearchTimeLimit=60;
+end
+
+function [first,next,old,stored]=localOncoming(interrupt)
+    [ego,target,road,cfg]=localControllerFixture();target.targetPositionInertial=[18.4;0];
+    target.targetVelocityInertial=[-8;0];target.targetHeadingInertial=pi;
+    [~,~,first,old]=collisionAvoidanceController(ego,target,road,cfg,[]);
+    ego=encounterTestFixture.nextEgo(old,first.model.lane);
+    target.targetPositionInertial=target.targetPositionInertial+.1*target.targetVelocityInertial;
+    if interrupt,cfg.solver.jointFunction=@localTimeout;end
+    [~,~,next,stored]=collisionAvoidanceController(ego,target,road,cfg,old);
+end
+
+function result=localTimeout(~,program)
+    result=struct('decision',100*ones(numel(program.q),1),'exitFlag',0, ...
+        'output',struct('message',"Simulated optimizer timeout with an unsafe iterate."));
+end
+
+function result=localUnsafeRestoration(~,program)
+    decision=zeros(numel(program.q),1);decision(1:3)=[1.2;10;1];decision(program.angleIndex)=pi/2;
+    result=struct('decision',decision,'exitFlag',1,'output',struct());
+end
+
+function [first,next,oldAngles]=localUncertainTargets()
+    [ego,target,road,cfg]=localControllerFixture();
+    ego.controllerStateErrorBound=1e-4*ones(6,1);
+    target.targetYawErrorBound=.12;target.targetPositionInertialErrorBound=[.02;.03];
+    second=target;second.trackId=2;second.targetPositionInertial=[13;-4];target=[target,second];
+    [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
+    ego=encounterTestFixture.nextEgo(stored,first.model.lane);ego.controllerStateErrorBound=5e-5*ones(6,1);
+    for index=1:numel(target)
+        target(index).targetPositionInertial=target(index).targetPositionInertial+.1*target(index).targetVelocityInertial;
+        target(index).targetPositionInertialErrorBound=[.01;.02];target(index).targetYawErrorBound=.1;
+    end
+    [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,stored);
+    oldAngles=stored.program.jointCertificate.angles([stored.program.jointCertificate.records.stage]>1);
+end
+
+function [first,next,stored]=localScheduledPair()
+    [ego,target,road,cfg]=localControllerFixture();
+    station=(0:2:40).';fraction=station/40;
+    curvature=.01*(10*fraction.^3-15*fraction.^4+6*fraction.^5);
+    curve=struct('origin',[0;0],'heading',0,'curvature',0,'length',40, ...
+        'curvatureProfile',[station,curvature],'continuation',"constantCurvature");
+    road=struct('centerline',road,'referenceCurve',curve);
+    cfg.model.frontWheelSteeringRateMaximum=.5;cfg.model.brakingRatioRateMaximum=1;
+    [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
+    ego=encounterTestFixture.nextEgo(stored,first.model.lane);
+    target.targetPositionInertial=target.targetPositionInertial+.1*target.targetVelocityInertial;
+    [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,stored);
+end

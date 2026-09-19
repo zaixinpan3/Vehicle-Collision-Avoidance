@@ -1,6 +1,11 @@
 classdef avoidanceStageQp
     %avoidanceStageQp Equivalent sparse realization of the certified plan.
     methods (Static)
+        function conic=joint(program,point,angles,restoration,violation,cfg)
+        % Lift the support majorants onto the same sparse stage variables.
+            conic=localJointConic(program,point,angles,restoration,violation,cfg);
+        end
+
         function lifted=build(program)
             lifted=program;
             if ~isfield(program,'prediction') || program.terminalOptimization,return;end
@@ -82,6 +87,115 @@ classdef avoidanceStageQp
             lifted.stateIndex=indices;lifted.stateCenter=centers;
             lifted.physicalDecisionCount=original;
         end
+    end
+end
+
+function conic=localJointConic(program,point,angles,restoration,violation,cfg)
+    program.anchorPlan=point(program.layout.planIndex);
+    base=avoidanceStageQp.build(program);
+    records=program.jointCertificate.records;count=numel(records);
+    baseCount=numel(base.q);angleIndex=baseCount+(1:count);total=baseCount+count;
+    slackIndex=[];
+    if restoration,total=total+1;slackIndex=total;end
+    equalityCount=base.cones(1);linearCount=base.cones(2);
+    linearRows={base.A(equalityCount+(1:linearCount),:)};
+    linearBounds={base.b(equalityCount+(1:linearCount))};
+    coneRows={base.A(equalityCount+linearCount+1:end,:)};
+    coneBounds={base.b(equalityCount+linearCount+1:end)};
+    coneSizes=base.cones(3:end);
+    if restoration
+        addLinear(row(slackIndex,-1),0);
+        addLinear(row(slackIndex,1),violation);
+    end
+    step=cfg.jointCertificate.positionStep;eta=1/step;
+    for index=1:count
+        item=records(index);stateIndex=base.stateIndex(:,item.stage).';
+        state=base.stateCenter(:,item.stage+1);theta=angles(index);
+        normal=[cos(theta);sin(theta)];tangent=[-normal(2);normal(1)];
+        relative=item.positionOffset+item.positionMap*state;
+        yaw=item.yawOffset+item.yawRow*state;
+        positionMap=sparse(2,total);positionMap(:,stateIndex)=item.positionMap;
+        angleRow=row(angleIndex(index),1);
+        yawRow=row(stateIndex,item.yawRow);
+        egoAngle=theta-yaw;obstacleAngle=theta-item.targetYaw;
+        argument=[-sin(egoAngle);cos(egoAngle)]*(angleRow-yawRow);
+        support=shapeSupport(item.egoHalfSize,item.egoYawRadius, ...
+            [cos(egoAngle);sin(egoAngle)],argument);
+        argument=[-sin(obstacleAngle);cos(obstacleAngle)]*pad(angleRow);
+        next=shapeSupport(item.targetHalfSize,item.targetYawRadius, ...
+            [cos(obstacleAngle);sin(obstacleAngle)],argument);
+        support=pad(support)+next;
+        next=absoluteSupport(item.generators.'*normal,item.generators.'*tangent*pad(angleRow), ...
+            ones(size(item.generators,2),1));
+        support=pad(support)+next;
+        % z >= .5 ||L Delta||^2, with the exact touching curvature bound.
+        curvature=norm(item.targetHalfSize)+sum(vecnorm(item.generators))+norm(relative)+step+1/eta;
+        quadratic=[sqrt(norm(item.egoHalfSize))*(pad(angleRow)-pad(yawRow)); ...
+            sqrt(curvature)*pad(angleRow);sqrt(eta)*pad(positionMap)];
+        z=allocate(1);zrow=row(z,1);
+        addCone([1;-1;zeros(size(quadratic,1),1)], ...
+            [zrow;zrow;sqrt(2)*pad(quadratic)]);
+        inequality=pad(support)+zrow-normal.'*pad(positionMap)-tangent.'*relative*pad(angleRow);
+        if restoration,inequality(slackIndex)=inequality(slackIndex)-1;end
+        addLinear(inequality,program.jointCertificate.upperBound(index) ...
+            -item.clearance-item.positionBall+normal.'*relative);
+        addLinear([pad(angleRow);-pad(angleRow)],repmat(cfg.jointCertificate.angleStep,2,1));
+        addCone([step;0;0],[sparse(1,total);pad(positionMap)]);
+    end
+    rows=cellfun(@pad,linearRows,UniformOutput=false);
+    cones=cellfun(@pad,coneRows,UniformOutput=false);
+    conic=struct('P',sparse(total,total),'q',zeros(total,1), ...
+        'A',[pad(base.A(1:equalityCount,:));vertcat(rows{:});vertcat(cones{:})], ...
+        'b',[base.b(1:equalityCount);vertcat(linearBounds{:});vertcat(coneBounds{:})], ...
+        'cones',[equalityCount;sum(cellfun(@numel,linearBounds));coneSizes], ...
+        'anchorPlan',program.anchorPlan,'angleIndex',angleIndex,'slackIndex',slackIndex, ...
+        'primaryCount',numel(program.q));
+    if restoration
+        conic.q(slackIndex)=1;
+    else
+        conic.P(1:baseCount,1:baseCount)=base.P;conic.q(1:baseCount)=base.q;
+    end
+    weight=cfg.jointCertificate.proximalWeight;
+    primary=1:numel(point);scale=[program.decisionRadius;1];
+    diagonal=weight./max(scale,1e-3).^2;
+    conic.P(primary,primary)=conic.P(primary,primary)+spdiags(diagonal,0,numel(point),numel(point));
+    conic.q(primary)=conic.q(primary)-diagonal.*point;
+    conic.P(angleIndex,angleIndex)=weight*speye(count);
+
+    function indices=allocate(number)
+        indices=total+(1:number);total=total+number;
+    end
+    function out=pad(in)
+        out=[in,sparse(size(in,1),total-size(in,2))];
+    end
+    function out=row(indices,values)
+        out=sparse(ones(size(indices)),indices,values,1,total);
+    end
+    function addLinear(matrix,bound)
+        linearRows{end+1,1}=matrix;linearBounds{end+1,1}=bound(:);
+    end
+    function addCone(offset,map)
+        coneRows{end+1,1}=-map;coneBounds{end+1,1}=offset;
+        coneSizes(end+1,1)=numel(offset);
+    end
+    function support=absoluteSupport(offset,map,weights)
+        number=numel(offset);indices=allocate(number);
+        selector=sparse(1:number,indices,ones(1,number),number,total);
+        addLinear([pad(map)-selector;-pad(map)-selector],[-offset;offset]);
+        support=row(indices,weights(:).');
+    end
+    function support=shapeSupport(halfSize,radius,offset,map)
+        if all(halfSize==0),support=sparse(1,total);return;end
+        if radius==0
+            support=absoluteSupport(offset,map,halfSize);return;
+        end
+        [directions,bounds,bodyRadius]=avoidanceSafetyGeometry.yawHull(halfSize,radius);
+        multipliers=allocate(numel(bounds));supportIndex=allocate(1);
+        support=row(supportIndex,1);top=support-row(multipliers,bounds.');
+        bottom=bodyRadius*pad(map);
+        bottom(:,multipliers)=bottom(:,multipliers)-bodyRadius*directions.';
+        addCone([0;bodyRadius*offset],[top;bottom]);
+        addLinear(sparse(1:numel(bounds),multipliers,-ones(1,numel(bounds)),numel(bounds),total),zeros(numel(bounds),1));
     end
 end
 

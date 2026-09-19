@@ -2,6 +2,10 @@
 
 Controller format 35, September 18, 2026.
 
+This remains the default `fixedNormal` baseline. The selectable format-36
+`jointSupport` research policy and its admission/continuation proof are described
+in [JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
+
 ## Online algorithm
 
 The controller shifts the previous accepted input/state prediction by one

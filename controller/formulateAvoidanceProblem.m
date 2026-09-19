@@ -1,7 +1,7 @@
 function [program,prediction,clf] = formulateAvoidanceProblem(model)
-%formulateAvoidanceProblem One convexification about the shifted nominal.
-% Retain prediction/terminal continuation, but always use the newly computed
-% nominal directions. A changed family is not automatically recursively feasible.
+%formulateAvoidanceProblem Common convex base and separation certificates.
+% fixedNormal recomputes a nominal slice. jointSupport retains inherited
+% occupied sets and directions and delegates convexification to the solver.
     carry=model.carriedWitness;
     if isempty(carry)
         [program,prediction,clf]=localFormulate(model);
@@ -236,7 +236,7 @@ function [program,prediction,clf] = localFormulate(model)
     program.terminalOptimization=isfield(model,'terminalOptimization') && model.terminalOptimization;
     program.feasibleWitness=localCompleteSlack(program,anchor);
     if inherited,program.inheritedWitness=program.feasibleWitness;end
-    if inherited && ~isempty(model.encounters)
+    if inherited && ~isempty(model.encounters) && cfg.controller.certificateMethod=="fixedNormal"
         [candidate,dual,candidatePrediction]=localSupportGeometry(model,prediction,program,anchor);
         if ~dual.available
             error('collisionAvoidanceController:invalidSeparationNormal','A finite unit support direction is required.');
@@ -247,6 +247,9 @@ function [program,prediction,clf] = localFormulate(model)
         program.inheritedFeasibleFamily=dual.witnessPreserved;
     end
     program.supportGeometry=dual;
+    if cfg.controller.certificateMethod=="jointSupport" && ~isempty(model.encounters)
+        program=avoidanceSafetyGeometry.jointProgram(program,model);
+    end
 end
 
 function [candidate,information,prediction]=localSupportGeometry(model,prediction,program,anchor)

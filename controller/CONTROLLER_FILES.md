@@ -3,12 +3,15 @@
 The core control algorithm has an upper limit of **20 source files**. The
 current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
-Every frame fixes support directions on the shifted nominal and solves one hard
+The default `fixedNormal` policy fixes support directions on the shifted nominal and solves one hard
 trajectory SOCP with a full input sequence and penalized first-hold CLF slack. Since
 2026-09-17 the safety rows are certified at the hold nodes only
 ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
 Its format-35 state retains the complete prediction and terminal continuation.
 See [the algorithm and guarantees](SINGLE_SOLVE_CBF_CLF.md).
+The selectable [joint-support research policy](JOINT_SUPPORT_CERTIFICATES.md)
+adds angular/support variables, unexecuted restoration and retained verified
+incumbents inside these same modules, with state format 36.
 Related operations stay in the module that owns their responsibility.
 
 The count includes every source file under `controller/`, including future
@@ -42,7 +45,7 @@ Do not move controller helpers into those directories to evade the limit.
 
 ## Current interfaces and scope
 
-The public controller signature is unchanged. Its fourth output is a
+For the default baseline, the public controller signature is unchanged. Its fourth output is a
 format-35 predictive certificate. The online path calls
 `formulateAvoidanceProblem(model)` and `solveHardCbfClf.constrained` once.
 Accepted successors retain their prediction, terminal set and absolute exit
@@ -52,8 +55,10 @@ selecting old geometry. Active-encounter recursive feasibility therefore
 requires an additional inclusion premise; see SUPPORT_CONVEXIFICATION.md.
 The terminal law is never dispatched after solver failure.
 
-`avoidanceStageQp.build` is the sole online sparse realization. Restoration
-and constraint-generation solve loops have been removed.
+`avoidanceStageQp.build` supplies the common sparse base. Its `joint` method
+adds stage-local support and angle epigraphs for the research policy.
+`solveHardCbfClf.joint` owns that policy's restoration and hard-improvement loop;
+the default baseline continues to use a single `constrained` call.
 Nonlinear Fiala tools retain their separate study scope. The online guarantee
 remains the declared zero-residual held affine plant.
 

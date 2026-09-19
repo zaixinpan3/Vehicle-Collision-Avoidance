@@ -36,6 +36,15 @@ classdef solveHardCbfClf
             end
             program.safetyBound=certified;
             program.terminalCone.bound=adjusted;
+            if isfield(program,'jointCertificate')
+                program=avoidanceSafetyGeometry.certifyJoint(program,decision);
+            end
+        end
+
+        function [program,result,search] = joint(program,model,cfg)
+        % Restoration is unexecuted. Only a separately verified incumbent can
+        % leave this method, including when an improvement solve is stopped.
+            [program,result,search]=localJointSearch(program,model,cfg);
         end
 
         function solve = constrained(program,cfg)
@@ -46,6 +55,158 @@ classdef solveHardCbfClf
             solve = localRunJointProgram(problem,cfg);
         end
 
+    end
+end
+
+function [program,result,search]=localJointSearch(program,~,cfg)
+    search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
+        'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
+        'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
+        'policy',"jointSupport",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
+        'initialCertificateAngles',program.jointCertificate.angles);
+    point=program.feasibleWitness;angles=program.jointCertificate.angles;
+    [admitted,accepted]=localVerifyJointPoint(program,point,angles);
+    if admitted,program=localRefreshBounds(accepted);end
+    if ~admitted
+        % First find a point in the complete convex base set. An empty base
+        % cannot be repaired by separation directions or collision slack.
+        value=program.b-program.A*point;
+        baseFeasible=localConesContain(value,program.cones);
+        if ~baseFeasible
+            phase=tic;result=solveHardCbfClf.constrained(program,cfg);
+            search.solveSeconds=search.solveSeconds+toc(phase);
+            search.baseSolves=1;search.nativeSolves=1;
+            if ~result.feasible
+                result.message="Joint convex base failed: "+result.message;return;
+            end
+            point=result.decision;
+            base=rmfield(program,'jointCertificate');
+            try
+                base=solveHardCbfClf.certify(base,point);
+            catch exception
+                if ~strcmp(exception.identifier,'collisionAvoidanceController:optimizationFailed'),rethrow(exception);end
+                result.feasible=false;result.message="Joint convex base failed independent verification.";return;
+            end
+            program.safetyBound=base.safetyBound;program.terminalCone=base.terminalCone;
+            program=localRefreshBounds(program);
+        end
+        basePoint=point;initialAngles=angles;
+        for start=1:cfg.jointCertificate.maximumStarts
+            if ~localJointTimeAvailable(cfg),break;end
+            point=basePoint;angles=initialAngles;
+            if start>1
+                % Deterministic alternative INITIALIZATIONS of free angles.
+                % This finite search is not a global completeness guarantee.
+                offsets=[pi/2,-pi/2,0,pi];
+                heading=program.geometry.frames(1).heading;
+                angles(~[program.jointCertificate.records.isExit])=heading+offsets(start-1);
+            end
+            search.familyAttempts=start;
+            values=avoidanceSafetyGeometry.jointResidual(program,point,angles);
+            violation=max([0;values-program.jointCertificate.upperBound]);
+            history=violation;
+            for iteration=1:cfg.jointCertificate.maximumIterations
+                [admitted,accepted]=localVerifyJointPoint(program,point,angles);
+                if admitted,program=localRefreshBounds(accepted);break;end
+                if ~localJointTimeAvailable(cfg),break;end
+                phase=tic;conic=avoidanceStageQp.joint(program,point,angles,true,violation,cfg);
+                search.formulationSeconds=search.formulationSeconds+toc(phase);
+                phase=tic;trial=localSolveConic(conic,cfg);
+                search.solveSeconds=search.solveSeconds+toc(phase);
+                search.restorationSolves=search.restorationSolves+1;search.nativeSolves=search.nativeSolves+1;
+                if ~trial.feasible,break;end
+                candidate=trial.decision(1:conic.primaryCount);
+                % A numerical success flag does not establish membership in
+                % D. Recompute its physical rows and terminal/CLF cones before
+                % using this point as the next touching-model center.
+                [baseSafe,base]=localVerifyBasePoint(program,candidate);
+                if ~baseSafe,break;end
+                nextAngles=angles+trial.decision(conic.angleIndex);
+                values=avoidanceSafetyGeometry.jointResidual(program,candidate,nextAngles);
+                nextViolation=max([0;values-program.jointCertificate.upperBound]);
+                if ~isfinite(nextViolation) || nextViolation>violation+128*eps*(1+violation),break;end
+                program.safetyBound=base.safetyBound;program.terminalCone=base.terminalCone;
+                program=localRefreshBounds(program);
+                point=candidate;angles=nextAngles;history(end+1)=nextViolation; %#ok<AGROW>
+                [admitted,accepted]=localVerifyJointPoint(program,point,angles);
+                if admitted,program=localRefreshBounds(accepted);break;end
+                if violation-nextViolation<=cfg.jointCertificate.stallTolerance*(1+violation),break;end
+                violation=nextViolation;
+            end
+            search.violationHistory{end+1}=history;
+            if admitted,break;end
+        end
+    end
+    if ~admitted
+        result=localEmptySolve();
+        result.message="Joint restoration ended without a hard-safe certificate (stalled, iteration or time limit).";
+        return;
+    end
+    % One hard improvement contains the complete verified point and angles.
+    program.jointCertificate.angles=angles;
+    incumbent=point;
+    phase=tic;conic=avoidanceStageQp.joint(program,point,angles,false,0,cfg);
+    search.formulationSeconds=search.formulationSeconds+toc(phase);
+    phase=tic;trial=localSolveConic(conic,cfg);
+    search.solveSeconds=search.solveSeconds+toc(phase);
+    search.hardSolves=1;search.nativeSolves=search.nativeSolves+1;
+    improved=false;
+    if trial.feasible
+        point=trial.decision(1:conic.primaryCount);
+        nextAngles=angles+trial.decision(conic.angleIndex);
+        [improved,accepted]=localVerifyJointPoint(program,point,nextAngles);
+    end
+    if improved
+        program=accepted;result=trial;result.decision=point;
+    else
+        % This result reports a verified stored solution, not a successful
+        % solver status or an unverified interior-point iterate.
+        result=localEmptySolve();result.decision=incumbent;result.feasible=true;
+        result.exitFlag=trial.exitFlag;result.message="Retained verified certificate; improvement: "+trial.message;
+        search.usedCertifiedIncumbent=true;
+    end
+    program.supportGeometry.witnessPreserved=program.inheritedPredictionFamily;
+    program.inheritedFeasibleFamily=program.inheritedPredictionFamily;
+end
+
+function result=localSolveConic(program,cfg)
+    problem=struct('layout',struct('decisionCount',numel(program.q)),'stageProgram',program);
+    result=localRunJointProgram(problem,cfg);
+end
+
+function [accepted,candidate]=localVerifyJointPoint(program,point,angles)
+    candidate=program;candidate.jointCertificate.angles=angles;accepted=false;
+    try
+        candidate=solveHardCbfClf.certify(candidate,point);accepted=true;
+    catch exception
+        if ~strcmp(exception.identifier,'collisionAvoidanceController:optimizationFailed'),rethrow(exception);end
+    end
+end
+
+function [accepted,candidate]=localVerifyBasePoint(program,point)
+    candidate=rmfield(program,'jointCertificate');accepted=false;
+    try
+        candidate=solveHardCbfClf.certify(candidate,point);accepted=true;
+    catch exception
+        if ~strcmp(exception.identifier,'collisionAvoidanceController:optimizationFailed'),rethrow(exception);end
+    end
+end
+
+function program=localRefreshBounds(program)
+    program.b(1:numel(program.safetyBound))=program.safetyBound;
+    program.b(end-numel(program.terminalCone.bound)+1:end)=program.terminalCone.bound;
+end
+
+function available=localJointTimeAvailable(cfg)
+    available=~isfield(cfg.solver,'workTimer') || ~isfinite(cfg.solver.workTimeLimit) ...
+        || toc(cfg.solver.workTimer)<cfg.solver.workTimeLimit;
+end
+
+function contained=localConesContain(value,cones)
+    equality=cones(1);cursor=equality+cones(2);
+    contained=all(isfinite(value)) && all(value(1:equality)==0) && all(value(equality+1:cursor)>=0);
+    for size=cones(3:end).'
+        block=value(cursor+(1:size));contained=contained && block(1)>=norm(block(2:end));cursor=cursor+size;
     end
 end
 

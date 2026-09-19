@@ -212,6 +212,179 @@ classdef avoidanceSafetyGeometry
                 "cellIndex",vertcat(groups.cellIndex),"cellData",vertcat(cellData{:}));
         end
 
+        function program = jointProgram(program,model)
+        % Keep the convex base and carry the occupied sets with their angles.
+        % These independent position/yaw enclosures are fixed at admission;
+        % conditioning never replaces them with a larger product enclosure.
+            inherited=program.inheritedPredictionFamily;
+            if inherited && isfield(model.carriedWitness.program,'jointCertificate')
+                certificate=model.carriedWitness.program.jointCertificate;
+                keep=[certificate.records.stage]>1 & ...
+                    ~ismember(string({certificate.records.key}),model.dischargedTargetKeys);
+                certificate.records=certificate.records(keep);
+                certificate.angles=certificate.angles(keep);
+                certificate.upperBound=certificate.upperBound(keep);
+                for index=1:numel(certificate.records)
+                    certificate.records(index).stage=certificate.records(index).stage-1;
+                end
+            else
+                records=cell(0,1);angles=zeros(0,1);
+                for index=1:numel(program.prediction.cells)
+                    tube=program.prediction.cells(index);
+                    assert(tube.duration==0 && size(tube.offset,2)==1, ...
+                        'avoidanceSafetyGeometry:nodeCertificate','Joint certificates require hold nodes.');
+                    data=program.geometry.cellData(index);
+                    for target=1:numel(data.targets)
+                        records{end+1,1}=localJointRecord(data.targets(target), ...
+                            model.encounters(target).key,tube.stage,program.geometry.frames(index), ...
+                            tube.radius,[model.cfg.vehicle.length;model.cfg.vehicle.width]/2, ...
+                            model.cfg.collision.clearanceMargin,false); %#ok<AGROW>
+                        normal=program.geometry.normals{index}(:,target);
+                        angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
+                    end
+                end
+                for target=1:numel(model.encounters)
+                    item=model.encounters(target);
+                    [item.center,item.radius]=targetPrediction.finiteFlow(item, ...
+                        program.prediction.stageCount*model.sampleTime);
+                    records{end+1,1}=localJointRecord(item,item.key,program.prediction.stageCount, ...
+                        program.completion.frame,program.prediction.initialErrorBound(:,end), ...
+                        zeros(2,1),model.confirmation.range+model.cfg.encounter.numericalMargin,true); %#ok<AGROW>
+                    normal=-program.completion.direction(:,target);
+                    angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
+                end
+                records=vertcat(records{:});
+                reserve=zeros(numel(records),1);
+                states=localJointStates(program,program.anchorPlan);
+                for index=1:numel(records)
+                    record=records(index);
+                    relative=record.positionOffset+record.positionMap*states(:,record.stage+1);
+                    reserve(index)=8*max(model.cfg.encounter.numericalMargin,model.cfg.solver.constraintTolerance) ...
+                        *(1+record.clearance+norm(relative)+sum(record.egoHalfSize)+sum(record.targetHalfSize) ...
+                        +sum(vecnorm(record.generators)));
+                end
+                certificate=struct('records',records,'angles',angles,'upperBound',-reserve);
+            end
+            % Remove only collision and exit slices, keeping all actuator,
+            % slew, chart, reference-phase, CLF and terminal constraints.
+            remove=startsWith(program.physicalLabels,"collision:") | startsWith(program.physicalLabels,"exit:");
+            count=numel(remove);keep=[~remove;true(size(program.A,1)-count,1)];
+            program.A=program.A(keep,:);program.b=program.b(keep);
+            program.cones(2)=program.cones(2)-nnz(remove);
+            program.physicalMatrix=program.physicalMatrix(~remove,:);
+            program.physicalBound=program.physicalBound(~remove);
+            program.safetyBound=program.safetyBound(~remove);
+            program.physicalLabels=program.physicalLabels(~remove);
+            geometry=program.geometry;keep=~startsWith(geometry.label,"collision:");
+            for name={'matrix','physicalBound','safety','label','stage','cellIndex'}
+                geometry.(name{1})=geometry.(name{1})(keep,:);
+            end
+            for index=1:numel(geometry.local)
+                item=geometry.local(index);keep=~startsWith(item.nodeLabels,"collision:");
+                for name={'stateMatrix','inputMatrix','bound','nodeStateRows','nodeInputRows', ...
+                        'nodeLimits','nodeStartStateRows','nodeLabels'}
+                    item.(name{1})=item.(name{1})(keep,:,:);
+                end
+                geometry.local(index)=item;
+            end
+            program.geometry=geometry;program.jointCertificate=certificate;
+            program.obstacleCbfRowCount=nnz(~[certificate.records.isExit]);
+            program.supportGeometry.used=true;program.supportGeometry.available=true;
+            program.supportGeometry.witnessPreserved=inherited;
+            program.replacementContainsWitness=inherited;
+        end
+
+        function values = jointResidual(program,decision,angles)
+        % Independent nonlinear support evaluation; no conic epigraph values.
+            states=localJointStates(program,decision(program.layout.planIndex));
+            records=program.jointCertificate.records;values=zeros(numel(records),1);
+            for index=1:numel(records)
+                values(index)=avoidanceSafetyGeometry.jointValue(records(index), ...
+                    states(:,records(index).stage+1),angles(index));
+            end
+        end
+
+        function value = jointValue(record,state,angle)
+            normal=[cos(angle);sin(angle)];
+            yaw=record.yawOffset+record.yawRow*state;
+            value=record.clearance+record.positionBall ...
+                +avoidanceSafetyGeometry.supportValue(record.egoHalfSize,record.egoYawRadius, ...
+                    [cos(angle-yaw);sin(angle-yaw)]) ...
+                +avoidanceSafetyGeometry.supportValue(record.targetHalfSize,record.targetYawRadius, ...
+                    [cos(angle-record.targetYaw);sin(angle-record.targetYaw)]) ...
+                +sum(abs(record.generators.'*normal)) ...
+                -normal.'*(record.positionOffset+record.positionMap*state);
+        end
+
+        function value = jointMajorant(record,state0,angle0,state,angle,positionStep)
+        % Touching bound on a declared relative-position step ball.
+            delta=angle-angle0;dr=record.positionMap*(state-state0);
+            assert(norm(dr)<=positionStep+1e-10,'avoidanceSafetyGeometry:stepDomain', ...
+                'The relative-position increment exceeds its certified domain.');
+            r=record.positionOffset+record.positionMap*state0;
+            dyaw=record.yawRow*(state-state0);yaw=record.yawOffset+record.yawRow*state0;
+            n=[cos(angle0);sin(angle0)];t=[-n(2);n(1)];
+            egoAngle=angle0-yaw;targetAngle=angle0-record.targetYaw;
+            ae=[cos(egoAngle);sin(egoAngle)]+[-sin(egoAngle);cos(egoAngle)]*(delta-dyaw);
+            ao=[cos(targetAngle);sin(targetAngle)]+[-sin(targetAngle);cos(targetAngle)]*delta;
+            eta=1/positionStep;
+            curvature=norm(record.targetHalfSize)+sum(vecnorm(record.generators))+norm(r)+positionStep+1/eta;
+            value=record.clearance+record.positionBall ...
+                +avoidanceSafetyGeometry.supportValue(record.egoHalfSize,record.egoYawRadius,ae) ...
+                +avoidanceSafetyGeometry.supportValue(record.targetHalfSize,record.targetYawRadius,ao) ...
+                +sum(abs(record.generators.'*(n+t*delta)))-n.'*r-n.'*dr-t.'*r*delta ...
+                +.5*(norm(record.egoHalfSize)*(delta-dyaw)^2+curvature*delta^2+eta*(dr.'*dr));
+        end
+
+        function value = supportValue(halfSize,yawRadius,vector)
+        % Positively homogeneous support, including the zero vector.
+            value=norm(vector)*targetPrediction.rectangleSupport( ...
+                halfSize(1),halfSize(2),vector,0,yawRadius);
+        end
+
+        function [directions,bounds,radius] = yawHull(halfSize,yawRadius)
+        % Exact hull of the four vertex arcs: disk and uncovered-gap chords.
+            radius=norm(halfSize);
+            phase=atan2(halfSize(2),halfSize(1));
+            vertices=[phase;pi-phase;pi+phase;2*pi-phase];
+            next=[vertices(2:end);vertices(1)+2*pi];
+            gaps=next-vertices-2*yawRadius;keep=gaps>0;
+            middle=(vertices+next)/2;
+            directions=[cos(middle(keep)),sin(middle(keep))];
+            bounds=radius*cos(gaps(keep)/2);
+        end
+
+        function program = certifyJoint(program,decision)
+        % Numerical reserves belong to the accepted certificate and shift once.
+            cert=program.jointCertificate;
+            values=avoidanceSafetyGeometry.jointResidual(program,decision,cert.angles);
+            allowance=localJointAllowance(program,decision);
+            if any(~isfinite(values)) || any(values+allowance>0)
+                error('collisionAvoidanceController:optimizationFailed', ...
+                    'The independently evaluated joint separation certificate is unsafe. No command was issued.');
+            end
+            cert.upperBound=max(cert.upperBound,values+allowance);
+            program.jointCertificate=cert;
+            keys=program.completion.keys;
+            for index=1:numel(cert.records)
+                item=cert.records(index);normal=[cos(cert.angles(index));sin(cert.angles(index))];
+                target=find(keys==string(item.key),1);
+                if item.isExit
+                    program.completion.direction(:,target)=-normal;
+                    program.completion.stateRow(target,:)=-normal.'*item.positionMap;
+                    program.completion.stateBound(target)=normal.'*item.positionOffset-item.clearance-item.positionBall ...
+                        -sum(abs(item.generators.'*normal))-avoidanceSafetyGeometry.supportValue( ...
+                        item.targetHalfSize,item.targetYawRadius, ...
+                        [cos(cert.angles(index)-item.targetYaw);sin(cert.angles(index)-item.targetYaw)]);
+                else
+                    cellIndex=find([program.prediction.cells.stage]==item.stage,1);
+                    program.geometry.normals{cellIndex}(:,target)=normal;
+                    program.geometry.cellData(cellIndex).normals(:,target)=normal;
+                end
+            end
+            program.prediction.separationNormals=program.geometry.normals;
+        end
+
         function [normal,information] = supportDirection(egoPosition,egoYaw,targetPosition,targetYaw,halfDimensions)
         % A support direction remains meaningful at overlap and contact.
             [vertices,faces,bounds]=localConfigurationObstacle(egoYaw,targetPosition,targetYaw,halfDimensions);
@@ -453,6 +626,43 @@ function result = localProjectedRows(data)
         "physicalBound",physical(:), ...
         "safety",true(numel(physical),1),"label",repmat(labels,pointCount,1), ...
         "stage",repmat(tube.stage,numel(physical),1),"local",local);
+end
+
+function record=localJointRecord(target,key,stage,frame,rho,egoHalfSize,clearance,isExit)
+    [pose,domain]=laneGeometry.poseData(frame);
+    positionMap=reshape(pose(3:14),2,6);yawRow=pose(16:21).';
+    generators=[positionMap*diag(rho),diag(target.radius(1:2))];
+    positionBall=0;
+    if domain(1)>0
+        positionBall=pose(22);
+    else
+        generators=[generators,diag(frame.positionErrorBound)];
+    end
+    generators=generators(:,any(generators~=0,1));
+    record=struct('key',string(key),'stage',stage,'isExit',isExit, ...
+        'positionMap',positionMap,'positionOffset',pose(1:2)-target.center(1:2), ...
+        'yawRow',yawRow,'yawOffset',pose(15), ...
+        'egoHalfSize',egoHalfSize,'egoYawRadius',abs(yawRow)*rho+frame.headingErrorBound, ...
+        'targetHalfSize',[target.halfLength;target.halfWidth], ...
+        'targetYaw',target.center(7),'targetYawRadius',target.radius(7), ...
+        'generators',generators,'positionBall',positionBall,'clearance',clearance);
+end
+
+function states=localJointStates(program,plan)
+    prediction=program.prediction;
+    states=prediction.egoStateOffset+reshape(pagemtimes(prediction.egoStateMatrix,plan),6,[]);
+end
+
+function allowance=localJointAllowance(program,decision)
+    states=localJointStates(program,decision(program.layout.planIndex));
+    records=program.jointCertificate.records;allowance=zeros(numel(records),1);
+    for index=1:numel(records)
+        record=records(index);
+        scale=1+record.clearance+record.positionBall+sum(record.egoHalfSize)+sum(record.targetHalfSize) ...
+            +sum(vecnorm(record.generators))+norm(record.positionOffset) ...
+            +norm(abs(record.positionMap)*abs(states(:,record.stage+1)));
+        allowance(index)=512*(1+program.layout.planCount)*eps*scale;
+    end
 end
 
 function [vertices, faceNormal, faceBound] = ...

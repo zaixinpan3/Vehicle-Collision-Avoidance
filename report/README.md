@@ -1,6 +1,8 @@
 # Experiment reports
 
-Latest controller policy: [Shifted nominal, one convex solve, and straight/circular validation](SHIFTED_NOMINAL_SINGLE_SOLVE_20260918.md). Branch search and restoration are removed; admission and guarantee limitations are recorded explicitly.
+Latest research implementation: [Joint trajectory/support certificates, admission restoration and retained feasibility](JOINT_SUPPORT_CERTIFICATES_20260919.md). The selectable `jointSupport` policy is compared with the default `fixedNormal` baseline. Admission latency and inter-node clearance limitations remain explicit.
+
+Default controller baseline: [Shifted nominal, one convex solve, and straight/circular validation](SHIFTED_NOMINAL_SINGLE_SOLVE_20260918.md).
 
 Experiment results, validation reports, runtime analyses, and recorded implementation findings live here. Executable experiment drivers remain in `../scripts/`.
 
@@ -29,7 +31,7 @@ Latest diagnosis: [Stationary and oncoming distance-dual initialization failures
 
 Latest admission design review: [Overlap-aware support directions, temporal conflicts and hard-feasibility ablation, September 16, 2026](OVERLAP_SUPPORT_PROPOSAL_REVIEW_20260916.md).
 
-Current convexification: [Shifted nominal directions and one hard solve](../controller/SUPPORT_CONVEXIFICATION.md). The former admission search has been removed. Dated reports below retain their historical findings.
+Current convexifications: [Default fixed-normal baseline](../controller/SUPPORT_CONVEXIFICATION.md) and [joint-support research policy](../controller/JOINT_SUPPORT_CERTIFICATES.md). Dated reports below retain their historical findings.
 
 Latest independent rerun: [CLF slack without artificial road boundaries, September 15, 2026](CLF_SLACK_NO_ROAD_RERUN_20260915.md).
 

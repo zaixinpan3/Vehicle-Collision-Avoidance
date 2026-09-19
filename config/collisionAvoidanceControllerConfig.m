@@ -38,7 +38,12 @@ function cfg = localDefaults()
     % retain one convex program; the terminal policy remains a certificate only.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
-        "poseTrustRadius",[2;4;0.5]);
+        "poseTrustRadius",[2;4;0.5],"certificateMethod","fixedNormal");
+    % jointSupport is an experimental admission/continuation method. Step
+    % radii are metres and radians; restoration slack is never executable.
+    cfg.jointCertificate = struct("maximumIterations",60,"maximumStarts",5, ...
+        "positionStep",4.0,"angleStep",0.5,"proximalWeight",1.0e-3, ...
+        "stallTolerance",1.0e-7);
     cfg.collision = struct("clearanceMargin",0.25,"cbfRate",2.0);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
     % (terminal family synthesis, fixedPredict audits). The online certificate
@@ -187,6 +192,19 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    if ~isscalar(string(cfg.controller.certificateMethod)) ...
+            || ~any(string(cfg.controller.certificateMethod)==["fixedNormal","jointSupport"])
+        error('collisionAvoidanceController:invalidConfiguration','Unknown separation certificate method.');
+    end
+    for name = ["maximumIterations","maximumStarts"]
+        validateattributes(cfg.jointCertificate.(name),{'double'}, ...
+            {'scalar','real','finite','integer','positive'});
+    end
+    for name = ["positionStep","angleStep","proximalWeight","stallTolerance"]
+        validateattributes(cfg.jointCertificate.(name),{'double'}, ...
+            {'scalar','real','finite','positive'});
+    end
+    validateattributes(cfg.jointCertificate.maximumStarts,{'double'},{'<=',5});
     validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
