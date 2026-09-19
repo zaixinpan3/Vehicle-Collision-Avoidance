@@ -24,9 +24,11 @@
     "offlineCompleted": 15,
     "offlineIssuedHolds": 4500,
     "priorFailedAdmissionsResolved": 13,
-    "sampledClearancePassed": 13,
     "periodicCompleted": 1,
-    "periodicFailedAdmissions": 14
+    "periodicFailedAdmissions": 14,
+    "historicalBufferBasedPassed": 13,
+    "sampledCollisionFree": 15,
+    "configuredClearanceMaintained": 13
   },
   "activeSuccessorTiming": {
     "count": 505,
@@ -108,7 +110,6 @@
       "minimumNodeMargin": 0.00022339096569223837,
       "minimumSampledMargin": -0.024101843397543565,
       "minimumSampledBodyGap": 0.22589815660245643,
-      "sampledClearancePassed": false,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         3.669463022441225e-18,
@@ -117,7 +118,10 @@
         3.454483533489255e-18,
         2.941045860962778e-18
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": false,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": false
     },
     {
       "scenario": "oncoming",
@@ -159,7 +163,6 @@
       "minimumNodeMargin": 7.04783176294077e-05,
       "minimumSampledMargin": -0.06359837287881076,
       "minimumSampledBodyGap": 0.18640162712118924,
-      "sampledClearancePassed": false,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         4.100877354321865e-17,
@@ -168,7 +171,10 @@
         1.0232049885047526e-17,
         8.958003723680898e-18
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": false,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": false
     },
     {
       "scenario": "crossing",
@@ -210,7 +216,6 @@
       "minimumNodeMargin": 9.269691160084129,
       "minimumSampledMargin": 9.269691160084129,
       "minimumSampledBodyGap": 9.519691160084129,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         2.8380906431284075e-20,
@@ -219,7 +224,10 @@
         1.7545039003149346e-23,
         1.614475795137672e-23
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "stationary",
@@ -261,7 +269,6 @@
       "minimumNodeMargin": 0.10009452871097824,
       "minimumSampledMargin": 0.09767370144710436,
       "minimumSampledBodyGap": 0.34767370144710436,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.0314817585291118e-05,
@@ -270,7 +277,10 @@
         9.298307679372897e-09,
         9.388656657671746e-09
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "oncoming",
@@ -312,7 +322,6 @@
       "minimumNodeMargin": 0.0964957802687903,
       "minimumSampledMargin": 0.0600475729601056,
       "minimumSampledBodyGap": 0.3100475729601056,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.0314817577693897e-05,
@@ -321,7 +330,10 @@
         9.298304348703823e-09,
         9.388652716380008e-09
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "crossing",
@@ -363,7 +375,6 @@
       "minimumNodeMargin": 0.10437789778110518,
       "minimumSampledMargin": 0.09635623197999499,
       "minimumSampledBodyGap": 0.346356231979995,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.0314817580759153e-05,
@@ -372,7 +383,10 @@
         9.298303946247977e-09,
         9.388652660868857e-09
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "stationary",
@@ -414,7 +428,6 @@
       "minimumNodeMargin": 0.09364874476372259,
       "minimumSampledMargin": 0.08960134566239086,
       "minimumSampledBodyGap": 0.33960134566239086,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.0314817582104431e-05,
@@ -423,7 +436,10 @@
         9.29830468177073e-09,
         9.388653604558428e-09
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "oncoming",
@@ -465,7 +481,6 @@
       "minimumNodeMargin": 0.09713822297675645,
       "minimumSampledMargin": 0.0438236583233782,
       "minimumSampledBodyGap": 0.2938236583233782,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.0314817577414606e-05,
@@ -474,7 +489,10 @@
         9.29830309970292e-09,
         9.388651661668135e-09
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "crossing",
@@ -516,7 +534,6 @@
       "minimumNodeMargin": 0.09368877899739014,
       "minimumSampledMargin": 0.08840620888598244,
       "minimumSampledBodyGap": 0.33840620888598244,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.0314817579292444e-05,
@@ -525,7 +542,10 @@
         9.298302711124862e-09,
         9.388651384112379e-09
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "stationary",
@@ -567,7 +587,6 @@
       "minimumNodeMargin": 0.20189469020589706,
       "minimumSampledMargin": 0.1989679171969081,
       "minimumSampledBodyGap": 0.4489679171969081,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.9139451807098293e-05,
@@ -576,7 +595,10 @@
         6.651947950797599e-08,
         6.338935260030709e-08
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "oncoming",
@@ -618,7 +640,6 @@
       "minimumNodeMargin": 0.19686474666665543,
       "minimumSampledMargin": 0.18145490790352642,
       "minimumSampledBodyGap": 0.4314549079035264,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.91394518058996e-05,
@@ -627,7 +648,10 @@
         6.651947997982077e-08,
         6.33893531554186e-08
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "crossing",
@@ -677,7 +701,6 @@
       "minimumNodeMargin": 0.21828249995686716,
       "minimumSampledMargin": 0.21135963085924353,
       "minimumSampledBodyGap": 0.46135963085924353,
-      "sampledClearancePassed": true,
       "confirmedReleases": 2,
       "finalTwoSecondsMaximumError": [
         1.912576797422766e-05,
@@ -686,7 +709,10 @@
         1.7561323517600869e-07,
         1.587504507849502e-07
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "stationary",
@@ -728,7 +754,6 @@
       "minimumNodeMargin": 0.17299647958064124,
       "minimumSampledMargin": 0.17192763714761777,
       "minimumSampledBodyGap": 0.4219276371476178,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.9139451804777233e-05,
@@ -737,7 +762,10 @@
         6.651948081248804e-08,
         6.338935365501897e-08
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "oncoming",
@@ -779,7 +807,6 @@
       "minimumNodeMargin": 0.19926297864497072,
       "minimumSampledMargin": 0.14234133360978263,
       "minimumSampledBodyGap": 0.3923413336097826,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.9139451806532773e-05,
@@ -788,7 +815,10 @@
         6.651947967450944e-08,
         6.338935276684055e-08
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     },
     {
       "scenario": "crossing",
@@ -830,7 +860,6 @@
       "minimumNodeMargin": 0.16863267936655268,
       "minimumSampledMargin": 0.16863267936655268,
       "minimumSampledBodyGap": 0.4186326793665527,
-      "sampledClearancePassed": true,
       "confirmedReleases": 1,
       "finalTwoSecondsMaximumError": [
         1.913945180617195e-05,
@@ -839,7 +868,10 @@
         6.651947970226502e-08,
         6.338935248928479e-08
       ],
-      "allIssuedCertified": true
+      "allIssuedCertified": true,
+      "historicalBufferBasedPassed": true,
+      "sampledCollisionFree": true,
+      "configuredClearanceMaintained": true
     }
   ],
   "initialCommitOffline": {
@@ -1576,5 +1608,38 @@
       }
     ]
   },
-  "rawDirectory": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919"
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/joint-support-retest-20260919",
+  "acceptanceCorrection": {
+    "date": "2026-09-19T00:52:35.524209-05:00",
+    "criterion": "Minimum sampled signed body gap strictly greater than zero",
+    "configuredPlanningBufferMeters": 0.25,
+    "rawTracesModified": false,
+    "reason": "The user requires positive physical separation, not the configured 0.25 m planning buffer. Historical raw pass flags used the buffer threshold.",
+    "scope": "Sampled experimental acceptance; not a continuous-time proof or a change to controller certification.",
+    "validation": {
+      "originalTracesRechecked": 15,
+      "supplementalReruns": {
+        "scenarios": [
+          "stationary",
+          "oncoming"
+        ],
+        "curvature": 0,
+        "holdsEach": 60,
+        "frameAndSearchBudgetSeconds": 30,
+        "bothPassed": true,
+        "bothBelowConfiguredBuffer": true
+      },
+      "regressionTests": {
+        "passed": 5,
+        "failed": 0,
+        "incomplete": 0,
+        "classes": [
+          "circularArcExactStateScenarioTest",
+          "straightRoadBoundaryConfigurationTest"
+        ]
+      },
+      "artifacts": "/home/zai/.cache/collisionAvoidance/positive-gap-acceptance-20260919",
+      "controllerVersion": "Current joint-support-only working tree; patch saved with validation artifacts; not a new timing campaign"
+    }
+  }
 }

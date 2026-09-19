@@ -1,6 +1,9 @@
 # Joint-support admission retest
 
-September 19, 2026. Controller-only experiment; no production changes in this task.
+September 19, 2026. Controller-only experiment. Acceptance interpretation corrected
+on September 19 after the user clarified that any strictly positive body gap is
+acceptable. The controller's configured 0.25 m planning buffer is not a task
+acceptance threshold.
 
 ## Result
 
@@ -10,8 +13,10 @@ All fifteen straight/circular obstacle trials complete 300 holds (30 s), confirm
 target release and recover cruise. However, **100 ms execution is still not
 qualified**: fourteen of fifteen strict periodic trials fail to produce an
 admitted command. The remaining straight crossing case completes but is a weak
-avoidance challenge. Straight stationary and oncoming runs still violate the
-requested clearance between certified nodes.
+avoidance challenge. **All fifteen offline trials pass the sampled noncollision
+criterion: actual signed body gap strictly greater than zero.** Straight
+stationary and oncoming gaps below the configured planning buffer are diagnostic
+buffer shortfalls, not failures of the user's collision-avoidance requirement.
 
 This distinguishes existence of a found hard-certified plan from finding it
 before the execution deadline. Neither outcome proves feasibility for arbitrary
@@ -51,7 +56,9 @@ not silently attributed to this snapshot, and are excluded from this task's comm
 - Existing stationary, oncoming and crossing target fixtures. Curved targets
   move along inertial lines, not along the reference circle.
 - Exact held affine plant and exact ego/target sensing; zero process residual,
-  zero target jerk; seed 20260912; sensing range 16 m; body clearance 0.25 m.
+  zero target jerk; seed 20260912; sensing range 16 m; configured planning buffer
+  0.25 m. Experimental collision acceptance requires actual signed body gap > 0;
+  neither touching nor overlap is acceptable.
 - No physical road boundaries or estimator; existing pose-validity constraints
   remain. No terminal fallback commands are executed.
 - Offline frame/search budgets are 30 s. Strict frame/search budgets are 0.1 s.
@@ -94,10 +101,20 @@ minimum oriented-rectangle body distance sampled eleven times per hold.
 
 The prior failures comprise **eight curved stationary/crossing admissions plus
 five straight/curved oncoming admissions: thirteen resolved offline failures**.
-All twelve curved offline cases pass the sampled clearance check. The straight
-stationary gap is **0.225898 m**, and the straight oncoming gap is **0.186402 m**,
-both below 0.25 m despite positive node margins. No sampled body overlap is
-found; these sampled distances do not prove the global continuous minimum.
+All fifteen offline cases pass the sampled noncollision check. The straight
+stationary gap is **0.225898 m**, and the straight oncoming gap is **0.186402 m**;
+both are acceptable positive separations. Thirteen cases also maintain the
+configured 0.25 m buffer at all audit samples; that stronger diagnostic is not
+required for experimental collision acceptance. These sampled distances do not
+prove the global continuous minimum.
+
+The original raw MAT/JSON traces are preserved unchanged. Their historical
+`passed` flags used the configured buffer as an acceptance threshold and are
+superseded by this explicit reclassification. The revised report JSON separates
+`sampledCollisionFree` from `configuredClearanceMaintained`. No trajectories or
+runtime measurements are changed by reclassification. The scenario and campaign
+drivers now use and expose the same distinction for future experiments; the
+controller configuration and its command-certification checks are unchanged.
 
 The +0.02 crossing trial also has a later admission at 22.4 s, after an earlier
 release. It is recorded separately from the first admission in the JSON. All
@@ -161,6 +178,20 @@ are in the JSON. No early-recovery deadline is imposed.
 
 ## Reproduction and artifacts
 
+Acceptance-correction validation: independently reload all fifteen original MAT
+traces and reconstruct physical gap as `minimumSampledSeparationMargin +
+configuration.collision.clearanceMargin`. All fifteen pass the corrected gap,
+completion, slew and relaxed-CLF checks. Rerun the straight stationary and
+oncoming fixtures for 60 holds each through the corrected campaign driver with
+30 s search/frame budgets. Both pass, reproduce gaps 0.225898 m and 0.186402 m,
+and explicitly report `configuredClearanceMaintained=false`. Five existing
+MATLAB tests pass across `circularArcExactStateScenarioTest` and
+`straightRoadBoundaryConfigurationTest`. These supplemental checks use the
+current joint-support-only working tree; they do not replace the frozen
+campaign's timing measurements. Validation logs, MAT outputs and the exact
+working-tree patch are retained under
+`/home/zai/.cache/collisionAvoidance/positive-gap-acceptance-20260919/`.
+
 Committed-version offline command:
 
 ```matlab
@@ -184,7 +215,8 @@ completion, hard verification, shifted residuals, one-call continuation,
 actuator slew, relaxed CLF and expected baseline failures. `git diff --check`
 passes for this task's reports.
 
-This task commits only its report and JSON. Concurrent controller/configuration,
-driver, test and documentation work, dependencies, binaries and unrelated
+The original retest committed only its report and JSON. This acceptance correction
+also updates the two experiment drivers. Concurrent controller/configuration,
+driver-policy, test and documentation work, dependencies, binaries and unrelated
 untracked files are deliberately excluded. No new controller implementation,
 estimator experiment, network modification or hardware test is claimed.
