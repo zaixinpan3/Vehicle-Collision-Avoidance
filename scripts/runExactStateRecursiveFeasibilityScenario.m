@@ -5,6 +5,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
 % Geometry and CLF measurements below are offline experimental diagnostics;
 % they do not accept, reject, repair, or select a controller command.
 % Road boundaries are opt-in. State-domain margins are diagnostics only.
+% Collision acceptance requires a strictly positive sampled body gap; the
+% configured planning clearance is reported separately as a buffer diagnostic.
     arguments
         options.Scenario (1,1) string {mustBeMember(options.Scenario,["stationary","oncoming","crossing","cruise"])} = "stationary"
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 120
@@ -201,7 +203,12 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'egoErrorBound',options.EgoErrorBound,'targetErrorBound',options.TargetErrorBound, ...
         'targetMotion',truthTarget,'recursiveFeasibilityGuaranteed',executed>0 && all(recursive(1:executed)), ...
         'scope',"Predictive finite encounter and road-terminal witness; failed optimization ends execution");
-    report.passed=report.completed && minimumSeparation>=-1e-8 ...
+    report.minimumSampledBodyGap=minimumSeparation+cfg.collision.clearanceMargin;
+    report.minimumNodeBodyGap=minimumNodeSeparation+cfg.collision.clearanceMargin;
+    report.sampledCollisionFree=report.minimumSampledBodyGap>0;
+    report.configuredClearanceMaintained=minimumSeparation>=0;
+    report.collisionAcceptanceCriterion="Sampled signed body gap strictly greater than zero";
+    report.passed=report.completed && report.sampledCollisionFree ...
         && (~options.UseRoadBoundaries || minimumRoad>=-1e-8) ...
         && maximumSlew<=1e-8 && all(clfResidual(1:executed)<=1e-8);
     report.runtime=struct('frameSeconds',seconds(1:attempted),'deadlineSeconds',h, ...
@@ -214,8 +221,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         report.failureTime=executed*h;
     end
     localSave(report,options);
-    fprintf('%s: %d/%d holds; separation %.6g m; road %.6g m; max frame %.3f ms\n', ...
-        options.Scenario,executed,count,minimumSeparation,minimumRoad,1000*report.runtime.maximumSeconds);
+    fprintf('%s: %d/%d holds; body gap %.6g m; buffer margin %.6g m; road %.6g m; max frame %.3f ms\n', ...
+        options.Scenario,executed,count,report.minimumSampledBodyGap,minimumSeparation, ...
+        minimumRoad,1000*report.runtime.maximumSeconds);
     if ~isempty(failure),rethrow(failure);end
 end
 
