@@ -254,16 +254,16 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:optimizationFailed');
             saved=load(fullfile(folder,'cruise-exact-state.mat'));
             testCase.verifyEqual(saved.report.executedHolds,1);
-            testCase.verifyEqual(saved.report.failureTime,.1,AbsTol=0);
+            testCase.verifyEqual(saved.report.failureTime,.05,AbsTol=0);
             testCase.verifyFalse(saved.report.completed);
         end
         function pathAndSpeedRecoverWithTheOptimizedClfSlack(testCase)
-            report=runExactStateRecursiveFeasibilityScenario(Scenario="cruise",SampleCount=120, ...
+            report=runExactStateRecursiveFeasibilityScenario(Scenario="cruise",SampleCount=240, ...
                 InitialTrackingError=[.05;.002;-.05;0;0],DeadlineSeconds=Inf);
             testCase.verifyTrue(report.passed);
             testCase.verifyLessThan(norm(report.state(2:6,end)-[0;0;8;0;0]),1e-3);
             testCase.verifyLessThanOrEqual(max(report.clfDissipationResidual),0);
-            testCase.verifyEqual(report.solverCallCount,ones(1,120));
+            testCase.verifyEqual(report.solverCallCount,ones(1,240));
         end
     end
 end

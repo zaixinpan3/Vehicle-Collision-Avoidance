@@ -6,6 +6,16 @@ instant inside a held command. This note states exactly what the certificate
 covers, what it no longer covers, how the implementation realizes it, and
 which whole-hold enclosures remain in offline tooling.
 
+The current scenario defaults use a **50 ms** prediction-node interval,
+input hold and controller update period, all driven by `controller.sampleTime`.
+The exact-state experiment exposes this as `SampleTime`; its 1.6 s performance
+window becomes 32 nodes and a 30 s run becomes 600 holds. Terminal encounter
+completion still determines its required physical duration. Strict periodic
+experiments enforce a 50 ms frame deadline. See
+[the period-change measurements](../report/CONTROL_PERIOD_50MS_20260919.md).
+Changing the period requires a fresh controller state and rebuilt discrete
+CLF/terminal certificates. It does not change the sampling-only safety scope.
+
 ## Statement
 
 Let `h` be the sample period and `t_k = t_0 + k h`. The declared plant of the
@@ -46,7 +56,7 @@ support residuals. See [JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATE
 ## What is not certified
 
 Nothing is claimed about the state between two consecutive nodes. Within one
-hold the ego moves about `v h` along its path (0.8 m at 8 m/s), the relative
+hold the ego moves about `v h` along its path (0.4 m at 8 m/s with a 50 ms hold), the relative
 position to a moving target changes by up to the sum of the speeds times `h`,
 and the heading changes by the yaw rate times `h`. Two rectangles that are
 separated at both nodes can, in principle, touch between them. The numerical

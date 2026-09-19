@@ -1,4 +1,7 @@
 classdef pipelineDeadlineTest < matlab.unittest.TestCase
+    properties (TestParameter)
+        sampleTime = struct('fiftyMilliseconds',.05,'hundredMilliseconds',.1);
+    end
     methods (TestClassSetup)
         function addPaths(testCase)
             root = fileparts(fileparts(mfilename("fullpath")));
@@ -8,6 +11,15 @@ classdef pipelineDeadlineTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function theJointComparisonUsesTheRequestedControlPeriod(testCase,sampleTime)
+            report=runDeclaredPlantEstimatorControllerScenario(SampleCount=2, ...
+                SampleTime=sampleTime,UseEstimator=false,DeadlineSeconds=30);
+            testCase.verifyTrue(report.completed);
+            testCase.verifyEqual(report.time,(0:2)*sampleTime,AbsTol=1e-12);
+            testCase.verifyEqual(report.configuration.controller.sampleTime,sampleTime,AbsTol=0);
+            testCase.verifyEqual(report.configuration.controller.horizonSteps*sampleTime,1.6,AbsTol=1e-12);
+        end
+
         function anExpiredFrameNeverAdvancesThePlant(testCase)
             cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8,"controller",struct("horizonSteps",24,"sampleTime",0.1)));
             trial = runFiniteBicycleDiagnostic(cfg,.1,PrepareController=false,FullStateObservation=true, ...

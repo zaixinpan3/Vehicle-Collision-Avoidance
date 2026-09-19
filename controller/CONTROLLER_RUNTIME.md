@@ -1,5 +1,13 @@
 # Controller runtime and numerical implementation
 
+Current experiment timing: prediction steps, certificate nodes and input holds
+share a 50 ms period. The 1.6 s performance window is retained (32 nodes), and
+strict scenario runs use the same 50 ms frame deadline. Diagnostic runs with a
+larger computation budget are explicitly separate. See
+[the 50 ms rerun](../report/CONTROL_PERIOD_50MS_20260919.md) for measured admission,
+continuation and collision results. The generic controller configuration already
+used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
+
 Current algorithm (September 19, 2026): format 39 uses homogeneous joint
 support majorants. Fresh admission uses one projected geometric initialization
 and at most three conic solves by default, counting any required base solve.

@@ -2,11 +2,14 @@ function summary=runBoundedAdmissionBenchmark(options)
 %runBoundedAdmissionBenchmark Warm desktop admission and continuation timing.
 % Raw traces and summaries belong to the explicitly selected output folder.
 % ReplayFixture optionally names a saved ego/target/road/cfg admission input.
-% Only its admission-algorithm settings are replaced by current defaults.
+% Its initial physical observations are retained; timing and horizon follow
+% this run's options and admission-algorithm settings use current defaults.
     arguments
         options.OutputDirectory (1,1) string
         options.ReplayFixture (1,1) string = ""
-        options.SampleCount (1,1) double {mustBePositive,mustBeInteger} = 300
+        options.SampleCount (1,1) double {mustBePositive,mustBeInteger} = 600
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
+        options.HorizonSeconds (1,1) double {mustBeFinite,mustBePositive} = 1.6
         options.Repetitions (1,1) double {mustBePositive,mustBeInteger} = 2
     end
     root=fileparts(fileparts(mfilename('fullpath')));
@@ -15,15 +18,19 @@ function summary=runBoundedAdmissionBenchmark(options)
     oldThreads=maxNumCompThreads(1);cleanup=onCleanup(@()maxNumCompThreads(oldThreads));
     profile off;
     summary=struct('method',"boundedJointSupport",'sampleCount',options.SampleCount, ...
+        'sampleTime',options.SampleTime,'horizonSeconds',options.HorizonSeconds, ...
         'repetitions',options.Repetitions,'replayFixture',options.ReplayFixture, ...
         'matlabVersion',string(version),'replays',{{}},'campaigns',{{}},'strict',{{}});
     curvatures=[0,.01,-.01,.02,-.02];
     runJointSupportCertificateValidation(OutputDirectory=fullfile(options.OutputDirectory,'warmup'), ...
-        SampleCount=60,Curvatures=curvatures);
+        SampleCount=ceil(6/options.SampleTime),Curvatures=curvatures, ...
+        SampleTime=options.SampleTime,HorizonSeconds=options.HorizonSeconds);
     if strlength(options.ReplayFixture)>0
         data=load(options.ReplayFixture,'ego','target','road','cfg');
         defaults=collisionAvoidanceControllerConfig();
         data.cfg.jointCertificate=defaults.jointCertificate;
+        data.cfg.controller.sampleTime=options.SampleTime;
+        data.cfg.controller.horizonSteps=ceil(options.HorizonSeconds/options.SampleTime);
         save(fullfile(options.OutputDirectory,'current-fixture.mat'),'-struct','data');
         for index=1:20,localReplay(data);end
         for index=1:30,summary.replays{end+1}=localReplay(data);end
@@ -32,7 +39,8 @@ function summary=runBoundedAdmissionBenchmark(options)
     for repetition=1:options.Repetitions
         summary.campaigns{end+1}=runJointSupportCertificateValidation( ...
             OutputDirectory=fullfile(options.OutputDirectory,sprintf('measured-%d',repetition)), ...
-            SampleCount=options.SampleCount,Curvatures=curvatures);
+            SampleCount=options.SampleCount,Curvatures=curvatures, ...
+            SampleTime=options.SampleTime,HorizonSeconds=options.HorizonSeconds);
         localWrite(summary,options.OutputDirectory);
     end
     for curvature=curvatures
@@ -40,7 +48,9 @@ function summary=runBoundedAdmissionBenchmark(options)
             directory=fullfile(options.OutputDirectory,'strict',sprintf('%s-%g',scenario,curvature));
             try
                 result=runExactStateRecursiveFeasibilityScenario(Scenario=scenario,RoadCurvature=curvature, ...
-                    SampleCount=options.SampleCount,DeadlineSeconds=.1,SearchTimeLimitSeconds=.1, ...
+                    SampleCount=options.SampleCount,SampleTime=options.SampleTime, ...
+                    HorizonSeconds=options.HorizonSeconds, ...
+                    DeadlineSeconds=options.SampleTime,SearchTimeLimitSeconds=options.SampleTime, ...
                     OutputDirectory=directory);
             catch exception
                 artifact=fullfile(directory,scenario+'-exact-state.mat');
@@ -50,6 +60,7 @@ function summary=runBoundedAdmissionBenchmark(options)
             summary.strict{end+1}=struct('scenario',scenario,'curvature',curvature, ...
                 'completed',result.completed,'passed',result.passed, ...
                 'executedHolds',result.executedHolds,'maximumSeconds',result.runtime.maximumSeconds, ...
+                'deadlineMisses',result.runtime.deadlineMisses,'runtimeQualified',result.runtimeQualified, ...
                 'minimumSampledBodyGap',result.minimumSampledBodyGap, ...
                 'failureTime',result.failureTime,'failureMessage',result.failureMessage);
             localWrite(summary,options.OutputDirectory);

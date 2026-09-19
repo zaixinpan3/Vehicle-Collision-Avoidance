@@ -5,12 +5,12 @@ function summary=runSmoothReferenceControllerValidation(options)
 % and rectangle-distance diagnostics use the smooth spatial reference.
     arguments
         options.OutputDirectory (1,1) string
-        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
+        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 600
         options.RunStrictTiming (1,1) logical = false
         options.IncludeEncounters (1,1) logical = true
         options.Paths (1,:) string {mustBeMember(options.Paths,["sBend","transition","asymmetric"])} = ["sBend","transition","asymmetric"]
         options.DiagnosticDeadlineSeconds (1,1) double {mustBeFinite,mustBePositive} = 5
-        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = .1
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = .05
         options.HorizonSeconds (1,1) double {mustBeFinite,mustBePositive} = 1.6
     end
     root=fileparts(fileparts(mfilename('fullpath')));

@@ -2,12 +2,13 @@ function summary = runCircularArcControllerValidation(options)
 %runCircularArcControllerValidation Exact-state circular-arc controller trials.
 % Targets are stationary or move along inertial straight lines. The oncoming
 % line is tangent to the arc at s=30 m; the crossing line is normal at s=15 m.
-% Startup trials are discarded before independent 100 ms periodic trials.
+% Startup trials are discarded before independent periodic trials (50 ms default).
 % A failed periodic trial is repeated independently with an offline budget to
 % distinguish certificate/search failure from deadline failure.
     arguments
         options.OutputDirectory (1,1) string
-        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
+        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 600
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
         options.Curvatures (1,:) double {mustBeFinite} = [.01,-.01,.02,-.02]
         options.Scenarios (1,:) string = ["cruise","stationary","oncoming","crossing"]
         options.WarmupCount (1,1) double {mustBeInteger,mustBeNonnegative} = 6
@@ -17,20 +18,22 @@ function summary = runCircularArcControllerValidation(options)
     previousThreads = maxNumCompThreads(1);
     cleanup = onCleanup(@()maxNumCompThreads(previousThreads));
     summary = struct('matlabVersion',string(version),'computationalThreads',1, ...
-        'sampleTime',.1,'referenceSpeed',8,'roadBoundariesEnabled',false, ...
+        'sampleTime',options.SampleTime,'referenceSpeed',8,'roadBoundariesEnabled',false, ...
         'estimatorEnabled',false,'seed',20260912,'startup',{{}},'trials',{{}}, ...
         'scope',"Exact declared affine plant and sensing; curved-reference trim; targets follow inertial straight lines; offline truth integration excluded from frame time");
     for repetition = 1:options.WarmupCount
         directory = fullfile(options.OutputDirectory,"startup-"+string(repetition));
-        summary.startup{end+1} = localTrial("stationary",.01,2,5,directory);
+        summary.startup{end+1} = localTrial("stationary",.01,2,5,directory,options.SampleTime);
     end
     for curvature = options.Curvatures
         for scenario = options.Scenarios
             directory = fullfile(options.OutputDirectory,sprintf('kappa-%g',curvature),"periodic");
-            trial = localTrial(scenario,curvature,options.SampleCount,.1,directory,options.InitialTrackingError);
+            trial = localTrial(scenario,curvature,options.SampleCount,options.SampleTime,directory, ...
+                options.SampleTime,options.InitialTrackingError);
             if ~trial.runtimeQualified
                 directory = fullfile(options.OutputDirectory,sprintf('kappa-%g',curvature),"diagnostic");
-                trial.offlineDiagnostic = localTrial(scenario,curvature,options.SampleCount,5,directory,options.InitialTrackingError);
+                trial.offlineDiagnostic = localTrial(scenario,curvature,options.SampleCount,5,directory, ...
+                    options.SampleTime,options.InitialTrackingError);
             end
             summary.trials{end+1} = trial;
             localSave(summary,options.OutputDirectory);
@@ -40,11 +43,12 @@ function summary = runCircularArcControllerValidation(options)
     localSave(summary,options.OutputDirectory);
 end
 
-function item = localTrial(scenario,curvature,count,deadline,directory,initialError)
-    if nargin<6,initialError=zeros(5,1);end
+function item = localTrial(scenario,curvature,count,deadline,directory,sampleTime,initialError)
+    if nargin<7,initialError=zeros(5,1);end
     try
         report = runExactStateRecursiveFeasibilityScenario(Scenario=scenario,RoadCurvature=curvature, ...
-            SampleCount=count,DeadlineSeconds=deadline,OutputDirectory=directory,InitialTrackingError=initialError);
+            SampleCount=count,SampleTime=sampleTime,DeadlineSeconds=deadline, ...
+            OutputDirectory=directory,InitialTrackingError=initialError);
     catch exception
         artifact = fullfile(directory,scenario+"-exact-state.mat");
         if ~isfile(artifact),rethrow(exception);end

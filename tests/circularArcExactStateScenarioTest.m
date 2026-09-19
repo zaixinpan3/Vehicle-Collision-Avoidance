@@ -18,6 +18,9 @@ classdef circularArcExactStateScenarioTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(abs(report.trackingError),[],'all'),1e-3);
             testCase.verifyGreaterThan(curvature*report.cruiseState(6),0);
             testCase.verifyFalse(report.roadBoundariesEnabled);
+            testCase.verifyEqual(report.time,(0:3)*.05,AbsTol=1e-12);
+            testCase.verifyEqual(report.configuration.controller.horizonSteps* ...
+                report.configuration.controller.sampleTime,1.6,AbsTol=1e-12);
         end
     end
 end

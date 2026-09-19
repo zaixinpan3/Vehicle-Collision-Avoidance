@@ -9,11 +9,13 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
 % for a controller-only comparison; it does not run or reset the observer.
 % Road boundaries are opt-in; state-domain margins are diagnostic only.
     arguments
-        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
+        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 600
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
+        options.HorizonSeconds (1,1) double {mustBeFinite,mustBePositive} = 1.6
         options.TargetInitialDistance (1,1) double {mustBePositive} = 100
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260913
         options.OutputDirectory (1,1) string = ""
-        options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
+        options.DeadlineSeconds (1,1) double {mustBePositive} = 0.05
         options.ReferenceSpeed (1,1) double {mustBePositive} = 10
         options.TargetLateralPosition (1,1) double {mustBeFinite} = 0.8
         options.ConfirmationRange (1,1) double {mustBePositive} = 30
@@ -24,7 +26,8 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
     root = fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'),fullfile(root,'estimator'),fullfile(root,'solver','nrmm'));
     cfg = collisionAvoidanceControllerConfig(struct('referenceSpeed',options.ReferenceSpeed, ...
-        'controller',struct('sampleTime',0.1,'horizonSteps',16), ...
+        'controller',struct('sampleTime',options.SampleTime, ...
+        'horizonSteps',ceil(options.HorizonSeconds/options.SampleTime)), ...
         'model',struct('lateralDomainRadius',4), ...
         'solver',struct('certificateSearchTimeLimit',3,'frameDeadlineSeconds',options.DeadlineSeconds)));
     estimator = estimatorControllerIntegrationConfig();

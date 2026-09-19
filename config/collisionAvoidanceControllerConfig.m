@@ -36,6 +36,7 @@ function cfg = localDefaults()
 
     % Joint support certificates define collision and encounter-exit constraints.
     % Continuations retain the complete certificate, including its directions.
+    % sampleTime is the common prediction-node interval and input-hold period.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);

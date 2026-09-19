@@ -7,13 +7,16 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
 % Road boundaries are opt-in. State-domain margins are diagnostics only.
 % Collision acceptance requires a strictly positive sampled body gap.
 % Separation-margin fields report physical gap without an added clearance.
+% SampleTime is shared by prediction nodes, executed input holds and updates.
     arguments
         options.Scenario (1,1) string {mustBeMember(options.Scenario,["stationary","oncoming","crossing","cruise"])} = "stationary"
-        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 120
+        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 240
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
+        options.HorizonSeconds (1,1) double {mustBeFinite,mustBePositive} = 1.6
         options.UseRoadBoundaries (1,1) logical = false
         options.FailAfterAdmission (1,1) logical = false
         options.OutputDirectory (1,1) string = ""
-        options.DeadlineSeconds (1,1) double {mustBePositive} = 0.1
+        options.DeadlineSeconds (1,1) double {mustBePositive} = 0.05
         options.EgoErrorBound (6,1) double {mustBeNonnegative,mustBeFinite} = zeros(6,1)
         options.TargetErrorBound (8,1) double {mustBeNonnegative,mustBeFinite} = zeros(8,1)
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260912
@@ -29,7 +32,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8, ...
-        "controller",struct("sampleTime",0.1,"minimumHorizonSteps",options.MinimumHorizonSteps), ...
+        "controller",struct("sampleTime",options.SampleTime, ...
+        "horizonSteps",ceil(options.HorizonSeconds/options.SampleTime), ...
+        "minimumHorizonSteps",options.MinimumHorizonSteps), ...
         "model",struct("lateralDomainRadius",4), ...
         "solver",struct("frameDeadlineSeconds",options.DeadlineSeconds, ...
         "certificateSearchTimeLimit",options.SearchTimeLimitSeconds)));

@@ -1,5 +1,8 @@
 classdef nodeCertificateTest < matlab.unittest.TestCase
     %nodeCertificateTest Hold-node safety certificate of the accepted plan.
+    properties (TestParameter)
+        sampleTime = struct('fiftyMilliseconds',.05,'hundredMilliseconds',.1);
+    end
     methods (TestClassSetup)
         function addPaths(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -9,8 +12,8 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function everyNodeOfTheAcceptedPlanIsPhysicallyClear(testCase)
-            [ego,target,cfg,road]=localFixture();
+        function everyNodeOfTheAcceptedPlanIsPhysicallyClear(testCase,sampleTime)
+            [ego,target,cfg,road]=localFixture(sampleTime);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             [distance,nodes]=localNodeDistances(problem);
@@ -19,10 +22,11 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(size(nodes,2),problem.prediction.stageCount);
         end
 
-        function nodeStatesFollowTheExactSampledPlant(testCase)
-            [ego,target,cfg,road]=localFixture();
-            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+        function nodeStatesFollowTheExactSampledPlant(testCase,sampleTime)
+            [ego,target,cfg,road]=localFixture(sampleTime);
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             prediction=problem.prediction;plan=problem.inputPlan;h=problem.model.sampleTime;
+            testCase.verifyEqual(command.holdSeconds,sampleTime,AbsTol=0);
             state=problem.model.initialEgoState;
             for stage=1:prediction.stageCount
                 flow=expm(h*[prediction.continuousA(:,:,stage),prediction.continuousB(:,:,stage), ...
@@ -36,8 +40,8 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             end
         end
 
-        function collisionCertificatesUseTheTargetSetAtEachNodeTime(testCase)
-            [ego,target,cfg,road]=localFixture();
+        function collisionCertificatesUseTheTargetSetAtEachNodeTime(testCase,sampleTime)
+            [ego,target,cfg,road]=localFixture(sampleTime);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             geometry=problem.program.geometry;encounter=problem.model.encounters(1);
             for index=1:numel(problem.prediction.cells)
@@ -54,25 +58,25 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
-        function theCarriedNodesShiftByOneHold(testCase)
-            [ego,target,cfg,road]=localFixture();
+        function theCarriedNodesShiftByOneHold(testCase,sampleTime)
+            [ego,target,cfg,road]=localFixture(sampleTime);
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             x=stored.predictedState(:,2);
             [ego.position,ego.yaw]=laneGeometry.fromFrenet(x,first.model.lane);
             ego.speed=x(4);ego.lateralVelocity=x(5);ego.yawRate=x(6);
-            ego.stateTime=.1;ego.perception.time=.1;ego.heldActuatorInput=stored.appliedInput;
-            target.targetPositionInertial=target.targetPositionInertial+.1*target.targetVelocityInertial;
+            ego.stateTime=sampleTime;ego.perception.time=sampleTime;ego.heldActuatorInput=stored.appliedInput;
+            target.targetPositionInertial=target.targetPositionInertial+sampleTime*target.targetVelocityInertial;
             [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,stored);
             testCase.verifyTrue(next.program.inheritedPredictionFamily);
             testCase.verifyEqual(next.metadata.inheritedFeasibleFamily,next.metadata.shiftedWitnessContained);
             testCase.verifyEqual([next.prediction.cells.stage],1:first.prediction.stageCount-1);
-            testCase.verifyEqual([next.prediction.cells.time],.1*(1:first.prediction.stageCount-1),AbsTol=1e-12);
+            testCase.verifyEqual([next.prediction.cells.time],sampleTime*(1:first.prediction.stageCount-1),AbsTol=1e-12);
             distance=localNodeDistances(next);
             testCase.verifyGreaterThan(distance,0);
         end
 
-        function metadataDeclaresTheNodeSampling(testCase)
-            [ego,~,cfg,road]=localFixture();
+        function metadataDeclaresTheNodeSampling(testCase,sampleTime)
+            [ego,~,cfg,road]=localFixture(sampleTime);
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyFalse(problem.metadata.wholeHoldCertificate);
             testCase.verifyEqual(problem.metadata.certificateSampling,"holdNodes");
@@ -80,9 +84,10 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
     end
 end
 
-function [ego,target,cfg,road]=localFixture()
+function [ego,target,cfg,road]=localFixture(sampleTime)
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'controller',struct('sampleTime',.1),'solver',struct('frameDeadlineSeconds',30)));
+        'controller',struct('sampleTime',sampleTime,'horizonSteps',ceil(1.6/sampleTime)), ...
+        'solver',struct('frameDeadlineSeconds',30)));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'stateTime',0, ...
         'perception',struct('time',0,'range',16,'completeWithinRange',true));
     target=struct('trackId',1,'targetPositionInertial',[15;0], ...

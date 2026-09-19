@@ -4,7 +4,8 @@ function summary=runOverlapAdmissionValidation(options)
 % advance the measured trials. Plant integration and truth audits are offline.
     arguments
         options.OutputDirectory (1,1) string
-        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 300
+        options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 600
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
         options.WarmupCount (1,1) double {mustBeInteger,mustBeNonnegative} = 6
         options.IncludeEstimator (1,1) logical = true
     end
@@ -12,23 +13,27 @@ function summary=runOverlapAdmissionValidation(options)
     previousThreads=maxNumCompThreads(1);
     cleanup=onCleanup(@()maxNumCompThreads(previousThreads));
     summary=struct('matlabVersion',string(version),'computationalThreads',1, ...
+        'sampleTime',options.SampleTime, ...
         'warmup',{{}},'controller',struct(),'joint',struct(), ...
         'scope',"Declared affine plant; complete periodic frames; startup saved separately; no reused commands");
     for repetition=1:options.WarmupCount
         directory=fullfile(options.OutputDirectory,"startup-"+string(repetition));
-        summary.warmup{repetition}=localController("stationary",2,5,directory);
+        summary.warmup{repetition}=localController("stationary",2,5,directory,options.SampleTime);
     end
     for scenario=["stationary","oncoming","crossing","cruise"]
-        summary.controller.(scenario)=localController(scenario,options.SampleCount,.1, ...
-            fullfile(options.OutputDirectory,"controller"));
+        summary.controller.(scenario)=localController(scenario,options.SampleCount,options.SampleTime, ...
+            fullfile(options.OutputDirectory,"controller"),options.SampleTime);
     end
     qualified=all(structfun(@(item)item.runtimeQualified,summary.controller));
     if options.IncludeEstimator && qualified
-        summary.joint.exactSensing=localJoint(options.SampleCount,.1,fullfile(options.OutputDirectory,"exact-sensing"),false);
-        summary.joint.functional=localJoint(options.SampleCount,5,fullfile(options.OutputDirectory,"joint-functional"));
+        summary.joint.exactSensing=localJoint(options.SampleCount,options.SampleTime, ...
+            fullfile(options.OutputDirectory,"exact-sensing"),options.SampleTime,false);
+        summary.joint.functional=localJoint(options.SampleCount,5, ...
+            fullfile(options.OutputDirectory,"joint-functional"),options.SampleTime);
         % An independent reset/seed reproduces the same scene under the full
-        % 100 ms gate. The functional run supplies no executable witness.
-        summary.joint.periodic=localJoint(options.SampleCount,.1,fullfile(options.OutputDirectory,"joint-periodic"));
+        % control-period gate. The functional run supplies no executable witness.
+        summary.joint.periodic=localJoint(options.SampleCount,options.SampleTime, ...
+            fullfile(options.OutputDirectory,"joint-periodic"),options.SampleTime);
     else
         summary.joint.skipped=true;
         summary.joint.reason="Estimator disabled or controller runtime gate did not pass.";
@@ -38,11 +43,11 @@ function summary=runOverlapAdmissionValidation(options)
     fprintf(file,'%s\n',jsonencode(summary,PrettyPrint=true));
 end
 
-function item=localController(scenario,count,deadline,directory)
+function item=localController(scenario,count,deadline,directory,sampleTime)
     failure="";
     try
         report=runExactStateRecursiveFeasibilityScenario(Scenario=scenario,SampleCount=count, ...
-            DeadlineSeconds=deadline,OutputDirectory=directory);
+            SampleTime=sampleTime,DeadlineSeconds=deadline,OutputDirectory=directory);
     catch exception
         file=fullfile(directory,scenario+"-exact-state.mat");
         if ~isfile(file),rethrow(exception);end
@@ -55,12 +60,13 @@ function item=localController(scenario,count,deadline,directory)
         'finalTrackingError',last(2:6)-[0;0;8;0;0],'failure',failure,'artifact',fullfile(directory,scenario+"-exact-state.mat"));
 end
 
-function item=localJoint(count,deadline,directory,useEstimator)
-    if nargin<4,useEstimator=true;end
+function item=localJoint(count,deadline,directory,sampleTime,useEstimator)
+    if nargin<5,useEstimator=true;end
     failure="";
     try
         report=runDeclaredPlantEstimatorControllerScenario(SampleCount=count,TargetInitialDistance=60, ...
-            ReferenceSpeed=8,TargetLateralPosition=0,ConfirmationRange=16,DeadlineSeconds=deadline, ...
+            ReferenceSpeed=8,TargetLateralPosition=0,ConfirmationRange=16, ...
+            SampleTime=sampleTime,DeadlineSeconds=deadline, ...
             Warmup=false,UseEstimator=useEstimator,OutputDirectory=directory);
     catch exception
         file=fullfile(directory,'joint-declared-plant.mat');
@@ -70,6 +76,6 @@ function item=localJoint(count,deadline,directory,useEstimator)
     item=struct('completed',report.completed,'executedHolds',report.executedHolds, ...
         'failureTime',report.failure.time,'maximumFrameMilliseconds',1000*max(report.frameSeconds), ...
         'maximumObserverMilliseconds',1000*max(report.observerSeconds), ...
-        'deadlineMisses',nnz(report.frameSeconds>.1),'failure',failure, ...
+        'deadlineMisses',nnz(report.frameSeconds>sampleTime),'failure',failure, ...
         'artifact',fullfile(directory,'joint-declared-plant.mat'));
 end

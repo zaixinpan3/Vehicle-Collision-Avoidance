@@ -3,7 +3,8 @@ function summary = runRecursiveSafetyValidation(options)
 % Reports mathematical certificate checks separately from measured deadlines.
     arguments
         options.OutputDirectory (1,1) string
-        options.SampleCount (1,1) double {mustBePositive,mustBeInteger} = 300
+        options.SampleCount (1,1) double {mustBePositive,mustBeInteger} = 600
+        options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
         options.IncludeDeadlineRuns (1,1) logical = true
     end
     root=fileparts(fileparts(mfilename('fullpath')));
@@ -20,7 +21,8 @@ function summary = runRecursiveSafetyValidation(options)
         folder=fullfile(options.OutputDirectory,cases(index));
         try
             result=runExactStateRecursiveFeasibilityScenario(Scenario=scenario, ...
-                SampleCount=options.SampleCount,DeadlineSeconds=Inf,OutputDirectory=folder, ...
+                SampleCount=options.SampleCount,SampleTime=options.SampleTime, ...
+                DeadlineSeconds=Inf,OutputDirectory=folder, ...
                 EgoErrorBound=egoBound,TargetErrorBound=targetBound,TargetJerkAmplitude=jerk);
         catch exception
             file=fullfile(folder,scenario+"-exact-state.mat");
@@ -29,16 +31,18 @@ function summary = runRecursiveSafetyValidation(options)
         end
         entries{index}=localSummary(cases(index),result);
     end
-    summary=struct('seed',20260912,'sampleTime',.1,'roadBoundariesEnabled',false, ...
+    summary=struct('seed',20260912,'sampleTime',options.SampleTime,'roadBoundariesEnabled',false, ...
         'cases',[entries{:}],'deadlineCases',struct([]), ...
         'scope',"Declared held affine plant; numerical simulation is validation, not the recursion proof");
     if options.IncludeDeadlineRuns
         entries=cell(1,3);
         for index=1:3
-            scenario=cases(index);folder=fullfile(options.OutputDirectory,'deadline100ms',scenario);
+            scenario=cases(index);
+            folder=fullfile(options.OutputDirectory,sprintf('deadline-%gms',1000*options.SampleTime),scenario);
             try
                 result=runExactStateRecursiveFeasibilityScenario(Scenario=scenario, ...
-                    SampleCount=60,DeadlineSeconds=.1,OutputDirectory=folder);
+                    SampleCount=ceil(6/options.SampleTime),SampleTime=options.SampleTime, ...
+                    DeadlineSeconds=options.SampleTime,OutputDirectory=folder);
             catch exception
                 file=fullfile(folder,scenario+"-exact-state.mat");
                 if ~isfile(file),rethrow(exception);end
@@ -70,5 +74,6 @@ function result=localSummary(name,report)
         'approximateSolutionsCertified',nnz(report.approximateSolveCertified), ...
         'allExecutedHoldsVerified',all(report.hardCertificateVerified), ...
         'medianFrameMs',median(times),'maximumFrameMs',max(times), ...
-        'framesOver100ms',nnz(times>100),'maximumWarmFrameMs',max(times(2:end)));
+        'deadlineMisses',report.runtime.deadlineMisses,'deadlineSeconds',report.runtime.deadlineSeconds, ...
+        'maximumWarmFrameMs',max(times(2:end)));
 end
