@@ -305,6 +305,11 @@ classdef avoidanceSafetyGeometry
             end
         end
 
+        function allowance = jointAllowance(program,decision)
+        % Same arithmetic reserve for MATLAB and standalone verification.
+            allowance=localJointAllowance(program,decision);
+        end
+
         function value = jointValue(record,state,angle)
             normal=[cos(angle);sin(angle)];
             yaw=record.yawOffset+record.yawRow*state;

@@ -1,0 +1,416 @@
+{
+  "scope": "Prepared joint-certificate numerical frame; preparation and I/O excluded",
+  "frameCount": 278,
+  "groups": {
+    "all": {
+      "matlab": {
+        "count": 1390,
+        "medianMs": 12.4055,
+        "maximumMs": 66.16900000000001,
+        "over50Ms": 1
+      },
+      "native": {
+        "count": 1390,
+        "medianMs": 8.52339698758442,
+        "maximumMs": 28.015068994136527,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        2.902190506574698,
+        4.8992894880939275,
+        0.16310000501107424
+      ],
+      "statuses": {
+        "0": 5,
+        "1": 20,
+        "2": 1365,
+        "3": 0
+      }
+    },
+    "stationary-0": {
+      "matlab": {
+        "count": 420,
+        "medianMs": 20.3645,
+        "maximumMs": 66.16900000000001,
+        "over50Ms": 1
+      },
+      "native": {
+        "count": 420,
+        "medianMs": 12.413744494551793,
+        "maximumMs": 28.015068994136527,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        5.7770969870034605,
+        6.3892189937178046,
+        0.17718400340527296
+      ],
+      "statuses": {
+        "0": 0,
+        "1": 5,
+        "2": 415,
+        "3": 0
+      }
+    },
+    "oncoming-0": {
+      "matlab": {
+        "count": 240,
+        "medianMs": 11.731,
+        "maximumMs": 24.242,
+        "over50Ms": 0
+      },
+      "native": {
+        "count": 240,
+        "medianMs": 6.825302494689822,
+        "maximumMs": 15.48694897792302,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        2.73920051404275,
+        3.978472013841383,
+        0.10515449685044587
+      ],
+      "statuses": {
+        "0": 0,
+        "1": 5,
+        "2": 235,
+        "3": 0
+      }
+    },
+    "crossing-0": {
+      "matlab": {
+        "count": 65,
+        "medianMs": 6.525,
+        "maximumMs": 9.094,
+        "over50Ms": 0
+      },
+      "native": {
+        "count": 65,
+        "medianMs": 3.1394190154969692,
+        "maximumMs": 4.094966017873958,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        1.3786850031465292,
+        1.7070749890990555,
+        0.053530005970969796
+      ],
+      "statuses": {
+        "0": 0,
+        "1": 0,
+        "2": 65,
+        "3": 0
+      }
+    },
+    "stationary-0.01": {
+      "matlab": {
+        "count": 420,
+        "medianMs": 12.072,
+        "maximumMs": 30.108,
+        "over50Ms": 0
+      },
+      "native": {
+        "count": 420,
+        "medianMs": 10.36103100341279,
+        "maximumMs": 24.13434998015873,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        2.8835955017711967,
+        7.131446996936575,
+        0.27944899920839816
+      ],
+      "statuses": {
+        "0": 0,
+        "1": 5,
+        "2": 415,
+        "3": 0
+      }
+    },
+    "oncoming-0.01": {
+      "matlab": {
+        "count": 240,
+        "medianMs": 7.798,
+        "maximumMs": 16.717,
+        "over50Ms": 0
+      },
+      "native": {
+        "count": 240,
+        "medianMs": 6.278178989305161,
+        "maximumMs": 13.71099500101991,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        1.6957995103439316,
+        4.50794049538672,
+        0.16596447676420212
+      ],
+      "statuses": {
+        "0": 0,
+        "1": 5,
+        "2": 235,
+        "3": 0
+      }
+    },
+    "crossing-0.01": {
+      "matlab": {
+        "count": 5,
+        "medianMs": 6.704,
+        "maximumMs": 7.153,
+        "over50Ms": 0
+      },
+      "native": {
+        "count": 5,
+        "medianMs": 3.925046999938786,
+        "maximumMs": 3.989456017734483,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        3.495897981338203,
+        0,
+        0.4209880135022104
+      ],
+      "statuses": {
+        "0": 5,
+        "1": 0,
+        "2": 0,
+        "3": 0
+      }
+    },
+    "inherited": {
+      "matlab": {
+        "count": 1360,
+        "medianMs": 12.7545,
+        "maximumMs": 66.16900000000001,
+        "over50Ms": 1
+      },
+      "native": {
+        "count": 1360,
+        "medianMs": 8.895021004718728,
+        "maximumMs": 28.015068994136527,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        2.902190506574698,
+        5.548026994802058,
+        0.1600949908606708
+      ],
+      "statuses": {
+        "0": 0,
+        "1": 0,
+        "2": 1360,
+        "3": 0
+      }
+    },
+    "fresh": {
+      "matlab": {
+        "count": 30,
+        "medianMs": 7.456499999999999,
+        "maximumMs": 28.372999999999998,
+        "over50Ms": 0
+      },
+      "native": {
+        "count": 30,
+        "medianMs": 4.029396019177511,
+        "maximumMs": 4.77813501493074,
+        "over50Ms": 0
+      },
+      "nativePhaseMediansMs": [
+        3.0544500041287392,
+        0.0,
+        0.41139348468277603
+      ],
+      "statuses": {
+        "0": 5,
+        "1": 20,
+        "2": 5,
+        "3": 0
+      }
+    }
+  },
+  "validation": {
+    "scope": "Prepared joint-certificate numerical frame; preparation and I/O excluded",
+    "frameCount": 278,
+    "hardCertificateFailures": 0,
+    "acceptanceDifferences": 0,
+    "maximumDecisionDifference": 8.937801553032809e-08,
+    "maximumAngleDifference": 4.259023815400553e-05
+  },
+  "artifacts": {
+    "native/controller-replay": {
+      "sha256": "4ecda4fe18d5854bd0c7e63e1850e4906dd55a1ebfbd68b8fb86f0739dc406f5",
+      "bytes": 6448416
+    },
+    "native/standaloneControllerFrame.a": {
+      "sha256": "448c5dddd9ba51c30d345d01c943e7ef560fd81652efe5d3349aec41c8fea53a",
+      "bytes": 884984
+    },
+    "native-replay.jsonl": {
+      "sha256": "7a6fa7278be3c9d773ac7ee214d5b77615d264d86c6863e0a4e082a757d30260",
+      "bytes": 1210187
+    },
+    "capture/matlab-replay.json": {
+      "sha256": "af16d01762b6702ba43de324baad54028c8119bd43bc23ed4ceeea1721fa55fd",
+      "bytes": 1060688
+    },
+    "capture/native-validation.json": {
+      "sha256": "73c2525dc9ba35d3b1aae9af1d9184f105fe88a76a885fab363cf9f64d0d6157",
+      "bytes": 94539
+    },
+    "capture/capture.json": {
+      "sha256": "8a83e8db1725a53aab1bfe460abe871f4c3f9fd777450940de9046151175777e",
+      "bytes": 69259
+    },
+    "hybrid-metrics.json": {
+      "sha256": "588234faacc6562b0306b851446bc50d15f88de1abb0abba94518627322a5ca3",
+      "bytes": 33408
+    },
+    "full-tests.json": {
+      "sha256": "845aa82eaca0cc90d5bdac868dd70e7030290acb0f3b97275b4a682f5cb26bcb",
+      "bytes": 53
+    },
+    "mex-validation.json": {
+      "sha256": "516bc544c5cc2b1632b5bbf899d0aa2c4af2256ba8112d357081c275748b1985",
+      "bytes": 158
+    }
+  },
+  "slowestNativeFrame": {
+    "file": "/home/zai/.cache/collisionAvoidance/standalone-c-20260919/capture/stationary-0/frames/frame-0002.bin",
+    "iteration": 2,
+    "seconds": 0.028015068994136527,
+    "status": 2,
+    "metrics": [
+      0.015519079024670646,
+      0.012018039997201413,
+      0.0004741600132547319,
+      1
+    ],
+    "scenario": "stationary",
+    "curvature": 0,
+    "frame": 2,
+    "horizonSteps": 95
+  },
+  "hybrid": {
+    "trials": [
+      {
+        "scenario": "crossing",
+        "curvature": 0,
+        "completed": true,
+        "executedHolds": 600,
+        "medianMs": 7.4175,
+        "maximumMs": 22.071,
+        "over50Ms": 0,
+        "minimumSampledBodyGap": 9.51969553186302,
+        "sampledCollisionFree": true,
+        "maximumFinalTrackingError": 9.545264134658282e-09,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "completed": false,
+        "executedHolds": 0,
+        "medianMs": 36.875,
+        "maximumMs": 36.875,
+        "over50Ms": 0,
+        "minimumSampledBodyGap": null,
+        "sampledCollisionFree": true,
+        "maximumFinalTrackingError": 0,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Generated numerical kernel status 0). No command was issued."
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0,
+        "completed": true,
+        "executedHolds": 600,
+        "medianMs": 7.730499999999999,
+        "maximumMs": 30.136,
+        "over50Ms": 0,
+        "minimumSampledBodyGap": -0.005382492767009417,
+        "sampledCollisionFree": false,
+        "maximumFinalTrackingError": 9.545173540459473e-09,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0.01,
+        "completed": true,
+        "executedHolds": 600,
+        "medianMs": 7.6915000000000004,
+        "maximumMs": 28.805,
+        "over50Ms": 0,
+        "minimumSampledBodyGap": 0.08978162696178953,
+        "sampledCollisionFree": true,
+        "maximumFinalTrackingError": 1.0899880765416307e-05,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0,
+        "completed": true,
+        "executedHolds": 600,
+        "medianMs": 7.8335,
+        "maximumMs": 92.155,
+        "over50Ms": 8,
+        "minimumSampledBodyGap": -0.0005513653242033012,
+        "sampledCollisionFree": false,
+        "maximumFinalTrackingError": 9.545265911015122e-09,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "completed": true,
+        "executedHolds": 600,
+        "medianMs": 7.592,
+        "maximumMs": 55.554,
+        "over50Ms": 1,
+        "minimumSampledBodyGap": 0.08260055698276243,
+        "sampledCollisionFree": true,
+        "maximumFinalTrackingError": 1.089988076323229e-05,
+        "failureMessage": ""
+      }
+    ],
+    "groups": {
+      "allSeconds": {
+        "count": 3001,
+        "medianMs": 7.624,
+        "maximumMs": 92.155,
+        "over50Ms": 9
+      },
+      "activeSeconds": {
+        "count": 277,
+        "medianMs": 19.583,
+        "maximumMs": 92.155,
+        "over50Ms": 9
+      },
+      "inheritedSeconds": {
+        "count": 272,
+        "medianMs": 19.494,
+        "maximumMs": 57.804,
+        "over50Ms": 7
+      },
+      "freshSeconds": {
+        "count": 5,
+        "medianMs": 28.805,
+        "maximumMs": 92.155,
+        "over50Ms": 2
+      }
+    }
+  },
+  "checks": {
+    "unitTests": {
+      "total": 726,
+      "passed": 726,
+      "failed": 0,
+      "incomplete": 0
+    },
+    "checkedMex": {
+      "checkedMexFrames": 278,
+      "comparedConicPrograms": 28,
+      "maximumMatrixDifference": 0,
+      "maximumDecisionDifference": 1.9810542095655137e-15,
+      "maximumAngleDifference": 0
+    }
+  }
+}

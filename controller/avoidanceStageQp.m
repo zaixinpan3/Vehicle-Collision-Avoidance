@@ -30,7 +30,14 @@ classdef avoidanceStageQp
                 [ones(6*count,1);inputValues(:);stateValues(:)],6*count,total);
             rhs=-reshape(pagemtimes(prediction.stageMatrixB,reshape(anchor,2,1,count)),6*count,1);
             geometric=numel(program.geometry.label);cursor=0;
-            rowBlocks=cell(numel(program.geometry.local),1);columnBlocks=rowBlocks;valueBlocks=rowBlocks;
+            entries=0;
+            for cellIndex=1:numel(program.geometry.local)
+                localRows=program.geometry.local(cellIndex);
+                entries=entries+nnz(localRows.inputMatrix);
+                if localRows.stage>1,entries=entries+nnz(localRows.stateMatrix);end
+            end
+            rowEntries=zeros(entries,1);columnEntries=rowEntries;valueEntries=rowEntries;
+            entryCursor=0;
             bound=program.b;
             for cellIndex=1:numel(program.geometry.local)
                 localRows=program.geometry.local(cellIndex);stage=localRows.stage;
@@ -41,16 +48,17 @@ classdef avoidanceStageQp
                 end
                 % find returns row vectors for a one-row cell; keep columns.
                 [r,c,v]=find(coefficients);
-                rowBlocks{cellIndex}=reshape(rows(r),[],1);
-                columnBlocks{cellIndex}=reshape(columns(c),[],1);valueBlocks{cellIndex}=reshape(v,[],1);
+                positions=entryCursor+(1:numel(v));entryCursor=entryCursor+numel(v);
+                rowEntries(positions)=reshape(rows(r),[],1);
+                columnEntries(positions)=reshape(columns(c),[],1);valueEntries(positions)=reshape(v,[],1);
                 bound(rows)=localRows.bound-localRows.stateMatrix*centers(:,stage) ...
                     +program.safetyBound(rows)-program.geometry.physicalBound(rows);
             end
             assert(cursor==geometric,'avoidanceStageQp:geometryRows','Inconsistent stage row mapping.');
             % Append the CLF slack column, which is zero in physical geometry rows.
             [extraRow,extraColumn,extraValue]=find(program.A(1:geometric,n+1:original));
-            geometricMatrix=sparse([vertcat(rowBlocks{:});extraRow(:)],[vertcat(columnBlocks{:});n+extraColumn(:)], ...
-                [vertcat(valueBlocks{:});extraValue(:)],geometric,total);
+            geometricMatrix=sparse([rowEntries;extraRow(:)],[columnEntries;n+extraColumn(:)], ...
+                [valueEntries;extraValue(:)],geometric,total);
             matrix=[geometricMatrix;program.A(geometric+1:end,:),sparse(size(program.A,1)-geometric,6*count)];
             % The terminal modal cone acts on the final state. Its stored RHS
             % and numerical reserve are transferred without reconstruction.
@@ -98,11 +106,13 @@ function conic=localJointConic(program,point,angles,cfg)
     fixed=localDomainCertificate(program,angles);
     total=cursor+localAuxiliaryCount(records(~fixed));
     equalityCount=base.cones(1);linearCount=base.cones(2);
-    linearRows={base.A(equalityCount+(1:linearCount),:)};
-    linearBounds={base.b(equalityCount+(1:linearCount))};
-    coneRows={base.A(equalityCount+linearCount+1:end,:)};
-    coneBounds={base.b(equalityCount+linearCount+1:end)};
-    coneSizes=base.cones(3:end);
+    [linearRow,linearColumn,linearValue]=find(base.A(equalityCount+(1:linearCount),:));
+    linearRow=linearRow(:);linearColumn=linearColumn(:);linearValue=linearValue(:);
+    linearBounds=reshape(base.b(equalityCount+(1:linearCount)),[],1);
+    [coneRow,coneColumn,coneValue]=find(base.A(equalityCount+linearCount+1:end,:));
+    coneRow=coneRow(:);coneColumn=coneColumn(:);coneValue=coneValue(:);
+    coneBounds=reshape(base.b(equalityCount+linearCount+1:end),[],1);
+    coneSizes=reshape(base.cones(3:end),[],1);
     eta=1/cfg.jointCertificate.positionScale;
     for index=1:count
         if fixed(index),continue;end
@@ -142,14 +152,14 @@ function conic=localJointConic(program,point,angles,cfg)
         addLinear(inequality,normal.'*relative);
     end
     assert(cursor==total,'avoidanceStageQp:jointLayout','Inconsistent auxiliary-variable count.');
-    rows=cellfun(@pad,linearRows,UniformOutput=false);
-    cones=cellfun(@pad,coneRows,UniformOutput=false);
+    linearMatrix=sparse(linearRow,linearColumn,linearValue,numel(linearBounds),total);
+    coneMatrix=sparse(coneRow,coneColumn,coneValue,numel(coneBounds),total);
     fixedCount=nnz(fixed);
     fixedRows=sparse(1:fixedCount,angleIndex(fixed),ones(1,fixedCount),fixedCount,total);
     conic=struct('P',sparse(total,total),'q',zeros(total,1), ...
-        'A',[pad(base.A(1:equalityCount,:));fixedRows;vertcat(rows{:});vertcat(cones{:})], ...
-        'b',[base.b(1:equalityCount);zeros(fixedCount,1);vertcat(linearBounds{:});vertcat(coneBounds{:})], ...
-        'cones',[equalityCount+fixedCount;sum(cellfun(@numel,linearBounds));coneSizes], ...
+        'A',[pad(base.A(1:equalityCount,:));fixedRows;linearMatrix;coneMatrix], ...
+        'b',[base.b(1:equalityCount);zeros(fixedCount,1);linearBounds;coneBounds], ...
+        'cones',[equalityCount+fixedCount;numel(linearBounds);coneSizes], ...
         'anchorPlan',program.anchorPlan,'angleIndex',angleIndex, ...
         'primaryCount',numel(program.q),'domainCertifiedRecords',find(fixed));
     conic.P(1:baseCount,1:baseCount)=base.P;conic.q(1:baseCount)=base.q;
@@ -164,21 +174,22 @@ function conic=localJointConic(program,point,angles,cfg)
         indices=cursor+(1:number);cursor=cursor+number;
     end
     function out=pad(in)
-        if size(in,2)==total
-            out=in;
-        else
-            out=[in,sparse(size(in,1),total-size(in,2))];
-        end
+        out=[sparse(in),sparse(size(in,1),total-size(in,2))];
     end
     function out=row(indices,values)
         out=sparse(ones(size(indices)),indices,values,1,total);
     end
     function addLinear(matrix,bound)
-        linearRows{end+1,1}=matrix;linearBounds{end+1,1}=bound(:);
+        [ri,ci,vi]=find(matrix);
+        linearRow=[linearRow;numel(linearBounds)+ri(:)];
+        linearColumn=[linearColumn;ci(:)];linearValue=[linearValue;vi(:)];
+        linearBounds=[linearBounds;bound(:)];
     end
     function addCone(offset,map)
-        coneRows{end+1,1}=-map;coneBounds{end+1,1}=offset;
-        coneSizes(end+1,1)=numel(offset);
+        [ri,ci,vi]=find(-map);
+        coneRow=[coneRow;numel(coneBounds)+ri(:)];
+        coneColumn=[coneColumn;ci(:)];coneValue=[coneValue;vi(:)];
+        coneBounds=[coneBounds;offset(:)];coneSizes=[coneSizes;numel(offset)];
     end
     function support=absoluteSupport(offset,map,weights)
         active=offset~=0 | any(map~=0,2);
@@ -268,7 +279,7 @@ function retained=localDistinctRows(matrix,bound)
         transposed=matrix.';
         later=rows(candidate);earlier=rows([candidate(2:end);false]);
         difference=transposed(:,later)-transposed(:,earlier);
-        duplicate(candidate)=~any(difference,1).';
+        duplicate(candidate)=full(~any(difference,1).');
     end
     retained=sort(rows(~duplicate));
 end

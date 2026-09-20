@@ -2,6 +2,8 @@
 
 Current controller: [Scalar admission and inherited joint-support continuation](../controller/JOINT_SUPPORT_CERTIFICATES.md). One signed control section replaces admission restoration; inherited performance improvement retains one hard SOCP and the verified incumbent. Restricted admission failures and inter-node clearance limitations remain explicit.
 
+Latest native benchmark: [Generated C executable, same-input timing and complete hybrid-frame limits](STANDALONE_C_BENCHMARK_20260920.md). The numerical kernel is ported; complete standalone orchestration remains unfinished.
+
 Latest implementation: [Affine-section admission: fixed interval computation, 50 ms straight/circular rerun and capability tradeoff](AFFINE_SECTION_ADMISSION_20260919.md).
 
 Latest period change: [50 ms prediction nodes, input holds and control updates; matched-duration runtime and collision rerun](CONTROL_PERIOD_50MS_20260919.md).

@@ -4,6 +4,29 @@ classdef solveHardCbfClf
         function program = certify(program,decision)
         % Validate physical safety independently of a numerical success flag.
         % Transfer a feasible affine family WITHOUT repeated inward tightening.
+            [status,certified,adjusted]=solveHardCbfClf.inspect(program,decision);
+            tops=1:3:numel(adjusted);
+            if status==1
+                [excess,row]=max(certified-program.physicalBound);
+                error('collisionAvoidanceController:optimizationFailed', ...
+                    ['The returned solution failed the hard-safety certificate ' ...
+                    '(linear excess %.9g at %s, terminal excess %.9g). No command was issued.'], ...
+                    excess,program.physicalLabels(row), ...
+                    max(adjusted(tops)-program.terminalConePhysicalBound(tops)));
+            end
+            if status==2
+                error('collisionAvoidanceController:optimizationFailed', ...
+                    'The returned solution failed the reserved soft-CLF inequality. No command was issued.');
+            end
+            program.safetyBound=certified;
+            program.terminalCone.bound=adjusted;
+            if isfield(program,'jointCertificate')
+                program=avoidanceSafetyGeometry.certifyJoint(program,decision);
+            end
+        end
+
+        function [status,certified,adjusted,clf] = inspect(program,decision)
+        % Numeric hard-row, terminal and soft-CLF check shared by native builds.
             gamma=64*numel(decision)*eps;
             value=program.physicalMatrix*decision;
             allowance=gamma*(1+abs(program.physicalBound)+abs(program.physicalMatrix)*abs(decision));
@@ -14,31 +37,25 @@ classdef solveHardCbfClf
             coneAllowance=gamma*(1+abs(program.terminalCone.bound)+abs(map)*abs(input));
             tops=1:3:numel(cone);
             adjusted=program.terminalCone.bound;
-            for first=tops
+            for first=1:3:numel(cone)
                 adjusted(first)=adjusted(first)+max(0,norm(cone(first+(1:2))) ...
                     +norm(coneAllowance(first+(0:2)))-cone(first));
             end
             first=program.cones(2)+1;
             clf=program.b(first:first+5)-program.A(first:first+5,:)*decision;
+            status=0;
             if any(~isfinite(certified)) || any(certified>program.physicalBound) ...
                     || any(~isfinite(adjusted)) || any(adjusted(tops)>program.terminalConePhysicalBound(tops))
-                [excess,row]=max(certified-program.physicalBound);
-                error('collisionAvoidanceController:optimizationFailed', ...
-                    ['The returned solution failed the hard-safety certificate ' ...
-                    '(linear excess %.9g at %s, terminal excess %.9g). No command was issued.'], ...
-                    excess,program.physicalLabels(row), ...
-                    max(adjusted(tops)-program.terminalConePhysicalBound(tops)));
+                status=1;
+            elseif norm(clf(2:end))-clf(1)>program.clfNumericalReserve ...
+                    || decision(end)<-program.clfNumericalReserve || any(~isfinite(clf))
+                status=2;
             end
-            if norm(clf(2:end))-clf(1)>program.clfNumericalReserve ...
-                    || decision(end)<-program.clfNumericalReserve
-                error('collisionAvoidanceController:optimizationFailed', ...
-                    'The returned solution failed the reserved soft-CLF inequality. No command was issued.');
-            end
-            program.safetyBound=certified;
-            program.terminalCone.bound=adjusted;
-            if isfield(program,'jointCertificate')
-                program=avoidanceSafetyGeometry.certifyJoint(program,decision);
-            end
+        end
+
+        function [reduced,retained] = reduce(program)
+        % Preserve the exact row/column reduction in generated solver adapters.
+            [reduced,retained]=localReducedProgram(program);
         end
 
         function [program,result,search] = joint(program,model,cfg)
@@ -61,7 +78,7 @@ classdef solveHardCbfClf
             angles=program.jointCertificate.angles;decision=[];
             information=struct('status',"noDirection",'baseInterval',[], ...
                 'safeIntervals',zeros(0,2),'amplitude',NaN,'basisResidual',NaN, ...
-                'normalCount',cfg.admission.normalCount,'amplitudeCells',cfg.admission.amplitudeCells);
+                'normalCount',cfg.admission.normalCount,'amplitudeCells',cfg.admission.amplitudeCells,'maximumYaw',NaN);
             if ~localSectionTimeAvailable(cfg),information.status="searchTimeLimit";return;end
             states=localStates(program.prediction,origin);
             [direction,information.basisResidual]=localDirection(program,cfg,states);
@@ -81,7 +98,7 @@ classdef solveHardCbfClf
                     tangent(first+(1:2)),center(first),interval);
                 if isempty(interval),information.status="emptyTerminalBase";return;end
             end
-            if any(~isfinite(interval)),information.status="unboundedParameter";return;end
+            if any(~isfinite(interval),'all'),information.status="unboundedParameter";return;end
             information.baseInterval=interval;
             dictionary=program.geometry.frames(1).heading+2*pi*(0:cfg.admission.normalCount-1)/cfg.admission.normalCount;
             normals=[cos(dictionary);sin(dictionary)];
@@ -104,14 +121,14 @@ classdef solveHardCbfClf
                 targetSizes,targetRadius,dictionary-targetYaw)-relative*normals;
             coefficient=relativeSlope*normals;
             boundaries=linspace(interval(1),interval(2),cfg.admission.amplitudeCells+1);
-            groups=cell(cfg.admission.amplitudeCells,1);collisionComponents=0;
+            intervals=zeros(cfg.admission.amplitudeCells*(total+1),2);intervalCount=0;collisionComponents=0;
             for cellIndex=1:cfg.admission.amplitudeCells
                 if ~localSectionTimeAvailable(cfg),information.status="searchTimeLimit";return;end
-                domain=boundaries(cellIndex:cellIndex+1);middle=mean(domain);radius=diff(domain)/2;
+                domain=boundaries(cellIndex:cellIndex+1);middle=mean(domain,'all');radius=diff(domain,1,2)/2;
                 limits=fixed+solveHardCbfClf.rectangleSupports(egoSizes, ...
                     egoRadius+abs(yawSlope)*radius,dictionary-yaw-yawSlope*middle);
                 % Charge evaluation and endpoint arithmetic before subtraction.
-                limits=limits+256*eps*(1+abs(limits)+abs(coefficient)*max(abs(domain)));
+                limits=limits+256*eps*(1+abs(limits)+abs(coefficient)*max(abs(domain),[],'all'));
                 ratio=limits./coefficient;
                 lower=ratio;lower(coefficient>=0)=-Inf;lower=max(lower,[],2);
                 upper=ratio;upper(coefficient<=0)=Inf;upper=min(upper,[],2);
@@ -120,9 +137,11 @@ classdef solveHardCbfClf
                 collision=keep & ~[records.isExit].';
                 collisionIntervals=solveHardCbfClf.subtractIntervals(domain,[lower(collision),upper(collision)]);
                 collisionComponents=collisionComponents+size(collisionIntervals,1);
-                groups{cellIndex}=solveHardCbfClf.subtractIntervals(domain,[lower(keep),upper(keep)]);
+                component=solveHardCbfClf.subtractIntervals(domain,[lower(keep),upper(keep)]);
+                intervals(intervalCount+(1:size(component,1)),:)=component;
+                intervalCount=intervalCount+size(component,1);
             end
-            intervals=vertcat(groups{:});information.safeIntervals=intervals;
+            intervals=intervals(1:intervalCount,:);information.safeIntervals=intervals;
             if isempty(intervals)
                 information.status="collisionExcluded";
                 if collisionComponents>0,information.status="exitExcluded";end
@@ -144,7 +163,11 @@ classdef solveHardCbfClf
             candidates=min(max((left+right)/2,lower),upper);
             slack=max(0,vecnorm(clfCenter+clfSlope*candidates.',2,1).'-clfRadius);
             costs=quadratic*candidates.^2+linear*candidates+program.slackWeight*slack.^2;
-            [~,selected]=min(costs);amplitude=candidates(selected);
+            % Resolve arithmetic-scale objective ties by interval order so
+            % generated BLAS/SVD arithmetic cannot flip symmetric solutions.
+            best=min(costs);
+            selected=find(costs<=best+64*eps*(1+abs(best)),1,'first');
+            selected=selected(1);amplitude=candidates(selected);
             plan=origin+amplitude*direction;
             decision=[plan;slack(selected)+64*eps*(1+slack(selected)+norm(clfCenter+clfSlope*amplitude))];
             chosen=states+amplitude*slope;
@@ -156,10 +179,12 @@ classdef solveHardCbfClf
             [~,indices]=min(actual,[],2);angles=dictionary(indices).';
             if size(angles,2)>1,angles=angles.';end
             information.status="candidate";information.amplitude=amplitude;
-            information.maximumYaw= max(abs(chosen(3,:)));
+            information.maximumYaw= max(abs(chosen(3,:)),[],'all');
         end
 
-        function interval = linearInterval(coefficient,bound,interval)
+        function interval = linearInterval(coefficient,bound,domain)
+            interval=domain;
+            coder.varsize('interval',[1,2],[true,true]);
             if isempty(interval),return;end
             if any(~isfinite(coefficient)) || any(~isfinite(bound)) ...
                     || any(coefficient==0 & bound<0)
@@ -171,7 +196,9 @@ classdef solveHardCbfClf
             if interval(1)>interval(2),interval=[];end
         end
 
-        function interval = ballInterval(center,direction,radius,interval)
+        function interval = ballInterval(center,direction,radius,domain)
+            interval=domain;
+            coder.varsize('interval',[1,2],[true,true]);
             if isempty(interval),return;end
             if radius<0 || ~isfinite(radius) || any(~isfinite([center;direction]))
                 interval=[];return;
@@ -374,7 +401,8 @@ function [reduced,retained] = localReducedProgram(program)
 % identically zero with a satisfiable right-hand side.
     retained = true(numel(program.q),1);
     if isfield(program,"inactiveSlackIndex"),retained(program.inactiveSlackIndex) = false;end
-    matrix = program.A(:,retained);
+    columns=find(retained);
+    matrix = program.A(:,columns);
     equalities = program.cones(1);
     linearRows = equalities+program.cones(2);
     rowNorm = full(sum(abs(matrix(1:linearRows,:)),2));
@@ -384,9 +412,9 @@ function [reduced,retained] = localReducedProgram(program)
     keep(1:equalities) = ~trivialEquality;
     keep(equalities+1:linearRows) = ~trivialInequality;
     reduced = program;
-    reduced.P = program.P(retained,retained);
+    reduced.P = program.P(columns,columns);
     reduced.q = program.q(retained);
-    reduced.A = matrix(keep,:);
+    reduced.A = matrix(find(keep),:);
     reduced.b = program.b(keep);
     reduced.cones = [equalities-nnz(trivialEquality);program.cones(2)-nnz(trivialInequality);program.cones(3:end)];
     reduced.inactiveSlackIndex = zeros(1,0);
@@ -526,8 +554,11 @@ function [direction,residual]=localDirection(program,cfg,states)
     values=avoidanceSafetyGeometry.jointResidual(program,program.feasibleWitness,program.jointCertificate.angles);
     values([records.isExit])=-Inf;
     [~,critical]=max(values-program.jointCertificate.upperBound);
-    selected=find(string({records.key}).'==records(critical).key & ~[records.isExit].' ...
-        & values>program.jointCertificate.upperBound);
+    matching=false(numel(records),1);
+    for index=1:numel(records)
+        matching(index)=isequal(records(index).key,records(critical).key);
+    end
+    selected=find(matching & ~[records.isExit].' & values>program.jointCertificate.upperBound);
     count=program.layout.planCount;maps=program.prediction.egoStateMatrix;
     if isempty(selected)
         index=program.terminal.stateIndex;
@@ -536,7 +567,7 @@ function [direction,residual]=localDirection(program,cfg,states)
         desired=[program.terminal.reference(index)-states(index,end); ...
             program.terminal.input-program.anchorPlan(end-1:end)];
     else
-        stages=[records(selected).stage];first=min(stages);last=max(stages);
+        stages=[records(selected).stage];first=min(stages,[],'all');last=max(stages,[],'all');
         samples=unique([first,round((first+last)/2),last]);
         initial=records(selected(1));final=records(selected(end));
         travel=final.positionOffset+final.positionMap*states(:,final.stage+1) ...
@@ -558,7 +589,7 @@ function [direction,residual]=localDirection(program,cfg,states)
     root=chol(metric);map=constraint/root;
     direction=root\(pinv(full(map))*desired);
     residual=norm(constraint*direction-desired,Inf);
-    if any(~isfinite(direction)) || norm(direction)==0,direction=[];end
+    if any(~isfinite(direction)) || norm(direction)==0,direction=zeros(0,1);end
 end
 
 function [quadratic,linear,center,slope,radius]=localObjective(program,origin,direction,states,stateSlope)
