@@ -2,7 +2,9 @@
 
 Current controller: [Scalar admission and inherited joint-support continuation](../controller/JOINT_SUPPORT_CERTIFICATES.md). One signed control section replaces admission restoration; inherited performance improvement retains one hard SOCP and the verified incumbent. Restricted admission failures and inter-node clearance limitations remain explicit.
 
-Latest MATLAB profiling: [Warm full frames, first admission, exact replays and current assembly hotspots](MATLAB_RUNTIME_PROFILE_20260920.md). Active continuation median/max is 18.266/65.469 ms; joint conic construction dominates the slow straight stationary frame.
+Latest MATLAB optimization: [Local support assembly, exact program equivalence and warm runtime retest](MATLAB_ASSEMBLY_OPTIMIZATION_20260920.md). Active continuation median/max is 13.9275/42.613 ms with zero measured 50 ms misses; first admission still reaches 97.773 ms. All 737 tests pass.
+
+Baseline MATLAB profiling: [Warm full frames, first admission, exact replays and assembly hotspots](MATLAB_RUNTIME_PROFILE_20260920.md). This preceding measurement motivated the assembly optimization.
 
 Latest native benchmark: [Generated C executable, same-input timing and complete hybrid-frame limits](STANDALONE_C_BENCHMARK_20260920.md). The numerical kernel is ported; complete standalone orchestration remains unfinished.
 

@@ -269,19 +269,24 @@ classdef avoidanceSafetyGeometry
             % Remove only collision and exit slices, keeping all actuator,
             % slew, chart, reference-phase, CLF and terminal constraints.
             remove=startsWith(program.physicalLabels,"collision:") | startsWith(program.physicalLabels,"exit:");
-            count=numel(remove);keep=[~remove;true(size(program.A,1)-count,1)];
-            program.A=program.A(keep,:);program.b=program.b(keep);
-            program.cones(2)=program.cones(2)-nnz(remove);
-            program.physicalMatrix=program.physicalMatrix(~remove,:);
-            program.physicalBound=program.physicalBound(~remove);
-            program.safetyBound=program.safetyBound(~remove);
-            program.physicalLabels=program.physicalLabels(~remove);
+            if any(remove)
+                count=numel(remove);keep=[~remove;true(size(program.A,1)-count,1)];
+                program.A=program.A(keep,:);program.b=program.b(keep);
+                program.cones(2)=program.cones(2)-nnz(remove);
+                program.physicalMatrix=program.physicalMatrix(~remove,:);
+                program.physicalBound=program.physicalBound(~remove);
+                program.safetyBound=program.safetyBound(~remove);
+                program.physicalLabels=program.physicalLabels(~remove);
+            end
             geometry=program.geometry;keep=~startsWith(geometry.label,"collision:");
-            for name={'matrix','physicalBound','safety','label','stage','cellIndex'}
-                geometry.(name{1})=geometry.(name{1})(keep,:);
+            if ~all(keep)
+                for name={'matrix','physicalBound','safety','label','stage','cellIndex'}
+                    geometry.(name{1})=geometry.(name{1})(keep,:);
+                end
             end
             for index=1:numel(geometry.local)
                 item=geometry.local(index);keep=~startsWith(item.nodeLabels,"collision:");
+                if all(keep),continue;end
                 for name={'stateMatrix','inputMatrix','bound','nodeStateRows','nodeInputRows', ...
                         'nodeLimits','nodeStartStateRows','nodeLabels'}
                     item.(name{1})=item.(name{1})(keep,:,:);

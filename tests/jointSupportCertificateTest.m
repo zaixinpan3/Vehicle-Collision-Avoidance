@@ -3,6 +3,7 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
     properties (TestParameter)
         yawRadius=struct('fixed',0,'interval',.12,'full',pi);
         nonpositiveGap=struct('contact',0,'overlap',-.01);
+        reservedGap=struct('certified',.002,'violated',-.002);
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -51,6 +52,35 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             [actual,expected,solved]=localSupportComparison(yawRadius);
             testCase.verifyTrue(solved);
             testCase.verifyEqual(actual,expected,AbsTol=2e-6);
+        end
+
+        function fixedPlanConesAgreeWithIndependentSupport(testCase,yawRadius,reservedGap)
+            [program,cfg]=localSquare();point=[.2;0;1];
+            records=repmat(localRecord(),2,1);angles=[.4;-.7];
+            state=program.prediction.egoStateOffset(:,2)+program.prediction.egoStateMatrix(:,:,2)*point(1:2);
+            for index=1:2
+                item=records(index);item.egoHalfSize=[2.4;.95];item.targetHalfSize=[2.2;.9];
+                item.egoYawRadius=yawRadius;item.targetYawRadius=yawRadius/2;
+                item.targetYaw=-.3*index;item.positionBall=.02;
+                item.generators=[.2,0,.1;0,.3,.05];
+                item.positionMap=[1,.2,.1,.03,.02,.01;-.1,1,.2,.01,.03,.02];
+                item.yawRow=[.02,-.01,1,.03,.04,-.02];
+                gap=.2;if index==2,gap=reservedGap;end
+                residual=avoidanceSafetyGeometry.jointValue(item,state,angles(index));
+                item.positionOffset=[cos(angles(index));sin(angles(index))]*(residual+1e-4+gap);
+                records(index)=item;
+            end
+            program.jointCertificate=struct('records',records,'angles',angles,'upperBound',-1e-4*ones(2,1));
+            conic=avoidanceStageQp.joint(program,point,angles,cfg);
+            % Fix the complete physical plan and both direction increments.
+            % Only the support epigraph variables remain free to certify it.
+            indices=[1:numel(point),conic.angleIndex];number=numel(indices);
+            lock=sparse(1:number,indices,ones(1,number),number,numel(conic.q));
+            conic.A=[lock;conic.A];conic.b=[point;zeros(2,1);conic.b];
+            conic.cones(1)=conic.cones(1)+number;
+            conic.P=sparse(numel(conic.q),numel(conic.q));conic.q(:)=0;
+            result=solveHardCbfClf.constrained(conic,cfg);
+            testCase.verifyEqual(result.feasible,reservedGap>0);
         end
 
         function majorantsTouchAndBoundRobustSeparation(testCase)

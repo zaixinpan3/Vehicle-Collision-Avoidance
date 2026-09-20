@@ -104,7 +104,8 @@ function conic=localJointConic(program,point,angles,cfg)
     records=program.jointCertificate.records;count=numel(records);
     baseCount=numel(base.q);angleIndex=baseCount+(1:count);cursor=baseCount+count;
     fixed=localDomainCertificate(program,angles);
-    total=cursor+localAuxiliaryCount(records(~fixed));
+    recordCounts=localAuxiliaryCount(records);
+    total=cursor+sum(recordCounts(~fixed));
     equalityCount=base.cones(1);linearCount=base.cones(2);
     [linearRow,linearColumn,linearValue]=find(base.A(equalityCount+(1:linearCount),:));
     linearRow=linearRow(:);linearColumn=linearColumn(:);linearValue=linearValue(:);
@@ -113,51 +114,79 @@ function conic=localJointConic(program,point,angles,cfg)
     coneRow=coneRow(:);coneColumn=coneColumn(:);coneValue=coneValue(:);
     coneBounds=reshape(base.b(equalityCount+linearCount+1:end),[],1);
     coneSizes=reshape(base.cones(3:end),[],1);
+    % Reserve triplets once. A support row touches at most six states, its
+    % angle, and one epigraph variable. Each record adds at most four cones.
+    % Auxiliary variables bound the absolute-value and yaw-hull row counts.
+    activeCount=nnz(~fixed);auxiliaryCount=total-cursor;
+    linearNonzeros=numel(linearValue);linearRows=numel(linearBounds);
+    coneNonzeros=numel(coneValue);coneRows=numel(coneBounds);coneCount=numel(coneSizes);
+    linearExtra=17*auxiliaryCount+8*activeCount;
+    coneExtra=3*auxiliaryCount+48*activeCount;
+    linearRow=[linearRow;zeros(linearExtra,1)];
+    linearColumn=[linearColumn;zeros(linearExtra,1)];
+    linearValue=[linearValue;zeros(linearExtra,1)];
+    linearBounds=[linearBounds;zeros(2*auxiliaryCount+activeCount,1)];
+    coneRow=[coneRow;zeros(coneExtra,1)];
+    coneColumn=[coneColumn;zeros(coneExtra,1)];
+    coneValue=[coneValue;zeros(coneExtra,1)];
+    coneBounds=[coneBounds;zeros(14*activeCount,1)];
+    coneSizes=[coneSizes;zeros(4*activeCount,1)];
     eta=1/cfg.jointCertificate.positionScale;
     for index=1:count
         if fixed(index),continue;end
-        item=records(index);stateIndex=base.stateIndex(:,item.stage).';
+        item=records(index);stateIndex=1:6;
+        % Assemble one record in its own coordinates, then map its triplets
+        % once. Sparse temporaries need only six states, one angle and this
+        % record's epigraph variables, rather than the full horizon width.
+        width=7+recordCounts(index);localCursor=7;
+        columns=[base.stateIndex(:,item.stage).',angleIndex(index),cursor+(1:recordCounts(index))];
         state=base.stateCenter(:,item.stage+1);theta=angles(index);
         normal=[cos(theta);sin(theta)];tangent=[-normal(2);normal(1)];
         relative=item.positionOffset+item.positionMap*state;
         yaw=item.yawOffset+item.yawRow*state;
-        positionMap=sparse(2,total);positionMap(:,stateIndex)=item.positionMap;
-        angleRow=row(angleIndex(index),1);
+        positionMap=sparse(2,width);positionMap(:,stateIndex)=item.positionMap;
+        angleRow=row(7,1);
         yawRow=row(stateIndex,item.yawRow);
         egoAngle=theta-yaw;obstacleAngle=theta-item.targetYaw;
         argument=[-sin(egoAngle);cos(egoAngle)]*(angleRow-yawRow);
         support=shapeSupport(item.egoHalfSize,item.egoYawRadius, ...
             [cos(egoAngle);sin(egoAngle)],argument);
-        argument=[-sin(obstacleAngle);cos(obstacleAngle)]*pad(angleRow);
+        argument=[-sin(obstacleAngle);cos(obstacleAngle)]*angleRow;
         next=shapeSupport(item.targetHalfSize,item.targetYawRadius, ...
             [cos(obstacleAngle);sin(obstacleAngle)],argument);
-        support=pad(support)+next;
-        next=absoluteSupport(item.generators.'*normal,item.generators.'*tangent*pad(angleRow), ...
+        support=support+next;
+        next=absoluteSupport(item.generators.'*normal,item.generators.'*tangent*angleRow, ...
             ones(size(item.generators,2),1));
-        support=pad(support)+next;
+        support=support+next;
         % The nonunit direction n+t*a is never zero. Its homogeneous support
         % avoids a position-dependent unit-circle remainder. The bilinear
         % term -a*t'*dr has the global touching bound (sqrt(eta)*t'*dr-
         % a/sqrt(eta))^2/4. No artificial position/angle step bound is needed.
         egoRadius=norm(item.egoHalfSize);
-        quadratic=[sqrt(egoRadius)*pad(angleRow);sqrt(2*egoRadius)*pad(yawRow); ...
-            sqrt(eta/2)*tangent.'*pad(positionMap)-sqrt(1/(2*eta))*pad(angleRow)];
+        quadratic=[sqrt(egoRadius)*angleRow;sqrt(2*egoRadius)*yawRow; ...
+            sqrt(eta/2)*tangent.'*positionMap-sqrt(1/(2*eta))*angleRow];
         z=allocate(1);zrow=row(z,1);
         addCone([1;-1;zeros(size(quadratic,1),1)], ...
-            [zrow;zrow;sqrt(2)*pad(quadratic)]);
+            [zrow;zrow;sqrt(2)*quadratic]);
         diskRadius=item.clearance+item.positionBall-program.jointCertificate.upperBound(index);
         disk=allocate(1);diskRow=row(disk,1);
-        addCone([0;diskRadius;0],[diskRow;sparse(1,total);diskRadius*pad(angleRow)]);
-        inequality=pad(support)+pad(zrow)+diskRow-normal.'*pad(positionMap)-tangent.'*relative*pad(angleRow);
+        addCone([0;diskRadius;0],[diskRow;sparse(1,width);diskRadius*angleRow]);
+        inequality=support+zrow+diskRow-normal.'*positionMap-tangent.'*relative*angleRow;
         addLinear(inequality,normal.'*relative);
+        assert(localCursor==width,'avoidanceStageQp:jointLayout','Inconsistent record layout.');
+        cursor=cursor+recordCounts(index);
     end
     assert(cursor==total,'avoidanceStageQp:jointLayout','Inconsistent auxiliary-variable count.');
-    linearMatrix=sparse(linearRow,linearColumn,linearValue,numel(linearBounds),total);
-    coneMatrix=sparse(coneRow,coneColumn,coneValue,numel(coneBounds),total);
+    linearMatrix=sparse(linearRow(1:linearNonzeros),linearColumn(1:linearNonzeros), ...
+        linearValue(1:linearNonzeros),linearRows,total);
+    coneMatrix=sparse(coneRow(1:coneNonzeros),coneColumn(1:coneNonzeros), ...
+        coneValue(1:coneNonzeros),coneRows,total);
+    linearBounds=linearBounds(1:linearRows);coneBounds=coneBounds(1:coneRows);
+    coneSizes=coneSizes(1:coneCount);
     fixedCount=nnz(fixed);
     fixedRows=sparse(1:fixedCount,angleIndex(fixed),ones(1,fixedCount),fixedCount,total);
     conic=struct('P',sparse(total,total),'q',zeros(total,1), ...
-        'A',[pad(base.A(1:equalityCount,:));fixedRows;linearMatrix;coneMatrix], ...
+        'A',[[base.A(1:equalityCount,:),sparse(equalityCount,total-baseCount)];fixedRows;linearMatrix;coneMatrix], ...
         'b',[base.b(1:equalityCount);zeros(fixedCount,1);linearBounds;coneBounds], ...
         'cones',[equalityCount+fixedCount;numel(linearBounds);coneSizes], ...
         'anchorPlan',program.anchorPlan,'angleIndex',angleIndex, ...
@@ -171,49 +200,51 @@ function conic=localJointConic(program,point,angles,cfg)
     conic.P(angleIndex,angleIndex)=weight*speye(count);
 
     function indices=allocate(number)
-        indices=cursor+(1:number);cursor=cursor+number;
-    end
-    function out=pad(in)
-        out=[sparse(in),sparse(size(in,1),total-size(in,2))];
+        indices=localCursor+(1:number);localCursor=localCursor+number;
     end
     function out=row(indices,values)
-        out=sparse(ones(size(indices)),indices,values,1,total);
+        out=sparse(ones(size(indices)),indices,values,1,width);
     end
     function addLinear(matrix,bound)
         [ri,ci,vi]=find(matrix);
-        linearRow=[linearRow;numel(linearBounds)+ri(:)];
-        linearColumn=[linearColumn;ci(:)];linearValue=[linearValue;vi(:)];
-        linearBounds=[linearBounds;bound(:)];
+        selected=linearNonzeros+(1:numel(vi));
+        linearRow(selected)=linearRows+ri(:);
+        linearColumn(selected)=columns(ci);linearValue(selected)=vi(:);
+        linearBounds(linearRows+(1:numel(bound)))=bound(:);
+        linearNonzeros=linearNonzeros+numel(vi);linearRows=linearRows+numel(bound);
     end
     function addCone(offset,map)
         [ri,ci,vi]=find(-map);
-        coneRow=[coneRow;numel(coneBounds)+ri(:)];
-        coneColumn=[coneColumn;ci(:)];coneValue=[coneValue;vi(:)];
-        coneBounds=[coneBounds;offset(:)];coneSizes=[coneSizes;numel(offset)];
+        selected=coneNonzeros+(1:numel(vi));
+        coneRow(selected)=coneRows+ri(:);
+        coneColumn(selected)=columns(ci);coneValue(selected)=vi(:);
+        coneBounds(coneRows+(1:numel(offset)))=offset(:);
+        coneCount=coneCount+1;coneSizes(coneCount)=numel(offset);
+        coneNonzeros=coneNonzeros+numel(vi);coneRows=coneRows+numel(offset);
     end
     function support=absoluteSupport(offset,map,weights)
         active=offset~=0 | any(map~=0,2);
         active=active & weights(:)~=0;
         offset=offset(active);map=map(active,:);weights=weights(active);
         number=numel(offset);
-        if number==0,support=sparse(1,total);return;end
+        if number==0,support=sparse(1,width);return;end
         indices=allocate(number);
-        selector=sparse(1:number,indices,ones(1,number),number,total);
-        addLinear([pad(map)-selector;-pad(map)-selector],[-offset;offset]);
+        selector=sparse(1:number,indices,ones(1,number),number,width);
+        addLinear([map-selector;-map-selector],[-offset;offset]);
         support=row(indices,weights(:).');
     end
     function support=shapeSupport(halfSize,radius,offset,map)
-        if all(halfSize==0),support=sparse(1,total);return;end
+        if all(halfSize==0),support=sparse(1,width);return;end
         if radius==0
             support=absoluteSupport(offset,map,halfSize);return;
         end
         [directions,bounds,bodyRadius]=avoidanceSafetyGeometry.yawHull(halfSize,radius);
         multipliers=allocate(numel(bounds));supportIndex=allocate(1);
         support=row(supportIndex,1);top=support-row(multipliers,bounds.');
-        bottom=bodyRadius*pad(map);
+        bottom=bodyRadius*map;
         bottom(:,multipliers)=bottom(:,multipliers)-bodyRadius*directions.';
         addCone([0;bodyRadius*offset],[top;bottom]);
-        addLinear(sparse(1:numel(bounds),multipliers,-ones(1,numel(bounds)),numel(bounds),total),zeros(numel(bounds),1));
+        addLinear(sparse(1:numel(bounds),multipliers,-ones(1,numel(bounds)),numel(bounds),width),zeros(numel(bounds),1));
     end
 end
 
@@ -239,12 +270,12 @@ function fixed=localDomainCertificate(program,angles)
     end
 end
 
-function count=localAuxiliaryCount(records)
-% Allocate the final sparse width once. This changes no coefficient or cone.
-    count=0;
+function counts=localAuxiliaryCount(records)
+% Count each record once for both local and global sparse coordinates.
+    counts=zeros(numel(records),1);
     for index=1:numel(records)
         item=records(index);
-        count=count+2+nnz(any(item.generators~=0,1));
+        count=2+nnz(any(item.generators~=0,1));
         dimensions=[item.egoHalfSize,item.targetHalfSize];
         radii=[item.egoYawRadius,item.targetYawRadius];
         for body=1:2
@@ -257,6 +288,7 @@ function count=localAuxiliaryCount(records)
                 count=count+numel(bounds)+1;
             end
         end
+        counts(index)=count;
     end
 end
 
