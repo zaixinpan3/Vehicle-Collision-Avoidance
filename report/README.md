@@ -2,6 +2,8 @@
 
 Current controller: [Scalar admission and inherited joint-support continuation](../controller/JOINT_SUPPORT_CERTIFICATES.md). One signed control section replaces admission restoration; inherited performance improvement retains one hard SOCP and the verified incumbent. Restricted admission failures and inter-node clearance limitations remain explicit.
 
+Latest MATLAB profiling: [Warm full frames, first admission, exact replays and current assembly hotspots](MATLAB_RUNTIME_PROFILE_20260920.md). Active continuation median/max is 18.266/65.469 ms; joint conic construction dominates the slow straight stationary frame.
+
 Latest native benchmark: [Generated C executable, same-input timing and complete hybrid-frame limits](STANDALONE_C_BENCHMARK_20260920.md). The numerical kernel is ported; complete standalone orchestration remains unfinished.
 
 Native performance entry: [Automatic recapture, C regeneration, rebuild and executable verification; historical 92.155 ms frame breakdown](NATIVE_BENCHMARK_WORKFLOW_20260920.md). Use `python3 scripts/runNativeControllerBenchmark.py` after source changes; reported timings are from the standalone numerical executable.
