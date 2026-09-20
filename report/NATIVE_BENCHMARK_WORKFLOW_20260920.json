@@ -1,0 +1,190 @@
+{
+  "historicalHybridFrame": {
+    "source": "/home/zai/.cache/collisionAvoidance/standalone-c-20260919/hybrid/measured/stationary-0/stationary-exact-state.mat",
+    "scope": "Historical complete MATLAB plus checked-MEX hybrid frame; not a standalone C frame",
+    "frame": 1,
+    "scenario": "stationary",
+    "horizonSteps": 96,
+    "totalMs": 92.155,
+    "inputPreparationMs": 7.628,
+    "formulationAggregateMs": 73.64800000000001,
+    "upstreamFormulationAndPackingUnseparatedMs": 67.62390899025091,
+    "nativeAdmissionMs": 5.336133006494492,
+    "nativeVerificationMs": 0.6879580032546073,
+    "nativeSolverMs": 0,
+    "remainingUnseparatedMs": 10.879
+  },
+  "automaticNativeRun": {
+    "scope": "Standalone C prepared-program numerical kernel; NOT full controller pipeline",
+    "fullPipelineMeasured": false,
+    "frameCount": 278,
+    "groups": {
+      "all": {
+        "calls": 1390,
+        "medianMs": 8.489962492603809,
+        "maximumMs": 27.547129982849583,
+        "over50Ms": 0,
+        "rejections": 5
+      },
+      "fresh": {
+        "calls": 30,
+        "medianMs": 3.9931075007189065,
+        "maximumMs": 4.76725900080055,
+        "over50Ms": 0,
+        "rejections": 5
+      },
+      "inherited": {
+        "calls": 1360,
+        "medianMs": 8.863511495292187,
+        "maximumMs": 27.547129982849583,
+        "over50Ms": 0,
+        "rejections": 0
+      },
+      "stationary-0": {
+        "calls": 420,
+        "medianMs": 12.312216495047323,
+        "maximumMs": 27.547129982849583,
+        "over50Ms": 0,
+        "rejections": 0
+      },
+      "oncoming-0": {
+        "calls": 240,
+        "medianMs": 6.969824506086297,
+        "maximumMs": 14.414167002541944,
+        "over50Ms": 0,
+        "rejections": 0
+      },
+      "crossing-0": {
+        "calls": 65,
+        "medianMs": 3.1476470176130533,
+        "maximumMs": 4.248231998644769,
+        "over50Ms": 0,
+        "rejections": 0
+      },
+      "stationary-0.01": {
+        "calls": 420,
+        "medianMs": 10.266705488902517,
+        "maximumMs": 24.011765024624765,
+        "over50Ms": 0,
+        "rejections": 0
+      },
+      "oncoming-0.01": {
+        "calls": 240,
+        "medianMs": 6.305672504822724,
+        "maximumMs": 13.451042002998292,
+        "over50Ms": 0,
+        "rejections": 0
+      },
+      "crossing-0.01": {
+        "calls": 5,
+        "medianMs": 3.910092986188829,
+        "maximumMs": 3.9306819962803274,
+        "over50Ms": 0,
+        "rejections": 5
+      }
+    },
+    "slowestNativeCall": {
+      "scenario": "stationary",
+      "curvature": 0,
+      "frame": 3,
+      "horizonSteps": 94,
+      "inherited": true,
+      "iteration": 1,
+      "status": 2,
+      "totalMs": 27.547129982849583,
+      "assemblyOrAdmissionMs": 15.271254000253975,
+      "nativeSolverMs": 11.811278003733605,
+      "verificationMs": 0.4608180024661124,
+      "unattributedMs": 0.0037799763958901167
+    },
+    "validation": {
+      "scope": "Prepared joint-certificate numerical frame; preparation and I/O excluded",
+      "frameCount": 278,
+      "hardCertificateFailures": 0,
+      "acceptanceDifferences": 0,
+      "maximumDecisionDifference": 8.937801553032809e-08,
+      "maximumAngleDifference": 4.259023815400553e-05
+    },
+    "captureOutcomes": [
+      {
+        "scenario": "stationary",
+        "curvature": 0,
+        "completed": true,
+        "sampledCollisionFree": false,
+        "executedHolds": 600,
+        "minimumSampledBodyGap": -0.0005513653242135153,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0,
+        "completed": true,
+        "sampledCollisionFree": false,
+        "executedHolds": 600,
+        "minimumSampledBodyGap": -0.005382492415134887,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0,
+        "completed": true,
+        "sampledCollisionFree": true,
+        "executedHolds": 600,
+        "minimumSampledBodyGap": 9.51969553186302,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "stationary",
+        "curvature": 0.01,
+        "completed": true,
+        "sampledCollisionFree": true,
+        "executedHolds": 600,
+        "minimumSampledBodyGap": 0.08260055695483416,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "oncoming",
+        "curvature": 0.01,
+        "completed": true,
+        "sampledCollisionFree": true,
+        "executedHolds": 600,
+        "minimumSampledBodyGap": 0.08978162709323204,
+        "failureMessage": ""
+      },
+      {
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "completed": false,
+        "sampledCollisionFree": true,
+        "executedHolds": 0,
+        "minimumSampledBodyGap": null,
+        "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Scalar admission found no hard-certified plan: collisionExcluded). No command was issued."
+      }
+    ],
+    "manifest": "/home/zai/.cache/collisionAvoidance/native-auto-20260920/manifest.json"
+  },
+  "tests": {
+    "passed": 9,
+    "failed": 0,
+    "incomplete": 0,
+    "names": [
+      "standaloneBenchmarkWorkflowTest/changedSourceInvalidatesTheBenchmark",
+      "standaloneBenchmarkWorkflowTest/addedSourceInvalidatesTheBenchmark",
+      "standaloneBenchmarkWorkflowTest/replacedExecutableInvalidatesTheBenchmark",
+      "standaloneBenchmarkWorkflowTest/duplicateMeasurementsAreRejected",
+      "standaloneBenchmarkWorkflowTest/summaryUsesOnlyExecutableTiming",
+      "standaloneControllerFrameTest/exportedFrameRetainsACompleteHardCertificate",
+      "standaloneControllerFrameTest/numericalVerifierRejectsANonfiniteClf",
+      "standaloneControllerFrameTest/numericalVerifierRejectsAnActuatorViolation",
+      "standaloneControllerFrameTest/packingPreservesDifferentTargetIdentities"
+    ]
+  },
+  "artifactsSha256": {
+    "/home/zai/.cache/collisionAvoidance/native-auto-20260920/manifest.json": "362fe23bb88dae4965e94bf51021fcb926a9b2460205a7533bd1a2dd054763cb",
+    "/home/zai/.cache/collisionAvoidance/native-auto-20260920/summary.json": "a851f2f153ad05f795a2e5975e346e937faf3b68ebebb586dd98302cdf909c01",
+    "/home/zai/.cache/collisionAvoidance/native-auto-20260920/native/controller-replay": "4ecda4fe18d5854bd0c7e63e1850e4906dd55a1ebfbd68b8fb86f0739dc406f5",
+    "/home/zai/.cache/collisionAvoidance/native-auto-20260920/native-replay.jsonl": "60823808f0339a5b675dd2957482a109f67cbdba2c5ac447e72cd8fc50e6feee",
+    "/home/zai/.cache/collisionAvoidance/native-auto-20260920/workflow-tests.json": "4d0dbc8578b74985723ef84a6623cd22f4cc733ab5d35dc2520448af97ca7d80",
+    "/home/zai/.cache/collisionAvoidance/standalone-c-20260919/hybrid/measured/stationary-0/stationary-exact-state.mat": "5f6fa9b644e73e3ef599ebc73fba22e3ca95d02644822ba7fc5d780615c4fdd3"
+  }
+}

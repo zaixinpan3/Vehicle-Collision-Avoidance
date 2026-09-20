@@ -4,6 +4,8 @@ Current controller: [Scalar admission and inherited joint-support continuation](
 
 Latest native benchmark: [Generated C executable, same-input timing and complete hybrid-frame limits](STANDALONE_C_BENCHMARK_20260920.md). The numerical kernel is ported; complete standalone orchestration remains unfinished.
 
+Native performance entry: [Automatic recapture, C regeneration, rebuild and executable verification; historical 92.155 ms frame breakdown](NATIVE_BENCHMARK_WORKFLOW_20260920.md). Use `python3 scripts/runNativeControllerBenchmark.py` after source changes; reported timings are from the standalone numerical executable.
+
 Latest implementation: [Affine-section admission: fixed interval computation, 50 ms straight/circular rerun and capability tradeoff](AFFINE_SECTION_ADMISSION_20260919.md).
 
 Latest period change: [50 ms prediction nodes, input holds and control updates; matched-duration runtime and collision rerun](CONTROL_PERIOD_50MS_20260919.md).
