@@ -3,7 +3,11 @@
 The format-40 controller first tries to admit a new encounter using one signed affine
 control section and forbidden-amplitude interval subtraction. A fixed support
 dictionary and fixed yaw enclosures on amplitude cells bound the geometric
-work. The scalar objective retains input effort and squared CLF slack.
+work. Curved predictions taper the displacement at the ends of the selected
+conflict interval to 0.8 of its middle peak; straight predictions retain their
+plateau. The default search uses 16 directions and 8 amplitude cells. This
+restricts the candidate family and certificate search without changing hard
+acceptance constraints. The scalar objective retains input effort and squared CLF slack.
 An independently verified scalar witness is issued directly. After section
 exclusion, a least-violated geometric proposal can initialize one hard joint
 SOCP with the complete control sequence free. That proposal cannot be issued;

@@ -69,6 +69,9 @@ end
 
 function [program,cfg]=localCircularFixture()
     [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+    % Exercise the full-plan adapter branch even when the default taper admits.
+    cfg.admission.temporalShoulderFraction=1;
+    cfg.admission.normalCount=32;cfg.admission.amplitudeCells=16;
     [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
     program=formulateAvoidanceProblem(problem.model);
 end

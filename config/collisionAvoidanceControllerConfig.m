@@ -40,8 +40,12 @@ function cfg = localDefaults()
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);
-    % Fresh admission tries one signed section before at most one hard joint solve.
-    cfg.admission = struct("normalCount",32,"amplitudeCells",16,"performanceIterations",32);
+    % One tapered time shape, with a deliberately coarser certified search.
+    % On curved predictions, shoulder fraction scales the first/last conflict
+    % displacement; one and straight charts retain the plateau. A failed
+    % admission may use one hard joint solve.
+    cfg.admission = struct("normalCount",16,"amplitudeCells",8,"performanceIterations",32, ...
+        "temporalShoulderFraction",0.8);
     % Global majorant scaling for admission and inherited performance improvement.
     cfg.jointCertificate = struct("positionScale",4.0,"proximalWeight",1.0e-3);
     cfg.collision = struct("cbfRate",2.0);
@@ -192,6 +196,12 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    fraction=cfg.admission.temporalShoulderFraction;
+    if ~isnumeric(fraction) || ~isreal(fraction) || ~isscalar(fraction) ...
+            || ~isfinite(fraction) || fraction<=0 || fraction>1
+        error("collisionAvoidanceController:invalidConfiguration", ...
+            "admission.temporalShoulderFraction must be in (0,1].");
+    end
     for name = ["normalCount","amplitudeCells","performanceIterations"]
         validateattributes(cfg.admission.(name),{'double'}, ...
             {'scalar','real','finite','integer','positive'});

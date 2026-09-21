@@ -1,0 +1,1386 @@
+{
+  "scope": "Warmed full MATLAB frames; sensitivity and footprint audits are untimed capability checks",
+  "baselineCommit": "c622028432b8989494dea0b1e010002a269ace2b",
+  "analysisParentCommit": "c622028432b8989494dea0b1e010002a269ace2b",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "replay": [
+    {
+      "fixture": "measured-longest",
+      "variant": "plateauFine",
+      "timing": {
+        "calls": 22,
+        "medianMs": 31.472,
+        "maximumMs": 38.623,
+        "over50Ms": 0
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.5815,
+        "formulationSeconds": 25.048000000000002,
+        "solveSeconds": 0.0
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.5810000000000001,
+        "formulationSeconds": 30.448,
+        "solveSeconds": 0,
+        "remainingSeconds": 7.593999999999997
+      },
+      "nativeSolveCounts": [
+        0
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "measured-longest",
+      "variant": "taperFine",
+      "timing": {
+        "calls": 22,
+        "medianMs": 31.182,
+        "maximumMs": 32.141999999999996,
+        "over50Ms": 0
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.5635,
+        "formulationSeconds": 24.707,
+        "solveSeconds": 0.0
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.592,
+        "formulationSeconds": 25.708000000000002,
+        "solveSeconds": 0,
+        "remainingSeconds": 5.841999999999996
+      },
+      "nativeSolveCounts": [
+        0
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "measured-longest",
+      "variant": "plateauCoarse",
+      "timing": {
+        "calls": 22,
+        "medianMs": 28.323,
+        "maximumMs": 29.704,
+        "over50Ms": 0
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.6015,
+        "formulationSeconds": 21.933,
+        "solveSeconds": 0.0
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.55,
+        "formulationSeconds": 22.166,
+        "solveSeconds": 0,
+        "remainingSeconds": 6.988000000000001
+      },
+      "nativeSolveCounts": [
+        0
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "measured-longest",
+      "variant": "taperCoarse",
+      "timing": {
+        "calls": 22,
+        "medianMs": 28.3095,
+        "maximumMs": 29.171,
+        "over50Ms": 0
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.5579999999999999,
+        "formulationSeconds": 21.962000000000003,
+        "solveSeconds": 0.0
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.532,
+        "formulationSeconds": 22.56,
+        "solveSeconds": 0,
+        "remainingSeconds": 6.078999999999998
+      },
+      "nativeSolveCounts": [
+        0
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "circular-crossing-longest",
+      "variant": "plateauFine",
+      "timing": {
+        "calls": 22,
+        "medianMs": 57.914500000000004,
+        "maximumMs": 60.331999999999994,
+        "over50Ms": 22
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.7725,
+        "formulationSeconds": 35.1185,
+        "solveSeconds": 15.75
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.892,
+        "formulationSeconds": 36.761,
+        "solveSeconds": 15.943999999999999,
+        "remainingSeconds": 6.734999999999998
+      },
+      "nativeSolveCounts": [
+        1
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "circular-crossing-longest",
+      "variant": "taperFine",
+      "timing": {
+        "calls": 22,
+        "medianMs": 33.355,
+        "maximumMs": 35.196,
+        "over50Ms": 0
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.65,
+        "formulationSeconds": 26.552,
+        "solveSeconds": 0.0
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.8140000000000001,
+        "formulationSeconds": 27.994,
+        "solveSeconds": 0,
+        "remainingSeconds": 6.388000000000002
+      },
+      "nativeSolveCounts": [
+        0
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "circular-crossing-longest",
+      "variant": "plateauCoarse",
+      "timing": {
+        "calls": 22,
+        "medianMs": 51.519000000000005,
+        "maximumMs": 54.763,
+        "over50Ms": 22
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.7225,
+        "formulationSeconds": 29.276999999999997,
+        "solveSeconds": 15.01
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.8490000000000001,
+        "formulationSeconds": 31.385999999999996,
+        "solveSeconds": 15.283,
+        "remainingSeconds": 7.245000000000001
+      },
+      "nativeSolveCounts": [
+        1
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "circular-crossing-longest",
+      "variant": "taperCoarse",
+      "timing": {
+        "calls": 22,
+        "medianMs": 30.6155,
+        "maximumMs": 33.421,
+        "over50Ms": 0
+      },
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.6479999999999999,
+        "formulationSeconds": 23.640500000000003,
+        "solveSeconds": 0.0
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.763,
+        "formulationSeconds": 26.122,
+        "solveSeconds": 0,
+        "remainingSeconds": 6.5360000000000005
+      },
+      "nativeSolveCounts": [
+        0
+      ],
+      "horizonSteps": [
+        96
+      ]
+    }
+  ],
+  "campaign": {
+    "diagnostic": {
+      "trials": [
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.0006150720565774037,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.032358,
+          "maximumSeconds": 0.032358,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 7.28046038112457e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": 0.08582290633764128,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0805,
+            "maximumMs": 32.358,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.0006150720565774037,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.03349,
+          "maximumSeconds": 0.03349,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 7.28046038112457e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": 0.08582290633764128,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.991499999999999,
+            "maximumMs": 33.49,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.005782571632208633,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.008127,
+          "maximumSeconds": 0.021026,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 6.160206667523757e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": -0.05386406178188863,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.957,
+            "maximumMs": 21.026,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.005782571632208633,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.009772,
+          "maximumSeconds": 0.021495,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 6.160206667523757e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": -0.05386406178188863,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.9254999999999995,
+            "maximumMs": 21.495,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.51969553186302,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.016049,
+          "maximumSeconds": 0.016049,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 9.51969553186302,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.39994063732390395,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.9175,
+            "maximumMs": 16.049,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.51969553186302,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.016992,
+          "maximumSeconds": 0.016992,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 9.51969553186302,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.39994063732390395,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.918499999999999,
+            "maximumMs": 16.992,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.09937430648243359,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.033739,
+          "maximumSeconds": 0.033739,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.10063708431359375,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.06603485837249373,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.1375,
+            "maximumMs": 33.739,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.09937430648243359,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.033469,
+          "maximumSeconds": 0.033469,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.10063708431359375,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.06603485837249373,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0445,
+            "maximumMs": 33.469,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.10088662057735048,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.008672,
+          "maximumSeconds": 0.021387,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.10212592439262143,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.09548270290310834,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0405,
+            "maximumMs": 21.387,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.10088662057735048,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.009248,
+          "maximumSeconds": 0.02217,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.10212592439262143,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.09548270290310834,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0809999999999995,
+            "maximumMs": 22.169999999999998,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.07582944409845904,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.03339,
+          "maximumSeconds": 0.03339,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.10039920223099116,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1052947990065014,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0445,
+            "maximumMs": 33.39,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.07582944409845904,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.033621,
+          "maximumSeconds": 0.033621,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.10039920223099116,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1052947990065014,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.056500000000001,
+            "maximumMs": 33.620999999999995,
+            "over50Ms": 0
+          }
+        }
+      ],
+      "timing": {
+        "all": {
+          "calls": 7200,
+          "medianMs": 7.029,
+          "maximumMs": 33.739,
+          "over50Ms": 0
+        },
+        "admission": {
+          "calls": 12,
+          "medianMs": 27.263999999999996,
+          "maximumMs": 33.739,
+          "over50Ms": 0
+        },
+        "continuation": {
+          "calls": 710,
+          "medianMs": 13.9035,
+          "maximumMs": 31.834,
+          "over50Ms": 0
+        },
+        "cruise": {
+          "calls": 6478,
+          "medianMs": 7.019,
+          "maximumMs": 9.938,
+          "over50Ms": 0
+        }
+      },
+      "maximumFrame": {
+        "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.json",
+        "frame": 1,
+        "seconds": 0.033739,
+        "kind": "admission",
+        "phase": {
+          "inputPreparationSeconds": 0.000975,
+          "formulationSeconds": 0.025935,
+          "solveSeconds": 0
+        }
+      }
+    },
+    "strict": {
+      "trials": [
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.0006150720565774037,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.032715,
+          "maximumSeconds": 0.032715,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 7.28046038112457e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": 0.08582290633764128,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.099,
+            "maximumMs": 32.715,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.0006150720565774037,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.032519,
+          "maximumSeconds": 0.032519,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 7.28046038112457e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": 0.08582290633764128,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.004,
+            "maximumMs": 32.519,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.005782571632208633,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.00952,
+          "maximumSeconds": 0.021019,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 6.160206667523757e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": -0.05386406178188863,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.983,
+            "maximumMs": 21.019,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": -0.005782571632208633,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.009273,
+          "maximumSeconds": 0.020892,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 6.160206667523757e-05,
+          "sampledCollisionFree": false,
+          "minimumSampledModelDomainMargin": -0.05386406178188863,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.9295,
+            "maximumMs": 20.892,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.51969553186302,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.016925,
+          "maximumSeconds": 0.016925,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 9.51969553186302,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.39994063732390395,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.9235,
+            "maximumMs": 16.925,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.51969553186302,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.018057,
+          "maximumSeconds": 0.018057,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 9.51969553186302,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.39994063732390395,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.992,
+            "maximumMs": 18.057,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.09937430648243359,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.034141,
+          "maximumSeconds": 0.034141,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.10063708431359375,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.06603485837249373,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0809999999999995,
+            "maximumMs": 34.141,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.09937430648243359,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.033762,
+          "maximumSeconds": 0.033762,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.10063708431359375,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.06603485837249373,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.036,
+            "maximumMs": 33.762,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.10088662057735048,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.009176,
+          "maximumSeconds": 0.021701,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.10212592439262143,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.09548270290310834,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0335,
+            "maximumMs": 21.701,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.10088662057735048,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.010048,
+          "maximumSeconds": 0.021671,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.10212592439262143,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.09548270290310834,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.085,
+            "maximumMs": 21.671,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.07582944409845904,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.035101,
+          "maximumSeconds": 0.035101,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.10039920223099116,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1052947990065014,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0705,
+            "maximumMs": 35.101,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.07582944409845904,
+          "allCertified": true,
+          "fullPlanAdmissions": 0,
+          "firstFrameSeconds": 0.033666,
+          "maximumSeconds": 0.033666,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.10039920223099116,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1052947990065014,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0695,
+            "maximumMs": 33.666000000000004,
+            "over50Ms": 0
+          }
+        }
+      ],
+      "timing": {
+        "all": {
+          "calls": 7200,
+          "medianMs": 7.033,
+          "maximumMs": 35.101,
+          "over50Ms": 0
+        },
+        "admission": {
+          "calls": 12,
+          "medianMs": 27.110000000000003,
+          "maximumMs": 35.101,
+          "over50Ms": 0
+        },
+        "continuation": {
+          "calls": 710,
+          "medianMs": 13.836,
+          "maximumMs": 32.34,
+          "over50Ms": 0
+        },
+        "cruise": {
+          "calls": 6478,
+          "medianMs": 7.024,
+          "maximumMs": 11.857,
+          "over50Ms": 0
+        }
+      },
+      "maximumFrame": {
+        "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.json",
+        "frame": 1,
+        "seconds": 0.035101,
+        "kind": "admission",
+        "phase": {
+          "inputPreparationSeconds": 0.001673,
+          "formulationSeconds": 0.026503,
+          "solveSeconds": 0
+        }
+      }
+    }
+  },
+  "sensitivity": {
+    "plateauFine": {
+      "fixtures": 30,
+      "certified": 30,
+      "activeTargets": 28,
+      "fullPlanAdmissions": 8
+    },
+    "taperCoarse": {
+      "fixtures": 30,
+      "certified": 30,
+      "activeTargets": 28,
+      "fullPlanAdmissions": 0
+    }
+  },
+  "shapeSweep": [
+    {
+      "shoulderFraction": 1,
+      "fixtures": 6,
+      "scalarCertificates": 0
+    },
+    {
+      "shoulderFraction": 0.9,
+      "fixtures": 6,
+      "scalarCertificates": 4
+    },
+    {
+      "shoulderFraction": 0.8,
+      "fixtures": 6,
+      "scalarCertificates": 6
+    },
+    {
+      "shoulderFraction": 0.7,
+      "fixtures": 6,
+      "scalarCertificates": 0
+    }
+  ],
+  "excludedWarmupHolds": 1680,
+  "independentAudit": [
+    {
+      "scenario": "crossing",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 7.850476048459103,
+      "minimumRefinedSatGap": 7.850476048459103,
+      "refinedMinimumTime": 0.47500000000000003,
+      "minimumRefinedBodyGap": 9.519500954495808,
+      "refinedBodyMinimumTime": 0.30180000000000007,
+      "minimumNodeSatGap": 8.050423191149495,
+      "nominalMinimumSatGap": 7.85,
+      "nominalMinimumTime": 0.475,
+      "nominalSampledCollision": false
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": -0.005782571632209521,
+      "minimumRefinedSatGap": -0.005808359416005882,
+      "refinedMinimumTime": 3.7312000000000003,
+      "minimumRefinedBodyGap": -0.005808359416005882,
+      "refinedBodyMinimumTime": 3.7312000000000003,
+      "minimumNodeSatGap": 6.16020666754924e-05,
+      "nominalMinimumSatGap": -1.9000000000000004,
+      "nominalMinimumTime": 3.725,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": -0.0006150720565778478,
+      "minimumRefinedSatGap": -0.0006181367146158578,
+      "refinedMinimumTime": 1.6839000000000002,
+      "minimumRefinedBodyGap": -0.0006181367146156358,
+      "refinedBodyMinimumTime": 1.6839000000000002,
+      "minimumNodeSatGap": 7.280460381076104e-05,
+      "nominalMinimumSatGap": -1.9,
+      "nominalMinimumTime": 1.5150000000000001,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.07561189732663642,
+      "minimumRefinedSatGap": 0.06841242769027067,
+      "refinedMinimumTime": 1.6766,
+      "minimumRefinedBodyGap": 0.07514560681692535,
+      "refinedBodyMinimumTime": 1.679,
+      "minimumNodeSatGap": 0.10039920223099141,
+      "nominalMinimumSatGap": -3.3596270462452713,
+      "nominalMinimumTime": 1.875,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.10088662057735043,
+      "minimumRefinedSatGap": 0.10086258048249541,
+      "refinedMinimumTime": 3.7412,
+      "minimumRefinedBodyGap": 0.10086258048249534,
+      "refinedBodyMinimumTime": 3.7412,
+      "minimumNodeSatGap": 0.10212592439262114,
+      "nominalMinimumSatGap": -1.9271008185150427,
+      "nominalMinimumTime": 3.745,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.08730263542034677,
+      "minimumRefinedSatGap": 0.07838760863865968,
+      "refinedMinimumTime": 1.2461000000000002,
+      "minimumRefinedBodyGap": 0.09777540733882167,
+      "refinedBodyMinimumTime": 1.2475000000000003,
+      "minimumNodeSatGap": 0.0998911729173575,
+      "nominalMinimumSatGap": -1.9349273315610707,
+      "nominalMinimumTime": 1.72,
+      "nominalSampledCollision": true
+    }
+  ],
+  "generatedMexVerification": {
+    "admissionStatus": 1,
+    "admissionDecisionMaximumError": 2.6645352591003757e-15,
+    "continuationStatus": 2,
+    "continuationDecisionMaximumError": 0,
+    "originalVerifierPassed": true
+  },
+  "tests": {
+    "scope": "Complete suite plus rerun of the only revised test class; production sources unchanged",
+    "total": 765,
+    "passed": 765,
+    "failed": 0,
+    "incomplete": 0,
+    "durationSeconds": 560.938895,
+    "initialFullSuiteTotal": 763,
+    "initialFullSuitePassed": 762,
+    "initialFailedTest": "nodeCertificateTest/everyNodeOfTheAcceptedPlanIsPhysicallyClear(sampleTime=fiftyMilliseconds)",
+    "rerunClass": "nodeCertificateTest",
+    "rerunPassed": 12,
+    "rerunFailed": 0
+  },
+  "codeAnalysis": [
+    {
+      "file": "config/collisionAvoidanceControllerConfig.m",
+      "settings": "factory",
+      "issues": []
+    },
+    {
+      "file": "controller/solveHardCbfClf.m",
+      "settings": "factory",
+      "issues": {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 486,
+        "column": [
+          24,
+          27
+        ]
+      }
+    },
+    {
+      "file": "controller/collisionAvoidanceController.m",
+      "settings": "factory",
+      "issues": []
+    },
+    {
+      "file": "scripts/runTaperedAdmissionValidation.m",
+      "settings": "factory",
+      "issues": [
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 129,
+          "column": [
+            9,
+            13
+          ]
+        },
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 132,
+          "column": [
+            25,
+            29
+          ]
+        },
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 133,
+          "column": [
+            33,
+            37
+          ]
+        },
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 134,
+          "column": [
+            29,
+            33
+          ]
+        },
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 135,
+          "column": [
+            30,
+            34
+          ]
+        }
+      ]
+    },
+    {
+      "file": "scripts/runExactStateRecursiveFeasibilityScenario.m",
+      "settings": "factory",
+      "issues": []
+    },
+    {
+      "file": "scripts/standaloneControllerBenchmark.m",
+      "settings": "factory",
+      "issues": []
+    },
+    {
+      "file": "tests/taperedAdmissionTest.m",
+      "settings": "factory",
+      "issues": []
+    },
+    {
+      "file": "tests/fullPlanAdmissionTest.m",
+      "settings": "factory",
+      "issues": []
+    },
+    {
+      "file": "tests/standaloneControllerFrameTest.m",
+      "settings": "factory",
+      "issues": []
+    },
+    {
+      "file": "tests/nodeCertificateTest.m",
+      "settings": "factory",
+      "issues": []
+    }
+  ],
+  "artifactsSha256": {
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/all-tests-final.log": "8b8f886e6f8f890f3c92f199c7abe9853b9139684ffa6fd61daf692fe5d2a032",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/all-tests-final.mat": "04d9679b8c6bd8261b5825256ef62693845eef02fdd090ca04c30503d944d0db",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/auditTaperedCampaign.m": "32ba356f42dd6ac8f5f942ad9229b330887b30a4a94d3ec892b868a5d5f2868e",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/campaign.json": "bf7cd4bce9e2f5d94abbeffae689795be9c84e697bfa662350a790e200339875",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/code-analysis.json": "10f752a6df9d02d3e5bb30a94b1795904ab0d7311a4e0fa88fe0079f64bef4a5",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.json": "4ea24efeb0fd4ded1ca935e000c08109f468e8aa842a2b692512adbaf0d95f48",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat": "62560fbc5ce8d3a89a1d57d1d355be3f0ed59eff96cb521d84444e26c7d47986",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.json": "3dd50312f542519b34d1eaa969200de4c1dd6af79bddc297c902085e5e31797b",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.mat": "352aa9ee3473438692e8bfde402685f095cb8a64c09ad24d463ab5f9fee6dba9",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.json": "7767d098af1f3c5ca487d76aeccb17dbff0cbd479d3b34d5930865b79a9b9ec9",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat": "6117b1c9193fa61a815edc3a8f5227f1bb383ed1cef9924517ebbd40d26066a9",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.json": "46668b3c39a69e20a606944e8e4e58cf5a2d1b62b9edc0401f6acdae5da2f8c2",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.mat": "cca28ccc4b30f592dc7d72da557afe906af3dd1c13a280795a5c1974193b5f3e",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.json": "ce2f65749df8ca9fbad0ad9adbbf5a3652afde650db570646ff235cc4dd33e97",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat": "823ff975b4dd76086d9fdbeb9c0865b1ee4826b329e5e93a3a020d12c1db4118",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.json": "c955b905d7e094eb41fc409fcf0d4ec63c634a0b4aa8833c4605bca20263422a",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.mat": "018ca1b43c26676d68705544dc40b1b2c9297ffb42c54d578cb293e854d8676c",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.json": "9eeec9bf9fcc456bf60996fd379b9932911d878921da059c552021b6c4760033",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat": "55fd380fc9e41d670551ac99c6abcdc62c2685fb8edfce98f4b174074678a12f",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.json": "76f49dba6901cde979c8d78b4fef768fb9199f84345bc7fefa1fa84a4e67d014",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.mat": "b2cf2c62bac6f27410d39e1177b121f15054fb4042d00f68912edd4707c3215b",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.json": "587c475626916b3ace61ac67e6e27168cf9b6c7c8b69f19c8168731792f0ae5f",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat": "5b70123d7394e6c798c671a65661fb10612fab2ca90818bb68df1ef7d0f07347",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.json": "f90388eba9fc93608b985247b40a08cf4c0331aafcfc24eb2ae1e84b65bbeac0",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.mat": "6935b3a367b7d5dc67330ea60855cb8477513631e0d3904bd732a8864a1e1b14",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.json": "e7719c3d63462ee737b3be9c277d1c5afad251f1dc9d2896e41ffc150c7a7062",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat": "63ae1001de3f4945a946f69a5160011d4a0b5cc3a962ec7e8f59e661884799fb",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.json": "af671abda1d6f3f53cc44f76ca41e0cffea64bef9053e9ad244693b55860c21a",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.mat": "3fc5b25f4852dfe3d4546f131beed80222162c9634631c1252cd4d423da45035",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/finalizeTaperTests.m": "7832fbc64d2e8e9c573373e6f81eb5abef17c82da29ab2bee35a7fc3d5d89c0b",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/full-suite-before-test-update.mat": "125410a8b8e952c0474e4f664b5fbdeafee66f27d241e252e696f6a4898e0db3",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/generated/standaloneControllerFrameMex.mexa64": "09971b21d7ffa042118bb008e8d7047db5986653dae3fb10a05c90ad4ba3ab33",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/generated/verification.json": "882da936e0f89ecb3148c588a3d10c90a39aefa15a9e65a31a9e65283158305a",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/generated-audit.log": "4f5f545ace5541ddb1aa7bbc2edb050c0019be179d9bffc78dcdc32108c23316",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/independent-audit.json": "cc9d32868abd1c47c5e52e231312198812bae12d616540412e14bee799cf5514",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/probeAdmissionShapes.m": "578b43597d3d99229e5e31b8a8823cbe2a2b8c3078d78e79ce8036824e767fc7",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/replay.json": "c3bd3986486f0a7d978e663db1acaf927a6c85d93167b66acaf39e405de29f83",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/sensitivity.json": "1303061e4a8da32e9c62e11814a7bfdc8a6e1869c14b8e2a3550b34ac7e675d7",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/shape-sweep.json": "3d269a52c72b544b263b698acd74a045ce110cd6e326c7160056390e2c5b637a",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/shapedAdmissionProbe.m": "c8b18df22f7a4eaa07d33f292d4bdea8d23f787de5f7fdbb79648aec2a5cea7f",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-crossing-1/crossing-exact-state.json": "b509ce2385d73575efcf65a9152595b7d2aa1fcf850792dcaf07d2efd55693bf",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-crossing-1/crossing-exact-state.mat": "7955e78d703e5d7fe0ad96312f268acde0c1615e1108728ecc0e9fa73a82700e",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-crossing-2/crossing-exact-state.json": "b556eea01f26cb202213cca540b1f54bb59e3d4d2ce9f8991919b918f1401991",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-crossing-2/crossing-exact-state.mat": "b54ffa22d1a32549eef28ae324dfdb468895fbcc5307b99f286512dc6a305940",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.json": "fbdcf1e7152bff1c866bd6c459e76f255ee4ba393bc0293ea970ca04ed3be495",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.mat": "e90779e42d30798d9990a93a2c78145d91456382fb319bae507deaafb22b3c95",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.json": "fb5fb81638eb44c54bd7ef743c27e2b9382fb138a5de92ebde4183d76e1f6f31",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.mat": "44fd8434d152f9fd7eb35d1c859f20b20779076d97b524f89160f92cc1743632",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-stationary-1/stationary-exact-state.json": "9ddbf5284366f932bd06435bb0aafb9d116e81d2f1d1d8835f51a77f9f5aef51",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-stationary-1/stationary-exact-state.mat": "4207a09f713d96f3f4ec858cde1d69d908aa3914d5e9c3226903ca67eb2b9247",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-stationary-2/stationary-exact-state.json": "bc89c9333569fa98b3db0421cd080132b314da23923e000088a4f5f0bd843afc",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0-stationary-2/stationary-exact-state.mat": "c14171bf3c38cfd238e8f6431c4327701ed408cc049f0ee6fee37fb067c7a124",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.json": "fa35bbafffa731132168d8326b1da2804dc7a59c7bcc42b783f8d6d43fc51911",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.mat": "4a61295721bfb83d8c7862a749248fcf72c4007a2973839b30fa16687c920b52",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.json": "0230f7488723d269a4952cab25c8123554f48d6bbc70bdc6f990f5f8658dad51",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.mat": "eebc3807a51f69082244a36d98a78a84d1db5a214f573e50c05dfbfc796a4a40",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.json": "654daccc8b91aa95ac92390219c4a5d01f24d1baf89be67d1868d25bdc92ef7a",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.mat": "fbd8fbbc4cd607ddd1137572629c3fa71cde6c15f9ea9adf586c1de49fc6c1f2",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.json": "8e83c2877cd9be9b8ab75dbc8dd5f2e9dec29fe10837d83c5340ac82cad16e7c",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.mat": "301ecf1d39bb5e5e0e23a6a5b5b78c739c92d92d7fab2cdacd7d8a9ca8744226",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.json": "edef5e66efd35649ab8ca5b564093df90135629d75ac5b86d0cba9e4c3e12f36",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.mat": "49cf814da101b6fb382723cb65d34e453e4fb81869c6ed0787eb8a8dfb43fd64",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.json": "85ad8a17109015edb0c2ec8cc75745d8e8da2440f7e223bcfbf21e5920624283",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.mat": "e4179f00c7a936c4d2e64a3cb241b45245e21d44b7f24ac1440d2bfbff376824",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/test-results.json": "c417e2ff630dd2c27b53ec570c7e1f9a08e669e06e9aaf4d72205fd8c5836c6e",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/verifyGeneratedTaper.m": "bf227a80d26a57b40624d92b4128e7a7cbbf53d8da2271d254e98ae3f6cd8f64",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0-crossing-1/crossing-exact-state.json": "9ee12f8d8687f200d86dc3be0e1ca3e1276c9b7b16fa0075a51f3e5ee3f415a7",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0-crossing-2/crossing-exact-state.json": "adcaa5071ace83651ad7cd84fc3925f5b34b66ae409eef1b1203a48eedc0a0c2",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0-oncoming-1/oncoming-exact-state.json": "2e8b4f039b2ebbd020e60446424008b4dc8da3721acc830d69df2e152bb5bac8",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0-oncoming-2/oncoming-exact-state.json": "99c170d292be3a8b7beb4f65405bba2d3dfa2e37f1ed88f42cd4345698a24755",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0-stationary-1/stationary-exact-state.json": "bc883e15dd0d6abe41c246ab5d388c3d3ab872ce8d97268c14afe832e11af91c",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0-stationary-2/stationary-exact-state.json": "d0f02c59e1230d5d9106a4954af8c2317443c451872fbaca8856f759e1615d80",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0.01-crossing-1/crossing-exact-state.json": "fee1e9591461f47db60565cbcab2dfb4106c9d58484664d66e4a4241234f8dfc",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0.01-crossing-2/crossing-exact-state.json": "1cbacb0b6c191e0890de8b60a3a1eabc793e64e1d3b582d5883ed439caf8be9f",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0.01-oncoming-1/oncoming-exact-state.json": "9e57a15b77dd8d2d49fe33902a7b111d83975322d904949332e01ffb8ada1d3b",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0.01-oncoming-2/oncoming-exact-state.json": "fe8de3f42dd5b2b0afbf5d28d5f6deda91b27105821b08203b2ad72ee11db639",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0.01-stationary-1/stationary-exact-state.json": "25986b917809b5b22cde0e6a1d0176e742cf4cbfb7ef380c10fb16ed151db0ac",
+    "/home/zai/.cache/collisionAvoidance/restricted-admission-20260921/warmup/kappa-0.01-stationary-2/stationary-exact-state.json": "c1fd0c82cec8b8ddb9cc39e4f30d0a2851f8672557c1c56a788ad2feaada9342",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/config/collisionAvoidanceControllerConfig.m": "ab376363a4c4c27d5d125e5eff3a6d63bb68da756826e030dec441e20eebf4a2",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m": "949248b837a844a165b0a07d462ff0e3e6ec4254681968f9a2c2fe5c7e3f4b00",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceStageQp.m": "de76dde95db7de6b6c3a5806bb4e9c4c942e3dcd12abcd6774e5be37043ab351",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m": "6c8bace5c285a8c5ea7e73c0d14f86101b54ac2599f6e4a661ee136c04b9c368",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/fialaCertificate.m": "a1bead6717b4ec4e77a70e884b23a4021b6fdc3e5e12868046a6795dca22a565",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m": "8139ddb13ae15dc8326c9e27d4cc40e9ead49f6155c2c1695320a10d578487f7",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m": "34733f20f813de7a45856e295a711a7367b49a2b2b565928a86ff2b927f45f02",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m": "07bb016f1be0cca0009e25c9f797f5a9f237c527b0240b295732365ce2646483",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m": "fb496561840d9fef1b0cba3cf460dab0189eeee3ae65198c4938ebd9f54859d5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/readPlanningInputs.m": "b605f3343436153da4fd8161606ffc162e30630306213b24d88b5c3e3427bc61",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m": "f33aee2506ac632232305aa4bf35da1cfcfe5447ea6f28065b2eb7a1123675d7",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/stateUncertainty.m": "44f9d3a61afff0d495d473cac1124a8b5b0e6d5a98526da181695fb10df89f0d",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/targetPrediction.m": "02c71faa8004c2d81d0ddc506721f3301bba6914eaed07ed5e8850014c608d13",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/analyzeTaperedAdmissionValidation.py": "641886590de0f024960c15ca06e31ddd0d8af8efcdbcfba341f7021a5927133d",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runExactStateRecursiveFeasibilityScenario.m": "46817a49a284444014d3bd5a3adbd6b82bcae5f1f7c8a3642c050276e4b27f83",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runTaperedAdmissionValidation.m": "5a77eb09fce68b1ee155a0f09a90275cc43bf2207b946b5372976601a94a2363",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/standaloneControllerBenchmark.m": "24722173c4aaf7f4e8a73781bebdce463c3e318154e69c29a46e9689c1325a81",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fullPlanAdmissionTest.m": "25262b03d92f647dd1f2b831fac73026f978ec3832f5bec1dcff1af6a9a84471",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nodeCertificateTest.m": "f675d0f36ac21af0ff89528b9f12ed86f867d0682d0782c35ab64c2b5b38a8ff",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/standaloneControllerFrameTest.m": "6fc0eb70cd0f5d7961ccf9c14a6487ea44c3cfbcf093157f95400b5b67b19671",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/taperedAdmissionTest.m": "197de59f558ef797113f3dad4665fe88db1e63df3cbbabdd4744cdbfeb39e45e"
+  }
+}

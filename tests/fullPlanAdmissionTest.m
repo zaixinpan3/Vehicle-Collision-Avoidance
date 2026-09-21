@@ -26,7 +26,7 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
         end
 
         function unrestrictedAdmissionRecoversTheRejectedCircularSection(testCase)
-            [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+            [ego,target,road,cfg]=localRecoveryFixture();
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.admissionSearch.usedFullPlanAdmission);
             testCase.verifyEqual(problem.metadata.admissionSearch.section.status,"collisionExcluded");
@@ -37,21 +37,21 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
         end
 
         function failedAdmissionSolveCannotIssueItsUncertifiedCenter(testCase)
-            [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+            [ego,target,road,cfg]=localRecoveryFixture();
             cfg.solver.jointFunction=@encounterTestFixture.fail;
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
         end
 
         function aPositiveSolverFlagCannotBypassAdmissionVerification(testCase)
-            [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+            [ego,target,road,cfg]=localRecoveryFixture();
             cfg.solver.jointFunction=@encounterTestFixture.unsafe;
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
         end
 
         function anExpiredBudgetCannotStartUnrestrictedAdmission(testCase)
-            [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+            [ego,target,road,cfg]=localRecoveryFixture();
             cfg.solver.certificateSearchTimeLimit=1e-9;
             [cfg.solver.jointFunction,count]=localCountedFailure();
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
@@ -79,9 +79,15 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             testCase.verifyTrue(all(report.hardCertificateVerified));
             testCase.verifyTrue(any(report.confirmedRelease));
             testCase.verifyGreaterThan(report.minimumSampledBodyGap,0);
-            testCase.verifyEqual(sum(report.restorationSolverCallCount),1);
+            testCase.verifyEqual(sum(report.restorationSolverCallCount),0);
         end
     end
+end
+
+function [ego,target,road,cfg]=localRecoveryFixture()
+    [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+    cfg.admission.temporalShoulderFraction=1;
+    cfg.admission.normalCount=32;cfg.admission.amplitudeCells=16;
 end
 
 function [hook,count]=localCountedFailure()

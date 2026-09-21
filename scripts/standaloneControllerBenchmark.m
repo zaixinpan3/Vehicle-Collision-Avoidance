@@ -10,7 +10,7 @@ classdef standaloneControllerBenchmark
                 'layout','feasibleWitness','clfNumericalReserve','inheritedPredictionFamily'};
             p=rmfield(p,setdiff(fieldnames(p),keep));
             p.prediction=rmfield(p.prediction,setdiff(fieldnames(p.prediction), ...
-                {'stageCount','stageMatrixA','stageMatrixB','stageAffine','egoStateMatrix','egoStateOffset'}));
+                {'stageCount','stageMatrixA','stageMatrixB','stageAffine','egoStateMatrix','egoStateOffset','scheduleCurvature'}));
             g=p.geometry;
             p.geometry=struct('label',zeros(numel(g.label),1),'local',g.local, ...
                 'frames',g.frames,'physicalBound',g.physicalBound);

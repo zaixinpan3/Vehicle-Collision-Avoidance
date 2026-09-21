@@ -648,7 +648,15 @@ function [direction,residual]=localDirection(program,cfg,states)
         constraint(end-1:end,end-1:end)=eye(2);
         terminalChange=zeros(6,1);index=program.terminal.stateIndex;
         terminalChange(index)=program.terminal.reference(index)-states(index,end);
-        desired=[repmat(transverse,numel(samples),1);terminalChange; ...
+        % A single smooth taper reduces premature chart excursions while
+        % retaining one amplitude and the same terminal interpolation rows.
+        phase=(samples-first)/max(last-first,1);
+        fraction=cfg.admission.temporalShoulderFraction;
+        % Straight charts have no curvature remainder; retain their plateau
+        % instead of adding an unnecessary temporal restriction to a pass.
+        if all(program.prediction.scheduleCurvature==0),fraction=1;end
+        weights=fraction+(1-fraction)*sin(pi*phase);
+        desired=[reshape(transverse*weights,[],1);terminalChange; ...
             program.terminal.input-program.anchorPlan(end-1:end)];
     end
     scale=max(vecnorm(constraint,2,2),eps);constraint=constraint./scale;desired=desired./scale;

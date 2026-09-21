@@ -9,8 +9,11 @@ continuation and collision results. The generic controller configuration already
 used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
 
 Current algorithm (September 21, 2026): format 40 first searches one signed
-affine control section, 16 amplitude geometry cells, 32 support directions and
-32 scalar objective iterations. A restricted admission candidate passes the
+affine control section, 8 amplitude geometry cells, 16 support directions and
+32 scalar objective iterations. Curved predictions use a single temporal taper
+with shoulder fraction 0.8; straight predictions retain the plateau. The smaller
+dictionary and coarser cells deliberately reduce certificate exploration.
+A restricted admission candidate passes the
 independent physical verifier and needs no conic solve. After geometric
 section exclusion, one least-violated proposal can initialize one hard joint
 SOCP with the complete input sequence free. Its uncertified center cannot be

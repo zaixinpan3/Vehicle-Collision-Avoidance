@@ -6,7 +6,8 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % plant, not between nodes (NODE_SAMPLED_CERTIFICATE.md).
 % Store the accepted prediction and terminal witness for next-frame transfer.
 % The terminal law is a mathematical continuation, never a runtime fallback.
-% Fresh admission first searches one signed affine section, then may release
+% Fresh admission searches one signed section, tapered on curved predictions,
+% with a coarser certificate dictionary. It may then release
 % the complete control sequence in one hard solve. Subsequent frames improve
 % the complete verified continuation.
 % Inherited joint-support optimization retains verified incumbents when an

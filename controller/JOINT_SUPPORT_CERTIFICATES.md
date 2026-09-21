@@ -250,7 +250,7 @@ Choose the target with the largest violated nominal support certificate and
 the first, middle and last violated stages for that target. The nominal
 relative motion defines a transverse displacement direction in the first
 pose chart. A stationary relative-motion tie uses the chart lateral axis.
-Compute one minimum-energy input deformation that produces unit displacements
+Compute one minimum-energy input deformation that produces prescribed displacements
 in that direction at the selected stages, a final correction to the terminal
 reference and a compatible last-input correction. At a trim origin the latter
 corrections are zero. If nominal geometry is already clear but the base witness
@@ -263,6 +263,22 @@ if these design equalities are rank deficient. The rule chooses no amplitude
 or left/right route. It does restrict the control-sequence shape and the
 relative steering/braking timing; that loss of freedom is explicit.
 
+On a curved prediction, the displacement at selected stage $k$ is weighted by
+
+\[
+w_k=\rho+(1-\rho)\sin\!\left(\pi\frac{k-k_a}{\max(k_b-k_a,1)}\right),
+\qquad \rho=\texttt{admission.temporalShoulderFraction}\in(0,1].
+\]
+
+Here $k_a,k_b$ are the first and last violated stages. The default $\rho=0.8$
+reduces the shoulders while retaining the middle peak; it addresses premature
+chart-boundary excursions without adding another search coordinate. Exactly
+straight predictions retain $w_k=1$, avoiding an observed oncoming-admission
+regression from unnecessary tapering. Setting $\rho=1$ restores the plateau
+on all roads. Terminal interpolation rows and all acceptance constraints are
+unchanged. This is one deterministic direction, not a catalog of attempted
+time shapes. It can miss plans available to other shapes.
+
 Propagate the origin and direction through the declared affine stages. Actuator,
 slew, chart and terminal linear rows reduce to scalar half-lines. A terminal
 modal cone has a fixed radius and becomes an interval obtained by projecting
@@ -270,11 +286,11 @@ its affine center onto the scalar direction. A negative radius is rejected
 before squaring. Their intersection is the hard base interval $I_0$.
 
 Partition $I_0$ into `admission.amplitudeCells` uniform closed cells (default
-16). This refines geometry on the **same** control line; it does not create new
+8). This refines geometry on the **same** control line; it does not create new
 control modes or solver starts. For each cell, bound the entire affine nominal
 yaw range plus its stored uncertainty. Position maps, target yaw/position
 uncertainty and pose-chart remainders retain the original certificate scope.
-Use `admission.normalCount` unit directions (default 32), uniformly spaced and
+Use `admission.normalCount` unit directions (default 16), uniformly spaced and
 rotated by the initial chart heading. The vectorized analytic rectangle support
 checks both yaw endpoints and any interior support maximizer.
 
@@ -297,6 +313,11 @@ endpoint. Each cell yields at most $R+1$ closed components for $R$ records.
 With $C$ amplitude cells and $L$ normals, geometric work is
 $O(C(RL+R\log R))$, excluding prediction, basis construction, objective and
 verification. Shared cell endpoints may appear twice without changing safety.
+Compared with the previous 32 directions and 16 cells, the default evaluates
+one quarter as many cell/record/direction combinations. For an unchanged
+control line, fewer support directions and wider yaw-enclosure cells can lose
+certifiable amplitudes; they do not authorize a point that fails the independent
+original verifier. The changed tapered line is not a subset of the old plateau.
 The selected numerical candidate is moved inward where possible and must pass
 independent original constraints; endpoint arithmetic alone never authorizes
 execution.
