@@ -2,6 +2,8 @@
 
 Current controller: [Fixed-direction convex trajectory optimization](../controller/JOINT_SUPPORT_CERTIFICATES.md). Direction search only initializes the trajectory optimization. The selected normals remain fixed, and every new admission requires a full hard-constrained SOCP result. Inherited frames optimize the complete control sequence using retained directions.
 
+Latest initialization study: [Cheng virtual-fluid reference construction and offline convex admission](CHENG_FLUID_INITIALIZATION_REVIEW_20260921.md). The paper's modified-function path rule yields a Gaussian lateral excursion. A motion-aware curved-road prototype supplies fixed normals that admit six mirrored crossing fixtures at selected widths; all 60 parameter-study outcomes, including failures, are retained. Production initialization is unchanged; no new closed-loop or runtime claim is made.
+
 Latest implementation and validation: [Mandatory full trajectory optimization after direction selection](FIXED_DIRECTION_CONVEX_OPTIMIZATION_20260921.md). This supersedes the scalar direct-output and joint-normal branches of the preceding implementation. Warmup is excluded from the measured runtime results.
 
 Preceding algorithm optimization: [Tapered admission, coarser exploration and warmed paired validation](TAPERED_ADMISSION_OPTIMIZATION_20260921.md). Circular-crossing replay median/max decreases from 57.9145/60.332 to 30.6155/33.421 ms. All 14,400 measured frames complete below 50 ms, including 7,200 under the strict deadline. Refined circular-crossing body gap is 0.075145607 m; known straight inter-node overlaps persist. These finite observations are not a worst-case runtime or continuous-safety guarantee.
