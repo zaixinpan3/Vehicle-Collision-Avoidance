@@ -3,20 +3,30 @@
 Prepared September 21, 2026. Controller revision:
 `cce7dc307a6ab086f95c96db78fa5101425a5eee`.
 
-The measured campaign maximum is the first straight-stationary admission,
-104.576 ms, with **zero native solver calls**. The circular-crossing maximum is
-its second repetition's first admission, 64.545 ms, with one full-plan solve.
-Including the separately recorded startup warmups, the maximum is 906.718 ms.
-All three are frame 1 at simulation time zero; none has an inherited plan.
+Assessment scope clarified September 21, 2026: exclude warmup/startup overhead
+from the real-time assessment. Use uninstrumented measurements after warming
+the same execution path. Fresh admission after detecting an obstacle remains
+online work, even when it occurs at simulation time zero; warming executable
+code does not supply an inherited feasible plan.
 
-Exact-input, uninstrumented warm replay takes 34.865 ms median for the straight
-frame and 60.888 ms for the circular frame. Circular admission therefore has a
-sustained 50 ms deadline problem in this replay, beyond initial-use latency.
+Exact-input, uninstrumented warm replay takes **34.865/37.236 ms median/maximum**
+for straight stationary and **60.888/64.033 ms** for circular crossing. All
+eleven circular replays exceed 50 ms. Circular admission therefore retains a
+50 ms deadline problem after warmup is excluded. The largest clean time among
+these two replay fixtures is 64.033 ms; this is not an exhaustive warmed
+maximum over every scenario and controller state.
+
 Its main costs are fresh prediction/geometry construction, scalar admission
 and proposal selection, joint-program construction, and one 19-iteration
 Clarabel solve. Production controller and configuration files were unchanged.
 
-## Original experimental frames
+## Original experimental frames retained for traceability
+
+The original 104.576 ms straight-frame observation and 906.718 ms startup
+observation remain historical records, rather than the headline warmed-runtime
+results. No estimated warmup duration is subtracted from an individual frame.
+The original measurements below are unchanged; the matched warm replays above
+provide the applicable timing evidence for the clarified assessment scope.
 
 The source is the campaign accompanying
 [the admission repair](CIRCULAR_CROSSING_ADMISSION_REPAIR_20260921.md): three
