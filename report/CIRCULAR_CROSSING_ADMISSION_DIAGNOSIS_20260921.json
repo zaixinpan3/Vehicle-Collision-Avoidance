@@ -1,0 +1,899 @@
+{
+  "sourceRevision": "4b5fd3afdcb60b00d54b08658d50132d1e770771",
+  "originalFailure": "The hard-safety, soft-CLF search failed at t=0 s (Scalar admission found no hard-certified plan: collisionExcluded). No command was issued.",
+  "search": {
+    "hardSolves": 0,
+    "restorationSolves": 0,
+    "baseSolves": 0,
+    "nativeSolves": 0,
+    "familyAttempts": 1,
+    "horizonAttempts": 1,
+    "formulationSeconds": 0.015151,
+    "solveSeconds": 0,
+    "initialOverlappingNodes": 16,
+    "policy": "affineSectionAdmission",
+    "violationHistory": [],
+    "usedCertifiedIncumbent": false,
+    "issuedAdmissionWitness": false,
+    "initialCertificateAngles": [
+      2.9036085794273765,
+      2.910228649581995,
+      2.917252779053259,
+      2.924731196318718,
+      2.9327227544702015,
+      2.941296848012503,
+      2.950535859149995,
+      2.9605383102968306,
+      2.9714229693326195,
+      2.9833342559531975,
+      2.9964494481792867,
+      3.010988414508285,
+      3.0272269426654135,
+      3.0455152714117824,
+      3.0663042749968894,
+      3.090183096808693,
+      3.1179342062789304,
+      -3.1325699135307135,
+      -3.09350137545463,
+      -3.072903583491578,
+      -3.0689033273718334,
+      -3.0649030712520884,
+      -3.0609028151323443,
+      -3.0569025590125998,
+      -3.0529023028928552,
+      -3.0489020467731107,
+      -3.0449017906533657,
+      -3.040901534533621,
+      -3.0369012784138842,
+      -3.032901022294132,
+      -2.9915926535897936,
+      -2.991592653589793,
+      -2.9915926535897936,
+      -2.9915926535897936,
+      -2.9915926535897936,
+      -2.991592653589793,
+      -2.9915926535897936,
+      0.1499999999999998,
+      0.14999999999999902,
+      0.14999999999999974,
+      0.1499999999999998,
+      0.1499999999999998,
+      0.1499999999999998,
+      0.14999999999999974,
+      0.1499999999999998,
+      0.15000000000001054,
+      0.14999999999999958,
+      0.1499999999999991,
+      0.14999999999999977,
+      0.14999999999999977,
+      0.1499999999999997,
+      0.14999999999999974,
+      0.14999999999999977,
+      0.1499999999999998,
+      0.1368035496091353,
+      0.09280173197258833,
+      0.05725480840863289,
+      0.028090621031753454,
+      0.003840547615073904,
+      -0.01655770426539724,
+      -0.03388768545437243,
+      -0.04873795628561819,
+      -0.061558051099253254,
+      -0.07269658091399422,
+      -0.08242765694777215,
+      -0.09096953973593218,
+      -0.09849802052612987,
+      -0.1051561719652292,
+      -0.11106155555517536,
+      -0.11631162033575577,
+      -0.12098779671608031,
+      -0.1251586363997469,
+      -0.12888224626852954,
+      -0.13220819361049382,
+      -0.13517901122011478,
+      -0.13783139658339105,
+      -0.14019717496333475,
+      -0.14230407865253822,
+      -0.14417638189908277,
+      -0.14583542163746976,
+      -0.14730002720222896,
+      -0.14858687699602854,
+      -0.14971079615320793,
+      -0.1506850062471442,
+      -0.15152133579405141,
+      -0.15223039853158596,
+      -0.15282174506990248,
+      -0.1533039924312111,
+      -0.15368493514132398,
+      -0.1539716408605382,
+      -0.15417053300205533,
+      -0.15428746235373786,
+      -0.15432776937055903,
+      -0.15429633852282149,
+      -0.15419764585548842,
+      -0.15403580072620643,
+      -0.21924166550009658
+    ],
+    "section": {
+      "status": "collisionExcluded",
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "safeIntervals": [],
+      "amplitude": null,
+      "basisResidual": 2.7755575615628914e-16,
+      "normalCount": 32,
+      "amplitudeCells": 16,
+      "maximumYaw": null
+    }
+  },
+  "horizonSteps": 96,
+  "horizonSeconds": 4.800000000000001,
+  "controlVariables": 192,
+  "recordCount": 97,
+  "violatingStages": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "deformationStages": [
+    29,
+    38,
+    46
+  ],
+  "basisResidual": 2.7755575615628914e-16,
+  "deformationPositions": [
+    [
+      0.4165970244985544,
+      0.4165970244985536,
+      0.4165970244985542
+    ],
+    [
+      0.9090912600938102,
+      0.9090912600938093,
+      0.9090912600938085
+    ]
+  ],
+  "terminalDeformation": [
+    2.7459123302046874e-15,
+    -8.641226952723984e-15,
+    -2.6615164346304997e-16,
+    2.8221818017669164e-16,
+    8.952872952738881e-17,
+    4.0275947767415145e-17
+  ],
+  "initialInputDirection": [
+    0.035338434880656786,
+    0.044148598042865084
+  ],
+  "terminalInputDirection": [
+    5.2923559046836864e-17,
+    2.1706376585863072e-17
+  ],
+  "linearBase": [
+    -4.3316180630804775,
+    4.331610104760229
+  ],
+  "lowerLimitingRow": "poseDomain",
+  "upperLimitingRow": "poseDomain",
+  "lowerLimitingRowNumber": 191,
+  "upperLimitingRowNumber": 188,
+  "finalBase": [
+    -4.3316180630804775,
+    4.331610104760229
+  ],
+  "maximumPositionBall": 0.10080001108260965,
+  "maximumEgoYawRadius": 0,
+  "maximumTargetYawRadius": 0,
+  "dictionarySweeps": [
+    {
+      "normals": 32,
+      "cells": 16,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.011687
+    },
+    {
+      "normals": 32,
+      "cells": 64,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.01786
+    },
+    {
+      "normals": 32,
+      "cells": 256,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.074232
+    },
+    {
+      "normals": 128,
+      "cells": 16,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.016657
+    },
+    {
+      "normals": 128,
+      "cells": 64,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.05853
+    },
+    {
+      "normals": 128,
+      "cells": 256,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.22537
+    },
+    {
+      "normals": 512,
+      "cells": 16,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.060637
+    },
+    {
+      "normals": 512,
+      "cells": 64,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.223472
+    },
+    {
+      "normals": 512,
+      "cells": 256,
+      "status": "collisionExcluded",
+      "found": false,
+      "baseInterval": [
+        -4.3316180630804775,
+        4.331610104760229
+      ],
+      "seconds": 0.866928
+    }
+  ],
+  "sectionStudy": {
+    "physicalBestMinimumNodeSatGap": 0.08475314826085543,
+    "physicalBestAlpha": -4.3316180630804775,
+    "physicalLimitingStage": 34,
+    "chartBestMinimumNodeSatGap": -0.0038354740302644075,
+    "chartBestAlpha": -4.3316180630804775,
+    "chartLimitingStage": 34,
+    "numberPhysicalSafeSamples": 201,
+    "numberChartSafeSamples": 0,
+    "samples": 20001,
+    "step": 0.00043316140839166906,
+    "endpointMinima": [
+      0.08475314826085543,
+      -0.1213130251724368
+    ],
+    "physicalDomain": [
+      -4.3316180630804775,
+      4.331610104760229
+    ],
+    "rowFamilies": [
+      {
+        "label": "actuator",
+        "interval": [
+          -8.724437139209586,
+          8.450701782299834
+        ],
+        "rows": 384
+      },
+      {
+        "label": "poseDomain",
+        "interval": [
+          -4.3316180630804775,
+          4.331610104760229
+        ],
+        "rows": 576
+      },
+      {
+        "label": "terminalPoseDomain",
+        "interval": [
+          -541875488753053.94,
+          541871152739451.25
+        ],
+        "rows": 6
+      }
+    ],
+    "directionAblation": [
+      {
+        "degrees": 0,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -1.9627495140157036,
+          1.9627481076275872
+        ]
+      },
+      {
+        "degrees": 15,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -2.0316397885030373,
+          2.031638332752298
+        ]
+      },
+      {
+        "degrees": 30,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -2.2655516771477,
+          2.265550053789786
+        ]
+      },
+      {
+        "degrees": 45,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -2.7739735211756438,
+          2.773971533513251
+        ]
+      },
+      {
+        "degrees": 60,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -3.921156984137707,
+          3.921154174472721
+        ]
+      },
+      {
+        "degrees": 75,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -4.072386623097707,
+          4.072379141053711
+        ]
+      },
+      {
+        "degrees": 90,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -3.9277072548503673,
+          3.9277000386203764
+        ]
+      },
+      {
+        "degrees": 105,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -4.060155301917376,
+          4.060147842345531
+        ]
+      },
+      {
+        "degrees": 120,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -3.9298478829063686,
+          3.929850698800747
+        ]
+      },
+      {
+        "degrees": 135,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -2.7775207222177403,
+          2.77752271242327
+        ]
+      },
+      {
+        "degrees": 150,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -2.267223156934323,
+          2.267224781491082
+        ]
+      },
+      {
+        "degrees": 165,
+        "status": "collisionExcluded",
+        "certified": false,
+        "amplitude": null,
+        "baseInterval": [
+          -2.032334514451205,
+          2.032335970700786
+        ]
+      }
+    ]
+  },
+  "witnessStudy": {
+    "exactLine": {
+      "samples": 2001,
+      "bestAlpha": -4.3316180630804775,
+      "bestMinimumOptimisticCertificateGap": -0.003909624684822586,
+      "limitingStage": 34,
+      "limitingTime": 1.7000000000000002,
+      "actualBodyGapAtLimitingStage": 0.08475314826085502,
+      "chartPositionErrorAtLimitingStage": 0.07510577695883215,
+      "positionBall": 0.10080000168446566,
+      "exitGap": 7.089587795784729,
+      "angleRadians": -1.5068649806893823,
+      "unsampledCertifiedGapUpperBound": -0.0016375859342570762,
+      "maximumNodeGapLipschitzConstant": 1.1577745128627652,
+      "entireLineExcluded": true,
+      "baseInspectionStatus": 0,
+      "densePhysicalAudit": {
+        "minimumSampledSatGap": 0.05849629865984429,
+        "time": 1.6853000000000002,
+        "minimumNodeSatGap": 0.08475314826085478,
+        "endpointError": 1.4210854715202004e-14,
+        "denseStepSeconds": 0.0001,
+        "scope": "Independent SAT; 0.1 ms in holds 20:60 and 5 ms elsewhere; physical sample only"
+      }
+    },
+    "chartSensitivity": [
+      {
+        "lateralTrustRadius": 3.5,
+        "status": "collisionExcluded",
+        "baseInterval": [
+          -3.7901546307998495,
+          3.790146672479604
+        ],
+        "amplitude": null,
+        "certified": false,
+        "positionBall": 0.09070001105919655
+      },
+      {
+        "lateralTrustRadius": 4,
+        "status": "collisionExcluded",
+        "baseInterval": [
+          -4.3316180630804775,
+          4.331610104760229
+        ],
+        "amplitude": null,
+        "certified": false,
+        "positionBall": 0.10080001108260965
+      },
+      {
+        "lateralTrustRadius": 4.01,
+        "status": "collisionExcluded",
+        "baseInterval": [
+          -4.342447331726089,
+          4.342439373405842
+        ],
+        "amplitude": null,
+        "certified": false,
+        "positionBall": 0.10100201108307791
+      },
+      {
+        "lateralTrustRadius": 4.05,
+        "status": "candidate",
+        "baseInterval": [
+          -4.38576440630854,
+          4.385756447988293
+        ],
+        "amplitude": -4.362360438887751,
+        "certified": true,
+        "positionBall": 0.10181001108495097
+      },
+      {
+        "lateralTrustRadius": 4.1,
+        "status": "candidate",
+        "baseInterval": [
+          -4.439910749536603,
+          4.439902791216355
+        ],
+        "amplitude": -4.3618029182798255,
+        "certified": true,
+        "positionBall": 0.1028200110872923
+      },
+      {
+        "lateralTrustRadius": 4.2,
+        "status": "candidate",
+        "baseInterval": [
+          -4.548203435992728,
+          4.548195477672482
+        ],
+        "amplitude": -4.360686362442041,
+        "certified": true,
+        "positionBall": 0.104840011091975
+      },
+      {
+        "lateralTrustRadius": 4.5,
+        "status": "candidate",
+        "baseInterval": [
+          -4.604185934002402,
+          4.604180845832783
+        ],
+        "amplitude": -4.365291506704046,
+        "certified": true,
+        "positionBall": 0.11090001110602309
+      },
+      {
+        "lateralTrustRadius": 5,
+        "status": "candidate",
+        "baseInterval": [
+          -4.604185934002402,
+          4.604180845832783
+        ],
+        "amplitude": -4.3757285692888725,
+        "certified": true,
+        "positionBall": 0.12100001112943683
+      }
+    ],
+    "shapeSensitivity": [
+      {
+        "weights": [
+          1,
+          1,
+          1
+        ],
+        "status": "collisionExcluded",
+        "amplitude": null,
+        "baseInterval": [
+          -4.331618063080478,
+          4.33161010476023
+        ],
+        "certified": false,
+        "audit": {}
+      },
+      {
+        "weights": [
+          0.9,
+          1,
+          1
+        ],
+        "status": "collisionExcluded",
+        "amplitude": null,
+        "baseInterval": [
+          -4.33948480150192,
+          4.339471435490341
+        ],
+        "certified": false,
+        "audit": {}
+      },
+      {
+        "weights": [
+          1,
+          0.9,
+          1
+        ],
+        "status": "collisionExcluded",
+        "amplitude": null,
+        "baseInterval": [
+          -4.318623594673292,
+          4.318619097489516
+        ],
+        "certified": false,
+        "audit": {}
+      },
+      {
+        "weights": [
+          1,
+          1,
+          0.9
+        ],
+        "status": "candidate",
+        "amplitude": -4.266557773902121,
+        "baseInterval": [
+          -4.2857712395791125,
+          4.2857628936694105
+        ],
+        "certified": true,
+        "audit": {
+          "minimumSampledSatGap": 0.08997259569983385,
+          "time": 1.6787,
+          "minimumNodeSatGap": 0.1198427659716752,
+          "endpointError": 1.4210854715202004e-14,
+          "denseStepSeconds": 0.0001,
+          "scope": "Independent SAT; 0.1 ms in holds 20:60 and 5 ms elsewhere; physical sample only"
+        }
+      },
+      {
+        "weights": [
+          0.8,
+          1,
+          1
+        ],
+        "status": "collisionExcluded",
+        "amplitude": null,
+        "baseInterval": [
+          -4.302440638067635,
+          4.302427386155481
+        ],
+        "certified": false,
+        "audit": {}
+      },
+      {
+        "weights": [
+          1,
+          1,
+          0.8
+        ],
+        "status": "candidate",
+        "amplitude": -4.173370870071879,
+        "baseInterval": [
+          -4.236587676159226,
+          4.236579426027285
+        ],
+        "certified": true,
+        "audit": {
+          "minimumSampledSatGap": 0.09404553267632298,
+          "time": 1.6739000000000002,
+          "minimumNodeSatGap": 0.12224268990516673,
+          "endpointError": 2.1316282072803006e-14,
+          "denseStepSeconds": 0.0001,
+          "scope": "Independent SAT; 0.1 ms in holds 20:60 and 5 ms elsewhere; physical sample only"
+        }
+      },
+      {
+        "weights": [
+          0.8,
+          1,
+          0.8
+        ],
+        "status": "candidate",
+        "amplitude": -4.2184146094792885,
+        "baseInterval": [
+          -4.398520646220585,
+          4.398510004934269
+        ],
+        "certified": true,
+        "audit": {
+          "minimumSampledSatGap": 0.15494648969989067,
+          "time": 1.6335000000000002,
+          "minimumNodeSatGap": 0.19098509485145776,
+          "endpointError": 2.1316282072803006e-14,
+          "denseStepSeconds": 0.0001,
+          "scope": "Independent SAT; 0.1 ms in holds 20:60 and 5 ms elsewhere; physical sample only"
+        }
+      },
+      {
+        "weights": [
+          1,
+          0.8,
+          1
+        ],
+        "status": "collisionExcluded",
+        "amplitude": null,
+        "baseInterval": [
+          -4.031445718469696,
+          4.031441777518373
+        ],
+        "certified": false,
+        "audit": {}
+      },
+      {
+        "weights": [
+          0.5,
+          1,
+          0.5
+        ],
+        "status": "collisionExcluded",
+        "amplitude": null,
+        "baseInterval": [
+          -2.1716152101527326,
+          2.3760909077049743
+        ],
+        "certified": false,
+        "audit": {}
+      },
+      {
+        "weights": [
+          1,
+          1.2,
+          1
+        ],
+        "status": "candidate",
+        "amplitude": -3.5321867997496454,
+        "baseInterval": [
+          -3.6646164813168673,
+          3.6646076155557736
+        ],
+        "certified": true,
+        "audit": {
+          "minimumSampledSatGap": 0.1503135331668548,
+          "time": 1.6398000000000001,
+          "minimumNodeSatGap": 0.17082855772216154,
+          "endpointError": 1.4210854715202004e-14,
+          "denseStepSeconds": 0.0001,
+          "scope": "Independent SAT; 0.1 ms in holds 20:60 and 5 ms elsewhere; physical sample only"
+        }
+      }
+    ],
+    "maximumGeneratorRadius": 2.1789220900893395e-08
+  },
+  "verification": {
+    "originalMaximumLateralDeviation": 3.999901450744009,
+    "originalLateralLimitStage": 32,
+    "originalLateralLimitTime": 1.6,
+    "witnesses": [
+      {
+        "shapeIndex": 4,
+        "firstInput": [
+          -0.11391167926915993,
+          -0.1659986533988848
+        ],
+        "clfSlack": 0.039179218686711134,
+        "minimumNodeCertificateGap": 0.02285343550336494,
+        "maximumPhysicalExcess": -0.01803513082768804,
+        "minimumTerminalMargin": 0.17370086993139014,
+        "clfConeResidual": -1.5328016633731067e-14,
+        "maximumStationDeviation": 1.8329865451901597,
+        "maximumLateralDeviation": 3.9819648691723133,
+        "maximumHeadingDeviation": 0.4570002089608299,
+        "minimumSpeed": 6.324283455427578,
+        "maximumSpeed": 9.038938688984345,
+        "terminalDeviation": 9.237055564881302e-14,
+        "unchangedPhysicalRowsAndDynamics": true,
+        "passesOriginalIndependentVerifier": true
+      },
+      {
+        "shapeIndex": 6,
+        "firstInput": [
+          -0.10538509312233046,
+          -0.1539593093979173
+        ],
+        "clfSlack": 0.036866903912692324,
+        "minimumNodeCertificateGap": 0.026004493937816786,
+        "maximumPhysicalExcess": -0.05876285835807854,
+        "minimumTerminalMargin": 0.17370086993138925,
+        "clfConeResidual": -1.5258627694691995e-14,
+        "maximumStationDeviation": 1.8126623338535737,
+        "maximumLateralDeviation": 3.940211745125121,
+        "maximumHeadingDeviation": 0.4412371416419215,
+        "minimumSpeed": 6.38816443877364,
+        "maximumSpeed": 9.24954444547912,
+        "terminalDeviation": 9.947598300641403e-14,
+        "unchangedPhysicalRowsAndDynamics": true,
+        "passesOriginalIndependentVerifier": true
+      },
+      {
+        "shapeIndex": 7,
+        "firstInput": [
+          -0.04201104947010065,
+          -0.07408915326132641
+        ],
+        "clfSlack": 0.019766458635380065,
+        "minimumNodeCertificateGap": 0.06427838302427435,
+        "maximumPhysicalExcess": -0.13501219007462323,
+        "minimumTerminalMargin": 0.17370086993139014,
+        "clfConeResidual": -1.4769435674466536e-14,
+        "maximumStationDeviation": 1.7576654451384677,
+        "maximumLateralDeviation": 3.8360937457973607,
+        "maximumHeadingDeviation": 0.36498780992537705,
+        "minimumSpeed": 6.7009909135097105,
+        "maximumSpeed": 9.543922846810194,
+        "terminalDeviation": 1.0658141036401503e-13,
+        "unchangedPhysicalRowsAndDynamics": true,
+        "passesOriginalIndependentVerifier": true
+      },
+      {
+        "shapeIndex": 10,
+        "firstInput": [
+          -0.055035097665254135,
+          -0.09093506518547309
+        ],
+        "clfSlack": 0.023284514425411088,
+        "minimumNodeCertificateGap": 0.06471408125316813,
+        "maximumPhysicalExcess": -0.13593005222715193,
+        "minimumTerminalMargin": 0.17370086993139103,
+        "clfConeResidual": -1.487004963607319e-14,
+        "maximumStationDeviation": 1.7671331217557427,
+        "maximumLateralDeviation": 3.8553314136095826,
+        "maximumHeadingDeviation": 0.36406994777284823,
+        "minimumSpeed": 6.688595600792041,
+        "maximumSpeed": 9.357811927856224,
+        "terminalDeviation": 9.947598300641403e-14,
+        "unchangedPhysicalRowsAndDynamics": true,
+        "passesOriginalIndependentVerifier": true
+      }
+    ]
+  },
+  "recordedAt": "2026-09-21T01:51:00.169841-05:00",
+  "scope": "Offline admission diagnosis and verified 4.8 s existence witnesses; production controller unchanged",
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921",
+  "reproductionCommand": "matlab -singleCompThread -batch \"addpath('scripts'); analyzeCircularCrossingAdmission('/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921');\"",
+  "validation": {
+    "integratedBatchExitCode": 0,
+    "factoryCodeAnalyzerIssues": 0,
+    "productionAndDependencyHashesUnchanged": true,
+    "originalFailureReproduced": true,
+    "copiedAdmissionInformationExactlyEqual": true,
+    "certifiedCounterexamples": 4,
+    "fullUnitSuite": "Not rerun; diagnostic driver numerical assertions are the task checks."
+  },
+  "limitations": [
+    "Finite trajectory sampling is not a continuous-time noncollision proof.",
+    "The alpha covering argument uses analytical Lipschitz bounds and ordinary floating point, not formal interval arithmetic.",
+    "Optimistic exclusion omits at most 2.18e-8 m nonnegative generator support; all witness acceptance retains full original constraints.",
+    "Witnesses are offline plans of the declared affine plant, not new production commands, closed-loop tests, or nonlinear vehicle guarantees.",
+    "No real-time timing or WCET improvement is established by these diagnostic probes."
+  ],
+  "artifactsSha256": {
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/diagnosis.mat": "f6a22f7cbf94b4f5eb6397e87a49325ac0ce332d4a239f5d48ab27ff8cb853d2",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/diagnosis.json": "c70a64786ff96b426a2d35cd8c985322140cecc3e088f0bde9650d2da39ea538",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/diagnosticSectionSolver.m": "6c646e54b117b274ed541011dc5788d4e2158ef09d325921f019479a543640e4",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/manifest.json": "6bd8e1d3f2f99a29b47161c27146143d654752ddbe0e2c8765f75b74b4806a84",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/section-scan.mat": "f38f48cf0797d73734ef5ab699422592a28f605f11e9c6591afcca05bf67f3f0",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/section-scan.json": "e6177659c6c852e067d548982ab857bdbf972543a8f8580cc303726cc7e06b5d",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/exact-line.mat": "c93ac20f6b04f53db778ae701cec8ad6f197d272e0c8edf502fec8d61d17f7fc",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/witness-probes.json": "b7fac34e3457ba8bd6bb975b002c984ee5dd2b085c8c6d996358294d728fa5ff",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/verification.json": "b62d8dfb265fe4d289cca39ac21004581de258476b00076ea0fb69c2461dcf15",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/physical-section-witness.mat": "84041a48c69266b0603e90fecc27df3fbc35c7536bfe05c9c34e576de6dcfd4a",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/validated-run.log": "b2a16272b7dbf024994905f9246fa250518185e179d975dc70bef04cf4c1d7ba",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/plot-data.json": "89da0e63e946cdba55b376238d7eb1c9a280c3cbe49d66c099d118aef6e1c14a",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/diagnosis-figure.png": "933c647ea95a753bf6dcfc911d79aff514a47800a98b816aa4d0999796225221",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/diagnosis-figure.pdf": "f84193a5c4984740e74bdde51b678789b902cfd7b39e193220cb312f400f8053",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/finalizeDiagnosis.py": "1ab0ac8a552b7f508783caea54d0d8a5b602438a1e4fc2748dbca4e4f31f677a",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/shape-04-witness.mat": "272369ba5390d891111429b1fcb1c3e4ea3a1b64d0924b843420cda4186d4e4f",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/shape-06-witness.mat": "b195d6d6972f89d013a4122af71854a3e8f43cb5261f391558e94f7ae81472d8",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/shape-07-witness.mat": "8c1e8583776b9ca4cad6b368612bb111b4226f37b669e7dfe1a890299d8436a2",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-diagnosis-20260921/shape-10-witness.mat": "736ddbad6d9a32d94f308b697856a64723e3eccd893e6f38da3c0d94264622bb",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/analyzeCircularCrossingAdmission.m": "13bcf478d7a365dcd2d2046d6ec9cf6f66cd2c2973ccf921a7f8253a5dbba5b4"
+  }
+}
