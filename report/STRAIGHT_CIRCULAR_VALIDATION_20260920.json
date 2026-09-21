@@ -1,0 +1,1655 @@
+{
+  "activityDate": "2026-09-20",
+  "analyzedAt": "2026-09-20T22:32:29.807999-05:00",
+  "baseCommit": "5104a8247cad7da796f2d3831c1325ddef6d1df6",
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229",
+  "scope": "MATLAB plus existing native solver/geometry MEX; exact sensing and declared affine plant; controller full-frame desktop timing",
+  "configuration": {
+    "speedMetersPerSecond": 8,
+    "sampleSeconds": 0.05,
+    "requestedSeconds": 30,
+    "requestedHolds": 600,
+    "nominalHorizonSeconds": 1.6,
+    "sensingRangeMeters": 16,
+    "curvatures": [
+      0,
+      0.01
+    ],
+    "seed": 20260912,
+    "warmupHoldsPerScenario": 120,
+    "measuredRepetitions": 2,
+    "computationalBudgetSeconds": 30,
+    "roadBoundaries": false,
+    "fixedClearanceBufferMeters": 0
+  },
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "groups": {
+    "all": {
+      "count": 6002,
+      "meanMs": 8.203454015328223,
+      "medianMs": 7.2700000000000005,
+      "p95Ms": 12.75139999999999,
+      "p99Ms": 28.15148999999999,
+      "maximumMs": 108.71000000000001,
+      "misses50Ms": 4
+    },
+    "admission": {
+      "count": 12,
+      "meanMs": 41.95016666666667,
+      "medianMs": 31.134,
+      "p95Ms": 91.45374999999999,
+      "p99Ms": 105.25875000000002,
+      "maximumMs": 108.71000000000001,
+      "misses50Ms": 4
+    },
+    "continuation": {
+      "count": 544,
+      "meanMs": 15.637689338235294,
+      "medianMs": 14.354500000000002,
+      "p95Ms": 30.46725,
+      "p99Ms": 33.71075000000004,
+      "maximumMs": 42.173,
+      "misses50Ms": 0
+    },
+    "cruise": {
+      "count": 5446,
+      "meanMs": 7.3864902680866695,
+      "medianMs": 7.2524999999999995,
+      "p95Ms": 8.128,
+      "p99Ms": 9.1483,
+      "maximumMs": 12.759,
+      "misses50Ms": 0
+    }
+  },
+  "cases": {
+    "crossing-0": {
+      "all": {
+        "count": 1200,
+        "meanMs": 7.304906666666666,
+        "medianMs": 7.167,
+        "p95Ms": 8.05605,
+        "p99Ms": 9.74708,
+        "maximumMs": 17.473,
+        "misses50Ms": 0
+      },
+      "admission": {
+        "count": 2,
+        "meanMs": 17.165999999999997,
+        "medianMs": 17.165999999999997,
+        "p95Ms": 17.4423,
+        "p99Ms": 17.46686,
+        "maximumMs": 17.473,
+        "misses50Ms": 0
+      },
+      "continuation": {
+        "count": 24,
+        "meanMs": 7.405458333333333,
+        "medianMs": 7.3195,
+        "p95Ms": 8.76405,
+        "p99Ms": 8.87239,
+        "maximumMs": 8.897,
+        "misses50Ms": 0
+      },
+      "cruise": {
+        "count": 1174,
+        "meanMs": 7.286051959114141,
+        "medianMs": 7.1659999999999995,
+        "p95Ms": 7.9895499999999995,
+        "p99Ms": 9.460169999999998,
+        "maximumMs": 10.969,
+        "misses50Ms": 0
+      }
+    },
+    "crossing-0.01": {
+      "all": {
+        "count": 2,
+        "meanMs": 35.3675,
+        "medianMs": 35.3675,
+        "p95Ms": 36.71165,
+        "p99Ms": 36.831129999999995,
+        "maximumMs": 36.861,
+        "misses50Ms": 0
+      },
+      "admission": {
+        "count": 2,
+        "meanMs": 35.3675,
+        "medianMs": 35.3675,
+        "p95Ms": 36.71165,
+        "p99Ms": 36.831129999999995,
+        "maximumMs": 36.861,
+        "misses50Ms": 0
+      }
+    },
+    "oncoming-0": {
+      "all": {
+        "count": 1200,
+        "meanMs": 7.9023216666666665,
+        "medianMs": 7.2829999999999995,
+        "p95Ms": 10.947349999999991,
+        "p99Ms": 20.203909999999997,
+        "maximumMs": 28.394,
+        "misses50Ms": 0
+      },
+      "cruise": {
+        "count": 1104,
+        "meanMs": 7.4163931159420295,
+        "medianMs": 7.261,
+        "p95Ms": 8.2327,
+        "p99Ms": 9.270999999999999,
+        "maximumMs": 12.759,
+        "misses50Ms": 0
+      },
+      "admission": {
+        "count": 2,
+        "meanMs": 27.7135,
+        "medianMs": 27.7135,
+        "p95Ms": 28.32595,
+        "p99Ms": 28.38039,
+        "maximumMs": 28.394,
+        "misses50Ms": 0
+      },
+      "continuation": {
+        "count": 94,
+        "meanMs": 13.187882978723405,
+        "medianMs": 12.24,
+        "p95Ms": 20.799,
+        "p99Ms": 21.669599999999992,
+        "maximumMs": 22.488,
+        "misses50Ms": 0
+      }
+    },
+    "oncoming-0.01": {
+      "all": {
+        "count": 1200,
+        "meanMs": 7.848365,
+        "medianMs": 7.281000000000001,
+        "p95Ms": 9.868949999999995,
+        "p99Ms": 19.284259999999996,
+        "maximumMs": 27.358,
+        "misses50Ms": 0
+      },
+      "cruise": {
+        "count": 1104,
+        "meanMs": 7.3997807971014495,
+        "medianMs": 7.275,
+        "p95Ms": 8.044649999999999,
+        "p99Ms": 8.971650000000002,
+        "maximumMs": 10.751,
+        "misses50Ms": 0
+      },
+      "admission": {
+        "count": 2,
+        "meanMs": 26.8125,
+        "medianMs": 26.8125,
+        "p95Ms": 27.30345,
+        "p99Ms": 27.34709,
+        "maximumMs": 27.358,
+        "misses50Ms": 0
+      },
+      "continuation": {
+        "count": 94,
+        "meanMs": 12.713351063829785,
+        "medianMs": 11.814499999999999,
+        "p95Ms": 20.032049999999998,
+        "p99Ms": 20.781489999999998,
+        "maximumMs": 21.253,
+        "misses50Ms": 0
+      }
+    },
+    "stationary-0": {
+      "all": {
+        "count": 1200,
+        "meanMs": 9.0502225,
+        "medianMs": 7.35,
+        "p95Ms": 23.348599999999998,
+        "p99Ms": 30.329039999999996,
+        "maximumMs": 108.71000000000001,
+        "misses50Ms": 2
+      },
+      "admission": {
+        "count": 2,
+        "meanMs": 93.02250000000001,
+        "medianMs": 93.02250000000001,
+        "p95Ms": 107.14125000000001,
+        "p99Ms": 108.39625000000001,
+        "maximumMs": 108.71000000000001,
+        "misses50Ms": 2
+      },
+      "continuation": {
+        "count": 166,
+        "meanMs": 17.935102409638553,
+        "medianMs": 17.469,
+        "p95Ms": 30.66825,
+        "p99Ms": 34.7979,
+        "maximumMs": 42.173,
+        "misses50Ms": 0
+      },
+      "cruise": {
+        "count": 1032,
+        "meanMs": 7.458328488372094,
+        "medianMs": 7.288500000000001,
+        "p95Ms": 8.311749999999998,
+        "p99Ms": 9.264599999999998,
+        "maximumMs": 10.65,
+        "misses50Ms": 0
+      }
+    },
+    "stationary-0.01": {
+      "all": {
+        "count": 1200,
+        "meanMs": 8.866180833333335,
+        "medianMs": 7.3020000000000005,
+        "p95Ms": 23.666749999999997,
+        "p99Ms": 31.153439999999996,
+        "maximumMs": 52.966,
+        "misses50Ms": 2
+      },
+      "admission": {
+        "count": 2,
+        "meanMs": 51.619,
+        "medianMs": 51.619,
+        "p95Ms": 52.8313,
+        "p99Ms": 52.93906,
+        "maximumMs": 52.966,
+        "misses50Ms": 2
+      },
+      "continuation": {
+        "count": 166,
+        "meanMs": 17.573668674698798,
+        "medianMs": 16.6445,
+        "p95Ms": 31.384499999999996,
+        "p99Ms": 34.3174,
+        "maximumMs": 37.605,
+        "misses50Ms": 0
+      },
+      "cruise": {
+        "count": 1032,
+        "meanMs": 7.382703488372093,
+        "medianMs": 7.278499999999999,
+        "p95Ms": 8.0139,
+        "p99Ms": 8.591129999999996,
+        "maximumMs": 9.598,
+        "misses50Ms": 0
+      }
+    }
+  },
+  "maxima": {
+    "admission": {
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.json",
+      "frame": 1,
+      "scenarioTime": 0.0,
+      "milliseconds": 108.71000000000001,
+      "category": "admission",
+      "phase": {
+        "inputPreparationSeconds": 0.008346,
+        "formulationSeconds": 0.087051,
+        "solveSeconds": 0
+      }
+    },
+    "continuation": {
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.json",
+      "frame": 2,
+      "scenarioTime": 0.05,
+      "milliseconds": 42.173,
+      "category": "continuation",
+      "phase": {
+        "inputPreparationSeconds": 0.002875,
+        "formulationSeconds": 0.018997,
+        "solveSeconds": 0.013084
+      }
+    },
+    "cruise": {
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0/oncoming-exact-state.json",
+      "frame": 45,
+      "scenarioTime": 2.2,
+      "milliseconds": 12.759,
+      "category": "cruise",
+      "phase": {
+        "inputPreparationSeconds": 0.001093,
+        "formulationSeconds": 0.008366,
+        "solveSeconds": 0.002092
+      }
+    }
+  },
+  "trials": [
+    {
+      "scenario": "crossing",
+      "roadCurvature": 0,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": true,
+      "minimumSampledBodyGap": 9.51969553186302,
+      "minimumNodeBodyGap": 9.51969553186302,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": 0.39994063732390395,
+      "repetition": 1,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0/crossing-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 17.473,
+          "medianMs": 17.473,
+          "p95Ms": 17.473,
+          "p99Ms": 17.473,
+          "maximumMs": 17.473,
+          "misses50Ms": 0
+        },
+        "continuation": {
+          "count": 12,
+          "meanMs": 7.415166666666667,
+          "medianMs": 7.3605,
+          "p95Ms": 8.62335,
+          "p99Ms": 8.75667,
+          "maximumMs": 8.79,
+          "misses50Ms": 0
+        },
+        "cruise": {
+          "count": 587,
+          "meanMs": 7.274919931856901,
+          "medianMs": 7.144,
+          "p95Ms": 8.0222,
+          "p99Ms": 9.882219999999997,
+          "maximumMs": 10.969,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 7.294721666666666,
+        "medianMs": 7.144,
+        "p95Ms": 8.0916,
+        "p99Ms": 10.117159999999998,
+        "maximumMs": 17.473,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0/crossing-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 17.473,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.000986,
+            "formulationSeconds": 0.011588,
+            "solveSeconds": 0.002256
+          }
+        }
+      ],
+      "finalTrackingError": [
+        -2.1593113850854423e-20,
+        1.0068192831899156e-24,
+        9.545264134658282e-09,
+        -2.0881424367956415e-25,
+        1.095436448077163e-25
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.976741626393689e-06,
+      "minimumSpeed": 8,
+      "maximumLateralExcursion": 0.00029847374084111176
+    },
+    {
+      "scenario": "crossing",
+      "roadCurvature": 0.01,
+      "executedHolds": 0,
+      "completed": false,
+      "passed": false,
+      "minimumSampledBodyGap": null,
+      "minimumNodeBodyGap": null,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Scalar admission found no hard-certified plan: collisionExcluded). No command was issued.",
+      "failureTime": 0,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": null,
+      "repetition": 1,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0.01/crossing-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 33.874,
+          "medianMs": 33.874,
+          "p95Ms": 33.874,
+          "p99Ms": 33.874,
+          "maximumMs": 33.874,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 1,
+        "meanMs": 33.874,
+        "medianMs": 33.874,
+        "p95Ms": 33.874,
+        "p99Ms": 33.874,
+        "maximumMs": 33.874,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0.01/crossing-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 33.874,
+          "category": "admission",
+          "phase": null
+        }
+      ],
+      "finalTrackingError": null,
+      "certifiedCommands": 0,
+      "maximumConicCalls": null,
+      "restorationCalls": 0,
+      "confirmedRelease": false,
+      "maximumRelaxedClfResidual": null,
+      "minimumSpeed": null,
+      "maximumLateralExcursion": null
+    },
+    {
+      "scenario": "oncoming",
+      "roadCurvature": 0,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": false,
+      "minimumSampledBodyGap": -0.005382492415134887,
+      "minimumNodeBodyGap": 6.160378440340397e-05,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": -0.05964936952293476,
+      "repetition": 1,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0/oncoming-exact-state.json",
+      "timing": {
+        "cruise": {
+          "count": 552,
+          "meanMs": 7.448449275362319,
+          "medianMs": 7.271,
+          "p95Ms": 8.38845,
+          "p99Ms": 9.270999999999999,
+          "maximumMs": 11.225000000000001,
+          "misses50Ms": 0
+        },
+        "admission": {
+          "count": 1,
+          "meanMs": 28.394,
+          "medianMs": 28.394,
+          "p95Ms": 28.394,
+          "p99Ms": 28.394,
+          "maximumMs": 28.394,
+          "misses50Ms": 0
+        },
+        "continuation": {
+          "count": 47,
+          "meanMs": 12.929106382978729,
+          "medianMs": 12.174000000000001,
+          "p95Ms": 19.3538,
+          "p99Ms": 20.25214,
+          "maximumMs": 20.294,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 7.912676666666666,
+        "medianMs": 7.295,
+        "p95Ms": 10.868599999999997,
+        "p99Ms": 18.864569999999997,
+        "maximumMs": 28.394,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0/oncoming-exact-state.json",
+          "frame": 53,
+          "scenarioTime": 2.6,
+          "milliseconds": 28.394,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.001041,
+            "formulationSeconds": 0.022565,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        3.416136372255022e-20,
+        -1.58979901841598e-20,
+        9.545173540459473e-09,
+        2.711017814135368e-20,
+        2.3158815942200897e-20
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.649302269914572e-06,
+      "minimumSpeed": 6.9310883776817,
+      "maximumLateralExcursion": 2.2580970422745
+    },
+    {
+      "scenario": "oncoming",
+      "roadCurvature": 0.01,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": true,
+      "minimumSampledBodyGap": 0.08978162709323204,
+      "minimumNodeBodyGap": 0.09943602400563509,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": -0.045050429808140446,
+      "repetition": 1,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0.01/oncoming-exact-state.json",
+      "timing": {
+        "cruise": {
+          "count": 552,
+          "meanMs": 7.390746376811594,
+          "medianMs": 7.256500000000001,
+          "p95Ms": 8.10125,
+          "p99Ms": 9.060220000000001,
+          "maximumMs": 9.85,
+          "misses50Ms": 0
+        },
+        "admission": {
+          "count": 1,
+          "meanMs": 27.358,
+          "medianMs": 27.358,
+          "p95Ms": 27.358,
+          "p99Ms": 27.358,
+          "maximumMs": 27.358,
+          "misses50Ms": 0
+        },
+        "continuation": {
+          "count": 47,
+          "meanMs": 12.587659574468082,
+          "medianMs": 11.677,
+          "p95Ms": 19.853599999999997,
+          "p99Ms": 20.45482,
+          "maximumMs": 20.746000000000002,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 7.8311166666666665,
+        "medianMs": 7.263000000000001,
+        "p95Ms": 9.403499999999978,
+        "p99Ms": 18.819879999999998,
+        "maximumMs": 27.358,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0.01/oncoming-exact-state.json",
+          "frame": 53,
+          "scenarioTime": 2.6,
+          "milliseconds": 27.358,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.000705,
+            "formulationSeconds": 0.02179,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        1.0899880766240301e-05,
+        -9.191136393638111e-10,
+        2.2456429782380383e-07,
+        9.895141289684162e-09,
+        1.0967080646406835e-08
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.569529268010444e-06,
+      "minimumSpeed": 6.761608276913426,
+      "maximumLateralExcursion": 2.3119507068833998
+    },
+    {
+      "scenario": "stationary",
+      "roadCurvature": 0,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": false,
+      "minimumSampledBodyGap": -0.0005513653242135153,
+      "minimumNodeBodyGap": 7.280609151349435e-05,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": 0.08183369108109134,
+      "repetition": 1,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 108.71000000000001,
+          "medianMs": 108.71000000000001,
+          "p95Ms": 108.71000000000001,
+          "p99Ms": 108.71000000000001,
+          "maximumMs": 108.71000000000001,
+          "misses50Ms": 1
+        },
+        "continuation": {
+          "count": 83,
+          "meanMs": 18.530385542168673,
+          "medianMs": 19.086,
+          "p95Ms": 31.886699999999987,
+          "p99Ms": 36.697859999999956,
+          "maximumMs": 42.173,
+          "misses50Ms": 0
+        },
+        "cruise": {
+          "count": 516,
+          "meanMs": 7.602763565891474,
+          "medianMs": 7.5165,
+          "p95Ms": 8.42175,
+          "p99Ms": 9.038200000000002,
+          "maximumMs": 10.65,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 9.28293,
+        "medianMs": 7.619999999999999,
+        "p95Ms": 23.474999999999994,
+        "p99Ms": 30.72702999999999,
+        "maximumMs": 108.71000000000001,
+        "misses50Ms": 1
+      },
+      "missedFrames": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 108.71000000000001,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.008346,
+            "formulationSeconds": 0.087051,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 108.71000000000001,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.008346,
+            "formulationSeconds": 0.087051,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        -2.0729438740007815e-20,
+        -8.576403985675089e-22,
+        9.545265911015122e-09,
+        2.5800250135923668e-21,
+        2.149585478213231e-21
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.540270130583937e-06,
+      "minimumSpeed": 7.848056190455454,
+      "maximumLateralExcursion": 2.106933122494928
+    },
+    {
+      "scenario": "stationary",
+      "roadCurvature": 0.01,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": true,
+      "minimumSampledBodyGap": 0.08260055695483416,
+      "minimumNodeBodyGap": 0.10073662442840292,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": 0.07071444499252272,
+      "repetition": 1,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0.01/stationary-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 52.966,
+          "medianMs": 52.966,
+          "p95Ms": 52.966,
+          "p99Ms": 52.966,
+          "maximumMs": 52.966,
+          "misses50Ms": 1
+        },
+        "continuation": {
+          "count": 83,
+          "meanMs": 17.89219277108434,
+          "medianMs": 16.724,
+          "p95Ms": 33.0228,
+          "p99Ms": 35.39099999999998,
+          "maximumMs": 37.605,
+          "misses50Ms": 0
+        },
+        "cruise": {
+          "count": 516,
+          "meanMs": 7.39456007751938,
+          "medianMs": 7.3020000000000005,
+          "p95Ms": 8.017,
+          "p99Ms": 8.605150000000002,
+          "maximumMs": 8.999,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 8.922685,
+        "medianMs": 7.3294999999999995,
+        "p95Ms": 25.092299999999987,
+        "p99Ms": 32.38911999999999,
+        "maximumMs": 52.966,
+        "misses50Ms": 1
+      },
+      "missedFrames": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0.01/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 52.966,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.004537,
+            "formulationSeconds": 0.041669000000000005,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0.01/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 52.966,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.004537,
+            "formulationSeconds": 0.041669000000000005,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        1.0899880763777861e-05,
+        -9.191141354947252e-10,
+        2.2456432091644274e-07,
+        9.895142455418338e-09,
+        1.0967082311741372e-08
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.4778626687057565e-06,
+      "minimumSpeed": 7.7833533207886525,
+      "maximumLateralExcursion": 2.163297963317466
+    },
+    {
+      "scenario": "crossing",
+      "roadCurvature": 0,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": true,
+      "minimumSampledBodyGap": 9.51969553186302,
+      "minimumNodeBodyGap": 9.51969553186302,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": 0.39994063732390395,
+      "repetition": 2,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0/crossing-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 16.858999999999998,
+          "medianMs": 16.858999999999998,
+          "p95Ms": 16.858999999999998,
+          "p99Ms": 16.858999999999998,
+          "maximumMs": 16.858999999999998,
+          "misses50Ms": 0
+        },
+        "continuation": {
+          "count": 12,
+          "meanMs": 7.39575,
+          "medianMs": 7.2235,
+          "p95Ms": 8.742999999999999,
+          "p99Ms": 8.866200000000001,
+          "maximumMs": 8.897,
+          "misses50Ms": 0
+        },
+        "cruise": {
+          "count": 587,
+          "meanMs": 7.29718398637138,
+          "medianMs": 7.198,
+          "p95Ms": 7.968499999999998,
+          "p99Ms": 8.42508,
+          "maximumMs": 10.871,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 7.315091666666667,
+        "medianMs": 7.199,
+        "p95Ms": 8.017249999999999,
+        "p99Ms": 8.58334,
+        "maximumMs": 16.858999999999998,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0/crossing-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 16.858999999999998,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.000922,
+            "formulationSeconds": 0.010801999999999999,
+            "solveSeconds": 0.002404
+          }
+        }
+      ],
+      "finalTrackingError": [
+        -2.1593113850854423e-20,
+        1.0068192831899156e-24,
+        9.545264134658282e-09,
+        -2.0881424367956415e-25,
+        1.095436448077163e-25
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.976741626393689e-06,
+      "minimumSpeed": 8,
+      "maximumLateralExcursion": 0.00029847374084111176
+    },
+    {
+      "scenario": "crossing",
+      "roadCurvature": 0.01,
+      "executedHolds": 0,
+      "completed": false,
+      "passed": false,
+      "minimumSampledBodyGap": null,
+      "minimumNodeBodyGap": null,
+      "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+      "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Scalar admission found no hard-certified plan: collisionExcluded). No command was issued.",
+      "failureTime": 0,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": null,
+      "repetition": 2,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0.01/crossing-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 36.861,
+          "medianMs": 36.861,
+          "p95Ms": 36.861,
+          "p99Ms": 36.861,
+          "maximumMs": 36.861,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 1,
+        "meanMs": 36.861,
+        "medianMs": 36.861,
+        "p95Ms": 36.861,
+        "p99Ms": 36.861,
+        "maximumMs": 36.861,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0.01/crossing-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 36.861,
+          "category": "admission",
+          "phase": null
+        }
+      ],
+      "finalTrackingError": null,
+      "certifiedCommands": 0,
+      "maximumConicCalls": null,
+      "restorationCalls": 0,
+      "confirmedRelease": false,
+      "maximumRelaxedClfResidual": null,
+      "minimumSpeed": null,
+      "maximumLateralExcursion": null
+    },
+    {
+      "scenario": "oncoming",
+      "roadCurvature": 0,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": false,
+      "minimumSampledBodyGap": -0.005382492415134887,
+      "minimumNodeBodyGap": 6.160378440340397e-05,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": -0.05964936952293476,
+      "repetition": 2,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0/oncoming-exact-state.json",
+      "timing": {
+        "cruise": {
+          "count": 552,
+          "meanMs": 7.384336956521739,
+          "medianMs": 7.257,
+          "p95Ms": 8.04745,
+          "p99Ms": 9.2291,
+          "maximumMs": 12.759,
+          "misses50Ms": 0
+        },
+        "admission": {
+          "count": 1,
+          "meanMs": 27.033,
+          "medianMs": 27.033,
+          "p95Ms": 27.033,
+          "p99Ms": 27.033,
+          "maximumMs": 27.033,
+          "misses50Ms": 0
+        },
+        "continuation": {
+          "count": 47,
+          "meanMs": 13.446659574468084,
+          "medianMs": 12.523,
+          "p95Ms": 21.4959,
+          "p99Ms": 22.083199999999998,
+          "maximumMs": 22.488,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 7.891966666666667,
+        "medianMs": 7.2725,
+        "p95Ms": 11.162699999999983,
+        "p99Ms": 20.703799999999998,
+        "maximumMs": 27.033,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0/oncoming-exact-state.json",
+          "frame": 53,
+          "scenarioTime": 2.6,
+          "milliseconds": 27.033,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.000673,
+            "formulationSeconds": 0.021509,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        3.416136372255022e-20,
+        -1.58979901841598e-20,
+        9.545173540459473e-09,
+        2.711017814135368e-20,
+        2.3158815942200897e-20
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.649302269914572e-06,
+      "minimumSpeed": 6.9310883776817,
+      "maximumLateralExcursion": 2.2580970422745
+    },
+    {
+      "scenario": "oncoming",
+      "roadCurvature": 0.01,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": true,
+      "minimumSampledBodyGap": 0.08978162709323204,
+      "minimumNodeBodyGap": 0.09943602400563509,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": -0.045050429808140446,
+      "repetition": 2,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0.01/oncoming-exact-state.json",
+      "timing": {
+        "cruise": {
+          "count": 552,
+          "meanMs": 7.408815217391305,
+          "medianMs": 7.2985,
+          "p95Ms": 7.9547,
+          "p99Ms": 8.90199,
+          "maximumMs": 10.751,
+          "misses50Ms": 0
+        },
+        "admission": {
+          "count": 1,
+          "meanMs": 26.267,
+          "medianMs": 26.267,
+          "p95Ms": 26.267,
+          "p99Ms": 26.267,
+          "maximumMs": 26.267,
+          "misses50Ms": 0
+        },
+        "continuation": {
+          "count": 47,
+          "meanMs": 12.83904255319149,
+          "medianMs": 11.952,
+          "p95Ms": 20.0301,
+          "p99Ms": 20.692259999999997,
+          "maximumMs": 21.253,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 7.865613333333334,
+        "medianMs": 7.31,
+        "p95Ms": 9.970449999999992,
+        "p99Ms": 19.6531,
+        "maximumMs": 26.267,
+        "misses50Ms": 0
+      },
+      "missedFrames": [],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0.01/oncoming-exact-state.json",
+          "frame": 53,
+          "scenarioTime": 2.6,
+          "milliseconds": 26.267,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.000733,
+            "formulationSeconds": 0.020178,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        1.0899880766240301e-05,
+        -9.191136393638111e-10,
+        2.2456429782380383e-07,
+        9.895141289684162e-09,
+        1.0967080646406835e-08
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.569529268010444e-06,
+      "minimumSpeed": 6.761608276913426,
+      "maximumLateralExcursion": 2.3119507068833998
+    },
+    {
+      "scenario": "stationary",
+      "roadCurvature": 0,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": false,
+      "minimumSampledBodyGap": -0.0005513653242135153,
+      "minimumNodeBodyGap": 7.280609151349435e-05,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": 0.08183369108109134,
+      "repetition": 2,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0/stationary-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 77.33500000000001,
+          "medianMs": 77.33500000000001,
+          "p95Ms": 77.33500000000001,
+          "p99Ms": 77.33500000000001,
+          "maximumMs": 77.33500000000001,
+          "misses50Ms": 1
+        },
+        "continuation": {
+          "count": 83,
+          "meanMs": 17.339819277108436,
+          "medianMs": 16.617,
+          "p95Ms": 28.9628,
+          "p99Ms": 30.931559999999994,
+          "maximumMs": 31.54,
+          "misses50Ms": 0
+        },
+        "cruise": {
+          "count": 516,
+          "meanMs": 7.313893410852713,
+          "medianMs": 7.1884999999999994,
+          "p95Ms": 8.060500000000001,
+          "p99Ms": 9.369650000000004,
+          "maximumMs": 10.536,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 8.817515000000002,
+        "medianMs": 7.214499999999999,
+        "p95Ms": 22.880949999999995,
+        "p99Ms": 28.81862,
+        "maximumMs": 77.33500000000001,
+        "misses50Ms": 1
+      },
+      "missedFrames": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 77.33500000000001,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.001688,
+            "formulationSeconds": 0.069134,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 77.33500000000001,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.001688,
+            "formulationSeconds": 0.069134,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        -2.0729438740007815e-20,
+        -8.576403985675089e-22,
+        9.545265911015122e-09,
+        2.5800250135923668e-21,
+        2.149585478213231e-21
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.540270130583937e-06,
+      "minimumSpeed": 7.848056190455454,
+      "maximumLateralExcursion": 2.106933122494928
+    },
+    {
+      "scenario": "stationary",
+      "roadCurvature": 0.01,
+      "executedHolds": 600,
+      "completed": true,
+      "passed": true,
+      "minimumSampledBodyGap": 0.08260055695483416,
+      "minimumNodeBodyGap": 0.10073662442840292,
+      "failureIdentifier": "",
+      "failureMessage": "",
+      "failureTime": null,
+      "maximumSlewViolation": 0,
+      "minimumSampledModelDomainMargin": 0.07071444499252272,
+      "repetition": 2,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0.01/stationary-exact-state.json",
+      "timing": {
+        "admission": {
+          "count": 1,
+          "meanMs": 50.272,
+          "medianMs": 50.272,
+          "p95Ms": 50.272,
+          "p99Ms": 50.272,
+          "maximumMs": 50.272,
+          "misses50Ms": 1
+        },
+        "continuation": {
+          "count": 83,
+          "meanMs": 17.255144578313253,
+          "medianMs": 16.559,
+          "p95Ms": 30.912799999999997,
+          "p99Ms": 33.361399999999996,
+          "maximumMs": 34.001000000000005,
+          "misses50Ms": 0
+        },
+        "cruise": {
+          "count": 516,
+          "meanMs": 7.370846899224806,
+          "medianMs": 7.2385,
+          "p95Ms": 8.006250000000001,
+          "p99Ms": 8.493050000000002,
+          "maximumMs": 9.598,
+          "misses50Ms": 0
+        }
+      },
+      "allTiming": {
+        "count": 600,
+        "meanMs": 8.809676666666668,
+        "medianMs": 7.266,
+        "p95Ms": 23.6353,
+        "p99Ms": 30.563919999999996,
+        "maximumMs": 50.272,
+        "misses50Ms": 1
+      },
+      "missedFrames": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0.01/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 50.272,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.0046,
+            "formulationSeconds": 0.037593,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "admissions": [
+        {
+          "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0.01/stationary-exact-state.json",
+          "frame": 1,
+          "scenarioTime": 0.0,
+          "milliseconds": 50.272,
+          "category": "admission",
+          "phase": {
+            "inputPreparationSeconds": 0.0046,
+            "formulationSeconds": 0.037593,
+            "solveSeconds": 0
+          }
+        }
+      ],
+      "finalTrackingError": [
+        1.0899880763777861e-05,
+        -9.191141354947252e-10,
+        2.2456432091644274e-07,
+        9.895142455418338e-09,
+        1.0967082311741372e-08
+      ],
+      "certifiedCommands": 600,
+      "maximumConicCalls": 1,
+      "restorationCalls": 0,
+      "confirmedRelease": true,
+      "maximumRelaxedClfResidual": -5.4778626687057565e-06,
+      "minimumSpeed": 7.7833533207886525,
+      "maximumLateralExcursion": 2.163297963317466
+    }
+  ],
+  "independentAudit": [
+    {
+      "scenario": "crossing",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0/crossing-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 7.850476048459103,
+      "minimumRefinedSatGap": 7.850476048459103,
+      "refinedMinimumTime": 0.47500000000000003,
+      "minimumRefinedBodyGap": 9.519500954495808,
+      "refinedBodyMinimumTime": 0.30180000000000007,
+      "minimumNodeSatGap": 8.050423191149495,
+      "refinedHolds": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "nominalMinimumSatGap": 7.85,
+      "nominalMinimumTime": 0.475,
+      "nominalSampledCollision": false
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0.01/crossing-exact-state.mat",
+      "executedHolds": 0,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": null,
+      "minimumRefinedSatGap": null,
+      "refinedMinimumTime": null,
+      "minimumRefinedBodyGap": null,
+      "refinedBodyMinimumTime": null,
+      "minimumNodeSatGap": null,
+      "refinedHolds": [],
+      "nominalMinimumSatGap": -3.3596270462452713,
+      "nominalMinimumTime": 1.875,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": -0.005382492415135998,
+      "minimumRefinedSatGap": -0.005442167206022308,
+      "refinedMinimumTime": 3.7319,
+      "minimumRefinedBodyGap": -0.005442167206022308,
+      "refinedBodyMinimumTime": 3.7319,
+      "minimumNodeSatGap": 6.160378440367431e-05,
+      "refinedHolds": [
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84
+      ],
+      "nominalMinimumSatGap": -1.9000000000000004,
+      "nominalMinimumTime": 3.725,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0.01/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.08978162709323168,
+      "minimumRefinedSatGap": 0.08977836384129256,
+      "refinedMinimumTime": 3.7245000000000004,
+      "minimumRefinedBodyGap": 0.08977836384129231,
+      "refinedBodyMinimumTime": 3.7245000000000004,
+      "minimumNodeSatGap": 0.09943602400563512,
+      "refinedHolds": [
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83
+      ],
+      "nominalMinimumSatGap": -1.9271008185150427,
+      "nominalMinimumTime": 3.745,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": -0.0005513653242132932,
+      "minimumRefinedSatGap": -0.0005514057617448387,
+      "refinedMinimumTime": 1.6849,
+      "minimumRefinedBodyGap": -0.0005514057617450607,
+      "refinedBodyMinimumTime": 1.6849,
+      "minimumNodeSatGap": 7.280609151383288e-05,
+      "refinedHolds": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52
+      ],
+      "nominalMinimumSatGap": -1.9,
+      "nominalMinimumTime": 1.5150000000000001,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0.01/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.07404542249792034,
+      "minimumRefinedSatGap": 0.0660364609111126,
+      "refinedMinimumTime": 1.2435000000000003,
+      "minimumRefinedBodyGap": 0.08257998419610972,
+      "refinedBodyMinimumTime": 1.2448000000000001,
+      "minimumNodeSatGap": 0.10073662442840203,
+      "refinedHolds": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52
+      ],
+      "nominalMinimumSatGap": -1.9349273315610707,
+      "nominalMinimumTime": 1.72,
+      "nominalSampledCollision": true
+    }
+  ],
+  "excludedWarmups": [
+    {
+      "scenario": "crossing",
+      "curvature": 0,
+      "firstFrameMs": 21.753999999999998,
+      "timing": {
+        "count": 120,
+        "meanMs": 7.983175,
+        "medianMs": 7.647500000000001,
+        "p95Ms": 9.5414,
+        "p99Ms": 10.784450000000001,
+        "maximumMs": 21.753999999999998,
+        "misses50Ms": 0
+      }
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.01,
+      "firstFrameMs": 58.15,
+      "timing": {
+        "count": 1,
+        "meanMs": 58.15,
+        "medianMs": 58.15,
+        "p95Ms": 58.15,
+        "p99Ms": 58.15,
+        "maximumMs": 58.15,
+        "misses50Ms": 1
+      }
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0,
+      "firstFrameMs": 43.458,
+      "timing": {
+        "count": 120,
+        "meanMs": 11.042124999999999,
+        "medianMs": 8.1955,
+        "p95Ms": 20.1219,
+        "p99Ms": 41.04291000000003,
+        "maximumMs": 78.825,
+        "misses50Ms": 1
+      }
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.01,
+      "firstFrameMs": 12.99,
+      "timing": {
+        "count": 120,
+        "meanMs": 10.233200000000002,
+        "medianMs": 7.8389999999999995,
+        "p95Ms": 19.586100000000002,
+        "p99Ms": 20.94262,
+        "maximumMs": 40.466,
+        "misses50Ms": 0
+      }
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0,
+      "firstFrameMs": 915.4689999999999,
+      "timing": {
+        "count": 120,
+        "meanMs": 25.816883333333333,
+        "medianMs": 11.777000000000001,
+        "p95Ms": 38.12484999999996,
+        "p99Ms": 132.9303400000001,
+        "maximumMs": 915.4689999999999,
+        "misses50Ms": 6
+      }
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "firstFrameMs": 101.784,
+      "timing": {
+        "count": 120,
+        "meanMs": 15.600850000000001,
+        "medianMs": 9.454999999999998,
+        "p95Ms": 31.48405,
+        "p99Ms": 46.961440000000024,
+        "maximumMs": 101.784,
+        "misses50Ms": 1
+      }
+    }
+  ],
+  "verification": {
+    "productionSourcesUnchanged": true,
+    "repeatedStatesAndInputsExactlyEqual": true,
+    "independentOverlapSignsAgree": true,
+    "affineEndpointsReconstructed": true,
+    "certifiedCommands": 6000,
+    "measuredFrameAttempts": 6002,
+    "unitTests": "Not rerun: production source is unchanged; fresh experiments and numerical assertions are the task checks."
+  },
+  "limitations": [
+    "Node certificates do not certify continuous-time separation.",
+    "Dense finite sampling detects overlap but does not prove whole-hold safety.",
+    "Simulation applies controls immediately; observed overruns are not injected as actuator delays.",
+    "No estimator, nonlinear plant mismatch, sensor latency, enforced road edges, or target-device WCET is tested.",
+    "Straight crossing cruise counterfactual is collision-free, so it does not demonstrate required evasive action."
+  ],
+  "artifactsSha256": {
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/manifest.json": "96625c1e7845f5f39b5c54c146d7eab5decd7f820bc54f67c4c14aa5d302b7fb",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/campaign.json": "bb16c1355797dcae2bf580b0f273286beac98482db61c61a6c819c1d2395df69",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/campaign.log": "abd6c5d5fdcde7a0c154c6a67cf38ae1abd810ac1c168406e82ad90b4661c836",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/audit-final.log": "ff3daa6a342d0f3191960daaeba5da32cb7e65871f0e6f27f90597071238d3ba",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/auditCampaign.m": "8d92e1703ae9b84d5ee1a197781e794471f2f6ffe0a0ef3c0786594190b6641e",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/summarizeCampaign.py": "0d728bc200588b1afe1d1703dffd81345d1159980d1b91c053352a100cefcb48",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/independent-audit.json": "3ed38fce1e5d80b7d8eb08b7e76a722c8cd07c7c624ba452cfd8ebc74a6f8a1d",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/safety-runtime.png": "fb0fdfe7af3d887c8bc0bf0abfb927adfbc1e32c65a17778a38265062112fbaa",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/safety-runtime.pdf": "b872c779c90afded12ac694a677be8d1a86ff5430406eb2da3e7be8dbb2d90ca",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0/crossing-exact-state.mat": "85af254d25e7f5ea9f7902a9761f3c5c4167d23b4cf9469bfb4630a61a3d6ed4",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0.01/crossing-exact-state.mat": "d3524753521ad5b820e5ed2644d45eb375c3756f66346eaf2449599a2fd8d738",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0/oncoming-exact-state.mat": "4b98f65a2bd216f92ee47e39db30293c12a8805f40eb74533e869982d0b3e31f",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0.01/oncoming-exact-state.mat": "f7569e630f71b45de8beef5b477856fe18493ca278e1321d53212428ec8c06a9",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.mat": "0537a87822d113b16a79bb3e6074a2709322e86c30c503c53fa73bd234a7dd24",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0.01/stationary-exact-state.mat": "ef3e8356205269ba93878e1c6d8978251fe32d78b9a4a34b95d3ea0b4a7faded",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0/crossing-exact-state.mat": "161daeb72dd58fed3e1a282219fb8966f01fbab4e282b057358bcb36ae9b7504",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0.01/crossing-exact-state.mat": "ec31f501f83963dd2df61695af56261a08486ee72c1e42c791172cb06df28046",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0/oncoming-exact-state.mat": "5a35ff8cb3d518e729ccc3b61611806f0d603d8535c190cc8e2cb19c54cbead7",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0.01/oncoming-exact-state.mat": "4098e174e4a4174d6fcff68b7fcad7fe36a0a6d9999c71a90f3d20262dbdd798",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0/stationary-exact-state.mat": "7f8856d2182d47f7585e6d63a42c00321aaf5748107c1ad3d7f529ee4a2ff6ff",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0.01/stationary-exact-state.mat": "f775f911a3f02952a6e532f2d0fbd83912425f85016697e4b92eff0a80064c54",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0/crossing-exact-state.json": "d844f01981a3971548e096fee9867a5a0b001e02abb991d2507200a1f1fd4644",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/crossing-0.01/crossing-exact-state.json": "76d5fb8a945ad64bb3f0351fcbfe6fcbf3c7389bbce28dfb6e67150ccdf487e4",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0/oncoming-exact-state.json": "fa3274c23c21e76ad79137879e02e38aa97215ca1f50d4d76dc95f98fd386c96",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/oncoming-0.01/oncoming-exact-state.json": "c17053acdefc1aac3828e70f36f8dfe82e402fbe547ee5bd3c2525b449d09cd8",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0/stationary-exact-state.json": "3c41e5337169232a1bd64057c4f9929b9f55c756d9ee6578382e4d4ee8a5c928",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-1/stationary-0.01/stationary-exact-state.json": "96c2177fa9d8ade8535d9616fae2222ec7649ad1f54b3139ed8a4a1bfe03b62d",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0/crossing-exact-state.json": "df546defc82217c5d9abde6ff7791cd3a5f0e3ee5eff28a8303898db8dbe0163",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/crossing-0.01/crossing-exact-state.json": "146a0cb5644b1f39b46bb8aa6f5c34f769615b06e110a77902f15897383f376b",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0/oncoming-exact-state.json": "e58426f3f26d3133e6d45f952c4059d9beb67d1b2cbe426c6942f556c077de42",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/oncoming-0.01/oncoming-exact-state.json": "04fd36b3c017718c01d244cbb57160af3a3befe9005e356ba335b5f7a1e52699",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0/stationary-exact-state.json": "8bbbdd4b3c125668a8de04d253307c1e8fea5bdbdf81d90d547ff1be517669eb",
+    "/home/zai/.cache/collisionAvoidance/straight-circular-validation-20260920-2229/measured-2/stationary-0.01/stationary-exact-state.json": "2fc79724ad9e921e927af3112a8dee05eb7042f537e7f45f17199c2d68997d31"
+  }
+}
