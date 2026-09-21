@@ -231,6 +231,123 @@ no such internal allocation is inferred. The 15.542761 ms is included within
    frames have maximum 16.247 ms. These are finite empirical results, not
    controller-wide timing guarantees.
 
+## Why the warm formulation and admission block takes about 40 ms
+
+The eighth clean circular replay is the 64.033 ms maximum. Its own saved
+buckets are 1.046 ms preparation, **39.169 ms formulation/search**, 16.862 ms
+solve wrapper and 6.956 ms residual work. The internal explanation below uses
+the separate representative probe invocation: 25.499 ms base formulation,
+9.502 ms scalar admission/proposal and 5.118 ms joint assembly, totaling
+40.119 ms. These are not exact subdivisions of that clean 39.169 ms.
+
+### Fresh plan construction carries more than one simulated trajectory
+
+The encounter horizon expands beyond the nominal horizon to include the
+proposed target departure; it is 96 holds of 50 ms in this fixture. A fresh
+admission has no previously certified prediction family to shift. The code
+propagates an affine dependence on the complete 192-coordinate actuator plan:
+`x_k = F_k U + f_k`. It also propagates node error boxes, numerical allowances,
+local transition maps and the data needed to certify later plan continuation.
+The stored state-map array is `6 x 192 x 97`. Its size alone is not evidence of
+a memory-bandwidth bottleneck, but the work is larger than integrating one
+six-state nominal trajectory 96 times.
+
+The measured prediction/anchor component is 3.326 ms. Constant operating
+conditions reuse equilibrium and transition calculations where the code permits;
+it would be incorrect to attribute the whole block to 96 independent matrix
+exponentials. Terminal construction is 0.837 ms and the CLF/common assembly is
+0.498 ms, so neither dominates this example.
+
+### Geometric certification requires repeated per-stage data handling
+
+Lane frames (1.493 ms), initial support normals (2.124 ms), geometry/projection
+(9.917 ms), and joint-record construction (4.513 ms) together take 18.047 ms.
+The geometry uses oriented vehicle/target rectangles, frame approximation
+remainders and hard pose domains, not just center-point distances. Actual road
+edges are disabled in this fixture, while the pose/chart domains remain active.
+
+`avoidanceSafetyGeometry.build` traverses all 96 cells to pack target and frame
+data, then invokes the geometry kernel, packs projection inputs, invokes the
+projection kernel, and assembles local/global rows and labels. The line profile
+confirms one batched call to each existing geometry MEX, rather than 96 MEX
+invocations. It also records 96 `rmfield`/label assembly operations and 97
+`localJointRecord` calls. MATLAB structs, cells, string labels, array slicing
+and assembling the resulting matrices remain on the warm execution path.
+These observations identify work to investigate; they do not isolate the
+speedup obtainable by changing its representation.
+
+There is a concrete construction-and-removal path: `build` generates and
+projects fixed-normal collision rows; `formulateAvoidanceProblem` combines them
+with the base constraints; `jointProgram` then removes collision/exit slices
+from the common and local row structures while retaining the geometry data and
+normals needed by joint certificates. The local filter loops over eight fields
+for each affected cell (768 field-slicing executions in this profile). This
+provides a specific candidate for avoiding intermediate row materialization.
+The underlying geometry data and the retained hard domains are still required;
+neither the whole geometry block nor its 9.917 ms can be declared redundant.
+
+### The scalar shortcut fails before the successful full-plan solve
+
+The scalar section uses `U(alpha) = U0 + alpha*d`: all 192 actuator coordinates
+move along one fixed temporal direction. Direction construction takes 0.899 ms
+and preserves the specified terminal conditions. Although the amplitude changes,
+the section cannot independently retime steering/braking at different nodes.
+The circular case excludes all certified amplitudes in that section. This is
+a restriction of the searched family and its conservative certificate, not a
+proof that the complete control problem has no safe solution.
+
+For each of 16 amplitude cells, the method evaluates 97 records against 32
+separating directions, including an analytic rectangle-support bound over the
+whole yaw interval induced by the amplitude cell. It derives forbidden
+amplitude intervals and subtracts their union. The 16 cells represent 49,664
+record/direction combinations, not 512 optimization solves or 16 nominal-point
+collision checks. Trigonometric support evaluation, interval arithmetic,
+temporary arrays, reductions and interval-set operations all contribute.
+
+After exclusion, 17 cell-boundary candidates are evaluated to find a least
+violated initialization that still satisfies the hard base/terminal/CLF tests.
+That is another 52,768 record/direction combinations, taking 3.759 ms in the
+proposal routine. One target-support evaluation, 16 interval-support evaluations
+and 17 proposal evaluations explain the 34 recorded calls to the vectorized
+rectangle-support function. Interval/dictionary processing and remaining scalar
+work take 4.844 ms, making the scalar total `0.899 + 4.844 + 3.759 = 9.502 ms`.
+
+This fast admission route avoids a conic solve when it succeeds, as in the
+straight fixture. Here it precedes the full-plan route and adds to the latency.
+Its proposal and base-interval calculations supply that route's initialization;
+removing the search would not automatically save 9.502 ms while preserving the
+same admission result. An alternative initializer requires separate validation.
+
+### The solver consumes a second, sparse representation
+
+The base formulation first constructs a condensed objective through a
+`480 x 192` tracking map and its Gram matrix (1.409 ms). For the native solve,
+`avoidanceStageQp.build` introduces `6 x 96 = 576` state coordinates and
+constructs a sparse stage objective and dynamic equalities instead. The
+condensed prediction maps remain useful to admission and independent
+certification. The two objective representations nevertheless expose another
+possible source of avoidable intermediate construction; removing one requires
+checking all consumers and branches, and this cost alone cannot close the gap.
+
+Joint assembly then adds support-angle and epigraph variables, screens already
+safe records, builds the remaining support majorant cones and assembles sparse
+triplets. In this replay, 39 of 97 records need the movable support-cone branch.
+The 5.118 ms assembly divides into 1.767 ms stage lifting/row compaction,
+0.666 ms domain screening and 2.685 ms support-cone/remaining assembly. Native
+iterations begin only after this block; their time belongs to the separate
+solve bucket.
+
+### Engineering implication and limits of this explanation
+
+Prioritize avoiding unnecessary geometric row/data construction and conversions,
+then a cheaper validated initialization path for cases that exhaust the scalar
+section. Batch or preallocate structures where measurements justify it, preserve
+shared prediction data, and investigate deferred condensed-objective assembly.
+Changing the horizon, reducing dictionary coverage or skipping certificates can
+change admission capability or safety assumptions, so those are not equivalent
+implementation-only optimizations. No ablation, speedup or production change is
+claimed here. This is a source-level explanation of existing measured costs.
+
 ## Reproduction and verification
 
 Raw campaign directory:
