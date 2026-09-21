@@ -42,7 +42,7 @@ def main():
     for fixture, entries in groups.items():
         samples = [sample for entry in entries for sample in entry['samples']]
         assert len(samples) == 22
-        assert all(x['certified'] and x['directionsUnchanged'] and not x['scalarWitnessIssued'] for x in samples)
+        assert all(x['certified'] and x['directionsUnchanged'] and not x.get('initializerIssued', x.get('scalarWitnessIssued', True)) for x in samples)
         assert all(x['solverCalls'] == 1 and x['maximumJointResidual'] <= 0
                    and x['maximumPhysicalResidual'] <= 0 for x in samples)
         assert all(x['fixedAnglesMaximumError'] == 0 and x['controlLineDepartureNorm'] > 1e-4 for x in entries)
@@ -112,7 +112,7 @@ def main():
     sensitivity = load('sensitivity.json')['entries']
     assert len(sensitivity) == 30
     samples = [entry['sample'] for entry in sensitivity]
-    assert all(x['certified'] and x['directionsUnchanged'] and not x['scalarWitnessIssued'] for x in samples)
+    assert all(x['certified'] and x['directionsUnchanged'] and not x.get('initializerIssued', x.get('scalarWitnessIssued', True)) for x in samples)
     assert all(x['solverCalls'] == 1 for x in samples if x['hasTarget'])
     result['sensitivity'] = {'fixtures': 30, 'certified': sum(x['certified'] for x in samples),
                              'activeTargets': sum(x['hasTarget'] for x in samples)}
@@ -136,9 +136,9 @@ def main():
     artifacts.extend(root / name for name in ('config/collisionAvoidanceControllerConfig.m',
                      'scripts/runFixedDirectionValidation.m', 'scripts/analyzeFixedDirectionValidation.py',
                      'scripts/runExactStateRecursiveFeasibilityScenario.m', 'scripts/standaloneControllerFrame.m',
-                     'scripts/standaloneControllerBenchmark.m', 'tests/taperedAdmissionTest.m',
+                     'scripts/standaloneControllerBenchmark.m', 'tests/fluidInitializationTest.m',
                      'tests/fullPlanAdmissionTest.m', 'tests/standaloneControllerFrameTest.m',
-                     'tests/jointSupportCertificateTest.m', 'tests/affinePlanAdmissionTest.m',
+                     'tests/jointSupportCertificateTest.m', 'tests/admissionSafetyTest.m',
                      'tests/certificateContinuationTest.m', 'tests/collisionAvoidanceControllerTest.m'))
     result['artifactsSha256'] = {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
                                for path in sorted(set(artifacts))}

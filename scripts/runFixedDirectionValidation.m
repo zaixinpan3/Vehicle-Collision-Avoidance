@@ -26,14 +26,14 @@ function summary=runFixedDirectionValidation(directory,options)
                 samples=cell(11,1);decision=[];
                 for repetition=1:11
                     [sample,problem]=localInvoke(fixture);
-                    assert(sample.certified && sample.solverCalls==1 && ~sample.scalarWitnessIssued);
+                    assert(sample.certified && sample.solverCalls==1 && ~sample.initializerIssued);
                     if repetition==1,decision=problem.decision;end
                     assert(isequaln(problem.decision,decision),'Repeated complete decision changed.');
                     samples{repetition}=sample;
                 end
                 % Inspect the actual optimization dimensions outside timing.
                 program=formulateAvoidanceProblem(problem.model);
-                [seed,angles]=solveHardCbfClf.admitSection(program,fixture.cfg);
+                [seed,angles]=solveHardCbfClf.fluidInitialize(program,fixture.cfg);
                 conic=avoidanceStageQp.fixedDirections(program,seed,angles,fixture.cfg);
                 direction=seed(program.layout.planIndex)-program.anchorPlan;
                 displacement=problem.decision(program.layout.planIndex)-program.anchorPlan;
@@ -110,7 +110,7 @@ function [sample,problem]=localInvoke(fixture)
     sample=struct('seconds',seconds,'certified',problem.metadata.planCertified, ...
         'phase',problem.metadata.runtime,'horizonSteps',problem.metadata.horizonSteps, ...
         'solverCalls',problem.metadata.solverCallCount,'hasTarget',problem.metadata.hasTarget, ...
-        'scalarWitnessIssued',issued,'directionsUnchanged',fixedAngles, ...
+        'initializerIssued',issued,'directionsUnchanged',fixedAngles, ...
         'maximumJointResidual',jointResidual, ...
         'maximumPhysicalResidual',max(problem.program.physicalMatrix*problem.decision-problem.program.physicalBound));
 end

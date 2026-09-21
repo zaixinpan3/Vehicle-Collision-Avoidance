@@ -72,186 +72,14 @@ classdef solveHardCbfClf
             solve = localRunJointProgram(problem,cfg);
         end
 
-        function [decision,angles,information,proposal] = admitSection(program,cfg)
-        % Choose a trajectory anchor and separation directions, never a command.
-            origin=program.anchorPlan;count=program.layout.planCount;
-            records=program.jointCertificate.records;
-            angles=program.jointCertificate.angles;decision=[];
-            % A proposal is an uncertified optimizer center, never a command.
-            proposal=struct('decision',zeros(0,1),'angles',angles,'violation',Inf);
-            coder.varsize('proposal.decision',[Inf,1],[true,false]);
-            information=struct('status',"noDirection",'baseInterval',[], ...
-                'safeIntervals',zeros(0,2),'amplitude',NaN,'basisResidual',NaN, ...
-                'normalCount',cfg.admission.normalCount,'amplitudeCells',cfg.admission.amplitudeCells,'maximumYaw',NaN);
-            if ~localSectionTimeAvailable(cfg),information.status="searchTimeLimit";return;end
-            states=localStates(program.prediction,origin);
-            [direction,information.basisResidual]=localDirection(program,cfg,states);
-            if isempty(direction),return;end
-            slope=localDirections(program.prediction,direction);
-            physical=program.physicalMatrix(:,1:count);
-            interval=solveHardCbfClf.linearInterval(physical*direction, ...
-                program.safetyBound-physical*origin,[-Inf,Inf]);
-            information.status="emptyLinearBase";
-            if isempty(interval),return;end
-            center=program.terminalCone.bound-program.terminalCone.matrix*origin;
-            tangent=-program.terminalCone.matrix*direction;
-            for first=1:3:numel(center)
-                assert(tangent(first)==0,'affinePlanAdmission:variableConeTop', ...
-                    'Terminal modal cones must have a constant radius.');
-                interval=solveHardCbfClf.ballInterval(center(first+(1:2)), ...
-                    tangent(first+(1:2)),center(first),interval);
-                if isempty(interval),information.status="emptyTerminalBase";return;end
-            end
-            if any(~isfinite(interval),'all'),information.status="unboundedParameter";return;end
-            information.baseInterval=interval;
-            dictionary=program.geometry.frames(1).heading+2*pi*(0:cfg.admission.normalCount-1)/cfg.admission.normalCount;
-            normals=[cos(dictionary);sin(dictionary)];
-            total=numel(records);relative=zeros(total,2);relativeSlope=relative;
-            yaw=zeros(total,1);yawSlope=yaw;egoSizes=zeros(total,2);egoRadius=yaw;
-            targetSizes=egoSizes;targetYaw=yaw;targetRadius=yaw;constant=yaw;
-            generatorSupport=zeros(total,numel(dictionary));
-            for index=1:total
-                item=records(index);state=states(:,item.stage+1);delta=slope(:,item.stage+1);
-                relative(index,:)=(item.positionOffset+item.positionMap*state).';
-                relativeSlope(index,:)=(item.positionMap*delta).';
-                yaw(index)=item.yawOffset+item.yawRow*state;yawSlope(index)=item.yawRow*delta;
-                egoSizes(index,:)=item.egoHalfSize.';egoRadius(index)=item.egoYawRadius;
-                targetSizes(index,:)=item.targetHalfSize.';targetYaw(index)=item.targetYaw;
-                targetRadius(index)=item.targetYawRadius;
-                constant(index)=item.clearance+item.positionBall-program.jointCertificate.upperBound(index);
-                generatorSupport(index,:)=sum(abs(item.generators.'*normals),1);
-            end
-            fixed=constant+generatorSupport+solveHardCbfClf.rectangleSupports( ...
-                targetSizes,targetRadius,dictionary-targetYaw)-relative*normals;
-            coefficient=relativeSlope*normals;
-            boundaries=linspace(interval(1),interval(2),cfg.admission.amplitudeCells+1);
-            intervals=zeros(cfg.admission.amplitudeCells*(total+1),2);intervalCount=0;collisionComponents=0;
-            for cellIndex=1:cfg.admission.amplitudeCells
-                if ~localSectionTimeAvailable(cfg),information.status="searchTimeLimit";return;end
-                domain=boundaries(cellIndex:cellIndex+1);middle=mean(domain,'all');radius=diff(domain,1,2)/2;
-                limits=fixed+solveHardCbfClf.rectangleSupports(egoSizes, ...
-                    egoRadius+abs(yawSlope)*radius,dictionary-yaw-yawSlope*middle);
-                % Charge evaluation and endpoint arithmetic before subtraction.
-                limits=limits+256*eps*(1+abs(limits)+abs(coefficient)*max(abs(domain),[],'all'));
-                ratio=limits./coefficient;
-                lower=ratio;lower(coefficient>=0)=-Inf;lower=max(lower,[],2);
-                upper=ratio;upper(coefficient<=0)=Inf;upper=min(upper,[],2);
-                alwaysSafe=any(coefficient==0 & limits<=0,2);
-                keep=~alwaysSafe & lower<upper;
-                collision=keep & ~[records.isExit].';
-                collisionIntervals=solveHardCbfClf.subtractIntervals(domain,[lower(collision),upper(collision)]);
-                collisionComponents=collisionComponents+size(collisionIntervals,1);
-                component=solveHardCbfClf.subtractIntervals(domain,[lower(keep),upper(keep)]);
-                intervals(intervalCount+(1:size(component,1)),:)=component;
-                intervalCount=intervalCount+size(component,1);
-            end
-            intervals=intervals(1:intervalCount,:);information.safeIntervals=intervals;
-            if isempty(intervals)
-                information.status="collisionExcluded";
-                if collisionComponents>0,information.status="exitExcluded";end
-                if nargout>3 && localSectionTimeAvailable(cfg)
-                    proposal=localAdmissionProposal(program,origin,direction,boundaries, ...
-                        dictionary,fixed,coefficient,egoSizes,egoRadius,yaw,yawSlope,cfg);
-                end
-                return;
-            end
-            [quadratic,linear,clfCenter,clfSlope,clfRadius]=localObjective(program,origin,direction,states,slope);
-            left=interval(1);right=interval(2);
-            for iteration=1:cfg.admission.performanceIterations
-                middle=(left+right)/2;value=clfCenter+clfSlope*middle;length=norm(value);
-                derivative=2*quadratic*middle+linear;
-                if length>clfRadius && length>0
-                    derivative=derivative+2*program.slackWeight*(length-clfRadius)*(clfSlope.'*value)/length;
-                end
-                if derivative>0,right=middle;else,left=middle;end
-            end
-            inward=64*eps*(1+max(abs(intervals),[],2));
-            lower=min(intervals(:,1)+inward,mean(intervals,2));
-            upper=max(intervals(:,2)-inward,mean(intervals,2));
-            candidates=min(max((left+right)/2,lower),upper);
-            slack=max(0,vecnorm(clfCenter+clfSlope*candidates.',2,1).'-clfRadius);
-            costs=quadratic*candidates.^2+linear*candidates+program.slackWeight*slack.^2;
-            % Resolve arithmetic-scale objective ties by interval order so
-            % generated BLAS/SVD arithmetic cannot flip symmetric solutions.
-            best=min(costs);
-            selected=find(costs<=best+64*eps*(1+abs(best)),1,'first');
-            selected=selected(1);amplitude=candidates(selected);
-            plan=origin+amplitude*direction;
-            decision=[plan;slack(selected)+64*eps*(1+slack(selected)+norm(clfCenter+clfSlope*amplitude))];
-            chosen=states+amplitude*slope;
-            % Select a certifying dictionary direction at the chosen witness.
-            actual=constant+generatorSupport+solveHardCbfClf.rectangleSupports( ...
-                targetSizes,targetRadius,dictionary-targetYaw) ...
-                +solveHardCbfClf.rectangleSupports(egoSizes,egoRadius,dictionary-yaw-yawSlope*amplitude) ...
-                -(relative+amplitude*relativeSlope)*normals;
-            [~,indices]=min(actual,[],2);angles=dictionary(indices).';
-            if size(angles,2)>1,angles=angles.';end
-            information.status="candidate";information.amplitude=amplitude;
-            information.maximumYaw= max(abs(chosen(3,:)),[],'all');
+        function [decision,angles,information] = fluidInitialize(program,cfg)
+        % Cheng et al. (2021), DOI 10.1109/TITS.2020.2990211, Eqs. (34)-(36).
+        % A Gaussian Frenet reference initializes the geometry of one full SOCP.
+        % Prediction-based placement and affine-model fitting are extensions;
+        % this seed is neither a feasible certificate nor an executable plan.
+            [decision,angles,information]=localFluidInitialize(program,cfg);
         end
 
-        function interval = linearInterval(coefficient,bound,domain)
-            interval=domain;
-            coder.varsize('interval',[1,2],[true,true]);
-            if isempty(interval),return;end
-            if any(~isfinite(coefficient)) || any(~isfinite(bound)) ...
-                    || any(coefficient==0 & bound<0)
-                interval=[];return;
-            end
-            positive=coefficient>0;negative=coefficient<0;
-            interval=[max([interval(1);bound(negative)./coefficient(negative)]), ...
-                min([interval(2);bound(positive)./coefficient(positive)])];
-            if interval(1)>interval(2),interval=[];end
-        end
-
-        function interval = ballInterval(center,direction,radius,domain)
-            interval=domain;
-            coder.varsize('interval',[1,2],[true,true]);
-            if isempty(interval),return;end
-            if radius<0 || ~isfinite(radius) || any(~isfinite([center;direction]))
-                interval=[];return;
-            end
-            length=norm(direction);
-            if length==0
-                if norm(center)>radius,interval=[];end
-                return;
-            end
-            unit=direction/length;middle=-(unit.'*center)/length;
-            distance=norm(center+middle*direction);
-            if distance>radius,interval=[];return;end
-            halfWidth=sqrt(max(0,(radius-distance)*(radius+distance)))/length;
-            interval=[max(interval(1),middle-halfWidth),min(interval(2),middle+halfWidth)];
-            if interval(1)>interval(2),interval=[];end
-        end
-
-        function intervals = subtractIntervals(domain,forbidden)
-            % The forbidden intervals are open: touching endpoints survive.
-            forbidden=sortrows(forbidden,1);intervals=zeros(size(forbidden,1)+1,2);
-            cursor=domain(1);count=0;
-            for index=1:size(forbidden,1)
-                lower=forbidden(index,1);upper=forbidden(index,2);
-                if lower>=upper || upper<=cursor || lower>domain(2),continue;end
-                if lower>=cursor
-                    count=count+1;intervals(count,:)=[cursor,min(lower,domain(2))];
-                end
-                cursor=max(cursor,upper);
-                if cursor>domain(2),break;end
-            end
-            if cursor<=domain(2),count=count+1;intervals(count,:)=[cursor,domain(2)];end
-            intervals=intervals(1:count,:);
-        end
-
-        function support = rectangleSupports(halfSize,radius,angle)
-            % Analytic maximum over the complete yaw interval, row by row.
-            long=halfSize(:,1);wide=halfSize(:,2);circumradius=hypot(long,wide);
-            first=angle-radius;last=angle+radius;
-            support=max(long.*abs(cos(first))+wide.*abs(sin(first)), ...
-                long.*abs(cos(last))+wide.*abs(sin(last)));
-            peak=atan2(wide,long);
-            distance=min(abs(mod(angle-peak+pi/2,pi)-pi/2),abs(mod(angle+peak+pi/2,pi)-pi/2));
-            support=max(support,circumradius.*(distance<=radius+32*eps*(1+abs(angle))));
-            support=support+32*eps*(1+circumradius);
-        end
     end
 end
 
@@ -263,7 +91,7 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
         'policy',"fixedDirectionTrajectoryOptimization",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
         'issuedAdmissionWitness',false,'usedFullPlanAdmission',false, ...
-        'fullPlanStatus',"notAttempted",'admissionProposalViolation',NaN, ...
+        'fullPlanStatus',"notAttempted", ...
         'initialCertificateAngles',program.jointCertificate.angles, ...
         'fixedCertificateAngles',program.jointCertificate.angles,'directionSeedSource',"nominalWitness");
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
@@ -274,16 +102,12 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
     end
     if ~inherited && ~admitted
         phase=tic;
-        [candidate,directions,search.section,proposal]=solveHardCbfClf.admitSection(program,cfg);
+        [point,angles,search.initialization]=solveHardCbfClf.fluidInitialize(program,cfg);
         search.formulationSeconds=toc(phase);search.familyAttempts=1;
-        if ~isempty(candidate)
-            point=candidate;angles=directions;search.directionSeedSource="scalarCandidate";
-        elseif ~isempty(proposal.decision)
-            point=proposal.decision;angles=proposal.angles;
-            search.admissionProposalViolation=proposal.violation;search.directionSeedSource="scalarProposal";
-        else
+        search.directionSeedSource="chengFluidReference";
+        if isempty(point)
             result=localEmptySolve();
-            result.message="Direction initialization found no candidate: "+search.section.status;return;
+            result.message="Fluid initialization failed: "+search.initialization.status;return;
         end
     elseif admitted
         program=localRefreshBounds(accepted);
@@ -316,34 +140,6 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
     end
     program.supportGeometry.witnessPreserved=inherited;
     program.inheritedFeasibleFamily=inherited;
-end
-
-function proposal=localAdmissionProposal(program,origin,direction,boundaries, ...
-        dictionary,fixed,coefficient,egoSizes,egoRadius,yaw,yawSlope,cfg)
-% Choose one geometric center from the already computed hard base interval.
-% Exact dictionary gaps at cell boundaries choose the least violated center;
-% no failed center is returned as an admitted decision or carried witness.
-    proposal=struct('decision',zeros(0,1),'angles',program.jointCertificate.angles,'violation',Inf);
-    coder.varsize('proposal.decision',[Inf,1],[true,false]);
-    inward=64*eps*(1+max(abs(boundaries)));
-    amplitudes=min(max(boundaries,boundaries(1)+inward),boundaries(end)-inward);
-    if boundaries(end)-boundaries(1)<2*inward,amplitudes=mean(boundaries);end
-    for index=1:numel(amplitudes)
-        amplitude=amplitudes(index);
-        if ~localSectionTimeAvailable(cfg),return;end
-        residual=fixed+solveHardCbfClf.rectangleSupports(egoSizes,egoRadius, ...
-            dictionary-yaw-yawSlope*amplitude)-coefficient*amplitude;
-        [values,indices]=min(residual,[],2);violation=max(values);
-        if violation>=proposal.violation,continue;end
-        plan=origin+amplitude*direction;
-        first=program.cones(2)+1;
-        clf=program.b(first:first+5)-program.A(first:first+5,:)*[plan;0];
-        slack=max(0,norm(clf(2:end))-clf(1));
-        point=[plan;slack+64*eps*(1+slack+norm(clf))];
-        if solveHardCbfClf.inspect(program,point)~=0,continue;end
-        proposal.decision=point;proposal.angles=reshape(dictionary(indices),[],1);
-        proposal.violation=violation;
-    end
 end
 
 function result=localSolveConic(program,cfg)
@@ -589,82 +385,126 @@ function states=localStates(prediction,inputs)
     end
 end
 
-function states=localDirections(prediction,inputs)
-    count=prediction.stageCount;states=zeros(6,count+1);
-    for stage=1:count
-        states(:,stage+1)=prediction.stageMatrixA(:,:,stage)*states(:,stage) ...
-            +prediction.stageMatrixB(:,:,stage)*inputs(2*stage-1:2*stage);
-    end
-end
-
-function [direction,residual]=localDirection(program,cfg,states)
+function [point,angles,information]=localFluidInitialize(program,cfg)
+    point=zeros(0,1);angles=program.jointCertificate.angles;
+    coder.varsize('point',[Inf,1],[true,false]);
+    information=struct('status',"nominal",'amplitudeMeters',0,'widthMeters',0, ...
+        'centerStationMeters',0,'conflictStages',zeros(1,2),'terminalFitError',0, ...
+        'maximumPhysicalExcess',NaN,'maximumSupportResidual',NaN, ...
+        'referenceCount',0,'referenceScores',Inf(1,2));
+    if ~localInitializationTimeAvailable(cfg),information.status="searchTimeLimit";return;end
+    nominal=localStates(program.prediction,program.anchorPlan);
     records=program.jointCertificate.records;
-    values=avoidanceSafetyGeometry.jointResidual(program,program.feasibleWitness,program.jointCertificate.angles);
+    values=avoidanceSafetyGeometry.jointResidual(program,program.feasibleWitness,angles);
     values([records.isExit])=-Inf;
-    [~,critical]=max(values-program.jointCertificate.upperBound);
-    matching=false(numel(records),1);
-    for index=1:numel(records)
-        matching(index)=isequal(records(index).key,records(critical).key);
+    selected=zeros(0,1);
+    if ~isempty(records)
+        [excess,critical]=max(values-program.jointCertificate.upperBound);
+        if excess>0
+            matching=false(numel(records),1);
+            for index=1:numel(records)
+                matching(index)=isequal(records(index).key,records(critical).key);
+            end
+            selected=find(matching & ~[records.isExit].' & values>program.jointCertificate.upperBound);
+        end
     end
-    selected=find(matching & ~[records.isExit].' & values>program.jointCertificate.upperBound);
-    count=program.layout.planCount;maps=program.prediction.egoStateMatrix;
-    if isempty(selected)
-        index=program.terminal.stateIndex;
-        constraint=[maps(index,:,end);zeros(2,count)];
-        constraint(end-1:end,end-1:end)=eye(2);
-        desired=[program.terminal.reference(index)-states(index,end); ...
-            program.terminal.input-program.anchorPlan(end-1:end)];
-    else
+    plans=program.anchorPlan;amplitudes=0;terminalErrors=0;
+    if ~isempty(selected)
         stages=[records(selected).stage];first=min(stages,[],'all');last=max(stages,[],'all');
-        samples=unique([first,round((first+last)/2),last]);
+        center=(nominal(1,first+1)+nominal(1,last+1))/2;
+        width=cfg.admission.widthScale*max(cfg.admission.minimumWidthMeters, ...
+            abs(nominal(1,last+1)-nominal(1,first+1))/2);
         initial=records(selected(1));final=records(selected(end));
-        travel=final.positionOffset+final.positionMap*states(:,final.stage+1) ...
-            -initial.positionOffset-initial.positionMap*states(:,initial.stage+1);
-        transverse=initial.positionMap(:,1:2)\[-travel(2);travel(1)];
-        if norm(transverse)<=64*eps*(1+norm(travel)),transverse=[0;1];end
-        transverse=transverse/norm(transverse);
-        constraint=[reshape(permute(maps(1:2,:,samples+1),[1,3,2]),[],count);maps(:,:,end);zeros(2,count)];
-        constraint(end-1:end,end-1:end)=eye(2);
-        terminalChange=zeros(6,1);index=program.terminal.stateIndex;
-        terminalChange(index)=program.terminal.reference(index)-states(index,end);
-        % A single smooth taper reduces premature chart excursions while
-        % retaining one amplitude and the same terminal interpolation rows.
-        phase=(samples-first)/max(last-first,1);
-        fraction=cfg.admission.temporalShoulderFraction;
-        % Straight charts have no curvature remainder; retain their plateau
-        % instead of adding an unnecessary temporal restriction to a pass.
-        if all(program.prediction.scheduleCurvature==0),fraction=1;end
-        weights=fraction+(1-fraction)*sin(pi*phase);
-        desired=[reshape(transverse*weights,[],1);terminalChange; ...
-            program.terminal.input-program.anchorPlan(end-1:end)];
+        lateral=initial.positionMap(:,2);lateral=lateral/norm(lateral);
+        relativeFirst=initial.positionOffset+initial.positionMap*nominal(:,first+1);
+        relativeLast=final.positionOffset+final.positionMap*nominal(:,last+1);
+        % Relative travel orders the two sides only. Actual robust separation
+        % residuals select between passing ahead of and behind a moving target.
+        transverse=lateral.'*(relativeLast-relativeFirst);
+        side=sign(transverse);
+        if abs(transverse)<=1e-6,side=sign(lateral.'*relativeFirst);end
+        if side==0,side=1;end
+        [~,middleIndex]=min(abs(stages(:)-(first+last)/2));
+        middle=records(selected(middleIndex(1)));
+        middleLateral=middle.positionMap(:,2);middleLateral=middleLateral/norm(middleLateral);
+        targetSupport=targetPrediction.rectangleSupport(middle.targetHalfSize(1), ...
+            middle.targetHalfSize(2),middleLateral,middle.targetYaw,0);
+        % Nominal footprints shape the path; unchanged hard constraints retain
+        % all uncertainty, chart remainder and clearance requirements.
+        magnitude=middle.egoHalfSize(2)+targetSupport+cfg.admission.clearanceAllowanceMeters;
+        amplitudes=magnitude*[side,-side];distance=nominal(1,:)-center;
+        bump=amplitudes(:).*exp(-.5*(distance/width).^2);
+        derivative=-distance/width^2.*bump;
+        heading=atan2(derivative,1-program.prediction.scheduleCurvature.*bump);
+        [plans,terminalErrors]=localFitFluidReference(program,bump,heading,cfg);
+        information.status="candidate";information.widthMeters=width;
+        information.centerStationMeters=center;information.conflictStages=[first,last];
+        information.referenceCount=2;
     end
-    scale=max(vecnorm(constraint,2,2),eps);constraint=constraint./scale;desired=desired./scale;
-    difference=speye(count)-spdiags(ones(count,1),-2,count,count);
-    metric=spdiags(program.inputWeight,0,count,count) ...
-        +cfg.encounter.inputRateWeight/cfg.controller.sampleTime^2*(difference.'*difference);
-    root=chol(metric);map=constraint/root;
-    direction=root\(pinv(full(map))*desired);
-    residual=norm(constraint*direction-desired,Inf);
-    if any(~isfinite(direction)) || norm(direction)==0,direction=zeros(0,1);end
+    best=Inf;
+    for candidate=1:size(plans,2)
+        if ~localInitializationTimeAvailable(cfg)
+            point=zeros(0,1);information.status="searchTimeLimit";return;
+        end
+        plan=plans(:,candidate);
+        if any(~isfinite(plan)) || terminalErrors(candidate)>1e-8,continue;end
+        trial=localFluidPoint(program,plan);states=localStates(program.prediction,plan);
+        directions=angles;
+        for index=1:numel(records)
+            item=records(index);state=states(:,item.stage+1);
+            relative=item.positionOffset+item.positionMap*state;
+            yaw=item.yawOffset+item.yawRow*state;
+            normal=avoidanceSafetyGeometry.supportDirection(relative,yaw,[0;0],item.targetYaw, ...
+                [item.egoHalfSize;item.targetHalfSize]);
+            directions(index)=atan2(normal(2),normal(1));
+        end
+        residual=avoidanceSafetyGeometry.jointResidual(program,trial,directions);
+        score=0;maximum=0;
+        if ~isempty(residual)
+            score=max(residual-program.jointCertificate.upperBound);maximum=max(residual);
+        end
+        information.referenceScores(candidate)=score;
+        if ~isfinite(score),continue;end
+        % Arithmetic-scale ties preserve the deterministic geometric ordering.
+        if isempty(point) || score<best-64*eps*(1+abs(best))
+            best=score;point=trial;angles=directions;
+            information.amplitudeMeters=amplitudes(candidate);
+            information.terminalFitError=terminalErrors(candidate);
+            information.maximumSupportResidual=maximum;
+        end
+    end
+    if isempty(point),information.status="invalidFit";return;end
+    information.maximumPhysicalExcess=max(program.physicalMatrix*point-program.physicalBound);
 end
 
-function [quadratic,linear,center,slope,radius]=localObjective(program,origin,direction,states,stateSlope)
-    quadratic=sum(program.inputWeight.*direction.^2);
-    linear=2*sum(program.inputWeight.*(origin-program.referenceInputs(:)).*direction);
-    for stage=1:program.prediction.stageCount
-        error=states(2:6,stage+1)-program.referenceStates(2:6,stage+1);
-        change=stateSlope(2:6,stage+1);matrix=program.referenceMatrices(:,:,stage+1);
-        quadratic=quadratic+change.'*matrix*change;
-        linear=linear+2*error.'*matrix*change;
-    end
+function point=localFluidPoint(program,plan)
     first=program.cones(2)+1;
-    value=program.b(first:first+5)-program.A(first:first+5,:)*[origin;0];
-    delta=-program.A(first:first+5,:)*[direction;0];
-    assert(delta(1)==0 && value(1)>=0,'affinePlanAdmission:invalidClf','The CLF norm radius must be fixed and nonnegative.');
-    center=value(2:end);slope=delta(2:end);radius=value(1);
+    clf=program.b(first:first+5)-program.A(first:first+5,:)*[plan;0];
+    slack=max(0,norm(clf(2:end))-clf(1));
+    point=[plan;slack+64*eps*(1+slack+norm(clf))];
 end
 
-function available=localSectionTimeAvailable(cfg)
+function [plans,terminalErrors]=localFitFluidReference(program,bump,heading,cfg)
+% Fit both sides in one positive-definite system with two right-hand sides.
+% Terminal state/input stay fixed; other constraints belong to the full SOCP.
+    maps=program.prediction.egoStateMatrix;count=program.layout.planCount;
+    weights=[1;cfg.admission.headingWeight];
+    weighted=maps([2,3],:,2:end).*reshape(weights,[],1,1);
+    map=reshape(permute(weighted,[1,3,2]),[],count);
+    error=zeros(count,2);error(1:2:end,:)=bump(:,2:end).';
+    error(2:2:end,:)=cfg.admission.headingWeight*heading(:,2:end).';
+    difference=eye(count)-diag(ones(count-2,1),-2);
+    metric=diag(program.inputWeight)+cfg.encounter.inputRateWeight/cfg.controller.sampleTime^2*(difference.'*difference);
+    hessian=map.'*map+cfg.admission.regularizationWeight*metric;
+    constraint=[maps(:,:,end);zeros(2,count)];constraint(end-1:end,end-1:end)=eye(2);
+    scale=max(vecnorm(constraint,2,2),eps);scaled=constraint./scale;
+    inverse=hessian\[map.'*error,scaled.'];
+    change=inverse(:,1:2)-inverse(:,3:end)*(pinv(scaled*inverse(:,3:end))*(scaled*inverse(:,1:2)));
+    terminalErrors=max(abs(constraint*change),[],1);
+    plans=program.anchorPlan+change;
+end
+
+function available=localInitializationTimeAvailable(cfg)
     available=~isfield(cfg.solver,'workTimer') || ~isfinite(cfg.solver.workTimeLimit) ...
         || toc(cfg.solver.workTimer)<cfg.solver.workTimeLimit;
 end

@@ -1,9 +1,13 @@
-classdef taperedAdmissionTest < matlab.unittest.TestCase
-    %taperedAdmissionTest Temporal seeds initialize fixed-direction trajectory optimization.
+classdef fluidInitializationTest < matlab.unittest.TestCase
+    %fluidInitializationTest Fluid references initialize fixed-direction trajectory optimization.
     properties (TestParameter)
         curvature=struct('left',.01,'right',-.01,'gentlerLeft',.008, ...
             'gentlerRight',-.008,'tighterLeft',.012,'tighterRight',-.012);
-        invalidFraction={0,-.1,1.1,NaN,Inf,[.8,1]};
+        variation=struct('laterCrossing',[.01,8,3,1], ...
+            'fasterEgo',[.01,9,4,1],'tighterCurve',[.015,8,4,-1], ...
+            'mirroredLaterCrossing',[-.01,8,3,-1]);
+        invalidWidth={0,-.1,NaN,Inf,[.8,1]};
+        retiredSetting={'normalCount','amplitudeCells','performanceIterations','temporalShoulderFraction'};
     end
     methods (TestClassSetup)
         function paths(testCase)
@@ -30,13 +34,41 @@ classdef taperedAdmissionTest < matlab.unittest.TestCase
                 problem.metadata.admissionSearch.fixedCertificateAngles,AbsTol=0);
         end
 
-        function invalidTemporalFractionsAreRejected(testCase,invalidFraction)
+        function invalidFluidWidthsAreRejected(testCase,invalidWidth)
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
-                'admission',struct('temporalShoulderFraction',invalidFraction))), ...
+                'admission',struct('widthScale',invalidWidth))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
 
-        function aCertifiedDirectionSeedCannotBypassAFailedOptimizer(testCase,curvature)
+        function retiredGridSettingsAreRejected(testCase,retiredSetting)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
+                'admission',struct(retiredSetting,1))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
+
+        function fluidReferenceOpposesTheCrossingMotion(testCase,curvature)
+            [ego,target,road,cfg]=encounterTestFixture.circularCrossing(curvature);
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            information=problem.metadata.admissionSearch.initialization;
+            testCase.verifyEqual(sign(information.amplitudeMeters),-sign(curvature));
+            testCase.verifyLessThan(information.terminalFitError,1e-8);
+            testCase.verifyEqual(problem.metadata.admissionSearch.directionSeedSource,"chengFluidReference");
+            testCase.verifyGreaterThan(information.maximumSupportResidual,0);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
+        end
+
+        function predictedGeometrySelectsAFeasibleSideWithOneSolve(testCase,variation)
+            [ego,target,road,cfg]=localVariation(variation);
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            information=problem.metadata.admissionSearch.initialization;
+            testCase.verifyEqual(sign(information.amplitudeMeters),variation(4));
+            testCase.verifyEqual(information.referenceCount,2);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1);
+            testCase.verifyTrue(problem.metadata.planCertified);
+            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
+        end
+
+        function aFluidSeedCannotBypassAFailedOptimizer(testCase,curvature)
             [ego,target,road,cfg]=encounterTestFixture.circularCrossing(curvature);
             cfg.solver.jointFunction=@encounterTestFixture.fail;
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
@@ -49,7 +81,7 @@ classdef taperedAdmissionTest < matlab.unittest.TestCase
             testCase.verifyTrue(anglesEqual);
         end
 
-        function exportedTaperedAdmissionRetainsTheOriginalCertificate(testCase)
+        function exportedFluidAdmissionRetainsTheOriginalCertificate(testCase)
             [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             program=formulateAvoidanceProblem(problem.model);
@@ -68,9 +100,16 @@ function [distance,anglesEqual]=localControlLineDeparture()
     [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
     [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
     program=formulateAvoidanceProblem(problem.model);
-    [seed,angles]=solveHardCbfClf.admitSection(program,cfg);
+    [seed,angles]=solveHardCbfClf.fluidInitialize(program,cfg);
     direction=seed(program.layout.planIndex)-program.anchorPlan;
     displacement=problem.decision(program.layout.planIndex)-program.anchorPlan;
     distance=norm(displacement-direction*((direction.'*displacement)/(direction.'*direction)));
     anglesEqual=isequal(angles,problem.program.jointCertificate.angles);
+end
+
+function [ego,target,road,cfg]=localVariation(value)
+    [ego,target,road,cfg]=encounterTestFixture.circularCrossing(value(1));
+    cfg.referenceSpeed=value(2);state=ltvBicycleModel.cruiseEquilibrium(value(1),cfg);
+    ego.yaw=state(3);ego.speed=state(4);ego.lateralVelocity=state(5);ego.yawRate=state(6);
+    target.targetVelocityInertial=target.targetVelocityInertial*(value(3)/4);
 end

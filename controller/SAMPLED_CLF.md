@@ -2,7 +2,7 @@
 
 After initializing and fixing separation directions, the controller optimizes
 the complete finite input plan at every fresh admission and inherited
-performance step. The scalar search is only an initializer. The final convex
+performance step. The fluid reference only initializes the geometry. The final convex
 problem also optimizes a
 nonnegative first-hold CLF norm slack. Physical input effort is centered on
 the CLF/LQR operating input. For N holds its objective is

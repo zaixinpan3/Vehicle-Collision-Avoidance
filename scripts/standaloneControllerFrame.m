@@ -17,16 +17,9 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
     admission=~program.inheritedPredictionFamily;
     if admission && ~accepted
         start=localClock();
-        [candidate,directions,~,proposal]=solveHardCbfClf.admitSection(program,cfg);
-        decision=candidate(:);angles=directions(:);
+        [decision,angles]=solveHardCbfClf.fluidInitialize(program,cfg);
         metrics(1)=localClock()-start;
-        if ~isempty(decision)
-            % The candidate supplies fixed normals and a convexification center.
-            % It must still pass through the full trajectory optimization below.
-        else
-            if isempty(proposal.decision),return;end
-            decision=proposal.decision;angles=proposal.angles;
-        end
+        if isempty(decision),return;end
     elseif ~accepted
         return;
     end

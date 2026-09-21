@@ -83,7 +83,7 @@ def main():
     # timers such as localFixedDirectionSearch are retained separately, never summed.
     partition = ['formulateAvoidanceProblem.formulateAvoidanceProblem',
                  'avoidanceStageQp.fixedDirections', 'solveHardCbfClf.localDefaultSolve',
-                 'solveHardCbfClf.admitSection', 'solveHardCbfClf.certify']
+                 'solveHardCbfClf.fluidInitialize', 'solveHardCbfClf.certify']
     for item in coarse['fixtures']:
         selected = sorted(item['samples'], key=lambda x: x['seconds'])[len(item['samples']) // 2]
         values = collections.defaultdict(lambda: {'seconds': 0, 'calls': 0})

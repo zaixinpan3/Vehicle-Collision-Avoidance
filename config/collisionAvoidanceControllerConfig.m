@@ -40,12 +40,11 @@ function cfg = localDefaults()
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);
-    % One tapered time shape initializes the fixed separation directions.
-    % On curved predictions, shoulder fraction scales the first/last conflict
-    % displacement; one and straight charts retain the plateau. Every new
-    % admitted plan must then come from a complete fixed-direction convex solve.
-    cfg.admission = struct("normalCount",16,"amplitudeCells",8,"performanceIterations",32, ...
-        "temporalShoulderFraction",0.8);
+    % Cheng modified-fluid reference: geometry-only initialization for one SOCP.
+    % Lengths are in meters; clearanceAllowanceMeters shapes the seed only.
+    % It does not change the hard collision clearance or authorize execution.
+    cfg.admission = struct("widthScale",1.2,"minimumWidthMeters",3.0, ...
+        "clearanceAllowanceMeters",0.2,"headingWeight",4.0,"regularizationWeight",0.02);
     % Small trajectory regularization for fixed-direction convex optimization.
     cfg.jointCertificate = struct("proximalWeight",1.0e-3);
     cfg.collision = struct("cbfRate",2.0);
@@ -196,16 +195,15 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
-    fraction=cfg.admission.temporalShoulderFraction;
-    if ~isnumeric(fraction) || ~isreal(fraction) || ~isscalar(fraction) ...
-            || ~isfinite(fraction) || fraction<=0 || fraction>1
-        error("collisionAvoidanceController:invalidConfiguration", ...
-            "admission.temporalShoulderFraction must be in (0,1].");
+    for name = ["widthScale","minimumWidthMeters","headingWeight","regularizationWeight"]
+        value=cfg.admission.(name);
+        if ~isnumeric(value) || ~isreal(value) || ~isscalar(value) || ~isfinite(value) || value<=0
+            error("collisionAvoidanceController:invalidConfiguration", ...
+                "admission.%s must be a positive finite scalar.",name);
+        end
     end
-    for name = ["normalCount","amplitudeCells","performanceIterations"]
-        validateattributes(cfg.admission.(name),{'double'}, ...
-            {'scalar','real','finite','integer','positive'});
-    end
+    localValidateNonnegativeScalar(cfg.admission.clearanceAllowanceMeters, ...
+        "admission.clearanceAllowanceMeters");
     for name = "proximalWeight"
         validateattributes(cfg.jointCertificate.(name),{'double'}, ...
             {'scalar','real','finite','positive'});

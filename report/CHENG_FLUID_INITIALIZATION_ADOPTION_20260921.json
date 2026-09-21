@@ -1,0 +1,1844 @@
+{
+  "scope": "Production Cheng fluid initialization; unchanged full fixed-normal SOCP and hard node verifier. Warmup excluded; no WCET or continuous-safety claim.",
+  "parentCommit": "cd2bc0fdb8dd30b9802854b63b070916214b5b5e",
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921",
+  "tests": {
+    "total": 776,
+    "passed": 776,
+    "failed": 0,
+    "incomplete": 0,
+    "durationSeconds": 478.8526680000001,
+    "failedNames": []
+  },
+  "replay": [
+    {
+      "fixture": "circular-crossing-longest",
+      "timing": {
+        "calls": 22,
+        "medianMs": 47.9935,
+        "maximumMs": 123.73299999999999,
+        "over50Ms": 6
+      },
+      "allCertified": true,
+      "allSingleSolve": true,
+      "allNormalsFixed": true,
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.7565000000000001,
+        "formulationSeconds": 31.115999999999996,
+        "solveSeconds": 9.5085
+      },
+      "maximumFrame": {
+        "seconds": 0.123733,
+        "certified": true,
+        "phase": {
+          "inputPreparationSeconds": 0.000921,
+          "formulationSeconds": 0.106133,
+          "solveSeconds": 0.009935
+        },
+        "horizonSteps": 96,
+        "solverCalls": 1,
+        "hasTarget": true,
+        "initializerIssued": false,
+        "directionsUnchanged": true,
+        "maximumJointResidual": -8.858900869856967e-05,
+        "maximumPhysicalResidual": -0.03600906360674888
+      },
+      "controlLineDepartureNorm": 1.5663663273429191,
+      "seedObjective": -42.51393189997846,
+      "optimizedObjective": -44.01753363901766
+    },
+    {
+      "fixture": "measured-longest",
+      "timing": {
+        "calls": 22,
+        "medianMs": 76.5625,
+        "maximumMs": 122.818,
+        "over50Ms": 11
+      },
+      "allCertified": true,
+      "allSingleSolve": true,
+      "allNormalsFixed": true,
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.8130000000000001,
+        "formulationSeconds": 62.438500000000005,
+        "solveSeconds": 6.9175
+      },
+      "maximumFrame": {
+        "seconds": 0.122818,
+        "certified": true,
+        "phase": {
+          "inputPreparationSeconds": 0.000858,
+          "formulationSeconds": 0.108696,
+          "solveSeconds": 0.006848
+        },
+        "horizonSteps": 96,
+        "solverCalls": 1,
+        "hasTarget": true,
+        "initializerIssued": false,
+        "directionsUnchanged": true,
+        "maximumJointResidual": -7.283449676354081e-05,
+        "maximumPhysicalResidual": -0.4433893838598244
+      },
+      "controlLineDepartureNorm": 0.32670805325311764,
+      "seedObjective": 7.275850879537059,
+      "optimizedObjective": 7.178407934212212
+    }
+  ],
+  "campaign": {
+    "diagnostic": {
+      "trials": [
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.277504013623124e-05,
+          "allCertified": true,
+          "firstFrameSeconds": 0.046673,
+          "maximumSeconds": 0.046673,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.057499999999999,
+            "maximumMs": 46.673,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 9.277504013623124e-05,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.277504013623124e-05,
+          "allCertified": true,
+          "firstFrameSeconds": 0.196427,
+          "maximumSeconds": 0.196427,
+          "deadlineMisses": 12,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.054,
+            "maximumMs": 196.427,
+            "over50Ms": 12
+          },
+          "minimumNodeBodyGap": 9.277504013623124e-05,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.051102521744107586,
+          "allCertified": true,
+          "firstFrameSeconds": 0.010024,
+          "maximumSeconds": 0.029494,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.953,
+            "maximumMs": 29.494,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.054082815916539156,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.051102521744107586,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009071,
+          "maximumSeconds": 0.029563,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.9395,
+            "maximumMs": 29.563,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.054082815916539156,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.014644,
+          "maximumSeconds": 0.014644,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.915,
+            "maximumMs": 14.644,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.018843,
+          "maximumSeconds": 0.018843,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.941,
+            "maximumMs": 18.843,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.0993407862928135,
+          "allCertified": true,
+          "firstFrameSeconds": 0.048556,
+          "maximumSeconds": 0.048556,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.1255,
+            "maximumMs": 48.556000000000004,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.09999611894618499,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.0993407862928135,
+          "allCertified": true,
+          "firstFrameSeconds": 0.049708,
+          "maximumSeconds": 0.049708,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.136,
+            "maximumMs": 49.708000000000006,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.09999611894618499,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.13165963357336877,
+          "allCertified": true,
+          "firstFrameSeconds": 0.00883,
+          "maximumSeconds": 0.031069,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.054,
+            "maximumMs": 31.069,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.1329716464647182,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.13165963357336877,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009408,
+          "maximumSeconds": 0.031747,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.0615,
+            "maximumMs": 31.746999999999996,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.1329716464647182,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.1502991471336624,
+          "allCertified": true,
+          "firstFrameSeconds": 0.05109,
+          "maximumSeconds": 0.05109,
+          "deadlineMisses": 1,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.355,
+            "maximumMs": 51.09,
+            "over50Ms": 1
+          },
+          "minimumNodeBodyGap": 0.16235941857005395,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.1502991471336624,
+          "allCertified": true,
+          "firstFrameSeconds": 0.05434,
+          "maximumSeconds": 0.05434,
+          "deadlineMisses": 1,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.235500000000001,
+            "maximumMs": 54.339999999999996,
+            "over50Ms": 1
+          },
+          "minimumNodeBodyGap": 0.16235941857005395,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        }
+      ],
+      "timing": {
+        "calls": 7200,
+        "medianMs": 7.055,
+        "maximumMs": 196.427,
+        "over50Ms": 14
+      },
+      "phaseTiming": {
+        "admission": {
+          "calls": 12,
+          "medianMs": 39.209999999999994,
+          "maximumMs": 196.427,
+          "over50Ms": 3
+        },
+        "continuation": {
+          "calls": 698,
+          "medianMs": 11.7515,
+          "maximumMs": 28.240000000000002,
+          "over50Ms": 0
+        },
+        "cruise": {
+          "calls": 6490,
+          "medianMs": 7.046,
+          "maximumMs": 69.545,
+          "over50Ms": 11
+        }
+      },
+      "incompleteTrials": 0,
+      "executedHolds": 7200
+    },
+    "strict": {
+      "trials": [
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": false,
+          "executedHolds": 0,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": null,
+          "allCertified": true,
+          "firstFrameSeconds": 0.144187,
+          "maximumSeconds": 0.144187,
+          "deadlineMisses": 1,
+          "failureMessage": "The hard-safety, soft-CLF search failed at t=0 s (Fluid initialization failed: searchTimeLimit). No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "timing": {
+            "calls": 1,
+            "medianMs": 144.187,
+            "maximumMs": 144.187,
+            "over50Ms": 1
+          },
+          "minimumNodeBodyGap": null,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.277504013623124e-05,
+          "allCertified": true,
+          "firstFrameSeconds": 0.047004,
+          "maximumSeconds": 0.047004,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.976000000000001,
+            "maximumMs": 47.004,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 9.277504013623124e-05,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.051102521744107586,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009301,
+          "maximumSeconds": 0.029668,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.9464999999999995,
+            "maximumMs": 29.668,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.054082815916539156,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.051102521744107586,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009281,
+          "maximumSeconds": 0.029943,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.9485,
+            "maximumMs": 29.943,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.054082815916539156,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.015479,
+          "maximumSeconds": 0.015479,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.9905,
+            "maximumMs": 15.479,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.015759,
+          "maximumSeconds": 0.015759,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "timing": {
+            "calls": 600,
+            "medianMs": 6.930000000000001,
+            "maximumMs": 15.758999999999999,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": false,
+          "executedHolds": 0,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": null,
+          "allCertified": true,
+          "firstFrameSeconds": 0.050887,
+          "maximumSeconds": 0.050887,
+          "deadlineMisses": 1,
+          "failureMessage": "The complete frame exceeded its execution deadline. No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "timing": {
+            "calls": 1,
+            "medianMs": 50.887,
+            "maximumMs": 50.887,
+            "over50Ms": 1
+          },
+          "minimumNodeBodyGap": null,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": false,
+          "executedHolds": 0,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": null,
+          "allCertified": true,
+          "firstFrameSeconds": 0.051322,
+          "maximumSeconds": 0.051322,
+          "deadlineMisses": 1,
+          "failureMessage": "The complete frame exceeded its execution deadline. No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "timing": {
+            "calls": 1,
+            "medianMs": 51.322,
+            "maximumMs": 51.322,
+            "over50Ms": 1
+          },
+          "minimumNodeBodyGap": null,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.13165963357336877,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009438,
+          "maximumSeconds": 0.031697,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.0835,
+            "maximumMs": 31.697000000000003,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.1329716464647182,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.13165963357336877,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009274,
+          "maximumSeconds": 0.03172,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "timing": {
+            "calls": 600,
+            "medianMs": 7.119999999999999,
+            "maximumMs": 31.72,
+            "over50Ms": 0
+          },
+          "minimumNodeBodyGap": 0.1329716464647182,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": false,
+          "executedHolds": 0,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": null,
+          "allCertified": true,
+          "firstFrameSeconds": 0.052935,
+          "maximumSeconds": 0.052935,
+          "deadlineMisses": 1,
+          "failureMessage": "The complete frame exceeded its execution deadline. No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "timing": {
+            "calls": 1,
+            "medianMs": 52.935,
+            "maximumMs": 52.935,
+            "over50Ms": 1
+          },
+          "minimumNodeBodyGap": null,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": false,
+          "executedHolds": 0,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": null,
+          "allCertified": true,
+          "firstFrameSeconds": 0.055854,
+          "maximumSeconds": 0.055854,
+          "deadlineMisses": 1,
+          "failureMessage": "The complete frame exceeded its execution deadline. No command was issued.",
+          "artifact": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "timing": {
+            "calls": 1,
+            "medianMs": 55.854,
+            "maximumMs": 55.854,
+            "over50Ms": 1
+          },
+          "minimumNodeBodyGap": null,
+          "sampledCollisionFree": true,
+          "seed": 20260912.0,
+          "allExecutedHoldsCertified": true
+        }
+      ],
+      "timing": {
+        "calls": 4205,
+        "medianMs": 6.997,
+        "maximumMs": 144.187,
+        "over50Ms": 5
+      },
+      "phaseTiming": {
+        "rejected": {
+          "calls": 5,
+          "medianMs": 52.935,
+          "maximumMs": 144.187,
+          "over50Ms": 5
+        },
+        "admission": {
+          "calls": 7,
+          "medianMs": 29.943,
+          "maximumMs": 47.004,
+          "over50Ms": 0
+        },
+        "continuation": {
+          "calls": 293,
+          "medianMs": 9.571,
+          "maximumMs": 22.397,
+          "over50Ms": 0
+        },
+        "cruise": {
+          "calls": 3900,
+          "medianMs": 6.991499999999999,
+          "maximumMs": 10.853,
+          "over50Ms": 0
+        }
+      },
+      "incompleteTrials": 5,
+      "executedHolds": 4200
+    }
+  },
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "excludedReplayWarmupCalls": 20,
+  "excludedCampaignWarmupHolds": 1680,
+  "sensitivity": {
+    "fixtures": 30,
+    "accepted": 30,
+    "activeTargets": 28,
+    "allOutcomes": [
+      {
+        "curvature": -0.012,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.843731,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.138641,
+            "formulationSeconds": 0.6467259999999999,
+            "solveSeconds": 0.020959
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.861676171978417e-05,
+          "maximumPhysicalResidual": -0.0054161664023291145
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.17449,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.018933,
+            "formulationSeconds": 0.127767,
+            "solveSeconds": 0.010946
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.858900558772476e-05,
+          "maximumPhysicalResidual": -0.03600906360693473
+        }
+      },
+      {
+        "curvature": -0.008,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.134159,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.018757,
+            "formulationSeconds": 0.093655,
+            "solveSeconds": 0.011167
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.494918412926822e-05,
+          "maximumPhysicalResidual": -0.00014719206181301736
+        }
+      },
+      {
+        "curvature": 0.008,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.101463,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.004778,
+            "formulationSeconds": 0.07714,
+            "solveSeconds": 0.011189
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.494918489887482e-05,
+          "maximumPhysicalResidual": -0.00014719206235702664
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.262883,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.037297,
+            "formulationSeconds": 0.187734,
+            "solveSeconds": 0.01654
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.858900869856967e-05,
+          "maximumPhysicalResidual": -0.03600906360674888
+        }
+      },
+      {
+        "curvature": 0.012,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.093326,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.002474,
+            "formulationSeconds": 0.073647,
+            "solveSeconds": 0.009865
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.861675488036624e-05,
+          "maximumPhysicalResidual": -0.0054161664441345625
+        }
+      },
+      {
+        "curvature": -0.015,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.086506,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000984,
+            "formulationSeconds": 0.069445,
+            "solveSeconds": 0.009314
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.866536175533568e-05,
+          "maximumPhysicalResidual": -0.014921886080985769
+        }
+      },
+      {
+        "curvature": -0.005,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.086559,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.001007,
+            "formulationSeconds": 0.06772500000000001,
+            "solveSeconds": 0.011208
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.491458691395337e-05,
+          "maximumPhysicalResidual": -0.0001335160353734821
+        }
+      },
+      {
+        "curvature": 0.005,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.084517,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000953,
+            "formulationSeconds": 0.06568600000000001,
+            "solveSeconds": 0.011162
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.491458814230413e-05,
+          "maximumPhysicalResidual": -0.00013351603741873497
+        }
+      },
+      {
+        "curvature": 0.015,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.08296,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000989,
+            "formulationSeconds": 0.066169,
+            "solveSeconds": 0.009229
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -8.866522009487454e-05,
+          "maximumPhysicalResidual": -0.014921886303714604
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 7,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.084132,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.029723,
+            "formulationSeconds": 0.038608,
+            "solveSeconds": 0.009067
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.003988068995643079,
+          "maximumPhysicalResidual": -0.00012195923464819458
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 9,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.079376,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.035144,
+            "formulationSeconds": 0.029883,
+            "solveSeconds": 0.008732
+          },
+          "horizonSteps": 80,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.02126705139025109,
+          "maximumPhysicalResidual": -0.0001428799390161828
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 3,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.086596,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.03334,
+            "formulationSeconds": 0.036384,
+            "solveSeconds": 0.010148
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.06931886655174146,
+          "maximumPhysicalResidual": -0.00017143560787546974
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 3.5,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.085466,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000866,
+            "formulationSeconds": 0.06736400000000001,
+            "solveSeconds": 0.010483
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.026648737962089886,
+          "maximumPhysicalResidual": -0.00014385415239859256
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4.5,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.083643,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000899,
+            "formulationSeconds": 0.066497,
+            "solveSeconds": 0.009508
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.0017516981465410808,
+          "maximumPhysicalResidual": -0.00012945038284528643
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 5,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.085526,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000997,
+            "formulationSeconds": 0.067478,
+            "solveSeconds": 0.010279
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.04385501862321606,
+          "maximumPhysicalResidual": -0.00023657104374763538
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 13,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.086545,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.001621,
+            "formulationSeconds": 0.067661,
+            "solveSeconds": 0.010608
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.023768885553383967,
+          "maximumPhysicalResidual": -0.00012851958550808007
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 17,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.068405,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.006484,
+            "formulationSeconds": 0.052874,
+            "solveSeconds": 0.007489
+          },
+          "horizonSteps": 32,
+          "solverCalls": 1,
+          "hasTarget": false,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": null,
+          "maximumPhysicalResidual": -0.666740481278298
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 6.5,
+        "sample": {
+          "seconds": 0.08033,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000876,
+            "formulationSeconds": 0.063029,
+            "solveSeconds": 0.009504
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.005942160587704581,
+          "maximumPhysicalResidual": -0.0001343551742618576
+        }
+      },
+      {
+        "curvature": -0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 8.5,
+        "sample": {
+          "seconds": 0.084272,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.00088,
+            "formulationSeconds": 0.065247,
+            "solveSeconds": 0.011275
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.023760011401896097,
+          "maximumPhysicalResidual": -0.0001437907884596079
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 7,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.084071,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.033293,
+            "formulationSeconds": 0.034992999999999996,
+            "solveSeconds": 0.009222
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.003988069016820361,
+          "maximumPhysicalResidual": -0.00012195923449254131
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 9,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.074312,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.032483,
+            "formulationSeconds": 0.027724,
+            "solveSeconds": 0.008685
+          },
+          "horizonSteps": 80,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.021267051390369218,
+          "maximumPhysicalResidual": -0.00014287993902906138
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 3,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.079146,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.027865,
+            "formulationSeconds": 0.034463,
+            "solveSeconds": 0.010175
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.06931886655205499,
+          "maximumPhysicalResidual": -0.0001714356078359458
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 3.5,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.080642,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000789,
+            "formulationSeconds": 0.062843,
+            "solveSeconds": 0.010411
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.02664873793396083,
+          "maximumPhysicalResidual": -0.00014385415505380195
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4.5,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.077201,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000824,
+            "formulationSeconds": 0.060352,
+            "solveSeconds": 0.009462
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.0017516981540399712,
+          "maximumPhysicalResidual": -0.00012945039723444296
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 5,
+        "targetStation": 15,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.081211,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000837,
+            "formulationSeconds": 0.06344,
+            "solveSeconds": 0.010323
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.0438550186165263,
+          "maximumPhysicalResidual": -0.00023657103919660916
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 13,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.080783,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000951,
+            "formulationSeconds": 0.06256,
+            "solveSeconds": 0.01068
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.023768885576990417,
+          "maximumPhysicalResidual": -0.00012851959739190733
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 17,
+        "targetOffset": 7.5,
+        "sample": {
+          "seconds": 0.038759,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.002145,
+            "formulationSeconds": 0.033932,
+            "solveSeconds": 0.002133
+          },
+          "horizonSteps": 32,
+          "solverCalls": 1,
+          "hasTarget": false,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": null,
+          "maximumPhysicalResidual": -0.6667404812782971
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 6.5,
+        "sample": {
+          "seconds": 0.072383,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.000845,
+            "formulationSeconds": 0.055297,
+            "solveSeconds": 0.009549
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.005942160587178336,
+          "maximumPhysicalResidual": -0.0001343551743340221
+        }
+      },
+      {
+        "curvature": 0.01,
+        "egoSpeed": 8,
+        "targetSpeed": 4,
+        "targetStation": 15,
+        "targetOffset": 8.5,
+        "sample": {
+          "seconds": 0.080604,
+          "certified": true,
+          "phase": {
+            "inputPreparationSeconds": 0.00084,
+            "formulationSeconds": 0.062928,
+            "solveSeconds": 0.010353
+          },
+          "horizonSteps": 96,
+          "solverCalls": 1,
+          "hasTarget": true,
+          "initializerIssued": false,
+          "directionsUnchanged": true,
+          "maximumJointResidual": -0.023760011402184755,
+          "maximumPhysicalResidual": -0.00014379078846138427
+        }
+      }
+    ],
+    "scope": "Fixtures informed the heuristic; not held-out validation. Timing is not used for deadline qualification."
+  },
+  "initialOneSideAccepted": 18,
+  "independentAudit": [
+    {
+      "scenario": "crossing",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 7.851234386533799,
+      "minimumRefinedSatGap": 7.851234386533799,
+      "refinedMinimumTime": 0.47500000000000003,
+      "minimumRefinedBodyGap": 9.51948281792381,
+      "refinedBodyMinimumTime": 0.30190000000000006,
+      "minimumNodeSatGap": 8.05110906259726,
+      "nominalMinimumSatGap": 7.85,
+      "nominalMinimumTime": 0.475,
+      "nominalSampledCollision": false
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.0511025217441079,
+      "minimumRefinedSatGap": 0.05110245102318145,
+      "refinedMinimumTime": 3.7351,
+      "minimumRefinedBodyGap": 0.05110245102318154,
+      "refinedBodyMinimumTime": 3.7351,
+      "minimumNodeSatGap": 0.054082815916539406,
+      "nominalMinimumSatGap": -1.9000000000000004,
+      "nominalMinimumTime": 3.725,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 9.277504013627258e-05,
+      "minimumRefinedSatGap": 9.273563746114988e-05,
+      "refinedMinimumTime": 2.3502,
+      "minimumRefinedBodyGap": 9.273563746039886e-05,
+      "refinedBodyMinimumTime": 2.3502,
+      "minimumNodeSatGap": 9.277504013627258e-05,
+      "nominalMinimumSatGap": -1.9,
+      "nominalMinimumTime": 1.5150000000000001,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.1430257996744242,
+      "minimumRefinedSatGap": 0.14157280748429324,
+      "refinedMinimumTime": 1.6729,
+      "minimumRefinedBodyGap": 0.14947460133308618,
+      "refinedBodyMinimumTime": 1.6831,
+      "minimumNodeSatGap": 0.16235941857005454,
+      "nominalMinimumSatGap": -3.3596270462452713,
+      "nominalMinimumTime": 1.875,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.13165963357336863,
+      "minimumRefinedSatGap": 0.13148071010435247,
+      "refinedMinimumTime": 3.7492,
+      "minimumRefinedBodyGap": 0.13148868396122418,
+      "refinedBodyMinimumTime": 3.7487000000000004,
+      "minimumNodeSatGap": 0.1329716464647186,
+      "nominalMinimumSatGap": -1.9271008185150427,
+      "nominalMinimumTime": 3.745,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.09934078629281373,
+      "minimumRefinedSatGap": 0.09933847065284529,
+      "refinedMinimumTime": 2.221,
+      "minimumRefinedBodyGap": 0.09933847065284451,
+      "refinedBodyMinimumTime": 2.221,
+      "minimumNodeSatGap": 0.09999611894618488,
+      "nominalMinimumSatGap": -1.9349273315610707,
+      "nominalMinimumTime": 1.72,
+      "nominalSampledCollision": true
+    }
+  ],
+  "native": {
+    "admissionStatus": 4,
+    "admissionDecisionMaximumError": 6.399047958183246e-12,
+    "continuationStatus": 2,
+    "continuationDecisionMaximumError": 0,
+    "originalVerifierPassed": true
+  },
+  "codeAnalysis": [
+    {
+      "file": "config/collisionAvoidanceControllerConfig.m",
+      "issues": []
+    },
+    {
+      "file": "controller/collisionAvoidanceController.m",
+      "issues": []
+    },
+    {
+      "file": "controller/solveHardCbfClf.m",
+      "issues": {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 261,
+        "column": [
+          24,
+          27
+        ]
+      }
+    },
+    {
+      "file": "scripts/standaloneControllerFrame.m",
+      "issues": []
+    },
+    {
+      "file": "scripts/runFixedDirectionValidation.m",
+      "issues": []
+    },
+    {
+      "file": "tests/fluidInitializationTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/admissionSafetyTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/fullPlanAdmissionTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/nodeCertificateTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/standaloneControllerFrameTest.m",
+      "issues": []
+    }
+  ],
+  "artifactsSha256": {
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/archiveChengAdoption.py": "011ab4afc03dcef5ce9627f87a79eaa44eee27f8e1601f12e63ac72737fd7a59",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/auditFixedDirectionCampaign.m": "17ed7dd83f3f01d1f4a7859aca4f95742b4dc7f001d0e25d5c31ef1df6fd1afc",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/campaign.json": "88e80bd1cfe425a18c8aa22c35c8e77998c9660b35037335d6a6fc0c74eeaccd",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/checks-final.log": "777399fbb97c15e4d342a6dc3f7163d6b5acb0ea31afebfba5bcc7133d48be5b",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/checks-rerun.log": "a295b0e3befcf096d7a214c9ddf24c38e065dc9ec081b42437d7ca2eb803134b",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/checks.log": "2c1052c5276f941358654f1c6c61d1175810c7901d09a71e423691fc6b700726",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/code-analysis.json": "81d386045317f4f17899fa83a56de2ae98f32a6d317656cfc3edc96893ce3e88",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/continueValidation.py": "1ef784005a0ee260393e228f190fdfb49e7226ea9edfb264e5d7fb65d740f67b",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.json": "e24a33c60cc4ce40a655d76e5d16258a654363d6e5f728d612f142e19b1ad364",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.json": "262885b9e30580658988ef21ffea776e50966c823ec808f8fa36472ad79fc1ba",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.json": "759896903ae8bdeb91fc432687164f40fe1a47361a3f9471bc748ff615e70d36",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.json": "8ee4fa7fc63f001f956e99816770822294aee3de53898ca1202ab0b2d64df7d1",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.json": "f09d2a6dd5d56c339d9a39243a49cedcc2c3a5e6e9236c5236ff4b454f4a0047",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.json": "d19cd30ced43357423bd42b556b221b858f1f78bb58970ff2b58abc344626b9d",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.json": "469b26bf38d055f1bdf2a43d840073060e110236556c559f7dea541a035e9899",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.json": "70461eae2b9b9444497565e5af27cca190cdb26e3e619a56502dc8c191605df9",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.json": "ef1f7a485ab5704affb48e7da18fff061fd1bcb8914bab68adfe2e7cd52c76be",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.json": "949be7292df14198b2aa9297f644ff7af99f833313cc5d27dced83588df3f782",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.json": "ec50ba640b7253d4bb57a5ac0ef92bbf4394ba460c5584db27e73126ad30fdd1",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.json": "1a81f4a9f4b2258d5d00e6ed311662b2e7f6aa00d4f077da0909828eb6ae2005",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/fit-probe-weight-0.02.json": "bacced4c07de7b96e1c7ba9b0019f8693382e0e4bbd8575f3091f5240b63b8e0",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/fit-probe-weight-0.05.json": "f50c669f9a666159748222f0e7d5d931a3cf0b3689c8e54365eb25d53d7a8394",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/fit-probe-weight-0.1.json": "fd185535eea6ecbec3ed103f9196463b5dee74d4a2f6d704b1848112036074b1",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/fit-probe-weight-0.2.json": "ffa168312af932819faa670952c949325b63139ec186f813ce6a8f4ece866c8b",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/fit-probe-weight-0.5.json": "e2b25558dbd6abbd24858f9bc4d179cf798c5dfcbdfe90655aadf6180f8efa52",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/fit-probe.log": "f2c40b7b57c4e8e309d560f4465038c9661dcffe432f68e5cca3c0c4fe010bb4",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/fluidProbeSolver.m": "43bb4c64ed245eec791e299e9921afad6dc8454db949edcda94d89c66fdae742",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/focused-final.mat": "ba1dec07d71d4a225cba1bf11fefef72743c727fc114abf97f65fb96c2623d98",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/full-regression-final.json": "310b34e08bbba5dc408929fdb8258d66ccc9193bb7e8e877d6d5f0695bdf4487",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/full-regression.json": "310b34e08bbba5dc408929fdb8258d66ccc9193bb7e8e877d6d5f0695bdf4487",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/full-tests.log": "2e2fea95889fc85570abf347736c7b98f638891e4597803e4156061f2b9af3f4",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/full-tests.mat": "7dce72f30ef6d783ca9c9bf94e2b347e381c189ed6117df8ec662cdce81e94f6",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/functional-pilot.log": "429c4a3f6228c97de4e816c2e49a66ee2747758493101098b3d0d140186e1f8e",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/generated-final/standaloneControllerFrameMex.mexa64": "521ce2dc53bfa091c981dccce0284f207839acffafcb357b8201e32a37aa214a",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/generated-final/verification.json": "ecafeab32e36d97b71a3f9e3773bb6203bf84cc9c369941fb0dbc1e5f9f3024b",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/independent-audit.json": "3de77ea95bc2c40a0bb93de46203024e3cd1d6db6472898f2805e7cb25075a35",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/initial-full-tests.log": "2e2fea95889fc85570abf347736c7b98f638891e4597803e4156061f2b9af3f4",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/initial-full-tests.mat": "989e3366e19c161d1e56e49069f62b3748ff0709a08e68095c0286a82434f14d",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/measurements.log": "e7b44346cc257cddf5614c53eaa872151a131055c6ee4d5a371ec2e2a8e90c3c",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/native-final-rerun.log": "1fc726a22c479f5b87f8a6c4c8ad84c429ba4026a0758162bebb1c6ace632658",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/native-final.log": "91d001dc20036256526d9eb6cdb6db30f797dcad09adcb31cd8b9a98ffc403ab",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/probeFluidFit.m": "7d436d6bb1ee79541d771d17ca80f01a6e63a9b664e2528d7a5999b83429f353",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/probeFluidSides.m": "7670d45e923db96dcfa9590e18abdfe2a9a6cf5a62dc08930973f3e3b7469044",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/replay.json": "ae3cef71367cc6c89592a6265a0f80d8af8f90f613632251d57fd7518ef4728b",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/runChengChecks.m": "3b80316ecf4fd7a4c4123004006c62dd67448d3786266038f1a4255b8dd90bd3",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/runChengMeasurements.m": "b12bbf7f61a57c5b605e69b39090fb72d3ef2b1a8022984ebdcafcd31fb42727",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/sensitivity-initial.json": "ea03a41c9af986320f93d4ef91b6bc35557137e201cfcdf8a4b15af4e0da10ac",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/sensitivity.json": "da3078ade0d3e87491bab4ce89286a90165b059f460d950176472bfc3757ebd7",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/side-probe-rerun.log": "57872ca240efac756a498e01aba5366c1b256c4e11372f7551325dd58e4ec552",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/side-probe-width-1.5.json": "10f45f05d2e957c8e69176608334752ce2553837ac89c7879091c65850527a32",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/side-probe.json": "2b914c3e51850b1ddfb734f643a09944364d6d6f5955a3d8678dc54ab9ab0acd",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/side-probe.log": "78d48d93cdd696c8ac9ff1adf670bf0bc166159bad2bf03c61f4d35db17fd5bc",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-crossing-1/crossing-exact-state.json": "62b28af4c910ac35cf60d1ff7f6e28b9fde2c2a117b40c8d7c4211dc297200a8",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-crossing-2/crossing-exact-state.json": "dec5bfd9fb5f65d965963a62d6b671e890d410e2291fd888f1858c41098714f7",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.json": "9a05f23eafe07418105e827ae57c21b3b898d7bafac6150b42f3cb876571d6d2",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.json": "94163e2d506ed7a4644690e5e8b8411006d6df1cca1f3b1eabbf29ab1a7fc9aa",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-stationary-1/stationary-exact-state.json": "84168088eba78c15ca79ceea93f506f141f0c3d983f33018748c73e63aa770aa",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0-stationary-2/stationary-exact-state.json": "25b4e0faa1813adffcb3cebfd4936d71e18f8a82d73d29ade8efa7e18891d218",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.json": "738b307a547fc1e38b481927a8b2419fe05b350129ccfa4110d896f95e636cf2",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.json": "52695124196c8398696fcad45c314c5522b53f18f6acb53271932960f64fb1ce",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.json": "2998f77d612b404a9768233fd72016401895b596006cfff4cc27d2776b850d3e",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.json": "270d66c4be9316bc23ca6eb6d1707082ec5b0303aeb5e48d39df63d13a934af1",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.json": "d5a346f3104e3d1691632e2d290f244d360429babd09f454bb48b3e18a186a62",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.json": "0dc8a03e6a82d1af148e45c303845b86059d5af33b23036cdafe689f7cdc3612",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/summarizeChengProduction.py": "2d68f6823c7ce58865bc6371b0ea81fa951470684222136264621b2c9e75ec19",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/verifyFixedDirections.m": "c1afc251317043d57339ec01eacc8b0046e4021844444d40b6c09a1666cf81dc",
+    "/home/zai/.cache/collisionAvoidance/cheng-production-20260921/width-probe.log": "a6f7e6d3f4f55751155eac0c935d6148568a1316efb1c13f6a73231a59fb056f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/config/collisionAvoidanceControllerConfig.m": "9b7bb9991100afa191abaead8aab53cb1cb1ee07bd96c825892331096d0d3b2c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m": "70fa6b0959bc45f1297d5d8caeabe27e922137b5b7ed890e56ae54a8ce87e111",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceStageQp.m": "56fc54308ed19f57eb5d553afd46dbd7d82f40f38cd777994bf58b130efe46a0",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m": "8b8292d601a2396e0a56b2ec5adfe94abda6b0e4df1aa0c9afed6e0cd57adb08",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/fialaCertificate.m": "a1bead6717b4ec4e77a70e884b23a4021b6fdc3e5e12868046a6795dca22a565",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m": "b5f07c5aa7b4efd15b5c7cf0de6e19205f8d4f93a331e534cc28dad77b63258e",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m": "bb9add70b6de411955306cf1f6e914d23bc077010c799702e6cb71c620a24696",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m": "07bb016f1be0cca0009e25c9f797f5a9f237c527b0240b295732365ce2646483",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m": "fb496561840d9fef1b0cba3cf460dab0189eeee3ae65198c4938ebd9f54859d5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/readPlanningInputs.m": "b605f3343436153da4fd8161606ffc162e30630306213b24d88b5c3e3427bc61",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m": "1e8346945bc770e26276f09155ac51312a8ca7ce7e7c8942c466dc6214d95bbf",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/stateUncertainty.m": "44f9d3a61afff0d495d473cac1124a8b5b0e6d5a98526da181695fb10df89f0d",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/targetPrediction.m": "02c71faa8004c2d81d0ddc506721f3301bba6914eaed07ed5e8850014c608d13",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md": "7c49bae304d6da36fe3f2a864436073bb5573fb89a68189c110aa482c7c039ac",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runFixedDirectionValidation.m": "5d89b91d573e977f637cd3a3eac5587b839d7c005659569a836896052875368c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/standaloneControllerFrame.m": "f8e81fc2d26ca1ef491fe648a79db41885ed5ff65db289ca9999e5b36508fdf0",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/admissionSafetyTest.m": "ff34c4c9a3f85ef48e437b5d989ec4fc503333375c8578639497af697f1b70a5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/avoidanceNativeGeometryTest.m": "b3f4a27a6a95deb9d9551e893fdb3601fb2e8a6bcb102525da62d8aea4ed9ece",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/avoidanceSafetyGeometryTest.m": "39f7b59e4e8983934cef386424e82c07d7b33f8317409806c2664b1b2b531568",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/benchmarkControllerRuntimeTest.m": "36f6ffde9cceeccbf767ee3a9b618f1fdc548c0e49203962d0841710e14c77e1",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/bicycleNativeKernelTest.m": "cc93a6433be36e5f8b23838b6803da0625a37655cb7a8f5e821ff85ef1e2cfdf",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/boundedTargetMotionTest.m": "81e5b4922b6f61dba56b753d639b2517265dc6b6c33b79abdf4670fc3eb57699",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/certificateContinuationTest.m": "2eaed7f006298bc044326f61df53dc3d02dfa2344b55812b92570d5520ba439c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/certifiedKinematicCourseCorrespondenceTest.m": "b27af26417534778bf87b0c66b7497974bc5dca5add62969df0b6154ef125f03",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/circularArcExactStateScenarioTest.m": "419631784b06fabe58bdd40759c6e7db6b6da3b8fbf44bace4f6dea47059b2e0",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/circularCenterlineCruiseScenarioTest.m": "6ac53d30909b0711bc907571328c9c9741051a7413208e80f67148c660b3304a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/circularCenterlineStraightTargetAvoidanceScenarioTest.m": "017e8c7947c08203012f8c2e05d71d8ef87cfd85b5bcd2fcad5647a20a501b31",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/collisionAvoidanceControllerConfigTest.m": "ac5ce031ee18a6d8176d8955b54837543eebd000f4979f9003b07dc708e4acc9",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/collisionAvoidanceControllerTest.m": "f1525dbda188636f373e3fe2631becc53d5b9a9735c0903754828bc87dce5e24",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/collisionRectangleEnvelopeTest.m": "ce0dc1e90636cfba74f55158a53f0c1a693d2e29a6472138758d6433cb8074e3",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/computeLidarRingCurbFeaturesTest.m": "ffa0d9ac6de0c39b9001e491525cfb2086f75c01d9aa6a1abb2ffbbc2b94f460",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/constantCurvatureReferenceTest.m": "3e64da7c1a411a7884be8cbccdb488d6f411e2aae58a97754f4233ab5874dd28",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/controllerDesignExperimentTest.m": "ed21688526774f94e6aa862110f0adac1ef2476295a165d8134c1c00573e8c55",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/controllerEstimatorBoundsTest.m": "8c9da35e0711b04d2e3777885041dffbfc81a46faf2b11790d6d13edd860714a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/controllerRepairTest.m": "19a687b07aefad795f53d571ff28963e0f29f4de56574765e01f9fdbe3e56a81",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/controllerSourceBudgetTest.m": "29cee642debe1ab8db28e58f2f1621b0f9a582521bb80643e4a83c42d1cd4b61",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/curvedCruiseCertificateTest.m": "fc3b55679757a6dd530844d3ee3e30e6bad2832ff51713348736f0d942eeb181",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/curvedPoseDomainTest.m": "1b1c12bc9c50016391a71125a59e7f6b865feb2b1cf50b7d3ec1a43fd09fc434",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/encounterCertificateScenarioTest.m": "93a622137a112752a6fd3faa6db963b981e1fca9bdc4d431c27c68502fb2502d",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/estimateRoadHeadingFromFeatureSeedsTest.m": "7d2be602883261d4082b0cbf6fe01aeb39ae7316435ab727994dc6c582466424",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/estimatedStateAvoidanceScenarioTest.m": "1208d79cdee50ffda4d531d9b0f644d1ca69f930a39bf53ab88218c40c854af6",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/estimatedStateAvoidanceVideoTest.m": "0c3ca79fddd35f79ee232965b1710a96200b98b23eecc8fe6439838a4aeb8460",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/evaluateCurbDetectorDevelopmentRegressionTest.m": "0211c85eced5349a032d2a691353fa14266de89836ff361104d4de665429fca4",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/evaluateCurbRingFeatureBackgroundCalibrationTest.m": "437b9f1e8e89f46fc7cb6874adf0be144ffc22b2c3177f1728ce9e0d0c7bdb53",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/evaluateExportedCurbMasksAgainstDevelopmentLabelsTest.m": "a7ab1fba8514bbb7b5bb59c9f3b31d435f80e1470cb4fa4133e70a09c54a8fce",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/evaluatePreDetectionCruiseTest.m": "d45da14a0eafb8227a4a3c247c737088fae7e1174cc31cee12ab2c20d5bd19e7",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fialaFeedbackSampleTest.m": "63c5cc36e733e90815b1cadc9d820b6a0935d45f2331d532c9594dd127d3576f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fialaIntervalKernelTest.m": "c62afa6a1ed300f530c35213133a3b0bfeeba3a3d9ff22f9b8d251ad2e1c80ec",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fialaResidualCertificateTest.m": "e8fb0e42dcb02ea909d507ee2deb3b72b4be915af6e99f75174b7c271bdc0e1b",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fitPerceivedRoadBoundariesTest.m": "2cedbbcba174e972e5d971230df53fb018f77211f6070729c57200173236ec0a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fluidInitializationTest.m": "858b259212be43d68cd4b738dd33574134595ad304d3caf97eece2e47e10f356",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fullPlanAdmissionTest.m": "a7b3ec3cbab238a743e72db0cba8344e37457ac9229c0998d02fef0629d343a3",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fuseLidarRingCurbFeaturesTest.m": "1911d67292cde8cc2f57166b12735806fc9839538ecd72903912ac26cf1d48e1",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/groundPointsProcessingTest.m": "239feecc7b4df94d34d861e934df87beb517b663a13879446b96227a8b570bf7",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/immediateActuationTest.m": "bd6b43e05e6f60a77c236e598f2fd8a9acd4b523ad9444d1a91a2213e7760092",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/jointSupportCertificateTest.m": "679933410407d78fab4799df4e46cab2a3691d370e6f3c366506304990266de2",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/laneNativeGeometryTest.m": "cc6e1072a46f5942cf2378789a2653d41a3fb565feaa7dd03a5ecc005b728b0f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/longitudinalRoadLoadTest.m": "2b3534e1ff79814e00307bdc50e4a84859de7be418e6d19fb1b201e9a205f3a8",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/ltvBicyclePredictionTest.m": "60e2613345f1455ee559b0679d621470db857b74522f0625e51319772ce7445e",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/maneuverCouplingTest.m": "81563cca0fb8f84dc1a00329089184e5d4305f442354bbb3d76b7e0832733ab7",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/modifiedFialaTireTest.m": "4587fcc44b2ce5feb93488befb3175ee4e386f98fb0d42c62e18246e1c6dc13f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nodeCertificateTest.m": "7fff716187725c5f9dde69d0a567eac72b05ed17b0cb255335928d99c6d77e3a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmCascadeCertificateTest.m": "335f62fea291b0a4a20ce2ac5c9e9d09e4f1b682665661d834bf10568e57e8ae",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmControllerErrorBoundsTest.m": "9e36d60ddb1bdd1bb1b728bc0e7ee5c84ddb157c5dccb7f3766e0fa2d408dbad",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmDirectVelocityTest.m": "08c2c290878d9527992609989171cbb3bbf705cafcdb69906028d036f08df2ca",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmModelFormulationTest.m": "8c43897569301436ae3ab5c506d8c104e6574fe284edcfe460711f3e55d538df",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmNativeKernelTest.m": "98d297364aeb6f38b2a3c47421c64ae40c93864201641e42f9a9fea2bb41211f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmObserverVectorFieldTest.m": "1c75bb16061f3d53be8f342ab023b62803f286c41515214257c501f2ae858930",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmPositionErrorBoundTest.m": "ed42f08bbb80cd2a6b8bf44849e8f2cae68ca298bea507950d4cdb498c8c5edf",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmStructuredHighGainTest.m": "27f66f8d018df44ae51a8d663bc049c758ebe23fff852c9a8c42408dc997450c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmTargetHistoryTest.m": "14d9315eb60fd2ee048fc75da53be8f1d8d1d4e1a7b6ddb82fd9dec94a5a0d5b",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmTruthEnclosureAuditTest.m": "425ecbef89e61a911658c888eec7720792ca54a3757b67e5eacaf07158ed7efb",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmYawObserverTest.m": "2e32fe52e47e292bb5e8449850300d6de02d0135f22b44fb363bdc7cd5804dc1",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nrmmYawSetTest.m": "5a3ef6d6d19eaf6e6ba0f2bc3a638f4ddfd107705dee94a3dff111f7bf9d1c10",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/observerGainSynthesisTest.m": "1921560501708c581233646d9dee62f50284ffa4c77170ed03dcc6da91f7eb59",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/oncomingVehicleAvoidanceScenarioTest.m": "4b6dd8e2891fcd1afc797dea7b651539c7c6d6b9e80a9ae486fab20ec5d8c502",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/onlineNrmmTrackingRuntimeTest.m": "32dcab9c034c616856054d7232c7db6437bb3ade93a3d24e47203fc15a962bf1",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/pipelineDeadlineTest.m": "5efdb35f27600ac1cfe40058c4c9bf684a861b728a0f653fe1eb2db2a6bbee82",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/recursiveSafetyClosureTest.m": "fba62423cf207b38252d4e7b922b8df692388f588397a780366d8ff20e431a70",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/sampledFeedbackTransitionTest.m": "b01b1924e51f2c0bb70df837ce9a2cb77ea66f3c813ac96d414c74a98688ffec",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/scheduledReferenceControllerTest.m": "5ad6317a01c757008c42d5a46988c9e46f51bf3f03686cb169bfa261f41aa586",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/scheduledTerminalContinuationTest.m": "be758e5d9fc1146b3fe6b1f9312bef4c9552f89a32e7dce0da8ee19817a48ffd",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/smoothReferenceGeometryTest.m": "d8301e54dcc79ef29d52b5b2e3ec2e44804040bf6e45946c2e6f3059d81e2405",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/standaloneBenchmarkWorkflowTest.m": "55a0f66c21e0c0c5f879e057e59f6ed765d12576e8031cd28fc8c1b08b8c363b",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/standaloneControllerFrameTest.m": "11af092ba22bf6c55156413b1947aac1d2d770119fe32159f98fad3a6b0f0272",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/straightCenterlineCruiseScenarioTest.m": "5909771293ba6c2dc505ce9cb939f0e65cf2db848341315542cebaa8bbaf3f3a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/straightControllerRecoveryTest.m": "ce0305ae78b74314ad4c3854aea7214113ba20f8bf6047f9d0e4018ea060747d",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/straightRoadBoundaryConfigurationTest.m": "89996f431d56effc3378586cf874624f2e10e1e676fb4175575b0cbae9c89db5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/sweptFlowCertificateTest.m": "b13ad550ed47a15f0f669ea3cd9469189c220fccec71c9a7672bf2b881375c00",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/targetObservationConditioningTest.m": "d25764a5e700081023a90e92b0608e363a8e48c9bb887136edf01f055252231a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/targetPredictionTest.m": "e59d4a3efccf84f930e459186f261209c2ab9c6bba1effd4dda72f22e65e848a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/temporalGroundPointsProcessingTest.m": "fbb310ba825a54d864f19326237ccc7f7a23c20c63898f0f96dddb7e04d87c0d",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/terminalCbfProofTest.m": "3a2f0b1ff6954e320c6fbcf5a903974e14ae28abc8a2c0e43c724b9d7861e150",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/trackCurbQuadraticModelsTest.m": "836da9f1921e63f19bb21c786f0760d8b2bff2e4e55ae8818c907639b3dd71f7",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/uncertaintyGeometryTest.m": "a991e90ce023f965d5da4968687a5335c2e6a8674a646bac2612c5d25901221c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/varyingCurvatureShoulderGeometryTest.m": "e8ddd3403268af7c4d4a82e5aa15c985919b748d1f0fe87f34d10b12ac6363b1",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/wholeHoldActuatorConstraintsTest.m": "c87c4ff8e9243e1e5de62865c4ea5b665906a80f933cb4c483396be5ccd2dd23"
+  }
+}

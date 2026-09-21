@@ -2,13 +2,14 @@
 
 The format-41 controller first initializes separation directions, then fixes
 them and solves one convex problem for the complete control sequence. Fresh
-initialization searches one signed affine control section using 16 directions
-and 8 amplitude cells. Curved predictions taper the conflict-interval shoulders
-to 0.8 of the middle peak; straight predictions retain their plateau. These
-choices affect only initialization. Neither a certified scalar candidate nor
-an uncertified least-violated proposal can be issued directly. Every new
-admission must come from the full trajectory solver and pass independent hard
-verification. An already certified nominal follows the same full solve.
+initialization uses a Cheng modified-fluid Gaussian reference in the road's
+Frenet chart. Predicted conflict stations set its center and length; target
+relative lateral motion orders the two sides. A shared terminal-preserving
+least-squares fit supplies both seeds. Analytic rectangle normals and robust
+support residuals select one side without additional trajectory solves. No direction dictionary, amplitude cells or scalar
+objective search remains. The seed may violate constraints and never authorizes
+execution. Every new admission, including an already certified nominal, must
+come from the full trajectory solver and pass independent hard verification.
 
 Inherited frames retain their certificate directions and attempt one full
 trajectory improvement. Target-free frames solve the convex dynamics, CLF

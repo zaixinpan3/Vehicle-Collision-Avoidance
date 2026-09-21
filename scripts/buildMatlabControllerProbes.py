@@ -21,8 +21,8 @@ TARGETS = {
     'laneGeometry.m': ['sweptCellFrames'],
     'avoidanceSafetyGeometry.m': ['build', 'supportNormals', 'jointProgram', 'certifyJoint', 'jointResidual'],
     'avoidanceStageQp.m': ['fixedDirections', 'build', 'localDomainCertificate'],
-    'solveHardCbfClf.m': ['certify', 'inspect', 'admitSection', 'localDirection', 'localFixedDirectionSearch',
-                        'localAdmissionProposal', 'localObjective', 'localDefaultSolve', 'localReducedProgram'],
+    'solveHardCbfClf.m': ['certify', 'inspect', 'fluidInitialize', 'localFluidInitialize', 'localFixedDirectionSearch',
+                        'localFitFluidReference', 'localDefaultSolve', 'localReducedProgram'],
 }
 
 

@@ -21,11 +21,8 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(size(nodes,2),problem.prediction.stageCount);
         end
 
-        function aFineSearchCanCertifyClearanceBelowTheRetiredBuffer(testCase,sampleTime)
+        function anOptimizedPlanCanCertifyClearanceBelowTheRetiredBuffer(testCase,sampleTime)
             [ego,target,cfg,road]=localFixture(sampleTime);
-            % Coarse search can legitimately select a more conservative plan.
-            % Retain the fine-search witness for the no-fixed-buffer contract.
-            cfg.admission.normalCount=32;cfg.admission.amplitudeCells=16;
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             distance=localNodeDistances(problem);
             testCase.verifyTrue(problem.metadata.planCertified);

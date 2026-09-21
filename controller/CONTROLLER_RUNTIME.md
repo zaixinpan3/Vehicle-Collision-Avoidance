@@ -10,9 +10,11 @@ used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
 
 Current algorithm (September 21, 2026): format 41 initializes separation
 directions and fixes them before optimizing the complete trajectory in one
-hard SOCP. Fresh initialization uses one signed control section, 8 amplitude
-cells, 16 directions and 32 scalar objective iterations; this section supplies
-no executable command. Every successful new admission includes a full solve.
+hard SOCP. Fresh initialization uses two opposite-side Gaussian fluid references in one
+terminal-preserving affine-model fit, followed by analytic rectangle normals
+and geometric selection of one seed.
+There is no direction/amplitude grid or repeated candidate SOCP. Every
+successful new admission includes one full solve; the seed is not executable.
 Inherited frames use retained directions and attempt one full improvement,
 with only the previously optimized, verified suffix available after failure.
 The conic formulation removes angular decision variables and their associated
@@ -22,7 +24,7 @@ Full sensitivity maps and the condensed objective remain for certificate
 transfer. Preparation is not claimed linear in horizon length. The native
 solver itself is unchanged; generated prepared-frame adapters must be rebuilt.
 See [the fixed-direction derivation](JOINT_SUPPORT_CERTIFICATES.md) and
-[the current warmed validation](../report/FIXED_DIRECTION_CONVEX_OPTIMIZATION_20260921.md).
+[the current warmed validation](../report/CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md).
 The dated measurements below describe earlier implementations.
 
 Historical version 21 used a finite encounter witness, current observation confirmation,

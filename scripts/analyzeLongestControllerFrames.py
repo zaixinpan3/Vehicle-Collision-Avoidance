@@ -20,7 +20,7 @@ PARTITION = [
     'collisionAvoidanceController.localFiniteModel',
     'hardEncounterBarrier.prepare',
     'formulateAvoidanceProblem.formulateAvoidanceProblem',
-    'solveHardCbfClf.admitSection',
+    'solveHardCbfClf.fluidInitialize',
     'avoidanceStageQp.fixedDirections',
     'solveHardCbfClf.localDefaultSolve',
     'solveHardCbfClf.certify',

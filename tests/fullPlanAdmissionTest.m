@@ -1,5 +1,5 @@
 classdef fullPlanAdmissionTest < matlab.unittest.TestCase
-    %fullPlanAdmissionTest Recover restricted searches without issuing unsafe seeds.
+    %fullPlanAdmissionTest Optimize fluid seeds without issuing unsafe initial trajectories.
     properties (TestParameter)
         curvature=struct('left',.01,'right',-.01,'gentler',.008,'tighter',.012);
     end
@@ -25,12 +25,12 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.holdSeconds,.05,AbsTol=0);
         end
 
-        function unrestrictedAdmissionRecoversTheRejectedCircularSection(testCase)
+        function fullOptimizationRepairsTheUnsafeFluidSeed(testCase)
             [ego,target,road,cfg]=localRecoveryFixture();
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.admissionSearch.usedFullPlanAdmission);
-            testCase.verifyEqual(problem.metadata.admissionSearch.section.status,"collisionExcluded");
-            testCase.verifyGreaterThan(problem.metadata.admissionSearch.admissionProposalViolation,0);
+            testCase.verifyEqual(problem.metadata.admissionSearch.initialization.status,"candidate");
+            testCase.verifyGreaterThan(problem.metadata.admissionSearch.initialization.maximumSupportResidual,0);
             testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyEqual(problem.metadata.solverCallCount, ...
                 problem.metadata.trajectorySolverCallCount+problem.metadata.restorationSolverCallCount);
@@ -69,6 +69,8 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             testCase.verifyTrue(next.metadata.certifiedIncumbentUsed);
             testCase.verifyTrue(next.metadata.planCertified);
             testCase.verifyFalse(next.metadata.admissionSearch.usedFullPlanAdmission);
+            testCase.verifyEqual(next.metadata.admissionSearch.directionSeedSource,"inheritedWitness");
+            testCase.verifyFalse(isfield(next.metadata.admissionSearch,'initialization'));
             testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
         end
 
@@ -86,8 +88,6 @@ end
 
 function [ego,target,road,cfg]=localRecoveryFixture()
     [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
-    cfg.admission.temporalShoulderFraction=1;
-    cfg.admission.normalCount=32;cfg.admission.amplitudeCells=16;
 end
 
 function [hook,count]=localCountedFailure()
