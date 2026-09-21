@@ -54,7 +54,8 @@ after solver failure.
 
 `avoidanceStageQp.build` supplies the common sparse base. Its `joint` method
 adds stage-local support and tangent-coordinate epigraphs.
-`solveHardCbfClf.joint` owns single-initialization admission and hard continuation improvement. Target-free
+`solveHardCbfClf.joint` owns scalar admission, at most one hard full-plan recovery
+after section exclusion, and hard continuation improvement. Target-free
 frames solve only the common convex base with a single `constrained` call.
 Nonlinear Fiala tools retain their separate study scope. The online guarantee
 remains the declared zero-residual held affine plant.

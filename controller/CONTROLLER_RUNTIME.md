@@ -8,14 +8,18 @@ larger computation budget are explicitly separate. See
 continuation and collision results. The generic controller configuration already
 used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
 
-Current algorithm (September 19, 2026): format 40 replaces admission restoration
-with one signed affine control section, 16 amplitude geometry cells, 32 support
-directions and 32 scalar objective iterations. A restricted admission candidate
-passes the independent physical verifier before execution and needs no conic
-solve. An already certified nominal, or an inherited successor, attempts one
+Current algorithm (September 21, 2026): format 40 first searches one signed
+affine control section, 16 amplitude geometry cells, 32 support directions and
+32 scalar objective iterations. A restricted admission candidate passes the
+independent physical verifier and needs no conic solve. After geometric
+section exclusion, one least-violated proposal can initialize one hard joint
+SOCP with the complete input sequence free. Its uncertified center cannot be
+issued, and the original frame deadline remains in force. An already certified nominal, or an inherited successor, attempts one
 joint-support performance improvement while retaining its verified incumbent.
-There is no route/start enumeration or restoration slack. The fixed geometric
-work restricts admissibility; empty intervals are reported as search failure.
+There is no route/start enumeration or collision restoration slack. Admission
+remains incomplete, and the added solve increases worst-case work. The
+[repair validation](../report/CIRCULAR_CROSSING_ADMISSION_REPAIR_20260921.md)
+separates diagnostic-budget safety results from strict 50 ms acceptance.
 
 The scalar trajectory and objective are accumulated directly. Full sensitivity
 maps and the canonical condensed objective remain for compatibility with the

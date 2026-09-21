@@ -21,6 +21,27 @@ classdef standaloneControllerFrameTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(certified.safetyBound-certified.physicalBound),0);
         end
 
+        function exportedCircularAdmissionReleasesTheCompleteInputSequence(testCase)
+            [program,cfg]=localCircularFixture();
+            packed=standaloneControllerBenchmark.pack(program);
+            [decision,angles,status]=standaloneControllerFrame(packed,standaloneControllerBenchmark.configuration(cfg));
+            program.jointCertificate.angles=angles;
+            certified=solveHardCbfClf.certify(program,decision);
+            testCase.verifyEqual(status,4);
+            testCase.verifyLessThanOrEqual(max(certified.safetyBound-certified.physicalBound),0);
+            testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...
+                program,decision,angles)),0);
+        end
+
+        function failedExportedAdmissionReturnsNoUncertifiedDecision(testCase)
+            [program,cfg]=localCircularFixture();
+            cfg.solver.maxIterations=1;
+            packed=standaloneControllerBenchmark.pack(program);
+            [decision,~,status]=standaloneControllerFrame(packed,standaloneControllerBenchmark.configuration(cfg));
+            testCase.verifyEqual(status,0);
+            testCase.verifyEmpty(decision);
+        end
+
         function numericalVerifierRejectsANonfiniteClf(testCase)
             [program,~]=localFixture();
             first=program.cones(2)+1;program.b(first)=NaN;
@@ -44,6 +65,12 @@ classdef standaloneControllerFrameTest < matlab.unittest.TestCase
             testCase.verifyNotEqual(packed.jointCertificate.records(1).key,packed.jointCertificate.records(2).key);
         end
     end
+end
+
+function [program,cfg]=localCircularFixture()
+    [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+    [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+    program=formulateAvoidanceProblem(problem.model);
 end
 
 function [program,cfg]=localFixture()

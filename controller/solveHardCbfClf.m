@@ -59,8 +59,8 @@ classdef solveHardCbfClf
         end
 
         function [program,result,search] = joint(program,model,cfg)
-        % Only a separately verified scalar plan or inherited incumbent can
-        % leave this method, including when an improvement solve is stopped.
+        % Only independently verified plans can leave this method. An
+        % uncertified admission proposal is never a retained incumbent.
             [program,result,search]=localJointSearch(program,model,cfg);
         end
 
@@ -72,10 +72,13 @@ classdef solveHardCbfClf
             solve = localRunJointProgram(problem,cfg);
         end
 
-        function [decision,angles,information] = admitSection(program,cfg)
+        function [decision,angles,information,proposal] = admitSection(program,cfg)
             origin=program.anchorPlan;count=program.layout.planCount;
             records=program.jointCertificate.records;
             angles=program.jointCertificate.angles;decision=[];
+            % A proposal is an uncertified optimizer center, never a command.
+            proposal=struct('decision',zeros(0,1),'angles',angles,'violation',Inf);
+            coder.varsize('proposal.decision',[Inf,1],[true,false]);
             information=struct('status',"noDirection",'baseInterval',[], ...
                 'safeIntervals',zeros(0,2),'amplitude',NaN,'basisResidual',NaN, ...
                 'normalCount',cfg.admission.normalCount,'amplitudeCells',cfg.admission.amplitudeCells,'maximumYaw',NaN);
@@ -145,6 +148,10 @@ classdef solveHardCbfClf
             if isempty(intervals)
                 information.status="collisionExcluded";
                 if collisionComponents>0,information.status="exitExcluded";end
+                if nargout>3 && localSectionTimeAvailable(cfg)
+                    proposal=localAdmissionProposal(program,origin,direction,boundaries, ...
+                        dictionary,fixed,coefficient,egoSizes,egoRadius,yaw,yawSlope,cfg);
+                end
                 return;
             end
             [quadratic,linear,clfCenter,clfSlope,clfRadius]=localObjective(program,origin,direction,states,slope);
@@ -248,29 +255,63 @@ classdef solveHardCbfClf
 end
 
 function [program,result,search]=localJointSearch(program,~,cfg)
-% Fresh admission searches one scalar section. Continuation retains its witness.
+% A failed scalar section may initialize one unrestricted hard solve.
+% Only continuation has a certified incumbent that can survive solve failure.
     search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
         'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
         'policy',"affineSectionAdmission",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
-        'issuedAdmissionWitness',false,'initialCertificateAngles',program.jointCertificate.angles);
+        'issuedAdmissionWitness',false,'usedFullPlanAdmission',false, ...
+        'fullPlanStatus',"notAttempted",'admissionProposalViolation',NaN, ...
+        'initialCertificateAngles',program.jointCertificate.angles);
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
     [admitted,accepted]=localVerifyJointPoint(program,point,angles);
     if ~program.inheritedPredictionFamily && ~admitted
         phase=tic;
-        [point,angles,search.section]=solveHardCbfClf.admitSection(program,cfg);
+        [point,angles,search.section,proposal]=solveHardCbfClf.admitSection(program,cfg);
         search.formulationSeconds=toc(phase);search.familyAttempts=1;
         if ~isempty(point)
             [admitted,accepted]=localVerifyJointPoint(program,point,angles);
             if ~admitted,search.section.status="independentVerificationFailed";end
         end
+        admissionSolve=localEmptySolve();
+        if ~admitted && ~isempty(proposal.decision) && localSectionTimeAvailable(cfg)
+            % The global support majorants do not require a feasible center.
+            % Release every input coordinate while keeping every hard row.
+            search.admissionProposalViolation=proposal.violation;
+            search.policy="affineSectionThenJointAdmission";
+            phase=tic;
+            conic=avoidanceStageQp.joint(program,proposal.decision,proposal.angles,cfg);
+            search.formulationSeconds=search.formulationSeconds+toc(phase);
+            phase=tic;admissionSolve=localSolveConic(conic,cfg);search.solveSeconds=toc(phase);
+            search.restorationSolves=1;search.nativeSolves=1;
+            search.fullPlanStatus="solverRejected";
+            if admissionSolve.feasible
+                point=admissionSolve.decision(1:conic.primaryCount);
+                angles=proposal.angles+atan(admissionSolve.decision(conic.angleIndex));
+                [admitted,accepted]=localVerifyJointPoint(program,point,angles);
+                search.usedFullPlanAdmission=admitted;
+                search.fullPlanStatus="independentVerificationFailed";
+                if admitted,search.fullPlanStatus="certified";end
+            end
+        end
         if ~admitted
+            if ~localSectionTimeAvailable(cfg),search.fullPlanStatus="searchTimeLimit";end
             result=localEmptySolve();
-            result.message="Scalar admission found no hard-certified plan: "+search.section.status;
+            result.message="Admission found no hard-certified plan: "+search.section.status;
+            if search.nativeSolves>0
+                result.message=result.message+"; full-plan "+search.fullPlanStatus+": "+admissionSolve.message;
+            elseif search.fullPlanStatus=="searchTimeLimit"
+                result.message=result.message+"; full-plan searchTimeLimit";
+            end
             return;
         end
         program=accepted;result=localEmptySolve();result.decision=point;result.feasible=true;
         result.exitFlag=1;result.message="Issued an independently verified scalar-admission witness.";
+        if search.usedFullPlanAdmission
+            result.exitFlag=admissionSolve.exitFlag;result.output=admissionSolve.output;
+            result.message="Issued an independently verified full-plan admission witness.";
+        end
         search.issuedAdmissionWitness=true;
     else
         if ~admitted
@@ -296,6 +337,34 @@ function [program,result,search]=localJointSearch(program,~,cfg)
     end
     program.supportGeometry.witnessPreserved=program.inheritedPredictionFamily;
     program.inheritedFeasibleFamily=program.inheritedPredictionFamily;
+end
+
+function proposal=localAdmissionProposal(program,origin,direction,boundaries, ...
+        dictionary,fixed,coefficient,egoSizes,egoRadius,yaw,yawSlope,cfg)
+% Choose one geometric center from the already computed hard base interval.
+% Exact dictionary gaps at cell boundaries choose the least violated center;
+% no failed center is returned as an admitted decision or carried witness.
+    proposal=struct('decision',zeros(0,1),'angles',program.jointCertificate.angles,'violation',Inf);
+    coder.varsize('proposal.decision',[Inf,1],[true,false]);
+    inward=64*eps*(1+max(abs(boundaries)));
+    amplitudes=min(max(boundaries,boundaries(1)+inward),boundaries(end)-inward);
+    if boundaries(end)-boundaries(1)<2*inward,amplitudes=mean(boundaries);end
+    for index=1:numel(amplitudes)
+        amplitude=amplitudes(index);
+        if ~localSectionTimeAvailable(cfg),return;end
+        residual=fixed+solveHardCbfClf.rectangleSupports(egoSizes,egoRadius, ...
+            dictionary-yaw-yawSlope*amplitude)-coefficient*amplitude;
+        [values,indices]=min(residual,[],2);violation=max(values);
+        if violation>=proposal.violation,continue;end
+        plan=origin+amplitude*direction;
+        first=program.cones(2)+1;
+        clf=program.b(first:first+5)-program.A(first:first+5,:)*[plan;0];
+        slack=max(0,norm(clf(2:end))-clf(1));
+        point=[plan;slack+64*eps*(1+slack+norm(clf))];
+        if solveHardCbfClf.inspect(program,point)~=0,continue;end
+        proposal.decision=point;proposal.angles=reshape(dictionary(indices),[],1);
+        proposal.violation=violation;
+    end
 end
 
 function result=localSolveConic(program,cfg)

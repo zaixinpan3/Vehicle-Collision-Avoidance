@@ -40,9 +40,9 @@ function cfg = localDefaults()
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
         "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);
-    % Fresh admission is one signed section with bounded geometric work.
+    % Fresh admission tries one signed section before at most one hard joint solve.
     cfg.admission = struct("normalCount",32,"amplitudeCells",16,"performanceIterations",32);
-    % Global majorant scaling for one inherited performance improvement.
+    % Global majorant scaling for admission and inherited performance improvement.
     cfg.jointCertificate = struct("positionScale",4.0,"proximalWeight",1.0e-3);
     cfg.collision = struct("cbfRate",2.0);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
@@ -124,8 +124,8 @@ function cfg = localDefaults()
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
     % Each convex subproblem calls the hook with (phase,program), P/q/A/b/cones
-    % and lifted coordinates. Admission uses the bounded call count above;
-    % continuation uses one solve. A hook must honor its feasibility status.
+    % and lifted coordinates. Admission and continuation use at most one solve
+    % each. A hook must honor its feasibility status.
     % constraintTolerance enters the pre-solve physical row reserves.
     % frameDeadlineSeconds is a complete controller-frame acceptance deadline.
     % A finite exit may require more stages than the performance window.

@@ -38,6 +38,13 @@ classdef standaloneBenchmarkWorkflowTest < matlab.unittest.TestCase
                 "assert result['groups']['all']['medianMs']==10 and not result['fullPipelineMeasured']"];
             localPython(testCase,code);
         end
+
+        function fullPlanAdmissionStatusIsAcceptedInNativeMeasurements(testCase)
+            code = ["baseline={'frames':[{'file':'frame'}]}", ...
+                "rows=[{'file':'frame','iteration':0,'status':4,'seconds':.01,'metrics':[.003,.006,.001,1]}]", ...
+                "b.checked_rows(baseline,rows,1)"];
+            localPython(testCase,code);
+        end
     end
 end
 

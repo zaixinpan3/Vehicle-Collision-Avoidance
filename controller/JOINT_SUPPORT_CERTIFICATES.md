@@ -1,11 +1,13 @@
 # Joint trajectory and separation certificates
 
-Fresh admission restricts the input sequence to one signed affine section
-and computes its certifiable amplitudes using a finite support dictionary.
-Inherited performance improvement optimizes the input sequence and one
+Fresh admission first searches one signed affine section using a finite
+support dictionary. If the section has a nonempty hard base interval but no
+certified amplitude, one hard joint solve may release the complete input
+sequence around its least-violated geometric proposal. Inherited performance
+improvement optimizes the input sequence and one
 separation angle per target/node, including terminal exit angles, in one SOCP.
-Every issued plan passes the original hard physical verification. There is no
-restoration solver or method selector. The certificate covers **hold nodes of
+Every issued plan passes the original hard physical verification. Admission
+recovery has no collision slack or executable uncertified incumbent. The certificate covers **hold nodes of
 the declared zero-residual sampled affine plant**, not the space between nodes
 or a real-time deadline.
 
@@ -19,6 +21,9 @@ CLF remain. The [affine-section review](../report/AFFINE_SECTION_ADMISSION_REVIE
 states the mathematical prerequisites;
 [the implementation report](../report/AFFINE_SECTION_ADMISSION_20260919.md)
 records the measured runtime and admission-capability tradeoff.
+The [September 21 admission repair](../report/CIRCULAR_CROSSING_ADMISSION_REPAIR_20260921.md)
+supersedes its first-admission search restriction; certificate format 40 remains
+unchanged.
 
 ## Research assessment
 
@@ -236,7 +241,7 @@ of $10^{-10}$ rad without losing the touching property during continuation.
 
 ## One signed control section and finite interval computation
 
-For fresh admission, retain the nominal input sequence $U_0$ and restrict
+For the fast admission attempt, retain the nominal input sequence $U_0$ and restrict
 candidate inputs to $U(\alpha)=U_0+\alpha v$. Both amplitude signs are available.
 The section is deliberately incomplete; an empty section is not evidence of
 physical inevitability of collision.
@@ -309,14 +314,60 @@ A successful restricted admission needs no conic solve. If the initial nominal
 already passes the complete verifier, one ordinary hard performance improvement
 is permitted. Inherited successors also attempt one such improvement while
 retaining the verified incumbent. Empty base, terminal exclusion, collision
-exclusion, exit exclusion and independent-verification failure are distinct
-admission outcomes. Search failure terminates without an issued command.
+exclusion, exit exclusion and independent-verification failure remain distinct
+section outcomes. A failed section can initialize the hard recovery below;
+failure of the complete admission search issues no command.
 
 The common full affine sensitivity maps and canonical condensed objective are
 still constructed for compatibility with the complete inherited family. The
 scalar search propagates its two trajectories and accumulates its objective
 directly; its improvement is not a claim that all preparation is linear in the
 horizon. Finite loop counts and observed desktop timings are not a WCET proof.
+
+## Release the time shape after section exclusion
+
+The scalar search can exclude every amplitude even when a hard-certified plan
+exists. The circular-crossing diagnosis demonstrated an early chart-boundary
+peak coupled to a later collision bottleneck. Since the restriction is in the
+control sequence, merely refining its normals or amplitude cells cannot remove it.
+
+After collision or exit exclusion, evaluate the exact dictionary residuals at
+the existing amplitude-cell boundaries, nudged inward at the base endpoints.
+For each proposal alpha, define the worst record residual
+
+\[
+v(\alpha)=\max_i\min_{n\in\mathcal D}r_i(U_0+\alpha v,n).
+\]
+
+Select the least-violated proposal that passes the original base/terminal/CLF
+checks, completing only its permitted CLF slack. It may still violate collision
+or exit certificates. `admitSection` returns it in a separate fourth output;
+its admitted `decision` output stays empty. The proposal is neither issued nor
+stored as an incumbent. This bounded scan chooses one initialization, not a
+library of predetermined trajectories or temporal weights.
+
+Build the same global joint-support SOCP used for continuation around this
+proposal and its best dictionary directions. All input coordinates and support
+angle increments are free; physical rows, chart radii/remainders, terminal
+cones, encounter-exit requirements and the performance objective remain hard
+or soft exactly as before. The support majorants are valid at infeasible
+centers as well as feasible ones. A feasible solution of this inner problem
+can therefore satisfy the original certificates even though its center does
+not. The touching argument guarantees inclusion of a feasible incumbent only
+for continuation; it does not guarantee that admission recovery succeeds.
+
+At most one such solve is attempted, subject to the original work timer and
+full-frame deadline. A positive solver status proceeds to the independent
+original verifier. Failure, an unverified solution or an expired frame issues
+no command. No collision slack is added. Metadata distinguishes the rejected
+section, the proposal violation, the full-plan solve and its verification.
+`restorationSolverCallCount` counts this one hard admission recovery when used;
+the scalar fast path still makes zero conic calls.
+
+The generated replay adapter implements the same branch with status 4 for a
+verified full-plan admission and an empty decision on failed admission. Existing
+compiled replay binaries must be rebuilt after this source change. It remains
+a prepared-frame benchmark rather than a complete real-time controller.
 
 ## Hard acceptance and continuation
 

@@ -86,7 +86,7 @@ def checked_rows(baseline, rows, repetitions):
         if (not math.isfinite(row['seconds']) or row['seconds'] < 0
                 or len(row['metrics']) != 4
                 or any(not math.isfinite(x) or x < 0 for x in row['metrics'][:3])
-                or row['status'] not in (0, 1, 2, 3)):
+                or row['status'] not in (0, 1, 2, 3, 4)):
             raise RuntimeError('Invalid native timing or acceptance status.')
 
 

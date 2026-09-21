@@ -1,7 +1,8 @@
 # Soft sampled CLF and its dissipation bound
 
-The controller optimizes a scalar restriction at fresh admission and a full
-finite input plan during inherited performance improvement, together with a
+The controller first optimizes a scalar restriction at fresh admission and can
+release the full finite input plan in one hard admission recovery. Inherited
+performance improvement also optimizes the full plan, together with a
 nonnegative first-hold CLF norm slack. Physical input effort is centered on
 the CLF/LQR operating input. For N holds its objective is
 

@@ -1,10 +1,12 @@
 # Experiment reports
 
-Current controller: [Scalar admission and inherited joint-support continuation](../controller/JOINT_SUPPORT_CERTIFICATES.md). One signed control section replaces admission restoration; inherited performance improvement retains one hard SOCP and the verified incumbent. Restricted admission failures and inter-node clearance limitations remain explicit.
+Current controller: [Scalar fast admission, one hard full-plan recovery and inherited continuation](../controller/JOINT_SUPPORT_CERTIFICATES.md). After geometric section exclusion, one hard joint solve releases the input sequence around a least-violated proposal. Original verification remains mandatory; failed admission never issues its uncertified center. Admission completeness, inter-node clearance and real-time limits remain explicit.
 
-Latest admission diagnosis: [Circular crossing: fixed temporal shape, chart conservatism and verified feasible counterexamples](CIRCULAR_CROSSING_ADMISSION_DIAGNOSIS_20260921.md). The original scalar line has no robust certificate within its chart domain; changing only the temporal deformation yields four plans that pass the unchanged original hard verifier. Production behavior remains unchanged.
+Latest admission repair: [Recover circular crossing through full-plan timing freedom](CIRCULAR_CROSSING_ADMISSION_REPAIR_20260921.md). The formerly rejected circular crossing now completes the declared-model closed loop. Diagnostic-budget safety and strict 50 ms frame acceptance are evaluated separately.
 
-Latest simulation rerun: [Straight/circular avoidance, independent footprint audit and full-frame timing](STRAIGHT_CIRCULAR_VALIDATION_20260920.md). Two measured six-case campaigns confirm two straight inter-node overlaps and circular crossing rejection; continuation maximum is 42.173 ms, while four admission frames exceed 50 ms and the maximum is 108.710 ms. Straight crossing has no nominal collision threat.
+Preceding admission diagnosis: [Circular crossing: fixed temporal shape, chart conservatism and verified feasible counterexamples](CIRCULAR_CROSSING_ADMISSION_DIAGNOSIS_20260921.md). The original scalar line has no robust certificate within its chart domain; changing only the temporal deformation yields four plans that pass the unchanged original hard verifier. That diagnostic task left production behavior unchanged; its failure reproducer is pinned to commit `07aa84b263fefa2c265be7fad8fabdbd527f428d`.
+
+Preceding simulation rerun: [Straight/circular avoidance, independent footprint audit and full-frame timing](STRAIGHT_CIRCULAR_VALIDATION_20260920.md). Two measured six-case campaigns confirm two straight inter-node overlaps and circular crossing rejection; continuation maximum is 42.173 ms, while four admission frames exceed 50 ms and the maximum is 108.710 ms. Straight crossing has no nominal collision threat.
 
 Latest MATLAB optimization: [Local support assembly, exact program equivalence and warm runtime retest](MATLAB_ASSEMBLY_OPTIMIZATION_20260920.md). Active continuation median/max is 13.9275/42.613 ms with zero measured 50 ms misses; first admission still reaches 97.773 ms. All 737 tests pass.
 

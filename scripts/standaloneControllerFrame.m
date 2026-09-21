@@ -3,7 +3,8 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
 %#codegen
 % Preparation, sensing, reference synthesis and witness shifting remain with
 % the MATLAB orchestrator. This entry is NOT a standalone closed-loop driver.
-% Status: 0 rejected, 1 scalar admission, 2 optimized, 3 retained incumbent.
+% Status: 0 rejected, 1 scalar admission, 2 optimized, 3 retained incumbent,
+% 4 full-plan admission. An uncertified center is never a retained incumbent.
 % Metrics: assembly/admission, native solve, verification seconds, solver status.
     coder.cinclude('nativeControllerBenchmarkBridge.h');
     assert(~program.terminalOptimization);
@@ -13,19 +14,25 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
     start=localClock();
     [accepted,program]=localVerify(program,decision,angles);
     metrics(3)=localClock()-start;
-    if ~program.inheritedPredictionFamily && ~accepted
+    admission=~program.inheritedPredictionFamily && ~accepted;
+    if admission
         start=localClock();
-        [candidate,directions]=solveHardCbfClf.admitSection(program,cfg);
+        [candidate,directions,~,proposal]=solveHardCbfClf.admitSection(program,cfg);
         decision=candidate(:);angles=directions(:);
         metrics(1)=localClock()-start;
-        if isempty(decision),return;end
-        start=localClock();[accepted,~]=localVerify(program,decision,angles);
-        metrics(3)=metrics(3)+localClock()-start;
-        if accepted,status=1;end
+        if ~isempty(decision)
+            start=localClock();[accepted,~]=localVerify(program,decision,angles);
+            metrics(3)=metrics(3)+localClock()-start;
+            if accepted,status=1;end
+            return;
+        end
+        if isempty(proposal.decision),return;end
+        decision=proposal.decision;angles=proposal.angles;
+    elseif ~accepted
         return;
     end
-    if ~accepted,return;end
-    incumbent=decision;oldAngles=angles;status=3;
+    incumbent=decision;oldAngles=angles;
+    if ~admission,status=3;end
     start=localClock();
     program.b(1:numel(program.safetyBound))=program.safetyBound;
     program.b(end-numel(program.terminalCone.bound)+1:end)=program.terminalCone.bound;
@@ -37,7 +44,7 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
     linear=reduced.q+reduced.P*center;bound=reduced.b-reduced.A*center;
     scale=1/max([1;abs(linear);abs(nonzeros(reduced.P))]);
     [pr,pc,pv]=find(scale*reduced.P);[ar,ac,av]=find(reduced.A);
-    metrics(1)=localClock()-start;
+    metrics(1)=metrics(1)+localClock()-start;
     start=localClock();
     native=zeros(numel(linear),1);solverStatus=0;
     options=[cfg.solver.constraintTolerance;cfg.solver.optimalityTolerance;cfg.solver.maxIterations];
@@ -60,9 +67,14 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
         newAngles=angles+atan(expanded(conic.angleIndex));
         [accepted,~]=localVerify(program,proposed,newAngles);
         metrics(3)=metrics(3)+localClock()-start;
-        if accepted,decision=proposed;angles=newAngles;status=2;return;end
+        if accepted
+            decision=proposed;angles=newAngles;status=2;
+            if admission,status=4;end
+            return;
+        end
     end
     decision=incumbent;angles=oldAngles;
+    if admission,decision=zeros(0,1);end
 end
 
 function [accepted,program]=localVerify(program,decision,angles)

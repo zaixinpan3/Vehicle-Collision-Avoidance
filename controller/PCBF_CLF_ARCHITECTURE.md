@@ -1,14 +1,17 @@
 # Predictive CBF and soft CLF controller
 
-The format-40 controller admits a new encounter using one signed affine
+The format-40 controller first tries to admit a new encounter using one signed affine
 control section and forbidden-amplitude interval subtraction. A fixed support
 dictionary and fixed yaw enclosures on amplitude cells bound the geometric
 work. The scalar objective retains input effort and squared CLF slack.
-An independently verified admission witness is issued directly. A nominal
+An independently verified scalar witness is issued directly. After section
+exclusion, a least-violated geometric proposal can initialize one hard joint
+SOCP with the complete control sequence free. That proposal cannot be issued;
+only an independently verified result can become the first incumbent. A nominal
 already carrying a complete certificate, or a shifted accepted certificate,
 can be improved with one hard joint trajectory/support SOCP. Target-free frames
-solve the convex dynamics/CLF/terminal base. There is no restoration solver,
-route catalog, method selector or executable backup controller.
+solve the convex dynamics/CLF/terminal base. Admission recovery adds no collision
+slack, route catalog, method selector or executable backup controller.
 
 The predictive continuation, fixed active-encounter exit deadline, invariant
 terminal set, actuator amplitude/slew limits, curved pose domains and squared
