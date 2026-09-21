@@ -2,6 +2,8 @@
 
 Current controller: [Scalar fast admission, one hard full-plan recovery and inherited continuation](../controller/JOINT_SUPPORT_CERTIFICATES.md). After geometric section exclusion, one hard joint solve releases the input sequence around a least-violated proposal. Original verification remains mandatory; failed admission never issues its uncertified center. Admission completeness, inter-node clearance and real-time limits remain explicit.
 
+Latest frame profile: [Longest measured frame and circular-crossing component timings](LONGEST_CONTROLLER_FRAME_PROFILE_20260921.md). The 104.576 ms measured maximum uses no native solver; exact warm replay takes 34.865 ms median. Circular admission remains 60.888 ms warm, with construction/search taking most of the frame. Original timings and instrumented attribution are reported separately.
+
 Latest admission repair: [Recover circular crossing through full-plan timing freedom](CIRCULAR_CROSSING_ADMISSION_REPAIR_20260921.md). The formerly rejected circular crossing now completes the declared-model closed loop. Diagnostic-budget safety and strict 50 ms frame acceptance are evaluated separately.
 
 Preceding admission diagnosis: [Circular crossing: fixed temporal shape, chart conservatism and verified feasible counterexamples](CIRCULAR_CROSSING_ADMISSION_DIAGNOSIS_20260921.md). The original scalar line has no robust certificate within its chart domain; changing only the temporal deformation yields four plans that pass the unchanged original hard verifier. That diagnostic task left production behavior unchanged; its failure reproducer is pinned to commit `07aa84b263fefa2c265be7fad8fabdbd527f428d`.

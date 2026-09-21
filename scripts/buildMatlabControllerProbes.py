@@ -12,17 +12,25 @@ import re
 
 
 TARGETS = {
-    'collisionAvoidanceController.m': ['collisionAvoidanceController', 'localFiniteModel', 'localCommand'],
+    'collisionAvoidanceController.m': ['collisionAvoidanceController', 'localControllerConfiguration',
+                                     'localFiniteModel', 'localCommand'],
     'readPlanningInputs.m': ['readPlanningInputs'],
     'formulateAvoidanceProblem.m': ['formulateAvoidanceProblem', 'localShift'],
     'hardEncounterBarrier.m': ['prepare', 'predict', 'completionRows', 'carriedData', 'localTerminalSet'],
     'ltvBicycleModel.m': ['sampledCruise', 'finitePredict'],
     'laneGeometry.m': ['sweptCellFrames'],
-    'avoidanceSafetyGeometry.m': ['build', 'supportNormals', 'jointProgram'],
+    'avoidanceSafetyGeometry.m': ['build', 'supportNormals', 'jointProgram', 'certifyJoint', 'jointResidual'],
     'avoidanceStageQp.m': ['joint', 'build', 'localDomainCertificate'],
-    'solveHardCbfClf.m': ['certify', 'admitSection', 'localDirection', 'localJointSearch',
-                        'localDefaultSolve', 'localReducedProgram'],
+    'solveHardCbfClf.m': ['certify', 'inspect', 'admitSection', 'localDirection', 'localJointSearch',
+                        'localAdmissionProposal', 'localObjective', 'localDefaultSolve', 'localReducedProgram'],
 }
+
+
+def wrap_block(text, begin, end, tag):
+    """Time a straight-line block; unique source anchors prevent silent drift."""
+    assert text.count(begin) == 1 and text.count(end) == 1, tag
+    text = text.replace(begin, f"    blockProfileToken=matlabControllerProbe('start','{tag}');\n" + begin)
+    return text.replace(end, "    matlabControllerProbe('stop',blockProfileToken);\n" + end)
 
 
 def main():
@@ -58,6 +66,17 @@ def main():
                 declaration = ''
         assert sorted(found) == sorted(names), (file, found, names)
         text = ''.join(result)
+        if file == 'formulateAvoidanceProblem.m':
+            text = wrap_block(text, '    safetyBound = bound;\n',
+                              '    % Only the five path/velocity errors enter performance;',
+                              'formulateAvoidanceProblem.clfAssembly')
+            text = wrap_block(text, '    objectiveMap=zeros(5*count,planCount);objectiveOffset=zeros(5*count,1);\n',
+                              "    layout = struct('planIndex',1:planCount,",
+                              'formulateAvoidanceProblem.objectiveAssembly')
+        if file == 'collisionAvoidanceController.m':
+            text = wrap_block(text, '    predictedInput = reshape(result.decision(program.layout.planIndex),2,[]);\n',
+                              '    if metadata.runtimeSeconds>cfg.solver.frameDeadlineSeconds\n',
+                              'collisionAvoidanceController.outputAssembly')
         if file == 'solveHardCbfClf.m':
             begin = '    [nativeDecision, output] = nativeSolver( ...'
             end = '        options);\n    output.objectiveValue'

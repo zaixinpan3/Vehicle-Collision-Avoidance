@@ -10,6 +10,8 @@ function summary=profileMatlabControllerRuntime(directory,options)
         options.CampaignRepetitions (1,1) double {mustBeInteger,mustBePositive} = 2
         options.Repetitions (1,1) double {mustBeInteger,mustBePositive} = 11
         options.Warmups (1,1) double {mustBeInteger,mustBeNonnegative} = 5
+        options.Selection (1,1) string {mustBeMember(options.Selection,["standard","longest"])} = "standard"
+        options.CampaignDirectory (1,1) string = ""
     end
     root=fileparts(fileparts(mfilename('fullpath')));
     addpath(fullfile(root,'controller'),fullfile(root,'config'), ...
@@ -33,7 +35,12 @@ function summary=profileMatlabControllerRuntime(directory,options)
         return;
     end
     if options.Mode=="replay"
-        definitions=localDefinitions(directory,options.CampaignRepetitions);
+        if options.Selection=="longest"
+            assert(strlength(options.CampaignDirectory)>0,'Specify the saved diagnostic campaign directory.');
+            definitions=localLongestDefinitions(options.CampaignDirectory);
+        else
+            definitions=localDefinitions(directory,options.CampaignRepetitions);
+        end
         summary=struct('scope',"MATLAB controller-only warm replay; profiler never enabled",'fixtures',{{}});
         for index=1:numel(definitions)
             item=definitions{index};loaded=load(item.source,'report');report=loaded.report;
@@ -102,6 +109,31 @@ function summary=profileMatlabControllerRuntime(directory,options)
         localWrite(fullfile(directory,options.Mode+'.json'),summary);
         fprintf('%s: %s collected; decision unchanged\n',item.definition.name,options.Mode);
     end
+end
+
+function definitions=localLongestDefinitions(directory)
+% Select measured maxima from saved successful frames, retaining original
+% timing buckets. Warmup and strict-deadline trials are separate populations.
+    files=dir(fullfile(directory,'diagnostic','*','*-exact-state.mat'));
+    assert(~isempty(files),'No saved diagnostic reports found.');
+    definitions=cell(1,2);maximum=[-Inf,-Inf];
+    names=["measured-longest","circular-crossing-longest"];
+    for index=1:numel(files)
+        source=fullfile(files(index).folder,files(index).name);
+        loaded=load(source,'report');report=loaded.report;
+        [seconds,frame]=max(report.runtime.frameSeconds(1:report.executedHolds));
+        eligible=[true,report.roadCurvature~=0 && startsWith(files(index).name,'crossing-')];
+        for selected=find(eligible & seconds>maximum)
+            phase=report.runtimeBreakdown{frame};
+            residual=seconds-phase.inputPreparationSeconds-phase.formulationSeconds-phase.solveSeconds;
+            definition=struct('name',names(selected),'kind',"measuredMaximum", ...
+                'source',string(source),'frame',frame,'campaignSeconds',seconds, ...
+                'originalPhase',phase,'originalOtherSeconds',residual, ...
+                'originalSearch',report.admissionSearch{frame});
+            definitions{selected}=definition;maximum(selected)=seconds;
+        end
+    end
+    assert(all(isfinite(maximum)),'Both overall and circular-crossing maxima are required.');
 end
 
 function definitions=localDefinitions(directory,repetitions)

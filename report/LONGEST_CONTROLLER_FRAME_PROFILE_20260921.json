@@ -1,0 +1,2387 @@
+{
+  "controllerCommit": "cce7dc307a6ab086f95c96db78fa5101425a5eee",
+  "scope": "Original campaign buckets, clean controller-only replay, and separate instrumented attribution",
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921",
+  "campaignDirectory": "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign",
+  "campaign": {
+    "maxima": {
+      "measured": {
+        "source": "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0-stationary/stationary-exact-state.json",
+        "frame": 1,
+        "timeSeconds": 0.0,
+        "seconds": 0.104576,
+        "phase": {
+          "inputPreparationSeconds": 0.02337,
+          "formulationSeconds": 0.073982,
+          "solveSeconds": 0
+        },
+        "otherSeconds": 0.007223999999999994,
+        "scenario": "stationary",
+        "curvature": 0,
+        "horizonSteps": 96,
+        "nativeSolves": 0,
+        "policy": "affineSectionAdmission"
+      },
+      "continuation": {
+        "source": "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0-stationary/stationary-exact-state.json",
+        "frame": 2,
+        "timeSeconds": 0.05,
+        "seconds": 0.040644,
+        "phase": {
+          "inputPreparationSeconds": 0.003907,
+          "formulationSeconds": 0.017797,
+          "solveSeconds": 0.012209
+        },
+        "otherSeconds": 0.006731000000000001,
+        "scenario": "stationary",
+        "curvature": 0,
+        "horizonSteps": 95,
+        "nativeSolves": 1,
+        "policy": "affineSectionAdmission"
+      },
+      "circularCrossing": {
+        "source": "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0.01-crossing/crossing-exact-state.json",
+        "frame": 1,
+        "timeSeconds": 0.0,
+        "seconds": 0.064545,
+        "phase": {
+          "inputPreparationSeconds": 0.000997,
+          "formulationSeconds": 0.039456000000000005,
+          "solveSeconds": 0.015924
+        },
+        "otherSeconds": 0.008168000000000002,
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "horizonSteps": 96,
+        "nativeSolves": 1,
+        "policy": "affineSectionThenJointAdmission"
+      },
+      "warmup": {
+        "source": "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/warmup-1/crossing-exact-state.json",
+        "frame": 1,
+        "timeSeconds": 0.0,
+        "seconds": 0.906718,
+        "phase": {
+          "inputPreparationSeconds": 0.133339,
+          "formulationSeconds": 0.647605,
+          "solveSeconds": 0.080323
+        },
+        "otherSeconds": 0.04545100000000002,
+        "scenario": "crossing",
+        "curvature": 0.01,
+        "horizonSteps": 96,
+        "nativeSolves": 1,
+        "policy": "affineSectionThenJointAdmission"
+      }
+    },
+    "groups": {
+      "all": {
+        "calls": 7200,
+        "medianMs": 7.069,
+        "maximumMs": 104.57600000000001,
+        "over50Ms": 6
+      },
+      "admission": {
+        "calls": 12,
+        "medianMs": 50.22500000000001,
+        "maximumMs": 104.57600000000001,
+        "over50Ms": 6
+      },
+      "continuation": {
+        "calls": 708,
+        "medianMs": 14.103000000000002,
+        "maximumMs": 40.644,
+        "over50Ms": 0
+      },
+      "cruise": {
+        "calls": 6480,
+        "medianMs": 7.058,
+        "maximumMs": 16.247,
+        "over50Ms": 0
+      }
+    }
+  },
+  "replays": [
+    {
+      "name": "measured-longest",
+      "fixture": "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/measured-longest-fixture.mat",
+      "source": "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0-stationary/stationary-exact-state.mat",
+      "frame": 1,
+      "timing": {
+        "calls": 11,
+        "medianMs": 34.865,
+        "maximumMs": 37.236,
+        "over50Ms": 0
+      },
+      "horizonSteps": 96,
+      "nativeSolves": 0
+    },
+    {
+      "name": "circular-crossing-longest",
+      "fixture": "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/circular-crossing-longest-fixture.mat",
+      "source": "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0.01-crossing/crossing-exact-state.mat",
+      "frame": 1,
+      "timing": {
+        "calls": 11,
+        "medianMs": 60.888,
+        "maximumMs": 64.033,
+        "over50Ms": 11
+      },
+      "horizonSteps": 96,
+      "nativeSolves": 1
+    }
+  ],
+  "probes": [
+    {
+      "name": "measured-longest",
+      "sampleIndex": 4,
+      "representativeMs": 37.112,
+      "timing": {
+        "calls": 11,
+        "medianMs": 37.112,
+        "maximumMs": 41.964,
+        "over50Ms": 0
+      },
+      "partitionMs": {
+        "collisionAvoidanceController.localControllerConfiguration": 0.063,
+        "readPlanningInputs.readPlanningInputs": 0.27999999999999997,
+        "collisionAvoidanceController.localFiniteModel": 0.067,
+        "hardEncounterBarrier.prepare": 0.221,
+        "formulateAvoidanceProblem.formulateAvoidanceProblem": 23.419999999999998,
+        "solveHardCbfClf.admitSection": 6.592,
+        "avoidanceStageQp.joint": 0,
+        "solveHardCbfClf.localDefaultSolve": 0,
+        "solveHardCbfClf.certify": 4.858,
+        "collisionAvoidanceController.outputAssembly": 1.242,
+        "otherAndTimerOverhead": 0.3690000000000069
+      },
+      "callTree": [
+        {
+          "name": "collisionAvoidanceController.collisionAvoidanceController",
+          "depth": 0,
+          "parent": 0,
+          "inclusiveMs": 37.068,
+          "exclusiveMs": 0.18399999999999667
+        },
+        {
+          "name": "collisionAvoidanceController.localControllerConfiguration",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.063,
+          "exclusiveMs": 0.063
+        },
+        {
+          "name": "readPlanningInputs.readPlanningInputs",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.27999999999999997,
+          "exclusiveMs": 0.27999999999999997
+        },
+        {
+          "name": "collisionAvoidanceController.localFiniteModel",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.067,
+          "exclusiveMs": 0.067
+        },
+        {
+          "name": "hardEncounterBarrier.prepare",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.221,
+          "exclusiveMs": 0.221
+        },
+        {
+          "name": "formulateAvoidanceProblem.formulateAvoidanceProblem",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 23.419999999999998,
+          "exclusiveMs": 0.7780000000000009
+        },
+        {
+          "name": "ltvBicycleModel.sampledCruise",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 0.076,
+          "exclusiveMs": 0.076
+        },
+        {
+          "name": "hardEncounterBarrier.predict",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 4.054,
+          "exclusiveMs": 0.06600000000000009
+        },
+        {
+          "name": "ltvBicycleModel.finitePredict",
+          "depth": 3,
+          "parent": 8,
+          "inclusiveMs": 3.9880000000000004,
+          "exclusiveMs": 3.9880000000000004
+        },
+        {
+          "name": "laneGeometry.sweptCellFrames",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 1.1039999999999999,
+          "exclusiveMs": 1.1039999999999999
+        },
+        {
+          "name": "avoidanceSafetyGeometry.supportNormals",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 2.124,
+          "exclusiveMs": 2.124
+        },
+        {
+          "name": "avoidanceSafetyGeometry.build",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 8.727,
+          "exclusiveMs": 8.727
+        },
+        {
+          "name": "hardEncounterBarrier.completionRows",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 0.767,
+          "exclusiveMs": 0.6819999999999999
+        },
+        {
+          "name": "hardEncounterBarrier.localTerminalSet",
+          "depth": 3,
+          "parent": 13,
+          "inclusiveMs": 0.085,
+          "exclusiveMs": 0.085
+        },
+        {
+          "name": "formulateAvoidanceProblem.clfAssembly",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 0.208,
+          "exclusiveMs": 0.208
+        },
+        {
+          "name": "formulateAvoidanceProblem.objectiveAssembly",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 1.408,
+          "exclusiveMs": 1.408
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointProgram",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 4.1739999999999995,
+          "exclusiveMs": 4.1739999999999995
+        },
+        {
+          "name": "solveHardCbfClf.localJointSearch",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 9.731,
+          "exclusiveMs": 0.1410000000000005
+        },
+        {
+          "name": "solveHardCbfClf.certify",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 1.1360000000000001,
+          "exclusiveMs": 0.03900000000000019
+        },
+        {
+          "name": "solveHardCbfClf.inspect",
+          "depth": 3,
+          "parent": 19,
+          "inclusiveMs": 0.089,
+          "exclusiveMs": 0.089
+        },
+        {
+          "name": "avoidanceSafetyGeometry.certifyJoint",
+          "depth": 3,
+          "parent": 19,
+          "inclusiveMs": 1.008,
+          "exclusiveMs": 0.42199999999999993
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 4,
+          "parent": 21,
+          "inclusiveMs": 0.5860000000000001,
+          "exclusiveMs": 0.5860000000000001
+        },
+        {
+          "name": "solveHardCbfClf.admitSection",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 6.592,
+          "exclusiveMs": 5.404
+        },
+        {
+          "name": "solveHardCbfClf.localDirection",
+          "depth": 3,
+          "parent": 23,
+          "inclusiveMs": 0.9039999999999999,
+          "exclusiveMs": 0.2909999999999999
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 4,
+          "parent": 24,
+          "inclusiveMs": 0.6130000000000001,
+          "exclusiveMs": 0.6130000000000001
+        },
+        {
+          "name": "solveHardCbfClf.localObjective",
+          "depth": 3,
+          "parent": 23,
+          "inclusiveMs": 0.28400000000000003,
+          "exclusiveMs": 0.28400000000000003
+        },
+        {
+          "name": "solveHardCbfClf.certify",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 1.8619999999999999,
+          "exclusiveMs": 0.043999999999999984
+        },
+        {
+          "name": "solveHardCbfClf.inspect",
+          "depth": 3,
+          "parent": 27,
+          "inclusiveMs": 0.088,
+          "exclusiveMs": 0.088
+        },
+        {
+          "name": "avoidanceSafetyGeometry.certifyJoint",
+          "depth": 3,
+          "parent": 27,
+          "inclusiveMs": 1.73,
+          "exclusiveMs": 1.184
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 4,
+          "parent": 29,
+          "inclusiveMs": 0.546,
+          "exclusiveMs": 0.546
+        },
+        {
+          "name": "solveHardCbfClf.certify",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 1.86,
+          "exclusiveMs": 0.048000000000000084
+        },
+        {
+          "name": "solveHardCbfClf.inspect",
+          "depth": 2,
+          "parent": 31,
+          "inclusiveMs": 0.091,
+          "exclusiveMs": 0.091
+        },
+        {
+          "name": "avoidanceSafetyGeometry.certifyJoint",
+          "depth": 2,
+          "parent": 31,
+          "inclusiveMs": 1.721,
+          "exclusiveMs": 1.1640000000000001
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 3,
+          "parent": 33,
+          "inclusiveMs": 0.5569999999999999,
+          "exclusiveMs": 0.5569999999999999
+        },
+        {
+          "name": "collisionAvoidanceController.outputAssembly",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 1.242,
+          "exclusiveMs": 0.28300000000000003
+        },
+        {
+          "name": "collisionAvoidanceController.localCommand",
+          "depth": 2,
+          "parent": 35,
+          "inclusiveMs": 0.087,
+          "exclusiveMs": 0.087
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 2,
+          "parent": 35,
+          "inclusiveMs": 0.5599999999999999,
+          "exclusiveMs": 0.5599999999999999
+        },
+        {
+          "name": "hardEncounterBarrier.carriedData",
+          "depth": 2,
+          "parent": 35,
+          "inclusiveMs": 0.312,
+          "exclusiveMs": 0.312
+        }
+      ],
+      "inclusiveEvents": {
+        "collisionAvoidanceController.collisionAvoidanceController": {
+          "seconds": 0.037068,
+          "calls": 1
+        },
+        "collisionAvoidanceController.localControllerConfiguration": {
+          "seconds": 6.3e-05,
+          "calls": 1
+        },
+        "readPlanningInputs.readPlanningInputs": {
+          "seconds": 0.00028,
+          "calls": 1
+        },
+        "collisionAvoidanceController.localFiniteModel": {
+          "seconds": 6.7e-05,
+          "calls": 1
+        },
+        "hardEncounterBarrier.prepare": {
+          "seconds": 0.000221,
+          "calls": 1
+        },
+        "formulateAvoidanceProblem.formulateAvoidanceProblem": {
+          "seconds": 0.02342,
+          "calls": 1
+        },
+        "ltvBicycleModel.sampledCruise": {
+          "seconds": 7.6e-05,
+          "calls": 1
+        },
+        "hardEncounterBarrier.predict": {
+          "seconds": 0.004054,
+          "calls": 1
+        },
+        "ltvBicycleModel.finitePredict": {
+          "seconds": 0.003988,
+          "calls": 1
+        },
+        "laneGeometry.sweptCellFrames": {
+          "seconds": 0.001104,
+          "calls": 1
+        },
+        "avoidanceSafetyGeometry.supportNormals": {
+          "seconds": 0.002124,
+          "calls": 1
+        },
+        "avoidanceSafetyGeometry.build": {
+          "seconds": 0.008727,
+          "calls": 1
+        },
+        "hardEncounterBarrier.completionRows": {
+          "seconds": 0.000767,
+          "calls": 1
+        },
+        "hardEncounterBarrier.localTerminalSet": {
+          "seconds": 8.5e-05,
+          "calls": 1
+        },
+        "formulateAvoidanceProblem.clfAssembly": {
+          "seconds": 0.000208,
+          "calls": 1
+        },
+        "formulateAvoidanceProblem.objectiveAssembly": {
+          "seconds": 0.001408,
+          "calls": 1
+        },
+        "avoidanceSafetyGeometry.jointProgram": {
+          "seconds": 0.004174,
+          "calls": 1
+        },
+        "solveHardCbfClf.localJointSearch": {
+          "seconds": 0.009731,
+          "calls": 1
+        },
+        "solveHardCbfClf.certify": {
+          "seconds": 0.0048579999999999995,
+          "calls": 3
+        },
+        "solveHardCbfClf.inspect": {
+          "seconds": 0.000268,
+          "calls": 3
+        },
+        "avoidanceSafetyGeometry.certifyJoint": {
+          "seconds": 0.004459,
+          "calls": 3
+        },
+        "avoidanceSafetyGeometry.jointResidual": {
+          "seconds": 0.002862,
+          "calls": 5
+        },
+        "solveHardCbfClf.admitSection": {
+          "seconds": 0.006592,
+          "calls": 1
+        },
+        "solveHardCbfClf.localDirection": {
+          "seconds": 0.000904,
+          "calls": 1
+        },
+        "solveHardCbfClf.localObjective": {
+          "seconds": 0.000284,
+          "calls": 1
+        },
+        "collisionAvoidanceController.outputAssembly": {
+          "seconds": 0.001242,
+          "calls": 1
+        },
+        "collisionAvoidanceController.localCommand": {
+          "seconds": 8.7e-05,
+          "calls": 1
+        },
+        "hardEncounterBarrier.carriedData": {
+          "seconds": 0.000312,
+          "calls": 1
+        },
+        "avoidanceStageQp.joint": {
+          "seconds": 0,
+          "calls": 0
+        },
+        "solveHardCbfClf.localDefaultSolve": {
+          "seconds": 0,
+          "calls": 0
+        }
+      },
+      "nativeCalls": []
+    },
+    {
+      "name": "circular-crossing-longest",
+      "sampleIndex": 9,
+      "representativeMs": 64.124,
+      "timing": {
+        "calls": 11,
+        "medianMs": 64.124,
+        "maximumMs": 66.04400000000001,
+        "over50Ms": 11
+      },
+      "partitionMs": {
+        "collisionAvoidanceController.localControllerConfiguration": 0.06999999999999999,
+        "readPlanningInputs.readPlanningInputs": 0.359,
+        "collisionAvoidanceController.localFiniteModel": 0.09899999999999999,
+        "hardEncounterBarrier.prepare": 0.328,
+        "formulateAvoidanceProblem.formulateAvoidanceProblem": 25.499000000000002,
+        "solveHardCbfClf.admitSection": 9.502,
+        "avoidanceStageQp.joint": 5.118,
+        "solveHardCbfClf.localDefaultSolve": 15.845999999999998,
+        "solveHardCbfClf.certify": 5.487000000000001,
+        "collisionAvoidanceController.outputAssembly": 1.3179999999999998,
+        "otherAndTimerOverhead": 0.49799999999999045
+      },
+      "callTree": [
+        {
+          "name": "collisionAvoidanceController.collisionAvoidanceController",
+          "depth": 0,
+          "parent": 0,
+          "inclusiveMs": 64.076,
+          "exclusiveMs": 0.20099999999999285
+        },
+        {
+          "name": "collisionAvoidanceController.localControllerConfiguration",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.06999999999999999,
+          "exclusiveMs": 0.06999999999999999
+        },
+        {
+          "name": "readPlanningInputs.readPlanningInputs",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.359,
+          "exclusiveMs": 0.359
+        },
+        {
+          "name": "collisionAvoidanceController.localFiniteModel",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.09899999999999999,
+          "exclusiveMs": 0.09899999999999999
+        },
+        {
+          "name": "hardEncounterBarrier.prepare",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 0.328,
+          "exclusiveMs": 0.328
+        },
+        {
+          "name": "formulateAvoidanceProblem.formulateAvoidanceProblem",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 25.499000000000002,
+          "exclusiveMs": 1.2980000000000005
+        },
+        {
+          "name": "ltvBicycleModel.sampledCruise",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 0.08399999999999999,
+          "exclusiveMs": 0.08399999999999999
+        },
+        {
+          "name": "hardEncounterBarrier.predict",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 3.326,
+          "exclusiveMs": 0.07600000000000011
+        },
+        {
+          "name": "ltvBicycleModel.finitePredict",
+          "depth": 3,
+          "parent": 8,
+          "inclusiveMs": 3.25,
+          "exclusiveMs": 3.25
+        },
+        {
+          "name": "laneGeometry.sweptCellFrames",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 1.4929999999999999,
+          "exclusiveMs": 1.4929999999999999
+        },
+        {
+          "name": "avoidanceSafetyGeometry.supportNormals",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 2.124,
+          "exclusiveMs": 2.124
+        },
+        {
+          "name": "avoidanceSafetyGeometry.build",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 9.917,
+          "exclusiveMs": 9.917
+        },
+        {
+          "name": "hardEncounterBarrier.completionRows",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 0.837,
+          "exclusiveMs": 0.748
+        },
+        {
+          "name": "hardEncounterBarrier.localTerminalSet",
+          "depth": 3,
+          "parent": 13,
+          "inclusiveMs": 0.089,
+          "exclusiveMs": 0.089
+        },
+        {
+          "name": "formulateAvoidanceProblem.clfAssembly",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 0.49799999999999994,
+          "exclusiveMs": 0.49799999999999994
+        },
+        {
+          "name": "formulateAvoidanceProblem.objectiveAssembly",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 1.409,
+          "exclusiveMs": 1.409
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointProgram",
+          "depth": 2,
+          "parent": 6,
+          "inclusiveMs": 4.513,
+          "exclusiveMs": 4.513
+        },
+        {
+          "name": "solveHardCbfClf.localJointSearch",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 34.22,
+          "exclusiveMs": 0.24899999999999922
+        },
+        {
+          "name": "solveHardCbfClf.certify",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 1.377,
+          "exclusiveMs": 0.04100000000000002
+        },
+        {
+          "name": "solveHardCbfClf.inspect",
+          "depth": 3,
+          "parent": 19,
+          "inclusiveMs": 0.189,
+          "exclusiveMs": 0.189
+        },
+        {
+          "name": "avoidanceSafetyGeometry.certifyJoint",
+          "depth": 3,
+          "parent": 19,
+          "inclusiveMs": 1.147,
+          "exclusiveMs": 0.5670000000000001
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 4,
+          "parent": 21,
+          "inclusiveMs": 0.58,
+          "exclusiveMs": 0.58
+        },
+        {
+          "name": "solveHardCbfClf.admitSection",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 9.502,
+          "exclusiveMs": 4.844
+        },
+        {
+          "name": "solveHardCbfClf.localDirection",
+          "depth": 3,
+          "parent": 23,
+          "inclusiveMs": 0.8989999999999999,
+          "exclusiveMs": 0.33399999999999996
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 4,
+          "parent": 24,
+          "inclusiveMs": 0.565,
+          "exclusiveMs": 0.565
+        },
+        {
+          "name": "solveHardCbfClf.localAdmissionProposal",
+          "depth": 3,
+          "parent": 23,
+          "inclusiveMs": 3.7590000000000003,
+          "exclusiveMs": 3.4340000000000006
+        },
+        {
+          "name": "solveHardCbfClf.inspect",
+          "depth": 4,
+          "parent": 26,
+          "inclusiveMs": 0.325,
+          "exclusiveMs": 0.325
+        },
+        {
+          "name": "avoidanceStageQp.joint",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 5.118,
+          "exclusiveMs": 2.6850000000000005
+        },
+        {
+          "name": "avoidanceStageQp.build",
+          "depth": 3,
+          "parent": 28,
+          "inclusiveMs": 1.767,
+          "exclusiveMs": 1.767
+        },
+        {
+          "name": "avoidanceStageQp.localDomainCertificate",
+          "depth": 3,
+          "parent": 28,
+          "inclusiveMs": 0.666,
+          "exclusiveMs": 0.666
+        },
+        {
+          "name": "solveHardCbfClf.localDefaultSolve",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 15.845999999999998,
+          "exclusiveMs": 15.719999999999997
+        },
+        {
+          "name": "solveHardCbfClf.localReducedProgram",
+          "depth": 3,
+          "parent": 31,
+          "inclusiveMs": 0.126,
+          "exclusiveMs": 0.126
+        },
+        {
+          "name": "solveHardCbfClf.certify",
+          "depth": 2,
+          "parent": 18,
+          "inclusiveMs": 2.128,
+          "exclusiveMs": 0.08000000000000021
+        },
+        {
+          "name": "solveHardCbfClf.inspect",
+          "depth": 3,
+          "parent": 33,
+          "inclusiveMs": 0.21000000000000002,
+          "exclusiveMs": 0.21000000000000002
+        },
+        {
+          "name": "avoidanceSafetyGeometry.certifyJoint",
+          "depth": 3,
+          "parent": 33,
+          "inclusiveMs": 1.838,
+          "exclusiveMs": 1.199
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 4,
+          "parent": 35,
+          "inclusiveMs": 0.639,
+          "exclusiveMs": 0.639
+        },
+        {
+          "name": "solveHardCbfClf.certify",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 1.9819999999999998,
+          "exclusiveMs": 0.044999999999999686
+        },
+        {
+          "name": "solveHardCbfClf.inspect",
+          "depth": 2,
+          "parent": 37,
+          "inclusiveMs": 0.177,
+          "exclusiveMs": 0.177
+        },
+        {
+          "name": "avoidanceSafetyGeometry.certifyJoint",
+          "depth": 2,
+          "parent": 37,
+          "inclusiveMs": 1.76,
+          "exclusiveMs": 1.1380000000000001
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 3,
+          "parent": 39,
+          "inclusiveMs": 0.622,
+          "exclusiveMs": 0.622
+        },
+        {
+          "name": "collisionAvoidanceController.outputAssembly",
+          "depth": 1,
+          "parent": 1,
+          "inclusiveMs": 1.3179999999999998,
+          "exclusiveMs": 0.2979999999999999
+        },
+        {
+          "name": "collisionAvoidanceController.localCommand",
+          "depth": 2,
+          "parent": 41,
+          "inclusiveMs": 0.102,
+          "exclusiveMs": 0.102
+        },
+        {
+          "name": "avoidanceSafetyGeometry.jointResidual",
+          "depth": 2,
+          "parent": 41,
+          "inclusiveMs": 0.583,
+          "exclusiveMs": 0.583
+        },
+        {
+          "name": "hardEncounterBarrier.carriedData",
+          "depth": 2,
+          "parent": 41,
+          "inclusiveMs": 0.335,
+          "exclusiveMs": 0.335
+        }
+      ],
+      "inclusiveEvents": {
+        "collisionAvoidanceController.collisionAvoidanceController": {
+          "seconds": 0.064076,
+          "calls": 1
+        },
+        "collisionAvoidanceController.localControllerConfiguration": {
+          "seconds": 7e-05,
+          "calls": 1
+        },
+        "readPlanningInputs.readPlanningInputs": {
+          "seconds": 0.000359,
+          "calls": 1
+        },
+        "collisionAvoidanceController.localFiniteModel": {
+          "seconds": 9.9e-05,
+          "calls": 1
+        },
+        "hardEncounterBarrier.prepare": {
+          "seconds": 0.000328,
+          "calls": 1
+        },
+        "formulateAvoidanceProblem.formulateAvoidanceProblem": {
+          "seconds": 0.025499,
+          "calls": 1
+        },
+        "ltvBicycleModel.sampledCruise": {
+          "seconds": 8.4e-05,
+          "calls": 1
+        },
+        "hardEncounterBarrier.predict": {
+          "seconds": 0.003326,
+          "calls": 1
+        },
+        "ltvBicycleModel.finitePredict": {
+          "seconds": 0.00325,
+          "calls": 1
+        },
+        "laneGeometry.sweptCellFrames": {
+          "seconds": 0.001493,
+          "calls": 1
+        },
+        "avoidanceSafetyGeometry.supportNormals": {
+          "seconds": 0.002124,
+          "calls": 1
+        },
+        "avoidanceSafetyGeometry.build": {
+          "seconds": 0.009917,
+          "calls": 1
+        },
+        "hardEncounterBarrier.completionRows": {
+          "seconds": 0.000837,
+          "calls": 1
+        },
+        "hardEncounterBarrier.localTerminalSet": {
+          "seconds": 8.9e-05,
+          "calls": 1
+        },
+        "formulateAvoidanceProblem.clfAssembly": {
+          "seconds": 0.000498,
+          "calls": 1
+        },
+        "formulateAvoidanceProblem.objectiveAssembly": {
+          "seconds": 0.001409,
+          "calls": 1
+        },
+        "avoidanceSafetyGeometry.jointProgram": {
+          "seconds": 0.004513,
+          "calls": 1
+        },
+        "solveHardCbfClf.localJointSearch": {
+          "seconds": 0.03422,
+          "calls": 1
+        },
+        "solveHardCbfClf.certify": {
+          "seconds": 0.0054870000000000006,
+          "calls": 3
+        },
+        "solveHardCbfClf.inspect": {
+          "seconds": 0.000901,
+          "calls": 4
+        },
+        "avoidanceSafetyGeometry.certifyJoint": {
+          "seconds": 0.004745,
+          "calls": 3
+        },
+        "avoidanceSafetyGeometry.jointResidual": {
+          "seconds": 0.0029890000000000003,
+          "calls": 5
+        },
+        "solveHardCbfClf.admitSection": {
+          "seconds": 0.009502,
+          "calls": 1
+        },
+        "solveHardCbfClf.localDirection": {
+          "seconds": 0.000899,
+          "calls": 1
+        },
+        "solveHardCbfClf.localAdmissionProposal": {
+          "seconds": 0.003759,
+          "calls": 1
+        },
+        "avoidanceStageQp.joint": {
+          "seconds": 0.005118,
+          "calls": 1
+        },
+        "avoidanceStageQp.build": {
+          "seconds": 0.001767,
+          "calls": 1
+        },
+        "avoidanceStageQp.localDomainCertificate": {
+          "seconds": 0.000666,
+          "calls": 1
+        },
+        "solveHardCbfClf.localDefaultSolve": {
+          "seconds": 0.015846,
+          "calls": 1
+        },
+        "solveHardCbfClf.localReducedProgram": {
+          "seconds": 0.000126,
+          "calls": 1
+        },
+        "collisionAvoidanceController.outputAssembly": {
+          "seconds": 0.001318,
+          "calls": 1
+        },
+        "collisionAvoidanceController.localCommand": {
+          "seconds": 0.000102,
+          "calls": 1
+        },
+        "hardEncounterBarrier.carriedData": {
+          "seconds": 0.000335,
+          "calls": 1
+        }
+      },
+      "nativeCalls": [
+        {
+          "seconds": 0.015584,
+          "solverSeconds": 0.015542761,
+          "iterations": 19,
+          "status": 1,
+          "variables": 1098,
+          "rows": 2281,
+          "nonzeros": 11607,
+          "cones": [
+            634,
+            1314,
+            6,
+            3,
+            3,
+            3,
+            3,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3,
+            5,
+            3
+          ]
+        }
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "name": "measured-longest",
+      "instrumentedMs": 229.08100000000002,
+      "hotFunctions": [
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.build",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.022119000000000003,
+          "selfSeconds": 0.017184000000000005,
+          "hottestLines": [
+            [
+              179,
+              1,
+              0.0017850000000000003
+            ],
+            [
+              79,
+              1,
+              0.0016530000000000002
+            ],
+            [
+              204,
+              96,
+              0.001198
+            ],
+            [
+              212,
+              1,
+              0.0009969999999999998
+            ],
+            [
+              124,
+              96,
+              0.0008329999999999999
+            ]
+          ]
+        },
+        {
+          "name": "solveHardCbfClf>solveHardCbfClf.admitSection",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m",
+          "calls": 1,
+          "totalSeconds": 0.039739000000000003,
+          "selfSeconds": 0.015415000000000005,
+          "hottestLines": [
+            [
+              87,
+              1,
+              0.008266
+            ],
+            [
+              132,
+              16,
+              0.004188
+            ],
+            [
+              141,
+              16,
+              0.002907
+            ],
+            [
+              157,
+              1,
+              0.002863
+            ],
+            [
+              130,
+              16,
+              0.001869
+            ]
+          ]
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.finitePredict",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 1,
+          "totalSeconds": 0.016905,
+          "selfSeconds": 0.014454999999999999,
+          "hottestLines": [
+            [
+              613,
+              96,
+              0.001383
+            ],
+            [
+              430,
+              1,
+              0.0012950000000000001
+            ],
+            [
+              606,
+              96,
+              0.000972
+            ],
+            [
+              427,
+              1,
+              0.000803
+            ],
+            [
+              429,
+              1,
+              0.000719
+            ]
+          ]
+        },
+        {
+          "name": "formulateAvoidanceProblem>localFormulate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m",
+          "calls": 1,
+          "totalSeconds": 0.09874299999999998,
+          "selfSeconds": 0.01378799999999998,
+          "hottestLines": [
+            [
+              107,
+              1,
+              0.022392000000000002
+            ],
+            [
+              240,
+              1,
+              0.018472
+            ],
+            [
+              95,
+              1,
+              0.018059000000000002
+            ],
+            [
+              109,
+              1,
+              0.010835
+            ],
+            [
+              99,
+              1,
+              0.007485
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.jointProgram",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.018101,
+          "selfSeconds": 0.013145999999999998,
+          "hottestLines": [
+            [
+              241,
+              96,
+              0.004693
+            ],
+            [
+              292,
+              768,
+              0.001173
+            ],
+            [
+              253,
+              1,
+              0.000686
+            ],
+            [
+              242,
+              96,
+              0.000532
+            ],
+            [
+              237,
+              96,
+              0.00046499999999999997
+            ]
+          ]
+        },
+        {
+          "name": "collisionAvoidanceController",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "calls": 1,
+          "totalSeconds": 0.22864900000000002,
+          "selfSeconds": 0.008306000000000036,
+          "hottestLines": [
+            [
+              55,
+              1,
+              0.157869
+            ],
+            [
+              30,
+              1,
+              0.022452
+            ],
+            [
+              42,
+              1,
+              0.020475
+            ],
+            [
+              79,
+              1,
+              0.009863
+            ],
+            [
+              31,
+              1,
+              0.0041199999999999995
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.certifyJoint",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 3,
+          "totalSeconds": 0.013395,
+          "selfSeconds": 0.006002000000000001,
+          "hottestLines": [
+            [
+              371,
+              3,
+              0.005622
+            ],
+            [
+              372,
+              3,
+              0.0022010000000000003
+            ],
+            [
+              391,
+              192,
+              0.001481
+            ],
+            [
+              381,
+              194,
+              0.000617
+            ],
+            [
+              389,
+              2,
+              0.00039900000000000005
+            ]
+          ]
+        },
+        {
+          "name": "hardEncounterBarrier>hardEncounterBarrier.completionRows",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m",
+          "calls": 1,
+          "totalSeconds": 0.010543,
+          "selfSeconds": 0.0051199999999999996,
+          "hottestLines": [
+            [
+              369,
+              1,
+              0.0025960000000000002
+            ],
+            [
+              328,
+              1,
+              0.001615
+            ],
+            [
+              327,
+              1,
+              0.0016070000000000001
+            ],
+            [
+              360,
+              1,
+              0.0003890000000000001
+            ],
+            [
+              355,
+              1,
+              0.00030300000000000005
+            ]
+          ]
+        },
+        {
+          "name": "solveHardCbfClf>localDirection",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m",
+          "calls": 1,
+          "totalSeconds": 0.008037,
+          "selfSeconds": 0.005005000000000001,
+          "hottestLines": [
+            [
+              659,
+              1,
+              0.0013260000000000001
+            ],
+            [
+              623,
+              1,
+              0.00129
+            ],
+            [
+              640,
+              1,
+              0.000912
+            ],
+            [
+              655,
+              1,
+              0.000366
+            ],
+            [
+              644,
+              1,
+              0.000313
+            ]
+          ]
+        },
+        {
+          "name": "solveHardCbfClf>solveHardCbfClf.rectangleSupports",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m",
+          "calls": 19,
+          "totalSeconds": 0.004744000000000001,
+          "selfSeconds": 0.004744000000000001,
+          "hottestLines": [
+            [
+              248,
+              19,
+              0.002258
+            ],
+            [
+              250,
+              19,
+              0.001383
+            ],
+            [
+              251,
+              19,
+              0.00014900000000000002
+            ],
+            [
+              246,
+              19,
+              9.400000000000001e-05
+            ],
+            [
+              252,
+              19,
+              4.1e-05
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.supportNormals",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.007265,
+          "selfSeconds": 0.004435999999999999,
+          "hottestLines": [
+            [
+              428,
+              1,
+              0.001889
+            ],
+            [
+              431,
+              1,
+              0.001047
+            ],
+            [
+              441,
+              96,
+              0.0006720000000000001
+            ],
+            [
+              437,
+              96,
+              0.00037600000000000003
+            ],
+            [
+              416,
+              1,
+              0.000231
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>localJointRecord",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 97,
+          "totalSeconds": 0.004619,
+          "selfSeconds": 0.004357,
+          "hottestLines": [
+            [
+              659,
+              97,
+              0.0008830000000000001
+            ],
+            [
+              643,
+              97,
+              0.000501
+            ],
+            [
+              670,
+              97,
+              0.00039
+            ],
+            [
+              645,
+              97,
+              0.00038700000000000003
+            ],
+            [
+              652,
+              97,
+              0.000331
+            ]
+          ]
+        },
+        {
+          "name": "hardEncounterBarrier>hardEncounterBarrier.prepare",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m",
+          "calls": 1,
+          "totalSeconds": 0.020123000000000002,
+          "selfSeconds": 0.004275000000000001,
+          "hottestLines": [
+            [
+              161,
+              1,
+              0.006855999999999999
+            ],
+            [
+              118,
+              1,
+              0.005635
+            ],
+            [
+              77,
+              1,
+              0.003313
+            ],
+            [
+              83,
+              1,
+              0.000909
+            ],
+            [
+              177,
+              1,
+              0.000333
+            ]
+          ]
+        },
+        {
+          "name": "targetPrediction>targetPrediction.finiteFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/targetPrediction.m",
+          "calls": 5,
+          "totalSeconds": 0.0042439999999999995,
+          "selfSeconds": 0.0042439999999999995,
+          "hottestLines": [
+            [
+              141,
+              4,
+              0.000504
+            ],
+            [
+              149,
+              4,
+              0.000492
+            ],
+            [
+              150,
+              4,
+              0.00046000000000000007
+            ],
+            [
+              151,
+              4,
+              0.00041600000000000003
+            ],
+            [
+              143,
+              4,
+              0.000415
+            ]
+          ]
+        },
+        {
+          "name": "laneGeometry>laneGeometry.sweptCellFrames",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.004828,
+          "selfSeconds": 0.003731,
+          "hottestLines": [
+            [
+              49,
+              1,
+              0.0013130000000000001
+            ],
+            [
+              44,
+              96,
+              0.000436
+            ],
+            [
+              35,
+              96,
+              0.000351
+            ],
+            [
+              41,
+              96,
+              0.000317
+            ],
+            [
+              42,
+              96,
+              0.00023900000000000004
+            ]
+          ]
+        },
+        {
+          "name": "collisionAvoidanceController>localCommand",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "calls": 1,
+          "totalSeconds": 0.009673000000000001,
+          "selfSeconds": 0.003557000000000001,
+          "hottestLines": [
+            [
+              262,
+              1,
+              0.005989
+            ],
+            [
+              265,
+              1,
+              0.0007250000000000001
+            ],
+            [
+              266,
+              1,
+              0.000628
+            ],
+            [
+              252,
+              1,
+              0.000272
+            ],
+            [
+              270,
+              1,
+              0.00022900000000000004
+            ]
+          ]
+        },
+        {
+          "name": "hardEncounterBarrier>localEncounterProposal",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m",
+          "calls": 1,
+          "totalSeconds": 0.006613,
+          "selfSeconds": 0.003117,
+          "hottestLines": [
+            [
+              795,
+              1,
+              0.00199
+            ],
+            [
+              781,
+              1,
+              0.0018769999999999998
+            ],
+            [
+              789,
+              1,
+              0.000499
+            ],
+            [
+              783,
+              1,
+              0.00034800000000000006
+            ],
+            [
+              797,
+              1,
+              0.000266
+            ]
+          ]
+        },
+        {
+          "name": "targetPrediction>targetPrediction.rectangleSupport",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/targetPrediction.m",
+          "calls": 974,
+          "totalSeconds": 0.002958,
+          "selfSeconds": 0.002958,
+          "hottestLines": [
+            [
+              247,
+              3896,
+              0.001136
+            ],
+            [
+              245,
+              974,
+              0.000657
+            ],
+            [
+              248,
+              3896,
+              0.000255
+            ],
+            [
+              246,
+              3896,
+              9.400000000000001e-05
+            ],
+            [
+              249,
+              974,
+              7.6e-05
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "circular-crossing-longest",
+      "instrumentedMs": 310.554,
+      "hotFunctions": [
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.build",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.022224999999999998,
+          "selfSeconds": 0.016869,
+          "hottestLines": [
+            [
+              179,
+              1,
+              0.002275
+            ],
+            [
+              79,
+              1,
+              0.0015810000000000002
+            ],
+            [
+              204,
+              96,
+              0.0012320000000000002
+            ],
+            [
+              212,
+              1,
+              0.000999
+            ],
+            [
+              138,
+              1,
+              0.0008080000000000001
+            ]
+          ]
+        },
+        {
+          "name": "solveAvoidanceSocpMex",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/clarabel/matlab/solveAvoidanceSocpMex.mexa64",
+          "calls": 1,
+          "totalSeconds": 0.015492000000000002,
+          "selfSeconds": 0.015492000000000002,
+          "hottestLines": []
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.finitePredict",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 1,
+          "totalSeconds": 0.01761,
+          "selfSeconds": 0.014906,
+          "hottestLines": [
+            [
+              613,
+              96,
+              0.0014910000000000001
+            ],
+            [
+              430,
+              1,
+              0.0013380000000000002
+            ],
+            [
+              606,
+              96,
+              0.00098
+            ],
+            [
+              429,
+              1,
+              0.0008020000000000001
+            ],
+            [
+              425,
+              1,
+              0.0007320000000000001
+            ]
+          ]
+        },
+        {
+          "name": "formulateAvoidanceProblem>localFormulate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m",
+          "calls": 1,
+          "totalSeconds": 0.10333200000000001,
+          "selfSeconds": 0.014477999999999991,
+          "hottestLines": [
+            [
+              107,
+              1,
+              0.022513000000000002
+            ],
+            [
+              95,
+              1,
+              0.01887
+            ],
+            [
+              240,
+              1,
+              0.0177
+            ],
+            [
+              109,
+              1,
+              0.011972000000000002
+            ],
+            [
+              98,
+              1,
+              0.00883
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceStageQp>localJointConic",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceStageQp.m",
+          "calls": 1,
+          "totalSeconds": 0.045528000000000006,
+          "selfSeconds": 0.013987000000000006,
+          "hottestLines": [
+            [
+              103,
+              1,
+              0.016093000000000003
+            ],
+            [
+              153,
+              39,
+              0.004633
+            ],
+            [
+              106,
+              1,
+              0.004229
+            ],
+            [
+              107,
+              1,
+              0.001708
+            ],
+            [
+              156,
+              39,
+              0.0016730000000000002
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.jointProgram",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.017319000000000005,
+          "selfSeconds": 0.012668000000000004,
+          "hottestLines": [
+            [
+              241,
+              96,
+              0.004828
+            ],
+            [
+              292,
+              768,
+              0.0011170000000000002
+            ],
+            [
+              242,
+              96,
+              0.0005279999999999999
+            ],
+            [
+              237,
+              96,
+              0.000454
+            ],
+            [
+              259,
+              1,
+              0.00045200000000000004
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceStageQp>avoidanceStageQp.build",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceStageQp.m",
+          "calls": 1,
+          "totalSeconds": 0.015955,
+          "selfSeconds": 0.012203,
+          "hottestLines": [
+            [
+              87,
+              1,
+              0.003138
+            ],
+            [
+              21,
+              1,
+              0.0009580000000000001
+            ],
+            [
+              76,
+              96,
+              0.000614
+            ],
+            [
+              55,
+              96,
+              0.00038300000000000004
+            ],
+            [
+              62,
+              1,
+              0.000369
+            ]
+          ]
+        },
+        {
+          "name": "solveHardCbfClf>solveHardCbfClf.admitSection",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m",
+          "calls": 1,
+          "totalSeconds": 0.037905,
+          "selfSeconds": 0.011532,
+          "hottestLines": [
+            [
+              87,
+              1,
+              0.008045000000000002
+            ],
+            [
+              153,
+              1,
+              0.0073
+            ],
+            [
+              132,
+              16,
+              0.004044000000000001
+            ],
+            [
+              141,
+              16,
+              0.002007
+            ],
+            [
+              130,
+              16,
+              0.0017770000000000002
+            ]
+          ]
+        },
+        {
+          "name": "collisionAvoidanceController",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "calls": 1,
+          "totalSeconds": 0.31008600000000003,
+          "selfSeconds": 0.008337000000000039,
+          "hottestLines": [
+            [
+              55,
+              1,
+              0.23075600000000004
+            ],
+            [
+              42,
+              1,
+              0.025632
+            ],
+            [
+              30,
+              1,
+              0.023805000000000003
+            ],
+            [
+              79,
+              1,
+              0.009651999999999999
+            ],
+            [
+              31,
+              1,
+              0.0060620000000000005
+            ]
+          ]
+        },
+        {
+          "name": "solveHardCbfClf>solveHardCbfClf.rectangleSupports",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m",
+          "calls": 34,
+          "totalSeconds": 0.007653000000000001,
+          "selfSeconds": 0.007653000000000001,
+          "hottestLines": [
+            [
+              248,
+              34,
+              0.0038270000000000005
+            ],
+            [
+              250,
+              34,
+              0.0024500000000000004
+            ],
+            [
+              251,
+              34,
+              0.000249
+            ],
+            [
+              246,
+              34,
+              0.00021100000000000003
+            ],
+            [
+              252,
+              34,
+              6.7e-05
+            ]
+          ]
+        },
+        {
+          "name": "laneGeometry>laneGeometry.localPoseFrames",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 2,
+          "totalSeconds": 0.008516000000000001,
+          "selfSeconds": 0.006901000000000001,
+          "hottestLines": [
+            [
+              103,
+              2,
+              0.0012120000000000002
+            ],
+            [
+              133,
+              97,
+              0.0008770000000000001
+            ],
+            [
+              104,
+              2,
+              0.000875
+            ],
+            [
+              108,
+              2,
+              0.000818
+            ],
+            [
+              116,
+              97,
+              0.0007880000000000002
+            ]
+          ]
+        },
+        {
+          "name": "hardEncounterBarrier>hardEncounterBarrier.completionRows",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m",
+          "calls": 1,
+          "totalSeconds": 0.011674000000000002,
+          "selfSeconds": 0.005985000000000002,
+          "hottestLines": [
+            [
+              369,
+              1,
+              0.002991
+            ],
+            [
+              328,
+              1,
+              0.0015820000000000003
+            ],
+            [
+              327,
+              1,
+              0.0013700000000000001
+            ],
+            [
+              360,
+              1,
+              0.000427
+            ],
+            [
+              355,
+              1,
+              0.00031400000000000004
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.certifyJoint",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 3,
+          "totalSeconds": 0.013465000000000001,
+          "selfSeconds": 0.005930000000000002,
+          "hottestLines": [
+            [
+              371,
+              3,
+              0.005731
+            ],
+            [
+              372,
+              3,
+              0.0022440000000000003
+            ],
+            [
+              391,
+              192,
+              0.0014020000000000003
+            ],
+            [
+              381,
+              194,
+              0.000613
+            ],
+            [
+              392,
+              192,
+              0.000397
+            ]
+          ]
+        },
+        {
+          "name": "hardEncounterBarrier>hardEncounterBarrier.prepare",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m",
+          "calls": 1,
+          "totalSeconds": 0.025265000000000003,
+          "selfSeconds": 0.005186,
+          "hottestLines": [
+            [
+              118,
+              1,
+              0.008891
+            ],
+            [
+              161,
+              1,
+              0.007832000000000002
+            ],
+            [
+              77,
+              1,
+              0.0033600000000000006
+            ],
+            [
+              83,
+              1,
+              0.0008740000000000001
+            ],
+            [
+              177,
+              1,
+              0.000364
+            ]
+          ]
+        },
+        {
+          "name": "solveHardCbfClf>localDirection",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m",
+          "calls": 1,
+          "totalSeconds": 0.007821999999999999,
+          "selfSeconds": 0.004892999999999999,
+          "hottestLines": [
+            [
+              659,
+              1,
+              0.001304
+            ],
+            [
+              623,
+              1,
+              0.0012030000000000003
+            ],
+            [
+              640,
+              1,
+              0.0008990000000000001
+            ],
+            [
+              655,
+              1,
+              0.000382
+            ],
+            [
+              652,
+              1,
+              0.000291
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>avoidanceSafetyGeometry.supportNormals",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.006355,
+          "selfSeconds": 0.004455000000000001,
+          "hottestLines": [
+            [
+              431,
+              1,
+              0.0010680000000000002
+            ],
+            [
+              428,
+              1,
+              0.000903
+            ],
+            [
+              441,
+              96,
+              0.000698
+            ],
+            [
+              437,
+              96,
+              0.00038899999999999997
+            ],
+            [
+              433,
+              1,
+              0.00026900000000000003
+            ]
+          ]
+        },
+        {
+          "name": "targetPrediction>targetPrediction.finiteFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/targetPrediction.m",
+          "calls": 5,
+          "totalSeconds": 0.004299,
+          "selfSeconds": 0.004299,
+          "hottestLines": [
+            [
+              141,
+              4,
+              0.0005610000000000001
+            ],
+            [
+              150,
+              4,
+              0.00047400000000000003
+            ],
+            [
+              137,
+              5,
+              0.00043100000000000007
+            ],
+            [
+              138,
+              5,
+              0.00041900000000000005
+            ],
+            [
+              149,
+              4,
+              0.00041700000000000005
+            ]
+          ]
+        },
+        {
+          "name": "avoidanceSafetyGeometry>localJointRecord",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m",
+          "calls": 97,
+          "totalSeconds": 0.004322,
+          "selfSeconds": 0.004086,
+          "hottestLines": [
+            [
+              659,
+              97,
+              0.0008640000000000001
+            ],
+            [
+              643,
+              97,
+              0.000465
+            ],
+            [
+              645,
+              97,
+              0.000378
+            ],
+            [
+              654,
+              97,
+              0.00025800000000000004
+            ],
+            [
+              652,
+              97,
+              0.000232
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "artifactsSha256": {
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0-crossing/crossing-exact-state.json": "0761f4bdf2fb77b23dd73bc8d4cef8409b52135135522bf0d691c9d9d48c995b",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0-oncoming/oncoming-exact-state.json": "4d2cb25786ec742fed4520c3530532ddc526bb959f259bf6da22b5f5ae078208",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0-stationary/stationary-exact-state.json": "0d4e2e81bd4438676f147fcf5f22890041c4bb0138db5654f41b6c4e28bb3d73",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0.01-crossing/crossing-exact-state.json": "c005af34ff3229bffeec69dbb2c1a5196506abd77821dffe4054b51a05b4ab49",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0.01-oncoming/oncoming-exact-state.json": "04ddc761363df509a4ee676c1a990e0d15ed0f5a433bb9353a48f2b023fe0ba5",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-1-kappa-0.01-stationary/stationary-exact-state.json": "0a5bbe5f69826350624d3b2e762b977ead4b08cc8c327b25ab13bba0ffa0539f",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0-crossing/crossing-exact-state.json": "e65424edca7d7cdbd97532d73e905f20ce0128ed62bfd38b0155e1774bec2852",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0-oncoming/oncoming-exact-state.json": "7f1fcab1222cf92d3de9f3b596107eebf4e270401d1c0fa8eb6f2ac27cca25a5",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0-stationary/stationary-exact-state.json": "4046ad5eff42c16a4c3714257ad91dc824c3976831b9ddce69f16fa79af2d057",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0.01-crossing/crossing-exact-state.json": "f5b79d84fb4a54c405066a703c8095321f5bf1acac39b03e1b61a69e9b54deb1",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0.01-oncoming/oncoming-exact-state.json": "2306797b9b95ca1f0dba0baa22d5ed90e27c3cdd114b339d036a875edc2ae730",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/diagnostic/repeat-2-kappa-0.01-stationary/stationary-exact-state.json": "94a92b9ea954a4ffdb094880079c3ae76329b3820ca7ca24eabd628bf4a1b262",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/warmup-1/crossing-exact-state.json": "ee8ca113f9ef76e0515e51e6c144dd506783f324ad5dd8abd9c3dedcfda17231",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/warmup-2/crossing-exact-state.json": "44759c2de3c79363147c8a94645428ce5cfbc04733f3b5c710999760ffc487da",
+    "/home/zai/.cache/collisionAvoidance/circular-crossing-repair-20260921/campaign/warmup-3/crossing-exact-state.json": "d85c0878c58a825826b06d2121b420bcad21a780a38ce13e1f8d20e4712dcf03",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/replay.json": "85651d43bcbe373a5455c52e4e1727918268a77be543a951ddada5f182e4380b",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/probes.json": "c8f524914acc4292cbf86c095984e92725aff9b0205d95747eeacf84cc3041c6",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/profile.json": "131ac82777a23945e56f1b1ca36fac95f9b2c687c20a850c64b39400dfa2ba4b",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/instrumentation-manifest.json": "b6a890579b0b707da6a7d1e4ec0b69586a58c940246eb56d219df9c286eef64f",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/measured-longest-fixture.mat": "1bd96dcca3256e4eb8b5f611d5abf9d5e5c8ea8bd4c0aee198489be6d0a79268",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/circular-crossing-longest-fixture.mat": "81ede6152888a4937895379863014eb6a8fb9ffc7e192fafca6e2412ce10e80d",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/measured-longest-profile.mat": "d93fb9f6137f7778400eebca05c6ba71cece5c139391d56682a42a7c2d52ebe4",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/circular-crossing-longest-profile.mat": "c0a77d645a3b38e43abea826155d938a2ce4259d9ae41a5ee2e6c639b189402c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m": "6f39fa5d0504048e0a1747813bbc8b361da3f75008ee88988f743c98c5a7b57e",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/readPlanningInputs.m": "b605f3343436153da4fd8161606ffc162e30630306213b24d88b5c3e3427bc61",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m": "8139ddb13ae15dc8326c9e27d4cc40e9ead49f6155c2c1695320a10d578487f7",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m": "34733f20f813de7a45856e295a711a7367b49a2b2b565928a86ff2b927f45f02",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m": "fb496561840d9fef1b0cba3cf460dab0189eeee3ae65198c4938ebd9f54859d5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m": "07bb016f1be0cca0009e25c9f797f5a9f237c527b0240b295732365ce2646483",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m": "949248b837a844a165b0a07d462ff0e3e6ec4254681968f9a2c2fe5c7e3f4b00",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceStageQp.m": "de76dde95db7de6b6c3a5806bb4e9c4c942e3dcd12abcd6774e5be37043ab351",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m": "04bd4c76ccc9d292a9853a08c2683c7f653037a9c7ac2ac6cb828380021ecf4f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/bicycleNominalKernelMex.mexa64": "5ab54290e5f975a59d68df4e164b3e6a578ec55fc5f9cf57535473b963a7bfba",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/bicycleLinearizationKernelMex.mexa64": "c9066e15c2fec9bc9186b76237fddf701e202bfaf6c637708bc3a55127e73f06",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/avoidanceCellRowsKernelMex.mexa64": "df01c4de0743b839751b2909f11a03c0be8f153139bdea183ab33e990f8d858b",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/avoidanceProjectedRowsKernelMex.mexa64": "711c5ff70ffcaef3c0a27061192c81f70a5e3ca548ab122709f123e09c8b7593",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/bicycleHeldIntervalKernelMex.mexa64": "65355c29b3526576537bae5305b8195a44bda61aa106f280afaa5bed0a96920b",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/avoidanceNominalCheckKernelMex.mexa64": "af91772ccd154d2bd9a6d67d51db6f75bd6255f4a087dde9ba733eaa7fbdcb24",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/avoidanceSupportKernelMex.mexa64": "a77a5619dd608b0afcf2a2676853ac47aef7776da06e589dd960c844303844a5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/clarabel/matlab/solveAvoidanceSocpMex.mexa64": "30f2cca72ef8622733f6bfd32f6567be0dafede7a6dfe94d050ca33c23344e5a",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/config/collisionAvoidanceControllerConfig.m": "9a797c79e85f8c7b54bca9ee117ef95bf8cc40d769c171a43d5275a729835a8d",
+    "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260921/code-analysis.json": "012bf08ea59f20b21519b03ed504fde6a6544994b3667f663074a51176f0a723",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/profileMatlabControllerRuntime.m": "4ad20328342d113c7c54914205fb1dcbc4ce933b9ae18c4bb38bb451bc210cd5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/buildMatlabControllerProbes.py": "61e50af4f56c265be4651ade7bbdd9ac7c8825c40dc6632dcd24cda137ef5f77",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/analyzeLongestControllerFrames.py": "783f3cf11f2b684ed83b736c0d777fa440a1db66ebbea0067403e7c7884802bd",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/analyzeMatlabControllerProfile.py": "508fbf82b2be70714ce1603c56eacf4079844be8100580fed792915d2d8131ef"
+  },
+  "verification": {
+    "fixtureCount": 2,
+    "cleanMeasuredCalls": 22,
+    "probeMeasuredCalls": 22,
+    "lineProfiledCalls": 2,
+    "completeReplayDecisionsUnchanged": true,
+    "productionSourcesMatchManifest": true,
+    "probePartitionsAreDisjointAndSumToRepresentativeTotal": true
+  }
+}
