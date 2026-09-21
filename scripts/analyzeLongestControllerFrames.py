@@ -21,7 +21,7 @@ PARTITION = [
     'hardEncounterBarrier.prepare',
     'formulateAvoidanceProblem.formulateAvoidanceProblem',
     'solveHardCbfClf.admitSection',
-    'avoidanceStageQp.joint',
+    'avoidanceStageQp.fixedDirections',
     'solveHardCbfClf.localDefaultSolve',
     'solveHardCbfClf.certify',
     'collisionAvoidanceController.outputAssembly',

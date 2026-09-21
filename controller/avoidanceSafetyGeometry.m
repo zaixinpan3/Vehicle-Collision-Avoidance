@@ -327,24 +327,18 @@ classdef avoidanceSafetyGeometry
                 -normal.'*(record.positionOffset+record.positionMap*state);
         end
 
-        function value = jointMajorant(record,state0,angle0,state,coordinate,positionScale)
-        % Global convex bound on sqrt(1+coordinate^2) times the unit residual.
-        % The physical angle is angle0+atan(coordinate); the coordinate itself
-        % is not an angle. Position scale selects a bound, not a step domain.
-            dr=record.positionMap*(state-state0);
-            r=record.positionOffset+record.positionMap*state0;
+        function value = fixedDirectionMajorant(record,state0,angle,state)
+        % Global touching convex bound with a fixed separation direction.
             dyaw=record.yawRow*(state-state0);yaw=record.yawOffset+record.yawRow*state0;
-            n=[cos(angle0);sin(angle0)];t=[-n(2);n(1)];
-            egoAngle=angle0-yaw;targetAngle=angle0-record.targetYaw;
-            ae=[cos(egoAngle);sin(egoAngle)]+[-sin(egoAngle);cos(egoAngle)]*(coordinate-dyaw);
-            ao=[cos(targetAngle);sin(targetAngle)]+[-sin(targetAngle);cos(targetAngle)]*coordinate;
-            eta=1/positionScale;
-            value=(record.clearance+record.positionBall)*hypot(1,coordinate) ...
+            n=[cos(angle);sin(angle)];
+            egoAngle=angle-yaw;targetAngle=angle-record.targetYaw;
+            ae=[cos(egoAngle);sin(egoAngle)]-[-sin(egoAngle);cos(egoAngle)]*dyaw;
+            ao=[cos(targetAngle);sin(targetAngle)];
+            value=record.clearance+record.positionBall ...
                 +avoidanceSafetyGeometry.supportValue(record.egoHalfSize,record.egoYawRadius,ae) ...
                 +avoidanceSafetyGeometry.supportValue(record.targetHalfSize,record.targetYawRadius,ao) ...
-                +sum(abs(record.generators.'*(n+t*coordinate)))-n.'*(r+dr)-t.'*r*coordinate ...
-                +.5*norm(record.egoHalfSize)*(coordinate^2+2*dyaw^2) ...
-                +.25*(sqrt(eta)*(t.'*dr)-coordinate/sqrt(eta))^2;
+                +sum(abs(record.generators.'*n))-n.'*(record.positionOffset+record.positionMap*state) ...
+                +.5*norm(record.egoHalfSize)*dyaw^2;
         end
 
         function value = supportValue(halfSize,yawRadius,vector)

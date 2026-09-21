@@ -80,9 +80,9 @@ def main():
         result['replays'].append(entry)
     coarse = json.loads((raw / 'probes.json').read_text())
     # These regions are disjoint in the current measured call graph. Parent
-    # timers such as localJointSearch are retained separately, never summed.
+    # timers such as localFixedDirectionSearch are retained separately, never summed.
     partition = ['formulateAvoidanceProblem.formulateAvoidanceProblem',
-                 'avoidanceStageQp.joint', 'solveHardCbfClf.localDefaultSolve',
+                 'avoidanceStageQp.fixedDirections', 'solveHardCbfClf.localDefaultSolve',
                  'solveHardCbfClf.admitSection', 'solveHardCbfClf.certify']
     for item in coarse['fixtures']:
         selected = sorted(item['samples'], key=lambda x: x['seconds'])[len(item['samples']) // 2]
@@ -113,7 +113,7 @@ def main():
     for item in profile['fixtures']:
         functions = item['functions']
         selected = [compact_function(x) for x in sorted(functions, key=lambda x: x['selfSeconds'], reverse=True)[:18]]
-        support = [compact_function(x) for x in functions if x['name'].startswith('avoidanceStageQp>localJointConic')]
+        support = [compact_function(x) for x in functions if x['name'].startswith('avoidanceStageQp>localFixedDirectionConic')]
         result['profiles'].append({'definition': item['definition'], 'seconds': item['sample']['seconds'],
                                    'largestSelfTimes': selected, 'jointConstructionFunctions': support})
     instrumented = json.loads((raw / 'instrumentation-manifest.json').read_text())

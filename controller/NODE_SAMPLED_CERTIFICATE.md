@@ -44,8 +44,8 @@ its box,
    finite-exit support certificate,
 
 together with the actuator amplitude and slew rows on the held inputs and the
-soft first-hold CLF cone. The current joint formulation also optimizes each
-certificate's unit direction. Under unchanged contracts, the shifted plan
+soft first-hold CLF cone. The current formulation fixes each certificate's
+unit direction before optimizing the complete trajectory. Under unchanged contracts, the shifted plan
 and its retained directions certify nodes `2, ..., N`; touching majorants
 contain that complete witness in the next optimization. The active horizon
 shrinks toward the fixed exit deadline. After confirmed release, terminal
@@ -90,9 +90,10 @@ nodes only.
 - `formulateAvoidanceProblem.localShift` reconstructs the node clock as
   `stage*h` when the executed hold is eliminated.
 - `avoidanceSafetyGeometry.jointProgram` uses those node enclosures to build
-  collision and exit records with angular decisions. `avoidanceStageQp.joint`
-  constructs their support majorants. Admission may require several conic
-  solves; a certified active successor needs only one hard improvement.
+  collision and exit records. `avoidanceStageQp.fixedDirections` constructs
+  their fixed-direction support majorants. Every successful fresh admission
+  requires one full trajectory solve; an active successor attempts one hard
+  improvement using retained directions. Scalar initializers are not issued.
 - `stateUncertainty.heldInterval` and `ltvBicycleModel.fixedPredict` remain
   for the scheduled terminal-family synthesis (whose whole-hold phase
   condition is stronger than the node condition and therefore still valid)

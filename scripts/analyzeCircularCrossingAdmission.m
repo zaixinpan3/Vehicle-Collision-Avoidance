@@ -52,7 +52,7 @@ function summary = analyzeCircularCrossingAdmission(outputDirectory)
     identity = struct('configuration',rmfield(cfg,'solver'),'lane',lane,'road',parsedRoad,'accelerationBias',0);
     model = hardEncounterBarrier.prepare(model,ego,observations,[],identity);
     [program,prediction,clf] = formulateAvoidanceProblem(model);
-    [~,result,search] = solveHardCbfClf.joint(program,model,cfg);
+    [~,result,search] = solveHardCbfClf.fixedDirections(program,model,cfg);
     assert(~result.feasible && search.section.status=="collisionExcluded");
     % Expose local computations through a renamed disposable copy. The
     % production class is neither edited nor shadowed by the diagnostic class.

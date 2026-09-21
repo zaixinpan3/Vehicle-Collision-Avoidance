@@ -19,7 +19,7 @@ function summary=runStandaloneKernelClosedLoop(mexDirectory,outputDirectory,opti
         for index=1:numel(files),copyfile(fullfile(files(index).folder,files(index).name),destination);end
     end
     file=fullfile(source,'controller','solveHardCbfClf.m');code=fileread(file);
-    needle='            [program,result,search]=localJointSearch(program,model,cfg);';
+    needle='            [program,result,search]=localFixedDirectionSearch(program,model,cfg);';
     assert(contains(code,needle),'The native integration point changed.');
     code=strrep(code,needle,'            [program,result,search]=standaloneControllerBenchmark.nativeJoint(program,model,cfg);');
     fid=fopen(file,'w');assert(fid>=0);fprintf(fid,'%s',code);fclose(fid);

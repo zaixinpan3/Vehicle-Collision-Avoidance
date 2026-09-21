@@ -1,7 +1,7 @@
 function [program,prediction,clf] = formulateAvoidanceProblem(model)
 %formulateAvoidanceProblem Common convex base and separation certificates.
-% Retain inherited occupied sets and directions, and delegate joint trajectory
-% and support-angle convexification to the solver.
+% Retain inherited occupied sets and directions, and delegate complete
+% trajectory optimization with fixed-direction support bounds to the solver.
     carry=model.carriedWitness;
     if isempty(carry)
         [program,prediction,clf]=localFormulate(model);

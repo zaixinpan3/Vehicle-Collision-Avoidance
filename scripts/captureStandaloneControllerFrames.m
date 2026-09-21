@@ -18,7 +18,7 @@ function summary=captureStandaloneControllerFrames(directory,options)
         for index=1:numel(files),copyfile(fullfile(files(index).folder,files(index).name),destination);end
     end
     file=fullfile(source,'controller','solveHardCbfClf.m');code=fileread(file);
-    needle='            [program,result,search]=localJointSearch(program,model,cfg);';
+    needle='            [program,result,search]=localFixedDirectionSearch(program,model,cfg);';
     assert(contains(code,needle),'The capture insertion point changed.');
     code=strrep(code,needle,['            standaloneControllerBenchmark.capture(program,cfg);',newline,needle]);
     fid=fopen(file,'w');assert(fid>=0);fprintf(fid,'%s',code);fclose(fid);

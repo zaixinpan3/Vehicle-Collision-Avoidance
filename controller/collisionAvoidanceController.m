@@ -6,12 +6,11 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % plant, not between nodes (NODE_SAMPLED_CERTIFICATE.md).
 % Store the accepted prediction and terminal witness for next-frame transfer.
 % The terminal law is a mathematical continuation, never a runtime fallback.
-% Fresh admission searches one signed section, tapered on curved predictions,
-% with a coarser certificate dictionary. It may then release
-% the complete control sequence in one hard solve. Subsequent frames improve
-% the complete verified continuation.
-% Inherited joint-support optimization retains verified incumbents when an
-% improvement is unavailable. Scalar candidates require independent checking.
+% Fresh admission uses a signed section only to initialize separation normals.
+% Fix those normals and optimize the complete input sequence in one hard SOCP.
+% Never issue an initializer, even if it already passes the physical verifier.
+% Subsequent frames optimize with the inherited normals fixed; a failed
+% improvement can retain only the previously optimized, verified continuation.
     persistent lastState
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -150,7 +149,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
         end
     end
     data = hardEncounterBarrier.carriedData(prediction,program,prediction.stageCount);
-    controllerState = struct('version',40, ...
+    controllerState = struct('version',41, ...
         'appliedInput',firstInput,'stateTime',model.stateTime, ...
         'identity',identity,'plan',predictedInput,'decision',result.decision, ...
         'predictedState',states,'stateErrorBound',prediction.initialErrorBound, ...
@@ -305,7 +304,7 @@ function [program,prediction,clf,result,search]=localSolve(model,cfg)
     [program,prediction,clf]=formulateAvoidanceProblem(model);
     formulationSeconds=toc(phase);
     if isfield(program,'jointCertificate')
-        [program,result,search]=solveHardCbfClf.joint(program,model,cfg);
+        [program,result,search]=solveHardCbfClf.fixedDirections(program,model,cfg);
         prediction=program.prediction;
         search.formulationSeconds=search.formulationSeconds+formulationSeconds;
         return;

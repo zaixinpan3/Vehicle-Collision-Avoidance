@@ -1,0 +1,1246 @@
+{
+  "scope": "Fixed directions followed by complete hard-constrained trajectory optimization; warmup excluded",
+  "analysisParentCommit": "8c67a7b4d73576b63a4ebcbafbc2edbe9e4076e7",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "replay": [
+    {
+      "fixture": "measured-longest",
+      "timing": {
+        "calls": 22,
+        "medianMs": 42.2365,
+        "maximumMs": 51.142,
+        "over50Ms": 1
+      },
+      "variables": 1057,
+      "constraints": 1751,
+      "controlLineDepartureNorm": 0.6446505357431954,
+      "fixedAnglesMaximumError": 0,
+      "seedObjective": 12.460243253361012,
+      "optimizedObjective": 9.473595519022675,
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.6975,
+        "formulationSeconds": 27.807499999999997,
+        "solveSeconds": 7.575
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 2.144,
+        "formulationSeconds": 34.08,
+        "solveSeconds": 7.707999999999999,
+        "remainingSeconds": 7.210000000000001
+      },
+      "nativeSolveCounts": [
+        1
+      ],
+      "horizonSteps": [
+        96
+      ]
+    },
+    {
+      "fixture": "circular-crossing-longest",
+      "timing": {
+        "calls": 22,
+        "medianMs": 46.9885,
+        "maximumMs": 55.598,
+        "over50Ms": 2
+      },
+      "variables": 874,
+      "constraints": 1845,
+      "controlLineDepartureNorm": 1.1800344280076258,
+      "fixedAnglesMaximumError": 0,
+      "seedObjective": -36.378482222499514,
+      "optimizedObjective": -43.94242452915603,
+      "phaseMediansMs": {
+        "inputPreparationSeconds": 0.8270000000000001,
+        "formulationSeconds": 28.776,
+        "solveSeconds": 10.7445
+      },
+      "maximumFramePartitionMs": {
+        "inputPreparationSeconds": 0.905,
+        "formulationSeconds": 34.352000000000004,
+        "solveSeconds": 11.710999999999999,
+        "remainingSeconds": 8.629999999999999
+      },
+      "nativeSolveCounts": [
+        1
+      ],
+      "horizonSteps": [
+        96
+      ]
+    }
+  ],
+  "campaign": {
+    "diagnostic": {
+      "trials": [
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.009896999285510738,
+          "allCertified": true,
+          "firstFrameSeconds": 0.043968,
+          "maximumSeconds": 0.043968,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.010275315761438064,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.05057632074616125,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.1625000000000005,
+            "maximumMs": 43.968,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.009896999285510738,
+          "allCertified": true,
+          "firstFrameSeconds": 0.045719,
+          "maximumSeconds": 0.045719,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.010275315761438064,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.05057632074616125,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.05,
+            "maximumMs": 45.719,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.4803162791091508,
+          "allCertified": true,
+          "firstFrameSeconds": 0.010441,
+          "maximumSeconds": 0.028783,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.4811692990361282,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1902828930156547,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.98,
+            "maximumMs": 28.783,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.4803162791091508,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009469,
+          "maximumSeconds": 0.028852,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.4811692990361282,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1902828930156547,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.988,
+            "maximumMs": 28.852,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.015299,
+          "maximumSeconds": 0.015299,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.3998552730692049,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.972499999999999,
+            "maximumMs": 15.299,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.019839,
+          "maximumSeconds": 0.019839,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.3998552730692049,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.9895000000000005,
+            "maximumMs": 19.839,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.18556047107843315,
+          "allCertified": true,
+          "firstFrameSeconds": 0.048219,
+          "maximumSeconds": 0.048219,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.23977566882855156,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.02563329073363496,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.175,
+            "maximumMs": 48.219,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.18556047107843315,
+          "allCertified": true,
+          "firstFrameSeconds": 0.048456,
+          "maximumSeconds": 0.048456,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.23977566882855156,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.02563329073363496,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.181,
+            "maximumMs": 48.455999999999996,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.22918429869206988,
+          "allCertified": true,
+          "firstFrameSeconds": 0.008657,
+          "maximumSeconds": 0.030386,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.2365250093479008,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11176827200912465,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.1495,
+            "maximumMs": 30.386,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.22918429869206988,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009403,
+          "maximumSeconds": 0.030693,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.2365250093479008,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11176827200912465,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.106999999999999,
+            "maximumMs": 30.693,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.32411019261694285,
+          "allCertified": true,
+          "firstFrameSeconds": 0.048026,
+          "maximumSeconds": 0.048026,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.37990043350352243,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11386048167434693,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.1485,
+            "maximumMs": 48.025999999999996,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 30,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.32411019261694285,
+          "allCertified": true,
+          "firstFrameSeconds": 0.049198,
+          "maximumSeconds": 0.049198,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "diagnostic",
+          "minimumNodeBodyGap": 0.37990043350352243,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11386048167434693,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.128,
+            "maximumMs": 49.198,
+            "over50Ms": 0
+          }
+        }
+      ],
+      "timing": {
+        "all": {
+          "calls": 7200,
+          "medianMs": 7.101999999999999,
+          "maximumMs": 49.198,
+          "over50Ms": 0
+        },
+        "admission": {
+          "calls": 12,
+          "medianMs": 37.3305,
+          "maximumMs": 49.198,
+          "over50Ms": 0
+        },
+        "continuation": {
+          "calls": 694,
+          "medianMs": 12.13,
+          "maximumMs": 28.575,
+          "over50Ms": 0
+        },
+        "cruise": {
+          "calls": 6494,
+          "medianMs": 7.0920000000000005,
+          "maximumMs": 14.295,
+          "over50Ms": 0
+        }
+      },
+      "maximumFrame": {
+        "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.json",
+        "frame": 1,
+        "seconds": 0.049198,
+        "kind": "admission",
+        "phase": {
+          "inputPreparationSeconds": 0.001876,
+          "formulationSeconds": 0.029849,
+          "solveSeconds": 0.01088
+        }
+      },
+      "retainedOptimizedIncumbents": 0,
+      "rejectedAttempts": 0
+    },
+    "strict": {
+      "trials": [
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.009896999285510738,
+          "allCertified": true,
+          "firstFrameSeconds": 0.045477,
+          "maximumSeconds": 0.045477,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.010275315761438064,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.05057632074616125,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.161,
+            "maximumMs": 45.477,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.009896999285510738,
+          "allCertified": true,
+          "firstFrameSeconds": 0.045356,
+          "maximumSeconds": 0.045356,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.010275315761438064,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.05057632074616125,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.981,
+            "maximumMs": 45.356,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.4803162791091508,
+          "allCertified": true,
+          "firstFrameSeconds": 0.00947,
+          "maximumSeconds": 0.028164,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.4811692990361282,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1902828930156547,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0135000000000005,
+            "maximumMs": 28.164,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.4803162791091508,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009919,
+          "maximumSeconds": 0.029121,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.4811692990361282,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.1902828930156547,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.0415,
+            "maximumMs": 29.121000000000002,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.015483,
+          "maximumSeconds": 0.015483,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.3998552730692049,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.991,
+            "maximumMs": 15.483,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 9.519679967807244,
+          "allCertified": true,
+          "firstFrameSeconds": 0.01615,
+          "maximumSeconds": 0.01615,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 9.519679967807244,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": 0.3998552730692049,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 6.988,
+            "maximumMs": 16.150000000000002,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.18556047107843315,
+          "allCertified": true,
+          "firstFrameSeconds": 0.048569,
+          "maximumSeconds": 0.048569,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.23977566882855156,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.02563329073363496,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.3035,
+            "maximumMs": 48.569,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "stationary",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.18556047107843315,
+          "allCertified": true,
+          "firstFrameSeconds": 0.047358,
+          "maximumSeconds": 0.047358,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.23977566882855156,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.02563329073363496,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.1085,
+            "maximumMs": 47.358,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.22918429869206988,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009943,
+          "maximumSeconds": 0.030878,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.2365250093479008,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11176827200912465,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.1485,
+            "maximumMs": 30.878,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "oncoming",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.22918429869206988,
+          "allCertified": true,
+          "firstFrameSeconds": 0.009545,
+          "maximumSeconds": 0.03037,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.2365250093479008,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11176827200912465,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.128,
+            "maximumMs": 30.37,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.32411019261694285,
+          "allCertified": true,
+          "firstFrameSeconds": 0.048674,
+          "maximumSeconds": 0.048674,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.mat",
+          "repetition": 1,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.37990043350352243,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11386048167434693,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.172000000000001,
+            "maximumMs": 48.674,
+            "over50Ms": 0
+          }
+        },
+        {
+          "scenario": "crossing",
+          "curvature": 0.01,
+          "budgetSeconds": 0.05,
+          "completed": true,
+          "executedHolds": 600,
+          "requestedHolds": 600,
+          "minimumSampledBodyGap": 0.32411019261694285,
+          "allCertified": true,
+          "firstFrameSeconds": 0.048965,
+          "maximumSeconds": 0.048965,
+          "deadlineMisses": 0,
+          "failureMessage": "",
+          "artifact": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.mat",
+          "repetition": 2,
+          "mode": "strict",
+          "minimumNodeBodyGap": 0.37990043350352243,
+          "sampledCollisionFree": true,
+          "minimumSampledModelDomainMargin": -0.11386048167434693,
+          "stateAndSlipBoundsEnforced": false,
+          "seed": 20260912.0,
+          "frameTiming": {
+            "calls": 600,
+            "medianMs": 7.101,
+            "maximumMs": 48.965,
+            "over50Ms": 0
+          }
+        }
+      ],
+      "timing": {
+        "all": {
+          "calls": 7200,
+          "medianMs": 7.095,
+          "maximumMs": 48.965,
+          "over50Ms": 0
+        },
+        "admission": {
+          "calls": 12,
+          "medianMs": 38.117,
+          "maximumMs": 48.965,
+          "over50Ms": 0
+        },
+        "continuation": {
+          "calls": 694,
+          "medianMs": 11.736,
+          "maximumMs": 26.067,
+          "over50Ms": 0
+        },
+        "cruise": {
+          "calls": 6494,
+          "medianMs": 7.084,
+          "maximumMs": 10.501,
+          "over50Ms": 0
+        }
+      },
+      "maximumFrame": {
+        "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.json",
+        "frame": 1,
+        "seconds": 0.048965,
+        "kind": "admission",
+        "phase": {
+          "inputPreparationSeconds": 0.00168,
+          "formulationSeconds": 0.029765,
+          "solveSeconds": 0.010903
+        }
+      },
+      "retainedOptimizedIncumbents": 0,
+      "rejectedAttempts": 0
+    }
+  },
+  "excludedReplayWarmupCalls": 20,
+  "excludedCampaignWarmupHolds": 1680,
+  "sensitivity": {
+    "fixtures": 30,
+    "certified": 30,
+    "activeTargets": 28
+  },
+  "independentAudit": [
+    {
+      "scenario": "crossing",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 7.851234386533799,
+      "minimumRefinedSatGap": 7.851234386533799,
+      "refinedMinimumTime": 0.47500000000000003,
+      "minimumRefinedBodyGap": 9.51948281792381,
+      "refinedBodyMinimumTime": 0.30190000000000006,
+      "minimumNodeSatGap": 8.05110906259726,
+      "nominalMinimumSatGap": 7.85,
+      "nominalMinimumTime": 0.475,
+      "nominalSampledCollision": false
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.48031627910915087,
+      "minimumRefinedSatGap": 0.4802844417180354,
+      "refinedMinimumTime": 3.7084,
+      "minimumRefinedBodyGap": 0.4802844417180354,
+      "refinedBodyMinimumTime": 3.7084,
+      "minimumNodeSatGap": 0.4811692990361285,
+      "nominalMinimumSatGap": -1.9000000000000004,
+      "nominalMinimumTime": 3.725,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0,
+      "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.009896999285510466,
+      "minimumRefinedSatGap": 0.009805328569665539,
+      "refinedMinimumTime": 1.8936000000000002,
+      "minimumRefinedBodyGap": 0.009805352356350086,
+      "refinedBodyMinimumTime": 1.8936000000000002,
+      "minimumNodeSatGap": 0.010275315761438142,
+      "nominalMinimumSatGap": -1.9,
+      "nominalMinimumTime": 1.5150000000000001,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "crossing",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.29739003455361135,
+      "minimumRefinedSatGap": 0.2870110162041346,
+      "refinedMinimumTime": 1.6216000000000002,
+      "minimumRefinedBodyGap": 0.32307619462210757,
+      "refinedBodyMinimumTime": 1.6275000000000002,
+      "minimumNodeSatGap": 0.3799004335035221,
+      "nominalMinimumSatGap": -3.3596270462452713,
+      "nominalMinimumTime": 1.875,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "oncoming",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.22910671367169622,
+      "minimumRefinedSatGap": 0.2284857132822644,
+      "refinedMinimumTime": 3.7114000000000003,
+      "minimumRefinedBodyGap": 0.2291801660210436,
+      "refinedBodyMinimumTime": 3.7101,
+      "minimumNodeSatGap": 0.23652500934790077,
+      "nominalMinimumSatGap": -1.9271008185150427,
+      "nominalMinimumTime": 3.745,
+      "nominalSampledCollision": true
+    },
+    {
+      "scenario": "stationary",
+      "curvature": 0.01,
+      "source": "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat",
+      "executedHolds": 600,
+      "coarseStepSeconds": 0.005,
+      "refinedStepSeconds": 0.0001,
+      "endpointMaximumError": 0,
+      "minimumSampledSatGap": 0.1572616090313348,
+      "minimumRefinedSatGap": 0.15534182863051593,
+      "refinedMinimumTime": 1.2153000000000003,
+      "minimumRefinedBodyGap": 0.18417246948780164,
+      "refinedBodyMinimumTime": 1.2224000000000002,
+      "minimumNodeSatGap": 0.23977566882855128,
+      "nominalMinimumSatGap": -1.9349273315610707,
+      "nominalMinimumTime": 1.72,
+      "nominalSampledCollision": true
+    }
+  ],
+  "generatedMexVerification": {
+    "admissionStatus": 4,
+    "admissionDecisionMaximumError": 5.6145199600621254e-11,
+    "continuationStatus": 2,
+    "continuationDecisionMaximumError": 0,
+    "originalVerifierPassed": true
+  },
+  "tests": {
+    "scope": "Complete suite plus rerun of the corrected controller contract class; production algorithm unchanged",
+    "total": 777,
+    "passed": 777,
+    "failed": 0,
+    "incomplete": 0,
+    "durationSeconds": 553.9196740000001,
+    "initialFullSuiteTotal": 773,
+    "initialFullSuitePassed": 769,
+    "initialFailedTests": [
+      "collisionAvoidanceControllerTest/failedImprovementReturnsOnlyTheVerifiedIncumbent(failedStatus=-999)",
+      "collisionAvoidanceControllerTest/failedImprovementReturnsOnlyTheVerifiedIncumbent(failedStatus=-2)",
+      "collisionAvoidanceControllerTest/failedImprovementReturnsOnlyTheVerifiedIncumbent(failedStatus=0)",
+      "collisionAvoidanceControllerTest/failedImprovementReturnsOnlyTheVerifiedIncumbent(failedStatus=2)"
+    ],
+    "rerunClass": "collisionAvoidanceControllerTest",
+    "rerunPassed": 51,
+    "rerunFailed": 0
+  },
+  "codeAnalysis": [
+    {
+      "file": "config/collisionAvoidanceControllerConfig.m",
+      "issues": []
+    },
+    {
+      "file": "controller/avoidanceSafetyGeometry.m",
+      "issues": []
+    },
+    {
+      "file": "controller/avoidanceStageQp.m",
+      "issues": [
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 47,
+          "column": [
+            21,
+            27
+          ]
+        },
+        {
+          "id": "AGROW",
+          "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+          "fix": 0,
+          "line": 47,
+          "column": [
+            60,
+            71
+          ]
+        },
+        {
+          "id": "SPRIX",
+          "message": "This sparse indexing expression is likely to be slow.",
+          "fix": 0,
+          "line": 146,
+          "column": [
+            37,
+            47
+          ]
+        }
+      ]
+    },
+    {
+      "file": "controller/collisionAvoidanceController.m",
+      "issues": []
+    },
+    {
+      "file": "controller/formulateAvoidanceProblem.m",
+      "issues": []
+    },
+    {
+      "file": "controller/hardEncounterBarrier.m",
+      "issues": [
+        {
+          "id": "SPRIX",
+          "message": "This sparse indexing expression is likely to be slow.",
+          "fix": 0,
+          "line": 681,
+          "column": [
+            56,
+            59
+          ]
+        },
+        {
+          "id": "SPRIX",
+          "message": "This sparse indexing expression is likely to be slow.",
+          "fix": 0,
+          "line": 682,
+          "column": [
+            9,
+            12
+          ]
+        },
+        {
+          "id": "SPRIX",
+          "message": "This sparse indexing expression is likely to be slow.",
+          "fix": 0,
+          "line": 683,
+          "column": [
+            9,
+            12
+          ]
+        },
+        {
+          "id": "SPRIX",
+          "message": "This sparse indexing expression is likely to be slow.",
+          "fix": 0,
+          "line": 690,
+          "column": [
+            45,
+            47
+          ]
+        },
+        {
+          "id": "SPRIX",
+          "message": "This sparse indexing expression is likely to be slow.",
+          "fix": 0,
+          "line": 690,
+          "column": [
+            66,
+            68
+          ]
+        }
+      ]
+    },
+    {
+      "file": "controller/solveHardCbfClf.m",
+      "issues": {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 465,
+        "column": [
+          24,
+          27
+        ]
+      }
+    },
+    {
+      "file": "scripts/analyzeCircularCrossingAdmission.m",
+      "issues": []
+    },
+    {
+      "file": "scripts/captureStandaloneControllerFrames.m",
+      "issues": []
+    },
+    {
+      "file": "scripts/runStandaloneKernelClosedLoop.m",
+      "issues": []
+    },
+    {
+      "file": "scripts/standaloneControllerBenchmark.m",
+      "issues": []
+    },
+    {
+      "file": "scripts/standaloneControllerFrame.m",
+      "issues": []
+    },
+    {
+      "file": "tests/affinePlanAdmissionTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/certificateContinuationTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/collisionAvoidanceControllerTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/jointSupportCertificateTest.m",
+      "issues": []
+    },
+    {
+      "file": "tests/taperedAdmissionTest.m",
+      "issues": []
+    },
+    {
+      "file": "scripts/runFixedDirectionValidation.m",
+      "issues": []
+    }
+  ],
+  "artifactsSha256": {
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/auditFixedDirectionCampaign.m": "17ed7dd83f3f01d1f4a7859aca4f95742b4dc7f001d0e25d5c31ef1df6fd1afc",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/auditFixedDirectionCode.m": "4e5813ea823b06be91df932cfa4ec9ab61636d1ed4a9f07203240cda7eacc74c",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/campaign.json": "71ef3acbae374627b4d047d32d73cd0d46f79c5641dbf193366e173b143691dc",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/checks.log": "7d1d1f3ec77882affe7f29a939a60d0818312e12af3c23c83969505fd65be872",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/code-analysis.json": "dc2ceb31da696e6bbfa2b1817a36ab69657defd20140aab5e666603f03948059",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/controller-contract-rerun.mat": "3cc4c36fda3cb887bbaced7a262c9998547a9c000fc40803cd947f123ee2a665",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.json": "5e65c1c5f58c15401ff3723bf658bcd22278cea97b533ff93a73ba15b216d9d5",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-crossing-1/crossing-exact-state.mat": "88a98a72b3107bd90b2c9dcb3c0e3fb30f9d581752170100fa871b782eb2f3e8",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.json": "7fb681537ee7f7be6387aa72a27a473b026782dfad0014feea6ffb3bead8c813",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-crossing-2/crossing-exact-state.mat": "83920fc21eccc42628b22607fe6b82af6734701a3f0213704c6938aea93c551c",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.json": "eb51ed3e7b525b24a146c15eb98759e3b582a6f74cc3c609d9348704d376391c",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-oncoming-1/oncoming-exact-state.mat": "b7bd27ed1fe6204adb28c4ad891263b5f88bec5a3933ae3fb1631e512bffa48c",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.json": "0062b888eaa8e3189d8e795f6f8998d04f6a9219a8dea52a689cb523e000ef07",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-oncoming-2/oncoming-exact-state.mat": "bee82748e68839e83724be916b3380e062b5c8753f6e6b64d55396f2a945cedf",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.json": "b3954c58fa2c5b6f67ecfc74d9b0a80809006601d8f4ec00bae12c742a0feaaa",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-stationary-1/stationary-exact-state.mat": "c5d488725acd36ad50152194630448c6e161b1540f69b2932e09263f4e5e52f9",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.json": "42eea33fd5b63e30467013afa2f318dcab9a062515318ba5f31933efd30a68e2",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0-stationary-2/stationary-exact-state.mat": "ccc8a875dfc186e7fd58b82d62501dd7cba5b54d14dd4e2cf604fc58e38bc397",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.json": "60340f626ed8251d90ed00a1854b791dc1baa86f818c37c194477b971688c119",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-1/crossing-exact-state.mat": "8189d0f8566cc15c6b16e86482e187db01ff6c1c2031a0b0dd2e6092aeb98c54",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.json": "a2b26e5bea85e6ad1bbeac32c689f67a4d013a55a1f267044c6f19cabcccd229",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-crossing-2/crossing-exact-state.mat": "a60cd8b3cb8763df8216f56d936e6f35936b19384c83297c4b05212ffafbe40d",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.json": "d99d65242fc781f41916ae5fdb7444624247b63eff1a0961764e32da0451e0ed",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-oncoming-1/oncoming-exact-state.mat": "78011f033d629ace257151339561499123a2333ec592777b1eaea25fe13f4bd9",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.json": "168fba3003c50660a242d9bbcf72aeaae2919d95bf906fd86413518b299cbd61",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-oncoming-2/oncoming-exact-state.mat": "5a887cdaebee4420c3d8f40cb5b819b139745276d289c2a24b6540d379a84143",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.json": "6d873d6ad85f1f07d06c566b3a988058dee6da9d5855967314441bbe3cc00c3d",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-stationary-1/stationary-exact-state.mat": "3633f67179a7f1b505ac4a876495686614465a7350bdc9d36fcd9bf3c4ef88c6",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.json": "94717507dc18b5b36bea48493c37542c52df976c413aba74a76453ab7a068405",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/diagnostic/kappa-0.01-stationary-2/stationary-exact-state.mat": "cd87eca592c515fc7c81a756b5693fcd1a461f709d26eabbfd3014da7125ba50",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/final-checks.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/finalizeFixedDirectionTests.m": "64fd82bec1450b374e1419b061a0631c14e10f15bcaccff5f22106c075717bc0",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/full-regression.json": "aa587a5b07ec7fbc3305e72f8bab90c3139a754de9ba391fd90c02065f99b338",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/full-regression.mat": "e3a0627cf563220441f306d76292d4d583502eae9af58ad950b6c40ed078739f",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/generated/standaloneControllerFrameMex.mexa64": "644b18d41bb281a0098b1f0a2bb8b181c93b7c552339c499601970316c28f959",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/generated/verification.json": "1ae7f847ef23c1a36eb3cae2faaee339ff46f30d2c0585e9702c40be6b55d415",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/independent-audit.json": "8033aae25a7032b0480355771bebaf9a6ac95226538343b0546a244233537e4d",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/initial-full-regression.mat": "2c293251c160e59acbac53fd16635fc1a6a672afd25640d3e933297524bebe81",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/replay.json": "a45d35992080f0aabec04d3a2830405bc7b0be95869b33c6e63db69f5a3ef346",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/runFullRegression.m": "24d44c35c7c071c397c45c14ed213698ee7603efb85aef32d77f42a1e2b2b8d6",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/sensitivity.json": "e64e44041d865c08df47b131b2e5ae41cbb3d43841376c664478d75f3530ad02",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-crossing-1/crossing-exact-state.json": "ee5ade6421158bccce420724b6440edd7566a95c9f23e209e5ed5db9b3d00443",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-crossing-1/crossing-exact-state.mat": "0a3a28b858ab321d36a02cdd75ba972e6ede293a02e2c73c4b8ff3909cd0f47d",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-crossing-2/crossing-exact-state.json": "e30f9c27cd1ac6bd3b3bf30600d2dc6b948145ea41e626631235e5549c2b976c",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-crossing-2/crossing-exact-state.mat": "da8d314ed814f7e961c790c348b49a3ff5baf1ee587f35844290a49971f7ea18",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.json": "29114a1a1a0e33d890220fe7013eda2a7905a57033183941f86999d391217101",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-oncoming-1/oncoming-exact-state.mat": "36dea280a377fb6b86f72e9824c614235eb1358235b31055b8c6f05341bf3fa6",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.json": "84fcfc7f39311addbb1892f5fda60c19074dd0a90a0079ba68439962114044d7",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-oncoming-2/oncoming-exact-state.mat": "0e5f81cdf3f6ca1a68f828048474dfe27db5e89653b1576c90a606f5af4858e3",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-stationary-1/stationary-exact-state.json": "a72cb1bc39e4391820f7c4b9fc14fd8b52052baf64723535f3734483e10b12e0",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-stationary-1/stationary-exact-state.mat": "4e60885214fd5364d43317fe812a4e12cf80e05fed10fe005e73b7c2ce112da0",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-stationary-2/stationary-exact-state.json": "4da6a350e38e06e2d664cb40905e88da88d8f50f8c799405ec2e5707699fcb44",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0-stationary-2/stationary-exact-state.mat": "7b8a9315d594b976e17dce50a18bfc892a5b9f4cb8b693f5fc81cf1b30fee685",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.json": "ce0bb4627ec953a7f7fe2417452afeaba723b59e8570802df9e05a3a0246b888",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-crossing-1/crossing-exact-state.mat": "9856d243449b747aab13228a433691e382ad02e915af4d1a011796f33a2c193a",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.json": "0ccf5c88596d4a1ab3494abdeb5649c695b04b247b8e9187ca98cc7e540e6532",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-crossing-2/crossing-exact-state.mat": "1ec67f05b4297f54afdfbfd93239a3945137e629594ff20915b30ec3912ad582",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.json": "b268a0c7769df46cb9508b2c0c74ba901f641d1f79d84515dad8143fd48b4c64",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-oncoming-1/oncoming-exact-state.mat": "a09495c9ceaddd7331a89564d7c3fbbcb707c6a2b2ae866cd7b4b8e5bd9cdb36",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.json": "260cd670d2e9e9f9848e6ad173a306a5994713b5d03fd8fe2d23cf7674d33b43",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-oncoming-2/oncoming-exact-state.mat": "254df1f648456c086cbaf60a9f36ec9222f60345d93205d8e2c4684ba588f587",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.json": "a093091ed931301defe9a19d57dc9eaef88b47cdce9a55c3a31b789839bdccb8",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-stationary-1/stationary-exact-state.mat": "3882fa649bf544c7001ad6a59da41f2151196417b8dd67218b5ee5f225be83bd",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.json": "497d4be57151a6759e4d6b6384b03a9c230fa496550b6aedd81fcd63fe2916f6",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/strict/kappa-0.01-stationary-2/stationary-exact-state.mat": "ac190bbdba6c1545e3ee3fa07d8ea6fa7b580dd8e53f8aa0472a6d99b5f36f6e",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/validation.log": "cee176342bb290d769124e4a99d5bfbbafecedae2d7fce424925ce18c5ccccaf",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/verifyFixedDirections.m": "c1afc251317043d57339ec01eacc8b0046e4021844444d40b6c09a1666cf81dc",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0-crossing-1/crossing-exact-state.json": "3a4382fd0fdf700adc9705569d354cd5ead712ad9b62fd9981dad41aa0c50b8b",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0-crossing-2/crossing-exact-state.json": "bc7746229f9fa0a243d2a54f7162d49c4d7a5e43620a1656639934bb7661da45",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0-oncoming-1/oncoming-exact-state.json": "b91f56339fcfb9e18b5b23bcf48a27c864e0f142e6d296460cde66b3b2cfa1e9",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0-oncoming-2/oncoming-exact-state.json": "de938e04135fab01daf19aab36ff77e46862029d57d6ad50b56d88df49fedc52",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0-stationary-1/stationary-exact-state.json": "999e35321852c5311869ffabba2d12e00ed5b5a11c33176abf731256eb291e05",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0-stationary-2/stationary-exact-state.json": "01f4f6545c05c9c69bc8098b65d1aeebbe9cbf8f8f8ac5a8a125c656bec29129",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0.01-crossing-1/crossing-exact-state.json": "07fba6f0f439d29aa26caa7fe8a3ab333c903527aea59c726c928b01af9e7097",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0.01-crossing-2/crossing-exact-state.json": "3456ee5e2bbddede8a0be7b827ae64d237f7dfc424753e1b964887f70072c646",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0.01-oncoming-1/oncoming-exact-state.json": "e68ae15991de6847f4cbabde147f485736d2e5bb14545d6ee8eff4491c04b63e",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0.01-oncoming-2/oncoming-exact-state.json": "01770fc20f80775992917c7f48a7f048048803827037d8948802d67ecef94039",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0.01-stationary-1/stationary-exact-state.json": "31bb0249cec0a9e1b3cd603b5f1477986ce5115809801217c9ceea20651530de",
+    "/home/zai/.cache/collisionAvoidance/fixed-direction-20260921/warmup/kappa-0.01-stationary-2/stationary-exact-state.json": "4758337c63852bab29b455ac0d4e7b9295b29c8211153ea06964406ff9e0d322",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/config/collisionAvoidanceControllerConfig.m": "e094f9ab51859fadbc0bd7d7d7682dbc6f1b9490ef7c2e8aba9b38678c273ee3",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceSafetyGeometry.m": "70fa6b0959bc45f1297d5d8caeabe27e922137b5b7ed890e56ae54a8ce87e111",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/avoidanceStageQp.m": "56fc54308ed19f57eb5d553afd46dbd7d82f40f38cd777994bf58b130efe46a0",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m": "cb6d01c454f1724cce0675aadc07ae3c6b1b5c074dfb8a8a32c6458e94712f45",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/fialaCertificate.m": "a1bead6717b4ec4e77a70e884b23a4021b6fdc3e5e12868046a6795dca22a565",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m": "b5f07c5aa7b4efd15b5c7cf0de6e19205f8d4f93a331e534cc28dad77b63258e",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m": "bb9add70b6de411955306cf1f6e914d23bc077010c799702e6cb71c620a24696",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m": "07bb016f1be0cca0009e25c9f797f5a9f237c527b0240b295732365ce2646483",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m": "fb496561840d9fef1b0cba3cf460dab0189eeee3ae65198c4938ebd9f54859d5",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/readPlanningInputs.m": "b605f3343436153da4fd8161606ffc162e30630306213b24d88b5c3e3427bc61",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveHardCbfClf.m": "70dd348cf8b07b83542047eef70e07ea6e47e135924eb4fc4b5c6485c688845f",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/stateUncertainty.m": "44f9d3a61afff0d495d473cac1124a8b5b0e6d5a98526da181695fb10df89f0d",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/targetPrediction.m": "02c71faa8004c2d81d0ddc506721f3301bba6914eaed07ed5e8850014c608d13",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/analyzeFixedDirectionValidation.py": "f1c8467a15e0ee44fd8a6e0ce06850042285420588fd98a81126e9f0209740f6",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runExactStateRecursiveFeasibilityScenario.m": "46817a49a284444014d3bd5a3adbd6b82bcae5f1f7c8a3642c050276e4b27f83",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runFixedDirectionValidation.m": "358b5d086c4e953b02227798165ff7fca0d04f4738b19e2a591a05902f34d7ae",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/standaloneControllerBenchmark.m": "7cc1a2498e54b5ac43ef4c17cdad83ca1798a06e7cc07a85847472c36108d8c3",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/standaloneControllerFrame.m": "f2ada004071c6d62ba1433c7013acdbbaccd85e93968c60418167ae50815e262",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/affinePlanAdmissionTest.m": "596dadac1a23c1e8207534ca9b9204cfaa29c3870825b024769f5512153a227c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/certificateContinuationTest.m": "2eaed7f006298bc044326f61df53dc3d02dfa2344b55812b92570d5520ba439c",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/collisionAvoidanceControllerTest.m": "f1525dbda188636f373e3fe2631becc53d5b9a9735c0903754828bc87dce5e24",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/fullPlanAdmissionTest.m": "25262b03d92f647dd1f2b831fac73026f978ec3832f5bec1dcff1af6a9a84471",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/jointSupportCertificateTest.m": "679933410407d78fab4799df4e46cab2a3691d370e6f3c366506304990266de2",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/standaloneControllerFrameTest.m": "6fc0eb70cd0f5d7961ccf9c14a6487ea44c3cfbcf093157f95400b5b67b19671",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/taperedAdmissionTest.m": "ff3872460fbc77c473e11efbf6f9a9e70c4cb7c8d8803a43f80afced49f218ef"
+  }
+}

@@ -1,9 +1,9 @@
 classdef avoidanceStageQp
     %avoidanceStageQp Equivalent sparse realization of the certified plan.
     methods (Static)
-        function conic=joint(program,point,angles,cfg)
-        % Lift the support majorants onto the same sparse stage variables.
-            conic=localJointConic(program,point,angles,cfg);
+        function conic=fixedDirections(program,point,angles,cfg)
+        % Optimize the complete trajectory with the supplied normals fixed.
+            conic=localFixedDirectionConic(program,point,angles,cfg);
         end
 
         function lifted=build(program)
@@ -98,11 +98,11 @@ classdef avoidanceStageQp
     end
 end
 
-function conic=localJointConic(program,point,angles,cfg)
+function conic=localFixedDirectionConic(program,point,angles,cfg)
     program.anchorPlan=point(program.layout.planIndex);
     base=avoidanceStageQp.build(program);
     records=program.jointCertificate.records;count=numel(records);
-    baseCount=numel(base.q);angleIndex=baseCount+(1:count);cursor=baseCount+count;
+    baseCount=numel(base.q);cursor=baseCount;
     fixed=localDomainCertificate(program,angles);
     recordCounts=localAuxiliaryCount(records);
     total=cursor+sum(recordCounts(~fixed));
@@ -114,8 +114,8 @@ function conic=localJointConic(program,point,angles,cfg)
     coneRow=coneRow(:);coneColumn=coneColumn(:);coneValue=coneValue(:);
     coneBounds=reshape(base.b(equalityCount+linearCount+1:end),[],1);
     coneSizes=reshape(base.cones(3:end),[],1);
-    % Reserve triplets once. A support row touches at most six states, its
-    % angle, and one epigraph variable. Each record adds at most four cones.
+    % Reserve triplets once. A support row touches at most six states and
+    % its epigraph variables. Each active record adds at most two cones.
     % Auxiliary variables bound the absolute-value and yaw-hull row counts.
     activeCount=nnz(~fixed);auxiliaryCount=total-cursor;
     linearNonzeros=numel(linearValue);linearRows=numel(linearBounds);
@@ -131,48 +131,40 @@ function conic=localJointConic(program,point,angles,cfg)
     coneValue=[coneValue;zeros(coneExtra,1)];
     coneBounds=[coneBounds;zeros(14*activeCount,1)];
     coneSizes=[coneSizes;zeros(4*activeCount,1)];
-    eta=1/cfg.jointCertificate.positionScale;
     for index=1:count
         if fixed(index),continue;end
         item=records(index);stateIndex=1:6;
         % Assemble one record in its own coordinates, then map its triplets
-        % once. Sparse temporaries need only six states, one angle and this
+        % once. Sparse temporaries need only six states and this
         % record's epigraph variables, rather than the full horizon width.
-        width=7+recordCounts(index);localCursor=7;
-        columns=[base.stateIndex(:,item.stage).',angleIndex(index),cursor+(1:recordCounts(index))];
+        width=6+recordCounts(index);localCursor=6;
+        columns=[base.stateIndex(:,item.stage).',cursor+(1:recordCounts(index))];
         state=base.stateCenter(:,item.stage+1);theta=angles(index);
-        normal=[cos(theta);sin(theta)];tangent=[-normal(2);normal(1)];
+        normal=[cos(theta);sin(theta)];
         relative=item.positionOffset+item.positionMap*state;
         yaw=item.yawOffset+item.yawRow*state;
         positionMap=sparse(2,width);positionMap(:,stateIndex)=item.positionMap;
-        angleRow=row(7,1);
         yawRow=row(stateIndex,item.yawRow);
         egoAngle=theta-yaw;obstacleAngle=theta-item.targetYaw;
-        argument=[-sin(egoAngle);cos(egoAngle)]*(angleRow-yawRow);
-        support=shapeSupport(item.egoHalfSize,item.egoYawRadius, ...
-            [cos(egoAngle);sin(egoAngle)],argument);
-        argument=[-sin(obstacleAngle);cos(obstacleAngle)]*angleRow;
-        next=shapeSupport(item.targetHalfSize,item.targetYawRadius, ...
-            [cos(obstacleAngle);sin(obstacleAngle)],argument);
-        support=support+next;
-        next=absoluteSupport(item.generators.'*normal,item.generators.'*tangent*angleRow, ...
-            ones(size(item.generators,2),1));
-        support=support+next;
-        % The nonunit direction n+t*a is never zero. Its homogeneous support
-        % avoids a position-dependent unit-circle remainder. The bilinear
-        % term -a*t'*dr has the global touching bound (sqrt(eta)*t'*dr-
-        % a/sqrt(eta))^2/4. No artificial position/angle step bound is needed.
+        constant=item.clearance+item.positionBall-program.jointCertificate.upperBound(index) ...
+            +avoidanceSafetyGeometry.supportValue(item.targetHalfSize,item.targetYawRadius, ...
+                [cos(obstacleAngle);sin(obstacleAngle)])+sum(abs(item.generators.'*normal));
+        support=sparse(1,width);zrow=sparse(1,width);
         egoRadius=norm(item.egoHalfSize);
-        quadratic=[sqrt(egoRadius)*angleRow;sqrt(2*egoRadius)*yawRow; ...
-            sqrt(eta/2)*tangent.'*positionMap-sqrt(1/(2*eta))*angleRow];
-        z=allocate(1);zrow=row(z,1);
-        addCone([1;-1;zeros(size(quadratic,1),1)], ...
-            [zrow;zrow;sqrt(2)*quadratic]);
-        diskRadius=item.clearance+item.positionBall-program.jointCertificate.upperBound(index);
-        disk=allocate(1);diskRow=row(disk,1);
-        addCone([0;diskRadius;0],[diskRow;sparse(1,width);diskRadius*angleRow]);
-        inequality=support+zrow+diskRow-normal.'*positionMap-tangent.'*relative*angleRow;
-        addLinear(inequality,normal.'*relative);
+        if egoRadius>0 && any(item.yawRow~=0)
+            argument=-[-sin(egoAngle);cos(egoAngle)]*yawRow;
+            support=shapeSupport(item.egoHalfSize,item.egoYawRadius, ...
+                [cos(egoAngle);sin(egoAngle)],argument);
+            % The normal is constant. Only ego rotation needs a remainder:
+            % ||R(-dpsi)n - (n-t*dpsi)|| <= dpsi^2/2 globally.
+            z=allocate(1);zrow=row(z,1);
+            addCone([1;-1;0],[zrow;zrow;sqrt(2*egoRadius)*yawRow]);
+        else
+            constant=constant+avoidanceSafetyGeometry.supportValue( ...
+                item.egoHalfSize,item.egoYawRadius,[cos(egoAngle);sin(egoAngle)]);
+        end
+        inequality=support+zrow-normal.'*positionMap;
+        addLinear(inequality,normal.'*relative-constant);
         assert(localCursor==width,'avoidanceStageQp:jointLayout','Inconsistent record layout.');
         cursor=cursor+recordCounts(index);
     end
@@ -183,13 +175,11 @@ function conic=localJointConic(program,point,angles,cfg)
         coneValue(1:coneNonzeros),coneRows,total);
     linearBounds=linearBounds(1:linearRows);coneBounds=coneBounds(1:coneRows);
     coneSizes=coneSizes(1:coneCount);
-    fixedCount=nnz(fixed);
-    fixedRows=sparse(1:fixedCount,angleIndex(fixed),ones(1,fixedCount),fixedCount,total);
     conic=struct('P',sparse(total,total),'q',zeros(total,1), ...
-        'A',[[base.A(1:equalityCount,:),sparse(equalityCount,total-baseCount)];fixedRows;linearMatrix;coneMatrix], ...
-        'b',[base.b(1:equalityCount);zeros(fixedCount,1);linearBounds;coneBounds], ...
-        'cones',[equalityCount+fixedCount;numel(linearBounds);coneSizes], ...
-        'anchorPlan',program.anchorPlan,'angleIndex',angleIndex, ...
+        'A',[[base.A(1:equalityCount,:),sparse(equalityCount,total-baseCount)];linearMatrix;coneMatrix], ...
+        'b',[base.b(1:equalityCount);linearBounds;coneBounds], ...
+        'cones',[equalityCount;numel(linearBounds);coneSizes], ...
+        'anchorPlan',program.anchorPlan,'fixedCertificateAngles',angles, ...
         'primaryCount',numel(program.q),'domainCertifiedRecords',find(fixed));
     conic.P(1:baseCount,1:baseCount)=base.P;conic.q(1:baseCount)=base.q;
     weight=cfg.jointCertificate.proximalWeight;
@@ -197,7 +187,6 @@ function conic=localJointConic(program,point,angles,cfg)
     diagonal=weight./max(scale,1e-3).^2;
     conic.P(primary,primary)=conic.P(primary,primary)+spdiags(diagonal,0,numel(point),numel(point));
     conic.q(primary)=conic.q(primary)-diagonal.*point;
-    conic.P(angleIndex,angleIndex)=weight*speye(count);
 
     function indices=allocate(number)
         indices=localCursor+(1:number);localCursor=localCursor+number;
@@ -275,16 +264,13 @@ function counts=localAuxiliaryCount(records)
     counts=zeros(numel(records),1);
     for index=1:numel(records)
         item=records(index);
-        count=2+nnz(any(item.generators~=0,1));
-        dimensions=[item.egoHalfSize,item.targetHalfSize];
-        radii=[item.egoYawRadius,item.targetYawRadius];
-        for body=1:2
-            halfSize=dimensions(:,body);
-            if all(halfSize==0),continue;end
-            if radii(body)==0
+        count=0;halfSize=item.egoHalfSize;
+        if any(halfSize~=0) && any(item.yawRow~=0)
+            count=1;
+            if item.egoYawRadius==0
                 count=count+nnz(halfSize);
             else
-                [~,bounds]=avoidanceSafetyGeometry.yawHull(halfSize,radii(body));
+                [~,bounds]=avoidanceSafetyGeometry.yawHull(halfSize,item.egoYawRadius);
                 count=count+numel(bounds)+1;
             end
         end

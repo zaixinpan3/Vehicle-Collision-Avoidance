@@ -58,10 +58,10 @@ classdef solveHardCbfClf
             [reduced,retained]=localReducedProgram(program);
         end
 
-        function [program,result,search] = joint(program,model,cfg)
+        function [program,result,search] = fixedDirections(program,model,cfg)
         % Only independently verified plans can leave this method. An
         % uncertified admission proposal is never a retained incumbent.
-            [program,result,search]=localJointSearch(program,model,cfg);
+            [program,result,search]=localFixedDirectionSearch(program,model,cfg);
         end
 
         function solve = constrained(program,cfg)
@@ -73,6 +73,7 @@ classdef solveHardCbfClf
         end
 
         function [decision,angles,information,proposal] = admitSection(program,cfg)
+        % Choose a trajectory anchor and separation directions, never a command.
             origin=program.anchorPlan;count=program.layout.planCount;
             records=program.jointCertificate.records;
             angles=program.jointCertificate.angles;decision=[];
@@ -254,89 +255,67 @@ classdef solveHardCbfClf
     end
 end
 
-function [program,result,search]=localJointSearch(program,~,cfg)
-% A failed scalar section may initialize one unrestricted hard solve.
-% Only continuation has a certified incumbent that can survive solve failure.
+function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
+% Direction search supplies an optimizer center, never a new issued plan.
+% Only an inherited, previously optimized certificate can survive solve failure.
     search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
         'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
-        'policy',"affineSectionAdmission",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
+        'policy',"fixedDirectionTrajectoryOptimization",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
         'issuedAdmissionWitness',false,'usedFullPlanAdmission',false, ...
         'fullPlanStatus',"notAttempted",'admissionProposalViolation',NaN, ...
-        'initialCertificateAngles',program.jointCertificate.angles);
+        'initialCertificateAngles',program.jointCertificate.angles, ...
+        'fixedCertificateAngles',program.jointCertificate.angles,'directionSeedSource',"nominalWitness");
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
+    inherited=program.inheritedPredictionFamily;
     [admitted,accepted]=localVerifyJointPoint(program,point,angles);
-    if ~program.inheritedPredictionFamily && ~admitted
-        phase=tic;
-        [point,angles,search.section,proposal]=solveHardCbfClf.admitSection(program,cfg);
-        search.formulationSeconds=toc(phase);search.familyAttempts=1;
-        if ~isempty(point)
-            [admitted,accepted]=localVerifyJointPoint(program,point,angles);
-            if ~admitted,search.section.status="independentVerificationFailed";end
-        end
-        admissionSolve=localEmptySolve();
-        if ~admitted && ~isempty(proposal.decision) && localSectionTimeAvailable(cfg)
-            % The global support majorants do not require a feasible center.
-            % Release every input coordinate while keeping every hard row.
-            search.admissionProposalViolation=proposal.violation;
-            search.policy="affineSectionThenJointAdmission";
-            phase=tic;
-            conic=avoidanceStageQp.joint(program,proposal.decision,proposal.angles,cfg);
-            search.formulationSeconds=search.formulationSeconds+toc(phase);
-            phase=tic;admissionSolve=localSolveConic(conic,cfg);search.solveSeconds=toc(phase);
-            search.restorationSolves=1;search.nativeSolves=1;
-            search.fullPlanStatus="solverRejected";
-            if admissionSolve.feasible
-                point=admissionSolve.decision(1:conic.primaryCount);
-                angles=proposal.angles+atan(admissionSolve.decision(conic.angleIndex));
-                [admitted,accepted]=localVerifyJointPoint(program,point,angles);
-                search.usedFullPlanAdmission=admitted;
-                search.fullPlanStatus="independentVerificationFailed";
-                if admitted,search.fullPlanStatus="certified";end
-            end
-        end
-        if ~admitted
-            if ~localSectionTimeAvailable(cfg),search.fullPlanStatus="searchTimeLimit";end
-            result=localEmptySolve();
-            result.message="Admission found no hard-certified plan: "+search.section.status;
-            if search.nativeSolves>0
-                result.message=result.message+"; full-plan "+search.fullPlanStatus+": "+admissionSolve.message;
-            elseif search.fullPlanStatus=="searchTimeLimit"
-                result.message=result.message+"; full-plan searchTimeLimit";
-            end
-            return;
-        end
-        program=accepted;result=localEmptySolve();result.decision=point;result.feasible=true;
-        result.exitFlag=1;result.message="Issued an independently verified scalar-admission witness.";
-        if search.usedFullPlanAdmission
-            result.exitFlag=admissionSolve.exitFlag;result.output=admissionSolve.output;
-            result.message="Issued an independently verified full-plan admission witness.";
-        end
-        search.issuedAdmissionWitness=true;
-    else
-        if ~admitted
-            result=localEmptySolve();result.message="The inherited witness failed independent verification.";return;
-        end
-        program=localRefreshBounds(accepted);incumbent=point;
-        phase=tic;conic=avoidanceStageQp.joint(program,point,angles,cfg);
-        search.formulationSeconds=toc(phase);
-        phase=tic;trial=localSolveConic(conic,cfg);search.solveSeconds=toc(phase);
-        search.hardSolves=1;search.nativeSolves=1;improved=false;
-        if trial.feasible
-            point=trial.decision(1:conic.primaryCount);
-            nextAngles=angles+atan(trial.decision(conic.angleIndex));
-            [improved,accepted]=localVerifyJointPoint(program,point,nextAngles);
-        end
-        if improved
-            program=accepted;result=trial;result.decision=point;
-        else
-            result=localEmptySolve();result.decision=incumbent;result.feasible=true;
-            result.exitFlag=trial.exitFlag;result.message="Retained verified certificate; improvement: "+trial.message;
-            search.usedCertifiedIncumbent=true;
-        end
+    if inherited && ~admitted
+        result=localEmptySolve();result.message="The inherited witness failed independent verification.";return;
     end
-    program.supportGeometry.witnessPreserved=program.inheritedPredictionFamily;
-    program.inheritedFeasibleFamily=program.inheritedPredictionFamily;
+    if ~inherited && ~admitted
+        phase=tic;
+        [candidate,directions,search.section,proposal]=solveHardCbfClf.admitSection(program,cfg);
+        search.formulationSeconds=toc(phase);search.familyAttempts=1;
+        if ~isempty(candidate)
+            point=candidate;angles=directions;search.directionSeedSource="scalarCandidate";
+        elseif ~isempty(proposal.decision)
+            point=proposal.decision;angles=proposal.angles;
+            search.admissionProposalViolation=proposal.violation;search.directionSeedSource="scalarProposal";
+        else
+            result=localEmptySolve();
+            result.message="Direction initialization found no candidate: "+search.section.status;return;
+        end
+    elseif admitted
+        program=localRefreshBounds(accepted);
+        if inherited,search.directionSeedSource="inheritedWitness";end
+    end
+    search.fixedCertificateAngles=angles;
+    incumbent=point;
+    phase=tic;conic=avoidanceStageQp.fixedDirections(program,point,angles,cfg);
+    search.formulationSeconds=search.formulationSeconds+toc(phase);
+    phase=tic;trial=localSolveConic(conic,cfg);search.solveSeconds=toc(phase);
+    search.hardSolves=1;search.nativeSolves=1;improved=false;
+    search.fullPlanStatus="solverRejected";
+    if trial.feasible
+        point=trial.decision(1:conic.primaryCount);
+        % The second stage must use exactly the normals selected above.
+        [improved,accepted]=localVerifyJointPoint(program,point,angles);
+        search.fullPlanStatus="independentVerificationFailed";
+    end
+    if improved
+        program=accepted;result=trial;result.decision=point;
+        search.usedFullPlanAdmission=~inherited;search.fullPlanStatus="certified";
+    elseif inherited
+        result=localEmptySolve();result.decision=incumbent;result.feasible=true;
+        result.exitFlag=trial.exitFlag;result.message="Retained previously optimized certificate: "+trial.message;
+        search.usedCertifiedIncumbent=true;
+    else
+        result=localEmptySolve();
+        result.message="Fixed-direction trajectory optimization failed: "+search.fullPlanStatus+": "+trial.message;
+        return;
+    end
+    program.supportGeometry.witnessPreserved=inherited;
+    program.inheritedFeasibleFamily=inherited;
 end
 
 function proposal=localAdmissionProposal(program,origin,direction,boundaries, ...

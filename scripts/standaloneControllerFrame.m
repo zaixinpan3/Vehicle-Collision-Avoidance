@@ -3,8 +3,8 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
 %#codegen
 % Preparation, sensing, reference synthesis and witness shifting remain with
 % the MATLAB orchestrator. This entry is NOT a standalone closed-loop driver.
-% Status: 0 rejected, 1 scalar admission, 2 optimized, 3 retained incumbent,
-% 4 full-plan admission. An uncertified center is never a retained incumbent.
+% Status: 0 rejected, 2 optimized continuation, 3 retained optimized incumbent,
+% 4 optimized admission. A direction-search seed is never issued directly.
 % Metrics: assembly/admission, native solve, verification seconds, solver status.
     coder.cinclude('nativeControllerBenchmarkBridge.h');
     assert(~program.terminalOptimization);
@@ -14,20 +14,19 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
     start=localClock();
     [accepted,program]=localVerify(program,decision,angles);
     metrics(3)=localClock()-start;
-    admission=~program.inheritedPredictionFamily && ~accepted;
-    if admission
+    admission=~program.inheritedPredictionFamily;
+    if admission && ~accepted
         start=localClock();
         [candidate,directions,~,proposal]=solveHardCbfClf.admitSection(program,cfg);
         decision=candidate(:);angles=directions(:);
         metrics(1)=localClock()-start;
         if ~isempty(decision)
-            start=localClock();[accepted,~]=localVerify(program,decision,angles);
-            metrics(3)=metrics(3)+localClock()-start;
-            if accepted,status=1;end
-            return;
+            % The candidate supplies fixed normals and a convexification center.
+            % It must still pass through the full trajectory optimization below.
+        else
+            if isempty(proposal.decision),return;end
+            decision=proposal.decision;angles=proposal.angles;
         end
-        if isempty(proposal.decision),return;end
-        decision=proposal.decision;angles=proposal.angles;
     elseif ~accepted
         return;
     end
@@ -37,7 +36,7 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
     program.b(1:numel(program.safetyBound))=program.safetyBound;
     program.b(end-numel(program.terminalCone.bound)+1:end)=program.terminalCone.bound;
     program.terminalOptimization=false;
-    conic=avoidanceStageQp.joint(program,decision,angles,cfg);
+    conic=avoidanceStageQp.fixedDirections(program,decision,angles,cfg);
     [reduced,retained]=solveHardCbfClf.reduce(conic);
     center=zeros(numel(reduced.q),1);
     center(1:numel(reduced.anchorPlan))=reduced.anchorPlan;
@@ -64,11 +63,10 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
         start=localClock();
         expanded=zeros(numel(conic.q),1);expanded(retained)=native+center;
         proposed=expanded(1:conic.primaryCount);
-        newAngles=angles+atan(expanded(conic.angleIndex));
-        [accepted,~]=localVerify(program,proposed,newAngles);
+        [accepted,~]=localVerify(program,proposed,angles);
         metrics(3)=metrics(3)+localClock()-start;
         if accepted
-            decision=proposed;angles=newAngles;status=2;
+            decision=proposed;status=2;
             if admission,status=4;end
             return;
         end

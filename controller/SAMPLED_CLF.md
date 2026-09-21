@@ -1,8 +1,9 @@
 # Soft sampled CLF and its dissipation bound
 
-The controller first optimizes a scalar restriction at fresh admission and can
-release the full finite input plan in one hard admission recovery. Inherited
-performance improvement also optimizes the full plan, together with a
+After initializing and fixing separation directions, the controller optimizes
+the complete finite input plan at every fresh admission and inherited
+performance step. The scalar search is only an initializer. The final convex
+problem also optimizes a
 nonnegative first-hold CLF norm slack. Physical input effort is centered on
 the CLF/LQR operating input. For N holds its objective is
 
@@ -12,7 +13,7 @@ the CLF/LQR operating input. For N holds its objective is
 \]
 
 The CLF is the only softened constraint in
-[scalar admission and joint continuation](JOINT_SUPPORT_CERTIFICATES.md). Collision, actuator,
+[fixed-direction admission and continuation](JOINT_SUPPORT_CERTIFICATES.md). Collision, actuator,
 slew, chart and terminal constraints remain hard at command acceptance.
 [TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md) specifies continuation and
 sensing assumptions. [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)

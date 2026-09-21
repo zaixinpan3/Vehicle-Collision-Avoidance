@@ -68,13 +68,12 @@ classdef affinePlanAdmissionTest < matlab.unittest.TestCase
             testCase.verifyLessThan(maximumExcess,1e-10);
         end
 
-        function freshAvoidanceNeedsNoConicSolveOrCollisionSlack(testCase)
+        function freshAvoidanceRequiresAConvexSolveWithoutCollisionSlack(testCase)
             [ego,target,road,cfg]=localFixture();
-            cfg.solver.jointFunction=@encounterTestFixture.fail;
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyTrue(problem.metadata.admissionSearch.issuedAdmissionWitness);
+            testCase.verifyFalse(problem.metadata.admissionSearch.issuedAdmissionWitness);
             testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
                 -problem.program.physicalBound),0);

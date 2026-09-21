@@ -50,12 +50,23 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         end
         function failedImprovementReturnsOnlyTheVerifiedIncumbent(testCase,failedStatus)
             [ego,target,road,cfg]=localFixture(true);
+            [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,first,stored);
+            target.targetPositionInertial=target.targetPositionInertial ...
+                +cfg.controller.sampleTime*target.targetVelocityInertial;
             localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
-            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,stored);
             testCase.verifyTrue(problem.metadata.certifiedIncumbentUsed);
             testCase.verifyEqual(problem.metadata.solverExitFlag,failedStatus);
             testCase.verifyEqual(command.actuatorInput,problem.program.anchorPlan(1:2),AbsTol=0);
             testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
+            testCase.verifyEqual(localFailureHook('count',[]),1);
+        end
+        function aClearFreshSeedCannotReplaceTheMandatoryTrajectorySolve(testCase,failedStatus)
+            [ego,target,road,cfg]=localFixture(true);
+            localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:optimizationFailed');
             testCase.verifyEqual(localFailureHook('count',[]),1);
         end
         function malformedSolvedResultsRaiseAnError(testCase,badDecision)

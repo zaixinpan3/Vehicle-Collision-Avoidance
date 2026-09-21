@@ -3,7 +3,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
     properties (TestParameter)
         geometry=struct('aligned',[12;0;0;0], ...
             'rotated',[8;5;.6;-.3],'corner',[5.2;2.1;0;0]);
-        previousVersion={30,35,36,38,39};
+        previousVersion={30,35,36,38,39,40};
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -87,13 +87,13 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(updates,0);
         end
 
-        function overlappingStraightStationarySeedIsAdmittedWithoutAConicSolve(testCase)
+        function overlappingStraightStationarySeedRequiresAFullTrajectorySolve(testCase)
             [ego,target,cfg,road]=localFixture();target=localRejectedTarget(target,"stationary");
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
             testCase.verifyGreaterThan(problem.metadata.admissionSearch.initialOverlappingNodes,0);
-            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1);
             testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision-problem.program.physicalBound),0);
             testCase.verifyEqual(command.actuatorInput,problem.inputPlan(:,1),AbsTol=0);
@@ -110,7 +110,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
-        function admissionOptimizesTheInitialSeparationDirections(testCase)
+        function admissionSelectsDirectionsBeforeTrajectoryOptimization(testCase)
             [ego,target,cfg,road]=localFixture();target=localRejectedTarget(target,"stationary");
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             increment=problem.program.jointCertificate.angles ...
@@ -118,7 +118,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(norm(atan2(sin(increment),cos(increment))),1e-3);
             testCase.verifyEqual(problem.metadata.nominalSource,"cruiseInitialization");
             testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
-            testCase.verifyEqual(problem.metadata.convexificationPolicy,"affineSectionAdmission");
+            testCase.verifyEqual(problem.metadata.convexificationPolicy,"fixedDirectionTrajectoryOptimization");
         end
 
         function newTargetUsesTheShiftedPreviousControlsAsItsNominal(testCase)

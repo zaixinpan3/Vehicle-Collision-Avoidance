@@ -1,21 +1,21 @@
 # Predictive CBF and soft CLF controller
 
-The format-40 controller first tries to admit a new encounter using one signed affine
-control section and forbidden-amplitude interval subtraction. A fixed support
-dictionary and fixed yaw enclosures on amplitude cells bound the geometric
-work. Curved predictions taper the displacement at the ends of the selected
-conflict interval to 0.8 of its middle peak; straight predictions retain their
-plateau. The default search uses 16 directions and 8 amplitude cells. This
-restricts the candidate family and certificate search without changing hard
-acceptance constraints. The scalar objective retains input effort and squared CLF slack.
-An independently verified scalar witness is issued directly. After section
-exclusion, a least-violated geometric proposal can initialize one hard joint
-SOCP with the complete control sequence free. That proposal cannot be issued;
-only an independently verified result can become the first incumbent. A nominal
-already carrying a complete certificate, or a shifted accepted certificate,
-can be improved with one hard joint trajectory/support SOCP. Target-free frames
-solve the convex dynamics/CLF/terminal base. Admission recovery adds no collision
-slack, route catalog, method selector or executable backup controller.
+The format-41 controller first initializes separation directions, then fixes
+them and solves one convex problem for the complete control sequence. Fresh
+initialization searches one signed affine control section using 16 directions
+and 8 amplitude cells. Curved predictions taper the conflict-interval shoulders
+to 0.8 of the middle peak; straight predictions retain their plateau. These
+choices affect only initialization. Neither a certified scalar candidate nor
+an uncertified least-violated proposal can be issued directly. Every new
+admission must come from the full trajectory solver and pass independent hard
+verification. An already certified nominal follows the same full solve.
+
+Inherited frames retain their certificate directions and attempt one full
+trajectory improvement. Target-free frames solve the convex dynamics, CLF
+and terminal base. The fixed-direction architecture follows the two-stage
+principle of Li et al. (2023), while the retained yaw support majorant, terminal
+cones and soft CLF make this implementation an SOCP. It does not add the
+paper's collision slack. See [the formulation](JOINT_SUPPORT_CERTIFICATES.md).
 
 The predictive continuation, fixed active-encounter exit deadline, invariant
 terminal set, actuator amplitude/slew limits, curved pose domains and squared
@@ -25,8 +25,8 @@ in the current validation scenarios. The declared plant is the exact sampled
 held affine model, with zero process residual.
 
 Every returned command passes independent physical-row, support-residual,
-terminal-cone and CLF verification. Failed joint improvement can return only
-an independently verified incumbent. A full-frame deadline miss or absence
+terminal-cone and CLF verification. Failed fixed-direction improvement can return only
+the previously optimized, independently verified suffix. A full-frame deadline miss or absence
 of a hard certificate issues no command. The terminal feedback remains a
 prediction certificate only.
 
@@ -34,7 +34,7 @@ Retained occupied sets and angles plus touching majorants constructively
 preserve subproblem feasibility under unchanged sensing/execution contracts.
 Admission from every seed and completion within a sample period are not
 guaranteed. See
-[the joint formulation and research assessment](JOINT_SUPPORT_CERTIFICATES.md),
+[the fixed-direction formulation and research assessment](JOINT_SUPPORT_CERTIFICATES.md),
 [the conditional proof](TERMINAL_CBF_PROOF.md) and
 [CLF details](SAMPLED_CLF.md).
 

@@ -8,31 +8,21 @@ larger computation budget are explicitly separate. See
 continuation and collision results. The generic controller configuration already
 used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
 
-Current algorithm (September 21, 2026): format 40 first searches one signed
-affine control section, 8 amplitude geometry cells, 16 support directions and
-32 scalar objective iterations. Curved predictions use a single temporal taper
-with shoulder fraction 0.8; straight predictions retain the plateau. The smaller
-dictionary and coarser cells deliberately reduce certificate exploration.
-A restricted admission candidate passes the
-independent physical verifier and needs no conic solve. After geometric
-section exclusion, one least-violated proposal can initialize one hard joint
-SOCP with the complete input sequence free. Its uncertified center cannot be
-issued, and the original frame deadline remains in force. An already certified nominal, or an inherited successor, attempts one
-joint-support performance improvement while retaining its verified incumbent.
-There is no route/start enumeration or collision restoration slack. Admission
-remains incomplete, and the added solve increases worst-case work. The
-[repair validation](../report/CIRCULAR_CROSSING_ADMISSION_REPAIR_20260921.md)
-separates diagnostic-budget safety results from strict 50 ms acceptance.
+Current algorithm (September 21, 2026): format 41 initializes separation
+directions and fixes them before optimizing the complete trajectory in one
+hard SOCP. Fresh initialization uses one signed control section, 8 amplitude
+cells, 16 directions and 32 scalar objective iterations; this section supplies
+no executable command. Every successful new admission includes a full solve.
+Inherited frames use retained directions and attempt one full improvement,
+with only the previously optimized, verified suffix available after failure.
+The conic formulation removes angular decision variables and their associated
+normalization and position-direction majorants. No collision slack is added.
 
-The scalar trajectory and objective are accumulated directly. Full sensitivity
-maps and the canonical condensed objective remain for compatibility with the
-stored complete certificate, so total preparation is not claimed linear in
-horizon length. No solver binary rebuild is required. See
-[the derivation](JOINT_SUPPORT_CERTIFICATES.md) and the
-[design review](../report/AFFINE_SECTION_ADMISSION_REVIEW_20260919.md).
-The [implemented 50 ms rerun](../report/AFFINE_SECTION_ADMISSION_20260919.md)
-records faster matched admissions, four rejected curved crossings and increased
-continuation latency; seven of fifteen strict trials qualify.
+Full sensitivity maps and the condensed objective remain for certificate
+transfer. Preparation is not claimed linear in horizon length. The native
+solver itself is unchanged; generated prepared-frame adapters must be rebuilt.
+See [the fixed-direction derivation](JOINT_SUPPORT_CERTIFICATES.md) and
+[the current warmed validation](../report/FIXED_DIRECTION_CONVEX_OPTIMIZATION_20260921.md).
 The dated measurements below describe earlier implementations.
 
 Historical version 21 used a finite encounter witness, current observation confirmation,

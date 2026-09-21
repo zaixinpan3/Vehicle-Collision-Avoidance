@@ -1,67 +1,38 @@
-# Joint trajectory and separation certificates
+# Fixed-direction convex trajectory optimization
 
-Fresh admission first searches one signed affine section using a finite
-support dictionary. If the section has a nonempty hard base interval but no
-certified amplitude, one hard joint solve may release the complete input
-sequence around its least-violated geometric proposal. Inherited performance
-improvement optimizes the input sequence and one
-separation angle per target/node, including terminal exit angles, in one SOCP.
-Every issued plan passes the original hard physical verification. Admission
-recovery has no collision slack or executable uncertified incumbent. The certificate covers **hold nodes of
-the declared zero-residual sampled affine plant**, not the space between nodes
-or a real-time deadline.
+Format 41 separates initialization from execution. A bounded geometric search
+selects a trajectory anchor and one unit separation direction per collision or
+exit record. These directions are then fixed while one hard SOCP optimizes the
+complete finite control sequence. A scalar candidate is never issued, even if
+it already passes the original verifier. Every new admission requires an
+independently verified result from the full trajectory solve. Inherited frames
+use their stored directions and attempt one full trajectory improvement; only
+a previously optimized, verified suffix can be retained after solve failure.
 
-```matlab
-cfg = collisionAvoidanceControllerConfig();
-```
+The certificate covers **hold nodes of the declared zero-residual sampled
+affine plant**. It establishes neither inter-node separation nor a real-time
+deadline. Clear saved certificates from formats earlier than 41. See
+[the implementation and validation](../report/FIXED_DIRECTION_CONVEX_OPTIMIZATION_20260921.md).
 
-Start with an empty saved state after upgrading to format 40. The public
-interface, actuator limits, terminal continuation, sensing contracts and soft
-CLF remain. The [affine-section review](../report/AFFINE_SECTION_ADMISSION_REVIEW_20260919.md)
-states the mathematical prerequisites;
-[the implementation report](../report/AFFINE_SECTION_ADMISSION_20260919.md)
-records the measured runtime and admission-capability tradeoff.
-The [September 21 admission repair](../report/CIRCULAR_CROSSING_ADMISSION_REPAIR_20260921.md)
-supersedes its first-admission search restriction; certificate format 40 remains
-unchanged.
-
-## Research assessment
-
-The proposed distinction between search feasibility and executable safety is
-valid. Inspection of the retired baseline showed that it installed a new
-fixed-normal family even when that family excluded the shifted witness.
-That replacement branch has been removed. The controller preserves the admitted occupied
-sets, charts, angular directions, terminal set and absolute exit deadline.
+## Relationship to Li et al. (2023)
 
 Li, Zhang, Guo, Lenzo and Guo's *Real-Time Optimal Trajectory Planning for
 Autonomous Driving with Collision Avoidance Using Convex Optimization*
-([2023, DOI](https://doi.org/10.1007/s42154-023-00222-7)), page 6, Eq. (13),
-does contain nonnegative collision slack. Its two-stage fixed-dual construction
-does not establish the hard-admission property required here. The local
-reference PDF was inspected directly.
+([publisher, DOI](https://doi.org/10.1007/s42154-023-00222-7)), Section 3,
+Eq. (12), computes distance-dual variables from an initialization. Section 3.2,
+Eq. (13), fixes those variables and optimizes the complete trajectory. The
+local reference PDF was inspected directly. Its final QP includes nonnegative
+collision slack. This implementation follows the **initialize directions,
+fix directions, optimize trajectory** architecture; it does not reproduce
+that QP literally. It retains hard collision acceptance, uncertain rectangular
+occupied sets, a yaw support majorant, terminal cones and a soft CLF cone.
+Those retained requirements give an SOCP. No collision slack is introduced.
 
-Zhang, Liniger and Borrelli's
-[Optimization-Based Collision Avoidance](https://arxiv.org/html/1711.03449),
-Section 4 and Theorem 2, supports an exact lifted certificate viewpoint for
-convex occupied sets, with the resulting trajectory problem remaining
-nonconvex. The present angular majorization is a project implementation and
-derivation, not a claim that OBCA supplies this conic algorithm or a novelty
-claim relative to the entire literature.
-
-[CFS](https://arxiv.org/html/1709.00627v3) and
-[SCvx](https://arxiv.org/html/1804.06539) provide relevant local-convexification
-frameworks, with problem-specific assumptions. SCvx's feasible-limit/local
-optimality statements do not establish admission of every finite iterate.
-[SCvx-fast](https://arxiv.org/html/2112.00108v1), Algorithm 1 and Theorem 3.1,
-also cannot be imported as a feasibility proof for this actuator-limited
-terminal problem without checking the full intersection of constraints.
-
-[Predictive safety filtering using system level synthesis](https://proceedings.mlr.press/v211/leeman23a.html)
-provides context for retaining an admissible continuation under explicit
-uncertainty contracts. [Drusvyatskiy and Lewis](https://arxiv.org/abs/1602.06661)
-provide error-bound/proximal convergence analysis; the local error bound and
-absence of positive-violation stationary points needed for a stronger admission
-theorem have **not** been established for this controller.
+The preceding scalar fast path and joint trajectory/normal improvement are
+retired. The present geometric initializer is deliberately incomplete; its
+restricted family does not restrict the final control sequence to that line.
+Fixing directions still selects an inner subset of the original avoidance
+problem. Failure of this subset does not establish inevitable collision.
 
 ## Occupied sets and physical residual
 
@@ -105,84 +76,46 @@ arguments, including zero. It does not mistake a nonunit affine argument for a
 unit direction. `jointResidual` reconstructs states from the input sequence and
 evaluates the exact interval-yaw support independently of solver epigraphs.
 
-## A homogeneous global majorant
+## Global majorant with a fixed separation direction
 
-At an anchor $(x_0,\theta_0)$ write $n_0=n(\theta_0)$,
-$t_0=(-n_{0,2},n_{0,1})$, $r_0=c+Px_0$, $\Delta r=P(x-x_0)$ and
-$\Delta\psi=w^\top(x-x_0)$. Optimize a **tangent coordinate** $a\in\mathbb R$:
+Let $n=(\cos\theta,\sin\theta)^\top$ be fixed, $\psi_0=\psi(x_0)$,
+$e_0=R(-\psi_0)n$, $t_E=(-e_{0,2},e_{0,1})$, and
+$\Delta\psi=w^\top(x-x_0)$. Only the trajectory is optimized. The unit rotation
+has the global Taylor remainder bound
 
 \[
-\widetilde n=n_0+a t_0,\qquad
-\ell=\|\widetilde n\|_2=\sqrt{1+a^2}\ge1,\qquad
-\theta=\theta_0+\arctan a.
+\|R(-\psi(x))n-(e_0-t_E\Delta\psi)\|_2
+\le\tfrac12(\Delta\psi)^2.
 \]
 
-The vector can never be zero. Its magnitude is immaterial to separation, and
-its normalized direction is precisely $n(\theta)$. The physical certificate
-still stores unit angles; `angleIndex` identifies tangent-coordinate decision
-columns in the conic interface, **not additive angle increments**.
-
-Let $b\le0$ be the inherited or initial numerical bound on the physical
-residual. Positive homogeneity gives the equivalent certificate
+The ego support function is $R_E=\|a_E\|_2$-Lipschitz, including the interval-yaw
+hull. Thus the following convex, globally valid majorant touches the exact
+fixed-direction residual at the anchor:
 
 \[
 \begin{aligned}
-F=\ell(f-b)={}&(d+\rho_p-b)\ell
-+h_{B_E}(R(-\psi)\widetilde n)
-+h_{B_O}(R(-\phi)\widetilde n)\\
-&+\|G^\top\widetilde n\|_1
--\widetilde n^\top(r_0+\Delta r)\le0.
+\widehat f(x;n)={}&d+\rho_p+h_{B_E}(e_0-t_E\Delta\psi)
++h_{B_O}(R(-\phi)n)+\|G^\top n\|_1\\
+&-n^\top(c+Px)+\tfrac12 R_E(\Delta\psi)^2,\\
+f(x,\theta)\le{}&\widehat f(x;n),\qquad
+\widehat f(x_0;n)=f(x_0,\theta).
 \end{aligned}
 \]
 
-The target and position-uncertainty supports now have **affine arguments**.
-They need no unit-circle Taylor remainder depending on target distance.
-For the ego, set $n_E=R(-\psi_0)n_0$, $t_E=R(-\psi_0)t_0$, and
-$v_E=n_E+t_E(a-\Delta\psi)$. The rotation remainder satisfies globally
+The builder enforces $\widehat f\le b$ for the stored numerical bound $b\le0$.
+Target shape and target position-uncertainty supports are constants. The ego
+support has an affine argument, represented by absolute-value epigraphs for
+fixed rectangles or the interval-yaw hull dual. One SOC represents the yaw
+quadratic. A point ego body, or a state-independent yaw, needs no such
+auxiliaries. Physical pose-domain, input, slew and terminal rows remain hard.
 
-\[
-\|R(-\psi)\widetilde n-v_E\|_2
-\le\tfrac12(\Delta\psi)^2+|a\Delta\psi|
-\le\tfrac12a^2+(\Delta\psi)^2.
-\]
-
-The support function is $R_E=\|a_E\|_2$-Lipschitz, also for an interval-yaw
-hull. For any $\eta>0$, the remaining position-direction bilinear term has
-another global, touching convex bound:
-
-\[
--a\,t_0^\top\Delta r
-\le\tfrac14\left(\sqrt\eta\,t_0^\top\Delta r-a/\sqrt\eta\right)^2.
-\]
-
-Subtracting the left side from the right gives the nonnegative square
-$(\sqrt\eta\,t_0^\top\Delta r+a/\sqrt\eta)^2/4$. Therefore the implemented
-majorant is
-
-\[
-\begin{aligned}
-\widehat F={}&(d+\rho_p-b)\sqrt{1+a^2}
-+h_{B_E}(v_E)+h_{B_O}(R(-\phi)\widetilde n)
-+\|G^\top\widetilde n\|_1\\
-&-n_0^\top(r_0+\Delta r)-a\,t_0^\top r_0
-+\tfrac12R_E\bigl(a^2+2(\Delta\psi)^2\bigr)\\
-&+\tfrac14\left(\sqrt\eta\,t_0^\top\Delta r-a/\sqrt\eta\right)^2.
-\end{aligned}
-\]
-
-It is convex, $F\le\widehat F$ globally, and equality holds at the anchor.
-`positionScale` selects $\eta=1/\texttt{positionScale}$; it does **not** limit
-displacement. The former 4 m position and 0.5 rad angle trust bounds are
-removed because this derivation does not need them. The certified pose/chart
-domains, dynamics, actuator and slew limits and terminal constraints remain
-hard. Each subproblem covers the open directional hemisphere about its
-anchor; it is still a local inner approximation, not the complete nonconvex set.
-
-`jointMajorant` evaluates this expression at $b=0$ for diagnostics; it bounds
-$\ell f$, not the unscaled unit residual. The conic builder includes $-b\ell$.
-Support epigraphs use absolute values for fixed rectangles and the exact
-interval-yaw hull dual otherwise. The disk norm and the positive quadratic
-terms use ordinary second-order cones. All couplings remain stage-local.
+`fixedDirectionMajorant` evaluates this expression directly for diagnostics.
+`avoidanceStageQp.fixedDirections` has **no angular decision columns** and
+returns `fixedCertificateAngles` as data. The former `angleIndex`, direction
+normalization cone, position-direction bilinear majorant, and `positionScale`
+configuration are removed. Holding the old angular coordinate at zero would
+retain an unnecessary position quadratic; deriving the fixed-direction bound
+directly avoids that restriction.
 
 ## Remove only majorants made redundant by a hard pose domain
 
@@ -202,8 +135,8 @@ following support bound over the **entire** admitted box:
 The ego circumradius bounds every possible orientation, including its yaw
 uncertainty. If this bound, with an outward arithmetic allowance, is at most
 the stored bound $b$, then $f(x,\theta_0)\le b$ for **every** state in the
-convex base. The conic builder fixes that record's tangent coordinate to zero
-with an equality and omits its redundant support epigraphs and majorant.
+convex base. The conic builder omits that record's redundant support
+epigraphs and majorant. Its direction remains fixed like every other record.
 Exit records are never screened. Without a hard pose box, screening is not
 used. A merely safe nominal point is insufficient.
 
@@ -241,7 +174,7 @@ of $10^{-10}$ rad without losing the touching property during continuation.
 
 ## One signed control section and finite interval computation
 
-For the fast admission attempt, retain the nominal input sequence $U_0$ and restrict
+For direction initialization, retain the nominal input sequence $U_0$ and restrict
 candidate inputs to $U(\alpha)=U_0+\alpha v$. Both amplitude signs are available.
 The section is deliberately incomplete; an empty section is not evidence of
 physical inevitability of collision.
@@ -331,13 +264,15 @@ it onto each certified component and choose the best scalar cost. The iteration
 limit affects performance accuracy, not the requirement for a hard certificate.
 No collision or terminal slack is introduced.
 
-A successful restricted admission needs no conic solve. If the initial nominal
-already passes the complete verifier, one ordinary hard performance improvement
-is permitted. Inherited successors also attempt one such improvement while
-retaining the verified incumbent. Empty base, terminal exclusion, collision
-exclusion, exit exclusion and independent-verification failure remain distinct
-section outcomes. A failed section can initialize the hard recovery below;
-failure of the complete admission search issues no command.
+After this initialization, a full fixed-direction convex trajectory solve is
+mandatory. The complete control sequence is free; it need not retain the
+initializer's steering/braking timing or scalar amplitude. An initially
+certified nominal also proceeds through this solve. Inherited successors use
+their retained directions and attempt the same full optimization. Empty base,
+terminal exclusion, collision exclusion, exit exclusion and verification
+failure remain distinct initializer outcomes. A failed section can still
+supply the least-violated anchor below; failure to initialize or to obtain a
+verified full-plan admission issues no command.
 
 The common full affine sensitivity maps and canonical condensed objective are
 still constructed for compatibility with the complete inherited family. The
@@ -345,7 +280,7 @@ scalar search propagates its two trajectories and accumulates its objective
 directly; its improvement is not a claim that all preparation is linear in the
 horizon. Finite loop counts and observed desktop timings are not a WCET proof.
 
-## Release the time shape after section exclusion
+## Initialization after section exclusion
 
 The scalar search can exclude every amplitude even when a hard-certified plan
 exists. The circular-crossing diagnosis demonstrated an early chart-boundary
@@ -367,35 +302,36 @@ its admitted `decision` output stays empty. The proposal is neither issued nor
 stored as an incumbent. This bounded scan chooses one initialization, not a
 library of predetermined trajectories or temporal weights.
 
-Build the same global joint-support SOCP used for continuation around this
-proposal and its best dictionary directions. All input coordinates and support
-angle increments are free; physical rows, chart radii/remainders, terminal
-cones, encounter-exit requirements and the performance objective remain hard
-or soft exactly as before. The support majorants are valid at infeasible
-centers as well as feasible ones. A feasible solution of this inner problem
-can therefore satisfy the original certificates even though its center does
-not. The touching argument guarantees inclusion of a feasible incumbent only
-for continuation; it does not guarantee that admission recovery succeeds.
+Build the fixed-direction SOCP around the selected candidate or proposal.
+All input coordinates are free, while all selected directions are constants.
+The support majorants are valid at infeasible centers as well as feasible
+ones. A feasible solution of this inner problem can therefore satisfy the
+original certificates even when its center does not. Touching preserves a
+feasible inherited anchor; it does not guarantee fresh admission.
 
-At most one such solve is attempted, subject to the original work timer and
-full-frame deadline. A positive solver status proceeds to the independent
-original verifier. Failure, an unverified solution or an expired frame issues
-no command. No collision slack is added. Metadata distinguishes the rejected
-section, the proposal violation, the full-plan solve and its verification.
-`restorationSolverCallCount` counts this one hard admission recovery when used;
-the scalar fast path still makes zero conic calls.
+At most one full trajectory solve is attempted, subject to the existing work
+timer and full-frame deadline. A positive solver status proceeds through the
+independent original verifier. A failed fresh solve, unverified solution or
+expired frame issues no command. Metadata reports
+`policy = "fixedDirectionTrajectoryOptimization"`, `fixedCertificateAngles`,
+`directionSeedSource`, and `fullPlanStatus`. Every successful fresh admission
+has `usedFullPlanAdmission = true` and one native solve;
+`issuedAdmissionWitness = false` always. `restorationSolverCallCount` is zero:
+this is the main trajectory stage, not a recovery-only call.
 
-The generated replay adapter implements the same branch with status 4 for a
-verified full-plan admission and an empty decision on failed admission. Existing
-compiled replay binaries must be rebuilt after this source change. It remains
-a prepared-frame benchmark rather than a complete real-time controller.
+The generated prepared-frame adapter has status 4 for optimized admission,
+2 for optimized continuation, 3 for a retained previously optimized suffix,
+and 0 for rejection. There is no direct-scalar status 1 branch. Rebuild
+compiled adapters after this change. This remains a prepared-frame benchmark,
+not a complete standalone real-time controller.
 
 ## Hard acceptance and continuation
 
 A scalar candidate never authorizes execution by itself. Acceptance reconstructs the input
 trajectory and independently checks every physical base row, terminal/CLF
 cone and exact nonlinear unit-support residual with arithmetic allowances.
-A candidate may be issued only when these original hard checks pass.
+Only a full-plan solver result may become a new executable admission after
+these checks; passing them does not authorize direct issuance of a scalar seed.
 The CLF is the only softened physical optimization condition. The next frame improves the ordinary performance
 objective. An already certified continuation can be retained if its attempted
 improvement fails, with the actual numerical status reported. The complete
@@ -424,9 +360,9 @@ certificate for a complete hold enclosure and is outside this change.
 
 - `avoidanceSafetyGeometry`: occupied-set records, homogeneous support, yaw
   hulls, exact nonlinear residuals, majorant evaluation and verification.
-- `avoidanceStageQp`: sparse stage lifting, angular/support variables and SOC
-  majorants. The original dynamics and terminal blocks remain sparse.
-- `solveHardCbfClf`: scalar interval admission, hard continuation improvement,
+- `avoidanceStageQp`: sparse stage lifting, fixed-direction support epigraphs and SOC
+  yaw majorants. The original dynamics and terminal blocks remain sparse.
+- `solveHardCbfClf`: scalar direction initialization, full fixed-direction optimization,
   physical acceptance and the certified-incumbent interface.
 - `formulateAvoidanceProblem` and `hardEncounterBarrier`: preserve and shift
   the entire certificate; collision and exit angles share the same method.
@@ -434,9 +370,9 @@ certificate for a complete hold enclosure and is outside this change.
   majorant checks, global majorants beyond the former trust domain, hard
   admission, uncertain multiple targets, suffix preservation and deadlines.
 - `affinePlanAdmissionTest`: scalar half-lines, modal balls, open interval
-  subtraction, complete yaw support, zero-conic admission and hard rejection.
+  subtraction, complete yaw support, mandatory full-plan admission and hard rejection.
 
 The implementation adds no core source file or third-party dependency. Its
 twenty-file source budget remains in force. `certificateContinuationTest`
-checks default joint admission, suffix containment, changed sensing contracts,
+checks fixed-direction admission, suffix containment, changed sensing contracts,
 rejection of older saved states and target-free renewal.

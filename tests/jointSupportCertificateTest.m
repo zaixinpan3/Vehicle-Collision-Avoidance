@@ -71,12 +71,12 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 records(index)=item;
             end
             program.jointCertificate=struct('records',records,'angles',angles,'upperBound',-1e-4*ones(2,1));
-            conic=avoidanceStageQp.joint(program,point,angles,cfg);
-            % Fix the complete physical plan and both direction increments.
+            conic=avoidanceStageQp.fixedDirections(program,point,angles,cfg);
+            % Fix the complete physical plan; directions are already constant.
             % Only the support epigraph variables remain free to certify it.
-            indices=[1:numel(point),conic.angleIndex];number=numel(indices);
+            indices=1:numel(point);number=numel(indices);
             lock=sparse(1:number,indices,ones(1,number),number,numel(conic.q));
-            conic.A=[lock;conic.A];conic.b=[point;zeros(2,1);conic.b];
+            conic.A=[lock;conic.A];conic.b=[point;conic.b];
             conic.cones(1)=conic.cones(1)+number;
             conic.P=sparse(numel(conic.q),numel(conic.q));conic.q(:)=0;
             result=solveHardCbfClf.constrained(conic,cfg);
@@ -89,7 +89,7 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyLessThan(touchingError,1e-11);
         end
 
-        function oncomingAdmissionOptimizesDirectionsAndRetainsItsSuffix(testCase)
+        function oncomingAdmissionFixesDirectionsAndRetainsItsOptimizedSuffix(testCase)
             [first,next,old,stored]=localOncoming(false);
             keep=[old.program.jointCertificate.records.stage]>1;
             oldAngles=old.program.jointCertificate.angles(keep);
@@ -98,7 +98,7 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 suffix(:),oldAngles);
             testCase.verifyTrue(first.metadata.planCertified);
             testCase.verifyEqual(first.metadata.restorationSolverCallCount,0);
-            testCase.verifyEqual(first.metadata.solverCallCount,0);
+            testCase.verifyEqual(first.metadata.solverCallCount,1);
             testCase.verifyTrue(next.metadata.shiftedWitnessContained);
             testCase.verifyEqual(next.metadata.admissionSearch.initialCertificateAngles,oldAngles,AbsTol=0);
             testCase.verifyEqual(next.metadata.conicSolverCallCount,1);
@@ -128,8 +128,8 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             program.feasibleWitness=[.1;0;1];program.anchorPlan=[.1;0];
             program.geometry.frames.domainCenter=[.9;0;0];
             program.geometry.frames.domainRadius=[0;2;0];
-            conic=avoidanceStageQp.joint(program,program.feasibleWitness,0,cfg);
-            [accepted,result]=solveHardCbfClf.joint(program,struct(),cfg);
+            conic=avoidanceStageQp.fixedDirections(program,program.feasibleWitness,0,cfg);
+            [accepted,result]=solveHardCbfClf.fixedDirections(program,struct(),cfg);
             testCase.verifyEqual(conic.domainCertifiedRecords,1);
             testCase.verifyTrue(result.feasible);
             testCase.verifyNumElements(accepted.jointCertificate.records,1);
@@ -144,8 +144,8 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             program.geometry.frames.domainRadius=[0;1;0];
             point=[1.5;0;1];program.feasibleWitness=point;
             program.jointCertificate.angles=pi/2;
-            conic=avoidanceStageQp.joint(program,point,pi/2,cfg);
-            [accepted,result]=solveHardCbfClf.joint(program,struct(),cfg);
+            conic=avoidanceStageQp.fixedDirections(program,point,pi/2,cfg);
+            [accepted,result]=solveHardCbfClf.fixedDirections(program,struct(),cfg);
             testCase.verifyEmpty(conic.domainCertifiedRecords);
             testCase.verifyTrue(result.feasible);
             testCase.verifyGreaterThan(result.decision(1),1.1);
@@ -224,11 +224,10 @@ function [minimumGap,touchingError]=localCheckMajorants()
     gaps=zeros(2000,1);errors=zeros(2000,1);
     for index=1:numel(gaps)
         state=randn(stream,6,1);angle=6*randn(stream);delta=10*randn(stream,6,1);
-        coordinate=5*randn(stream);newAngle=angle+atan(coordinate);
-        actual=avoidanceSafetyGeometry.jointValue(record,state+delta,newAngle);
-        majorant=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state+delta,coordinate,3);
-        gaps(index)=majorant-hypot(1,coordinate)*actual;
-        errors(index)=avoidanceSafetyGeometry.jointMajorant(record,state,angle,state,0,3) ...
+        actual=avoidanceSafetyGeometry.jointValue(record,state+delta,angle);
+        majorant=avoidanceSafetyGeometry.fixedDirectionMajorant(record,state,angle,state+delta);
+        gaps(index)=majorant-actual;
+        errors(index)=avoidanceSafetyGeometry.fixedDirectionMajorant(record,state,angle,state) ...
             -avoidanceSafetyGeometry.jointValue(record,state,angle);
     end
     minimumGap=min(gaps);touchingError=max(abs(errors));
