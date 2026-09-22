@@ -6,7 +6,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % plant, not between nodes (NODE_SAMPLED_CERTIFICATE.md).
 % Store the accepted prediction and terminal witness for next-frame transfer.
 % The terminal law is a mathematical continuation, never a runtime fallback.
-% Fresh admission uses a Cheng fluid reference to initialize separation normals.
+% Fresh admission uses timed NRMM/VFFM references to initialize separation normals.
 % Fix those normals and optimize the complete input sequence in one hard SOCP.
 % Never issue an initializer, even if it already passes the physical verifier.
 % Subsequent frames optimize with the inherited normals fixed; a failed

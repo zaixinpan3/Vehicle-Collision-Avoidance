@@ -2,6 +2,39 @@ classdef targetPrediction
     %targetPrediction Bounded online target motion and footprint propagation.
 
     methods (Static)
+        function [center,jerk] = nrmmFlow(initial,rearAxleDistance,time,stopPolicy)
+        % Exact fixed-frame NRMM, initial=[X;Y;V;A;psi;beta], in SI units.
+        % Output rows are [X;Y;vx;vy;ax;ay;psi;yawRate]. An explicit 'hold'
+        % policy freezes the pose after braking to rest; the default rejects
+        % times beyond that stop. Derivatives at a held stop are right sided.
+            if nargin<4,stopPolicy="reject";end
+            validateattributes(initial,{'double'},{'real','finite','size',[6,1]});
+            validateattributes(rearAxleDistance,{'double'},{'scalar','real','finite','positive'});
+            validateattributes(time,{'double'},{'real','finite','nonnegative','vector'});
+            assert(initial(3)>=0 && isscalar(string(stopPolicy)) ...
+                && any(string(stopPolicy)==["reject","hold"]), ...
+                'collisionAvoidanceController:invalidNrmmMotion','Use forward speed and a reject or hold stop policy.');
+            time=reshape(time,1,[]);speed=initial(3);acceleration=initial(4);
+            stopped=false(size(time));
+            if acceleration<0
+                stopTime=speed/-acceleration;
+                if any(time>stopTime) && string(stopPolicy)=="reject"
+                    error('collisionAvoidanceController:nrmmPastStop','Specify hold explicitly for times beyond the NRMM braking stop.');
+                end
+                if string(stopPolicy)=="hold",stopped=time>=stopTime;time=min(time,stopTime);end
+            end
+            curvature=sin(initial(6))/rearAxleDistance;
+            arc=speed*time+acceleration*time.^2/2;
+            course=initial(5)+initial(6)+curvature*arc;
+            position=initial(1:2)+localArcDisplacement(arc,curvature,initial(5)+initial(6));
+            speed=speed+acceleration*time;acceleration=acceleration+zeros(size(time));
+            speed(stopped)=0;acceleration(stopped)=0;
+            tangent=[cos(course);sin(course)];normal=[-sin(course);cos(course)];
+            center=[position;speed.*tangent;acceleration.*tangent+curvature*speed.^2.*normal; ...
+                initial(5)+curvature*arc;curvature*speed];
+            jerk=-curvature^2*speed.^3.*tangent+3*curvature*acceleration.*speed.*normal;
+        end
+
         function [offset,slope] = rectangleSupportMajorant(normal,referenceHeading,halfLength,halfWidth,anchor,errorMaximum)
         % Touching convex majorant of rectangle support over a yaw interval.
         % Every vertex projection is concave wherever it is nonnegative.
@@ -162,27 +195,27 @@ classdef targetPrediction
             end
             if isfield(encounter,"nominalCenter"), x = encounter.nominalCenter; end
             speed = norm(x(3:4));
-            if speed<=sqrt(eps)
-                center = repmat(x,1,numel(duration));center(3:6,:) = 0;center(8,:) = 0;
-                jerk = zeros(size(duration));yawAcceleration = jerk;
-                return;
+            if speed==0
+                % The Cartesian interface cannot identify sideslip/curvature at
+                % rest. Use the acceleration direction and a straight launch.
+                acceleration = norm(x(5:6));
+                initialCourse = x(7);
+                if acceleration>0,initialCourse=atan2(x(6),x(5));end
+                curvature = 0;
+            else
+                acceleration = dot(x(3:4),x(5:6))/speed;
+                initialCourse = atan2(x(4),x(3));
+                curvature = x(8)/speed;
             end
-            acceleration = dot(x(3:4),x(5:6))/speed;
             if isfield(encounter.contract,"scalarAccelerationMaximum")
                 limit = encounter.contract.scalarAccelerationMaximum;
                 acceleration = min(max(acceleration,-limit),limit);
             end
-            curvature = x(8)/speed;
             stopped = acceleration<0 & duration>=speed/-acceleration;
             if acceleration<0, duration = min(duration,speed/-acceleration); end
             arc = speed*duration+acceleration*duration.^2/2;
-            initialCourse = atan2(x(4),x(3));
             course = initialCourse+curvature*arc;
-            if abs(curvature)<sqrt(eps)
-                position = x(1:2)+[cos(initialCourse);sin(initialCourse)]*arc;
-            else
-                position = x(1:2)+[sin(course)-sin(initialCourse);cos(initialCourse)-cos(course)]/curvature;
-            end
+            position = x(1:2)+localArcDisplacement(arc,curvature,initialCourse);
             speed = max(0,speed+acceleration*duration);
             acceleration = acceleration+zeros(size(duration));
             acceleration(stopped) = 0;
@@ -317,6 +350,14 @@ classdef targetPrediction
         end
 
     end
+end
+
+function displacement=localArcDisplacement(arc,curvature,course)
+    halfTurn=curvature*arc/2;scale=ones(size(halfTurn));
+    regular=abs(halfTurn)>1e-4;
+    scale(regular)=sin(halfTurn(regular))./halfTurn(regular);
+    small=halfTurn(~regular);scale(~regular)=1-small.^2/6+small.^4/120;
+    displacement=arc.*scale.*[cos(course+halfTurn);sin(course+halfTurn)];
 end
 
 function radius = localDirectionRadius(magnitude, errorRadius)

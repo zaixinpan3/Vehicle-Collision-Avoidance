@@ -2,11 +2,12 @@
 
 The format-41 controller first initializes separation directions, then fixes
 them and solves one convex problem for the complete control sequence. Fresh
-initialization uses a Cheng modified-fluid Gaussian reference in the road's
-Frenet chart. Predicted conflict stations set its center and length; target
-relative lateral motion orders the two sides. A shared terminal-preserving
-least-squares fit supplies both seeds. Analytic rectangle normals and robust
-support residuals select one side without additional trajectory solves. No direction dictionary, amplitude cells or scalar
+initialization uses an [NRMM-based time-dependent VFFM reference](NRMM_VFFM_INITIALIZATION.md)
+in the selected road chart. Analytical target poses set moving Gaussian centers
+at ego arrival times; all active target contributions are superposed. Two passing
+assignments share a terminal-preserving fit to the affine vehicle model.
+Physical base-row feasibility and robust support residuals select one seed;
+analytic rectangle normals initialize the subsequent full trajectory solve. No direction dictionary, amplitude cells or scalar
 objective search remains. The seed may violate constraints and never authorizes
 execution. Every new admission, including an already certified nominal, must
 come from the full trajectory solver and pass independent hard verification.

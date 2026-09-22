@@ -2,6 +2,64 @@ classdef laneGeometry
     %laneGeometry Smooth-reference projection, Frenet poses and certified charts.
 
     methods (Static)
+        function chart = normalRoadChart(station,lane,road)
+        % Intersect route normals with finite quadratic boundaries. The chosen
+        % component contains d=0. This is a selected corridor, not a road union.
+        % Unbounded sections use a unit lateral scale and keep all hard rows.
+            station=reshape(station,1,[]);count=numel(station);
+            [position,heading]=laneGeometry.fromFrenet([station;zeros(5,count)],lane);
+            curvature=zeros(1,count);derivative=curvature;
+            if isfield(lane,'referenceCurve')
+                [curvature,derivative]=laneGeometry.referenceCurvature(station,lane.referenceCurve);
+            end
+            tangent=[cos(heading);sin(heading)];normal=[-sin(heading);cos(heading)];
+            midpoint=zeros(3,count);halfWidth=[ones(1,count);zeros(2,count)];
+            bounded=false(1,count);valid=true(1,count);
+            for node=1:count
+                lower=[-Inf;0;0];upper=[Inf;0;0];
+                for index=1:numel(road.boundaries)
+                    boundary=road.boundaries(index);a=boundary.coefficients(1);
+                    b=boundary.coefficients(2);c=boundary.coefficients(3);
+                    longitudinal=boundary.longitudinalDirection; lateral=boundary.lateralDirection;
+                    offset=position(:,node)-boundary.origin;
+                    x=longitudinal.'*offset;y=lateral.'*offset;
+                    nx=longitudinal.'*normal(:,node);ny=lateral.'*normal(:,node);
+                    polynomial=[-a*nx^2,ny-(2*a*x+b)*nx,y-a*x^2-b*x-c];
+                    tolerance=128*eps*(1+norm(polynomial));
+                    if x>=boundary.parameterRange(1) && x<=boundary.parameterRange(2) ...
+                            && boundary.safeSideSign*polynomial(3)<-tolerance
+                        valid(node)=false;
+                    end
+                    roots=localSectionRoots(polynomial);
+                    for rootIndex=1:numel(roots)
+                        d=roots(rootIndex);parameter=x+nx*d;
+                        if parameter<boundary.parameterRange(1) || parameter>boundary.parameterRange(2),continue;end
+                        gradient=lateral-(2*a*parameter+b)*longitudinal;
+                        denominator=gradient.'*normal(:,node);
+                        % A tangency does not delimit an open component.
+                        if abs(denominator)<=tolerance,continue;end
+                        k=curvature(node);kp=derivative(node);t=tangent(:,node);n=normal(:,node);
+                        first=-(gradient.'*t)*(1-k*d)/denominator;
+                        velocity=(1-k*d)*t+first*n;
+                        second=-(-2*a*(longitudinal.'*velocity)^2 ...
+                            +gradient.'*((-kp*d-2*k*first)*t+k*(1-k*d)*n))/denominator;
+                        value=[d;first;second];
+                        if boundary.safeSideSign*denominator>0 && d<=0 && d>lower(1),lower=value;end
+                        if boundary.safeSideSign*denominator<0 && d>=0 && d<upper(1),upper=value;end
+                    end
+                end
+                bounded(node)=isfinite(lower(1)) && isfinite(upper(1));
+                if bounded(node)
+                    midpoint(:,node)=(upper+lower)/2;halfWidth(:,node)=(upper-lower)/2;
+                    valid(node)=valid(node) && halfWidth(1,node)>0 ...
+                        && all(1-curvature(node)*[lower(1),upper(1)]>0);
+                end
+            end
+            chart=struct('position',position,'heading',heading,'tangent',tangent,'normal',normal, ...
+                'curvature',curvature,'curvatureDerivative',derivative, ...
+                'midpoint',midpoint,'halfWidth',halfWidth,'bounded',bounded,'valid',valid);
+        end
+
         function [frame,nominal] = sweptCellFrame(model,tube,anchor)
         % One frame construction for horizon admission and geometry rows.
             [frame,values] = laneGeometry.sweptCellFrames(model,tube,anchor);
@@ -178,6 +236,10 @@ classdef laneGeometry
                 heading = atan2(curve.curvature*radial(1,:),-curve.curvature*radial(2,:));
                 middle = curve.heading+curve.curvature*curve.length/2;
                 station = curve.length/2+atan2(sin(heading-middle),cos(heading-middle))/curve.curvature;
+                if ~isempty(stationHint)
+                    period=2*pi/abs(curve.curvature);
+                    station=station+period*round((stationHint-station)/period);
+                end
             end
             % The analytic reference continues beyond the display arc. On a
             % circle prepare() unwraps this coordinate about the carried node.
@@ -406,6 +468,19 @@ classdef laneGeometry
             end
         end
     end
+end
+
+function values=localSectionRoots(polynomial)
+    a=polynomial(1);b=polynomial(2);c=polynomial(3);values=zeros(1,0);
+    if a==0
+        if b~=0,values=-c/b;end
+        return;
+    end
+    discriminant=b*b-4*a*c;
+    if discriminant<0,return;end
+    direction=1;if b<0,direction=-1;end
+    q=-.5*(b+direction*sqrt(discriminant));
+    if q==0,values=-b/(2*a);else,values=[q/a,c/q];end
 end
 
 function values = localProjection(position, lane)

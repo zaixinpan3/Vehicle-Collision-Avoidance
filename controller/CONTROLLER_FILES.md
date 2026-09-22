@@ -53,7 +53,7 @@ after solver failure.
 
 `avoidanceStageQp.build` supplies the common sparse base. Its `fixedDirections`
 method adds stage-local support epigraphs and a global yaw majorant without
-angle variables. `solveHardCbfClf.fixedDirections` owns fluid-reference initialization,
+angle variables. `solveHardCbfClf.fixedDirections` owns analytical NRMM/VFFM reference preparation and fitting,
 mandatory full-plan admission, and full continuation improvement. Target-free
 frames solve only the common convex base with a single `constrained` call.
 Nonlinear Fiala tools retain their separate study scope. The online guarantee

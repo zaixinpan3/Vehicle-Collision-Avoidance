@@ -1,6 +1,6 @@
 # Fixed-direction convex trajectory optimization
 
-Format 41 separates initialization from execution. A Cheng modified-fluid reference
+Format 41 separates initialization from execution. An NRMM-timed VFFM reference
 initializes a trajectory anchor and one unit separation direction per collision or
 exit record. These directions are then fixed while one hard SOCP optimizes the
 complete finite control sequence. An initialization seed is never issued, even if
@@ -172,97 +172,43 @@ is independently verified and stored at admission, then inherited unchanged.
 This avoids introducing a complete interval-yaw dual for widths on the order
 of $10^{-10}$ rad without losing the touching property during continuation.
 
-## Cheng modified-fluid reference initialization
+## NRMM-based time-dependent VFFM initialization
 
-Cheng et al. (2021), *Virtual Fluid-Flow-Model-Based Lane-Keeping Integrated
-With Collision Avoidance Control System Design for Autonomous Vehicles*,
-[DOI 10.1109/TITS.2020.2990211](https://doi.org/10.1109/TITS.2020.2990211),
-Eqs. (34)--(36), imply a Gaussian lateral path through the derivative-extremum
-condition on their modified function. This is not numerical integration of a
-raw cylinder-flow streamline. The paper leaves moving obstacles to future work;
-conflict prediction, curved-road coordinates and vehicle fitting below are
-project extensions. See the [source review](../report/CHENG_FLUID_INITIALIZATION_REVIEW_20260921.md).
+The current initializer is specified in [NRMM_VFFM_INITIALIZATION.md](NRMM_VFFM_INITIALIZATION.md).
+It propagates nominal targets analytically at the ego arrival times, constructs
+normal-coordinate charts from the selected quadratic road boundaries, and
+superposes moving Gaussian contributions from every nominally conflicting
+target. Conflict-derived passing ordinates and relative-station widths are
+design parameters. Two joint passing assignments share one terminal-preserving
+affine-model fit. Body-yaw preferences subtract anchor sideslip from reference
+course; analytical derivatives retain target acceleration, turning and road
+width variation.
 
-If the nominal witness fails verification, select the target with the greatest
-reserved collision residual. Its first and last nominal conflicting nodes,
-$k_a,k_b$, determine
+The fitted rollout fixes the measured initial state and preserves the nominal
+terminal state/input. Prefer a fit satisfying the physical base rows, then
+minimize the worst reserved support residual within the same feasibility
+class. Analytic rectangle signed-distance normals initialize exactly one full
+fixed-normal SOCP. All controls remain free in that solve. The seed cannot be
+issued or retained as an executable fallback. Inherited optimized certificates
+retain their directions and do not regenerate the reference.
 
-\[
-s_c=(s_{k_a}+s_{k_b})/2,\qquad
-L=\texttt{widthScale}\max(\texttt{minimumWidthMeters},|s_{k_b}-s_{k_a}|/2).
-\]
+`program.fluidReference` contains numeric reference preparation shared with
+the generated prepared-frame adapter. Metadata retains
+`directionSeedSource = "chengFluidReference"` for compatibility; its
+`initialization` reports active target count, two support scores, two physical
+base-row excesses, dominant-target amplitude/width/conflict interval,
+terminal-fit error and selected seed residuals. `usedFullPlanAdmission` is
+true for successful fresh admission and `issuedAdmissionWitness` stays false.
+Adapter status 4 denotes optimized admission, 2 optimized continuation,
+3 retained verified continuation, and 0 rejection. Rebuild generated adapters
+after changing their prepared input structures.
 
-Defaults are width scale 1.2 and minimum base width 3 m. Relative lateral
-travel across this interval orders the side opposing target crossing first. When
-that travel is at most $10^{-6}$ m in magnitude, use the side away from the
-target's lateral center; a centered tie chooses positive road lateral. Both sides are fitted, then the smaller worst reserved support residual over
-all collision and exit records chooses one seed. Arithmetic-scale ties retain
-the geometric order. This is not a completeness guarantee. All
-other targets retain their original hard constraints.
-
-At the middle conflict node, project the nominal target rectangle onto road
-lateral. Add the ego half-width and a 0.2 m seed-shape allowance to obtain the
-signed amplitude $A$. The allowance is not a physical clearance requirement.
-Uncertainty and chart remainder are retained in the hard constraints, not
-counted again as a mandatory excursion in this nominal reference. Construct
-
-\[
-b(s)=A\exp[-(s-s_c)^2/(2L^2)],\quad
-\bar d_k=d_k+b(s_k),\quad
-\bar\psi_k=\psi_k+\operatorname{atan2}(b'(s_k),1-\kappa_k b(s_k)).
-\]
-
-Let $M$ map control changes to weighted lateral position/heading changes at
-all predicted nodes, with weights 1 and 4. Minimize
-
-\[
-\|M\Delta U-e\|^2+0.02\Delta U^\top R\Delta U,\qquad C\Delta U=0,
-\]
-
-where $R$ combines actuator weights and the existing input-difference metric.
-$C$ retains the nominal final six-state vector and final two inputs. Solve a
-positive-definite system for both references at once, then the small Schur
-complement using a pseudoinverse;
-reject nonfinite fits or terminal equality residual above $10^{-8}$. This fit
-does not enforce collision, road, actuator or intermediate chart inequalities.
-If no collision node needs a deformation, keep the nominal seed and let the
-full optimizer address its remaining obligations.
-
-Propagate the fitted control sequence through the affine prediction. At each
-collision/exit record compute the analytic rectangle signed-distance normal;
-it remains a useful geometric direction even when the seed overlaps a target.
-Normals are continuous geometric outputs, not one of a fixed angular dictionary.
-Support uncertainty is handled by the unchanged robust constraints and verifier.
-Complete the selected seed's allowed soft-CLF slack, then form exactly one fixed-normal
-full-trajectory SOCP. An infeasible center is valid for the global support
-majorant, but does not guarantee a feasible inner problem.
-
-The former signed control line, amplitude-cell subdivision, discrete normal
-dictionary, scalar objective bisection and least-violated boundary proposal
-are deleted. Their configuration fields are rejected. All input coordinates
-remain free in the final optimizer. The Gaussian does not constrain its shape.
-Inherited frames shift the previously optimized certificate and normals; they
-do not regenerate a fluid reference. Fresh admission is required when the
-existing sensing/execution rules invalidate that certificate.
-
-At most one full trajectory solve is attempted, subject to the existing work
-timer and full-frame deadline. A positive solver status proceeds through the
-independent original verifier. A failed fresh solve, unverified solution or
-expired frame issues no command. Metadata reports
-`policy = "fixedDirectionTrajectoryOptimization"`, `fixedCertificateAngles`,
-`directionSeedSource`, and `fullPlanStatus`. Fluid initialization reports
-`directionSeedSource = "chengFluidReference"`, with amplitude, width, conflict
-stages, terminal-fit error, the two geometric scores and unverified seed
-residuals under `initialization`. Every successful fresh admission
-has `usedFullPlanAdmission = true` and one native solve;
-`issuedAdmissionWitness = false` always. `restorationSolverCallCount` is zero:
-this is the main trajectory stage, not a recovery-only call.
-
-The generated prepared-frame adapter has status 4 for optimized admission,
-2 for optimized continuation, 3 for a retained previously optimized suffix,
-and 0 for rejection. There is no direct-scalar status 1 branch. Rebuild
-compiled adapters after this change. This remains a prepared-frame benchmark,
-not a complete standalone real-time controller.
+This extends the 2021 Cheng reference rule; it is not a fluid PDE solution.
+The online bounded Cartesian target model remains the hard safety model.
+The initializer supports selected route corridors rather than general unions
+of road patches. The unchanged node certificate does not establish all-time
+separation. Two passing assignments are incomplete, and failure does not prove
+that no feasible trajectory exists.
 
 ## Hard acceptance and continuation
 

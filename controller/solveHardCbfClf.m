@@ -1,6 +1,24 @@
 classdef solveHardCbfClf
     %solveHardCbfClf Certified convex trajectory solves and independent hard-safety checks.
     methods (Static)
+        function reference = vffmReference(time,progress,encounters,lane,road,widths,passingOffsets)
+        % Time-consistent Gaussian preference in a regular normal road chart.
+        % progress is [station; station rate; station acceleration] in SI units.
+        % Each column of passingOffsets specifies fixed lateral passing ordinates
+        % in metres. Moving Gaussian centres and chart widths vary with time.
+        % This geometric reference has no execution or feasibility authority.
+            validateattributes(time,{'double'},{'row','finite','nonnegative'});
+            validateattributes(progress,{'double'},{'size',[3,numel(time)],'finite','real'});
+            validateattributes(widths,{'double'},{'numel',numel(encounters),'positive','finite','real'});
+            validateattributes(passingOffsets,{'double'},{'nrows',numel(encounters),'finite','real'});
+            reference=localTimeDependentReference(time,progress,encounters,lane,road,widths,passingOffsets);
+        end
+
+        function reference = prepareFluidReference(program,model)
+        % Prepare numeric geometry once; native frame replay uses the same data.
+            reference=localPrepareFluidReference(program,model);
+        end
+
         function program = certify(program,decision)
         % Validate physical safety independently of a numerical success flag.
         % Transfer a feasible affine family WITHOUT repeated inward tightening.
@@ -74,8 +92,8 @@ classdef solveHardCbfClf
 
         function [decision,angles,information] = fluidInitialize(program,cfg)
         % Cheng et al. (2021), DOI 10.1109/TITS.2020.2990211, Eqs. (34)-(36).
-        % A Gaussian Frenet reference initializes the geometry of one full SOCP.
-        % Prediction-based placement and affine-model fitting are extensions;
+        % Timed NRMM/VFFM references initialize the geometry of one full SOCP.
+        % Moving targets, quadratic charts and affine-model fitting are extensions;
         % this seed is neither a feasible certificate nor an executable plan.
             [decision,angles,information]=localFluidInitialize(program,cfg);
         end
@@ -385,69 +403,154 @@ function states=localStates(prediction,inputs)
     end
 end
 
+function reference=localTimeDependentReference(time,progress,encounters,lane,road,widths,passingOffsets)
+    chart=laneGeometry.normalRoadChart(progress(1,:),lane,road);
+    candidates=size(passingOffsets,2);nodes=numel(time);targets=numel(encounters);
+    z=zeros(candidates,nodes);zd=z;zdd=z;valid=all(chart.valid);
+    targetStation=zeros(targets,nodes);targetLateral=targetStation;
+    coefficients=zeros(targets,nodes,candidates);
+    for index=1:targets
+        motion=targetPrediction.nominalFlow(encounters(index),time);
+        projection=laneGeometry.project(motion(1:2,:),lane,progress(1,:));
+        s=projection.station;d=projection.lateralPosition;
+        targetChart=laneGeometry.normalRoadChart(s,lane,road);
+        k=targetChart.curvature;kp=targetChart.curvatureDerivative;regular=1-k.*d;
+        valid=valid && all(targetChart.valid) && all(regular>sqrt(eps));
+        if ~valid,break;end
+        sd=sum(targetChart.tangent.*motion(3:4,:),1)./regular;
+        dd=sum(targetChart.normal.*motion(3:4,:),1);
+        sdd=(sum(targetChart.tangent.*motion(5:6,:),1)+2*k.*sd.*dd+kp.*d.*sd.^2)./regular;
+        m=targetChart.midpoint;h=targetChart.halfWidth;
+        hd=h(2,:).*sd;hdd=h(3,:).*sd.^2+h(2,:).*sdd;
+        numerator=passingOffsets(index,:).'-m(1,:);
+        numeratorD=-m(2,:).*sd;
+        numeratorDD=-m(3,:).*sd.^2-m(2,:).*sdd;
+        b=numerator./h(1,:);bd=(numeratorD-b.*hd)./h(1,:);
+        bdd=(numeratorDD-b.*hdd-2*bd.*hd)./h(1,:);
+        q=progress(1,:)-s;qd=progress(2,:)-sd;qdd=progress(3,:)-sdd;
+        exponent=exp(-.5*(q/widths(index)).^2);
+        lambda=-q.*qd/widths(index)^2;
+        lambdaD=-(qd.^2+q.*qdd)/widths(index)^2;
+        z=z+b.*exponent;zd=zd+(bd+b.*lambda).*exponent;
+        zdd=zdd+(bdd+2*bd.*lambda+b.*(lambda.^2+lambdaD)).*exponent;
+        targetStation(index,:)=s;targetLateral(index,:)=d;
+        coefficients(index,:,:)=permute(b,[3,2,1]);
+    end
+    m=chart.midpoint;h=chart.halfWidth;sd=progress(2,:);sdd=progress(3,:);
+    d=m(1,:)+h(1,:).*z;
+    dd=(m(2,:)+h(2,:).*z).*sd+h(1,:).*zd;
+    ddd=(m(3,:)+h(3,:).*z).*sd.^2+(m(2,:)+h(2,:).*z).*sdd ...
+        +2*h(2,:).*sd.*zd+h(1,:).*zdd;
+    regular=1-chart.curvature.*d;
+    tangential=regular.*sd;
+    at=regular.*sdd-chart.curvatureDerivative.*d.*sd.^2-2*chart.curvature.*sd.*dd;
+    an=chart.curvature.*regular.*sd.^2+ddd;
+    speed=hypot(tangential,dd);course=atan2(dd,tangential);
+    curvature=(tangential.*an-dd.*at)./max(speed,sqrt(eps)).^3;
+    positions=zeros(2,nodes,candidates);velocity=positions;acceleration=positions;
+    for candidate=1:candidates
+        positions(:,:,candidate)=chart.position+chart.normal.*d(candidate,:);
+        velocity(:,:,candidate)=chart.tangent.*tangential(candidate,:)+chart.normal.*dd(candidate,:);
+        acceleration(:,:,candidate)=chart.tangent.*at(candidate,:)+chart.normal.*an(candidate,:);
+    end
+    reference=struct('lateralPosition',d,'lateralRate',dd,'lateralAcceleration',ddd, ...
+        'courseOffset',course,'speed',speed,'curvature',curvature,'normalAcceleration',speed.^2.*curvature, ...
+        'position',positions,'velocity',velocity,'acceleration',acceleration, ...
+        'targetStation',targetStation,'targetLateral',targetLateral,'coefficients',coefficients, ...
+        'midpoint',m,'halfWidth',h,'bounded',chart.bounded, ...
+        'valid',valid & all(regular>sqrt(eps) & speed>sqrt(eps),2).');
+end
+
+function reference=localPrepareFluidReference(program,model)
+    count=program.prediction.stageCount;nodes=count+1;
+    reference=struct('bump',zeros(2,nodes),'heading',zeros(2,nodes),'valid',true(1,2), ...
+        'amplitudes',zeros(1,2),'width',0,'center',0,'stages',zeros(1,2), ...
+        'targetCount',0,'targetIndices',zeros(1,0),'widths',zeros(1,0), ...
+        'targetStation',zeros(0,nodes),'targetLateral',zeros(0,nodes), ...
+        'lateralRate',zeros(2,nodes),'lateralAcceleration',zeros(2,nodes), ...
+        'normalAcceleration',zeros(2,nodes),'bounded',false(1,nodes));
+    if program.inheritedPredictionFamily || isempty(model.encounters),return;end
+    records=program.jointCertificate.records;
+    values=avoidanceSafetyGeometry.jointResidual(program,program.feasibleWitness,program.jointCertificate.angles) ...
+        -program.jointCertificate.upperBound;
+    values([records.isExit])=-Inf;
+    nominal=localStates(program.prediction,program.anchorPlan);
+    time=(0:count)*model.sampleTime;progress=zeros(3,nodes);progress(1,:)=nominal(1,:);
+    for node=1:nodes
+        stage=min(node,count);a=program.prediction.continuousA(:,:,stage);
+        velocity=a*nominal(:,node)+program.prediction.continuousB(:,:,stage) ...
+            *program.anchorPlan(2*stage-1:2*stage)+program.prediction.continuousC(:,stage);
+        acceleration=a*velocity;progress(2:3,node)=[velocity(1);acceleration(1)];
+    end
+    selected=zeros(1,0);widths=zeros(1,0);passingOffsets=zeros(0,2);
+    largest=-Inf;
+    for target=1:numel(model.encounters)
+        matching=false(numel(records),1);
+        for index=1:numel(records),matching(index)=isequal(records(index).key,model.encounters(target).key);end
+        conflicts=find(matching & values>0);
+        if isempty(conflicts),continue;end
+        stages=[records(conflicts).stage];first=min(stages);last=max(stages);
+        middle=round((first+last)/2)+1;
+        motion=targetPrediction.nominalFlow(model.encounters(target),time);
+        projection=laneGeometry.project(motion(1:2,:),model.lane,progress(1,:));
+        q=progress(1,:)-projection.station;
+        width=model.cfg.admission.widthScale*max(model.cfg.admission.minimumWidthMeters, ...
+            (max(q(first+1:last+1))-min(q(first+1:last+1)))/2);
+        transverse=projection.lateralPosition(last+1)-projection.lateralPosition(first+1);
+        side=-sign(transverse);
+        if abs(transverse)<=1e-6,side=sign(nominal(2,middle)-projection.lateralPosition(middle));end
+        if side==0,side=1;end
+        normal=[-sin(projection.heading(middle));cos(projection.heading(middle))];
+        allowance=model.cfg.vehicle.width/2+targetPrediction.rectangleSupport( ...
+            model.encounters(target).halfLength,model.encounters(target).halfWidth,normal,motion(7,middle),0) ...
+            +model.cfg.admission.clearanceAllowanceMeters;
+        selected(end+1)=target;widths(end+1)=width; %#ok<AGROW>
+        passingOffsets(end+1,:)=projection.lateralPosition(middle)+[side,-side]*allowance; %#ok<AGROW>
+        excess=max(values(conflicts));
+        if excess>largest
+            largest=excess;reference.amplitudes=projection.lateralPosition(middle)+[side,-side]*allowance;
+            reference.width=width;reference.center=projection.station(middle);reference.stages=[first,last];
+        end
+    end
+    if isempty(selected),return;end
+    field=solveHardCbfClf.vffmReference(time,progress,model.encounters(selected),model.lane,model.road, ...
+        widths,passingOffsets);
+    reference.bump=field.lateralPosition-nominal(2,:);
+    % Course minus the anchor sideslip gives a body-yaw preference. The fit
+    % and subsequent full trajectory solve determine the actual lateral state.
+    heading=field.courseOffset-atan2(nominal(5,:),nominal(4,:))-nominal(3,:);
+    reference.heading=atan2(sin(heading),cos(heading));reference.valid=field.valid;
+    reference.targetCount=numel(selected);reference.targetIndices=selected;reference.widths=widths;
+    reference.targetStation=field.targetStation;reference.targetLateral=field.targetLateral;
+    reference.lateralRate=field.lateralRate;reference.lateralAcceleration=field.lateralAcceleration;
+    reference.normalAcceleration=field.normalAcceleration;reference.bounded=field.bounded;
+end
+
 function [point,angles,information]=localFluidInitialize(program,cfg)
     point=zeros(0,1);angles=program.jointCertificate.angles;
     coder.varsize('point',[Inf,1],[true,false]);
     information=struct('status',"nominal",'amplitudeMeters',0,'widthMeters',0, ...
         'centerStationMeters',0,'conflictStages',zeros(1,2),'terminalFitError',0, ...
         'maximumPhysicalExcess',NaN,'maximumSupportResidual',NaN, ...
-        'referenceCount',0,'referenceScores',Inf(1,2));
+        'referenceCount',0,'referenceScores',Inf(1,2),'referencePhysicalExcess',Inf(1,2),'activeTargetCount',0);
     if ~localInitializationTimeAvailable(cfg),information.status="searchTimeLimit";return;end
-    nominal=localStates(program.prediction,program.anchorPlan);
     records=program.jointCertificate.records;
-    values=avoidanceSafetyGeometry.jointResidual(program,program.feasibleWitness,angles);
-    values([records.isExit])=-Inf;
-    selected=zeros(0,1);
-    if ~isempty(records)
-        [excess,critical]=max(values-program.jointCertificate.upperBound);
-        if excess>0
-            matching=false(numel(records),1);
-            for index=1:numel(records)
-                matching(index)=isequal(records(index).key,records(critical).key);
-            end
-            selected=find(matching & ~[records.isExit].' & values>program.jointCertificate.upperBound);
-        end
-    end
+    reference=program.fluidReference;
     plans=program.anchorPlan;amplitudes=0;terminalErrors=0;
-    if ~isempty(selected)
-        stages=[records(selected).stage];first=min(stages,[],'all');last=max(stages,[],'all');
-        center=(nominal(1,first+1)+nominal(1,last+1))/2;
-        width=cfg.admission.widthScale*max(cfg.admission.minimumWidthMeters, ...
-            abs(nominal(1,last+1)-nominal(1,first+1))/2);
-        initial=records(selected(1));final=records(selected(end));
-        lateral=initial.positionMap(:,2);lateral=lateral/norm(lateral);
-        relativeFirst=initial.positionOffset+initial.positionMap*nominal(:,first+1);
-        relativeLast=final.positionOffset+final.positionMap*nominal(:,last+1);
-        % Relative travel orders the two sides only. Actual robust separation
-        % residuals select between passing ahead of and behind a moving target.
-        transverse=lateral.'*(relativeLast-relativeFirst);
-        side=sign(transverse);
-        if abs(transverse)<=1e-6,side=sign(lateral.'*relativeFirst);end
-        if side==0,side=1;end
-        [~,middleIndex]=min(abs(stages(:)-(first+last)/2));
-        middle=records(selected(middleIndex(1)));
-        middleLateral=middle.positionMap(:,2);middleLateral=middleLateral/norm(middleLateral);
-        targetSupport=targetPrediction.rectangleSupport(middle.targetHalfSize(1), ...
-            middle.targetHalfSize(2),middleLateral,middle.targetYaw,0);
-        % Nominal footprints shape the path; unchanged hard constraints retain
-        % all uncertainty, chart remainder and clearance requirements.
-        magnitude=middle.egoHalfSize(2)+targetSupport+cfg.admission.clearanceAllowanceMeters;
-        amplitudes=magnitude*[side,-side];distance=nominal(1,:)-center;
-        bump=amplitudes(:).*exp(-.5*(distance/width).^2);
-        derivative=-distance/width^2.*bump;
-        heading=atan2(derivative,1-program.prediction.scheduleCurvature.*bump);
-        [plans,terminalErrors]=localFitFluidReference(program,bump,heading,cfg);
-        information.status="candidate";information.widthMeters=width;
-        information.centerStationMeters=center;information.conflictStages=[first,last];
-        information.referenceCount=2;
+    if reference.targetCount>0
+        amplitudes=reference.amplitudes;
+        [plans,terminalErrors]=localFitFluidReference(program,reference.bump,reference.heading,cfg);
+        information.status="candidate";information.widthMeters=reference.width;
+        information.centerStationMeters=reference.center;information.conflictStages=reference.stages;
+        information.referenceCount=2;information.activeTargetCount=reference.targetCount;
     end
-    best=Inf;
+    best=Inf;bestPhysical=false;
     for candidate=1:size(plans,2)
         if ~localInitializationTimeAvailable(cfg)
             point=zeros(0,1);information.status="searchTimeLimit";return;
         end
         plan=plans(:,candidate);
-        if any(~isfinite(plan)) || terminalErrors(candidate)>1e-8,continue;end
+        if ~reference.valid(candidate) || any(~isfinite(plan)) || terminalErrors(candidate)>1e-8,continue;end
         trial=localFluidPoint(program,plan);states=localStates(program.prediction,plan);
         directions=angles;
         for index=1:numel(records)
@@ -464,10 +567,15 @@ function [point,angles,information]=localFluidInitialize(program,cfg)
             score=max(residual-program.jointCertificate.upperBound);maximum=max(residual);
         end
         information.referenceScores(candidate)=score;
+        physicalExcess=max(program.physicalMatrix*trial-program.physicalBound);
+        physical=physicalExcess<=0;
+        information.referencePhysicalExcess(candidate)=physicalExcess;
         if ~isfinite(score),continue;end
-        % Arithmetic-scale ties preserve the deterministic geometric ordering.
-        if isempty(point) || score<best-64*eps*(1+abs(best))
-            best=score;point=trial;angles=directions;
+        % Prefer an actuator/road/chart/terminal-admissible fit before comparing
+        % support residuals. No fitted seed, including such a fit, is issued.
+        if isempty(point) || (physical && ~bestPhysical) ...
+                || (physical==bestPhysical && score<best-64*eps*(1+abs(best)))
+            best=score;bestPhysical=physical;point=trial;angles=directions;
             information.amplitudeMeters=amplitudes(candidate);
             information.terminalFitError=terminalErrors(candidate);
             information.maximumSupportResidual=maximum;

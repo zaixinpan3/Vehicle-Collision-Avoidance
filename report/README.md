@@ -1,6 +1,12 @@
 # Experiment reports
 
-Latest implementation: [Adopt Cheng fluid-reference initialization](CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md). The production initializer now compares two Gaussian references using a shared terminal-preserving affine fit and analytic rectangle normals before one full convex trajectory solve. The old direction/amplitude search and its configuration fields are deleted. All 776 tests and 30 variation cases pass; 12 diagnostic closed loops complete. Five strict 50 ms trials reject their first frame, and the straight stationary refined gap is only 0.0927 mm; no hard-real-time or physical-robustness claim is made.
+Current trajectory initialization: [NRMM/VFFM reconstruction, derivation and validation](NRMM_VFFM_INITIALIZATION_20260922.md).
+Analytical target motion at ego arrival times, quadratic-road normal charts,
+multiple active targets and body-yaw-consistent affine fitting initialize one
+full hard SOCP. All 792 MATLAB tests pass. The safety motion contract and
+node-certificate scope remain unchanged.
+
+Previous initialization implementation: [Adopt Cheng fluid-reference initialization](CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md). The production initializer now compares two Gaussian references using a shared terminal-preserving affine fit and analytic rectangle normals before one full convex trajectory solve. The old direction/amplitude search and its configuration fields are deleted. All 776 tests and 30 variation cases pass; 12 diagnostic closed loops complete. Five strict 50 ms trials reject their first frame, and the straight stationary refined gap is only 0.0927 mm; no hard-real-time or physical-robustness claim is made.
 
 Current controller: [Fixed-direction convex trajectory optimization](../controller/JOINT_SUPPORT_CERTIFICATES.md). Direction search only initializes the trajectory optimization. The selected normals remain fixed, and every new admission requires a full hard-constrained SOCP result. Inherited frames optimize the complete control sequence using retained directions.
 

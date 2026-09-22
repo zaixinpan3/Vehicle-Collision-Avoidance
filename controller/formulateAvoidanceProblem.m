@@ -239,6 +239,7 @@ function [program,prediction,clf] = localFormulate(model)
     if ~isempty(model.encounters)
         program=avoidanceSafetyGeometry.jointProgram(program,model);
     end
+    program.fluidReference=solveHardCbfClf.prepareFluidReference(program,model);
 end
 
 function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anchor,labels,terminalCone] = localShift(model)

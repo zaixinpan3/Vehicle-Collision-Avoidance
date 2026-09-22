@@ -1,0 +1,84 @@
+{
+  "activity_date": "2026-09-22",
+  "base_commit": "4b678e2aa418184baff1a962ae56d609de02080b",
+  "scope": "NRMM/VFFM initial trajectory reconstruction; unchanged hard motion contract, SOCP and node certificate",
+  "full_suite": {
+    "passed": 792,
+    "total": 792,
+    "failed": 0,
+    "incomplete": 0,
+    "aggregateSeconds": 600.8838869999998,
+    "matlabVersion": "26.1.0.3276743 (R2026a) Update 3"
+  },
+  "full_suite_note": "Completed before native export diagnostic-field pruning. MATLAB continued after the MCP 300-second response timeout; the saved results were independently loaded and assertSuccess passed.",
+  "final_export_regression": {
+    "passed": 61,
+    "total": 61,
+    "failed": 0,
+    "incomplete": 0,
+    "aggregateSeconds": 3.5639799999999995
+  },
+  "native_parity": {
+    "admissionStatus": 4,
+    "admissionMaximumDecisionError": 2.7462054852378515e-09,
+    "continuationStatus": 2,
+    "continuationMaximumDecisionError": 0,
+    "originalVerifierPassed": true
+  },
+  "static_analysis": {
+    "files": [
+      "controller/solveHardCbfClf.m",
+      "controller/targetPrediction.m",
+      "controller/laneGeometry.m",
+      "controller/formulateAvoidanceProblem.m",
+      "controller/collisionAvoidanceController.m",
+      "config/collisionAvoidanceControllerConfig.m",
+      "scripts/standaloneControllerBenchmark.m",
+      "tests/nrmmVffmReferenceTest.m"
+    ],
+    "issues": [
+      {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 279,
+        "column": [
+          24,
+          27
+        ]
+      },
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ]
+  },
+  "initial_probe": {
+    "passed": 30,
+    "total": 46,
+    "failed": 16,
+    "finding": "Tracking the crossing target lateral position in the passing ordinate produced rejected full-plan solves. Conflict-derived fixed passing ordinates retained moving Gaussian centers."
+  },
+  "native_initial_probe": "Code generation succeeded; continuation rejected the scalar-to-empty diagnostic targetIndices argument size. Export now retains only consumed fields.",
+  "raw_artifacts": "/home/zai/.cache/collisionAvoidance/nrmm-vffm-20260922",
+  "source_sha256": {
+    "config/collisionAvoidanceControllerConfig.m": "620ad89b8581a6733c907184b51bdec038744b34286c19cac83b1077d0054f97",
+    "controller/collisionAvoidanceController.m": "dd291d0989a68a54e3585e27c918116dcdafad74772861d44dfa0ebaa965c573",
+    "controller/formulateAvoidanceProblem.m": "c55ec4787ee1c58dcdaa770d376ba5ec6bc43f11cf9af943c6d227f48271d205",
+    "controller/laneGeometry.m": "b1d228cb97816081b57a20c40fadad31f1468b249c91b9c4aebefddad4792635",
+    "controller/solveHardCbfClf.m": "34f2d0d03259cc163a07031b0a940f009fd8968163d97abad5f54b69b5e7a9d1",
+    "controller/targetPrediction.m": "52e171c798b09406f17569049e82254e750485df1c10dab448d523cf546acf2d",
+    "scripts/standaloneControllerBenchmark.m": "8a9bbd653fce20fa0a369da3f211b48fc117bb32a08c53dbfcc262f962cee064",
+    "tests/nrmmVffmReferenceTest.m": "e41d0ea56776d1cfe7982107489b83362d631eb92bb9d91c65469f1f453767f9",
+    "controller/NRMM_VFFM_INITIALIZATION.md": "688ece3f7e5bdaa1f5ff2b63228e3f6d04a456d49c3e231952359e14c039f8a8"
+  },
+  "limitations": [
+    "Two joint passing assignments are incomplete.",
+    "Only the selected route corridor is represented; no general union-domain intersection implementation.",
+    "Hard safety is node based; no continuous-time, nonlinear-vehicle, or hard-real-time guarantee.",
+    "Native parity covers a prepared admission and continuation, not standalone orchestration."
+  ]
+}

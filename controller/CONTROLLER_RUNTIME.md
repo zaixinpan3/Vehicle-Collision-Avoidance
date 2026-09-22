@@ -8,11 +8,12 @@ larger computation budget are explicitly separate. See
 continuation and collision results. The generic controller configuration already
 used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
 
-Current algorithm (September 21, 2026): format 41 initializes separation
+Current algorithm (September 22, 2026): format 41 initializes separation
 directions and fixes them before optimizing the complete trajectory in one
-hard SOCP. Fresh initialization uses two opposite-side Gaussian fluid references in one
-terminal-preserving affine-model fit, followed by analytic rectangle normals
-and geometric selection of one seed.
+hard SOCP. Fresh initialization uses analytical NRMM target predictions and quadratic-road
+normal charts to build two time-dependent, multi-target Gaussian references.
+One shared terminal-preserving fit supplies candidate rollouts; physical
+base-row feasibility and support residuals select their rectangle normals.
 There is no direction/amplitude grid or repeated candidate SOCP. Every
 successful new admission includes one full solve; the seed is not executable.
 Inherited frames use retained directions and attempt one full improvement,
@@ -24,7 +25,9 @@ Full sensitivity maps and the condensed objective remain for certificate
 transfer. Preparation is not claimed linear in horizon length. The native
 solver itself is unchanged; generated prepared-frame adapters must be rebuilt.
 See [the fixed-direction derivation](JOINT_SUPPORT_CERTIFICATES.md) and
-[the current warmed validation](../report/CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md).
+[the reconstruction validation](../report/NRMM_VFFM_INITIALIZATION_20260922.md).
+The previous [warmed campaign](../report/CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md)
+describes the earlier static initializer and is not a timing claim for this revision.
 The dated measurements below describe earlier implementations.
 
 Historical version 21 used a finite encounter witness, current observation confirmation,
