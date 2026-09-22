@@ -18,10 +18,12 @@ TARGETS = {
     'formulateAvoidanceProblem.m': ['formulateAvoidanceProblem', 'localShift'],
     'hardEncounterBarrier.m': ['prepare', 'predict', 'completionRows', 'carriedData', 'localTerminalSet'],
     'ltvBicycleModel.m': ['sampledCruise', 'finitePredict'],
-    'laneGeometry.m': ['sweptCellFrames'],
+    'laneGeometry.m': ['sweptCellFrames', 'normalRoadChart'],
+    'targetPrediction.m': ['nominalFlow'],
     'avoidanceSafetyGeometry.m': ['build', 'supportNormals', 'jointProgram', 'certifyJoint', 'jointResidual'],
     'avoidanceStageQp.m': ['fixedDirections', 'build', 'localDomainCertificate'],
-    'solveHardCbfClf.m': ['certify', 'inspect', 'fluidInitialize', 'localFluidInitialize', 'localFixedDirectionSearch',
+    'solveHardCbfClf.m': ['certify', 'inspect', 'prepareFluidReference', 'localPrepareFluidReference',
+                        'vffmReference', 'localTimeDependentReference', 'fluidInitialize', 'localFluidInitialize', 'localFixedDirectionSearch',
                         'localFitFluidReference', 'localDefaultSolve', 'localReducedProgram'],
 }
 
@@ -29,8 +31,9 @@ TARGETS = {
 def wrap_block(text, begin, end, tag):
     """Time a straight-line block; unique source anchors prevent silent drift."""
     assert text.count(begin) == 1 and text.count(end) == 1, tag
-    text = text.replace(begin, f"    blockProfileToken=matlabControllerProbe('start','{tag}');\n" + begin)
-    return text.replace(end, "    matlabControllerProbe('stop',blockProfileToken);\n" + end)
+    token = 'blockProfileToken' + re.sub(r'\W', '', tag)
+    text = text.replace(begin, f"    {token}=matlabControllerProbe('start','{tag}');\n" + begin)
+    return text.replace(end, f"    matlabControllerProbe('stop',{token});\n" + end)
 
 
 def main():
@@ -66,6 +69,25 @@ def main():
                 declaration = ''
         assert sorted(found) == sorted(names), (file, found, names)
         text = ''.join(result)
+        if file == 'avoidanceSafetyGeometry.m':
+            text = wrap_block(text, '            cfg = model.cfg;\n            groups = cell(numel(prediction.cells), 1);',
+                              '            data = vertcat(cellData{:});', 'avoidanceSafetyGeometry.cellDataAssembly')
+            text = wrap_block(text, '            data = vertcat(cellData{:});',
+                              '            projectionData = cell(numel(groups),1);', 'avoidanceSafetyGeometry.cellRowsKernel')
+            text = wrap_block(text, '            projectionData = cell(numel(groups),1);',
+                              '            data = vertcat(projectionData{:});', 'avoidanceSafetyGeometry.projectionDataAssembly')
+            text = wrap_block(text, '            data = vertcat(projectionData{:});',
+                              '            for cellIndex = 1:numel(groups)\n                names = sourceLabels{cellIndex};',
+                              'avoidanceSafetyGeometry.projectionKernel')
+            text = wrap_block(text, '            for cellIndex = 1:numel(groups)\n                names = sourceLabels{cellIndex};',
+                              '        end\n\n        function program = jointProgram', 'avoidanceSafetyGeometry.projectedDataAssembly')
+            text = wrap_block(text, '                records=cell(0,1);angles=zeros(0,1);',
+                              '                reserve=zeros(numel(records),1);', 'avoidanceSafetyGeometry.jointRecordAssembly')
+            text = wrap_block(text, '                reserve=zeros(numel(records),1);',
+                              "                certificate=struct('records',records,", 'avoidanceSafetyGeometry.jointReserveAssembly')
+            text = wrap_block(text, '            % Remove only collision and exit slices, keeping all actuator,',
+                              '            program.geometry=geometry;program.jointCertificate=certificate;',
+                              'avoidanceSafetyGeometry.discardedRowRemoval')
         if file == 'formulateAvoidanceProblem.m':
             text = wrap_block(text, '    safetyBound = bound;\n',
                               '    % Only the five path/velocity errors enter performance;',
@@ -78,6 +100,14 @@ def main():
                               '    if metadata.runtimeSeconds>cfg.solver.frameDeadlineSeconds\n',
                               'collisionAvoidanceController.outputAssembly')
         if file == 'solveHardCbfClf.m':
+            text = wrap_block(text, '        for index=1:numel(records)\n            item=records(index);state=states(:,item.stage+1);',
+                              '        residual=avoidanceSafetyGeometry.jointResidual(program,trial,directions);',
+                              'solveHardCbfClf.candidateNormals')
+            text = wrap_block(text, '    maps=program.prediction.egoStateMatrix;count=program.layout.planCount;',
+                              "    inverse=hessian\\[map.'*error,scaled.'];",
+                              'solveHardCbfClf.fitAssembly')
+            text = wrap_block(text, "    inverse=hessian\\[map.'*error,scaled.'];",
+                              '    change=inverse(:,1:2)', 'solveHardCbfClf.fitFactorization')
             begin = '    [nativeDecision, output] = nativeSolver( ...'
             end = '        options);\n    output.objectiveValue'
             assert text.count(begin) == 1 and text.count(end) == 1

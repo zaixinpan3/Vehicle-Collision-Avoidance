@@ -10,7 +10,7 @@ function summary=profileMatlabControllerRuntime(directory,options)
         options.CampaignRepetitions (1,1) double {mustBeInteger,mustBePositive} = 2
         options.Repetitions (1,1) double {mustBeInteger,mustBePositive} = 11
         options.Warmups (1,1) double {mustBeInteger,mustBeNonnegative} = 5
-        options.Selection (1,1) string {mustBeMember(options.Selection,["standard","longest"])} = "standard"
+        options.Selection (1,1) string {mustBeMember(options.Selection,["standard","longest","initialization"])} = "standard"
         options.CampaignDirectory (1,1) string = ""
     end
     root=fileparts(fileparts(mfilename('fullpath')));
@@ -35,7 +35,10 @@ function summary=profileMatlabControllerRuntime(directory,options)
         return;
     end
     if options.Mode=="replay"
-        if options.Selection=="longest"
+        if options.Selection=="initialization"
+            assert(strlength(options.CampaignDirectory)>0,'Specify the saved diagnostic campaign directory.');
+            definitions=localInitializationDefinitions(options.CampaignDirectory);
+        elseif options.Selection=="longest"
             assert(strlength(options.CampaignDirectory)>0,'Specify the saved diagnostic campaign directory.');
             definitions=localLongestDefinitions(options.CampaignDirectory);
         else
@@ -109,6 +112,31 @@ function summary=profileMatlabControllerRuntime(directory,options)
         localWrite(fullfile(directory,options.Mode+'.json'),summary);
         fprintf('%s: %s collected; decision unchanged\n',item.definition.name,options.Mode);
     end
+end
+
+function definitions=localInitializationDefinitions(directory)
+% Select the slowest fresh admission in each of the three deadline bottlenecks.
+    files=dir(fullfile(directory,'diagnostic','*','*-exact-state.mat'));
+    names=["straight-stationary","circular-stationary","circular-crossing"];
+    definitions=cell(1,3);maximum=-inf(1,3);
+    for index=1:numel(files)
+        source=fullfile(files(index).folder,files(index).name);
+        loaded=load(source,'report');report=loaded.report;
+        selected=find([report.roadCurvature==0 && report.scenario=="stationary", ...
+            report.roadCurvature~=0 && report.scenario=="stationary", ...
+            report.roadCurvature~=0 && report.scenario=="crossing"]);
+        if isempty(selected),continue;end
+        for frame=1:report.executedHolds
+            search=report.admissionSearch{frame};seconds=report.runtime.frameSeconds(frame);
+            if ~isfield(search,'initialCertificateAngles') || report.inheritedFeasibleFamily(frame) ...
+                    || seconds<=maximum(selected),continue;end
+            definitions{selected}=struct('name',names(selected),'kind',"freshAdmission", ...
+                'source',string(source),'frame',frame,'campaignSeconds',seconds, ...
+                'originalPhase',report.runtimeBreakdown{frame});
+            maximum(selected)=seconds;
+        end
+    end
+    assert(all(isfinite(maximum)),'Three saved bottleneck admissions are required.');
 end
 
 function definitions=localLongestDefinitions(directory)

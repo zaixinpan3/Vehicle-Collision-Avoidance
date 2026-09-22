@@ -1,5 +1,7 @@
 # Experiment reports
 
+Latest admission timing analysis: [NRMM/VFFM component profile and bounded optimization experiments](NRMM_VFFM_ADMISSION_PROFILE_20260922.md). Geometry and certificate assembly dominate the Gaussian reference. External early-row-filtering and dominated-candidate prototypes preserve full decisions and final safety programs on three fixtures; combined circular-crossing median improves by 2.45--3.50 ms against bracketing baselines. Production remains unchanged, and two combined scenario types still show 50 ms overruns.
+
 Latest controller review: [NRMM/VFFM warmed simulation and independent footprint audit](NRMM_VFFM_SIMULATION_REVIEW_20260922.md). All 792 tests and 12 diagnostic trials pass. Only 6 of 12 strict 50 ms trials complete; the other six reject their first frame. Refined circular-crossing gap is 0.155002 m, but straight-stationary clearance is only 0.0927 mm. Physical road boundaries remain unsupported by the terminal certificate, and three cases exceed the optional heading diagnostic envelope.
 
 Current trajectory initialization: [NRMM/VFFM reconstruction, derivation and validation](NRMM_VFFM_INITIALIZATION_20260922.md).
