@@ -551,7 +551,15 @@ function [point,angles,information]=localFluidInitialize(program,cfg)
         end
         plan=plans(:,candidate);
         if ~reference.valid(candidate) || any(~isfinite(plan)) || terminalErrors(candidate)>1e-8,continue;end
-        trial=localFluidPoint(program,plan);states=localStates(program.prediction,plan);
+        trial=localFluidPoint(program,plan);
+        physicalExcess=max(program.physicalMatrix*trial-program.physicalBound);
+        physical=physicalExcess<=0;
+        information.referencePhysicalExcess(candidate)=physicalExcess;
+        % A physically inadmissible fit cannot outrank an already selected
+        % physical fit, regardless of its support score. Preserve side order
+        % and tie rules; unevaluated diagnostic scores remain Inf.
+        if bestPhysical && ~physical,continue;end
+        states=localStates(program.prediction,plan);
         directions=angles;
         for index=1:numel(records)
             item=records(index);state=states(:,item.stage+1);
@@ -567,9 +575,6 @@ function [point,angles,information]=localFluidInitialize(program,cfg)
             score=max(residual-program.jointCertificate.upperBound);maximum=max(residual);
         end
         information.referenceScores(candidate)=score;
-        physicalExcess=max(program.physicalMatrix*trial-program.physicalBound);
-        physical=physicalExcess<=0;
-        information.referencePhysicalExcess(candidate)=physicalExcess;
         if ~isfinite(score),continue;end
         % Prefer an actuator/road/chart/terminal-admissible fit before comparing
         % support residuals. No fitted seed, including such a fit, is issued.

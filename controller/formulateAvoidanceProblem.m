@@ -104,7 +104,9 @@ function [program,prediction,clf] = localFormulate(model)
             prediction.geometryNominal=nominal;prediction.separationNormals=normals;
             dual.used=true;
         end
-        geometry = avoidanceSafetyGeometry.build(model,prediction);
+        % Joint certificates below replace the collision rows while retaining
+        % their occupied sets. Avoid projecting rows that would be discarded.
+        geometry = avoidanceSafetyGeometry.build(model,prediction,isempty(model.encounters));
         [terminalMatrix,terminalBound,terminal,completion,terminalCone] = ...
             hardEncounterBarrier.completionRows(model,prediction,geometry);
         count = prediction.stageCount;

@@ -22,9 +22,12 @@ classdef avoidanceSafetyGeometry
             end
         end
 
-        function geometry = build(model, prediction)
+        function geometry = build(model, prediction, includeCollisionRows)
         % One separating normal per cell; every Bernstein point uses that normal.
         % The cellRows entry exposes the shared numeric geometry kernel for codegen.
+        % Joint node certificates retain footprint data and replace collision
+        % rows. Other callers keep the complete projected geometry by default.
+            if nargin<3,includeCollisionRows=true;end
             cfg = model.cfg;
             groups = cell(numel(prediction.cells), 1);
             frames = cell(numel(groups), 1);
@@ -158,6 +161,17 @@ classdef avoidanceSafetyGeometry
                         geometric.bound=[geometric.bound;repmat(lateralLimit,2,numel(phase))];
                         geometric.source=[geometric.source;repmat(numel(sourceLabels{cellIndex}),2,1)];
                     end
+                    allGeometricRows(cellIndex)=geometric;
+                end
+                if ~includeCollisionRows && encounterCount>0
+                    assert(tube.duration==0 && size(tube.offset,2)==1, ...
+                        'avoidanceSafetyGeometry:nodeCertificate', ...
+                        'Joint certificates require hold nodes.');
+                    geometric=allGeometricRows(cellIndex);
+                    keep=geometric.source>encounterCount;
+                    geometric.state=geometric.state(keep,:);
+                    geometric.bound=geometric.bound(keep,:);
+                    geometric.source=geometric.source(keep);
                     allGeometricRows(cellIndex)=geometric;
                 end
                 stateRadius = tube.radius;

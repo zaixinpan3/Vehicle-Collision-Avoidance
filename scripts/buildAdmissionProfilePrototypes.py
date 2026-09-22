@@ -25,6 +25,9 @@ def main():
         parser.error('Prototype copies must remain outside the repository.')
     geometry = (root / 'controller/avoidanceSafetyGeometry.m').read_text()
     solver = (root / 'controller/solveHardCbfClf.m').read_text()
+    if 'includeCollisionRows' in geometry:
+        parser.error('These shortcuts are already implemented. Use benchmarkAdmissionOptimization; '
+                     'reproduce historical prototypes from the pre-adoption ff2a901 checkout.')
     reduced_geometry = replace_once(geometry,
         '                stateRadius = tube.radius;\n',
         '''                % Fixture experiment: omit rows removed by jointProgram.

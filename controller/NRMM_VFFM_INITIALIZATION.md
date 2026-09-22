@@ -241,15 +241,25 @@ nonfinite solution, an irregular chart, or terminal equality error above
 $10^{-8}$. The fitted rollout, not the raw reference, is the initial trajectory
 $(x_k^{(0)},U_k^{(0)})$ used to construct geometry.
 
-For every collision and exit record, query the analytic rectangle
+Complete the existing allowed CLF slack and evaluate physical base-row
+feasibility first. Once a finite-scored physically admissible fit has been
+selected, skip a later physically inadmissible fit: it cannot win the existing
+ranking. Its diagnostic support score remains `Inf` because it was not evaluated.
+Otherwise, for every collision and exit record, query the analytic rectangle
 signed-distance normal at that fitted pose. It remains defined at overlap,
-unlike normalization of a zero ordinary-distance dual vector. Complete the
-existing allowed CLF slack. Prefer a fit satisfying all physical base rows
+unlike normalization of a zero ordinary-distance dual vector.
+Prefer a fit satisfying all physical base rows
 (including actuator, road and chart rows); within the same base-row feasibility
 class, minimize the worst reserved support residual. This lexicographic rule
 avoids choosing a slightly smaller collision residual at the cost of a known
 base-constraint violation. It is still a heuristic for selecting a convex
 inner problem, not proof of feasibility.
+
+At fresh joint admission, geometry assembly keeps the occupied sets, normals,
+road and pose rows but omits projection of preliminary collision rows that
+the joint representation would immediately replace. Other geometry callers
+retain full collision rows by default. The final fixed-direction SOCP and
+independent support verifier still enforce every retained collision record.
 
 Fix the selected directions and optimize the complete input sequence once.
 Only `solveHardCbfClf.certify` accepting the optimized result can authorize a

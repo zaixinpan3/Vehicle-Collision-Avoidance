@@ -192,6 +192,13 @@ fixed-normal SOCP. All controls remain free in that solve. The seed cannot be
 issued or retained as an executable fallback. Inherited optimized certificates
 retain their directions and do not regenerate the reference.
 
+Compute base-row feasibility before candidate normals. If a finite-scored
+physical fit is already selected, a later physically infeasible fit cannot
+win this ranking and needs no normal/support evaluation. Preserve the original
+candidate order and tie rule. Fresh joint geometry also omits projection of
+preliminary collision rows that the joint representation would remove; occupied
+sets, normals, road/pose rows and final hard support inequalities are retained.
+
 `program.fluidReference` contains numeric reference preparation shared with
 the generated prepared-frame adapter. Metadata retains
 `directionSeedSource = "chengFluidReference"` for compatibility; its
@@ -199,6 +206,8 @@ the generated prepared-frame adapter. Metadata retains
 base-row excesses, dominant-target amplitude/width/conflict interval,
 terminal-fit error and selected seed residuals. `usedFullPlanAdmission` is
 true for successful fresh admission and `issuedAdmissionWitness` stays false.
+An unevaluated candidate's support score remains `Inf`, including a candidate
+screened by the physical ranking; it is not a measured support violation.
 Adapter status 4 denotes optimized admission, 2 optimized continuation,
 3 retained verified continuation, and 0 rejection. Rebuild generated adapters
 after changing their prepared input structures.
