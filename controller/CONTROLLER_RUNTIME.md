@@ -11,7 +11,8 @@ used 50 ms; the experiment drivers' former 100 ms overrides have been removed.
 Current algorithm (September 22, 2026): format 41 initializes separation
 directions and fixes them before optimizing the complete trajectory in one
 hard SOCP. Fresh initialization uses analytical NRMM target predictions and quadratic-road
-normal charts to build two time-dependent, multi-target Gaussian references.
+normal charts to build two time-dependent Gaussian references for one obstacle.
+The two candidates are opposite passing sides; multiple target inputs are rejected.
 One shared terminal-preserving fit supplies candidate rollouts; physical
 base-row feasibility and support residuals select their rectangle normals.
 There is no direction/amplitude grid or repeated candidate SOCP. Every

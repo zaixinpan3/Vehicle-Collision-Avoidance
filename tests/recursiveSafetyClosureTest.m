@@ -43,19 +43,16 @@ classdef recursiveSafetyClosureTest < matlab.unittest.TestCase
             testCase.verifyEqual(program.layout.planCount,2);
             testCase.verifyGreaterThanOrEqual(min(localPhysicalMargins(certified,result.decision)),0);
         end
-        function confirmedPartialReleasePreservesTheOtherEncounter(testCase)
+        function confirmedSingleTargetReleaseContinuesCertifiedControl(testCase)
             [ego,road,cfg]=localFixture(zeros(6,1),0);
             target=localTarget(1,[18;4],[20;0]);
-            targets=[target,localTarget(2,[12;4],[16;0])];
-            [~,~,p,s]=collisionAvoidanceController(ego,targets,road,cfg,[]);
+            [~,~,p,s]=collisionAvoidanceController(ego,target,road,cfg,[]);
             ego=localNext(ego,p,s);
-            targets(1).targetPositionInertial=[20;4];
-            targets(2).targetPositionInertial=[13.6;4];
-            [~,~,next]=collisionAvoidanceController(ego,targets([2,1]),road,cfg,s);
+            target.targetPositionInertial=[20;4];
+            [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,s);
             testCase.verifyTrue(next.metadata.confirmedRelease);
-            testCase.verifyTrue(next.metadata.inheritedFeasibleFamily);
-            testCase.verifyNumElements(next.model.encounters,1);
-            testCase.verifyEqual(next.program.completion.keys,"trackId:2");
+            testCase.verifyTrue(next.metadata.planCertified);
+            testCase.verifyEmpty(next.model.encounters);
             testCase.verifyFalse(any(ismember(next.program.physicalLabels,["collision:trackId:1","exit:trackId:1"])));
             testCase.verifyGreaterThanOrEqual(min(localConeMargins(next.program,next.program.feasibleWitness)),-1e-11);
         end

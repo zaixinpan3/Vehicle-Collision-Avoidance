@@ -1,5 +1,7 @@
 # Experiment reports
 
+Current study scope: [Single-obstacle NRMM/VFFM initialization](SINGLE_OBSTACLE_VFFM_SCOPE_20260922.md). The controller accepts zero or one obstacle and rejects multiple target records. One Gaussian generates opposite passing-side candidates. All 801 current tests have passing coverage across the full run and the final 159-test regression; the full run initially rejected one obsolete dual-target fixture.
+
 Latest validation rerun: [Controller validation rerun](CONTROLLER_VALIDATION_RERUN_20260922.md). The declared held affine plant passes all five recursion cases at 600 holds each, collision-free with a satisfied CLF decrease. All four PassVeh14DOF scenario commands in CLAUDE.md fail: the two cruise scenarios stop at the second sample on the zero-radius successor-box test, and the two avoidance scenarios are rejected at the first frame because the terminal certificate admits no road boundary. A stale planningProblem.qp field in scripts/runCenterlineCruiseScenario.m was corrected first; it had aborted every scenario before any result. Only one of three enforced 50 ms deadline cases completes.
 
 Latest controller optimization: [Adopt admission assembly shortcuts and compare warmed runtime](NRMM_VFFM_ADMISSION_OPTIMIZATION_20260922.md). All 799 tests pass. Alternating old/new measurements show circular-crossing median admission time decreasing from 50.469 to 46.377 ms (8.1%), with identical complete decisions and final safety programs. All 12 diagnostic closed loops preserve the prior trajectories exactly; strict 50 ms completion improves to 10/12, with two stationary-case first-frame timeouts remaining.
@@ -8,11 +10,11 @@ Preceding admission timing analysis: [NRMM/VFFM component profile and bounded op
 
 Latest controller review: [NRMM/VFFM warmed simulation and independent footprint audit](NRMM_VFFM_SIMULATION_REVIEW_20260922.md). All 792 tests and 12 diagnostic trials pass. Only 6 of 12 strict 50 ms trials complete; the other six reject their first frame. Refined circular-crossing gap is 0.155002 m, but straight-stationary clearance is only 0.0927 mm. Physical road boundaries remain unsupported by the terminal certificate, and three cases exceed the optional heading diagnostic envelope.
 
-Current trajectory initialization: [NRMM/VFFM reconstruction, derivation and validation](NRMM_VFFM_INITIALIZATION_20260922.md).
-Analytical target motion at ego arrival times, quadratic-road normal charts,
-multiple active targets and body-yaw-consistent affine fitting initialize one
-full hard SOCP. All 792 MATLAB tests pass. The safety motion contract and
-node-certificate scope remain unchanged.
+Original trajectory initialization reconstruction: [NRMM/VFFM reconstruction, derivation and validation](NRMM_VFFM_INITIALIZATION_20260922.md).
+That revision introduced analytical target motion at ego arrival times, quadratic-road
+normal charts, multi-target superposition and body-yaw-consistent affine fitting.
+Its 792-test result describes that revision. The current study is restricted to
+a single obstacle; see the [current derivation](../controller/NRMM_VFFM_INITIALIZATION.md).
 
 Previous initialization implementation: [Adopt Cheng fluid-reference initialization](CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md). The production initializer now compares two Gaussian references using a shared terminal-preserving affine fit and analytic rectangle normals before one full convex trajectory solve. The old direction/amplitude search and its configuration fields are deleted. All 776 tests and 30 variation cases pass; 12 diagnostic closed loops complete. Five strict 50 ms trials reject their first frame, and the straight stationary refined gap is only 0.0927 mm; no hard-real-time or physical-robustness claim is made.
 

@@ -1,6 +1,7 @@
 function [command, predictedInput, planningProblem, controllerState] = ...
         collisionAvoidanceController(egoState, targetEstimate, laneCenterline, cfg, previousState)
 %collisionAvoidanceController Predictive safety continuation with a soft CLF.
+% The current study accepts zero or one obstacle vehicle per input frame.
 % Optimize the complete finite control plan and execute only its first hold.
 % Safety rows are certified at the hold nodes of the exact sampled affine
 % plant, not between nodes (NODE_SAMPLED_CERTIFICATE.md).

@@ -5,7 +5,7 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
 % Converts the ego state (explicit controller-state fields or the
 % cascaded estimator's egoState vector form), the lane centerline or
 % scalar road-geometry structure (finite local-quadratic boundaries
-% and route selection), and an array of target estimate records
+% and route selection), and at most one target estimate record
 % into the canonical planning structures the controller
 % consumes. All validation of the
 % public input contract lives here; downstream modules assume these
@@ -529,6 +529,10 @@ function targets = localReadTargets(rawTargets, ego, cfg)
     if ~isstruct(rawTargets)
         error("collisionAvoidanceController:invalidInput", ...
             "targetEstimate must be a structure.");
+    end
+    if numel(rawTargets)>1
+        error("collisionAvoidanceController:unsupportedTargetCount", ...
+            "The current study accepts at most one obstacle vehicle.");
     end
     targets = repmat(localEmptyTarget(), numel(rawTargets), 1);
     count = 0;

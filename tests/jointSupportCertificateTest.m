@@ -172,8 +172,8 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.program.jointCertificate.records(1).targetYawRadius,.12,AbsTol=1e-10);
         end
 
-        function conditioningTwoUncertainTargetsPreservesTheirCertificates(testCase)
-            [first,next,oldAngles]=localUncertainTargets();
+        function conditioningOneUncertainTargetPreservesItsCertificate(testCase)
+            [first,next,oldAngles]=localUncertainTarget();
             testCase.verifyTrue(first.metadata.planCertified);
             testCase.verifyEqual(unique(string({next.program.jointCertificate.records.key})), ...
                 sort(first.program.completion.keys));
@@ -302,17 +302,14 @@ function result=localTimeout(~,program)
         'output',struct('message',"Simulated optimizer timeout with an unsafe iterate."));
 end
 
-function [first,next,oldAngles]=localUncertainTargets()
+function [first,next,oldAngles]=localUncertainTarget()
     [ego,target,road,cfg]=localControllerFixture();
     ego.controllerStateErrorBound=1e-4*ones(6,1);
     target.targetYawErrorBound=.12;target.targetPositionInertialErrorBound=[.02;.03];
-    second=target;second.trackId=2;second.targetPositionInertial=[13;-4];target=[target,second];
     [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
     ego=encounterTestFixture.nextEgo(stored,first.model.lane);ego.controllerStateErrorBound=5e-5*ones(6,1);
-    for index=1:numel(target)
-        target(index).targetPositionInertial=target(index).targetPositionInertial+.1*target(index).targetVelocityInertial;
-        target(index).targetPositionInertialErrorBound=[.01;.02];target(index).targetYawErrorBound=.1;
-    end
+    target.targetPositionInertial=target.targetPositionInertial+.1*target.targetVelocityInertial;
+    target.targetPositionInertialErrorBound=[.01;.02];target.targetYawErrorBound=.1;
     [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,stored);
     oldAngles=stored.program.jointCertificate.angles([stored.program.jointCertificate.records.stage]>1);
 end

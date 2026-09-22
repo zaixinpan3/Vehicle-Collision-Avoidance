@@ -262,7 +262,7 @@ certificate for a complete hold enclosure and is outside this change.
   the entire certificate; collision and exit angles share the same method.
 - `jointSupportCertificateTest`: homogeneous/interval support, 2,000 seeded
   majorant checks, global majorants beyond the former trust domain, hard
-  admission, uncertain multiple targets, suffix preservation and deadlines.
+  admission, uncertain target geometry, suffix preservation and deadlines.
 - `fluidInitializationTest`: mirrored crossing admission, terminal-fit accuracy,
   side selection, retired-option rejection, fixed normals and exported-frame parity.
 - `admissionSafetyTest`: mandatory full-plan admission and hard rejection.

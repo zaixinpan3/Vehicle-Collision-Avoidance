@@ -5,8 +5,9 @@ classdef solveHardCbfClf
         % Time-consistent Gaussian preference in a regular normal road chart.
         % progress is [station; station rate; station acceleration] in SI units.
         % Each column of passingOffsets specifies fixed lateral passing ordinates
-        % in metres. Moving Gaussian centres and chart widths vary with time.
+        % in metres for one obstacle. Its Gaussian centre and chart width vary with time.
         % This geometric reference has no execution or feasibility authority.
+            localRequireSingleTarget(encounters);
             validateattributes(time,{'double'},{'row','finite','nonnegative'});
             validateattributes(progress,{'double'},{'size',[3,numel(time)],'finite','real'});
             validateattributes(widths,{'double'},{'numel',numel(encounters),'positive','finite','real'});
@@ -409,32 +410,33 @@ function reference=localTimeDependentReference(time,progress,encounters,lane,roa
     z=zeros(candidates,nodes);zd=z;zdd=z;valid=all(chart.valid);
     targetStation=zeros(targets,nodes);targetLateral=targetStation;
     coefficients=zeros(targets,nodes,candidates);
-    for index=1:targets
-        motion=targetPrediction.nominalFlow(encounters(index),time);
+    if targets==1
+        motion=targetPrediction.nominalFlow(encounters,time);
         projection=laneGeometry.project(motion(1:2,:),lane,progress(1,:));
         s=projection.station;d=projection.lateralPosition;
         targetChart=laneGeometry.normalRoadChart(s,lane,road);
         k=targetChart.curvature;kp=targetChart.curvatureDerivative;regular=1-k.*d;
         valid=valid && all(targetChart.valid) && all(regular>sqrt(eps));
-        if ~valid,break;end
-        sd=sum(targetChart.tangent.*motion(3:4,:),1)./regular;
-        dd=sum(targetChart.normal.*motion(3:4,:),1);
-        sdd=(sum(targetChart.tangent.*motion(5:6,:),1)+2*k.*sd.*dd+kp.*d.*sd.^2)./regular;
-        m=targetChart.midpoint;h=targetChart.halfWidth;
-        hd=h(2,:).*sd;hdd=h(3,:).*sd.^2+h(2,:).*sdd;
-        numerator=passingOffsets(index,:).'-m(1,:);
-        numeratorD=-m(2,:).*sd;
-        numeratorDD=-m(3,:).*sd.^2-m(2,:).*sdd;
-        b=numerator./h(1,:);bd=(numeratorD-b.*hd)./h(1,:);
-        bdd=(numeratorDD-b.*hdd-2*bd.*hd)./h(1,:);
-        q=progress(1,:)-s;qd=progress(2,:)-sd;qdd=progress(3,:)-sdd;
-        exponent=exp(-.5*(q/widths(index)).^2);
-        lambda=-q.*qd/widths(index)^2;
-        lambdaD=-(qd.^2+q.*qdd)/widths(index)^2;
-        z=z+b.*exponent;zd=zd+(bd+b.*lambda).*exponent;
-        zdd=zdd+(bdd+2*bd.*lambda+b.*(lambda.^2+lambdaD)).*exponent;
-        targetStation(index,:)=s;targetLateral(index,:)=d;
-        coefficients(index,:,:)=permute(b,[3,2,1]);
+        if valid
+            sd=sum(targetChart.tangent.*motion(3:4,:),1)./regular;
+            dd=sum(targetChart.normal.*motion(3:4,:),1);
+            sdd=(sum(targetChart.tangent.*motion(5:6,:),1)+2*k.*sd.*dd+kp.*d.*sd.^2)./regular;
+            m=targetChart.midpoint;h=targetChart.halfWidth;
+            hd=h(2,:).*sd;hdd=h(3,:).*sd.^2+h(2,:).*sdd;
+            numerator=passingOffsets.'-m(1,:);
+            numeratorD=-m(2,:).*sd;
+            numeratorDD=-m(3,:).*sd.^2-m(2,:).*sdd;
+            b=numerator./h(1,:);bd=(numeratorD-b.*hd)./h(1,:);
+            bdd=(numeratorDD-b.*hdd-2*bd.*hd)./h(1,:);
+            q=progress(1,:)-s;qd=progress(2,:)-sd;qdd=progress(3,:)-sdd;
+            exponent=exp(-.5*(q/widths).^2);
+            lambda=-q.*qd/widths^2;
+            lambdaD=-(qd.^2+q.*qdd)/widths^2;
+            z=b.*exponent;zd=(bd+b.*lambda).*exponent;
+            zdd=(bdd+2*bd.*lambda+b.*(lambda.^2+lambdaD)).*exponent;
+            targetStation(1,:)=s;targetLateral(1,:)=d;
+            coefficients(1,:,:)=permute(b,[3,2,1]);
+        end
     end
     m=chart.midpoint;h=chart.halfWidth;sd=progress(2,:);sdd=progress(3,:);
     d=m(1,:)+h(1,:).*z;
@@ -462,6 +464,7 @@ function reference=localTimeDependentReference(time,progress,encounters,lane,roa
 end
 
 function reference=localPrepareFluidReference(program,model)
+    localRequireSingleTarget(model.encounters);
     count=program.prediction.stageCount;nodes=count+1;
     reference=struct('bump',zeros(2,nodes),'heading',zeros(2,nodes),'valid',true(1,2), ...
         'amplitudes',zeros(1,2),'width',0,'center',0,'stages',zeros(1,2), ...
@@ -482,48 +485,46 @@ function reference=localPrepareFluidReference(program,model)
             *program.anchorPlan(2*stage-1:2*stage)+program.prediction.continuousC(:,stage);
         acceleration=a*velocity;progress(2:3,node)=[velocity(1);acceleration(1)];
     end
-    selected=zeros(1,0);widths=zeros(1,0);passingOffsets=zeros(0,2);
-    largest=-Inf;
-    for target=1:numel(model.encounters)
-        matching=false(numel(records),1);
-        for index=1:numel(records),matching(index)=isequal(records(index).key,model.encounters(target).key);end
-        conflicts=find(matching & values>0);
-        if isempty(conflicts),continue;end
-        stages=[records(conflicts).stage];first=min(stages);last=max(stages);
-        middle=round((first+last)/2)+1;
-        motion=targetPrediction.nominalFlow(model.encounters(target),time);
-        projection=laneGeometry.project(motion(1:2,:),model.lane,progress(1,:));
-        q=progress(1,:)-projection.station;
-        width=model.cfg.admission.widthScale*max(model.cfg.admission.minimumWidthMeters, ...
-            (max(q(first+1:last+1))-min(q(first+1:last+1)))/2);
-        transverse=projection.lateralPosition(last+1)-projection.lateralPosition(first+1);
-        side=-sign(transverse);
-        if abs(transverse)<=1e-6,side=sign(nominal(2,middle)-projection.lateralPosition(middle));end
-        if side==0,side=1;end
-        normal=[-sin(projection.heading(middle));cos(projection.heading(middle))];
-        allowance=model.cfg.vehicle.width/2+targetPrediction.rectangleSupport( ...
-            model.encounters(target).halfLength,model.encounters(target).halfWidth,normal,motion(7,middle),0) ...
-            +model.cfg.admission.clearanceAllowanceMeters;
-        selected(end+1)=target;widths(end+1)=width; %#ok<AGROW>
-        passingOffsets(end+1,:)=projection.lateralPosition(middle)+[side,-side]*allowance; %#ok<AGROW>
-        excess=max(values(conflicts));
-        if excess>largest
-            largest=excess;reference.amplitudes=projection.lateralPosition(middle)+[side,-side]*allowance;
-            reference.width=width;reference.center=projection.station(middle);reference.stages=[first,last];
-        end
-    end
-    if isempty(selected),return;end
-    field=solveHardCbfClf.vffmReference(time,progress,model.encounters(selected),model.lane,model.road, ...
-        widths,passingOffsets);
+    target=model.encounters(1);
+    matching=false(numel(records),1);
+    for index=1:numel(records),matching(index)=isequal(records(index).key,target.key);end
+    conflicts=find(matching & values>0);
+    if isempty(conflicts),return;end
+    stages=[records(conflicts).stage];first=min(stages);last=max(stages);
+    middle=round((first+last)/2)+1;
+    motion=targetPrediction.nominalFlow(target,time);
+    projection=laneGeometry.project(motion(1:2,:),model.lane,progress(1,:));
+    q=progress(1,:)-projection.station;
+    width=model.cfg.admission.widthScale*max(model.cfg.admission.minimumWidthMeters, ...
+        (max(q(first+1:last+1))-min(q(first+1:last+1)))/2);
+    transverse=projection.lateralPosition(last+1)-projection.lateralPosition(first+1);
+    side=-sign(transverse);
+    if abs(transverse)<=1e-6,side=sign(nominal(2,middle)-projection.lateralPosition(middle));end
+    if side==0,side=1;end
+    normal=[-sin(projection.heading(middle));cos(projection.heading(middle))];
+    allowance=model.cfg.vehicle.width/2+targetPrediction.rectangleSupport( ...
+        target.halfLength,target.halfWidth,normal,motion(7,middle),0) ...
+        +model.cfg.admission.clearanceAllowanceMeters;
+    passingOffsets=projection.lateralPosition(middle)+[side,-side]*allowance;
+    reference.amplitudes=passingOffsets;
+    reference.width=width;reference.center=projection.station(middle);reference.stages=[first,last];
+    field=solveHardCbfClf.vffmReference(time,progress,target,model.lane,model.road,width,passingOffsets);
     reference.bump=field.lateralPosition-nominal(2,:);
     % Course minus the anchor sideslip gives a body-yaw preference. The fit
     % and subsequent full trajectory solve determine the actual lateral state.
     heading=field.courseOffset-atan2(nominal(5,:),nominal(4,:))-nominal(3,:);
     reference.heading=atan2(sin(heading),cos(heading));reference.valid=field.valid;
-    reference.targetCount=numel(selected);reference.targetIndices=selected;reference.widths=widths;
+    reference.targetCount=1;reference.targetIndices=1;reference.widths=width;
     reference.targetStation=field.targetStation;reference.targetLateral=field.targetLateral;
     reference.lateralRate=field.lateralRate;reference.lateralAcceleration=field.lateralAcceleration;
     reference.normalAcceleration=field.normalAcceleration;reference.bounded=field.bounded;
+end
+
+function localRequireSingleTarget(encounters)
+    if numel(encounters)>1
+        error('collisionAvoidanceController:unsupportedTargetCount', ...
+            'The VFFM initializer supports at most one obstacle vehicle.');
+    end
 end
 
 function [point,angles,information]=localFluidInitialize(program,cfg)

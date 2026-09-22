@@ -1,0 +1,46 @@
+{
+  "currentSuiteCount": 801,
+  "coveredByPassingResults": 801,
+  "fullRun": {
+    "total": 801,
+    "passed": 800,
+    "failed": 1,
+    "incomplete": 1,
+    "durationSeconds": 532.8640170000001,
+    "matlab": "26.1.0.3276743 (R2026a) Update 3"
+  },
+  "finalFocused": {
+    "total": 159,
+    "passed": 159,
+    "failed": 0,
+    "incomplete": 0,
+    "durationSeconds": 9.636247
+  },
+  "analysisFiles": [
+    "controller/readPlanningInputs.m",
+    "controller/solveHardCbfClf.m",
+    "controller/collisionAvoidanceController.m",
+    "tests/nrmmVffmReferenceTest.m",
+    "tests/collisionAvoidanceControllerTest.m",
+    "tests/recursiveSafetyClosureTest.m",
+    "tests/jointSupportCertificateTest.m"
+  ],
+  "analysisFindings": [
+    [],
+    {
+      "id": "FNDSB",
+      "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+      "fix": 1,
+      "line": 280,
+      "column": [
+        24,
+        27
+      ]
+    },
+    [],
+    [],
+    [],
+    [],
+    []
+  ]
+}

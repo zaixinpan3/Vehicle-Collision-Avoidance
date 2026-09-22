@@ -21,9 +21,15 @@ nor the quadratic-road streamfunction below is claimed to solve a moving-domain
 Navier–Stokes boundary-value problem. Li's Eq. (13) includes collision slack;
 this controller retains hard collision rows and only its existing soft CLF.
 
+The current study considers zero or one obstacle vehicle. Both the controller
+input parser and the VFFM reference interfaces reject multiple target records
+with `collisionAvoidanceController:unsupportedTargetCount`; no nearest-target
+selection or silent target omission is performed. Left/right reference
+candidates describe alternative maneuvers around the same obstacle.
+
 ## 1. Analytical target motion in the fixed planning frame
 
-For each target, with constant speed derivative $A$ and sideslip $\beta$, set
+For the single target, with constant speed derivative $A$ and sideslip $\beta$, set
 
 \[
 \kappa=\frac{\sin\beta}{l_r},\quad
@@ -113,45 +119,44 @@ road template $u=Qf'(\eta)F_s/J_F$. The implementation evaluates the resulting
 road coordinates and preferred reference directly; it does not integrate a
 fluid PDE or its instantaneous streamlines.
 
-## 3. Active targets, passing choices and timing
+## 3. Single-obstacle passing choices and timing
 
 Roll out the current nominal control sequence through the same affine model
 used by the optimizer. Its nodes supply progress $s_E(t_k)$ and one-sided
-held-flow derivatives $\dot s_E,\ddot s_E$. Every target having a positive
-reserved collision-support residual at any nominal node enters the reference.
-Other targets keep their hard constraints. For target $i$, let $K_i$ be the
-first-to-last conflicting node interval, and project its analytical poses into
-the same route chart to obtain $s_i(t),d_i(t)$. Its Gaussian length is
+held-flow derivatives $\dot s_E,\ddot s_E$. If there is no target or no positive
+reserved collision-support residual at any nominal node, retain the nominal
+seed. A present nonconflicting target still keeps its hard constraints.
+For a conflicting target, let $K$ be the first-to-last conflicting node
+interval, and project its analytical poses into the same route chart to
+obtain $s_o(t),d_o(t)$. Its Gaussian length is
 
 \[
-\ell_i=w_\ell\max\left(\ell_{\min},
-\frac{\max_{k\in K_i}(s_{E,k}-s_{i,k})-\min_{k\in K_i}(s_{E,k}-s_{i,k})}{2}\right).
+\ell=w_\ell\max\left(\ell_{\min},
+\frac{\max_{k\in K}(s_{E,k}-s_{o,k})-\min_{k\in K}(s_{E,k}-s_{o,k})}{2}\right).
 \]
 
 The default $w_\ell=1.2$ and $\ell_{\min}=3$ m remain design choices. Relative
 station, rather than just ego travel, accounts for an approaching or receding
 target when selecting temporal extent.
 
-At the middle conflicting node, choose the two passing ordinates
+At the middle conflicting node $t_m$, choose the two passing ordinates
 
 \[
-a_i^\sigma=d_i(t_{i,m})+\sigma_i D_i,\qquad
-D_i=W_E/2+h_{Q_i}(R_i^Tn_i)+d_{\mathrm{shape}}.
+a^\sigma=d_o(t_m)+\sigma D,\qquad \sigma\in\{-1,+1\},\qquad
+D=W_E/2+h_{Q_o}(R_o^Tn_o)+d_{\mathrm{shape}}.
 \]
 
 $d_{\mathrm{shape}}=0.2$ m is a reference-shape allowance, not a hard physical
 clearance. The footprint orientation in the support term is target body yaw.
-Order the first assignment against target lateral travel; a tie orders away
+Order the first side against target lateral travel; a tie orders away
 from its lateral center, then positive lateral if centered. The second
-assignment reverses all signs. Thus two joint assignments are evaluated even
-with multiple active targets; the method does not enumerate all $2^M$ choices.
+candidate uses the opposite side of the same target.
 
-The chosen design parameterization is
+The chosen design parameterization has one Gaussian term:
 
 \[
-b_i^\sigma(t)=\frac{a_i^\sigma-m(s_i(t))}{h(s_i(t))},\quad
-g^\sigma(s,t)=\sum_{i\in\mathcal A} b_i^\sigma(t)
- \exp[-(s-s_i(t))^2/(2\ell_i^2)].
+b^\sigma(t)=\frac{a^\sigma-m(s_o(t))}{h(s_o(t))},\quad
+g^\sigma(s,t)=b^\sigma(t)\exp[-(s-s_o(t))^2/(2\ell^2)].
 \]
 
 It follows from $\partial_\eta(\eta^2/2-\eta g)=0$ that $\eta_r=g$.
@@ -164,23 +169,23 @@ p_r^\sigma(t)=F(s_E(t),g^\sigma(s_E(t),t)).
 The passing ordinate is frozen from the predicted conflict, while the Gaussian
 center and chart normalization evolve with the target. This is an explicit
 design decision within the supplied formulation. Directly making the passing
-ordinate follow $d_i(t)$ caused the first implementation's crossing references
+ordinate follow $d_o(t)$ caused the first implementation's crossing references
 to move with the transverse obstacle and fail existing admission regressions.
 The supplied time-varying-amplitude example is not a feasibility theorem.
-Stationary targets on a straight, constant-width road recover Cheng's Gaussian.
+A stationary target on a straight, constant-width road recovers Cheng's Gaussian.
 
 ## 4. Derivatives and body-heading preference
 
-For $q_i=s_E-s_i$, $E_i=\exp[-q_i^2/(2\ell_i^2)]$ and
-$\lambda_i=-q_i\dot q_i/\ell_i^2$,
+For $q=s_E-s_o$, $E=\exp[-q^2/(2\ell^2)]$ and
+$\lambda=-q\dot q/\ell^2$,
 
 \[
-\dot\lambda_i=-(\dot q_i^2+q_i\ddot q_i)/\ell_i^2,\quad
-z=\sum_i b_iE_i,\quad
-\dot z=\sum_i(\dot b_i+b_i\lambda_i)E_i,
+\dot\lambda=-(\dot q^2+q\ddot q)/\ell^2,\quad
+z=bE,\quad
+\dot z=(\dot b+b\lambda)E,
 \]
 \[
-\ddot z=\sum_i[\ddot b_i+2\dot b_i\lambda_i+b_i(\lambda_i^2+\dot\lambda_i)]E_i.
+\ddot z=[\ddot b+2\dot b\lambda+b(\lambda^2+\dot\lambda)]E.
 \]
 
 For $d=m(s_E)+h(s_E)z$, retain all midpoint/width derivatives:
@@ -202,15 +207,15 @@ The Cartesian reference velocity and acceleration are
 \]
 
 Target station derivatives come from its analytical Cartesian velocity and
-acceleration, with $r_i=1-k_i d_i$:
+acceleration, with $r_o=1-k_o d_o$:
 
 \[
-\dot s_i=t_i^T\dot p_i/r_i,\quad \dot d_i=n_i^T\dot p_i,\quad
-\ddot s_i=[t_i^T\ddot p_i+2k_i\dot s_i\dot d_i+k_i'd_i\dot s_i^2]/r_i.
+\dot s_o=t_o^T\dot p_o/r_o,\quad \dot d_o=n_o^T\dot p_o,\quad
+\ddot s_o=[t_o^T\ddot p_o+2k_o\dot s_o\dot d_o+k_o'd_o\dot s_o^2]/r_o.
 \]
 
-Analytical quotient derivatives of $b_i=(a_i-m_i)/h_i$ retain $\dot h_i$,
-$\ddot h_i$, $\dot m_i$ and $\ddot m_i$. No constant-relative-speed
+Analytical quotient derivatives of $b=(a-m_o)/h_o$ retain $\dot h_o$,
+$\ddot h_o$, $\dot m_o$ and $\ddot m_o$. No constant-relative-speed
 approximation is used. Derivatives are local to smooth road pieces and smooth
 motion branches; knots, hold changes and a braking stop need one-sided values.
 
@@ -286,6 +291,11 @@ an issued control plan.
 
 ## Boundaries of this reconstruction
 
+The geometric initializer can evaluate supplied quadratic boundaries. The
+current end-to-end terminal certificates reject nonempty physical road-boundary
+sets; this scope change does not remove that limitation. See the
+[validation rerun](../report/CONTROLLER_VALIDATION_RERUN_20260922.md).
+
 - The implementation reconstructs initialization, not the entire nonlinear
   optimal-control problem in the supplied text. It retains the existing
   six-state Frenet affine Fiala model and held steering/braking inputs rather
@@ -299,8 +309,8 @@ an issued control plan.
   separation, a physical nonlinear-vehicle guarantee or a real-time deadline
   guarantee. Inter-sample margins from the supplied text are not silently
   assumed to exist in the current controller.
-- Multi-target superposition may cancel or leave the road; two assignments
-  need not include a feasible passing combination. Road footprint, collision,
+- Only one obstacle is in scope. Its two passing candidates need not include
+  a feasible maneuver and may leave the road. Road footprint, collision,
   actuator and terminal constraints belong to the subsequent optimization and
   verifier. Local rejection is not global infeasibility.
 

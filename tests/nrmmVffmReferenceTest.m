@@ -122,15 +122,18 @@ classdef nrmmVffmReferenceTest < matlab.unittest.TestCase
             testCase.verifyEqual(field.normalAcceleration(1,2),expected,AbsTol=1e-12);
         end
 
-        function allActiveObstaclesContributeToTheSameTimedReference(testCase)
+        function multipleObstaclesAreOutsideTheReferenceScope(testCase)
             [lane,road]=localRoad(0,false);time=1;progress=[8;8;0];
             targets=[localTarget([10;0;1;0;0;0;0;0]),localTarget([18;0;-2;0;0;0;pi;0])];
-            both=solveHardCbfClf.vffmReference(time,progress,targets,lane,road,[4,5],[3;-2]);
-            first=solveHardCbfClf.vffmReference(time,progress,targets(1),lane,road,4,3);
-            second=solveHardCbfClf.vffmReference(time,progress,targets(2),lane,road,5,-2);
-            testCase.verifyEqual(both.lateralPosition,first.lateralPosition+second.lateralPosition,AbsTol=1e-14);
-            testCase.verifyEqual(both.lateralAcceleration,first.lateralAcceleration+second.lateralAcceleration,AbsTol=1e-14);
-            testCase.verifyEqual(both.targetStation,[11;16],AbsTol=1e-14);
+            testCase.verifyError(@()solveHardCbfClf.vffmReference( ...
+                time,progress,targets,lane,road,[4,5],[3;-2]), ...
+                'collisionAvoidanceController:unsupportedTargetCount');
+        end
+
+        function preparationRejectsMultipleEncountersBeforeUsingTheProgram(testCase)
+            model=struct('encounters',repmat(localTarget(zeros(8,1)),1,2));
+            testCase.verifyError(@()solveHardCbfClf.prepareFluidReference(struct(),model), ...
+                'collisionAvoidanceController:unsupportedTargetCount');
         end
 
         function invalidWidthsAreRejectedByTheReferenceInterface(testCase)

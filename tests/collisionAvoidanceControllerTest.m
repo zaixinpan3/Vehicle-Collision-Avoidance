@@ -154,23 +154,27 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(minimum,-1e-9);
             testCase.verifyLessThanOrEqual(residual,1e-9);
         end
-        function multipleTargetsShareTheSameOptimization(testCase)
+        function multipleTargetsAreRejectedBeforeOptimization(testCase)
             [ego,target,road,cfg]=localFixture(true);
             targets=[target,target];targets(2).trackId=2;
             targets(2).targetPositionInertial=[-12;-4];targets(2).targetVelocityInertial=[-16;0];
             localHook('reset',[]);cfg.solver.jointFunction=@localHook;
-            [~,plan,problem]=collisionAvoidanceController(ego,targets,road,cfg,[]);
-            testCase.verifyEqual(localHook('count',[]),1);
-            testCase.verifySize(plan,[2,problem.metadata.horizonSteps]);
-            testCase.verifySize(problem.metadata.targetErrorBound,[8,2]);
-            testCase.verifySize(problem.program.completion.direction,[2,2]);
+            testCase.verifyError(@()collisionAvoidanceController(ego,targets,road,cfg,[]), ...
+                'collisionAvoidanceController:unsupportedTargetCount');
+            testCase.verifyEqual(localHook('count',[]),0);
         end
         function anUnsafeSecondTargetCannotBeIgnored(testCase)
             [ego,target,road,cfg]=localFixture(true);
             targets=[target,target];targets(2).trackId=2;
             targets(2).targetPositionInertial=[1;0];
             testCase.verifyError(@() collisionAvoidanceController(ego,targets,road,cfg,[]), ...
-                'collisionAvoidanceController:optimizationFailed');
+                'collisionAvoidanceController:unsupportedTargetCount');
+        end
+        function bundledMultipleTargetsAreAlsoRejected(testCase)
+            [ego,target,road,cfg]=localFixture(true);
+            ego.targetEstimates=[target,target];ego.targetEstimates(2).trackId=2;
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
+                'collisionAvoidanceController:unsupportedTargetCount');
         end
         function aCrossingBetweenTwoClearNodesIsOutsideTheNodeCertificate(testCase)
             % Project decision of 2026-09-17: safety is certified at the hold
