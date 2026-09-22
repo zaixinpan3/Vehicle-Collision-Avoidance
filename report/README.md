@@ -1,5 +1,7 @@
 # Experiment reports
 
+Latest controller review: [NRMM/VFFM warmed simulation and independent footprint audit](NRMM_VFFM_SIMULATION_REVIEW_20260922.md). All 792 tests and 12 diagnostic trials pass. Only 6 of 12 strict 50 ms trials complete; the other six reject their first frame. Refined circular-crossing gap is 0.155002 m, but straight-stationary clearance is only 0.0927 mm. Physical road boundaries remain unsupported by the terminal certificate, and three cases exceed the optional heading diagnostic envelope.
+
 Current trajectory initialization: [NRMM/VFFM reconstruction, derivation and validation](NRMM_VFFM_INITIALIZATION_20260922.md).
 Analytical target motion at ego arrival times, quadratic-road normal charts,
 multiple active targets and body-yaw-consistent affine fitting initialize one
