@@ -61,7 +61,7 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
     states = nan(6,count);inputs = nan(2,count);frameSeconds = nan(1,count);
     observerSeconds = nan(1,count);controllerSeconds = nan(1,count);
     published = false(1,count);certified = false(1,count);audits = cell(1,count);metadata = cell(1,count);
-    egoEstimates = cell(1,count);targetEstimates = cell(1,count);
+    egoEstimates = cell(1,count);targetEstimate = cell(1,count);
     certificate = [];command = [];
     failure = struct('identifier',"",'message',"",'time',NaN);
     failureException = [];
@@ -71,31 +71,31 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         frameTimer = tic;
         phase = tic;
         if options.UseEstimator
-            [context,ego,targets,~,audit] = nrmmEstimatorControllerAdapter('sample',context,time(k), ...
+            [context,ego,target,~,audit] = nrmmEstimatorControllerAdapter('sample',context,time(k), ...
                 localTruth(truth),targetFunction(time(k),[]));
         else
             ego = localTruth(truth);
             ego.stateTime = time(k);
             ego.perception = struct('time',time(k),'range',estimator.sensor.radar.rangeMaximum, ...
                 'completeWithinRange',true);
-            targets = targetFunction(time(k),[]);
-            targets.trackId = 1;
-            targets.targetHeadingInertial = targets.targetYawInertial;
-            if norm(targets.targetPositionInertial-truth(1:2))>estimator.sensor.radar.rangeMaximum
-                targets = [];
+            target = targetFunction(time(k),[]);
+            target.trackId = 1;
+            target.targetHeadingInertial = target.targetYawInertial;
+            if norm(target.targetPositionInertial-truth(1:2))>estimator.sensor.radar.rangeMaximum
+                target = [];
             end
             audit = struct('truthEnclosure',struct());
         end
         observerSeconds(k) = toc(phase);
         if ~isempty(command), ego.heldActuatorInput = command.actuatorInput; end
-        egoEstimates{k}=ego;targetEstimates{k}=targets;audits{k}=audit.truthEnclosure;
-        published(k) = ~isempty(targets);
+        egoEstimates{k}=ego;targetEstimate{k}=target;audits{k}=audit.truthEnclosure;
+        published(k) = ~isempty(target);
         phase = tic;
         try
             remaining=options.DeadlineSeconds-toc(frameTimer);
             if remaining<=0,error('collisionAvoidanceController:optimizationFailed','The observer exhausted the complete frame deadline.');end
             frameCfg=cfg;frameCfg.solver.frameDeadlineSeconds=remaining;
-            [command,~,problem,certificate] = collisionAvoidanceController(ego,targets,road,frameCfg,certificate);
+            [command,~,problem,certificate] = collisionAvoidanceController(ego,target,road,frameCfg,certificate);
             if toc(frameTimer)>options.DeadlineSeconds
                 error('collisionAvoidanceController:optimizationFailed','The complete estimator-controller frame exceeded its deadline.');
             end
@@ -138,7 +138,7 @@ function report = runDeclaredPlantEstimatorControllerScenario(options)
         'time',time(kept),'state',states(:,kept),'input',inputs(:,kept),'published',published(kept), ...
         'certified',certified(kept),'frameSeconds',frameSeconds(kept),'observerSeconds',observerSeconds(kept), ...
         'controllerSeconds',controllerSeconds(kept),'audit',{audits(kept)},'metadata',{metadata(kept)}, ...
-        'egoEstimate',{egoEstimates(kept)},'targetEstimate',{targetEstimates(kept)}, ...
+        'egoEstimate',{egoEstimates(kept)},'targetEstimate',{targetEstimate(kept)}, ...
         'minimumRoadMargin',minimumRoadMargin,'minimumSeparationMargin',minimumSeparationMargin, ...
         'configuration',cfg,'estimatorConfiguration',estimator,'options',options,'preparation',preparation, ...
         'scope',"Actual NRMM bounds, declared affine ego plant, fixed road; computation delay measured but not applied");

@@ -38,23 +38,23 @@ function report = probeEstimatorAdmission(options)
     acquisitionTime = NaN;
     for k = 1:count
         truth = exact.state(:,k);
-        [context,ego,targets] = nrmmEstimatorControllerAdapter('sample',context,time(k),localTruth(truth),targetFunction(time(k),[]));
+        [context,ego,target] = nrmmEstimatorControllerAdapter('sample',context,time(k),localTruth(truth),targetFunction(time(k),[]));
         if k>1, ego.heldActuatorInput = exact.input(:,k-1); end
         egoBound(:,k) = ego.controllerErrorBound.bounds(:);
-        published(k) = ~isempty(targets);
+        published(k) = ~isempty(target);
         if ~published(k), continue; end
         if isnan(acquisitionTime), acquisitionTime = time(k); end
-        bounds = targets.controllerErrorBound.bounds(:);
+        bounds = target.controllerErrorBound.bounds(:);
         targetPositionBound(:,k) = bounds(1:2);targetVelocityBound(:,k) = bounds(3:4);
         targetAccelerationBound(:,k) = bounds(5:6);targetYawBound(k) = bounds(7);
-        jerkBound(k) = targets.predictionMotion.jerkBound(1);
+        jerkBound(k) = target.predictionMotion.jerkBound(1);
         truthTarget = targetFunction(time(k),[]);
-        targetPositionError(k) = norm(targets.targetPositionInertial-truthTarget.targetPositionInertial);
-        targetVelocityError(k) = norm(targets.targetVelocityInertial-truthTarget.targetVelocityInertial);
+        targetPositionError(k) = norm(target.targetPositionInertial-truthTarget.targetPositionInertial);
+        targetVelocityError(k) = norm(target.targetVelocityInertial-truthTarget.targetVelocityInertial);
         if time(k)-acquisitionTime > options.MaximumProbeSeconds, continue; end
         attempted(k) = true;timer = tic;
         try
-            [~,~,problem] = collisionAvoidanceController(ego,targets,road,cfg,[]);
+            [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
             certified(k) = problem.metadata.planCertified;horizon(k) = problem.metadata.horizonSteps;
             nativeSolves(k) = problem.metadata.solverCallCount;
         catch exception
@@ -64,7 +64,7 @@ function report = probeEstimatorAdmission(options)
         end
         seconds(k) = toc(timer);
         fprintf('t=%.2f range %.1f m: certified %d (%s) %.3f s; target bounds pos [%.3f %.3f] vel [%.2f %.2f] yaw %.2f; vel error %.3f\n', ...
-            time(k),norm(targets.targetPositionInertial-truth(1:2)),certified(k),identifier(k),seconds(k), ...
+            time(k),norm(target.targetPositionInertial-truth(1:2)),certified(k),identifier(k),seconds(k), ...
             targetPositionBound(1,k),targetPositionBound(2,k),targetVelocityBound(1,k),targetVelocityBound(2,k),targetYawBound(k),targetVelocityError(k));
     end
     report = struct('time',time,'published',published,'attempted',attempted,'certified',certified, ...

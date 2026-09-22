@@ -24,7 +24,7 @@ classdef straightCenterlineCruiseScenarioTest < matlab.unittest.TestCase
             testCase.assertTrue(result.failure.occurred);
             testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:nonexactStudyInput");
 
-            testCase.verifyEqual(result.scenario.targetCount, 0);
+            testCase.verifyFalse(result.scenario.targetObserved);
             testCase.verifyEqual(result.scenario.sampleTime, ...
                 0.05, AbsTol=0.0);
             testCase.verifyEqual( ...

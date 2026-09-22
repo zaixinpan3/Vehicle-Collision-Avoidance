@@ -154,28 +154,6 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(minimum,-1e-9);
             testCase.verifyLessThanOrEqual(residual,1e-9);
         end
-        function multipleTargetsAreRejectedBeforeOptimization(testCase)
-            [ego,target,road,cfg]=localFixture(true);
-            targets=[target,target];targets(2).trackId=2;
-            targets(2).targetPositionInertial=[-12;-4];targets(2).targetVelocityInertial=[-16;0];
-            localHook('reset',[]);cfg.solver.jointFunction=@localHook;
-            testCase.verifyError(@()collisionAvoidanceController(ego,targets,road,cfg,[]), ...
-                'collisionAvoidanceController:unsupportedTargetCount');
-            testCase.verifyEqual(localHook('count',[]),0);
-        end
-        function anUnsafeSecondTargetCannotBeIgnored(testCase)
-            [ego,target,road,cfg]=localFixture(true);
-            targets=[target,target];targets(2).trackId=2;
-            targets(2).targetPositionInertial=[1;0];
-            testCase.verifyError(@() collisionAvoidanceController(ego,targets,road,cfg,[]), ...
-                'collisionAvoidanceController:unsupportedTargetCount');
-        end
-        function bundledMultipleTargetsAreAlsoRejected(testCase)
-            [ego,target,road,cfg]=localFixture(true);
-            ego.targetEstimates=[target,target];ego.targetEstimates(2).trackId=2;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
-                'collisionAvoidanceController:unsupportedTargetCount');
-        end
         function aCrossingBetweenTwoClearNodesIsOutsideTheNodeCertificate(testCase)
             % Project decision of 2026-09-17: safety is certified at the hold
             % nodes only. A target that crosses the ego path between two nodes
@@ -338,7 +316,7 @@ end
 function [minimum,residual]=localBarrierResidual(problem,command)
 % Independent rectangle audit sampled inside the first hold (a physical
 % diagnostic beyond the node certificate), plus all physical plan rows.
-    model=problem.model;target=model.encounters(1);
+    model=problem.model;target=model.encounter;
     generator=[problem.metadata.executedContinuousGenerator;zeros(3,9)];
     minimum=Inf;
     for time=linspace(0,model.sampleTime,21)

@@ -7,7 +7,7 @@ function [program,prediction,clf] = formulateAvoidanceProblem(model)
         [program,prediction,clf]=localFormulate(model);
         return;
     end
-    if isempty(model.encounters)
+    if isempty(model.encounter)
         fresh=model;fresh.carriedWitness=[];
         fresh.horizonSteps=max(model.cfg.controller.horizonSteps,model.cfg.controller.minimumHorizonSteps);
         fresh.initializationPlan=localContinuation(model,fresh.horizonSteps);
@@ -94,7 +94,7 @@ function [program,prediction,clf] = localFormulate(model)
     else
         [prediction,anchor] = hardEncounterBarrier.predict(model,cruise);
         model.anchorPlan = anchor;
-        if ~isempty(model.encounters)
+        if ~isempty(model.encounter)
             [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
             [normals,dual]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor);
             if ~dual.available
@@ -106,7 +106,7 @@ function [program,prediction,clf] = localFormulate(model)
         end
         % Joint certificates below replace the collision rows while retaining
         % their occupied sets. Avoid projecting rows that would be discarded.
-        geometry = avoidanceSafetyGeometry.build(model,prediction,isempty(model.encounters));
+        geometry = avoidanceSafetyGeometry.build(model,prediction,isempty(model.encounter));
         [terminalMatrix,terminalBound,terminal,completion,terminalCone] = ...
             hardEncounterBarrier.completionRows(model,prediction,geometry);
         count = prediction.stageCount;
@@ -145,11 +145,13 @@ function [program,prediction,clf] = localFormulate(model)
                 difference(finiteRate,:);-difference(finiteRate,:);terminalMatrix];
             physicalBound = [geometry.physicalBound;upper;-lower; ...
                 rate(finiteRate)+prior(finiteRate);rate(finiteRate)-prior(finiteRate);terminalBound];
+            exitLabel=strings(0,1);
+            if completion.active,exitLabel="exit:"+model.encounter.key;end
             labels=[geometry.label;repmat("actuator",2*planCount,1); ...
                 repmat("slew",2*nnz(finiteRate),1); ...
-                repmat("terminalEntry",numel(terminalBound)-numel(model.encounters)-completion.domainRowCount,1); ...
+                repmat("terminalEntry",numel(terminalBound)-double(completion.active)-completion.domainRowCount,1); ...
                 repmat("terminalPoseDomain",completion.domainRowCount,1); ...
-                "exit:"+string({model.encounters.key}).'];
+                exitLabel];
             reach = max(abs(lower),abs(upper));
             scale = 1+abs(physicalBound)+abs(matrix)*reach;
             reserve = 4*max(cfg.encounter.numericalMargin,cfg.solver.constraintTolerance) ...
@@ -238,7 +240,7 @@ function [program,prediction,clf] = localFormulate(model)
     program.feasibleWitness=localCompleteSlack(program,anchor);
     if inherited,program.inheritedWitness=program.feasibleWitness;end
     program.supportGeometry=dual;
-    if ~isempty(model.encounters)
+    if ~isempty(model.encounter)
         program=avoidanceSafetyGeometry.jointProgram(program,model);
     end
     program.fluidReference=solveHardCbfClf.prepareFluidReference(program,model);
@@ -256,11 +258,10 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     columns = 3:old.layout.planCount;
     matrix = old.physicalMatrix(:,columns);
     labels=old.physicalLabels;
-    discharging=~isempty(model.dischargedTargetKeys);
+    discharging=model.targetReleased;
     removed=false(numel(labels),1);
     if discharging
-        removed=ismember(labels,"collision:"+model.dischargedTargetKeys) ...
-            | ismember(labels,"exit:"+model.dischargedTargetKeys);
+        removed=startsWith(labels,"collision:") | startsWith(labels,"exit:");
     end
     selected = any(matrix~=0,2) & ~removed;
     geometric=numel(old.geometry.label);
@@ -273,12 +274,10 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     terminalCone.bound=terminalCone.bound-terminalCone.matrix(:,1:2)*executed;
     terminalCone.matrix=terminalCone.matrix(:,columns);
     terminal=carry.terminal;completion=carry.completion;anchor=carry.inputs(:);
-    retained=~ismember(completion.keys,model.dischargedTargetKeys);
-    completion.keys=completion.keys(retained);
-    completion.direction=completion.direction(:,retained);
-    completion.stateRow=completion.stateRow(retained,:);
-    completion.stateBound=completion.stateBound(retained);
-    completion.active=~isempty(completion.keys);
+    if discharging
+        completion.active=false;completion.direction=zeros(2,0);
+        completion.stateRow=zeros(0,6);completion.stateBound=zeros(0,1);
+    end
     prediction=carry.prediction;
     prediction.nominalInitialState=carry.predictedCenter;
     prediction.stageCount=prediction.stageCount-1;
@@ -327,7 +326,7 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     geometry=old.geometry;
     selected=geometry.stage>=2;
     if discharging
-        selected=selected & ~ismember(geometry.label,"collision:"+model.dischargedTargetKeys);
+        selected=selected & ~startsWith(geometry.label,"collision:");
     end
     geometry.physicalBound=geometry.physicalBound(selected)-geometry.matrix(selected,1:2)*executed;
     geometry.matrix=geometry.matrix(selected,columns);
@@ -336,13 +335,12 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     geometry.cellIndex=geometry.cellIndex(selected);
     geometry.cellIndex=geometry.cellIndex-min(geometry.cellIndex)+1;
     geometry.frames=geometry.frames(keep);geometry.normals=geometry.normals(keep);
-    geometry.normals=cellfun(@(normal) normal(:,retained),geometry.normals,UniformOutput=false);
     geometry.local=geometry.local(keep);
     geometry.cellData=geometry.cellData(keep);
     for index=1:numel(geometry.local)
         local=geometry.local(index);
         if discharging
-            rows=~ismember(local.nodeLabels,"collision:"+model.dischargedTargetKeys);
+            rows=~startsWith(local.nodeLabels,"collision:");
             expanded=repmat(rows,size(local.nodeStateRows,3),1);
             local.stateMatrix=local.stateMatrix(expanded,:);
             local.inputMatrix=local.inputMatrix(expanded,:);local.bound=local.bound(expanded);
@@ -350,8 +348,9 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
             local.nodeStartStateRows=local.nodeStartStateRows(rows,:,:);
             local.nodeInputRows=local.nodeInputRows(rows,:,:);
             local.nodeLimits=local.nodeLimits(rows,:);local.nodeLabels=local.nodeLabels(rows);
-            geometry.cellData(index).targets=geometry.cellData(index).targets(retained);
-            geometry.cellData(index).normals=geometry.cellData(index).normals(:,retained);
+            geometry.cellData(index).hasTarget=false;
+            geometry.cellData(index).normal=zeros(2,0);
+            geometry.normals{index}=zeros(2,0);
         end
         local.stage=local.stage-1;geometry.local(index)=local;
     end

@@ -35,7 +35,7 @@ collision and permanent actuator-amplitude/slew constraints, provided that:
    target enclosure certifies exterior membership. Observation semantics must
    cover the footprint used by the exit certificate; missed detections cannot
    count as release.
-4. New targets, increased motion bounds, and other enlarged obligations must
+4. A newly acquired target, increased motion bounds, and other enlarged obligations must
    admit a new feasible certificate. Arbitrary newly appearing obstacles are
    not covered by the previous encounter's theorem.
 5. The permanent reference is an analytically continued straight line or
@@ -323,7 +323,7 @@ Prediction alone never releases a target.
 
 ## 5. Successor construction for every controller mode
 
-### Nonempty suffix, including partial or full confirmed release
+### Nonempty suffix and confirmed target release
 
 Partition `M = [M_0 M_+]`. After applying the first accepted input `u_0`,
 substitute it in every stored affine row and terminal cones:
@@ -338,11 +338,11 @@ already executed prefix may be removed. There is no additional tightening,
 relinearization, chart change or normal reselection in this inherited family.
 Conditioning only restricts the covered physical states.
 
-Confirmed release removes collision and exit certificate records for that
-key. The remaining input/slew/terminal obligations stay intact.
-Completion directions are indexed by stable target keys. Removing an obligation
-cannot invalidate the old suffix. In particular, **partial release no longer
-forces an unproved fresh admission of all remaining obligations**.
+Confirmed release removes the single target's collision and exit certificate
+records. The remaining road, input, slew and terminal obligations stay intact.
+The completion certificate carries one direction; temporal target identity is
+checked before conditioning. Removing the target's obligations cannot invalidate
+the old suffix.
 
 The first-hold CLF cannot remove this candidate: for any finite hard-feasible
 input its cone can be satisfied by a finite nonnegative slack.
@@ -410,7 +410,7 @@ subsequent sample exactly one of the preceding constructions applies:
 - terminal-set invariance supplies a feasible candidate to the one-hold
   optimization after the finite suffix is exhausted.
 
-These cases cover active encounters, partial release, full release, and
+These cases cover the active encounter, confirmed target release, and
 indefinite no-target operation. Their assumptions include the previous held
 input, bounded measurement sets, the common plant and stable target contracts.
 By induction every successor problem is feasible, and each accepted hold is

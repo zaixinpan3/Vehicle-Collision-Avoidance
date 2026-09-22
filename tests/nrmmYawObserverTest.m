@@ -66,7 +66,7 @@ classdef nrmmYawObserverTest < matlab.unittest.TestCase
             [~,a] = onlineNrmmTrackingRuntime("step",first,localFrame(0,[15;0],0));
             [~,b] = onlineNrmmTrackingRuntime("step",second,localFrame(0,[15;0],0));
             testCase.verifyEqual(a.egoBodyVelocity,b.egoBodyVelocity,AbsTol=0);
-            testCase.verifyEqual(a.targetStates,b.targetStates,AbsTol=0);
+            testCase.verifyEqual(a.targetState,b.targetState,AbsTol=0);
             testCase.verifyEqual(a.relativePositionErrorBound,b.relativePositionErrorBound,AbsTol=0);
             testCase.verifyEqual(a.egoPositionInertial,b.egoPositionInertial,AbsTol=0);
             testCase.verifyGreaterThan(abs(a.egoYaw-b.egoYaw),0.5);

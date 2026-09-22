@@ -17,7 +17,7 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
     methods (Test)
         function changingForcingAndRadarModeRetainsTheExactComparisonFlow(testCase)
             for detected = [true,false,true]
-                [runtime,frame] = localRuntime(localSmoothConfig(testCase.Config),testCase.Design,1,struct());
+                [runtime,frame] = localRuntime(localSmoothConfig(testCase.Config),testCase.Design,struct());
                 frame.radarDetectionAvailable = detected;
                 if ~detected,frame.radarRelativePosition(:) = NaN;end
                 frame.yawRateMeasured = 0.03*double(detected);
@@ -56,19 +56,19 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
         end
 
         function currentBoundUsesThePredictedStateTimestamp(testCase)
-            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,1,struct());
+            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,struct());
             [changed,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
-            testCase.verifyEqual(output.targetEstimates.positionErrorBound.time, ...
+            testCase.verifyEqual(output.targetEstimate.positionErrorBound.time, ...
                 frame.time+testCase.Config.runtime.samplePeriod,AbsTol=1e-14);
             testCase.verifyEqual(output.lastRadarTime,frame.time,AbsTol=0);
             testCase.verifyEqual(changed.positionErrorBound.time,output.stateTime,AbsTol=0);
-            testCase.verifyTrue(output.targetEstimates.positionErrorBound.integrationErrorIncluded);
-            testCase.verifyFalse(output.targetEstimates.positionErrorBound.futurePredictionIncluded);
-            testCase.verifyFalse(output.targetEstimates.positionErrorBound.floatingPointVerified);
+            testCase.verifyTrue(output.targetEstimate.positionErrorBound.integrationErrorIncluded);
+            testCase.verifyFalse(output.targetEstimate.positionErrorBound.futurePredictionIncluded);
+            testCase.verifyFalse(output.targetEstimate.positionErrorBound.floatingPointVerified);
         end
 
         function aHeldGyroWithoutRateInformationUsesTheWholeDomain(testCase)
-            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,1,struct());
+            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,struct());
             frame.yawRateMeasured = 0.12;
             [changed,~] = onlineNrmmTrackingRuntime("step",runtime,frame);
             testCase.verifyEqual(changed.positionErrorBound.lastGyroscopeHoldError, ...
@@ -78,7 +78,7 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
 
         function finiteInputRatesGiveAnExplicitHoldErrorEnvelope(testCase)
             cfg = localSmoothConfig(testCase.Config);
-            [runtime,frame] = localRuntime(cfg,testCase.Design,1,struct());
+            [runtime,frame] = localRuntime(cfg,testCase.Design,struct());
             [changed,~] = onlineNrmmTrackingRuntime("step",runtime,frame);
             testCase.verifyEqual(changed.positionErrorBound.lastGyroscopeHoldError, ...
                 cfg.measurement.gyroscope.noiseMaximum ...
@@ -117,39 +117,38 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(excess,[],"all"),1e-8);
         end
 
-        function inconsistentRadarDisablesOnlyItsTrackBound(testCase)
-            prior = struct("yaw",0.1,"bodyVelocity",1,"targetComponents",zeros(3,2));
-            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,2,prior);
+        function inconsistentRadarDisablesTheTargetBound(testCase)
+            prior = struct("yaw",0.1,"bodyVelocity",1,"targetComponents",zeros(3,1));
+            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,prior);
             frame.radarRelativePosition(1,1) = 40;
             [~,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
-            testCase.verifyFalse(output.positionErrorBoundAvailable(1));
-            testCase.verifyTrue(isinf(output.relativePositionErrorBound(1)));
-            testCase.verifyTrue(output.positionErrorBoundAvailable(2));
+            testCase.verifyFalse(output.positionErrorBoundAvailable);
+            testCase.verifyTrue(isinf(output.relativePositionErrorBound));
         end
 
-        function anInvalidEgoBoundCannotBeRepairedByResettingOneTarget(testCase)
-            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,1,struct());
+        function anInvalidEgoBoundCannotBeRepairedByResettingTheTarget(testCase)
+            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,struct());
             frame.vxGps = 40;
             [changed,~] = onlineNrmmTrackingRuntime("step",runtime,frame);
-            changed = onlineNrmmTrackingRuntime("resetTarget",changed,1,changed.targetState);
+            changed = onlineNrmmTrackingRuntime("resetTarget",changed,changed.targetState);
             testCase.verifyFalse(changed.positionErrorBound.egoValid);
             testCase.verifyFalse(changed.positionErrorBound.valid);
         end
 
-        function reacquisitionRestartsOnlyTheSelectedTargetEnclosure(testCase)
-            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,2,struct());
+        function reacquisitionRestartsTheTargetEnclosureAndPreservesEgo(testCase)
+            [runtime,frame] = localRuntime(testCase.Config,testCase.Design,struct());
             [changed,~] = onlineNrmmTrackingRuntime("step",runtime,frame);
             preserved = changed.positionErrorBound;
-            reset = onlineNrmmTrackingRuntime("resetTarget",changed,1,[40;3;12;2;0;0]);
-            testCase.verifyEqual(reset.positionErrorBound.targetComponents(:,2), ...
-                preserved.targetComponents(:,2),AbsTol=0);
+            reset = onlineNrmmTrackingRuntime("resetTarget",changed,[40;3;12;2;0;0]);
+            testCase.verifyEqual(reset.targetState,[40;3;12;2;0;0],AbsTol=0);
+            testCase.verifyEqual(reset.positionErrorBound.bodyVelocity,preserved.bodyVelocity,AbsTol=0);
             testCase.verifyEqual(reset.positionErrorBound.yaw,preserved.yaw,AbsTol=0);
-            testCase.verifyTrue(isnan(reset.positionErrorBound.lastRadarTime(1)));
-            testCase.verifyTrue(reset.positionErrorBound.valid(1));
+            testCase.verifyTrue(isnan(reset.positionErrorBound.lastRadarTime));
+            testCase.verifyTrue(reset.positionErrorBound.valid);
         end
 
         function measurementUpdatesRejectStaleTimestamps(testCase)
-            [runtime,~] = localRuntime(testCase.Config,testCase.Design,1,struct());
+            [runtime,~] = localRuntime(testCase.Config,testCase.Design,struct());
             input = localInput(1);
             state = localState(0);
             testCase.verifyError(@() nrmmPositionErrorBound("measure", ...
@@ -173,7 +172,7 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
         end
 
         function aFreshMeasurementTightensThePublishedEgoBound(testCase)
-            [runtime, frame] = localRuntime(testCase.Config, testCase.Design, 1, struct());
+            [runtime, frame] = localRuntime(testCase.Config, testCase.Design,struct());
             [changed, predicted] = onlineNrmmTrackingRuntime("step", runtime, frame);
             frame.time = changed.currentTime;
             frame.xGps = 15*frame.time;
@@ -185,32 +184,32 @@ classdef nrmmPositionErrorBoundTest < matlab.unittest.TestCase
         end
 
         function invalidEgoCertificatesAreUnavailableForControl(testCase)
-            [runtime, frame] = localRuntime(testCase.Config, testCase.Design, 1, struct());
+            [runtime, frame] = localRuntime(testCase.Config, testCase.Design,struct());
             frame.vxGps = 40;
             output = onlineNrmmTrackingRuntime("output", runtime, frame);
             testCase.verifyFalse(output.controllerErrorBound.available);
             testCase.verifyTrue(all(isinf(output.controllerStateErrorBound)));
-            testCase.verifyFalse(output.targetEstimates.controllerErrorBound.available);
+            testCase.verifyFalse(output.targetEstimate.controllerErrorBound.available);
         end
 
         function controllerBoundsRetainTheObserverStateTimestamp(testCase)
-            [runtime, frame] = localRuntime(testCase.Config, testCase.Design, 1, struct());
+            [runtime, frame] = localRuntime(testCase.Config, testCase.Design,struct());
             [~, output] = onlineNrmmTrackingRuntime("step", runtime, frame);
             testCase.verifyEqual(output.controllerErrorBound.time, output.stateTime, AbsTol=0.0);
-            testCase.verifyEqual(output.targetEstimates.controllerErrorBound.time, output.stateTime, AbsTol=0.0);
+            testCase.verifyEqual(output.targetEstimate.controllerErrorBound.time, output.stateTime, AbsTol=0.0);
             testCase.verifyFalse(output.controllerErrorBound.futurePredictionIncluded);
-            testCase.verifyFalse(output.targetEstimates.controllerErrorBound.futurePredictionIncluded);
+            testCase.verifyFalse(output.targetEstimate.controllerErrorBound.futurePredictionIncluded);
         end
     end
 end
 
 function [slack,available,orientationContained] = localLargeInitialErrors(cfg,design)
     options = struct("egoInitialPosition",zeros(2,1),"egoInitialYaw",3.1, ...
-        "egoInitialBodyVelocity",[-15;0],"targetCount",1, ...
+        "egoInitialBodyVelocity",[-15;0], ...
         "targetInitialState",[-30;-2;-12;4;10;-8]);
     runtime = onlineNrmmTrackingRuntime("initialize",cfg,options,design);
-    [~,frame] = localRuntime(cfg,design,1,struct());
-    frame = rmfield(frame,"radarTargetIdentifiers");
+    [~,frame] = localRuntime(cfg,design,struct());
+    frame = rmfield(frame,"radarTargetIdentifier");
     slack = zeros(30,1);
     available = false(30,1);
     orientationContained = true;
@@ -219,7 +218,7 @@ function [slack,available,orientationContained] = localLargeInitialErrors(cfg,de
         frame.xGps = 15*frame.time;
         [runtime,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
         slack(index) = output.relativePositionErrorBound ...
-            -norm([30;2]-output.targetEstimates.relativePosition);
+            -norm([30;2]-output.targetEstimate.relativePosition);
         available(index) = output.positionErrorBoundAvailable;
         orientationContained = orientationContained && output.orientationCertificateAvailable ...
             && abs(atan2(sin(output.egoYaw),cos(output.egoYaw))) <= output.egoYawErrorBound+1e-12;
@@ -238,7 +237,7 @@ function output = localExactCase(cfg)
     cfg.ego.domain.yawAccelerationMaximum = 0;
     design = synthesizeNrmmObserverGains(cfg);
     prior = struct("yaw",0,"bodyVelocity",0,"targetComponents",zeros(3,1));
-    [runtime,frame] = localRuntime(cfg,design,1,prior);
+    [runtime,frame] = localRuntime(cfg,design,prior);
     [~,output] = onlineNrmmTrackingRuntime("step",runtime,frame);
 end
 
@@ -294,16 +293,16 @@ function result = localScenario(cfg,design,motion,dropouts)
         "TargetMotion",motion,"DropoutIntervals",dropouts,"DesignFunction",@(~) design);
 end
 
-function [runtime,frame] = localRuntime(cfg,design,count,prior)
+function [runtime,frame] = localRuntime(cfg,design,prior)
     options = struct("egoInitialPosition",zeros(2,1),"egoInitialYaw",0, ...
-        "egoInitialBodyVelocity",[15;0],"targetCount",count, ...
-        "targetInitialState",repmat([30;2;15;0;0;0],1,count), ...
-        "targetIdentifiers","track-"+string((1:count).'),"initialErrorBounds",prior);
+        "egoInitialBodyVelocity",[15;0],...
+        "targetInitialState",[30;2;15;0;0;0], ...
+        "targetIdentifier","track","initialErrorBounds",prior);
     runtime = onlineNrmmTrackingRuntime("initialize",cfg,options,design);
     frame = struct("time",0,"xGps",0,"yGps",0,"vxGps",15,"vyGps",0, ...
         "longitudinalAcceleration",0,"lateralAcceleration",0,"yawRateMeasured",0, ...
-        "radarRelativePosition",repmat([30,2],count,1), ...
-        "radarDetectionAvailable",true(count,1),"radarTargetIdentifiers",options.targetIdentifiers);
+        "radarRelativePosition",[30;2], ...
+        "radarDetectionAvailable",true,"radarTargetIdentifier",options.targetIdentifier);
 end
 
 function state = localState(yaw)

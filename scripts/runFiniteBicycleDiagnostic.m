@@ -55,7 +55,7 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
     end
     residualPeak = zeros(6,1);
     residualViolation = 0;
-    estimates = cell(steps,1);targetEstimates = cell(steps,1);audits = cell(steps,1);
+    estimates = cell(steps,1);targetEstimate = cell(steps,1);audits = cell(steps,1);
     frameSeconds = nan(steps,1);estimatorSeconds = zeros(steps,1);controllerSeconds = nan(steps,1);
     preparation = struct("performed",false,"elapsedSeconds",0);
     computedCommand = cell(steps,1);
@@ -92,7 +92,7 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
             audits{index} = audit;
             if index>1,ego.heldActuatorInput = inputs(end,:).';end
         end
-        estimates{index} = ego;targetEstimates{index} = target;
+        estimates{index} = ego;targetEstimate{index} = target;
         if index==1 && curvature~=0,ego.heldActuatorInput = trimInput;end
         controllerTimer = tic;
         lastAttemptMetadata = [];
@@ -155,7 +155,7 @@ function result = runFiniteBicycleDiagnostic(cfg,duration,options)
         "appliedSourceFrame",(1:size(inputs,1)).', ...
         "preparation",preparation,"scope","Online synthetic sensors, observer, bounds, input assembly and controller; plant and offline preparation excluded");
     result.egoEstimate = estimates(1:index);
-    result.targetEstimate = targetEstimates(1:index);
+    result.targetEstimate = targetEstimate(1:index);
     result.measurementAudit = audits(1:index);
     result.plantTrace = struct("time",traceTime,"state",traceState);
     [targetPosition,targetHeading] = laneGeometry.referencePose(120-10*traceTime.',0.8,curve);

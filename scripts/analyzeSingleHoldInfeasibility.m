@@ -44,35 +44,35 @@ function analysis = analyzeSingleHoldInfeasibility(campaignFile, outputDirectory
             last.withoutObstacles = localLinearSolve(program,setdiff(hardRows,obstacleRows));
             exactModel = model;
             exactModel.initialFrenetErrorBound(:)=0;
-            for targetIndex=1:numel(exactModel.encounters)
-                exactModel.encounters(targetIndex).radius(:)=0;
-                exactModel.encounters(targetIndex).contract.jerkBound(:)=0;
-                exactModel.encounters(targetIndex).contract.yawAccelerationBound=0;
+            if ~isempty(exactModel.encounter)
+                exactModel.encounter.radius(:)=0;
+                exactModel.encounter.contract.jerkBound(:)=0;
+                exactModel.encounter.contract.yawAccelerationBound=0;
             end
             exactProgram = formulateAvoidanceProblem(exactModel);
             last.withoutUncertainty = localLinearSolve(exactProgram,(1:exactProgram.cones(2)-1).');
             % Use the common initial error in b(h)-q*b(0) instead of two
             % independent endpoint boxes. Retain all other enclosure reserves.
             paired = program;
-            reductions = zeros(numel(model.encounters),1);
+            reduction = 0;
             phi = clf.cruise.transition(1:6,1:6);
             q = program.barrier.contraction;
-            for targetIndex=1:numel(model.encounters)
-                normal = program.barrier.normal(:,targetIndex);
+            if ~isempty(model.encounter)
+                normal = program.barrier.normal;
                 row = [normal.',zeros(1,4)];
                 assert(all(abs(model.lane.tangent(:,2))<1e-12), ...
                     'The correlated-error counterfactual requires a straight x-axis chart.');
-                reductions(targetIndex) = (abs(row)*abs(phi)+q*abs(row) ...
+                reduction = (abs(row)*abs(phi)+q*abs(row) ...
                     -abs(row*phi-q*row))*model.initialFrenetErrorBound ...
-                    +2*q*abs(normal).'*model.encounters(targetIndex).radius(1:2);
-                paired.b(decayRows(targetIndex))=paired.b(decayRows(targetIndex))+reductions(targetIndex);
+                    +2*q*abs(normal).'*model.encounter.radius(1:2);
+                paired.b(decayRows)=paired.b(decayRows)+reduction;
             end
             last.pairedInitialErrorSupport = localLinearSolve(paired,hardRows);
-            last.pairedSupportReduction = reductions;
+            last.pairedSupportReduction = reduction;
             last.failureState = model.initialEgoState;
             last.egoErrorRadius = model.initialFrenetErrorBound;
-            last.targetCenters = [model.encounters.center];
-            last.targetErrorRadius = [model.encounters.radius];
+            last.targetCenters = [model.encounter.center];
+            last.targetErrorRadius = [model.encounter.radius];
             last.decayMatrix = full(program.A(decayRows,:));
             last.decayBound = program.b(decayRows);
             last.equilibriumInput = clf.cruise.input;
@@ -203,24 +203,25 @@ end
 
 function [labels,decayRows,obstacleRows] = localLabels(model,prediction,clf)
     model.anchorPlan=clf.cruise.input;
-    geometryModel=model;geometryModel.encounters=struct('key',{},'radius',{},'contract',{});
+    geometryModel=model;geometryModel.encounter=struct('key',{},'radius',{},'contract',{});
     geometry=avoidanceSafetyGeometry.build(geometryModel,prediction);
     labels=geometry.label(~startsWith(geometry.label,'collision:'));
-    perTarget=numel(prediction.cells)*(model.cfg.encounter.taylorOrder+2)+2;
+    targetRows=numel(prediction.cells)*(model.cfg.encounter.taylorOrder+2)+2;
     first=numel(labels);
-    for targetIndex=1:numel(model.encounters)
-        suffix=repmat("obstacle:swept",perTarget,1);
+    if ~isempty(model.encounter)
+        suffix=repmat("obstacle:swept",targetRows,1);
         suffix(1)="obstacle:initial";suffix(end)="obstacle:decay";
-        labels=[labels;suffix]; %#ok<AGROW>
+        labels=[labels;suffix];
     end
     obstacleRows=(first+1:numel(labels)).';
-    decayRows=first+(1:numel(model.encounters))*perTarget;
+    decayRows=[];
+    if ~isempty(model.encounter),decayRows=first+targetRows;end
     labels=[labels;"input:steeringUpper";"input:betaUpper";"input:steeringLower";"input:betaLower"];
 end
 
 function model = localModel(data,cfg)
     cfg.solver.frameDeadlineSeconds=Inf;
-    [ego,lane,road,targets]=readPlanningInputs(data.ego,data.target,data.road,cfg);
+    [ego,lane,road,target]=readPlanningInputs(data.ego,data.target,data.road,cfg);
     projection=laneGeometry.project(ego.position,lane);
     [radius,~]=stateUncertainty.toFrenet(ego.modelState,ego.stateErrorBound,lane);
     previous=zeros(2,1);
@@ -231,9 +232,10 @@ function model = localModel(data,cfg)
         atan2(sin(ego.yaw-projection.heading),cos(ego.yaw-projection.heading));ego.modelState(4:6)], ...
         'initialFrenetErrorBound',radius,'longitudinalAccelerationBias',ego.longitudinalAccelerationBias, ...
         'previousInput',previous,'requiredMargin',0,'confirmation',[]);
-    encounters=cell(1,numel(targets));
-    for k=1:numel(targets),encounters{k}=targetPrediction.admitOnline(targets(k),model.stateTime,lane,cfg);end
-    model.encounters=[encounters{:}];
+    model.encounter=[];
+    if ~isempty(target)
+        model.encounter=targetPrediction.admitOnline(target,model.stateTime,lane,cfg);
+    end
 end
 
 function measurements = localMeasurements(report,caseIndex)

@@ -21,10 +21,10 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
         function reconstructedWorldStateIsContainedAcrossRotationsAndPeaking(testCase, geometry)
             [published, actualError] = localReconstruction(testCase.Design, geometry);
             testCase.verifyTrue(published.controllerErrorBound.available);
-            testCase.verifyTrue(published.targetEstimates.controllerErrorBound.available);
+            testCase.verifyTrue(published.targetEstimate.controllerErrorBound.available);
             testCase.verifyGreaterThanOrEqual( ...
                 [published.controllerErrorBound.bounds; ...
-                published.targetEstimates.controllerErrorBound.bounds]-actualError, -1e-10);
+                published.targetEstimate.controllerErrorBound.bounds]-actualError, -1e-10);
         end
         function freshVelocityBoundsRetainDirectionalInformation(testCase)
             [output, bound, input] = localVelocityFixture();
@@ -64,7 +64,7 @@ end
 
 function [output, bound, input] = localVelocityFixture()
     output = struct("stateTime",0,"egoPositionInertial",[0;0], ...
-        "egoBodyVelocity",[10;0],"targetEstimates",struct.empty);
+        "egoBodyVelocity",[10;0],"targetEstimate",struct.empty);
     bound = struct("yaw",0.05,"bodyVelocity",0.8,"egoValid",true, ...
         "holdBounds",struct("yawAcceleration",0,"acceleration",Inf), ...
         "orientationSet",nrmmYawSet("initialize",0,0.05),"scope","test enclosure");
@@ -108,7 +108,7 @@ function [published, actualError] = localReconstruction(design, geometry)
     target.targetAccelerationInertial = estimatedRotation*estimated(5:6);
     target.targetHeadingInertial = estimatedYaw+target.targetCourseAngleEgoFrame-target.targetSideslip;
     output = struct("stateTime", 0, "egoPositionInertial", estimatedPosition, ...
-        "targetEstimates", target);
+        "targetEstimate", target);
     components = vecnorm(reshape(actual-estimated, 2, 3)).';
     bound = struct("yaw", abs(geometry(2)), "bodyVelocity", norm(egoVelocity-estimatedEgoVelocity), ...
         "targetComponents", components, "trueRangeMaximum", norm(actual(1:2)), ...

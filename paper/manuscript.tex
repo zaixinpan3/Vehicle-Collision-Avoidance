@@ -387,7 +387,7 @@ passed to a dedicated road-curb extraction component, whose output specifies
 the curb-defined road boundary; the nominal path is known route geometry and
 requires no extraction. The estimator combines the obstacle-relative
 positions with the GNSS, IMU, and gyroscope measurements to estimate the motion
-states of the ego vehicle and each tracked obstacle vehicle. Each
+states of the ego vehicle and the single tracked obstacle vehicle. Each
 estimate is accompanied by a componentwise error enclosure, valid under
 the declared sensor, model and operating-domain premises, with which the
 controller tightens its own constraints. The enclosure bounds the current
@@ -1035,7 +1035,7 @@ Equation~\eqref{eq:component_extraction} is the ellipsoid support in
 $P\otimes I_2$ after undoing the position normalization.
 \end{IEEEproof}
 
-The core contains two ego-velocity states and six states per target. Its
+The core contains two ego-velocity states and six states for the single target. Its
 certificate requires neither informative yaw measurements nor a yaw
 innovation chart. The shared gyro also couples the two core stages;
 \eqref{eq:cascade_comparison} uses a triangular norm bound and does not
@@ -1413,7 +1413,7 @@ Zero-width yaw intervals use the rectangle's absolute-value support.
 These epigraphs and the quadratic terms in \eqref{eq:collision_majorant}
 have second-order cone representations.
 
-Each target also has a terminal exit record: use a point ego body and
+The target also has a terminal exit record: use a point ego body and
 $d_c=R_{\rm sensing}+\epsilon_{\rm encounter}$ in
 \eqref{eq:collision_residual}. The resulting halfspace places the entire
 target footprint outside the sensing disk by a stored absolute deadline.

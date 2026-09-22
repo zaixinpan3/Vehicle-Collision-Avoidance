@@ -71,10 +71,10 @@ classdef nrmmDirectVelocityTest < matlab.unittest.TestCase
             speed = 12;
             design.yaw.courseModel.sideslipDomainMaximum = 0;
             design.velocity.gain = speed/design.yaw.courseModel.rearAxleDistance;
-            estimate = struct("bodyVelocity",[speed;0],"position",[0;0],"targetState",zeros(6,0));
+            estimate = struct("bodyVelocity",[speed;0],"position",[0;0],"targetState",[20;2;12;0;0;0]);
             input = struct("yawRate",0.1,"gnssVelocity",[speed;0], ...
                 "bodyAcceleration",[0;0],"positionReference",[0;0], ...
-                "radarReference",zeros(2,0),"radarAvailable",false(0,1));
+                "radarReference",[20;2],"radarAvailable",false);
             derivative = nrmmObserverVectorField(estimate,input,design);
             testCase.verifyEqual(derivative.bodyVelocity,[0;0],AbsTol=1e-13);
         end

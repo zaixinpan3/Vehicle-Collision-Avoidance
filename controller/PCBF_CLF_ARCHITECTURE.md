@@ -47,7 +47,7 @@ claim is made between them. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTI
 cfg = collisionAvoidanceControllerConfig();
 certificate = [];
 [command, inputs, problem, certificate] = ...
-    collisionAvoidanceController(ego, targets, road, cfg, certificate);
+    collisionAvoidanceController(ego, target, road, cfg, certificate);
 ```
 
 Supply timestamped ego measurements, complete current perception declarations,

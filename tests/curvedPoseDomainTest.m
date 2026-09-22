@@ -72,7 +72,7 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             [~,~,problem]=localAdmission(.01);
             model=problem.model;completion=problem.program.completion;frame=completion.frame;
             model.initialEgoState(1:3)=frame.domainCenter;
-            target=model.encounters(1);target.radius(:)=0;
+            target=model.encounter;target.radius(:)=0;
             target.center(1:2)=frame.positionOffset+frame.positionMap*model.initialEgoState ...
                 +100*completion.direction;
             testCase.verifyTrue(hardEncounterBarrier.observedExterior(model,target,completion));
@@ -139,7 +139,7 @@ function gap=localPhysicalResidualGap(problem)
     points=frame.domainCenter+frame.domainRadius.*[s(:).';d(:).';e(:).'];
     states=[points;zeros(3,size(points,2))];
     [position,heading]=laneGeometry.fromFrenet(states,problem.model.lane);
-    target=data.targets(1);certificate=problem.program.jointCertificate;
+    target=data.target;certificate=problem.program.jointCertificate;
     selected=find([certificate.records.stage]==index & ~[certificate.records.isExit],1);
     record=certificate.records(selected);angle=certificate.angles(selected);
     conservative=zeros(1,size(points,2));

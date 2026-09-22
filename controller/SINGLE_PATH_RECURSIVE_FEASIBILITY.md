@@ -206,7 +206,7 @@ existence of a continuation; it is never dispatched by the public controller.
 
 ## Target safety for all future time
 
-For each terminal separating direction `n`, define the target position after
+For the target's terminal separating direction `n`, define the target position after
 terminal entry as `p_t(t_N+tau)=p_N+v_N tau+a_t tau^2/2`. Compute
 
 \[

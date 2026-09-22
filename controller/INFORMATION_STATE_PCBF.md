@@ -30,7 +30,7 @@ inputs. A separately optimized road-only tail with `L<M` is not implemented.
 The conditional guarantee requires:
 
 - One ego and zero or one admitted target. An active target's identity and
-  footprint are fixed. New targets and enlarged future motion bounds require
+  footprint are fixed. A newly acquired target and enlarged future motion bounds require
   fresh admission; an old witness does not certify these new obligations.
 - Current ego and target error boxes contain the true states. Ego and target
   measurements are intersected with the previously published reachable sets.

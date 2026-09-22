@@ -68,26 +68,21 @@ classdef avoidanceSafetyGeometry
                 end
             end
             cellData = cell(numel(groups),1);
-            activeTargets = cell(numel(groups),1);
             sourceLabels = cell(numel(groups),1);
-            % Bounded target flows at every cell start, one batch per encounter.
-            encounterCount = numel(model.encounters);
+            % One bounded target flow evaluated at every node time.
+            hasTarget = ~isempty(model.encounter);
             cellStarts = reshape([prediction.cells.start],1,[]);
-            flowCenters = cell(encounterCount,1);flowRadii = cell(encounterCount,1);
-            baseTargets = repmat(targetTemplate,encounterCount,1);
-            targetLabels = strings(encounterCount,1);
-            for encounterIndex = 1:encounterCount
-                encounter = model.encounters(encounterIndex);
-                [flowCenters{encounterIndex},flowRadii{encounterIndex}] = ...
-                    targetPrediction.finiteFlow(encounter,cellStarts);
-                baseTargets(encounterIndex).halfLength = encounter.halfLength;
-                baseTargets(encounterIndex).halfWidth = encounter.halfWidth;
-                baseTargets(encounterIndex).contract.jerkBound = encounter.contract.jerkBound;
-                baseTargets(encounterIndex).contract.yawAccelerationBound = encounter.contract.yawAccelerationBound;
-                targetLabels(encounterIndex) = "collision:"+encounter.key;
+            flowCenters=zeros(8,0);flowRadii=zeros(8,0);
+            baseTarget=targetTemplate;targetLabel=strings(0,1);
+            if hasTarget
+                encounter=model.encounter;
+                [flowCenters,flowRadii]=targetPrediction.finiteFlow(encounter,cellStarts);
+                baseTarget.halfLength=encounter.halfLength;baseTarget.halfWidth=encounter.halfWidth;
+                baseTarget.contract.jerkBound=encounter.contract.jerkBound;
+                baseTarget.contract.yawAccelerationBound=encounter.contract.yawAccelerationBound;
+                targetLabel="collision:"+encounter.key;
             end
-            activeAll = 1:encounterCount;
-            labelsPerCell = [targetLabels;boundaryLabels;"poseDomain";"referencePhaseDomain"];
+            labelsPerCell = [targetLabel;boundaryLabels;"poseDomain";"referencePhaseDomain"];
             reach = zeros(0,1);
             if ~isempty(prediction.cells)
                 reach = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
@@ -108,11 +103,9 @@ classdef avoidanceSafetyGeometry
                         "The finite CLF certificate requires a continuous reference chart over every cell.");
                 end
                 frames{cellIndex} = frame;
-                active = activeAll;
-                targets = baseTargets;
-                for targetIndex = 1:encounterCount
-                    targets(targetIndex).center = flowCenters{targetIndex}(:,cellIndex);
-                    targets(targetIndex).radius = flowRadii{targetIndex}(:,cellIndex);
+                target=baseTarget;
+                if hasTarget
+                    target.center=flowCenters(:,cellIndex);target.radius=flowRadii(:,cellIndex);
                 end
                 support = reshape(pagemtimes(abs(tube.map),reach),6,[]);
                 envelope = max(abs(tube.offset)+support+tube.radius,[],2);
@@ -120,20 +113,19 @@ classdef avoidanceSafetyGeometry
                 data = struct("frame",[frame.origin;frame.tangent;frame.lateral;frame.heading; ...
                     frame.positionErrorBound;frame.headingErrorBound;frame.stationLower;frame.stationUpper], ...
                     "pose",pose,"domain",domain, ...
-                    "nominal",nominal,"targets",targets,"boundaries",boundaries, ...
+                    "nominal",nominal,"target",target,"hasTarget",hasTarget,"boundaries",boundaries, ...
                     "settings",[cfg.vehicle.length/2;cfg.vehicle.width/2;envelope(3); ...
                         envelope(2)], ...
                     "duration",tube.duration,"degree",size(tube.offset,2)-1, ...
-                    "normals",zeros(2,0));
+                    "normal",zeros(2,0));
                 if isfield(prediction,"separationNormals")
-                    data.normals=prediction.separationNormals{cellIndex};
-                    validateattributes(data.normals,{'double'},{'size',[2,numel(model.encounters)],'finite','real'});
-                    if any(abs(vecnorm(data.normals)-1)>1e-10)
+                    data.normal=prediction.separationNormals{cellIndex};
+                    validateattributes(data.normal,{'double'},{'size',[2,double(hasTarget)],'finite','real'});
+                    if any(abs(vecnorm(data.normal)-1)>1e-10)
                         error("collisionAvoidanceController:invalidSeparationNormal","Separation normals must be unit vectors.");
                     end
                 end
                 cellData{cellIndex} = data;
-                activeTargets{cellIndex} = active;
                 sourceLabels{cellIndex} = labelsPerCell;
             end
             data = vertcat(cellData{:});
@@ -163,12 +155,12 @@ classdef avoidanceSafetyGeometry
                     end
                     allGeometricRows(cellIndex)=geometric;
                 end
-                if ~includeCollisionRows && encounterCount>0
+                if ~includeCollisionRows && hasTarget
                     assert(tube.duration==0 && size(tube.offset,2)==1, ...
                         'avoidanceSafetyGeometry:nodeCertificate', ...
                         'Joint certificates require hold nodes.');
                     geometric=allGeometricRows(cellIndex);
-                    keep=geometric.source>encounterCount;
+                    keep=geometric.source>1;
                     geometric.state=geometric.state(keep,:);
                     geometric.bound=geometric.bound(keep,:);
                     geometric.source=geometric.source(keep);
@@ -184,9 +176,7 @@ classdef avoidanceSafetyGeometry
                 projectionData{cellIndex} = struct("tube",numericTube, ...
                     "stateRadius",stateRadius, ...
                     "geometricRows",allGeometricRows(cellIndex),"planCount",prediction.planCount);
-                normals = zeros(2,numel(model.encounters));
-                normals(:,activeTargets{cellIndex}) = allGeometricRows(cellIndex).normals;
-                normalGroups{cellIndex} = normals;
+                normalGroups{cellIndex} = allGeometricRows(cellIndex).normal;
             end
             data = vertcat(projectionData{:});
             if exist("avoidanceProjectedRowsKernelMex","file")==3
@@ -233,8 +223,7 @@ classdef avoidanceSafetyGeometry
             inherited=program.inheritedPredictionFamily;
             if inherited
                 certificate=model.carriedWitness.program.jointCertificate;
-                keep=[certificate.records.stage]>1 & ...
-                    ~ismember(string({certificate.records.key}),model.dischargedTargetKeys);
+                keep=[certificate.records.stage]>1 & ~model.targetReleased;
                 certificate.records=certificate.records(keep);
                 certificate.angles=certificate.angles(keep);
                 certificate.upperBound=certificate.upperBound(keep);
@@ -248,25 +237,24 @@ classdef avoidanceSafetyGeometry
                     assert(tube.duration==0 && size(tube.offset,2)==1, ...
                         'avoidanceSafetyGeometry:nodeCertificate','Joint certificates require hold nodes.');
                     data=program.geometry.cellData(index);
-                    for target=1:numel(data.targets)
-                        records{end+1,1}=localJointRecord(data.targets(target), ...
-                            model.encounters(target).key,tube.stage,program.geometry.frames(index), ...
+                    if data.hasTarget
+                        records{end+1,1}=localJointRecord(data.target,tube.stage,program.geometry.frames(index), ...
                             tube.radius,[model.cfg.vehicle.length;model.cfg.vehicle.width]/2, ...
                             0,false,model.cfg.solver.constraintTolerance); %#ok<AGROW>
-                        normal=program.geometry.normals{index}(:,target);
+                        normal=program.geometry.normals{index};
                         angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
                     end
                 end
-                for target=1:numel(model.encounters)
-                    item=model.encounters(target);
+                if ~isempty(model.encounter)
+                    item=model.encounter;
                     [item.center,item.radius]=targetPrediction.finiteFlow(item, ...
                         program.prediction.stageCount*model.sampleTime);
-                    records{end+1,1}=localJointRecord(item,item.key,program.prediction.stageCount, ...
+                    records{end+1,1}=localJointRecord(item,program.prediction.stageCount, ...
                         program.completion.frame,program.prediction.initialErrorBound(:,end), ...
                         zeros(2,1),model.confirmation.range+model.cfg.encounter.numericalMargin, ...
-                        true,model.cfg.solver.constraintTolerance); %#ok<AGROW>
-                    normal=-program.completion.direction(:,target);
-                    angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
+                        true,model.cfg.solver.constraintTolerance);
+                    normal=-program.completion.direction;
+                    angles(end+1,1)=atan2(normal(2),normal(1));
                 end
                 records=vertcat(records{:});
                 reserve=zeros(numel(records),1);
@@ -384,21 +372,19 @@ classdef avoidanceSafetyGeometry
             end
             cert.upperBound=max(cert.upperBound,values+allowance);
             program.jointCertificate=cert;
-            keys=program.completion.keys;
             for index=1:numel(cert.records)
                 item=cert.records(index);normal=[cos(cert.angles(index));sin(cert.angles(index))];
-                target=find(keys==string(item.key),1);
                 if item.isExit
-                    program.completion.direction(:,target)=-normal;
-                    program.completion.stateRow(target,:)=-normal.'*item.positionMap;
-                    program.completion.stateBound(target)=normal.'*item.positionOffset-item.clearance-item.positionBall ...
+                    program.completion.direction=-normal;
+                    program.completion.stateRow=-normal.'*item.positionMap;
+                    program.completion.stateBound=normal.'*item.positionOffset-item.clearance-item.positionBall ...
                         -sum(abs(item.generators.'*normal))-avoidanceSafetyGeometry.supportValue( ...
                         item.targetHalfSize,item.targetYawRadius, ...
                         [cos(cert.angles(index)-item.targetYaw);sin(cert.angles(index)-item.targetYaw)]);
                 else
                     cellIndex=find([program.prediction.cells.stage]==item.stage,1);
-                    program.geometry.normals{cellIndex}(:,target)=normal;
-                    program.geometry.cellData(cellIndex).normals(:,target)=normal;
+                    program.geometry.normals{cellIndex}=normal;
+                    program.geometry.cellData(cellIndex).normal=normal;
                 end
             end
             program.prediction.separationNormals=program.geometry.normals;
@@ -421,10 +407,10 @@ classdef avoidanceSafetyGeometry
         % No sector, alternate direction scoring, or trajectory modification.
         % At overlap the oracle returns an outward support normal, not a
         % claim that the nominal itself already separates the rectangles.
-            cells=prediction.cells;targets=numel(model.encounters);
+            cells=prediction.cells;hasTarget=~isempty(model.encounter);
             count=numel(cells);normals=cell(count,1);
             available=true;overlaps=0;minimum=Inf;switches=0;
-            previous=zeros(2,targets);states=zeros(6,count);
+            previous=zeros(2,1);states=zeros(6,count);
             times=reshape([cells.start],1,[]);
             for index=1:count
                 tube=cells(index);
@@ -434,15 +420,13 @@ classdef avoidanceSafetyGeometry
                 states(:,index)=tube.map*plan+tube.offset;
             end
             [positions,yaws]=laneGeometry.fromFrenet(states,model.lane);
-            centers=cell(1,targets);
-            for targetIndex=1:targets
-                centers{targetIndex}=targetPrediction.finiteFlow(model.encounters(targetIndex),times);
-            end
+            centers=zeros(8,0);
+            if hasTarget,centers=targetPrediction.finiteFlow(model.encounter,times);end
             native=exist('avoidanceSupportKernelMex','file')==3;
             for index=1:count
-                normals{index}=zeros(2,targets);
-                for targetIndex=1:targets
-                    target=model.encounters(targetIndex);center=centers{targetIndex}(:,index);
+                normals{index}=zeros(2,0);
+                if hasTarget
+                    target=model.encounter;center=centers(:,index);
                     dimensions=[model.cfg.vehicle.length/2;model.cfg.vehicle.width/2; ...
                         target.halfLength;target.halfWidth];
                     if native
@@ -450,9 +434,9 @@ classdef avoidanceSafetyGeometry
                     else
                         [normal,query]=avoidanceSafetyGeometry.supportDirection(positions(:,index),yaws(index),center(1:2),center(7),dimensions);
                     end
-                    normals{index}(:,targetIndex)=normal;
-                    if index>1,switches=switches+double(norm(normal-previous(:,targetIndex))>1e-6);end
-                    previous(:,targetIndex)=normal;
+                    normals{index}=normal;
+                    if index>1,switches=switches+double(norm(normal-previous)>1e-6);end
+                    previous=normal;
                     available=available && query.available;
                     overlaps=overlaps+double(query.signedDistance<=0);
                     minimum=min(minimum,query.signedDistance);
@@ -502,7 +486,7 @@ classdef avoidanceSafetyGeometry
     end
 end
 
-function rows = localCellRows(data,prescribedNormals)
+function rows = localCellRows(data)
 % Numeric obstacle/road support construction shared by MATLAB and native code.
 % One nominal column is a certified node evaluated at the target's node-time
 % set; several columns are Bernstein coefficients of a whole-hold enclosure.
@@ -515,24 +499,21 @@ function rows = localCellRows(data,prescribedNormals)
     settings = data.settings;halfLength = settings(1);halfWidth = settings(2);
     headingDomain = settings(3);lateralDomain = settings(4);
     nominal = data.nominal;pointCount = size(nominal,2);
-    targetCount = numel(data.targets);boundaryCount = numel(data.boundaries);
-    maximumRows = 12*(targetCount+boundaryCount)+6;
+    hasTarget = data.hasTarget;boundaryCount = numel(data.boundaries);
+    maximumRows = 12*(double(hasTarget)+boundaryCount)+6;
     state = zeros(maximumRows,6);bound = zeros(maximumRows,pointCount);
     source = zeros(maximumRows,1);
-    normals = zeros(2,targetCount);count = 0;
-    for index = 1:targetCount
-        target = data.targets(index);
+    normal = zeros(2,0);separationNormal = normal;count = 0;
+    if hasTarget
+        target = data.target;
         middle = targetPrediction.finiteFlow(target,data.duration/2);
         centerEgo = positionOffset+positionMap*mean(nominal,2);
-        if nargin > 1
-            normal = prescribedNormals(:,index);
-        elseif isfield(data,'normals') && ~isempty(data.normals)
-            normal=data.normals(:,index);
+        if ~isempty(data.normal)
+            normal=data.normal;
         else
             [~,normal] = avoidanceSafetyGeometry.rectangleDistance(centerEgo,yawOffset+yawRow*mean(nominal,2), ...
                 middle(1:2),middle(7),[halfLength;halfWidth;target.halfLength;target.halfWidth]);
         end
-        normals(:,index) = normal;
         degree = data.degree;
         if pointCount==1
             % Node certificate: the target's bounded set at the node time.
@@ -568,7 +549,7 @@ function rows = localCellRows(data,prescribedNormals)
         bound(selected,:) = normal.'*positionOffset-normal.'*targetPosition-abs(normal).'*targetRadius ...
             -targetSupport-egoSupport-headingSlope*(yawOffset-yawCenter) ...
             -positionCharge-abs(headingSlope)*headingError;
-        source(selected) = index;count = count+rowCount;
+        source(selected) = 1;count = count+rowCount;separationNormal = normal;
     end
     for index = 1:boundaryCount
         boundary = data.boundaries(index);longitudinal = boundary.longitudinalDirection;
@@ -596,17 +577,17 @@ function rows = localCellRows(data,prescribedNormals)
         limit = normal.'*(origin-boundary.origin)-graphSupport-egoSupport-clearance ...
             -abs(normal).'*positionError-abs(headingSlope)*headingError;
         bound(selected,:) = repmat(limit,1,pointCount);
-        source(selected) = targetCount+index;count = count+rowCount;
+        source(selected) = double(hasTarget)+index;count = count+rowCount;
     end
     if localDomain
         selected=count+(1:6);
         directions=[eye(3);-eye(3)];
         state(selected,:)=[directions,zeros(6,3)];
         bound(selected,:)=repmat([data.domain(5:7);data.domain(5:7)]+directions*data.domain(2:4),1,pointCount);
-        source(selected)=targetCount+boundaryCount+1;count=count+6;
+        source(selected)=double(hasTarget)+boundaryCount+1;count=count+6;
     end
     rows = struct("state",state(1:count,:),"bound",bound(1:count,:), ...
-        "source",source(1:count),"normals",normals);
+        "source",source(1:count),"normal",separationNormal);
 end
 
 function result = localProjectedRows(data)
@@ -647,7 +628,7 @@ function result = localProjectedRows(data)
         "stage",repmat(tube.stage,numel(physical),1),"local",local);
 end
 
-function record=localJointRecord(target,key,stage,frame,rho,egoHalfSize,clearance,isExit,numericalTolerance)
+function record=localJointRecord(target,stage,frame,rho,egoHalfSize,clearance,isExit,numericalTolerance)
     [pose,domain]=laneGeometry.poseData(frame);
     positionMap=reshape(pose(3:14),2,6);yawRow=pose(16:21).';
     generators=[positionMap*diag(rho),diag(target.radius(1:2))];
@@ -658,7 +639,7 @@ function record=localJointRecord(target,key,stage,frame,rho,egoHalfSize,clearanc
         generators=[generators,diag(frame.positionErrorBound)];
     end
     generators=generators(:,any(generators~=0,1));
-    record=struct('key',string(key),'stage',stage,'isExit',isExit, ...
+    record=struct('stage',stage,'isExit',isExit, ...
         'positionMap',positionMap,'positionOffset',pose(1:2)-target.center(1:2), ...
         'yawRow',yawRow,'yawOffset',pose(15), ...
         'egoHalfSize',egoHalfSize,'egoYawRadius',abs(yawRow)*rho+frame.headingErrorBound, ...

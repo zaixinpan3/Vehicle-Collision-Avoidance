@@ -87,7 +87,7 @@ classdef targetPrediction
                     motion.kind = "finite-sensing-motion-v1";
                 end
             end
-            if startsWith(target.key,"anonymousTarget:"), target.key = "singleTarget:1"; end
+            if target.key=="anonymousTarget", target.key = "singleTarget:1"; end
             target.predictionMotion = motion;
             encounter = targetPrediction.admit(target,time,lane,cfg);
         end
@@ -146,7 +146,7 @@ classdef targetPrediction
                 if target.predictionYawAccelerationErrorBound>contract.yawAccelerationBound
                     error("collisionAvoidanceController:invalidEncounterContract","Yaw acceleration exceeds the motion bound.");
                 end
-                if startsWith(target.key,"anonymousTarget:")
+                if target.key=="anonymousTarget"
                     error("collisionAvoidanceController:invalidEncounterContract","Finite encounters need stable track identity.");
                 end
                 contract.jerkBound = contract.jerkBound(:);

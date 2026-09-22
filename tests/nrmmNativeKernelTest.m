@@ -1,6 +1,5 @@
 classdef nrmmNativeKernelTest < matlab.unittest.TestCase
     properties (TestParameter)
-        targetCount = struct('one',1,'two',2)
         informative = struct('headingCorrection',true,'gyroOnly',false)
     end
     methods (TestClassSetup)
@@ -23,7 +22,7 @@ classdef nrmmNativeKernelTest < matlab.unittest.TestCase
                 input = struct("time",time,"gnssVelocity",[10;0],"yawRate",0, ...
                     "gnssPosition",[10*time;0], ...
                     "radarRelativePosition",[20-18*time,1]+0.04*[sin(13*time),cos(13*time)]);
-                history = nrmmTargetHistory("sensor",history,input,design,1);
+                history = nrmmTargetHistory("sensor",history,input,design);
             end
             for age = [0,0.3]
                 for acceleration = [0.6,Inf]
@@ -39,7 +38,7 @@ classdef nrmmNativeKernelTest < matlab.unittest.TestCase
             end
         end
 
-        function nativeIntegrationPreservesEveryAcceptedSubstep(testCase,targetCount,informative)
+        function nativeIntegrationPreservesEveryAcceptedSubstep(testCase,informative)
             domain = struct("speedMinimum",5,"speedMaximum",20,"scalarAccelerationMaximum",2, ...
                 "yawRateMaximum",0.1,"accelerationNormBound",3,"sideslipMaximum",0.1, ...
                 "rearAxleDistance",1.6,"relativePositionMaximum",50);
@@ -47,17 +46,17 @@ classdef nrmmNativeKernelTest < matlab.unittest.TestCase
                 "target",struct("innovationGains",[8;20;30],"domain",domain), ...
                 "yaw",struct("correctionBandwidth",4,"courseModel", ...
                 struct("rearAxleDistance",1.5,"sideslipDomainMaximum",0.12)));
-            targets = repmat([28;0.8;-12;0.2;0.2;0.1],targetCount,1);
-            predictors = repmat([27.95;0.82],targetCount,1);
-            state = [10;0.1;0.01;-0.02;0;0;targets;predictors;-pi+0.01];
+            target = [28;0.8;-12;0.2;0.2;0.1];
+            predictor = [27.95;0.82];
+            state = [10;0.1;0.01;-0.02;0;0;target;predictor;-pi+0.01];
             measurement = struct("yawRate",0.04,"gnssVelocity",[-10.02;-0.12], ...
-                "bodyAcceleration",[0.2;0.1],"radarDetectionAvailable",[true;false(targetCount-1,1)], ...
+                "bodyAcceleration",[0.2;0.1],"radarDetectionAvailable",true, ...
                 "correspondence",struct("informative",informative,"heading",pi-0.01));
             [expected,expectedDerivatives] = nrmmObserverRk4Interval(state,measurement,design,0.0025,5);
             [actual,actualDerivatives] = nrmmObserverRk4IntervalMex(state,measurement,design,0.0025,5);
             testCase.verifyEqual(actual,expected,AbsTol=1e-10);
             testCase.verifyEqual(actualDerivatives,expectedDerivatives,AbsTol=1e-10);
-            testCase.verifySize(actual,[7+8*targetCount,6]);
+            testCase.verifySize(actual,[15,6]);
             testCase.verifyLessThanOrEqual(max(abs(actual(end,:))),pi);
         end
     end

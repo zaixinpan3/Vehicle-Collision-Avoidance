@@ -1,5 +1,5 @@
 classdef standaloneControllerFrameTest < matlab.unittest.TestCase
-    %standaloneControllerFrameTest Native adapter safety and target identity.
+    %standaloneControllerFrameTest Native adapter safety and scalar-target preparation.
     methods (TestClassSetup)
         function paths(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -55,15 +55,6 @@ classdef standaloneControllerFrameTest < matlab.unittest.TestCase
             testCase.verifyEqual(status,1);
         end
 
-        function packingPreservesDifferentTargetIdentities(testCase)
-            [program,~]=localFixture();
-            program.jointCertificate.records(1).key='target-a';
-            program.jointCertificate.records(2).key='target-b';
-            program.jointCertificate.records(3).key='target-a';
-            packed=standaloneControllerBenchmark.pack(program);
-            testCase.verifyEqual(packed.jointCertificate.records(1).key,packed.jointCertificate.records(3).key);
-            testCase.verifyNotEqual(packed.jointCertificate.records(1).key,packed.jointCertificate.records(2).key);
-        end
     end
 end
 

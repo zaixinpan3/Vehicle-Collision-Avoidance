@@ -9,10 +9,9 @@ classdef standaloneControllerBenchmark
                 'jointCertificate','physicalMatrix','physicalBound','safetyBound','terminalCone','terminalConePhysicalBound', ...
                 'layout','feasibleWitness','clfNumericalReserve','inheritedPredictionFamily','fluidReference'};
             p=rmfield(p,setdiff(fieldnames(p),keep));
-            % Export only consumed reference fields. Diagnostic target arrays
-            % may be scalar on admission and empty on inherited continuation.
+            % Export only the numeric reference fields consumed by the kernel.
             p.fluidReference=rmfield(p.fluidReference,setdiff(fieldnames(p.fluidReference), ...
-                {'bump','heading','valid','amplitudes','width','center','stages','targetCount'}));
+                {'bump','heading','valid','amplitudes','width','center','stages','active'}));
             p.prediction=rmfield(p.prediction,setdiff(fieldnames(p.prediction), ...
                 {'stageCount','stageMatrixA','stageMatrixB','stageAffine','egoStateMatrix','egoStateOffset','scheduleCurvature'}));
             g=p.geometry;
@@ -32,9 +31,6 @@ classdef standaloneControllerBenchmark
             p.geometry.frames=frames;
             p.terminal=rmfield(p.terminal,setdiff(fieldnames(p.terminal), ...
                 {'modalMatrix','stateIndex','reference','input'}));
-            keys=string({p.jointCertificate.records.key});
-            [~,~,indices]=unique(keys,'stable');
-            for index=1:numel(indices),p.jointCertificate.records(index).key=double(indices(index));end
         end
 
         function c=configuration(cfg)

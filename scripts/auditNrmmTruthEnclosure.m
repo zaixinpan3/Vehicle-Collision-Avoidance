@@ -25,10 +25,10 @@ function audit = auditNrmmTruthEnclosure(output, egoState, targetTruth, cfg)
     % An unavailable infinite radius is not evidence of containment.
     if ~available,egoSlack(:) = NaN;end
     targetSlack = NaN(6,1);
-    targetAvailable = isempty(output.targetEstimates);
+    targetAvailable = isempty(output.targetEstimate);
     targetChecked = false(6,1);
-    if ~isempty(output.targetEstimates)
-        target = output.targetEstimates(1);
+    if ~isempty(output.targetEstimate)
+        target = output.targetEstimate;
         targetAvailable = target.controllerErrorBound.available;
         fields = ["targetPositionInertial","targetVelocityInertial","targetAccelerationInertial"];
         for index = 1:3

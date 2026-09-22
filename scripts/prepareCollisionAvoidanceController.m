@@ -18,7 +18,7 @@ function preparation = prepareCollisionAvoidanceController(ego, road, cfg, targe
     nativePath = fullfile(fileparts(fileparts(mfilename("fullpath"))),"solver","bicycle");
     if isfolder(nativePath),addpath(nativePath);end
     cfg = collisionAvoidanceControllerConfig(cfg);
-    if isfield(ego, "targetEstimates"), ego = rmfield(ego, "targetEstimates"); end
+    if isfield(ego, "targetEstimate"), ego = rmfield(ego, "targetEstimate"); end
     probeCount = 3*~isempty(target);
     samples = zeros(1, probeCount);
     certified = false(1, probeCount);

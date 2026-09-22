@@ -1,7 +1,7 @@
 # Direct body-velocity and NRMM target observer: model and ISS certificate
 
 The continuous core is the two-state ego body-velocity observer followed by the
-six-state NRMM target observer. For one target it has eight continuous states.
+six-state NRMM observer of one target. The core has eight continuous states.
 A parallel continuous yaw observer supplies the orientation estimate for inertial
 outputs, adding one scalar state. A propagated and intersected orientation set
 certifies its error about that estimate. Yaw does not enter the body-velocity or
@@ -515,8 +515,7 @@ Absolute target position adds the ego-position radius. The runtime publishes
 orientation intervals, body centers/radii, and scalar controller enclosures.
 In the sampled implementation the actual RK4 yaw endpoint is used to compute
 \(B_\psi\). Set containment therefore bounds that numerical estimate without
-requiring a yaw integration-defect inequality. The core still has eight states
-for one target; the parallel yaw observer adds one, while the independent
+requiring a yaw integration-defect inequality. The core has eight states; the parallel yaw observer adds one, while the independent
 position output and sampled predictors remain outside that core count.
 
 ## 10. Scope
@@ -552,3 +551,13 @@ speed, yaw rate, sideslip and known state-component errors at logged times.
 It never feeds truth to the observer or controller. Passing sampled checks
 does not prove continuous-time validity; a violation invalidates application
 of the corresponding conditional certificate even if all states are finite.
+
+## Scalar sampled implementation
+
+The runtime has one target state `[rho; q; s]` in `R^6`, one radar-output
+predictor in `R^2`, one target comparison enclosure and one sensor-history
+record. Together with ego velocity, position, the GNSS-output predictor and
+yaw, the packed RK4 state is a fixed 15-vector. Time substeps and historical
+samples remain sequences. No target axis, count or radar association step is
+present. The controller receives one optional `targetEstimate`; see
+[the pipeline derivation](../controller/SINGLE_TARGET_PIPELINE.md).

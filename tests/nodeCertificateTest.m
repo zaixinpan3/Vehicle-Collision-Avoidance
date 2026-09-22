@@ -51,12 +51,12 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
         function collisionCertificatesUseTheTargetSetAtEachNodeTime(testCase,sampleTime)
             [ego,target,cfg,road]=localFixture(sampleTime);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            geometry=problem.program.geometry;encounter=problem.model.encounters(1);
+            geometry=problem.program.geometry;encounter=problem.model.encounter;
             for index=1:numel(problem.prediction.cells)
                 cell=problem.prediction.cells(index);data=geometry.cellData(index);
                 [center,radius]=targetPrediction.finiteFlow(encounter,cell.time);
-                testCase.verifyEqual(data.targets(1).center,center,AbsTol=0);
-                testCase.verifyEqual(data.targets(1).radius,radius,AbsTol=0);
+                testCase.verifyEqual(data.target.center,center,AbsTol=0);
+                testCase.verifyEqual(data.target.radius,radius,AbsTol=0);
                 testCase.verifyEqual(data.duration,0,AbsTol=0);
                 testCase.verifyEqual(data.degree,0,AbsTol=0);
             end
@@ -109,7 +109,7 @@ end
 function [distance,nodes]=localNodeDistances(problem)
 % Exact rectangle distance between the ego and the target at every certified node.
     prediction=problem.prediction;plan=problem.inputPlan(:);cfg=problem.model.cfg;
-    encounter=problem.model.encounters(1);count=prediction.stageCount;
+    encounter=problem.model.encounter;count=prediction.stageCount;
     nodes=zeros(6,count);distance=zeros(1,count);
     for stage=1:count
         cell=prediction.cells(stage);

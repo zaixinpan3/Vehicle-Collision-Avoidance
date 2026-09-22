@@ -49,14 +49,14 @@ function value = nrmmTargetHistory(action, varargin)
             % Shared numeric path for native/reference enclosure checks.
             value = localEnclose(varargin{:});
         case "sensor"
-            value = varargin{1};input = varargin{2};design = varargin{3};index = varargin{4};
+            value = varargin{1};input = varargin{2};design = varargin{3};
             course = certifiedKinematicCourseCorrespondence(input.gnssVelocity,input.yawRate, ...
                 design.yaw.courseModel.rearAxleDistance,design.sensors.velocityNoiseMaximum, ...
                 design.sensors.gyroscopeNoiseMaximum,design.yaw.courseModel.singleTrackYawRateMismatchMaximum, ...
                 design.yaw.courseModel.sideslipDomainMaximum);
             heading = course.correspondence.heading;
             angle = min(pi,course.correspondence.radius);
-            position = input.radarRelativePosition(index,:).';
+            position = input.radarRelativePosition(:);
             relative = [cos(heading),-sin(heading);sin(heading),cos(heading)]*position;
             orientation = min(2*norm(position), ...
                 abs([-relative(2);relative(1)])*angle+norm(position)*angle^2/2);

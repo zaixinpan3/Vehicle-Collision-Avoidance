@@ -88,7 +88,7 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
 
         function radarPredictorResidualRotatesWithTheEgoFrame(testCase)
             cfg = testCase.Config;
-            runtime = localRuntime(cfg,testCase.Design,1);
+            runtime = localRuntime(cfg,testCase.Design);
             frame = localFrame;
             frame.yawRateMeasured = 0.12;
             initialResidual = [0.1;-0.08];
@@ -101,29 +101,27 @@ classdef nrmmStructuredHighGainTest < matlab.unittest.TestCase
             testCase.verifyEqual(actual,expected,AbsTol=1e-6);
         end
 
-        function resetOneTrackPreservesEgoAndOtherTracks(testCase)
-            runtime = localRuntime(testCase.Config,testCase.Design,2);
-            runtime.lastRadarTime = [0;0];
+        function resetTargetPreservesEgoStateAndTime(testCase)
+            runtime = localRuntime(testCase.Config,testCase.Design);
+            runtime.lastRadarTime = 0;
             replacement = [40;3;12;2;0.1;0.4];
-            changed = onlineNrmmTrackingRuntime("resetTarget",runtime,1,replacement.');
-            testCase.verifyEqual(changed.targetState(:,1),replacement,AbsTol=0);
-            testCase.verifyEqual(changed.targetOutputPredictor(:,1),replacement(1:2),AbsTol=0);
-            testCase.verifyEqual(changed.targetState(:,2),runtime.targetState(:,2),AbsTol=0);
+            changed = onlineNrmmTrackingRuntime("resetTarget",runtime,replacement.');
+            testCase.verifyEqual(changed.targetState,replacement,AbsTol=0);
+            testCase.verifyEqual(changed.targetOutputPredictor,replacement(1:2),AbsTol=0);
             testCase.verifyEqual(changed.bodyVelocityEstimate,runtime.bodyVelocityEstimate,AbsTol=0);
             testCase.verifyEqual(changed.yawEstimate,runtime.yawEstimate,AbsTol=0);
             testCase.verifyEqual(changed.currentTime,runtime.currentTime,AbsTol=0);
-            testCase.verifyTrue(isnan(changed.lastRadarTime(1)));
-            testCase.verifyEqual(changed.lastRadarTime(2),0,AbsTol=0);
+            testCase.verifyTrue(isnan(changed.lastRadarTime));
         end
 
         function outputUsesOrientationSetsWithoutAChartCondition(testCase)
-            runtime = localRuntime(testCase.Config,testCase.Design,1);
+            runtime = localRuntime(testCase.Config,testCase.Design);
             runtime.yawEstimate = pi-1e-4;
             output = onlineNrmmTrackingRuntime("output",runtime,localFrame);
             testCase.verifyTrue(output.orientationCertificateAvailable);
             testCase.verifyFalse(isfield(output,"yawInnovationChartCompatible"));
             testCase.verifyFalse(output.certificateScope.sampledImplementationCertified);
-            testCase.verifyEqual(output.targetStates,runtime.targetState.',AbsTol=0);
+            testCase.verifyEqual(output.targetState,runtime.targetState,AbsTol=0);
         end
 
         function heldOutNoisyScenarioRetainsUsefulAccelerationEstimation(testCase)
@@ -178,13 +176,9 @@ function phi = localPhi(q,s,domain)
     phi = derivative(5:6);
 end
 
-function runtime = localRuntime(cfg,design,count)
-    physical = repmat([30;2;15;0;0;0],1,count);
-    options = struct("targetCount",count,"egoInitialPosition",zeros(2,1), ...
-        "egoInitialYaw",0,"egoInitialBodyVelocity",[15;0],"targetInitialState",physical);
-    if count > 1
-        options.targetIdentifiers = "track-"+string((1:count).');
-    end
+function runtime = localRuntime(cfg,design)
+    options = struct("egoInitialPosition",zeros(2,1),"egoInitialYaw",0, ...
+        "egoInitialBodyVelocity",[15;0],"targetInitialState",[30;2;15;0;0;0]);
     runtime = onlineNrmmTrackingRuntime("initialize",cfg,options,design);
 end
 

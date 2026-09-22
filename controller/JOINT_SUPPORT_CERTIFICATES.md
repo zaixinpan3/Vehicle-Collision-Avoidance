@@ -1,6 +1,6 @@
 # Fixed-direction convex trajectory optimization
 
-Format 41 separates initialization from execution. An NRMM-timed VFFM reference
+Format 42 separates initialization from execution. An NRMM-timed VFFM reference
 initializes a trajectory anchor and one unit separation direction per collision or
 exit record. These directions are then fixed while one hard SOCP optimizes the
 complete finite control sequence. An initialization seed is never issued, even if
@@ -11,7 +11,7 @@ a previously optimized, verified suffix can be retained after solve failure.
 
 The certificate covers **hold nodes of the declared zero-residual sampled
 affine plant**. It establishes neither inter-node separation nor a real-time
-deadline. Clear saved certificates from formats earlier than 41. See
+deadline. Clear saved certificates from formats earlier than 42. See
 [the implementation and validation](../report/CHENG_FLUID_INITIALIZATION_ADOPTION_20260921.md).
 
 ## Relationship to Li et al. (2023)
@@ -175,7 +175,7 @@ of $10^{-10}$ rad without losing the touching property during continuation.
 ## NRMM-based time-dependent VFFM initialization
 
 The current initializer is specified in [NRMM_VFFM_INITIALIZATION.md](NRMM_VFFM_INITIALIZATION.md).
-It propagates nominal targets analytically at the ego arrival times, constructs
+It propagates the nominal target analytically at the ego arrival times, constructs
 normal-coordinate charts from the selected quadratic road boundaries, and
 superposes moving Gaussian contributions from every nominally conflicting
 target. Conflict-derived passing ordinates and relative-station widths are
@@ -202,8 +202,8 @@ sets, normals, road/pose rows and final hard support inequalities are retained.
 `program.fluidReference` contains numeric reference preparation shared with
 the generated prepared-frame adapter. Metadata retains
 `directionSeedSource = "chengFluidReference"` for compatibility; its
-`initialization` reports active target count, two support scores, two physical
-base-row excesses, dominant-target amplitude/width/conflict interval,
+`initialization` reports the target-active flag, two support scores, two physical
+base-row excesses, target amplitude/width/conflict interval,
 terminal-fit error and selected seed residuals. `usedFullPlanAdmission` is
 true for successful fresh admission and `issuedAdmissionWitness` stays false.
 An unevaluated candidate's support score remains `Inf`, including a candidate

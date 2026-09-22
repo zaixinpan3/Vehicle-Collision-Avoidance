@@ -198,7 +198,7 @@ nonlinear stability, or low-speed tire accuracy.
 ## Geometry and proof scope
 
 Cartesian rectangle and road constraints use one fixed lane chart and one
-separating normal per target per cell. Directional support is maximized over
+separating normal for the target in each cell. Directional support is maximized over
 the admitted yaw interval, and every Bernstein control-point box must satisfy
 the hard halfspaces. Finite quadratic road boundaries must cover the complete
 admitted footprint range. Target constraints remain active through certified

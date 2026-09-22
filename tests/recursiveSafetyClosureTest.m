@@ -52,7 +52,7 @@ classdef recursiveSafetyClosureTest < matlab.unittest.TestCase
             [~,~,next]=collisionAvoidanceController(ego,target,road,cfg,s);
             testCase.verifyTrue(next.metadata.confirmedRelease);
             testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyEmpty(next.model.encounters);
+            testCase.verifyEmpty(next.model.encounter);
             testCase.verifyFalse(any(ismember(next.program.physicalLabels,["collision:trackId:1","exit:trackId:1"])));
             testCase.verifyGreaterThanOrEqual(min(localConeMargins(next.program,next.program.feasibleWitness)),-1e-11);
         end

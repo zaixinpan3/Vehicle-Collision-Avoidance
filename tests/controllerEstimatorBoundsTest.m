@@ -12,9 +12,9 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             [ego, target, cfg, lane] = localInputs();
             ego.controllerStateErrorBound = zeros(6, 1);
             target.targetPositionInertialErrorBound = zeros(2, 1);
-            [parsed, ~, ~, targets] = readPlanningInputs(ego, target, lane, cfg);
+            [parsed, ~, ~, parsedTarget] = readPlanningInputs(ego, target, lane, cfg);
             testCase.verifyEqual(parsed.stateErrorBound, ego.controllerErrorBound.bounds, AbsTol=0.0);
-            testCase.verifyEqual(targets.positionErrorBound, target.controllerErrorBound.bounds(1:2), AbsTol=0.0);
+            testCase.verifyEqual(parsedTarget.positionErrorBound, target.controllerErrorBound.bounds(1:2), AbsTol=0.0);
         end
 
         function eachCallUsesTheLatestBoundRatherThanAPastMaximum(testCase)
@@ -92,7 +92,7 @@ classdef controllerEstimatorBoundsTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.initialErrorBound(4:6), ego.controllerErrorBound.bounds(4:6), AbsTol=0);
             testCase.verifyEqual(problem.metadata.targetErrorBound(1:2), [0.2;0.2], AbsTol=0);
-            testCase.verifyEqual(problem.model.encounters.radius(1:2), [0.2;0.2], AbsTol=0);
+            testCase.verifyEqual(problem.model.encounter.radius(1:2), [0.2;0.2], AbsTol=0);
         end
 
         function currentMeasurementsConditionTheCarriedTargetBox(testCase)

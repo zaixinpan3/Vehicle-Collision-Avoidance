@@ -16,17 +16,17 @@ experiment boundary is recorded in `FEEDBACK_SPARSE_EXPERIMENTS.md`.
 
 ## 1. Specification and first admission
 
-Let actuation times be t_i=t_0+i h. For each admitted target j, require
+Let actuation times be t_i=t_0+i h. For the admitted target, require
 continuous-time noncollision until its first certified exit from perception,
-and a finite upper bound D_j on that exit time. No safety or invariance claim
+and a finite upper bound D on that exit time. No safety or invariance claim
 is made after discharge. A later reentry is a new admission. The initial
 optimization must contain a **complete robust executable policy**, rather
 than just a nominal collision-free path or a short prediction prefix.
 
 A deadline is selected jointly with the first feasible complete witness:
-D_j=t_0+N_j h for some finite integer N_j. There is no imposed 1.6 s exit
+D=t_0+N h for some finite integer N. There is no imposed 1.6 s exit
 requirement. A search window is an initialization of the search, not the
-allowed physical exit time. Once admitted, replacements cannot postpone D_j.
+allowed physical exit time. Once admitted, replacements cannot postpone D.
 Otherwise the planner could repeatedly predict exit a fixed duration ahead
 without ever executing it. An equivalent finite-time progress certificate
 could replace this deadline mechanism, but mere safety alone cannot prove exit.
@@ -44,7 +44,7 @@ target motion parameters, measurement histories relevant to future control,
 road knowledge, previous applied input, and any actuator or delay memory.
 All true quantities belong to these sets. A witness contains nominal states,
 causal feedback laws, inlet sets, swept enclosures, local model-domain
-certificates, road obligations and the unexpired exit deadlines. Planning
+certificates, road obligations and the unexpired exit deadline. Planning
 centers are variables and may remain at the old witness centers.
 
 ## 2. Exact Fiala model and local inclusion
@@ -185,9 +185,9 @@ shrinkage that the incumbent policy has not accounted for.
 
 ## 4. Continuous-time geometry and road meaning
 
-For each cell and target, form relative body points at the same time:
+For each cell, form relative body points at the same time:
 
-    d_ab(t)=p_e(t)+R(psi_e(t))a-p_j(t)-R(psi_j(t))b.
+    d_ab(t)=p_e(t)+R(psi_e(t))a-p_o(t)-R(psi_o(t))b.
 
 Construct verified Bernstein coefficient sets D_l^ab whose convex hull
 contains these relative points throughout the cell. Asynchronous differences
@@ -262,9 +262,9 @@ Removing an executed prefix removes obligations; it does not reduce this
 minimum. Retain their certified lower bounds when reusing a proof. Accept
 an improvement only if it is complete, preserves deadlines and has margin
 at least that of the retained suffix. Recomputing a looser lower bound must
-not overwrite a valid inherited bound. With new targets, joint feasibility
-and old target obligations must be established separately; a positive old
-margin is not guaranteed attainable after adding new constraints.
+not overwrite a valid inherited bound. Reacquisition must preserve the current
+target obligation. The positive old margin is not a certificate for a different
+target or an enlarged future motion bound.
 
 The augmented-state scalar h(I,W,t)=m(W) is nonnegative and nondecreasing
 under such continuation/replacement. It is a maintained predictive-barrier
@@ -281,13 +281,13 @@ Proof. The first witness establishes the induction base. At every step the
 suffix lemma supplies a feasible continuation; either this witness or a
 verified replacement is executed. Equation (9) and road/input obligations
 prove safety throughout that sample interval, including boundaries and
-command transitions. Finite induction reaches each terminal time D_j.
+command transitions. Finite induction reaches each terminal time D.
 At that time the terminal enclosure satisfies, for a fixed ||n_exit||<=1,
 
-    inf n_exit^T(p_e(D_j)-p_j(D_j)) >= R_exit+epsilon_exit,      (10)
+    inf n_exit^T(p_e(D)-p_o(D)) >= R_exit+epsilon_exit,      (10)
 
 where R_exit bounds the relevant perception range and epsilon_exit>0.
-Thus the target is outside perception by D_j. Earlier exit can be discharged
+Thus the target is outside perception by D. Earlier exit can be discharged
 only by a sound geometric observation/set proof, not by exhausting a counter.
 The remaining-step counter decreases because absolute deadlines do not move.
 Consequently exit occurs in finite time without any infinite-horizon
@@ -298,12 +298,10 @@ certified set exclusion from that field of view; the proof is unchanged.
 The footprint-separation requirement applies throughout the encounter;
 center-distance exit is used only when it matches the sensing definition.
 
-A newly entering target requires a new joint witness, including the already
-committed input and old deadlines. The old witness alone certifies nothing
-about an unadmitted target. The user's admission-domain hypothesis covers
-this obligation. An unlimited stream of admitted targets may keep perception
-nonempty forever while every individual target still exits by its own finite
-deadline. Simultaneous permanent emptiness is not the requested theorem.
+After confirmed discharge, a newly acquired target starts a separate encounter
+and requires a new complete witness, including any already committed input.
+The old witness alone certifies nothing about that new target. The admission
+domain hypothesis covers this obligation. Only one target is modeled at a time.
 
 ## 6. Short-prefix splicing is an inclusion problem
 

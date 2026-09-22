@@ -1,4 +1,4 @@
-function [ego, lane, road, targets] = readPlanningInputs( ...
+function [ego, lane, road, target] = readPlanningInputs( ...
         egoState, targetEstimate, laneCenterline, cfg)
 % readPlanningInputs Parse and validate the controller's three raw inputs.
 %
@@ -10,7 +10,7 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
 % consumes. All validation of the
 % public input contract lives here; downstream modules assume these
 % structures are well formed. An empty targetEstimate falls back to a
-% targetEstimates field bundled on the ego input, and an empty
+% targetEstimate field bundled on the ego input, and an empty
 % laneCenterline falls back to a long straight line through the current
 % ego pose.
 
@@ -28,14 +28,14 @@ function [ego, lane, road, targets] = readPlanningInputs( ...
     ego.perception = [];
     if isfield(egoState,"perception"), ego.perception = egoState.perception; end
     [lane, road] = localReadLane(laneCenterline, ego, cfg);
-    targets = localReadTargets(targetEstimate, ego, cfg);
+    target = localReadTarget(targetEstimate, ego, cfg);
 end
 
 function targetEstimate = localBundledTargetEstimate(egoInput)
     targetEstimate = struct();
     if isstruct(egoInput) && isscalar(egoInput) ...
-            && isfield(egoInput, "targetEstimates")
-        targetEstimate = egoInput.targetEstimates;
+            && isfield(egoInput, "targetEstimate")
+        targetEstimate = egoInput.targetEstimate;
     end
 end
 
@@ -525,112 +525,16 @@ function curvature = localPolylineSegmentCurvature( ...
     end
 end
 
-function targets = localReadTargets(rawTargets, ego, cfg)
-    if ~isstruct(rawTargets)
-        error("collisionAvoidanceController:invalidInput", ...
-            "targetEstimate must be a structure.");
+function target = localReadTarget(record, ego, cfg)
+    target = [];
+    if isempty(record),return;end
+    validateattributes(record,{'struct'},{'scalar'},mfilename,'targetEstimate');
+    if isempty(fieldnames(record)),return;end
+    [candidate,active] = localReadTargetRecord(record,ego,cfg);
+    if active
+        candidate.key = localTargetRecordKey(record);
+        target = candidate;
     end
-    if numel(rawTargets)>1
-        error("collisionAvoidanceController:unsupportedTargetCount", ...
-            "The current study accepts at most one obstacle vehicle.");
-    end
-    targets = repmat(localEmptyTarget(), numel(rawTargets), 1);
-    count = 0;
-    for index = 1:numel(rawTargets)
-        record = localTargetRecord(rawTargets(index));
-        if isempty(record), continue; end
-        [target, active] = localReadTargetRecord(record, ego, cfg);
-        if active
-            target.key = localTargetRecordKey(record, index);
-            count = count+1;
-            targets(count, 1) = target;
-        end
-    end
-    targets = targets(1:count);
-    if numel(unique(string({targets.key}))) ~= numel(targets)
-        error("collisionAvoidanceController:invalidInput", "Target identities must be unique.");
-    end
-end
-
-function record = localTargetRecord(rawTargets)
-% Normalize one member of the target structure array. Vectorized fields
-% inside a member are rejected so stable identities remain unambiguous.
-
-    record = [];
-    if isempty(rawTargets)
-        return;
-    end
-    if ~isscalar(rawTargets)
-        error("collisionAvoidanceController:invalidInput", ...
-            "targetEstimate must describe at most one target; this " ...
-            + "controller does not solve the multi-target problem.");
-    end
-    if isempty(fieldnames(rawTargets))
-        return;
-    end
-    localRejectVectorizedTarget(rawTargets);
-    record = rawTargets;
-end
-
-function localRejectVectorizedTarget(rawRecord)
-% Reject a record whose fields carry more than one target.
-
-    for fieldName = localTargetVectorFields()
-        if ~isfield(rawRecord, fieldName) ...
-                || isempty(rawRecord.(fieldName))
-            continue;
-        end
-        value = rawRecord.(fieldName);
-        if isnumeric(value) && ismatrix(value) ...
-                && size(value, 1) == 2 && size(value, 2) > 1
-            error("collisionAvoidanceController:invalidInput", ...
-                "%s must describe one target: a 2-element vector.", ...
-                fieldName);
-        end
-    end
-    for fieldName = localTargetScalarFields()
-        if ~isfield(rawRecord, fieldName) ...
-                || isempty(rawRecord.(fieldName))
-            continue;
-        end
-        value = rawRecord.(fieldName);
-        if (isnumeric(value) || islogical(value) || isstring(value)) ...
-                && isvector(value) && numel(value) > 1
-            error("collisionAvoidanceController:invalidInput", ...
-                "%s must describe one target: a scalar.", fieldName);
-        end
-    end
-end
-
-function scalarFields = localTargetScalarFields()
-    scalarFields = [ ...
-        "relativePositionX", "relativePositionY", ...
-        "targetVelocityX", "targetVelocityY", ...
-        "relativeVelocityX", "relativeVelocityY", ...
-        "targetAccelerationX", "targetAccelerationY", ...
-        "targetLength", "targetWidth", ...
-        "targetYawInertial", "targetHeadingInertial", "targetYawRelative", ...
-        "targetYawAngle", "targetYaw", "yawAngle", "yaw", ...
-        "heading", "relativeYaw", "relativeHeading", ...
-        "targetYawRate", "yawRate", "courseRate", ...
-        "targetYawErrorBound", "targetYawRateErrorBound", ...
-        "targetPredictionYawAccelerationErrorBound", ...
-        "trackId", "targetId", "objectId", "id", ...
-        "relativePositionFrame", "targetVelocityFrame", ...
-        "relativeVelocityFrame", "targetAccelerationFrame", ...
-        "targetYawFrame"];
-end
-
-function vectorFields = localTargetVectorFields()
-    vectorFields = [ ...
-        "targetPositionInertial", "targetVelocityInertial", ...
-        "targetAccelerationInertial", "relativePosition", ...
-        "relativeVelocity", "relativeAcceleration", ...
-        "targetVelocity", "targetAcceleration", ...
-        "targetPositionInertialErrorBound", ...
-        "targetVelocityInertialErrorBound", ...
-        "targetAccelerationInertialErrorBound", ...
-        "targetPredictionAccelerationInertialErrorBound"];
 end
 
 function target = localEmptyTarget()
@@ -648,7 +552,7 @@ function target = localEmptyTarget()
         "errorCertificate", [], "predictionMotion", []);
 end
 
-function key = localTargetRecordKey(data, recordIdx)
+function key = localTargetRecordKey(data)
     identityFields = ["trackId", "targetId", "objectId", "id"];
     for fieldName = identityFields
         if ~isfield(data, fieldName) || isempty(data.(fieldName))
@@ -672,7 +576,7 @@ function key = localTargetRecordKey(data, recordIdx)
         key = fieldName + ":" + value;
         return;
     end
-    key = "anonymousTarget:" + string(recordIdx);
+    key = "anonymousTarget";
 end
 
 function [target, active] = localReadTargetRecord(data, ego, cfg)

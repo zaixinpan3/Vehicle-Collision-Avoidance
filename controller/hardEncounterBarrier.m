@@ -2,10 +2,10 @@ classdef hardEncounterBarrier
     %hardEncounterBarrier Finite encounter completion and predictive continuation.
     % The terminal law is a prediction-side witness. It never issues a command.
     methods (Static)
-        function [model,carry] = prepare(model,ego,observations,stored,identity)
+        function [model,carry] = prepare(model,ego,observation,stored,identity)
             cfg = model.cfg;
             carry = [];
-            model.encounters = struct("key",{});
+            model.encounter = [];
             model.confirmation = [];
             model.carriedWitness = [];
             model.nominalSource = "cruiseInitialization";
@@ -26,10 +26,9 @@ classdef hardEncounterBarrier
             end
             model.cruiseCertificate = [];
             model.exitMargin = inf;
-            model.exitSteps = zeros(0,1);
-            model.dischargedTargetKeys = strings(1,0);
+            model.targetReleased = false;
             if ~isempty(stored)
-                expectedVersion=41;
+                expectedVersion=42;
                 if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=expectedVersion
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
@@ -72,33 +71,33 @@ classdef hardEncounterBarrier
                 model.previousInput = stored.appliedInput;
                 model.confirmation = stored.confirmation;
             end
-            measured = cell(1,numel(observations));
-            for index = 1:numel(observations)
-                measured{index} = targetPrediction.admitOnline(observations(index),model.stateTime,model.lane,cfg);
+            measured = [];
+            if ~isempty(observation)
+                measured = targetPrediction.admitOnline(observation,model.stateTime,model.lane,cfg);
             end
-            if isempty(measured),measured=struct("key",{});else,measured=[measured{:}];end
-            oldTargets = struct("key",{});
-            if ~isempty(stored),oldTargets=stored.encounters;end
-            needsObservation = ~isempty(measured) || ~isempty(oldTargets);
+            prior = [];
+            if ~isempty(stored),prior=stored.encounter;end
+            needsObservation = ~isempty(measured) || ~isempty(prior);
             valid = hardEncounterBarrier.confirmationObservation(ego,model.stateTime,model.confirmation,needsObservation);
             if needsObservation && isempty(model.confirmation)
                 model.confirmation = struct('range',ego.perception.range,'exitDirection',[], ...
                     'reference',"egoReferencePoint",'exitGeometry',"entireTargetFootprint", ...
                     'confirmationDelay',0,'observationContract',"currentCompleteObservationAtConfirmationSample");
                 body = hypot(cfg.vehicle.length,cfg.vehicle.width)/2;
-                for index = 1:numel(measured)
-                    if ego.perception.range<=body+hypot(measured(index).halfLength,measured(index).halfWidth)
-                        error('collisionAvoidanceController:invalidConfirmationRegion','The perception range must exceed the sum of both footprint circumradii.');
-                    end
+                if ~isempty(measured) && ego.perception.range<=body+hypot(measured.halfLength,measured.halfWidth)
+                    error('collisionAvoidanceController:invalidConfirmationRegion','The perception range must exceed the sum of both footprint circumradii.');
                 end
             end
+            sameTarget = ~isempty(prior) && ~isempty(measured) && prior.key==measured.key;
             changed = model.measurementContractChanged;
-            active = cell(1,numel(measured));
-            for index = 1:numel(measured)
-                target = measured(index);
-                match = find(string({oldTargets.key})==target.key,1);
-                if ~isempty(match)
-                    prior = oldTargets(match);
+            if ~isempty(prior) && ~sameTarget
+                hardEncounterBarrier.requirePossibleAbsence(model,prior);
+                model.targetReleased = true;
+                changed = changed || ~isempty(measured);
+            end
+            if ~isempty(measured)
+                target = measured;
+                if sameTarget
                     if target.halfLength~=prior.halfLength || target.halfWidth~=prior.halfWidth
                         error('collisionAvoidanceController:changedEncounterContract','The carried target footprint changed.');
                     end
@@ -109,30 +108,19 @@ classdef hardEncounterBarrier
                     target = conditioned;
                     changed = changed || increased;
                 end
-                if ~isempty(match) && stored.completion.active ...
+                if sameTarget && stored.completion.active ...
                         && model.stateTime>=stored.completion.deadline-1e-10
-                    completion = stored.completion;
-                    completion.direction = completion.direction(:,completion.keys==target.key);
-                    outside = valid && hardEncounterBarrier.observedExterior(model,target,completion);
+                    outside = valid && hardEncounterBarrier.observedExterior(model,target,stored.completion);
                 else
                     outside = valid && hardEncounterBarrier.observedExterior(model,target);
                 end
                 if outside
-                    if ~isempty(match),model.dischargedTargetKeys(end+1)=target.key;end
-                    continue;
-                end
-                changed = changed || isempty(match);
-                active{index} = target;
-            end
-            for index = 1:numel(oldTargets)
-                if ~any(string({measured.key})==oldTargets(index).key)
-                    hardEncounterBarrier.requirePossibleAbsence(model,oldTargets(index));
-                    model.dischargedTargetKeys(end+1)=oldTargets(index).key;
+                    model.targetReleased = model.targetReleased || sameTarget;
+                else
+                    changed = changed || ~sameTarget;
+                    model.encounter = target;
                 end
             end
-            model.encounters = [active{:}];
-            if isempty(model.encounters),model.encounters=struct("key",{});end
-            model.exitSteps = zeros(numel(model.encounters),1);
             if ~isempty(stored) && ~changed
                 % Preserve the actual accepted generators, enclosures, charts,
                 % normals and terminal set. No relinearization is a proof step.
@@ -145,21 +133,19 @@ classdef hardEncounterBarrier
                     'initialCenter',model.initialEgoState,'initialRadius',model.initialFrenetErrorBound, ...
                     'program',stored.program,'prediction',stored.prediction, ...
                     'issuedInput',stored.appliedInput,'predictedCenter',stored.predictedState(:,2));
-                if ~isempty(model.encounters) && stored.completion.active
+                if ~isempty(model.encounter) && stored.completion.active
                     model.exitDeadline = stored.completion.deadline;
                     if model.stateTime>=model.exitDeadline-1e-10
                         error('collisionAvoidanceController:unconfirmedEncounterExit','The finite deadline needs current confirmed release.');
                     end
                 end
-                if isempty(model.encounters),carry.completion.active=false;end
+                if isempty(model.encounter),carry.completion.active=false;end
             end
             model.horizonSteps = max(cfg.controller.horizonSteps,cfg.controller.minimumHorizonSteps);
             % Departure proposals of this frame, reused by the completion rows.
-            model.encounterProposals = cell(1,numel(model.encounters));
-            for index = 1:numel(model.encounters)
-                trial = model;trial.encounters=model.encounters(index);
-                [direction,steps,~] = localEncounterProposal(trial,model.confirmation.range);
-                model.encounterProposals{index} = direction;
+            model.exitDirectionProposal = [];
+            if ~isempty(model.encounter)
+                [model.exitDirectionProposal,steps,~] = localEncounterProposal(model,model.confirmation.range);
                 model.horizonSteps = max(model.horizonSteps,steps);
             end
             if isfield(model,'exitDeadline')
@@ -174,7 +160,7 @@ classdef hardEncounterBarrier
             if ~isempty(stored)
                 model.initializationPlan = [stored.plan(:,2:end),stored.plan(:,end)];
                 model.nominalSource = "shiftedPreviousSolution";
-            elseif isempty(model.encounters)
+            elseif isempty(model.encounter)
                 [model.horizonSteps,model.initializationPlan]=localCruiseAdmission(model);
             end
         end
@@ -214,35 +200,30 @@ classdef hardEncounterBarrier
         end
 
         function [matrix,bound,completion] = finiteCompletionRows(model,prediction,finalMap,finalOffset,frame)
-            count = numel(model.encounters);
-            matrix = zeros(count,prediction.planCount);bound=zeros(count,1);
-            directions=zeros(2,count);rows=zeros(count,6);limits=zeros(count,1);
             duration=prediction.stageCount*model.sampleTime;
+            matrix=zeros(0,prediction.planCount);bound=zeros(0,1);
+            completion=struct('active',false,'deadline',model.stateTime+duration, ...
+                'direction',zeros(2,0),'frame',frame,'stateRow',zeros(0,6),'stateBound',zeros(0,1));
+            if isempty(model.encounter),return;end
+            target=model.encounter;
             anchor=finalOffset+finalMap*model.anchorPlan;
-            for index=1:count
-                target=model.encounters(index);
-                [center,radius]=targetPrediction.finiteFlow(target,duration);
-                direction=localExitDirection(center,frame,anchor);
-                if isfield(frame,'positionMap')
-                    position=laneGeometry.fromFrenet(anchor,model.lane);
-                    relative=center(1:2)-position;
-                    if norm(relative)>sqrt(eps),direction=relative/norm(relative);end
-                end
-                if isfield(model,'encounterProposals') && numel(model.encounterProposals)==count
-                    proposed=model.encounterProposals{index};
-                else
-                    trial=model;trial.encounters=target;
-                    [proposed,~,~]=localEncounterProposal(trial,model.confirmation.range);
-                end
-                if ~isempty(proposed) && ~isfield(frame,'positionMap')
-                    direction=proposed;
-                end
-                [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
-                matrix(index,:)=row*finalMap;bound(index)=limit-row*finalOffset;
-                directions(:,index)=direction;rows(index,:)=row;limits(index)=limit;
+            [center,radius]=targetPrediction.finiteFlow(target,duration);
+            direction=localExitDirection(center,frame,anchor);
+            if isfield(frame,'positionMap')
+                position=laneGeometry.fromFrenet(anchor,model.lane);
+                relative=center(1:2)-position;
+                if norm(relative)>sqrt(eps),direction=relative/norm(relative);end
             end
-            completion=struct('active',count>0,'deadline',model.stateTime+duration, ...
-                'direction',directions,'frame',frame,'stateRow',rows,'stateBound',limits);
+            if isfield(model,'exitDirectionProposal')
+                proposed=model.exitDirectionProposal;
+            else
+                [proposed,~,~]=localEncounterProposal(model,model.confirmation.range);
+            end
+            if ~isempty(proposed) && ~isfield(frame,'positionMap'),direction=proposed;end
+            [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
+            matrix=row*finalMap;bound=limit-row*finalOffset;
+            completion.active=true;completion.direction=direction;
+            completion.stateRow=row;completion.stateBound=limit;
         end
 
         function valid = confirmationObservation(ego,time,confirmation,required)
@@ -357,7 +338,7 @@ classdef hardEncounterBarrier
             frame = laneGeometry.frameBounds(model.lane,finalOffset(1), ...
                 extent(1),abs(finalOffset(2))+extent(2));
             domainCount=0;
-            if ~isempty(model.encounters) && isfield(geometry.frames,'positionMap')
+            if ~isempty(model.encounter) && isfield(geometry.frames,'positionMap')
                 frame=geometry.frames(end);
                 directions=[eye(3);-eye(3)];
                 domainMatrix=directions*finalMap(1:3,:);
@@ -367,7 +348,6 @@ classdef hardEncounterBarrier
             end
             [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
                 model,prediction,finalMap,finalOffset,frame);
-            completion.keys = string({model.encounters.key});
             completion.domainRowCount=domainCount;
             matrix = [matrix;exitMatrix];bound=[bound;exitBound];
         end
@@ -781,7 +761,7 @@ function [direction,steps,passing] = localEncounterProposal(model,range)
     [position,heading] = laneGeometry.fromFrenet(model.initialEgoState,model.lane);
     frame = laneGeometry.frameBounds(model.lane,model.initialEgoState(1), ...
         cfg.controller.stationTrustRadius,abs(model.initialEgoState(2))+model.initialFrenetErrorBound(2));
-    target = model.encounters;
+    target = model.encounter;
     relative = target.center(1:2)-position;
     egoVelocity = [cos(heading),-sin(heading);sin(heading),cos(heading)]*model.initialEgoState(4:5);
     velocity = target.center(3:4)-egoVelocity;

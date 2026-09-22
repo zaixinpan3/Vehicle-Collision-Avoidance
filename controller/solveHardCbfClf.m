@@ -1,18 +1,17 @@
 classdef solveHardCbfClf
     %solveHardCbfClf Certified convex trajectory solves and independent hard-safety checks.
     methods (Static)
-        function reference = vffmReference(time,progress,encounters,lane,road,widths,passingOffsets)
+        function reference = vffmReference(time,progress,target,lane,road,width,passingOffsets)
         % Time-consistent Gaussian preference in a regular normal road chart.
         % progress is [station; station rate; station acceleration] in SI units.
         % Each column of passingOffsets specifies fixed lateral passing ordinates
         % in metres for one obstacle. Its Gaussian centre and chart width vary with time.
         % This geometric reference has no execution or feasibility authority.
-            localRequireSingleTarget(encounters);
             validateattributes(time,{'double'},{'row','finite','nonnegative'});
             validateattributes(progress,{'double'},{'size',[3,numel(time)],'finite','real'});
-            validateattributes(widths,{'double'},{'numel',numel(encounters),'positive','finite','real'});
-            validateattributes(passingOffsets,{'double'},{'nrows',numel(encounters),'finite','real'});
-            reference=localTimeDependentReference(time,progress,encounters,lane,road,widths,passingOffsets);
+            validateattributes(width,{'double'},{'scalar','positive','finite','real'});
+            validateattributes(passingOffsets,{'double'},{'row','finite','real'});
+            reference=localTimeDependentReference(time,progress,target,lane,road,width,passingOffsets);
         end
 
         function reference = prepareFluidReference(program,model)
@@ -404,14 +403,14 @@ function states=localStates(prediction,inputs)
     end
 end
 
-function reference=localTimeDependentReference(time,progress,encounters,lane,road,widths,passingOffsets)
+function reference=localTimeDependentReference(time,progress,target,lane,road,width,passingOffsets)
     chart=laneGeometry.normalRoadChart(progress(1,:),lane,road);
-    candidates=size(passingOffsets,2);nodes=numel(time);targets=numel(encounters);
+    candidates=size(passingOffsets,2);nodes=numel(time);
     z=zeros(candidates,nodes);zd=z;zdd=z;valid=all(chart.valid);
-    targetStation=zeros(targets,nodes);targetLateral=targetStation;
-    coefficients=zeros(targets,nodes,candidates);
-    if targets==1
-        motion=targetPrediction.nominalFlow(encounters,time);
+    targetStation=zeros(1,nodes);targetLateral=targetStation;
+    coefficients=zeros(candidates,nodes);
+    if ~isempty(target)
+        motion=targetPrediction.nominalFlow(target,time);
         projection=laneGeometry.project(motion(1:2,:),lane,progress(1,:));
         s=projection.station;d=projection.lateralPosition;
         targetChart=laneGeometry.normalRoadChart(s,lane,road);
@@ -429,13 +428,13 @@ function reference=localTimeDependentReference(time,progress,encounters,lane,roa
             b=numerator./h(1,:);bd=(numeratorD-b.*hd)./h(1,:);
             bdd=(numeratorDD-b.*hdd-2*bd.*hd)./h(1,:);
             q=progress(1,:)-s;qd=progress(2,:)-sd;qdd=progress(3,:)-sdd;
-            exponent=exp(-.5*(q/widths).^2);
-            lambda=-q.*qd/widths^2;
-            lambdaD=-(qd.^2+q.*qdd)/widths^2;
+            exponent=exp(-.5*(q/width).^2);
+            lambda=-q.*qd/width^2;
+            lambdaD=-(qd.^2+q.*qdd)/width^2;
             z=b.*exponent;zd=(bd+b.*lambda).*exponent;
             zdd=(bdd+2*bd.*lambda+b.*(lambda.^2+lambdaD)).*exponent;
             targetStation(1,:)=s;targetLateral(1,:)=d;
-            coefficients(1,:,:)=permute(b,[3,2,1]);
+            coefficients=b;
         end
     end
     m=chart.midpoint;h=chart.halfWidth;sd=progress(2,:);sdd=progress(3,:);
@@ -464,15 +463,14 @@ function reference=localTimeDependentReference(time,progress,encounters,lane,roa
 end
 
 function reference=localPrepareFluidReference(program,model)
-    localRequireSingleTarget(model.encounters);
     count=program.prediction.stageCount;nodes=count+1;
     reference=struct('bump',zeros(2,nodes),'heading',zeros(2,nodes),'valid',true(1,2), ...
         'amplitudes',zeros(1,2),'width',0,'center',0,'stages',zeros(1,2), ...
-        'targetCount',0,'targetIndices',zeros(1,0),'widths',zeros(1,0), ...
+        'active',false, ...
         'targetStation',zeros(0,nodes),'targetLateral',zeros(0,nodes), ...
         'lateralRate',zeros(2,nodes),'lateralAcceleration',zeros(2,nodes), ...
         'normalAcceleration',zeros(2,nodes),'bounded',false(1,nodes));
-    if program.inheritedPredictionFamily || isempty(model.encounters),return;end
+    if program.inheritedPredictionFamily || isempty(model.encounter),return;end
     records=program.jointCertificate.records;
     values=avoidanceSafetyGeometry.jointResidual(program,program.feasibleWitness,program.jointCertificate.angles) ...
         -program.jointCertificate.upperBound;
@@ -485,10 +483,8 @@ function reference=localPrepareFluidReference(program,model)
             *program.anchorPlan(2*stage-1:2*stage)+program.prediction.continuousC(:,stage);
         acceleration=a*velocity;progress(2:3,node)=[velocity(1);acceleration(1)];
     end
-    target=model.encounters(1);
-    matching=false(numel(records),1);
-    for index=1:numel(records),matching(index)=isequal(records(index).key,target.key);end
-    conflicts=find(matching & values>0);
+    target=model.encounter;
+    conflicts=find(values>0);
     if isempty(conflicts),return;end
     stages=[records(conflicts).stage];first=min(stages);last=max(stages);
     middle=round((first+last)/2)+1;
@@ -514,17 +510,10 @@ function reference=localPrepareFluidReference(program,model)
     % and subsequent full trajectory solve determine the actual lateral state.
     heading=field.courseOffset-atan2(nominal(5,:),nominal(4,:))-nominal(3,:);
     reference.heading=atan2(sin(heading),cos(heading));reference.valid=field.valid;
-    reference.targetCount=1;reference.targetIndices=1;reference.widths=width;
+    reference.active=true;
     reference.targetStation=field.targetStation;reference.targetLateral=field.targetLateral;
     reference.lateralRate=field.lateralRate;reference.lateralAcceleration=field.lateralAcceleration;
     reference.normalAcceleration=field.normalAcceleration;reference.bounded=field.bounded;
-end
-
-function localRequireSingleTarget(encounters)
-    if numel(encounters)>1
-        error('collisionAvoidanceController:unsupportedTargetCount', ...
-            'The VFFM initializer supports at most one obstacle vehicle.');
-    end
 end
 
 function [point,angles,information]=localFluidInitialize(program,cfg)
@@ -533,17 +522,17 @@ function [point,angles,information]=localFluidInitialize(program,cfg)
     information=struct('status',"nominal",'amplitudeMeters',0,'widthMeters',0, ...
         'centerStationMeters',0,'conflictStages',zeros(1,2),'terminalFitError',0, ...
         'maximumPhysicalExcess',NaN,'maximumSupportResidual',NaN, ...
-        'referenceCount',0,'referenceScores',Inf(1,2),'referencePhysicalExcess',Inf(1,2),'activeTargetCount',0);
+        'referenceCount',0,'referenceScores',Inf(1,2),'referencePhysicalExcess',Inf(1,2),'activeTarget',false);
     if ~localInitializationTimeAvailable(cfg),information.status="searchTimeLimit";return;end
     records=program.jointCertificate.records;
     reference=program.fluidReference;
     plans=program.anchorPlan;amplitudes=0;terminalErrors=0;
-    if reference.targetCount>0
+    if reference.active
         amplitudes=reference.amplitudes;
         [plans,terminalErrors]=localFitFluidReference(program,reference.bump,reference.heading,cfg);
         information.status="candidate";information.widthMeters=reference.width;
         information.centerStationMeters=reference.center;information.conflictStages=reference.stages;
-        information.referenceCount=2;information.activeTargetCount=reference.targetCount;
+        information.referenceCount=2;information.activeTarget=reference.active;
     end
     best=Inf;bestPhysical=false;
     for candidate=1:size(plans,2)

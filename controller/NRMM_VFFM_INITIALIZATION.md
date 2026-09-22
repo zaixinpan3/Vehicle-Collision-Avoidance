@@ -21,11 +21,14 @@ nor the quadratic-road streamfunction below is claimed to solve a moving-domain
 Navier–Stokes boundary-value problem. Li's Eq. (13) includes collision slack;
 this controller retains hard collision rows and only its existing soft CLF.
 
-The current study considers zero or one obstacle vehicle. Both the controller
-input parser and the VFFM reference interfaces reject multiple target records
-with `collisionAvoidanceController:unsupportedTargetCount`; no nearest-target
-selection or silent target omission is performed. Left/right reference
-candidates describe alternative maneuvers around the same obstacle.
+The complete pipeline represents one target. The estimator carries one
+six-vector, one radar predictor and one error enclosure; the adapter publishes
+one optional `targetEstimate`, and the controller stores one optional
+`encounter`. There is no target count, target collection, association/permutation
+step, joint target admission or Gaussian superposition. Left/right reference
+candidates describe alternative maneuvers around that same target. An absent
+observation and confirmed encounter release remain distinct conditions.
+See [the scalar state derivation](SINGLE_TARGET_PIPELINE.md).
 
 ## 1. Analytical target motion in the fixed planning frame
 

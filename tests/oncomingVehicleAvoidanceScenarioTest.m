@@ -24,7 +24,7 @@ classdef oncomingVehicleAvoidanceScenarioTest < matlab.unittest.TestCase
                 0.05, AbsTol=0.0);
             testCase.verifyEqual(result.scenario.targetSampleTime, ...
                 0.05, AbsTol=0.0);
-            testCase.verifyEqual(result.scenario.targetCount, 0);
+            testCase.verifyFalse(result.scenario.targetObserved);
             testCase.verifyEqual( ...
                 result.metrics.requestedControlSteps, 2);
             testCase.verifyEqual( ...
@@ -93,7 +93,7 @@ classdef oncomingVehicleAvoidanceScenarioTest < matlab.unittest.TestCase
                 result.controlTime, 0, ...
                 AbsTol=1.0e-15);
             testCase.verifyEmpty(result.command);
-            testCase.verifyEqual(result.scenario.targetCount, 0);
+            testCase.verifyFalse(result.scenario.targetObserved);
             testCase.verifyFalse(any( ...
                 result.perception.targetDetectionAvailable));
             testCase.verifyTrue(result.failure.occurred);

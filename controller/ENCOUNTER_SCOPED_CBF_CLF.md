@@ -15,18 +15,18 @@ Let the sample period be \(h>0\), \(t_k=kh\), and issue a held actuator input
 u(t)=u_k,\qquad t\in[t_k,t_{k+1}).
 \]
 
-For target \(j\), admission and certified discharge occur at
-\(\tau_j^{\mathrm{in}}\) and \(\tau_j^{\mathrm{out}}\). Define
+For the single target, admission and certified discharge occur at
+\(\tau^{\mathrm{in}}\) and \(\tau^{\mathrm{out}}\). Its active flag is
 
 \[
-\mathcal A(t)=\{j:\tau_j^{\mathrm{in}}\le t<\tau_j^{\mathrm{out}}\}.
+a(t)=\mathbf 1_{[\tau^{\mathrm{in}},\tau^{\mathrm{out}})}(t).
 \]
 
-Throughout every active encounter, require both
+While the encounter is active, require both
 
 \[
-\operatorname{dist}(\mathcal R_e(x(t)),\mathcal R_j(z^j(t)))
-\ge d_{\min},\qquad j\in\mathcal A(t),
+\operatorname{dist}(\mathcal R_e(x(t)),\mathcal R_o(z(t)))
+\ge d_{\min},\qquad a(t)=1,
 \tag{1}
 \]
 
@@ -37,7 +37,7 @@ to a separately certified holding/handoff regime. Every connected certificate
 must cover the transition into the next one; circular promises of future
 certification do not establish continuation.
 
-Each discharge guard \(I\in\mathcal E_j\) must establish that the current
+The discharge guard \(I\in\mathcal E\) must establish that the current
 conflict obligation ends under the admitted motion, route, and monitoring
 contracts. For a crossing, the entire uncertain target footprint may clear a
 defined shared conflict region. That geometric condition must be accompanied
@@ -51,16 +51,15 @@ instantaneous distance, and ego rest are not discharge guards. Track identity
 and encounter identity are separate: an occluded encounter remains active;
 reacquisition must not create a gap or discard its obligation. Monitoring
 premises include coverage, blackout limits, sensing/processing/actuation delay,
-and sufficient time and control authority for renewed joint admission. A range
+and sufficient time and control authority for renewed admission. A range
 threshold alone supplies none of those guarantees.
 
 The implementation may evaluate exit guards only at sample times and retain
 all current obligations through the complete preceding held interval. This is
 conservative and avoids an uncertified within-sample lifecycle transition.
-Individual targets may be discharged at different samples. A certificate may
-terminate only when all obligations assigned to it have been discharged or
-transferred to a valid successor certificate. Road, actuator, and other ongoing
-ego obligations must have an applicable controller at the handoff.
+A certificate may terminate only when its target obligation has been discharged
+or transferred to a valid successor certificate. Road, actuator, and other
+ongoing ego obligations must have an applicable controller at the handoff.
 
 ## 2. Information and finite-validity motion contracts
 
@@ -81,9 +80,9 @@ A nonsingular finite-duration target contract can use Cartesian motion and
 body yaw separately:
 
 \[
-\dot p^j=v^j,\quad \dot v^j=a^j,\quad
-\dot a^j\in\mathcal J_j(t,z^j),\qquad
-\dot\psi^j=\omega^j,\quad\dot\omega^j\in\mathcal N_j(t,z^j).
+\dot p=v,\quad \dot v=a,\quad
+\dot a\in\mathcal J(t,z),\qquad
+\dot\psi=\omega,\quad\dot\omega\in\mathcal N(t,z).
 \tag{3}
 \]
 
@@ -117,7 +116,7 @@ constant curvature and constant tangential acceleration.
 Use a sufficient information state
 
 \[
-I_k=(t_k,\mathcal B_k,\mathcal A_k,\mathscr C_k,u_{k-1},q_{k-1}),
+I_k=(t_k,\mathcal B_k,a_k,\mathscr C_k,u_{k-1},q_{k-1}),
 \tag{5}
 \]
 
@@ -183,17 +182,17 @@ Maximize this support over each admitted yaw interval. With position centers
 supports \(\bar h\), a physical clearance lower bound is
 
 \[
-\underline g_j(\tau,n)=n^\top(\bar p_e-\bar p_j)
- -\bar h_e-\bar h_j-|n|^\top(\rho_e^p+\rho_j^p)-d_{\min}.
+\underline g_o(\tau,n)=n^\top(\bar p_e-\bar p_o)
+ -\bar h_e-\bar h_o-|n|^\top(\rho_e^p+\rho_o^p)-d_{\min}.
 \tag{8}
 \]
 
 Partition each held interval into cells of width \(\Delta_\ell\), using
-one fixed normal \(n_{j\ell}\) in each cell. Bound the absolute rate of the
+one fixed normal \(n_\ell\) in each cell. Bound the absolute rate of the
 actual projected clearance by
 
 \[
-L_{j\ell}=\bar V_e+\bar V_j+R_e\bar\Omega_e+R_j\bar\Omega_j,
+L_\ell=\bar V_e+\bar V_o+R_e\bar\Omega_e+R_o\bar\Omega_o,
 \qquad R_a=\sqrt{l_a^2+w_a^2}.
 \tag{9}
 \]
@@ -204,17 +203,17 @@ a required dimensionless margin \(\mu\), the endpoint conditions
 
 \[
 \begin{aligned}
-\underline g_j(\tau_\ell,n_{j\ell})&\ge
-     s_j\mu+\tfrac12L_{j\ell}\Delta_\ell+\epsilon_{\mathrm{num}},\\
-\underline g_j(\tau_{\ell+1},n_{j\ell})&\ge
-     s_j\mu+\tfrac12L_{j\ell}\Delta_\ell+\epsilon_{\mathrm{num}}
+\underline g_o(\tau_\ell,n_\ell)&\ge
+     s_o\mu+\tfrac12L_\ell\Delta_\ell+\epsilon_{\mathrm{num}},\\
+\underline g_o(\tau_{\ell+1},n_\ell)&\ge
+     s_o\mu+\tfrac12L_\ell\Delta_\ell+\epsilon_{\mathrm{num}}
 \end{aligned}
 \tag{10}
 \]
 
 are sufficient. Every point is at most half a cell from one endpoint, so the
 actual clearance is at least that endpoint's lower bound minus
-\(L_{j\ell}\Delta_\ell/2\). The reserve \(\epsilon_{\mathrm{num}}\) must
+\(L_\ell\Delta_\ell/2\). The reserve \(\epsilon_{\mathrm{num}}\) must
 cover proven numerical error, in physical margin units. The rate is for the
 actual clearance; it need not equal the derivative of its conservative box
 envelope. Both endpoints must use the same cell normal. Subdivision or direct
@@ -484,7 +483,7 @@ construction also supplies finite exit. At no step is permanent joint
 ego–target invariance used. The CLF estimate follows independently from (18)
 and does not strengthen the safety theorem into a convergence theorem.
 
-## 8. Waiting, renewal, and additional targets
+## 8. Waiting and renewal
 
 Finite exit is a sufficient construction, not a universal safety requirement.
 A replacement may extend the deadline only after its complete continuation
@@ -500,13 +499,10 @@ expectation of new forecasts are insufficient. A genuinely nonterminating
 encounter needs continuing safety authority on every executed interval; that
 does not impose an invariant joint terminal set on every ordinary encounter.
 
-New targets require joint admission with all existing active encounters and
-their maneuver commitments. The old witness does not cover an unmodeled new
-target. Detection must precede the point at which a certified joint response
-becomes impossible under the admitted sensing/response contract. Failed joint
-admission must not be hidden by omitting the target. Changing the active set
-or normalization requires an explicit joint certificate transition, not
-reuse of a scalar bound whose meaning has changed.
+The pipeline models a single target. Reacquisition conditions its carried
+motion enclosure; it does not discard an active collision obligation. A different
+target can begin a new encounter only after the previous target's discharge has
+been confirmed. The new encounter requires its own admission certificate.
 
 ## 9. Executable finite-witness implementation
 
@@ -527,7 +523,7 @@ inferred from instantaneous velocity or from target disappearance.
 
 | Responsibility | Implemented behavior |
 | --- | --- |
-| Encounter state | Stable identifiers, finite contracts, visibility-independent active records, guarded discharge |
+| Encounter state | One temporal identifier, finite contract, visibility-independent active record, guarded discharge |
 | Motion | Cartesian jerk/yaw-acceleration inclusions; finite nonzero ego residuals |
 | CBF | Swept safety and verified margin carried with a shrinking absolute deadline |
 | CLF | One robust dissipation slack per held interval; a common metric and explicit affine-reference derivative |

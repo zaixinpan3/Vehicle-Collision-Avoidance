@@ -1,7 +1,7 @@
 classdef admissionAssemblyOptimizationTest < matlab.unittest.TestCase
     %admissionAssemblyOptimizationTest Preserve hard domains and side selection.
     properties (TestParameter)
-        targetCount=struct('none',0,'one',1,'two',2);
+        hasTarget=struct('absent',false,'present',true);
         curvature=struct('left',.01,'right',-.01);
     end
     methods (TestClassSetup)
@@ -13,8 +13,8 @@ classdef admissionAssemblyOptimizationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function jointGeometryPreservesRoadAndPoseAdmissibility(testCase,targetCount)
-            [complete,joint,plans]=localGeometry(targetCount);
+        function jointGeometryPreservesRoadAndPoseAdmissibility(testCase,hasTarget)
+            [complete,joint,plans]=localGeometry(hasTarget);
             retained=~startsWith(complete.label,"collision:");
             testCase.verifyTrue(any(startsWith(joint.label,"road:")));
             testCase.verifyEqual(joint.label,complete.label(retained));
@@ -66,15 +66,14 @@ function program=localReverseReferences(program)
     program.fluidReference=reference;
 end
 
-function [complete,joint,plans]=localGeometry(targetCount)
+function [complete,joint,plans]=localGeometry(hasTarget)
     [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
     [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
     model=problem.model;model.anchorPlan=problem.program.anchorPlan;
-    model.encounters=repmat(model.encounters(1),targetCount,1);
-    for index=1:targetCount
-        model.encounters(index).key="target-"+index;
-        model.encounters(index).center(1)=model.encounters(index).center(1)+index;
-        model.encounters(index).radius([1,2,7])=[.01;.02;.03];
+    if hasTarget
+        model.encounter.radius([1,2,7])=[.01;.02;.03];
+    else
+        model.encounter=[];
     end
     boundary=struct('coefficients',[.001,0,-20],'safeSideSign',1, ...
         'longitudinalDirection',[1;0],'lateralDirection',[0;1],'origin',[0;0], ...

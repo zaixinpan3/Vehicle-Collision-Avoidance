@@ -214,13 +214,15 @@ function [matrix,bound] = localLateralTailRows(model,prediction,frames)
         if tube.start>=1.3
             nominal(2,:)=-6;
         end
-        encounter=model.encounters(1);
+        encounter=model.encounter;
         [center,radius]=targetPrediction.finiteFlow(encounter,tube.start);
         target=struct('center',center,'radius',radius,'contract',encounter.contract, ...
             'halfLength',encounter.halfLength,'halfWidth',encounter.halfWidth);
+        [pose,domain]=laneGeometry.poseData(frame);
         data=struct('frame',[frame.origin;frame.tangent;frame.lateral;frame.heading; ...
             frame.positionErrorBound;frame.headingErrorBound;frame.stationLower;frame.stationUpper], ...
-            'nominal',nominal,'targets',target,'boundaries',model.road.boundaries([]), ...
+            'pose',pose,'domain',domain,'normal',zeros(2,0), ...
+            'nominal',nominal,'target',target,'hasTarget',true,'boundaries',model.road.boundaries([]), ...
             'settings',[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.model.headingDomainRadius; ...
                 cfg.model.lateralDomainRadius], ...
             'duration',tube.duration,'degree',cfg.encounter.taylorOrder+1);
@@ -299,7 +301,7 @@ function result = localEndpointBox(qp,prediction,model,core)
         end
     end
     frame=qp.geometry.frames(end);
-    target=targetPrediction.finiteFlow(model.encounters(1),prediction.stageCount*model.sampleTime);
+    target=targetPrediction.finiteFlow(model.encounter,prediction.stageCount*model.sampleTime);
     corners=[limits(1,[1,1,2,2]);limits(2,[1,2,1,2])];
     world=frame.origin+[frame.tangent,frame.lateral]*corners;
     result=struct('frenetLimits',limits,'targetCenter',target(1:2), ...
@@ -321,7 +323,7 @@ end
 
 function [qp,prediction,model,ego] = localRebuild(context,cfg)
     cfg = collisionAvoidanceControllerConfig(cfg);
-    [ego,lane,road,observations] = readPlanningInputs(context.controllerState,context.targetEstimate,context.controllerRoadGeometry,cfg);
+    [ego,lane,road,observation] = readPlanningInputs(context.controllerState,context.targetEstimate,context.controllerRoadGeometry,cfg);
     projection = laneGeometry.project(ego.position,lane);
     heading = atan2(sin(ego.yaw-projection.heading),cos(ego.yaw-projection.heading));
     [radius,valid] = stateUncertainty.toFrenet(ego.modelState,ego.stateErrorBound,lane);
@@ -333,13 +335,11 @@ function [qp,prediction,model,ego] = localRebuild(context,cfg)
         'referenceSpeed',cfg.referenceSpeed,'initialEgoState',[projection.station;projection.lateralPosition;heading;ego.modelState(4:6)], ...
         'initialFrenetErrorBound',radius,'longitudinalAccelerationBias',ego.longitudinalAccelerationBias, ...
         'previousInput',prior,'requiredMargin',0,'perceptionRange',ego.perceptionRange);
-    encounters = struct('key',{},'contract',{},'center',{},'radius',{},'time',{},'halfLength',{},'halfWidth',{},'nominalCenter',{});
-    for index=1:numel(observations)
-        encounters(end+1) = targetPrediction.admit(observations(index),model.stateTime,lane,cfg); %#ok<AGROW>
+    model.encounter = [];
+    if ~isempty(observation)
+        model.encounter = targetPrediction.admit(observation,model.stateTime,lane,cfg);
     end
-    model.encounters = encounters;
     model.exitMargin = Inf;
-    model.exitSteps = repmat(model.horizonSteps,numel(encounters),1);
     prediction = ltvBicycleModel.finitePredict(model,[]);
     input = reshape(prediction.referencePlan,2,[]);
     lower = [-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];

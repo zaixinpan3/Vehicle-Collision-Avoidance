@@ -1,6 +1,6 @@
 classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
     properties (TestParameter)
-        targetCount = struct('noTarget',0,'twoTargets',2)
+        hasTarget = struct('absent',false,'present',true)
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -20,7 +20,7 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
                 "localOffset",repmat([0.5;0;0;0;0;0],1,points), ...
                 "numericalRadius",1e-8*ones(6,points));
             geometric = struct("state",[0,1,0,0,0,0;0,-1,0,0,0,0], ...
-                "bound",10*ones(2,points),"source",[1;2],"normals",zeros(2,0));
+                "bound",10*ones(2,points),"source",[1;2],"normal",zeros(2,0));
             data = struct("tube",tube,"stateRadius",0.001*ones(6,points), ...
                 "geometricRows",geometric,"planCount",4);
             data = repmat(data,2,1);data(2).stateRadius = 2*data(2).stateRadius;
@@ -29,7 +29,7 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
             testCase.verifyEqual(actual,expected,AbsTol=1e-10);
         end
 
-        function nativeNodeRowsMatchTheInterpretedNodeRows(testCase,targetCount)
+        function nativeNodeRowsMatchTheInterpretedNodeRows(testCase,hasTarget)
             target = struct("center",[50;1;-10;0;0;0;pi;0],"radius",0.01*ones(8,1), ...
                 "contract",struct("jerkBound",[0.1;0.1],"yawAccelerationBound",0.01), ...
                 "halfLength",2.5,"halfWidth",1);
@@ -39,8 +39,8 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
             data = struct("frame",[2;-1;cos(0.2);sin(0.2);-sin(0.2);cos(0.2);0.2;0.01;0.02;0.003;30;35], ...
                 "pose",[2;-1;cos(.2);sin(.2);-sin(.2);cos(.2);zeros(8,1);.2;0;0;1;0;0;0;0], ...
                 "domain",zeros(7,1),"nominal",[32;0.1;0.05;10;0.1;0.02], ...
-                "targets",repmat(target,targetCount,1),"boundaries",boundary, ...
-                "settings",[2.5;1;0.4;8],"duration",0,"degree",0,"normals",zeros(2,0));
+                "target",target,"hasTarget",hasTarget,"boundaries",boundary, ...
+                "settings",[2.5;1;0.4;8],"duration",0,"degree",0,"normal",zeros(2,0));
             data = repmat(data,2,1);data(2).nominal(1) = 33;
             expected = avoidanceSafetyGeometry.cellRows(data);
             actual = avoidanceCellRowsKernelMex(data);
@@ -55,7 +55,7 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
                 avoidanceSafetyGeometry.projectRows(projection),AbsTol=1e-10);
         end
 
-        function nativeSupportsPreserveAllHalfspaceRows(testCase,targetCount)
+        function nativeSupportsPreserveAllHalfspaceRows(testCase,hasTarget)
             target = struct("center",[50;1;-10;0;0;0;pi;0],"radius",0.01*ones(8,1), ...
                 "contract",struct("jerkBound",[0.1;0.1],"yawAccelerationBound",0.01), ...
                 "halfLength",2.5,"halfWidth",1);
@@ -67,8 +67,8 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
                 "pose",[2;-1;cos(.2);sin(.2);-sin(.2);cos(.2);zeros(8,1);.2;0;0;1;0;0;0;0], ...
                 "domain",zeros(7,1), ...
                 "nominal",repmat([32;0.1;0.05;10;0.1;0.02],1,points), ...
-                "targets",repmat(target,targetCount,1),"boundaries",boundary, ...
-                "settings",[2.5;1;0.4;8],"duration",0.05,"degree",7,"normals",zeros(2,0));
+                "target",target,"hasTarget",hasTarget,"boundaries",boundary, ...
+                "settings",[2.5;1;0.4;8],"duration",0.05,"degree",7,"normal",zeros(2,0));
             data = repmat(data,2,1);
             data(2).nominal(1,:) = 33;
             expected = avoidanceSafetyGeometry.cellRows(data);

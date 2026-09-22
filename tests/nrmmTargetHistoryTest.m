@@ -57,7 +57,7 @@ classdef nrmmTargetHistoryTest < matlab.unittest.TestCase
                     "gnssPosition",egoPosition+0.04*[cos(11*time);sin(11*time)], ...
                     "radarRelativePosition",(rotation.'*(targetPosition-egoPosition) ...
                     +0.04*[sin(13*time);cos(13*time)]).');
-                history = nrmmTargetHistory("sensor",history,input,design,1);
+                history = nrmmTargetHistory("sensor",history,input,design);
             end
             enclosure = nrmmTargetHistory("enclose",history,1);
             truth = [12;2;-8;1;0;0];

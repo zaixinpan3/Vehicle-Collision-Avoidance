@@ -19,22 +19,22 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
     targetSpeed = max(estimatorCfg.observer.target.domain.speedMinimum, ...
         min(estimatorCfg.observer.target.domain.speedMaximum,0.8*speed));
     range = estimatorCfg.sensor.radar.rangeMaximum;
-    target = @(time,~) struct("targetPositionInertial",pose+(range+1-targetSpeed*time)*tangent+0.8*normal, ...
+    targetMotion = @(time,~) struct("targetPositionInertial",pose+(range+1-targetSpeed*time)*tangent+0.8*normal, ...
         "targetVelocityInertial",-targetSpeed*tangent,"targetAccelerationInertial",zeros(2,1));
     truth = @(time) struct("position",pose+speed*time*tangent,"yawAngle",yaw, ...
         "longitudinalVelocity",speed,"lateralVelocity",0,"yawRate",0);
     probeCfg = estimatorCfg;
     probeCfg.randomSeed = mod(double(estimatorCfg.randomSeed)+104729,2^32);
-    context = nrmmEstimatorControllerAdapter("initialize",probeCfg,truth(0),target);
+    context = nrmmEstimatorControllerAdapter("initialize",probeCfg,truth(0),targetMotion);
     probeCount = 24;
     probeSeconds = zeros(probeCount,1);certified = false(probeCount,1);failures = strings(probeCount,1);
     solverCalls = zeros(probeCount,1);
     for sample = 1:probeCount
         sampleTimer = tic;
         time = (sample-1)*cfg.controller.sampleTime;
-        [context,estimate,targets] = nrmmEstimatorControllerAdapter("sample",context,time,truth(time),target(time,[]));
+        [context,estimate,target] = nrmmEstimatorControllerAdapter("sample",context,time,truth(time),targetMotion(time,[]));
         try
-            [~,~,problem] = collisionAvoidanceController(estimate,targets,road,cfg,[]);
+            [~,~,problem] = collisionAvoidanceController(estimate,target,road,cfg,[]);
             certified(sample) = problem.metadata.planCertified;
             solverCalls(sample) = problem.metadata.solverCallCount;
         catch exception

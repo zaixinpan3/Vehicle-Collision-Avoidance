@@ -72,7 +72,7 @@ classdef laneGeometry
             nominal = cell(numel(tubes),1);
             curved = isfield(model.lane,'referenceCurve') && (model.lane.referenceCurve.curvature~=0 ...
                 || laneGeometry.isVaryingReference(model.lane)) ...
-                && ~isempty(model.encounters);
+                && ~isempty(model.encounter);
             if curved
                 centers=zeros(3,numel(tubes));radii=centers;
                 for index=1:numel(tubes)

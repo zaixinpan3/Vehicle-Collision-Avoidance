@@ -3,8 +3,9 @@ function [states,firstDerivatives] = nrmmObserverRk4Interval(state,measurement,d
 % Returns every accepted RK4 substep and its first derivative so that the
 % runtime can retain every error-bound update and operating-domain audit.
 % Point dynamics do not depend on the separately propagated error bounds.
-    states = zeros(numel(state),count+1);
-    firstDerivatives = zeros(numel(state),count);
+    validateattributes(state,{'double'},{'size',[15,1],'finite','real'});
+    states = zeros(15,count+1);
+    firstDerivatives = zeros(15,count);
     states(:,1) = state;
     for index = 1:count
         first = localDerivative(state,measurement,design);
@@ -23,10 +24,8 @@ function [states,firstDerivatives] = nrmmObserverRk4Interval(state,measurement,d
 end
 
 function derivative = localDerivative(state,measurement,design)
-    count = (numel(state)-7)/8;
-    targetEnd = 6+6*count;
-    targetState = reshape(state(7:targetEnd),6,count);
-    targetOutputPredictor = reshape(state(targetEnd+1:end-1),2,count);
+    targetState = state(7:12);
+    targetOutputPredictor = state(13:14);
     observerEstimate = struct("bodyVelocity",state(1:2),"position",state(3:4), ...
         "targetState",targetState);
     vectorFieldInput = struct("yawRate",measurement.yawRate,"gnssVelocity",measurement.gnssVelocity, ...

@@ -145,9 +145,9 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
             radius-radius*cos(leadTheta)];
         gap = norm(leadPosition-readout.position);
 
-        targets = struct('targetPositionInertial', {});
+        target = struct('targetPositionInertial', {});
         if gap <= perceptionRange && ~scene.noTarget
-            targets = struct( ...
+            target = struct( ...
                 'targetId', "lead", ...
                 'targetPositionInertial', leadPosition, ...
                 'targetVelocityInertial', ...
@@ -185,18 +185,18 @@ function results = arcAvoidanceScenario(duration, quiet, lightweight, cfgOverrid
             'heldActuatorInput', lastCommand);
 
         results.egoInput{stepIdx} = ego;
-        results.targetInput{stepIdx} = targets;
+        results.targetInput{stepIdx} = target;
         solveStart = tic;
         failed = false;
         try
             if lightweight
                 % Request only the command for this timing measurement.
                 command = collisionAvoidanceController( ...
-                    ego, targets, road, cfg);
+                    ego, target, road, cfg);
             else
                 [command, plan, problem] = ...
                     collisionAvoidanceController( ...
-                        ego, targets, road, cfg);
+                        ego, target, road, cfg);
                 results.plan{stepIdx} = plan;
                 md = problem.metadata;
                 results.collisionMargin(stepIdx) = md.collisionMargin;

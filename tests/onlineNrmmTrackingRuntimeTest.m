@@ -27,7 +27,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
 
     methods (Test)
         function sharedMeasurementPreservesCurrentPublicationAndEveryNextState(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             for detected = [true,false,true]
                 frame = localCruiseFrame(runtime.currentTime);
                 frame.radarDetectionAvailable = detected;
@@ -42,7 +42,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function omittedOutputPreservesEveryObserverAndBoundState(testCase)
-            initial = localRuntime(1);
+            initial = localRuntime();
             frame = localCruiseFrame(0);
             withoutPublication = onlineNrmmTrackingRuntime("step",initial,frame);
             [withPublication,~] = onlineNrmmTrackingRuntime("step",initial,frame);
@@ -50,7 +50,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function stepAdvancesOutputTimeByOneSamplePeriod(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             samplePeriod = runtime.samplePeriod;
 
             [runtime, output] = onlineNrmmTrackingRuntime( ...
@@ -69,7 +69,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(runtime.currentTime, samplePeriod, ...
                 AbsTol=1.0e-12);
             testCase.verifyEqual( ...
-                output.targetEstimates(1).estimateTime, samplePeriod, ...
+                output.targetEstimate.estimateTime, samplePeriod, ...
                 AbsTol=1.0e-12);
 
             [~, secondOutput] = onlineNrmmTrackingRuntime( ...
@@ -82,7 +82,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function outputActionLeavesRuntimeStateUntouched(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             [runtime, stepOutput] = onlineNrmmTrackingRuntime( ...
                 "step", runtime, localCruiseFrame(0.0));
             probeFrame = localCruiseFrame(runtime.samplePeriod);
@@ -100,8 +100,8 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 probeFrame.time, AbsTol=0.0);
             testCase.verifyEqual(firstProbe.egoPositionInertial, ...
                 stepOutput.egoPositionInertial, AbsTol=0.0);
-            testCase.verifyEqual(firstProbe.targetStates, ...
-                stepOutput.targetStates, AbsTol=0.0);
+            testCase.verifyEqual(firstProbe.targetState, ...
+                stepOutput.targetState, AbsTol=0.0);
             testCase.verifyEqual(secondProbe, firstProbe);
 
             [~, nextOutput] = onlineNrmmTrackingRuntime( ...
@@ -112,7 +112,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function framesMustLieOnTheSampleGrid(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             offGridFrame = localCruiseFrame(0.02);
 
             testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
@@ -131,7 +131,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function freshGyroKeepsItsSensorBoundAcrossTimestampRoundoff(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             [runtime, ~] = onlineNrmmTrackingRuntime("step", runtime, localCruiseFrame(0));
             frame = localCruiseFrame(runtime.currentTime);
             runtime.currentTime = runtime.currentTime+8*eps(max(1, runtime.currentTime));
@@ -145,7 +145,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function anAdvancedStateStillChargesActualGyroAge(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             [~, output] = onlineNrmmTrackingRuntime("step", runtime, localCruiseFrame(0));
             testCase.verifyGreaterThan(output.stateTime-output.lastGyroscopeTime, 0);
             testCase.verifyGreaterThan(output.egoYawRateErrorBound, ...
@@ -160,7 +160,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "targetInitialState"];
 
             for optionName = requiredOptionNames
-                options = rmfield(localOptions(1), optionName);
+                options = rmfield(localOptions(), optionName);
                 testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
                     "initialize", cfg, options, design), ...
                     "onlineNrmmTrackingRuntime:missingInitialState", ...
@@ -178,7 +178,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 "targetInitialState", zeros(5, 1)};
 
             for caseIdx = 1:size(invalidCases, 1)
-                options = localOptions(1);
+                options = localOptions();
                 options.(invalidCases{caseIdx, 1}) = ...
                     invalidCases{caseIdx, 2};
                 testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
@@ -188,48 +188,16 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                         + " must be rejected.");
             end
 
-            twoTargetOptions = localOptions(2);
-            twoTargetOptions.targetInitialState = ...
-                [100.0; 2.0; -12.0; 0.0; 0.0; 0.0];
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, twoTargetOptions, design), ...
-                "onlineNrmmTrackingRuntime:invalidInitialState");
-
-            fractionalCountOptions = localOptions(1);
-            fractionalCountOptions.targetCount = 1.5;
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, fractionalCountOptions, design), ...
-                "onlineNrmmTrackingRuntime:invalidOption");
         end
 
-        function multiTargetInitializationRequiresStableIdentifiers( ...
-                testCase)
-            cfg = nrmmTrackingConfig();
-            design = synthesizeNrmmObserverGains(cfg);
-            options = rmfield(localOptions(2), "targetIdentifiers");
 
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, options, design), ...
-                "onlineNrmmTrackingRuntime:missingTargetIdentifiers");
-        end
-
-        function initializationRejectsDuplicateTargetIdentifiers(testCase)
-            cfg = nrmmTrackingConfig();
-            design = synthesizeNrmmObserverGains(cfg);
-            options = localOptions(2);
-            options.targetIdentifiers = ["same"; "same"];
-
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, options, design), ...
-                "onlineNrmmTrackingRuntime:invalidTargetIdentifiers");
-        end
 
         function continuousDesignIsReusableAtDifferentSamplePeriods(testCase)
             cfg = nrmmTrackingConfig();
             design = synthesizeNrmmObserverGains(rmfield(cfg, "runtime"));
             cfg.runtime.samplePeriod = 2.0*cfg.runtime.samplePeriod;
             runtime = onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, localOptions(1), design);
+                "initialize", cfg, localOptions(), design);
             [runtime, output] = onlineNrmmTrackingRuntime( ...
                 "step", runtime, localCruiseFrame(0.0));
 
@@ -245,7 +213,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             design = synthesizeNrmmObserverGains(rmfield(cfg, "runtime"));
             cfg.runtime.integrationStepMaximum = 0.002;
             runtime = onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, localOptions(1), design);
+                "initialize", cfg, localOptions(), design);
 
             testCase.verifyEqual(runtime.observerDesign, design, AbsTol=1.0e-12);
             testCase.verifyEqual(runtime.integrationStep, 0.002, AbsTol=1.0e-14);
@@ -258,7 +226,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             cfg.runtime.samplePeriod = 0.0;
 
             testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, localOptions(1), design), ...
+                "initialize", cfg, localOptions(), design), ...
                 "MATLAB:onlineNrmmTrackingRuntime:expectedPositive");
         end
 
@@ -268,12 +236,12 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             cfg.runtime.integrationStepMaximum = Inf;
 
             testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "initialize", cfg, localOptions(1), design), ...
+                "initialize", cfg, localOptions(), design), ...
                 "MATLAB:onlineNrmmTrackingRuntime:expectedFinite");
         end
 
         function everyFrameRequiresSynchronizedRadar(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             frame = rmfield(localCruiseFrame(0.0), ...
                 "radarRelativePosition");
 
@@ -283,7 +251,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function everyFrameRequiresGnssVelocity(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             frame = rmfield(localCruiseFrame(0.0), "vyGps");
 
             testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
@@ -298,63 +266,35 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             unavailableWithFinite.radarDetectionAvailable = false;
 
             testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "step", localRuntime(1), availableWithNaN), ...
+                "step", localRuntime(), availableWithNaN), ...
                 "onlineNrmmTrackingRuntime:invalidSynchronizedRadar");
             testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "step", localRuntime(1), unavailableWithFinite), ...
+                "step", localRuntime(), unavailableWithFinite), ...
                 "onlineNrmmTrackingRuntime:invalidSynchronizedRadar");
         end
 
-        function multiTargetFrameRequiresKnownUniqueIdentifiers(testCase)
-            runtime = localRuntime(2);
-            radar = [100.0, 2.0; 80.0, -2.0];
-            missingIdentifiersFrame = localFrame(0.0, [0.0; 0.0], radar);
-            duplicateIdentifiersFrame = localFrame( ...
-                0.0, [0.0; 0.0], radar, ["same"; "same"]);
-            unknownIdentifierFrame = localFrame(0.0, [0.0; 0.0], radar, ...
-                ["test-target-1"; "not-initialized"]);
 
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "step", runtime, missingIdentifiersFrame), ...
-                "onlineNrmmTrackingRuntime:missingRadarTargetIdentifiers");
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "step", runtime, duplicateIdentifiersFrame), ...
-                "onlineNrmmTrackingRuntime:invalidRadarTargetIdentifiers");
-            testCase.verifyError(@() onlineNrmmTrackingRuntime( ...
-                "step", runtime, unknownIdentifierFrame), ...
+
+        function synchronizedRadarRetainsTheTargetIdentity(testCase)
+            runtime = localRuntime();
+            frame = localCruiseFrame(0);
+            frame.radarTargetIdentifier = "test-target";
+            [~, output] = onlineNrmmTrackingRuntime("step",runtime,frame);
+            testCase.verifyEqual(output.targetEstimate.trackId,"test-target");
+            testCase.verifySize(output.targetState,[6,1]);
+            testCase.verifyTrue(isscalar(output.targetEstimate));
+            frame.radarTargetIdentifier = "different-target";
+            testCase.verifyError(@() onlineNrmmTrackingRuntime("step",runtime,frame), ...
                 "onlineNrmmTrackingRuntime:unknownRadarTargetIdentifier");
         end
 
-        function radarIdentifiersMakeRowOrderIrrelevant(testCase)
-            radar = [100.0, 2.0; 80.0, -2.0];
-            identifiers = ["test-target-1"; "test-target-2"];
-
-            [~, canonicalOutput] = onlineNrmmTrackingRuntime( ...
-                "step", localRuntime(2), ...
-                localFrame(0.0, [0.0; 0.0], radar, identifiers));
-            [~, permutedOutput] = onlineNrmmTrackingRuntime( ...
-                "step", localRuntime(2), ...
-                localFrame(0.0, [0.0; 0.0], ...
-                    radar([2, 1], :), identifiers([2, 1])));
-
-            testCase.verifyEqual(permutedOutput.targetStates, ...
-                canonicalOutput.targetStates, AbsTol=1.0e-13);
-            testCase.verifyEqual( ...
-                string({canonicalOutput.targetEstimates.trackId}).', ...
-                identifiers);
-
-            slotOptions = rmfield(localOptions(1), "targetIdentifiers");
+        function anUnnamedTargetPublishesItsStateWithoutSyntheticIdentity(testCase)
             cfg = nrmmTrackingConfig();
-            slotRuntime = onlineNrmmTrackingRuntime("initialize", ...
-                cfg, slotOptions, synthesizeNrmmObserverGains(cfg));
-            [~, slotOutput] = onlineNrmmTrackingRuntime( ...
-                "step", slotRuntime, localCruiseFrame(0.0));
-
-            testCase.verifyFalse( ...
-                isfield(slotOutput.targetEstimates, "trackId"));
-            testCase.verifyEqual( ...
-                slotOutput.targetEstimates(1).temporarySlotIdentifier, ...
-                "target-slot-1");
+            options = rmfield(localOptions(),"targetIdentifier");
+            runtime = onlineNrmmTrackingRuntime("initialize",cfg,options);
+            output = onlineNrmmTrackingRuntime("output",runtime,localCruiseFrame(0));
+            testCase.verifyFalse(isfield(output.targetEstimate,"trackId"));
+            testCase.verifyEqual(output.targetState,options.targetInitialState);
         end
 
         function cascadedObserverConvergesOnAnalyticManeuver(testCase)
@@ -364,7 +304,6 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             scenario = localAnalyticScenario(cfg, frameCount);
             options = struct( ...
                 "initialTime", 0.0, ...
-                "targetCount", 1, ...
                 "egoInitialPosition", ...
                     scenario.egoPosition(:, 1)+[1.0; -1.0], ...
                 "egoInitialYaw", scenario.egoYaw(1)+0.1, ...
@@ -397,7 +336,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 scenario.frames(frameCount).yawRateMeasured, ...
                 "The published yaw rate is the measured gyroscope input.");
 
-            estimate = output.targetEstimates(1);
+            estimate = output.targetEstimate;
             testCase.verifyLessThan(norm(estimate.relativePosition ...
                 - scenario.targetRho(:, finalIdx)), 1.0e-3, ...
                 "The continuous radar predictor must keep rho exact.");
@@ -411,7 +350,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function runtimeCarriesNoEgoJerkState(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
 
             [runtime, output] = onlineNrmmTrackingRuntime( ...
                 "step", runtime, localCruiseFrame(0.0));
@@ -433,10 +372,10 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function radarDropoutAdvancesPurePrediction(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             [runtime, firstOutput] = onlineNrmmTrackingRuntime( ...
                 "step", runtime, localCruiseFrame(0.0));
-            priorTargetState = firstOutput.targetStates.';
+            priorTargetState = firstOutput.targetState;
             dropoutFrame = localFrame( ...
                 runtime.samplePeriod, [0.5; 0.0], [NaN, NaN]);
             dropoutFrame.radarDetectionAvailable = false;
@@ -453,7 +392,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 priorTargetState, frozenEgo, ...
                 runtime.observerDesign.target.domain, ...
                 runtime.integrationStep, runtime.integrationSubstepCount);
-            testCase.verifyEqual(output.targetStates.', ...
+            testCase.verifyEqual(output.targetState, ...
                 predictedTargetState, AbsTol=1.0e-9);
             % The floor is a closing rate times the sample period, so it
             % states the intent -- prediction is not frozen -- without
@@ -463,23 +402,23 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 10.0*runtime.samplePeriod, ...
                 "Pure prediction must still advance the target state.");
             testCase.verifyTrue( ...
-                all(isfinite(output.targetStates), "all"));
+                all(isfinite(output.targetState), "all"));
             testCase.verifyFalse(output.radarDetectionAvailable);
             testCase.verifyEqual(output.stateTime, ...
                 2.0*runtime.samplePeriod, AbsTol=1.0e-12);
             testCase.verifyEqual(output.lastRadarTime, 0.0, ...
                 "The radar timestamp stays at the last detection.");
             testCase.verifyEqual( ...
-                output.targetEstimates(1).lastRadarTime, 0.0, AbsTol=0.0);
+                output.targetEstimate.lastRadarTime, 0.0, AbsTol=0.0);
             testCase.verifyEqual( ...
-                output.targetEstimates(1).measurementTime, ...
-                output.targetEstimates(1).lastRadarTime, AbsTol=0.0);
+                output.targetEstimate.measurementTime, ...
+                output.targetEstimate.lastRadarTime, AbsTol=0.0);
         end
 
         function speedDomainAuditReportsPeakingWithoutRejection(testCase)
             cfg = nrmmTrackingConfig();
             design = synthesizeNrmmObserverGains(cfg);
-            options = localOptions(1);
+            options = localOptions();
             % Large target-velocity error: |q| starts far below the
             % certified minimum and the high-gain observer peaks.
             options.targetInitialState = ...
@@ -508,9 +447,9 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 output.targetCertifiedSpeedDomainValidThisInterval, ...
                 "The estimate must re-enter the certified speed domain.");
             testCase.verifyTrue( ...
-                output.targetEstimates(1).certifiedSpeedDomainValid);
+                output.targetEstimate.certifiedSpeedDomainValid);
             testCase.verifyEqual( ...
-                output.targetEstimates(1).targetVelocity, [-12.0; 0.0], ...
+                output.targetEstimate.targetVelocity, [-12.0; 0.0], ...
                 "The target velocity must recover.", AbsTol=0.5);
         end
 
@@ -595,7 +534,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function outputProbesUpdateCourseCertificatesWithoutChangingYaw(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             firstFrame = localConstantHeadingFrame(0.0, 0.25, 10.0);
             secondFrame = localConstantHeadingFrame(0.0, -0.2, 12.0);
 
@@ -614,7 +553,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function uninformativeCourseLeavesTheObserverDefined(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             [runtime,~] = onlineNrmmTrackingRuntime("step",runtime,localCruiseFrame(0));
             frame = localCruiseFrame(runtime.currentTime);
             frame.vxGps = 0;
@@ -628,7 +567,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function offGridFramesAreRejectedBeforeTheirCourseIsUsed(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             frame = localCruiseFrame(runtime.samplePeriod);
             frame.vxGps = 0.0;
             frame.vyGps = 0.0;
@@ -642,7 +581,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
         end
 
         function courseChannelPublishesCertifiedGeometry(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
 
             [~, output] = onlineNrmmTrackingRuntime( ...
                 "step", runtime, localCruiseFrame(0.0));
@@ -689,7 +628,6 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 * [cos(trueSideslip); sin(trueSideslip)];
             options = struct( ...
                 "initialTime", 0.0, ...
-                "targetCount", 1, ...
                 "egoInitialPosition", [0.0; 0.0], ...
                 "egoInitialYaw", trueYaw, ...
                 "egoInitialBodyVelocity", bodyVelocity, ...
@@ -724,7 +662,7 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             output = localSynchronizedTurningOutput();
             controllerCfg = collisionAvoidanceControllerConfig();
             controllerCfg.referenceSpeed = 10.0;
-            [ego, ~, ~, targets] = readPlanningInputs( ...
+            [ego, ~, ~, target] = readPlanningInputs( ...
                 output, [], localControllerRoad(output.egoPositionInertial), ...
                 controllerCfg);
 
@@ -735,63 +673,39 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(ego.modelState(6), ...
                 output.egoYawRate, AbsTol=0.0);
             testCase.verifyEqual(output.egoYawRate, 0.05, AbsTol=0.0);
-            testCase.verifyEqual(targets(1).position, ...
-                output.targetEstimates(1).targetPositionInertial, ...
+            testCase.verifyEqual(target.position, ...
+                output.targetEstimate.targetPositionInertial, ...
                 AbsTol=1.0e-12);
             testCase.verifyEqual(ego.stateErrorBound, ...
                 output.controllerErrorBound.bounds, AbsTol=0.0);
-            testCase.verifyEqual(targets(1).yaw, ...
-                output.targetEstimates(1).targetHeadingInertial, AbsTol=1.0e-12);
+            testCase.verifyEqual(target.yaw, ...
+                output.targetEstimate.targetHeadingInertial, AbsTol=1.0e-12);
         end
 
         function planningRejectsAnUnavailableOutOfDomainTargetBound(testCase)
-            runtime = localRuntime(1);
+            runtime = localRuntime();
             output = onlineNrmmTrackingRuntime("output", runtime, localCruiseFrame(0));
             cfg = collisionAvoidanceControllerConfig();
-            testCase.verifyFalse(output.targetEstimates.controllerErrorBound.available);
+            testCase.verifyFalse(output.targetEstimate.controllerErrorBound.available);
             testCase.verifyError(@() readPlanningInputs(output, [], ...
                 localControllerRoad(output.egoPositionInertial), cfg), ...
                 "collisionAvoidanceController:unavailableEstimatorBound");
         end
 
-        function multipleTargetsUseOneSynchronizedFrame(testCase)
-            runtime = localRuntime(2);
-            radar = [100.0, 2.0; 80.0, -2.0];
-            identifiers = ["test-target-1"; "test-target-2"];
-
-            [~, output] = onlineNrmmTrackingRuntime("step", runtime, ...
-                localFrame(0.0, [0.0; 0.0], radar, identifiers));
-
-            testCase.verifySize(output.targetStates, [2, 6]);
-            testCase.verifyGreaterThan(norm( ...
-                output.targetStates(1, :)-output.targetStates(2, :)), ...
-                1.0);
-        end
     end
 end
 
-function runtime = localRuntime(targetCount)
+function runtime = localRuntime()
     cfg = nrmmTrackingConfig();
     runtime = onlineNrmmTrackingRuntime( ...
-        "initialize", cfg, localOptions(targetCount), ...
+        "initialize", cfg, localOptions(), ...
         synthesizeNrmmObserverGains(cfg));
 end
 
-function options = localOptions(targetCount)
-    targetState = zeros(6, targetCount);
-    for targetIdx = 1:targetCount
-        targetState(:, targetIdx) = [100.0-20.0*(targetIdx-1); ...
-            2.0-4.0*(targetIdx-1); -12.0; 0.0; 0.0; 0.0];
-    end
-    options = struct( ...
-        "initialTime", 0.0, ...
-        "targetCount", targetCount, ...
-        "egoInitialPosition", [0.0; 0.0], ...
-        "egoInitialYaw", 0.0, ...
-        "egoInitialBodyVelocity", [10.0; 0.0], ...
-        "targetInitialState", targetState);
-    options.targetIdentifiers = ...
-        "test-target-" + string((1:targetCount).');
+function options = localOptions()
+    options = struct("initialTime",0,"egoInitialPosition",[0;0], ...
+        "egoInitialYaw",0,"egoInitialBodyVelocity",[10;0], ...
+        "targetInitialState",[100;2;-12;0;0;0],"targetIdentifier","test-target");
 end
 
 function output = localSynchronizedTurningOutput()
@@ -802,7 +716,7 @@ function output = localSynchronizedTurningOutput()
     yawRate = 0.05;
     sideslip = asin(cfg.ego.yaw.rearAxleDistance*yawRate/speed);
     velocity = speed*[cos(sideslip); sin(sideslip)];
-    options = localOptions(1);
+    options = localOptions();
     options.egoInitialBodyVelocity = velocity;
     options.targetInitialState = [30; 2; 8; 0; 0; 0];
     runtime = onlineNrmmTrackingRuntime("initialize", cfg, options);
@@ -827,7 +741,6 @@ function options = localHeadingOptions(initialYaw, speed)
 % Heading-test options: a co-moving target keeps |q| in the domain.
     options = struct( ...
         "initialTime", 0.0, ...
-        "targetCount", 1, ...
         "egoInitialPosition", [0.0; 0.0], ...
         "egoInitialYaw", initialYaw, ...
         "egoInitialBodyVelocity", [speed; 0.0], ...
@@ -835,7 +748,7 @@ function options = localHeadingOptions(initialYaw, speed)
 end
 
 function frame = localFrame( ...
-        time, gpsPosition, radarPosition, radarTargetIdentifiers)
+        time, gpsPosition, radarPosition, radarTargetIdentifier)
     frame = struct( ...
         "time", time, ...
         "xGps", gpsPosition(1), ...
@@ -847,7 +760,7 @@ function frame = localFrame( ...
         "yawRateMeasured", 0.0, ...
         "radarRelativePosition", radarPosition);
     if nargin >= 4
-        frame.radarTargetIdentifiers = radarTargetIdentifiers;
+        frame.radarTargetIdentifier = radarTargetIdentifier;
     end
 end
 

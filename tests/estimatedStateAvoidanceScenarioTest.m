@@ -312,7 +312,7 @@ classdef estimatedStateAvoidanceScenarioTest < matlab.unittest.TestCase
             testCase.verifyTrue(visibleEgo.targetEstimatePublished);
             testCase.verifyFalse(hiddenFrame.radarDetectionAvailable);
             testCase.verifyEmpty(hiddenTarget);
-            testCase.verifyEmpty(hiddenEgo.targetEstimates);
+            testCase.verifyEmpty(hiddenEgo.targetEstimate);
             testCase.verifyTrue(hiddenEgo.targetTrackAcquired);
             testCase.verifyFalse(hiddenEgo.targetEstimatePublished);
             testCase.verifyEqual( ...

@@ -374,7 +374,7 @@ These necessary checks do not verify every premise on the unknown true motion.
 
 ### 5.6 Interface for subsequent collision-avoidance control
 
-`output.targetEstimates(i).relativePositionErrorBound` is a scalar Euclidean
+`output.targetEstimate.relativePositionErrorBound` is a scalar Euclidean
 radius in the ego body frame at `stateTime`. The accompanying `positionErrorBound`
 structure carries `time`, `frame`, `available`, `reason`, and scope flags.
 The runtime's `step` consumes the sample at `t` and publishes the radius for the
@@ -385,7 +385,7 @@ rejected. The adapter passes these fields through with the raw target estimate.
 
 ```matlab
 [runtime, output] = onlineNrmmTrackingRuntime('step', runtime, frame);
-track = output.targetEstimates(1);
+track = output.targetEstimate;
 radiusM = track.relativePositionErrorBound;
 boundTime = track.positionErrorBound.time; % equals track.stateTime
 usableUnderDeclaredAssumptions = track.positionErrorBound.available;
