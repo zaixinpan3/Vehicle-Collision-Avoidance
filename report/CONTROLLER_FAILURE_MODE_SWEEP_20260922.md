@@ -6,9 +6,13 @@ certificate search limit 30 s), so a run ends only when the controller raises an
 error or the sample count is exhausted. Measured outcomes only; nothing here is a
 proof, a worst-case bound or a real-time claim.
 
-Environment: MATLAB R2026a Update 3, `matlab -batch`, repository `main` at
-`0affcf08c8f4b6cd999cbddd5b6eb2f1d666f831` plus the sweep script added with this
-report. Plant: the declared held affine flow of
+Environment: MATLAB R2026a Update 3, `matlab -batch`. The recorded run used the
+working tree at `6e75be9` ("Restrict VFFM initialization to one obstacle
+vehicle", committed by a concurrent session while this sweep was being
+prepared) plus the sweep script added with this report; the exploratory run
+preceding it started on `0affcf08c8f4b6cd999cbddd5b6eb2f1d666f831`. Every case
+here carries zero or one target, which that intervening change leaves
+unaffected, and the two runs agree case for case. Plant: the declared held affine flow of
 `runExactStateRecursiveFeasibilityScenario` (the plant is the controller's own
 model; ego 8 m/s, 0.05 s holds, 1.6 s nominal horizon, 240 holds, seed 20260912,
 `lateralDomainRadius = 4`). Two unrelated MATLAB desktop sessions belonging to
