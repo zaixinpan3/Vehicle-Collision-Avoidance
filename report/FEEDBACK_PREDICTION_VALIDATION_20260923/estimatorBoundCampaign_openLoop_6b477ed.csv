@@ -1,0 +1,9 @@
+scenario,curvature,completed,passed,executedHolds,failureIdentifier,failureMessage,minNodeGap,minSampledGap,minTerminalMargin,maxClfResidual,maxFrameMs
+stationary,0,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,876.281
+oncoming,0,1,1,240,,"",0.056441695456201,0.0463873337927961,1.70865298749329e-05,-0.00124865734564224,91.604
+crossing,0,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,26.606
+cruise,0,1,1,240,,"",Inf,Inf,1.70865298749329e-05,-0.000884273996342546,21.521
+stationary,0.01,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,97.068
+oncoming,0.01,1,1,240,,"",0.239214209647965,0.228828517939471,1.6102151584152e-05,-0.0219780091999925,50.863
+crossing,0.01,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,52.952
+cruise,0.01,1,1,240,,"",Inf,Inf,1.83805877772957e-05,-0.0217412044282119,9.934

@@ -1,0 +1,13 @@
+Case 48 (oncoming, curvature 0.01 /m, uncertainty x10), commit 6c244dd, failing frame rebuilt with a scratch model capture.
+CASE48 failing frame t=3.00 horizon 64
+CASE48 feedback=1 max reserved steering 0.0921 rad braking 0.1923; max slew reserve steering 0.1052 braking 0.2667
+CASE48   feedback=1 full                   status 2
+CASE48   feedback=1 no actuator amplitude  status 1
+CASE48   feedback=1 no slew                status 2
+CASE48   feedback=1 no actuator and slew   status 1
+CASE48 feedback=0 max reserved steering 0.0000 rad braking 0.0000; max slew reserve steering 0.0000 braking 0.0000
+CASE48   feedback=0 full                   status 1
+CASE48   feedback=0 no actuator amplitude  status 1
+CASE48   feedback=0 no slew                status 1
+CASE48   feedback=0 no actuator and slew   status 1
+(Clarabel status 1 = solved, 2 = primal infeasible)
