@@ -1,0 +1,13 @@
+case,stateTimeSeconds,horizonSeconds,feasibleSubsets,totalSubsets,minimalRelaxations
+ref-stationary-k0.01-pass,0.00,4.80,32,32,(none)
+27 crossing k-0.02,0.00,5.60,24,32,poseDomain | collision
+39 stationary k0 unc10,0.00,4.80,4,8,terminalCone
+42 stationary k0.01 unc10,0.00,4.80,8,32,exit+terminalCone+poseDomain | terminalCone+terminalPoseDomain+poseDomain | exit+terminalCone+collision
+48 oncoming k0.01 unc10,2.60,3.20,24,32,poseDomain | collision
+53 crossing k0.01 unc3,0.00,4.80,24,32,poseDomain | collision
+54 crossing k0.01 unc10,0.00,4.80,8,32,terminalCone+collision
+94 stationary k0.01 lat2,0.00,4.80,24,32,poseDomain | collision
+96 stationary k0.01 hdg0.1,0.00,4.80,24,32,poseDomain | collision
+97 stationary k0.01 hdg0.2,0.00,4.80,20,32,terminalCone | terminalPoseDomain+poseDomain
+98 stationary k0.01 hdg0.3,0.00,4.80,20,32,terminalCone | terminalPoseDomain+poseDomain
+99 stationary k0.01 spd-2,0.00,4.80,20,32,exit | terminalPoseDomain+poseDomain

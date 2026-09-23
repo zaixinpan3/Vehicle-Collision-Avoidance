@@ -1,0 +1,12 @@
+diff --git a/controller/collisionAvoidanceController.m b/controller/collisionAvoidanceController.m
+index 9b35f20..21ad009 100644
+--- a/controller/collisionAvoidanceController.m
++++ b/controller/collisionAvoidanceController.m
+@@ -50,6 +50,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
+         error('collisionAvoidanceController:referencePhaseOutsideDomain', ...
+             'The measured station is outside the declared scheduled-model phase domain.');
+     end
++    setappdata(0,'diagnosticFrame',struct('model',model,'cfg',cfg)); % scratch diagnostic only
+     preparationSeconds = toc(timer);
+     solverCfg=cfg;solverCfg.solver.workTimer=timer;
+     solverCfg.solver.workTimeLimit=min(cfg.solver.frameDeadlineSeconds,cfg.solver.certificateSearchTimeLimit);

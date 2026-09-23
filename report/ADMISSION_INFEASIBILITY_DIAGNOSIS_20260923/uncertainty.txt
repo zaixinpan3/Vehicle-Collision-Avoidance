@@ -1,0 +1,12 @@
+stationary: 0/1 holds; body gap Inf m; road NaN m; max frame 918.691 ms
+UNC 39 stationary k0 unc10         horizon 4.80 s | terminal box lateral 0.516 m heading 0.0107 rad | best-case terminal margin -0.0296 | target position uncertainty radius first 2.26 m max 17.57 m
+stationary: 0/1 holds; body gap Inf m; road NaN m; max frame 132.809 ms
+UNC 42 stationary k0.01 unc10      horizon 4.80 s | terminal box lateral 0.737 m heading 0.0186 rad | best-case terminal margin -0.1570 | target position uncertainty radius first 2.46 m max 18.18 m
+crossing: 0/1 holds; body gap Inf m; road NaN m; max frame 130.152 ms
+UNC 53 crossing k0.01 unc3         horizon 4.80 s | terminal box lateral 0.221 m heading 0.0056 rad | best-case terminal margin 0.0745 | target position uncertainty radius first 0.81 m max 5.52 m
+crossing: 0/1 holds; body gap Inf m; road NaN m; max frame 51.152 ms
+UNC 54 crossing k0.01 unc10        horizon 4.80 s | terminal box lateral 0.737 m heading 0.0186 rad | best-case terminal margin -0.1570 | target position uncertainty radius first 2.46 m max 18.18 m
+crossing: 1/1 holds; body gap 12.2933 m; road NaN m; max frame 120.463 ms
+UNC crossing k0.01 unc1 (passes)   horizon 4.80 s | terminal box lateral 0.074 m heading 0.0019 rad | best-case terminal margin 0.1406 | target position uncertainty radius first 0.34 m max 1.91 m
+stationary: 1/1 holds; body gap 9.79828 m; road NaN m; max frame 83.817 ms
+UNC stationary k0 unc3 (passes)    horizon 4.80 s | terminal box lateral 0.155 m heading 0.0032 rad | best-case terminal margin 0.1188 | target position uncertainty radius first 0.68 m max 5.27 m

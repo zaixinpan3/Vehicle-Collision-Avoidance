@@ -1,0 +1,105 @@
+stationary: 1/1 holds; body gap 9.6511 m; road NaN m; max frame 824.311 ms
+
+=== ref-stationary-k0.01-pass (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 32 of 32
+  minimal relaxations:
+    - (none)
+  error bound initial [0         0         0         0         0         0] terminal [0         0         0         0         0         0]
+crossing: 0/240 holds; body gap Inf m; road NaN m; max frame 131.135 ms
+27 crossing k-0.02: harness error collisionAvoidanceController:optimizationFailed
+
+=== 27 crossing k-0.02 (t=0.00 s, horizon 5.60 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 24 of 32
+  minimal relaxations:
+    - poseDomain
+    - collision
+  error bound initial [0         0         0         0         0         0] terminal [0         0         0         0         0         0]
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 174.324 ms
+39 stationary k0 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 39 stationary k0 unc10 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, collision)
+  feasible subsets 4 of 8
+  minimal relaxations:
+    - terminalCone
+  error bound initial [0.1       0.1      0.01       0.1       0.1      0.01] terminal [0.576     0.516    0.0107    0.0981  1.06e-31  9.81e-33]
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 65.468 ms
+42 stationary k0.01 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 42 stationary k0.01 unc10 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 8 of 32
+  minimal relaxations:
+    - exit+terminalCone+poseDomain
+    - terminalCone+terminalPoseDomain+poseDomain
+    - exit+terminalCone+collision
+  error bound initial [0.142     0.141    0.0114       0.1       0.1      0.01] terminal [0.789     0.737    0.0186       0.1  0.000391  0.000954]
+oncoming: 52/240 holds; body gap 14.0186 m; road NaN m; max frame 58.491 ms
+48 oncoming k0.01 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 48 oncoming k0.01 unc10 (t=2.60 s, horizon 3.20 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 24 of 32
+  minimal relaxations:
+    - poseDomain
+    - collision
+  error bound initial [0.0424    0.0603   0.00165   0.00213  8.59e-06  2.08e-05] terminal [0.0702     0.106   0.00192    0.0021  8.19e-06     2e-05]
+crossing: 0/240 holds; body gap Inf m; road NaN m; max frame 53.297 ms
+53 crossing k0.01 unc3: harness error collisionAvoidanceController:optimizationFailed
+
+=== 53 crossing k0.01 unc3 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 24 of 32
+  minimal relaxations:
+    - poseDomain
+    - collision
+  error bound initial [0.0424    0.0424   0.00342      0.03      0.03     0.003] terminal [0.237     0.221   0.00559      0.03  0.000117  0.000286]
+crossing: 0/240 holds; body gap Inf m; road NaN m; max frame 40.974 ms
+54 crossing k0.01 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 54 crossing k0.01 unc10 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 8 of 32
+  minimal relaxations:
+    - terminalCone+collision
+  error bound initial [0.142     0.141    0.0114       0.1       0.1      0.01] terminal [0.789     0.737    0.0186       0.1  0.000391  0.000954]
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 45.711 ms
+94 stationary k0.01 lat2: harness error collisionAvoidanceController:optimizationFailed
+
+=== 94 stationary k0.01 lat2 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 24 of 32
+  minimal relaxations:
+    - poseDomain
+    - collision
+  error bound initial [0         0         0         0         0         0] terminal [0         0         0         0         0         0]
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 43.116 ms
+96 stationary k0.01 hdg0.1: harness error collisionAvoidanceController:optimizationFailed
+
+=== 96 stationary k0.01 hdg0.1 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 24 of 32
+  minimal relaxations:
+    - poseDomain
+    - collision
+  error bound initial [0         0         0         0         0         0] terminal [0         0         0         0         0         0]
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 39.675 ms
+97 stationary k0.01 hdg0.2: harness error collisionAvoidanceController:optimizationFailed
+
+=== 97 stationary k0.01 hdg0.2 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 20 of 32
+  minimal relaxations:
+    - terminalCone
+    - terminalPoseDomain+poseDomain
+  error bound initial [0         0         0         0         0         0] terminal [0         0         0         0         0         0]
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 36.674 ms
+98 stationary k0.01 hdg0.3: harness error collisionAvoidanceController:optimizationFailed
+
+=== 98 stationary k0.01 hdg0.3 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 20 of 32
+  minimal relaxations:
+    - terminalCone
+    - terminalPoseDomain+poseDomain
+  error bound initial [0         0         0         0         0         0] terminal [0         0         0         0         0         0]
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 48.757 ms
+99 stationary k0.01 spd-2: harness error collisionAvoidanceController:optimizationFailed
+
+=== 99 stationary k0.01 spd-2 (t=0.00 s, horizon 4.80 s, groups present: exit, terminalCone, terminalPoseDomain, poseDomain, collision)
+  feasible subsets 20 of 32
+  minimal relaxations:
+    - exit
+    - terminalPoseDomain+poseDomain
+  error bound initial [0         0         0         0         0         0] terminal [0         0         0         0         0         0]

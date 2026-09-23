@@ -1,0 +1,196 @@
+stationary: 1/1 holds; body gap 9.6511 m; road NaN m; max frame 826.654 ms
+
+=== ref-stationary-k0.01-pass (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude -2.100 m)
+  baseline             status 1 FEASIBLE
+  noExit               status 1 FEASIBLE
+  noTerminalCone       status 1 FEASIBLE
+  noTerminalRows       status 1 FEASIBLE
+  noTerminalAtAll      status 1 FEASIBLE
+  noChartDomain        status 1 FEASIBLE
+  noSlew               status 1 FEASIBLE
+  noActuatorAmplitude  status 1 FEASIBLE
+  noCollision          status 1 FEASIBLE
+  otherSide            status 1 FEASIBLE (amplitude 2.100 m)
+  longerHorizon        status 1 FEASIBLE (128 steps)
+  redirected           status 1 FEASIBLE
+  collision-only plan: max collision residual -7.57e-05, exit shortfall -5.973 m, terminal modal margin 0.1049, terminal row margin 0.4856, max |lateral| 2.24 m
+crossing: 0/240 holds; body gap Inf m; road NaN m; max frame 122.116 ms
+27 crossing k-0.02: harness error collisionAvoidanceController:optimizationFailed
+
+=== 27 crossing k-0.02 (t=0.00 s, horizon 112 steps = 5.60 s, init candidate, amplitude 3.650 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 2 infeasible
+  noChartDomain        status 1 FEASIBLE
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 1 FEASIBLE
+  otherSide            status 1 FEASIBLE (amplitude -3.450 m)
+  longerHorizon        status 2 infeasible (144 steps)
+  redirected           status NaN infeasible
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 126.379 ms
+39 stationary k0 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 39 stationary k0 unc10 (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude -2.701 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 1 FEASIBLE
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 1 FEASIBLE
+  noChartDomain        status 2 infeasible
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 2 infeasible
+  otherSide            status 2 infeasible (amplitude 1.901 m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status 2 infeasible
+  collision-only plan: max collision residual -0.000147, exit shortfall -2.394 m, terminal modal margin -0.2440, terminal row margin , max |lateral| 6.58 m
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 56.571 ms
+42 stationary k0.01 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 42 stationary k0.01 unc10 (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude -2.732 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 2 infeasible
+  noChartDomain        status 2 infeasible
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 2 infeasible
+  otherSide            status 2 infeasible (amplitude 1.871 m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status NaN infeasible
+oncoming: 52/240 holds; body gap 14.0186 m; road NaN m; max frame 61.276 ms
+48 oncoming k0.01 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 48 oncoming k0.01 unc10 (t=2.60 s, horizon 64 steps = 3.20 s, init candidate, amplitude 1.579 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 2 infeasible
+  noChartDomain        status 1 FEASIBLE
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 1 FEASIBLE
+  otherSide            status 2 infeasible (amplitude -2.883 m)
+  longerHorizon        status 2 infeasible (96 steps)
+  redirected           status NaN infeasible
+crossing: 0/240 holds; body gap Inf m; road NaN m; max frame 50.722 ms
+53 crossing k0.01 unc3: harness error collisionAvoidanceController:optimizationFailed
+
+=== 53 crossing k0.01 unc3 (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude -3.387 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 2 infeasible
+  noChartDomain        status 1 FEASIBLE
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 1 FEASIBLE
+  otherSide            status 2 infeasible (amplitude 3.761 m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status NaN infeasible
+crossing: 0/240 holds; body gap Inf m; road NaN m; max frame 40.484 ms
+54 crossing k0.01 unc10: harness error collisionAvoidanceController:optimizationFailed
+
+=== 54 crossing k0.01 unc10 (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude -3.153 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 2 infeasible
+  noChartDomain        status 2 infeasible
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 2 infeasible
+  otherSide            status 2 infeasible (amplitude 4.092 m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status NaN infeasible
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 47.987 ms
+94 stationary k0.01 lat2: harness error collisionAvoidanceController:optimizationFailed
+
+=== 94 stationary k0.01 lat2 (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude 2.100 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 2 infeasible
+  noChartDomain        status 1 FEASIBLE
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 1 FEASIBLE
+  otherSide            status 2 infeasible (amplitude -2.100 m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status NaN infeasible
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 42.642 ms
+96 stationary k0.01 hdg0.1: harness error collisionAvoidanceController:optimizationFailed
+
+=== 96 stationary k0.01 hdg0.1 (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude -2.100 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 2 infeasible
+  noChartDomain        status 1 FEASIBLE
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 1 FEASIBLE
+  otherSide            status 2 infeasible (amplitude 2.100 m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status NaN infeasible
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 42.843 ms
+97 stationary k0.01 hdg0.2: harness error collisionAvoidanceController:optimizationFailed
+
+=== 97 stationary k0.01 hdg0.2 (t=0.00 s, horizon 96 steps = 4.80 s, init nominal, amplitude 0.000 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 1 FEASIBLE
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 1 FEASIBLE
+  noChartDomain        status 2 infeasible
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 2 infeasible
+  otherSide            status NaN infeasible (amplitude NaN m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status 2 infeasible
+  collision-only plan: max collision residual -0.000104, exit shortfall -4.477 m, terminal modal margin -2.2701, terminal row margin 0.0000, max |lateral| 3.49 m
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 36.110 ms
+98 stationary k0.01 hdg0.3: harness error collisionAvoidanceController:optimizationFailed
+
+=== 98 stationary k0.01 hdg0.3 (t=0.00 s, horizon 96 steps = 4.80 s, init nominal, amplitude 0.000 m)
+  baseline             status 2 infeasible
+  noExit               status 2 infeasible
+  noTerminalCone       status 1 FEASIBLE
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 1 FEASIBLE
+  noChartDomain        status 2 infeasible
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 2 infeasible
+  otherSide            status NaN infeasible (amplitude NaN m)
+  longerHorizon        status 2 infeasible (128 steps)
+  redirected           status 2 infeasible
+  collision-only plan: max collision residual -0.0066, exit shortfall -4.943 m, terminal modal margin -6.8147, terminal row margin -0.0000, max |lateral| 7.24 m
+stationary: 0/240 holds; body gap Inf m; road NaN m; max frame 45.041 ms
+99 stationary k0.01 spd-2: harness error collisionAvoidanceController:optimizationFailed
+
+=== 99 stationary k0.01 spd-2 (t=0.00 s, horizon 96 steps = 4.80 s, init candidate, amplitude -2.100 m)
+  baseline             status 2 infeasible
+  noExit               status 1 FEASIBLE
+  noTerminalCone       status 2 infeasible
+  noTerminalRows       status 2 infeasible
+  noTerminalAtAll      status 1 FEASIBLE
+  noChartDomain        status 2 infeasible
+  noSlew               status 2 infeasible
+  noActuatorAmplitude  status 2 infeasible
+  noCollision          status 2 infeasible
+  otherSide            status 2 infeasible (amplitude 2.100 m)
+  longerHorizon        status 1 FEASIBLE (128 steps)
+  redirected           status 2 infeasible
+  collision-only plan: max collision residual -7.33e-05, exit shortfall 2.581 m, terminal modal margin -0.7692, terminal row margin 0.0000, max |lateral| 2.20 m
