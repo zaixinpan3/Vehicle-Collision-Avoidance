@@ -1,0 +1,10 @@
+Case 96 (stationary target, curvature 0.01 /m, initial heading error 0.1 rad), commit 09f29f6.
+Accepted plans rebuilt with the controller's own formulation and solver at the listed frame times.
+"box excess" = largest amount by which a planned node leaves the former chart box (seed pose +- poseTrustRadius plus uncertainty radius).
+"chart error / allowance" = |exact Cartesian position - affine chart position| divided by the charged chart remainder, maximum over nodes.
+
+CHART t=0.00 horizon 96 | max box excess 9.811 | max chart error / allowance 7.979
+CHART t=0.05 horizon 95 | max box excess 9.885 | max chart error / allowance 8.065
+CHART t=0.20 horizon 92 | max box excess 9.977 | max chart error / allowance 8.171
+CHART t=0.45 horizon 87 | max box excess 9.979 | max chart error / allowance 8.173
+CHART t=0.95 horizon 77 | max box excess 10.177 | max chart error / allowance 8.407
