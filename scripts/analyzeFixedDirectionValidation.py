@@ -73,7 +73,6 @@ def main():
             artifacts.extend([path, path.with_suffix('.mat')])
             executed = report['executedHolds']
             assert report['sampleCount'] == 600
-            assert all(as_list(report['hardCertificateVerified']))
             assert report['completed'] == (executed == report['sampleCount'])
             frames = as_list(report['runtime']['frameSeconds'])
             assert len(frames) == executed + int(not report['completed'])

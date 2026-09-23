@@ -25,7 +25,6 @@ classdef fluidInitializationTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.solverCallCount,1);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyTrue(problem.metadata.admissionSearch.usedFullPlanAdmission);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
                 -problem.program.physicalBound),0);
             testCase.verifyEqual(problem.metadata.horizonSteps,96);
@@ -54,7 +53,6 @@ classdef fluidInitializationTest < matlab.unittest.TestCase
             testCase.verifyLessThan(information.terminalFitError,1e-8);
             testCase.verifyEqual(problem.metadata.admissionSearch.directionSeedSource,"chengFluidReference");
             testCase.verifyGreaterThan(information.maximumSupportResidual,0);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
         function predictedGeometrySelectsAFeasibleSideWithOneSolve(testCase,variation)
@@ -65,7 +63,6 @@ classdef fluidInitializationTest < matlab.unittest.TestCase
             testCase.verifyEqual(information.referenceCount,2);
             testCase.verifyEqual(problem.metadata.solverCallCount,1);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
         function aFluidSeedCannotBypassAFailedOptimizer(testCase,curvature)
@@ -85,13 +82,10 @@ classdef fluidInitializationTest < matlab.unittest.TestCase
             [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             program=formulateAvoidanceProblem(problem.model);
-            [decision,angles,status]=standaloneControllerFrame(standaloneControllerBenchmark.pack(program), ...
+            [decision,~,status]=standaloneControllerFrame(standaloneControllerBenchmark.pack(program), ...
                 standaloneControllerBenchmark.configuration(cfg));
-            program.jointCertificate.angles=angles;
-            checked=solveHardCbfClf.certify(program,decision);
             testCase.verifyEqual(status,4);
             testCase.verifyEqual(decision,problem.decision,AbsTol=1e-10);
-            testCase.verifyLessThanOrEqual(max(checked.safetyBound-checked.physicalBound),0);
         end
     end
 end

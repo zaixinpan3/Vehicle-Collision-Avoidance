@@ -57,17 +57,9 @@ function summary=analyzeChengFluidInitialization(directory,options)
                 accepted=false;message=solve.message;decision=[];
                 maximumSupport=NaN;maximumPhysical=NaN;
                 if solve.feasible
-                    decision=solve.decision(1:numel(program.q));checked=program;
-                    checked.jointCertificate.angles=angles;
-                    try
-                        checked=solveHardCbfClf.certify(checked,decision);accepted=true;
-                        assert(isequal(checked.jointCertificate.angles,angles));
-                        maximumSupport=max(avoidanceSafetyGeometry.jointResidual(checked,decision,angles));
-                        maximumPhysical=max(checked.physicalMatrix*decision-checked.physicalBound);
-                    catch exception
-                        if ~strcmp(exception.identifier,'collisionAvoidanceController:optimizationFailed'),rethrow(exception);end
-                        message=string(exception.message);
-                    end
+                    decision=solve.decision(1:numel(program.q));accepted=true;
+                    maximumSupport=max(avoidanceSafetyGeometry.jointResidual(program,decision,angles));
+                    maximumPhysical=max(program.physicalMatrix*decision-program.physicalBound);
                 end
                 item=struct('curvature',curvature,'side',side,'amplitudeMeters',amplitude, ...
                     'widthMeters',actualWidth,'widthScale',widthScale,'centerStationMeters',station, ...

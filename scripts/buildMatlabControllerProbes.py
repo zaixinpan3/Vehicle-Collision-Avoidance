@@ -20,9 +20,9 @@ TARGETS = {
     'ltvBicycleModel.m': ['sampledCruise', 'finitePredict'],
     'laneGeometry.m': ['sweptCellFrames', 'normalRoadChart'],
     'targetPrediction.m': ['nominalFlow'],
-    'avoidanceSafetyGeometry.m': ['build', 'supportNormals', 'jointProgram', 'certifyJoint', 'jointResidual'],
+    'avoidanceSafetyGeometry.m': ['build', 'supportNormals', 'jointProgram', 'jointResidual'],
     'avoidanceStageQp.m': ['fixedDirections', 'build', 'localDomainCertificate'],
-    'solveHardCbfClf.m': ['certify', 'inspect', 'prepareFluidReference', 'localPrepareFluidReference',
+    'solveHardCbfClf.m': ['prepareFluidReference', 'localPrepareFluidReference',
                         'vffmReference', 'localTimeDependentReference', 'fluidInitialize', 'localFluidInitialize', 'localFixedDirectionSearch',
                         'localFitFluidReference', 'localDefaultSolve', 'localReducedProgram'],
 }

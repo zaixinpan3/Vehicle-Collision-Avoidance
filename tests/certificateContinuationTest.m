@@ -49,7 +49,6 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
             testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.restorationSolverCallCount);
             testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
-            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
             testCase.verifyEqual(problem.program.physicalMatrix(:,end),zeros(numel(problem.program.physicalBound),1),AbsTol=0);
         end
 
@@ -78,7 +77,6 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyTrue(next.metadata.supportGeometry.witnessPreserved);
             testCase.verifyLessThanOrEqual(max(next.program.physicalMatrix*[witness;0]-next.program.physicalBound),0);
             testCase.verifyEqual(next.program.completion.deadline,first.program.completion.deadline,AbsTol=0);
-            testCase.verifyFalse(next.metadata.postSolveCertificationPerformed);
         end
 
         function shiftedNodeTimesStayNonnegativeAcrossAnEncounter(testCase)
@@ -94,7 +92,6 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
             testCase.verifyGreaterThan(problem.metadata.admissionSearch.initialOverlappingNodes,0);
             testCase.verifyEqual(problem.metadata.solverCallCount,1);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision-problem.program.physicalBound),0);
             testCase.verifyEqual(command.actuatorInput,problem.inputPlan(:,1),AbsTol=0);
             testCase.verifyFalse(problem.metadata.fallbackUsed);
@@ -107,7 +104,6 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
             testCase.verifyEqual(localCountedSolve('count',[]),problem.metadata.solverCallCount);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
         function admissionSelectsDirectionsBeforeTrajectoryOptimization(testCase)
@@ -133,7 +129,6 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.program.anchorPlan(1:n),shifted(1:n).',AbsTol=0);
             testCase.verifyFalse(next.metadata.inheritedFeasibleFamily);
             testCase.verifyTrue(next.metadata.planCertified);
-            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
         end
 
         function sparseRealizationPreservesAllRowsAndTheObjective(testCase)

@@ -89,7 +89,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     supportGeometry=cell(1,count);admissionSearch=cell(1,count);runtimeBreakdown=cell(1,count);trajectoryCalls=zeros(1,count);restorationCalls=zeros(1,count);
     horizons=zeros(1,count);inherited=false(1,count);releases=false(1,count);terminalCommands=false(1,count);
     terminalOptimizations=false(1,count);replacements=false(1,count);approximate=false(1,count);
-    verified=false(1,count);recursive=false(1,count);
+    recursive=false(1,count);
     inheritedViolation=nan(1,count);terminalMargin=nan(1,count);
     jointViolation=nan(1,count);shiftedJointViolation=nan(1,count);minimumNodeSeparation=inf;
     clfResidual=nan(1,count);clfValue=nan(1,count);cbfRows=zeros(1,count);
@@ -125,10 +125,10 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         terminalOptimizations(sample)=metadata.terminalInvariantOptimization;
         replacements(sample)=metadata.freshProblemContainsWitness;
         approximate(sample)=metadata.approximateSolveAccepted;
-        verified(sample)=metadata.postSolveCertificationPerformed;
         recursive(sample)=metadata.recursiveFeasibilityGuaranteed;
         if isfield(problem.program,'jointCertificate')
-            jointViolation(sample)=max(metadata.jointCertificateResidual);
+            jointViolation(sample)=max(avoidanceSafetyGeometry.jointResidual( ...
+                problem.program,problem.decision,problem.program.jointCertificate.angles));
         end
         % Offline audits do not authorize or reject a command.
         if inherited(sample)
@@ -196,7 +196,6 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         'confirmedRelease',releases(1:executed),'terminalCommands',terminalCommands(1:executed), ...
         'terminalInvariantOptimization',terminalOptimizations(1:executed), ...
         'verifiedReplacement',replacements(1:executed),'approximateSolveAccepted',approximate(1:executed), ...
-        'hardCertificateVerified',verified(1:executed), ...
         'inheritedWitnessViolation',inheritedViolation(1:executed),'terminalMembershipMargin',terminalMargin(1:executed), ...
         'jointSeparationViolation',jointViolation(1:executed),'shiftedJointSeparationViolation',shiftedJointViolation(1:executed), ...
         'minimumNodeSeparationMargin',minimumNodeSeparation, ...

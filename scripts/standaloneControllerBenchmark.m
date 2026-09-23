@@ -112,7 +112,7 @@ classdef standaloneControllerBenchmark
 
         function [program,result,search]=nativeJoint(program,~,cfg)
             % Experimental integration only: the unchanged MATLAB driver
-            % still prepares, transfers and finally verifies the certificate.
+            % still prepares and transfers the certificate.
             assert(isempty(cfg.solver.jointFunction),'The native benchmark cannot execute a MATLAB solver hook.');
             start=tic;initialAngles=program.jointCertificate.angles;
             [decision,angles,status,metrics]=standaloneControllerFrameMex( ...
@@ -130,8 +130,7 @@ classdef standaloneControllerBenchmark
                 'exitFlag',double(status>0),'message',"Generated numerical kernel status "+string(status), ...
                 'output',struct());
             if status<=0,return;end
-            program.jointCertificate.angles=angles;
-            program=solveHardCbfClf.certify(program,decision);
+            program=avoidanceSafetyGeometry.setDirections(program,angles);
             program.supportGeometry.witnessPreserved=program.inheritedPredictionFamily;
             program.inheritedFeasibleFamily=program.inheritedPredictionFamily;
         end

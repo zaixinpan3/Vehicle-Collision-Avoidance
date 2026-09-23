@@ -25,8 +25,8 @@ Do not move controller helpers into those directories to evade the limit.
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse base transcription (`build`) and fixed-direction support majorants (`fixedDirections`) |
-| `solveHardCbfClf.m` | Convex base solving (`constrained`), fixed-direction admission/continuation (`fixedDirections`) and the carried-witness hard-safety check (`certify`); solver success is accepted without a post-solve recheck |
-| `avoidanceSafetyGeometry.m` | Joint occupied-set records, support functions, exact residuals, certification and direction storage (`setDirections`); chart construction, signed-distance initialization and offline geometry kernels |
+| `solveHardCbfClf.m` | Convex base solving (`constrained`) and fixed-direction admission/continuation (`fixedDirections`); solver success is accepted with no post-solve verification |
+| `avoidanceSafetyGeometry.m` | Joint occupied-set records, support functions, exact residuals and direction storage (`setDirections`); chart construction, signed-distance initialization and offline geometry kernels |
 | `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and certified local chart bounds |
 | `ltvBicycleModel.m` | Held-input node prediction (`finitePredict`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |

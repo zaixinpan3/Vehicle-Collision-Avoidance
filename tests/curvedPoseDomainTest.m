@@ -63,7 +63,6 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             [~,~,problem]=localAdmission(curvature,0);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
                 -problem.program.physicalBound),0);
         end

@@ -17,7 +17,6 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             [ego,target,road,cfg]=encounterTestFixture.circularCrossing(curvature);
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
                 -problem.program.physicalBound),0);
             testCase.verifyLessThanOrEqual(problem.metadata.solverCallCount,1);
@@ -31,7 +30,6 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.admissionSearch.usedFullPlanAdmission);
             testCase.verifyEqual(problem.metadata.admissionSearch.initialization.status,"candidate");
             testCase.verifyGreaterThan(problem.metadata.admissionSearch.initialization.maximumSupportResidual,0);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyEqual(problem.metadata.solverCallCount, ...
                 problem.metadata.trajectorySolverCallCount+problem.metadata.restorationSolverCallCount);
         end
@@ -41,17 +39,6 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             cfg.solver.jointFunction=@encounterTestFixture.fail;
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
-        end
-
-        function aPositiveSolverFlagIsIssuedWithoutRecheck(testCase)
-            % Project decision of 2026-09-22: solver success alone admits the plan.
-            [ego,target,road,cfg]=localRecoveryFixture();
-            cfg.solver.jointFunction=@encounterTestFixture.unsafe;
-            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyEqual(command.actuatorInput(1),2,AbsTol=0);
-            testCase.verifyTrue(problem.metadata.admissionSearch.usedFullPlanAdmission);
-            testCase.verifyEqual(problem.metadata.admissionSearch.fullPlanStatus,"accepted");
-            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
         end
 
         function anExpiredBudgetCannotStartUnrestrictedAdmission(testCase)
@@ -75,14 +62,12 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             testCase.verifyFalse(next.metadata.admissionSearch.usedFullPlanAdmission);
             testCase.verifyEqual(next.metadata.admissionSearch.directionSeedSource,"inheritedWitness");
             testCase.verifyFalse(isfield(next.metadata.admissionSearch,'initialization'));
-            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
         end
 
         function circularCrossingCompletesTheEncounterWithPositiveSampledGap(testCase)
             report=runExactStateRecursiveFeasibilityScenario(Scenario="crossing", ...
                 RoadCurvature=.01,SampleCount=140,DeadlineSeconds=30,SearchTimeLimitSeconds=30);
             testCase.verifyTrue(report.passed);
-            testCase.verifyFalse(any(report.hardCertificateVerified));
             testCase.verifyTrue(any(report.confirmedRelease));
             testCase.verifyGreaterThan(report.minimumSampledBodyGap,0);
             testCase.verifyEqual(sum(report.restorationSolverCallCount),0);

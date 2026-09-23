@@ -303,18 +303,13 @@ classdef avoidanceSafetyGeometry
         end
 
         function values = jointResidual(program,decision,angles)
-        % Independent nonlinear support evaluation; no conic epigraph values.
+        % Nonlinear support evaluation from the input plan; no conic epigraph values.
             states=localJointStates(program,decision(program.layout.planIndex));
             records=program.jointCertificate.records;values=zeros(numel(records),1);
             for index=1:numel(records)
                 values(index)=avoidanceSafetyGeometry.jointValue(records(index), ...
                     states(:,records(index).stage+1),angles(index));
             end
-        end
-
-        function allowance = jointAllowance(program,decision)
-        % Same arithmetic reserve for MATLAB and standalone verification.
-            allowance=localJointAllowance(program,decision);
         end
 
         function value = jointValue(record,state,angle)
@@ -359,20 +354,6 @@ classdef avoidanceSafetyGeometry
             middle=(vertices+next)/2;
             directions=[cos(middle(keep)),sin(middle(keep))];
             bounds=radius*cos(gaps(keep)/2);
-        end
-
-        function program = certifyJoint(program,decision)
-        % Numerical reserves belong to the accepted certificate and shift once.
-            cert=program.jointCertificate;
-            values=avoidanceSafetyGeometry.jointResidual(program,decision,cert.angles);
-            allowance=localJointAllowance(program,decision);
-            if any(~isfinite(values)) || any(values+allowance>0)
-                error('collisionAvoidanceController:optimizationFailed', ...
-                    'The independently evaluated joint separation certificate is unsafe. No command was issued.');
-            end
-            cert.upperBound=max(cert.upperBound,values+allowance);
-            program.jointCertificate=cert;
-            program=avoidanceSafetyGeometry.setDirections(program,cert.angles);
         end
 
         function program = setDirections(program,angles)
@@ -672,18 +653,6 @@ end
 function states=localJointStates(program,plan)
     prediction=program.prediction;
     states=prediction.egoStateOffset+reshape(pagemtimes(prediction.egoStateMatrix,plan),6,[]);
-end
-
-function allowance=localJointAllowance(program,decision)
-    states=localJointStates(program,decision(program.layout.planIndex));
-    records=program.jointCertificate.records;allowance=zeros(numel(records),1);
-    for index=1:numel(records)
-        record=records(index);
-        scale=1+record.clearance+record.positionBall+sum(record.egoHalfSize)+sum(record.targetHalfSize) ...
-            +sum(vecnorm(record.generators))+norm(record.positionOffset) ...
-            +norm(abs(record.positionMap)*abs(states(:,record.stage+1)));
-        allowance(index)=512*(1+program.layout.planCount)*eps*scale;
-    end
 end
 
 function [vertices, faceNormal, faceBound] = ...

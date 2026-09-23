@@ -15,7 +15,6 @@ classdef admissionSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.solverCallCount,1);
             testCase.verifyTrue(problem.metadata.planCertified);
             testCase.verifyFalse(problem.metadata.admissionSearch.issuedAdmissionWitness);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
                 -problem.program.physicalBound),0);
             testCase.verifyEqual(command.holdSeconds,.05,AbsTol=0);

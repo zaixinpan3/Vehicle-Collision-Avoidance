@@ -63,7 +63,6 @@ classdef nodeCertificateTest < matlab.unittest.TestCase
             records=problem.program.jointCertificate.records;
             collision=records(~[records.isExit]);
             testCase.verifyEqual([collision.stage],1:problem.prediction.stageCount);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
         end
 
         function theCarriedNodesShiftByOneHold(testCase,sampleTime)

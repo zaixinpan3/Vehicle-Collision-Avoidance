@@ -13,7 +13,6 @@ classdef circularArcExactStateScenarioTest < matlab.unittest.TestCase
             report = runExactStateRecursiveFeasibilityScenario(Scenario="cruise", ...
                 RoadCurvature=curvature,SampleCount=3,DeadlineSeconds=30);
             testCase.verifyTrue(report.passed);
-            testCase.verifyFalse(any(report.hardCertificateVerified));
             testCase.verifyEqual(report.trackingError(:,1),zeros(5,1),AbsTol=1e-12);
             testCase.verifyLessThan(max(abs(report.trackingError),[],'all'),1e-3);
             testCase.verifyGreaterThan(curvature*report.cruiseState(6),0);

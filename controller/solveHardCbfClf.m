@@ -1,5 +1,5 @@
 classdef solveHardCbfClf
-    %solveHardCbfClf Convex trajectory solves and hard-safety checks of carried witnesses.
+    %solveHardCbfClf Convex trajectory solves with fixed separation directions.
     methods (Static)
         function reference = vffmReference(time,progress,target,lane,road,width,passingOffsets)
         % Time-consistent Gaussian preference in a regular normal road chart.
@@ -19,68 +19,14 @@ classdef solveHardCbfClf
             reference=localPrepareFluidReference(program,model);
         end
 
-        function program = certify(program,decision)
-        % Validate physical safety independently of a numerical success flag.
-        % Transfer a feasible affine family WITHOUT repeated inward tightening.
-        % The controller applies it to carried witnesses before a solve, never
-        % to a solver-accepted plan.
-            [status,certified,adjusted]=solveHardCbfClf.inspect(program,decision);
-            tops=1:3:numel(adjusted);
-            if status==1
-                [excess,row]=max(certified-program.physicalBound);
-                error('collisionAvoidanceController:optimizationFailed', ...
-                    ['The returned solution failed the hard-safety certificate ' ...
-                    '(linear excess %.9g at %s, terminal excess %.9g). No command was issued.'], ...
-                    excess,program.physicalLabels(row), ...
-                    max(adjusted(tops)-program.terminalConePhysicalBound(tops)));
-            end
-            if status==2
-                error('collisionAvoidanceController:optimizationFailed', ...
-                    'The returned solution failed the reserved soft-CLF inequality. No command was issued.');
-            end
-            program.safetyBound=certified;
-            program.terminalCone.bound=adjusted;
-            if isfield(program,'jointCertificate')
-                program=avoidanceSafetyGeometry.certifyJoint(program,decision);
-            end
-        end
-
-        function [status,certified,adjusted,clf] = inspect(program,decision)
-        % Numeric hard-row, terminal and soft-CLF check shared by native builds.
-            gamma=64*numel(decision)*eps;
-            value=program.physicalMatrix*decision;
-            allowance=gamma*(1+abs(program.physicalBound)+abs(program.physicalMatrix)*abs(decision));
-            certified=max(program.safetyBound,value+allowance);
-            map=program.terminalCone.matrix;
-            input=decision(program.layout.planIndex);
-            cone=program.terminalCone.bound-map*input;
-            coneAllowance=gamma*(1+abs(program.terminalCone.bound)+abs(map)*abs(input));
-            tops=1:3:numel(cone);
-            adjusted=program.terminalCone.bound;
-            for first=1:3:numel(cone)
-                adjusted(first)=adjusted(first)+max(0,norm(cone(first+(1:2))) ...
-                    +norm(coneAllowance(first+(0:2)))-cone(first));
-            end
-            first=program.cones(2)+1;
-            clf=program.b(first:first+5)-program.A(first:first+5,:)*decision;
-            status=0;
-            if any(~isfinite(certified)) || any(certified>program.physicalBound) ...
-                    || any(~isfinite(adjusted)) || any(adjusted(tops)>program.terminalConePhysicalBound(tops))
-                status=1;
-            elseif norm(clf(2:end))-clf(1)>program.clfNumericalReserve ...
-                    || decision(end)<-program.clfNumericalReserve || any(~isfinite(clf))
-                status=2;
-            end
-        end
-
         function [reduced,retained] = reduce(program)
         % Preserve the exact row/column reduction in generated solver adapters.
             [reduced,retained]=localReducedProgram(program);
         end
 
         function [program,result,search] = fixedDirections(program,model,cfg)
-        % A solver-accepted plan, or on solver failure the admitted inherited
-        % incumbent, leaves this method. An initializer is never issued.
+        % A solver-accepted plan, or on solver failure the shifted previous plan
+        % of an inherited frame, leaves this method. An initializer is never issued.
             [program,result,search]=localFixedDirectionSearch(program,model,cfg);
         end
 
@@ -105,7 +51,9 @@ end
 
 function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
 % Direction search supplies an optimizer center, never a new issued plan.
-% Only an inherited, previously optimized certificate can survive solve failure.
+% Inherited frames solve with their stored directions; if that solve fails the
+% shifted previous plan is retained. Fresh frames keep the nominal directions
+% unless the fluid reference detects a support conflict.
     search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
         'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
@@ -116,11 +64,7 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
         'fixedCertificateAngles',program.jointCertificate.angles,'directionSeedSource',"nominalWitness");
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
     inherited=program.inheritedPredictionFamily;
-    [admitted,accepted]=localVerifyJointPoint(program,point,angles);
-    if inherited && ~admitted
-        result=localEmptySolve();result.message="The inherited witness failed independent verification.";return;
-    end
-    if ~inherited && ~admitted
+    if ~inherited && program.fluidReference.active
         phase=tic;
         [point,angles,search.initialization]=solveHardCbfClf.fluidInitialize(program,cfg);
         search.formulationSeconds=toc(phase);search.familyAttempts=1;
@@ -129,9 +73,8 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
             result=localEmptySolve();
             result.message="Fluid initialization failed: "+search.initialization.status;return;
         end
-    elseif admitted
-        program=localRefreshBounds(accepted);
-        if inherited,search.directionSeedSource="inheritedWitness";end
+    elseif inherited
+        search.directionSeedSource="inheritedWitness";
     end
     search.fixedCertificateAngles=angles;
     incumbent=point;
@@ -141,14 +84,14 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
     search.hardSolves=1;search.nativeSolves=1;improved=trial.feasible;
     search.fullPlanStatus="solverRejected";
     if improved
-        % A solver-reported success is accepted as returned; the plan is not
-        % re-verified after the solve. It carries exactly the normals selected above.
+        % A solver-reported success is accepted as returned. It carries exactly
+        % the normals selected above.
         program=avoidanceSafetyGeometry.setDirections(program,angles);
         result=trial;result.decision=trial.decision(1:conic.primaryCount);
         search.usedFullPlanAdmission=~inherited;search.fullPlanStatus="accepted";
     elseif inherited
         result=localEmptySolve();result.decision=incumbent;result.feasible=true;
-        result.exitFlag=trial.exitFlag;result.message="Retained previously optimized certificate: "+trial.message;
+        result.exitFlag=trial.exitFlag;result.message="Retained the shifted previous plan: "+trial.message;
         search.usedCertifiedIncumbent=true;
     else
         result=localEmptySolve();
@@ -162,20 +105,6 @@ end
 function result=localSolveConic(program,cfg)
     problem=struct('layout',struct('decisionCount',numel(program.q)),'stageProgram',program);
     result=localRunJointProgram(problem,cfg);
-end
-
-function [accepted,candidate]=localVerifyJointPoint(program,point,angles)
-    candidate=program;candidate.jointCertificate.angles=angles;accepted=false;
-    try
-        candidate=solveHardCbfClf.certify(candidate,point);accepted=true;
-    catch exception
-        if ~strcmp(exception.identifier,'collisionAvoidanceController:optimizationFailed'),rethrow(exception);end
-    end
-end
-
-function program=localRefreshBounds(program)
-    program.b(1:numel(program.safetyBound))=program.safetyBound;
-    program.b(end-numel(program.terminalCone.bound)+1:end)=program.terminalCone.bound;
 end
 
 function program = localCompactPlanarRows(program)
@@ -374,8 +303,8 @@ function solve = localNormalizeSolve(solve, decisionCount, variableCount)
     end
     solve.exitFlag = double(solve.exitFlag);
     % Solved (1) and reduced-accuracy AlmostSolved (2) count as success and
-    % the returned plan is issued without re-verification. Infeasibility,
-    % iteration limits, timeouts and malformed decisions issue no command.
+    % the returned plan is issued as returned. Infeasibility, iteration
+    % limits, timeouts and malformed decisions issue no command.
     solve.feasible = any(solve.exitFlag==[1,2]) ...
         && isnumeric(solve.decision) && isreal(solve.decision) ...
         && numel(solve.decision) == decisionCount ...

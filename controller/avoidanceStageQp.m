@@ -239,7 +239,7 @@ end
 
 function fixed=localDomainCertificate(program,angles)
 % A circumscribed ego disk and hard pose box prove these directions safe
-% throughout the entire convex base. Original records remain in verification.
+% throughout the entire convex base. Original records remain in the carried certificate.
     records=program.jointCertificate.records;fixed=false(numel(records),1);
     for index=1:numel(records)
         item=records(index);
@@ -280,7 +280,7 @@ end
 
 function retained=localDistinctRows(matrix,bound)
 % Identical left sides need only their tightest RHS. No coefficients are
-% rounded; the complete original rows remain in the independent verifier.
+% rounded; duplicate rows with a looser RHS are implied by the retained row.
 % Two fixed projections propose candidate groups; an exact comparison of
 % the complete rows confirms every merge, so a projection collision can only
 % retain a duplicate, never drop a distinct row.

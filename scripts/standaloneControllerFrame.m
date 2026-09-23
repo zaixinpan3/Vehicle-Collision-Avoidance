@@ -3,32 +3,25 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
 %#codegen
 % Preparation, sensing, reference synthesis and witness shifting remain with
 % the MATLAB orchestrator. This entry is NOT a standalone closed-loop driver.
-% Status: 0 rejected, 2 optimized continuation, 3 retained optimized incumbent,
+% Status: 0 rejected, 2 optimized continuation, 3 retained shifted previous plan,
 % 4 optimized admission. A direction-search seed is never issued directly.
-% Metrics: assembly/admission, native solve, verification seconds, solver status.
+% A solver-reported success is issued as returned.
+% Metrics: assembly/admission, native solve, unused (0), solver status.
     coder.cinclude('nativeControllerBenchmarkBridge.h');
     assert(~program.terminalOptimization);
     program.terminalOptimization=false;
     decision=program.feasibleWitness;angles=program.jointCertificate.angles;
     metrics=zeros(4,1);status=0;
-    start=localClock();
-    [accepted,program]=localVerify(program,decision,angles);
-    metrics(3)=localClock()-start;
     admission=~program.inheritedPredictionFamily;
-    if admission && ~accepted
+    if admission && program.fluidReference.active
         start=localClock();
         [decision,angles]=solveHardCbfClf.fluidInitialize(program,cfg);
         metrics(1)=localClock()-start;
         if isempty(decision),return;end
-    elseif ~accepted
-        return;
     end
     incumbent=decision;oldAngles=angles;
     if ~admission,status=3;end
     start=localClock();
-    program.b(1:numel(program.safetyBound))=program.safetyBound;
-    program.b(end-numel(program.terminalCone.bound)+1:end)=program.terminalCone.bound;
-    program.terminalOptimization=false;
     conic=avoidanceStageQp.fixedDirections(program,decision,angles,cfg);
     [reduced,retained]=solveHardCbfClf.reduce(conic);
     center=zeros(numel(reduced.q),1);
@@ -52,33 +45,14 @@ function [decision,angles,status,metrics] = standaloneControllerFrame(program,cf
             coder.rref(coneSizes),coder.rref(options),coder.wref(native));
     end
     metrics(2)=localClock()-start;metrics(4)=solverStatus;
-    if solverStatus==1 || solverStatus==4
-        start=localClock();
+    if (solverStatus==1 || solverStatus==4) && all(isfinite(native))
         expanded=zeros(numel(conic.q),1);expanded(retained)=native+center;
-        proposed=expanded(1:conic.primaryCount);
-        [accepted,~]=localVerify(program,proposed,angles);
-        metrics(3)=metrics(3)+localClock()-start;
-        if accepted
-            decision=proposed;status=2;
-            if admission,status=4;end
-            return;
-        end
+        decision=expanded(1:conic.primaryCount);status=2;
+        if admission,status=4;end
+        return;
     end
     decision=incumbent;angles=oldAngles;
     if admission,decision=zeros(0,1);end
-end
-
-function [accepted,program]=localVerify(program,decision,angles)
-    accepted=false;
-    if numel(decision)~=numel(program.q) || any(~isfinite(decision)),return;end
-    [status,bound,terminal]=solveHardCbfClf.inspect(program,decision);
-    if status~=0,return;end
-    values=avoidanceSafetyGeometry.jointResidual(program,decision,angles);
-    allowance=avoidanceSafetyGeometry.jointAllowance(program,decision);
-    if any(~isfinite(values)) || any(values+allowance>0),return;end
-    accepted=true;program.safetyBound=bound;program.terminalCone.bound=terminal;
-    program.jointCertificate.angles=angles;
-    program.jointCertificate.upperBound=max(program.jointCertificate.upperBound,values+allowance);
 end
 
 function seconds=localClock()

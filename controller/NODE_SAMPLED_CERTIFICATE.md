@@ -49,11 +49,9 @@ unit direction before optimizing the complete trajectory. Under unchanged contra
 and its retained directions certify nodes `2, ..., N`; touching majorants
 contain that complete witness in the next optimization. The active horizon
 shrinks toward the fixed exit deadline. After confirmed release, terminal
-invariance supplies target-free continuation. A solver-accepted plan is
-issued without a post-solve recheck, so these predicates hold to the solver's
-feasibility tolerance. The carried-witness check (`solveHardCbfClf.certify`)
-evaluates physical rows, cones and the true nonlinear support residuals of the
-shifted suffix before the next solve. See [JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
+invariance supplies target-free continuation. The controller contains no
+post-solve verification: a solver-accepted plan is issued as returned, so
+these predicates hold to the solver's feasibility tolerance. See [JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
 
 ## What is not certified
 

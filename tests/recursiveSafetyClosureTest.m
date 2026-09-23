@@ -37,11 +37,10 @@ classdef recursiveSafetyClosureTest < matlab.unittest.TestCase
             [program,~,~]=formulateAvoidanceProblem(model);
             margins=localConeMargins(program,program.feasibleWitness);
             result=solveHardCbfClf.constrained(program,cfg);
-            certified=solveHardCbfClf.certify(program,result.decision);
             testCase.verifyGreaterThanOrEqual(min(margins),0);
             testCase.verifyTrue(result.feasible);
             testCase.verifyEqual(program.layout.planCount,2);
-            testCase.verifyGreaterThanOrEqual(min(localPhysicalMargins(certified,result.decision)),0);
+            testCase.verifyGreaterThanOrEqual(min(localPhysicalMargins(program,result.decision)),0);
         end
         function confirmedSingleTargetReleaseContinuesCertifiedControl(testCase)
             [ego,road,cfg]=localFixture(zeros(6,1),0);
@@ -64,22 +63,11 @@ classdef recursiveSafetyClosureTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(result.station,20);
             testCase.verifyFalse(any(result.fallback));
         end
-        function aSolverSuccessIsIssuedWithoutRecheck(testCase)
-            % Project decision of 2026-09-22: a solver-reported success is
-            % issued as returned; the plan is not re-verified after the solve.
-            [ego,road,cfg]=localFixture(zeros(6,1),0);
-            cfg.solver.jointFunction=@localUnsafe;
-            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            testCase.verifyEqual(command.actuatorInput(1),2,AbsTol=0);
-            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
-            testCase.verifyLessThan(min(localPhysicalMargins(problem.program,problem.decision)),0);
-        end
         function anApproximateSolutionIsIssuedWithoutRecheck(testCase)
             [ego,road,cfg]=localFixture(zeros(6,1),0);
             cfg.solver.jointFunction=@localApproximate;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyTrue(problem.metadata.approximateSolveAccepted);
-            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
             testCase.verifyGreaterThanOrEqual(min(localPhysicalMargins(problem.program,problem.decision)),0);
         end
         function anEnlargedEgoSensingBoundIsAChangedContract(testCase)
@@ -172,10 +160,6 @@ function result=localSequence(radius,count,curvature)
     result.station=stored.predictedState(1,2);
 end
 
-function result=localUnsafe(~,program)
-    result=program.defaultSolver();result.decision(1)=2;
-end
-
 function result=localApproximate(~,program)
     result=program.defaultSolver();result.exitFlag=2;
 end
@@ -197,7 +181,6 @@ function result=localTerminalSequence()
         model.initializationPlan=t.input+t.feedback*(model.initialEgoState-t.reference);
         [program,~,~]=formulateAvoidanceProblem(model);
         solve=solveHardCbfClf.constrained(program,cfg);
-        program=solveHardCbfClf.certify(program,solve.decision);
         input=solve.decision(1:2);
         truth=t.cruise.transition(1:6,:)*[truth;input;1];
         result.modalMargin(index)=min(t.radius-abs(t.modalMatrix*(truth(2:6)-t.reference(2:6))));

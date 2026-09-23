@@ -65,11 +65,5 @@ classdef encounterTestFixture
         function result = fail(~, ~)
             result = struct("decision", [], "exitFlag", -999, "output", struct());
         end
-
-        function result = unsafe(~, program)
-            result = program.defaultSolver();
-            result.decision(1) = 2;
-            result.exitFlag = 1;
-        end
     end
 end

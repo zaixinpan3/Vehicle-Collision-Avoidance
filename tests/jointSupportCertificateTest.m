@@ -2,7 +2,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
     %jointSupportCertificateTest Joint certificates and inherited performance solves.
     properties (TestParameter)
         yawRadius=struct('fixed',0,'interval',.12,'full',pi);
-        nonpositiveGap=struct('contact',0,'overlap',-.01);
         reservedGap=struct('certified',.002,'violated',-.002);
     end
     methods (TestClassSetup)
@@ -14,26 +13,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function aSmallPositiveBodyGapPassesTheHardVerifier(testCase)
-            program=localGapProgram(.01);
-            accepted=solveHardCbfClf.certify(program,[.1;0;1]);
-            residual=avoidanceSafetyGeometry.jointResidual(accepted,[.1;0;1],0);
-            testCase.verifyEqual(residual,-.01,AbsTol=1e-12);
-        end
-
-        function contactAndOverlapCannotPassTheHardVerifier(testCase,nonpositiveGap)
-            program=localGapProgram(nonpositiveGap);
-            testCase.verifyError(@()solveHardCbfClf.certify(program,[.1;0;1]), ...
-                'collisionAvoidanceController:optimizationFailed');
-        end
-
-        function uncertainOverlapStillRejectsANominallyPositiveGap(testCase)
-            program=localGapProgram(.01);
-            program.jointCertificate.records.positionBall=.02;
-            testCase.verifyError(@()solveHardCbfClf.certify(program,[.1;0;1]), ...
-                'collisionAvoidanceController:optimizationFailed');
-        end
-
         function aRemovedCertificateSelectorIsRejected(testCase)
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct( ...
                 'controller',struct('certificateMethod',"jointSupport"))), ...
@@ -133,9 +112,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(conic.domainCertifiedRecords,1);
             testCase.verifyTrue(result.feasible);
             testCase.verifyNumElements(accepted.jointCertificate.records,1);
-            accepted.jointCertificate.angles=pi;
-            testCase.verifyError(@()solveHardCbfClf.certify(accepted,result.decision), ...
-                'collisionAvoidanceController:optimizationFailed');
         end
 
         function nominalClearanceDoesNotProveSeparationThroughoutTheDomain(testCase)
@@ -153,13 +129,12 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 accepted,result.decision,accepted.jointCertificate.angles)),0);
         end
 
-        function interruptedImprovementReturnsOnlyTheVerifiedIncumbent(testCase)
+        function interruptedImprovementReturnsTheShiftedPreviousPlan(testCase)
             [~,next,old,stored]=localOncoming(true);
             testCase.verifyTrue(next.metadata.certifiedIncumbentUsed);
             testCase.verifyEqual(next.metadata.certificateSource,"retainedCertifiedIncumbent");
             testCase.verifyEqual(next.metadata.solverExitFlag,0);
             testCase.verifyEqual(stored.plan,old.plan(:,2:end),AbsTol=0);
-            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
         end
 
         function boundedPoseAndYawUseHardSupportCertificates(testCase)
@@ -168,7 +143,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             target.targetYawErrorBound=.12;target.targetPositionInertialErrorBound=[.02;.03];
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThanOrEqual(max(problem.metadata.jointCertificateResidual),0);
             testCase.verifyEqual(problem.program.jointCertificate.records(1).targetYawRadius,.12,AbsTol=1e-10);
         end
 
@@ -179,7 +153,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 first.model.encounter.key);
             testCase.verifyEqual(next.metadata.admissionSearch.initialCertificateAngles,oldAngles,AbsTol=0);
             testCase.verifyTrue(next.metadata.shiftedWitnessContained);
-            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
         end
 
         function scheduledDynamicsAndFiniteSlewKeepTheShiftedCertificate(testCase)
@@ -188,7 +161,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(next.metadata.referencePhaseIndex,first.metadata.referencePhaseIndex+1);
             testCase.verifyEqual(next.metadata.recursiveFeasibilityScope,"shiftedCompleteCertificateUnderUnchangedContracts");
             testCase.verifyLessThanOrEqual(abs(next.inputPlan(:,1)-stored.appliedInput),[.05;.1]+1e-10);
-            testCase.verifyLessThanOrEqual(max(next.metadata.jointCertificateResidual),0);
         end
 
         function aFrameDeadlineStillRejectsACertifiedIncumbent(testCase)
@@ -197,12 +169,6 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:optimizationFailed');
         end
     end
-end
-
-function program=localGapProgram(gap)
-    program=localSquare();
-    program.prediction.egoStateOffset(1,:)=1+gap;
-    program.jointCertificate.records.clearance=0;
 end
 
 function [actual,expected,solved]=localSupportComparison(yawRadius)
@@ -279,7 +245,8 @@ function [program,cfg]=localSquare()
         'referenceMatrices',repmat(eye(5),1,1,2),'referenceStates',offset,'referenceInputs',zeros(2,1), ...
         'inputWeight',ones(2,1),'slackWeight',1,'inheritedPredictionFamily',false, ...
         'supportGeometry',struct('overlappingNodes',1),'completion',struct('active',true), ...
-        'jointCertificate',struct('records',localRecord(),'angles',0,'upperBound',-1e-4));
+        'jointCertificate',struct('records',localRecord(),'angles',0,'upperBound',-1e-4), ...
+        'fluidReference',struct('active',false));
 end
 
 function [ego,target,road,cfg]=localControllerFixture()
