@@ -1,0 +1,18 @@
+estimatorBoundTube on frames captured at t = 0 from runExactStateRecursiveFeasibilityScenario (commit cb8d4ed, scratch model capture),
+ego bound = recorded estimator bound [0.076;0.076;0.048;0.089;0.497;0.0015] used as the estimation error at every hold,
+K = cruise LQR terminal feedback. "independent": arbitrary error in the box at every hold; "bias-like": one constant error over the horizon.
+The last column of the raw output (stage-1 closed-loop spectral radius < 1) is always 0 because the station mode has no feedback
+(eigenvalue exactly 1); it carries no stability information and is omitted here.
+
+stationary straight: horizon 4.80 s, estimator bound in controller coordinates [0.076 0.076 0.048 0.089 0.497 0.0015]
+  open loop (current)          | max lateral 2.021 m, max heading 0.0498 rad | terminal margin -0.7560 | feedback use steer 0.0000 rad braking 0.0000
+  LQR, independent error       | max lateral 0.583 m, max heading 0.0971 rad | terminal margin 0.1007 | feedback use steer 0.2204 rad braking 0.3333
+  LQR, bias-like error         | max lateral 0.582 m, max heading 0.0667 rad | terminal margin 0.1007 | feedback use steer 0.1950 rad braking 0.3333
+  no vy feedback, independent  | max lateral 0.445 m, max heading 0.0766 rad | terminal margin 0.1200 | feedback use steer 0.1701 rad braking 0.3333
+  no vy feedback, bias-like    | max lateral 0.445 m, max heading 0.0559 rad | terminal margin 0.1268 | feedback use steer 0.1493 rad braking 0.3333
+crossing curved 0.01: horizon 4.80 s, estimator bound in controller coordinates [0.108 0.107 0.0491 0.089 0.497 0.0015]
+  open loop (current)          | max lateral 2.051 m, max heading 0.0510 rad | terminal margin -0.7590 | feedback use steer 0.0000 rad braking 0.0000
+  LQR, independent error       | max lateral 0.627 m, max heading 0.1047 rad | terminal margin 0.0846 | feedback use steer 0.2425 rad braking 0.3750
+  LQR, bias-like error         | max lateral 0.627 m, max heading 0.0728 rad | terminal margin 0.0846 | feedback use steer 0.2149 rad braking 0.3709
+  no vy feedback, independent  | max lateral 0.487 m, max heading 0.0840 rad | terminal margin 0.1013 | feedback use steer 0.1903 rad braking 0.3569
+  no vy feedback, bias-like    | max lateral 0.487 m, max heading 0.0617 rad | terminal margin 0.1128 | feedback use steer 0.1674 rad braking 0.3433
