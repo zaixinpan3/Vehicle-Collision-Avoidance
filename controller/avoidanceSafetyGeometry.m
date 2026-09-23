@@ -372,6 +372,13 @@ classdef avoidanceSafetyGeometry
             end
             cert.upperBound=max(cert.upperBound,values+allowance);
             program.jointCertificate=cert;
+            program=avoidanceSafetyGeometry.setDirections(program,cert.angles);
+        end
+
+        function program = setDirections(program,angles)
+        % Store fixed separation angles in the certificate, cell normals and exit row.
+            program.jointCertificate.angles=angles;
+            cert=program.jointCertificate;
             for index=1:numel(cert.records)
                 item=cert.records(index);normal=[cos(cert.angles(index));sin(cert.angles(index))];
                 if item.isExit

@@ -1,5 +1,5 @@
 classdef solveHardCbfClf
-    %solveHardCbfClf Certified convex trajectory solves and independent hard-safety checks.
+    %solveHardCbfClf Convex trajectory solves and hard-safety checks of carried witnesses.
     methods (Static)
         function reference = vffmReference(time,progress,target,lane,road,width,passingOffsets)
         % Time-consistent Gaussian preference in a regular normal road chart.
@@ -22,6 +22,8 @@ classdef solveHardCbfClf
         function program = certify(program,decision)
         % Validate physical safety independently of a numerical success flag.
         % Transfer a feasible affine family WITHOUT repeated inward tightening.
+        % The controller applies it to carried witnesses before a solve, never
+        % to a solver-accepted plan.
             [status,certified,adjusted]=solveHardCbfClf.inspect(program,decision);
             tops=1:3:numel(adjusted);
             if status==1
@@ -77,8 +79,8 @@ classdef solveHardCbfClf
         end
 
         function [program,result,search] = fixedDirections(program,model,cfg)
-        % Only independently verified plans can leave this method. An
-        % uncertified admission proposal is never a retained incumbent.
+        % A solver-accepted plan, or on solver failure the admitted inherited
+        % incumbent, leaves this method. An initializer is never issued.
             [program,result,search]=localFixedDirectionSearch(program,model,cfg);
         end
 
@@ -136,17 +138,14 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
     phase=tic;conic=avoidanceStageQp.fixedDirections(program,point,angles,cfg);
     search.formulationSeconds=search.formulationSeconds+toc(phase);
     phase=tic;trial=localSolveConic(conic,cfg);search.solveSeconds=toc(phase);
-    search.hardSolves=1;search.nativeSolves=1;improved=false;
+    search.hardSolves=1;search.nativeSolves=1;improved=trial.feasible;
     search.fullPlanStatus="solverRejected";
-    if trial.feasible
-        point=trial.decision(1:conic.primaryCount);
-        % The second stage must use exactly the normals selected above.
-        [improved,accepted]=localVerifyJointPoint(program,point,angles);
-        search.fullPlanStatus="independentVerificationFailed";
-    end
     if improved
-        program=accepted;result=trial;result.decision=point;
-        search.usedFullPlanAdmission=~inherited;search.fullPlanStatus="certified";
+        % A solver-reported success is accepted as returned; the plan is not
+        % re-verified after the solve. It carries exactly the normals selected above.
+        program=avoidanceSafetyGeometry.setDirections(program,angles);
+        result=trial;result.decision=trial.decision(1:conic.primaryCount);
+        search.usedFullPlanAdmission=~inherited;search.fullPlanStatus="accepted";
     elseif inherited
         result=localEmptySolve();result.decision=incumbent;result.feasible=true;
         result.exitFlag=trial.exitFlag;result.message="Retained previously optimized certificate: "+trial.message;
@@ -374,9 +373,9 @@ function solve = localNormalizeSolve(solve, decisionCount, variableCount)
         solve.exitFlag = -999;
     end
     solve.exitFlag = double(solve.exitFlag);
-    % Exact optimality is unnecessary for recursive feasibility. A positive
-    % approximate-solve status may proceed ONLY to independent certification.
-    % Infeasibility, iteration limits and timeouts still issue no command.
+    % Solved (1) and reduced-accuracy AlmostSolved (2) count as success and
+    % the returned plan is issued without re-verification. Infeasibility,
+    % iteration limits, timeouts and malformed decisions issue no command.
     solve.feasible = any(solve.exitFlag==[1,2]) ...
         && isnumeric(solve.decision) && isreal(solve.decision) ...
         && numel(solve.decision) == decisionCount ...

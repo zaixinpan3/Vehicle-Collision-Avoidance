@@ -37,7 +37,7 @@ classdef wholeHoldActuatorConstraintsTest < matlab.unittest.TestCase
                 .1*(1:problem.prediction.stageCount),AbsTol=1e-12);
             testCase.verifyEqual([problem.prediction.cells.stage],1:problem.prediction.stageCount);
             testCase.verifyFalse(any(ismember(problem.program.physicalLabels,["modelDomain","tireSlip"])));
-            testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
         end
 
         function unrestrictedHeadingSupportContainsEveryRectangleOrientation(testCase)

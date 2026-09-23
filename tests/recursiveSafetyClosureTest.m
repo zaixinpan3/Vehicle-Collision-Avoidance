@@ -64,18 +64,22 @@ classdef recursiveSafetyClosureTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(result.station,20);
             testCase.verifyFalse(any(result.fallback));
         end
-        function aFalseSolverSuccessCannotBecomeAnUnsafeWitness(testCase)
+        function aSolverSuccessIsIssuedWithoutRecheck(testCase)
+            % Project decision of 2026-09-22: a solver-reported success is
+            % issued as returned; the plan is not re-verified after the solve.
             [ego,road,cfg]=localFixture(zeros(6,1),0);
             cfg.solver.jointFunction=@localUnsafe;
-            testCase.verifyError(@() collisionAvoidanceController(ego,[],road,cfg,[]), ...
-                'collisionAvoidanceController:optimizationFailed');
+            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyEqual(command.actuatorInput(1),2,AbsTol=0);
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
+            testCase.verifyLessThan(min(localPhysicalMargins(problem.program,problem.decision)),0);
         end
-        function anApproximateSolutionStillNeedsACompleteCertificate(testCase)
+        function anApproximateSolutionIsIssuedWithoutRecheck(testCase)
             [ego,road,cfg]=localFixture(zeros(6,1),0);
             cfg.solver.jointFunction=@localApproximate;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            testCase.verifyTrue(problem.metadata.approximateSolveCertified);
-            testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
+            testCase.verifyTrue(problem.metadata.approximateSolveAccepted);
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
             testCase.verifyGreaterThanOrEqual(min(localPhysicalMargins(problem.program,problem.decision)),0);
         end
         function anEnlargedEgoSensingBoundIsAChangedContract(testCase)

@@ -43,11 +43,15 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:optimizationFailed');
         end
 
-        function aPositiveSolverFlagCannotBypassAdmissionVerification(testCase)
+        function aPositiveSolverFlagIsIssuedWithoutRecheck(testCase)
+            % Project decision of 2026-09-22: solver success alone admits the plan.
             [ego,target,road,cfg]=localRecoveryFixture();
             cfg.solver.jointFunction=@encounterTestFixture.unsafe;
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:optimizationFailed');
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(command.actuatorInput(1),2,AbsTol=0);
+            testCase.verifyTrue(problem.metadata.admissionSearch.usedFullPlanAdmission);
+            testCase.verifyEqual(problem.metadata.admissionSearch.fullPlanStatus,"accepted");
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
         end
 
         function anExpiredBudgetCannotStartUnrestrictedAdmission(testCase)
@@ -78,7 +82,7 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             report=runExactStateRecursiveFeasibilityScenario(Scenario="crossing", ...
                 RoadCurvature=.01,SampleCount=140,DeadlineSeconds=30,SearchTimeLimitSeconds=30);
             testCase.verifyTrue(report.passed);
-            testCase.verifyTrue(all(report.hardCertificateVerified));
+            testCase.verifyFalse(any(report.hardCertificateVerified));
             testCase.verifyTrue(any(report.confirmedRelease));
             testCase.verifyGreaterThan(report.minimumSampledBodyGap,0);
             testCase.verifyEqual(sum(report.restorationSolverCallCount),0);

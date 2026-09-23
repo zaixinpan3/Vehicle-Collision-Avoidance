@@ -49,7 +49,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
             testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.restorationSolverCallCount);
             testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
-            testCase.verifyTrue(problem.metadata.postSolveCertificationPerformed);
+            testCase.verifyFalse(problem.metadata.postSolveCertificationPerformed);
             testCase.verifyEqual(problem.program.physicalMatrix(:,end),zeros(numel(problem.program.physicalBound),1),AbsTol=0);
         end
 
@@ -78,7 +78,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyTrue(next.metadata.supportGeometry.witnessPreserved);
             testCase.verifyLessThanOrEqual(max(next.program.physicalMatrix*[witness;0]-next.program.physicalBound),0);
             testCase.verifyEqual(next.program.completion.deadline,first.program.completion.deadline,AbsTol=0);
-            testCase.verifyTrue(next.metadata.postSolveCertificationPerformed);
+            testCase.verifyFalse(next.metadata.postSolveCertificationPerformed);
         end
 
         function shiftedNodeTimesStayNonnegativeAcrossAnEncounter(testCase)

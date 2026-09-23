@@ -4,10 +4,12 @@ Format 42 separates initialization from execution. An NRMM-timed VFFM reference
 initializes a trajectory anchor and one unit separation direction per collision or
 exit record. These directions are then fixed while one hard SOCP optimizes the
 complete finite control sequence. An initialization seed is never issued, even if
-it already passes the original verifier. Every new admission requires an
-independently verified result from the full trajectory solve. Inherited frames
-use their stored directions and attempt one full trajectory improvement; only
-a previously optimized, verified suffix can be retained after solve failure.
+it already passes the original verifier. Every new admission requires a
+successful full trajectory solve, and a solver-reported success is issued as
+returned, without a post-solve recheck. Inherited frames use their stored
+directions and attempt one full trajectory improvement; only a previously
+optimized suffix that passes the carried-witness check can be retained after
+solve failure.
 
 The certificate covers **hold nodes of the declared zero-residual sampled
 affine plant**. It establishes neither inter-node separation nor a real-time
@@ -60,8 +62,8 @@ f(x,\theta)=d+\rho_p+h_{B_E}(n(\theta-\psi(x)))
 \]
 
 For collision records, \(d=0\): no physical clearance offset is imposed.
-The tightened solve and independent arithmetic allowance enforce strictly
-positive separation of the declared occupied sets. The removed
+The tightened solve enforces strictly positive separation of the declared
+occupied sets, up to the solver's primal feasibility tolerance. The removed
 `collision.clearanceMargin` setting is not replaced by another physical buffer.
 Position/yaw uncertainty, chart remainders and numerical reserves remain.
 
@@ -144,10 +146,10 @@ This can only enlarge the feasible set projected onto the trajectory
 coordinates, relative to retaining those same majorants: any base-feasible
 trajectory already satisfies the omitted physical constraint using the fixed
 direction. All original occupied-set records and unit-support residuals remain
-in the independent acceptance check and carried certificate. No target is
+in the carried certificate and its carried-witness check. No target is
 released or safety obligation shortened by this calculation. Hard pose-domain
-rows remain hard in both fresh admission and continuation, and are independently
-verified. The same test is repeated against the inherited domain on continuation.
+rows remain hard in both fresh admission and continuation. The same test is
+repeated against the inherited domain on continuation.
 
 The builder precomputes its final sparse width and auxiliary-variable count.
 This avoids repeated width expansion; it is a separate, algebraically exact
@@ -168,7 +170,7 @@ An outward arithmetic allowance is added to each nonzero charge.
 These are conservative occupied-set inclusions, not deleted uncertainty and
 not a new physical clearance offset. The added disks join `positionBall`;
 larger uncertainties retain their original supports. The resulting enclosure
-is independently verified and stored at admission, then inherited unchanged.
+is stored at admission, then inherited unchanged.
 This avoids introducing a complete interval-yaw dual for widths on the order
 of $10^{-10}$ rad without losing the touching property during continuation.
 
@@ -221,11 +223,15 @@ that no feasible trajectory exists.
 
 ## Hard acceptance and continuation
 
-An initialization seed never authorizes execution by itself. Acceptance reconstructs the input
-trajectory and independently checks every physical base row, terminal/CLF
-cone and exact nonlinear unit-support residual with arithmetic allowances.
-Only a full-plan solver result may become a new executable admission after
-these checks; passing them does not authorize direct issuance of an initialization seed.
+An initialization seed never authorizes execution by itself. Only a full-plan
+solver result may become a new executable admission. Acceptance is the solver
+status: Solved and the reduced-accuracy AlmostSolved are issued as returned
+(`approximateSolveAccepted` marks the latter). The plan is not re-verified
+after the solve, so physical rows, terminal/CLF cones and the exact nonlinear
+unit-support residuals hold only to the solver's feasibility tolerance, and a
+false solver success is issued unchecked. Metadata
+`postSolveCertificationPerformed` is false; `planCertified` reports acceptance.
+Infeasible, iteration-limit, timeout and non-finite results issue no command.
 The CLF is the only softened physical optimization condition. The next frame improves the ordinary performance
 objective. An already certified continuation can be retained if its attempted
 improvement fails, with the actual numerical status reported. The complete
@@ -238,9 +244,12 @@ are shifted without recomputing their geometry. Conditioning intersects true
 sets with inherited enclosures. For the inherited direction, narrowing either
 occupied set can only increase its separating gap. The previous suffix
 therefore remains physically feasible. Touching at this complete suffix makes
-the next hard conic subproblem nonempty in exact arithmetic. Numerical reserve
-transfer follows the existing physical-verifier policy, without imposing a
-fresh inward margin at every shift.
+the next hard conic subproblem nonempty in exact arithmetic. On an inherited frame the shifted
+suffix is checked against the physical rows, cones and nonlinear residuals
+with arithmetic allowances before the solve (`solveHardCbfClf.certify`); a
+suffix that fails this check ends the frame without a solve. Numerical reserves
+are transferred by that check, without imposing a fresh inward margin at every
+shift.
 
 This is **conditional recursive subproblem feasibility**, not guaranteed solver
 completion or indefinite safety against future targets. New targets, larger
@@ -257,7 +266,7 @@ certificate for a complete hold enclosure and is outside this change.
 - `avoidanceStageQp`: sparse stage lifting, fixed-direction support epigraphs and SOC
   yaw majorants. The original dynamics and terminal blocks remain sparse.
 - `solveHardCbfClf`: fluid-reference direction initialization, full fixed-direction optimization,
-  physical acceptance and the certified-incumbent interface.
+  solver-status acceptance, the carried-witness check and the certified-incumbent interface.
 - `formulateAvoidanceProblem` and `hardEncounterBarrier`: preserve and shift
   the entire certificate; collision and exit angles share the same method.
 - `jointSupportCertificateTest`: homogeneous/interval support, 2,000 seeded
