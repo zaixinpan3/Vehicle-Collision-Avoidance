@@ -23,16 +23,6 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             testCase.verifyEqual(norm(frame.tangent),1,AbsTol=1e-14);
         end
 
-        function aClearCircularSeedRetainsHardPoseDomains(testCase,curvature)
-            [~,~,problem]=localAdmission(curvature);
-            domain=problem.program.physicalLabels=="poseDomain" | problem.program.physicalLabels=="terminalPoseDomain";
-            testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyGreaterThan(nnz(domain),0);
-            testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix(domain,:)*problem.decision ...
-                -problem.program.physicalBound(domain)),0);
-            testCase.verifyLessThan(max([problem.program.geometry.frames.positionRemainder]),1);
-        end
-
         function nativeCircularRowsMatchTheInterpretedCertificate(testCase)
             [~,~,problem]=localAdmission(.02);
             data=problem.program.geometry.cellData;
@@ -43,13 +33,6 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             [~,~,problem]=localAdmission(curvature);
             discrepancy=localPhysicalResidualGap(problem);
             testCase.verifyLessThanOrEqual(discrepancy,1e-10);
-        end
-
-        function anImpossiblePoseDomainCannotBeRelaxed(testCase)
-            [~,~,problem]=localAdmission(.01);
-            program=localImpossibleDomain(problem.program);
-            solved=solveHardCbfClf.constrained(program,problem.model.cfg);
-            testCase.verifyFalse(solved.feasible);
         end
 
         function sparseRealizationPreservesCircularDomainRows(testCase)
@@ -65,18 +48,6 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.restorationSolverCallCount,0);
             testCase.verifyLessThanOrEqual(max(problem.program.physicalMatrix*problem.decision ...
                 -problem.program.physicalBound),0);
-        end
-
-        function departureCannotUseAMapOutsideItsCertifiedDomain(testCase)
-            [~,~,problem]=localAdmission(.01);
-            model=problem.model;completion=problem.program.completion;frame=completion.frame;
-            model.initialEgoState(1:3)=frame.domainCenter;
-            target=model.encounter;target.radius(:)=0;
-            target.center(1:2)=frame.positionOffset+frame.positionMap*model.initialEgoState ...
-                +100*completion.direction;
-            testCase.verifyTrue(hardEncounterBarrier.observedExterior(model,target,completion));
-            model.initialEgoState(1)=frame.domainCenter(1)+frame.domainRadius(1)+5e-10;
-            testCase.verifyFalse(hardEncounterBarrier.observedExterior(model,target,completion));
         end
 
         function shiftingRetainsACompleteDomainAndExitWitness(testCase,curvature)
@@ -150,13 +121,6 @@ function gap=localPhysicalResidualGap(problem)
         physical(k)=egoSupport+targetSupport-normal.'*(position(:,k)-target.center(1:2));
     end
     gap=max(physical-conservative);
-end
-
-function program=localImpossibleDomain(program)
-    row=program.cones(2);
-    program.A=[program.A(1:row,:);sparse(1,size(program.A,2));program.A(row+1:end,:)];
-    program.b=[program.b(1:row);-1;program.b(row+1:end)];
-    program.cones(2)=row+1;
 end
 
 function [next,witness]=localSuccessor(ego,target,first,stored,road,cfg)

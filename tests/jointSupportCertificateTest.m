@@ -101,28 +101,13 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(minimumGap,-1e-14);
         end
 
-        function aDomainWideSeparationProofRetainsTheOriginalSafetyRecord(testCase)
-            [program,cfg]=localSquare();
-            program.jointCertificate.records.positionOffset=[10;0];
-            program.feasibleWitness=[.1;0;1];program.anchorPlan=[.1;0];
-            program.geometry.frames.domainCenter=[.9;0;0];
-            program.geometry.frames.domainRadius=[0;2;0];
-            conic=avoidanceStageQp.fixedDirections(program,program.feasibleWitness,0,cfg);
-            [accepted,result]=solveHardCbfClf.fixedDirections(program,struct(),cfg);
-            testCase.verifyEqual(conic.domainCertifiedRecords,1);
-            testCase.verifyTrue(result.feasible);
-            testCase.verifyNumElements(accepted.jointCertificate.records,1);
-        end
-
         function nominalClearanceDoesNotProveSeparationThroughoutTheDomain(testCase)
             [program,cfg]=localSquare();
             program.geometry.frames.domainCenter=[.9;1;0];
             program.geometry.frames.domainRadius=[0;1;0];
             point=[1.5;0;1];program.feasibleWitness=point;
             program.jointCertificate.angles=pi/2;
-            conic=avoidanceStageQp.fixedDirections(program,point,pi/2,cfg);
             [accepted,result]=solveHardCbfClf.fixedDirections(program,struct(),cfg);
-            testCase.verifyEmpty(conic.domainCertifiedRecords);
             testCase.verifyTrue(result.feasible);
             testCase.verifyGreaterThan(result.decision(1),1.1);
             testCase.verifyLessThanOrEqual(max(avoidanceSafetyGeometry.jointResidual( ...

@@ -37,9 +37,10 @@ its box,
    strictly separated by the selected support half-space after uncertainty
    and numerical allowances (joint support certificates; no added physical
    clearance buffer),
-2. the state lies in the local Frenet chart domain of that node (pose-domain
-   rows) and, for scheduled references, within the reference phase band and the
-   lateral regularity radius (phase rows),
+2. for scheduled references, the state lies within the reference phase band
+   and the lateral regularity radius (phase rows); curved-road chart boxes are
+   not enforced, so the chart remainder is not guaranteed outside
+   `poseTrustRadius` of the seed pose,
 3. the terminal node `N` lies in the modal terminal set and satisfies the
    finite-exit support certificate,
 

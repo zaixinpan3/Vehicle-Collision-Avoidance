@@ -108,7 +108,7 @@ Target shape and target position-uncertainty supports are constants. The ego
 support has an affine argument, represented by absolute-value epigraphs for
 fixed rectangles or the interval-yaw hull dual. One SOC represents the yaw
 quadratic. A point ego body, or a state-independent yaw, needs no such
-auxiliaries. Physical pose-domain, input, slew and terminal rows remain hard.
+auxiliaries. Physical input, slew and terminal rows remain hard.
 
 `fixedDirectionMajorant` evaluates this expression directly for diagnostics.
 `avoidanceStageQp.fixedDirections` has **no angular decision columns** and
@@ -118,37 +118,21 @@ configuration are removed. Holding the old angular coordinate at zero would
 retain an unnecessary position quadratic; deriving the fixed-direction bound
 directly avoids that restriction.
 
-## Remove only majorants made redundant by a hard pose domain
+## Curved-road charts carry no pose box
 
-For a curved chart the convex base already imposes a hard box
-$|q-q_c|\le r_q$ on $q=(s,d,e_\psi)$. When the position map is
-$r=c+P_q q$ (no velocity columns), a fixed unit direction $n_0$ has the
-following support bound over the **entire** admitted box:
-
-\[
-\begin{aligned}
-\overline f={}&d+\rho_p+\|a_E\|_2
-+h_{B_O}(R(-\phi)n_0)+\|G^\top n_0\|_1\\
-&-n_0^\top(c+P_q q_c)+|P_q^\top n_0|^\top r_q.
-\end{aligned}
-\]
-
-The ego circumradius bounds every possible orientation, including its yaw
-uncertainty. If this bound, with an outward arithmetic allowance, is at most
-the stored bound $b$, then $f(x,\theta_0)\le b$ for **every** state in the
-convex base. The conic builder omits that record's redundant support
-epigraphs and majorant. Its direction remains fixed like every other record.
-Exit records are never screened. Without a hard pose box, screening is not
-used. A merely safe nominal point is insufficient.
-
-This can only enlarge the feasible set projected onto the trajectory
-coordinates, relative to retaining those same majorants: any base-feasible
-trajectory already satisfies the omitted physical constraint using the fixed
-direction. All original occupied-set records remain in the carried
-certificate. No target is
-released or safety obligation shortened by this calculation. Hard pose-domain
-rows remain hard in both fresh admission and continuation. The same test is
-repeated against the inherited domain on continuation.
+On a curved reference the ego Frenet state is mapped to Cartesian position
+and yaw by an affine chart around the seed pose of each node, and each record
+charges the chart remainder computed for a range of `poseTrustRadius` around
+that pose. By project decision (2026-09-23) this range is **not** enforced:
+the former pose-domain and terminal pose-domain rows are removed, and so is
+the screening that omitted a record whose fixed direction was safe over the
+whole box. Every collision and exit record is therefore always a constraint.
+Once a plan leaves the chart range, the charged remainder is no longer
+guaranteed to bound the chart error, so the curved-road collision and exit
+certificates are no longer rigorous there. Roads without a curved reference
+chart never had pose-domain rows and are unaffected. The release test evaluates the carried exit direction in
+a chart centered on the observed state when the carried chart does not cover
+it.
 
 The builder precomputes its final sparse width and auxiliary-variable count.
 This avoids repeated width expansion; it is a separate, algebraically exact

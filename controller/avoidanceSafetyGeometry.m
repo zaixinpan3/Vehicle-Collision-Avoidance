@@ -137,6 +137,14 @@ classdef avoidanceSafetyGeometry
             projectionData = cell(numel(groups),1);
             for cellIndex = 1:numel(groups)
                 tube = prediction.cells(cellIndex);
+                % The shared kernel still emits the curved-chart box rows;
+                % they are not constraints of this controller and are dropped.
+                geometric = allGeometricRows(cellIndex);
+                keep = sourceLabels{cellIndex}(geometric.source)~="poseDomain";
+                geometric.state = geometric.state(keep,:);
+                geometric.bound = geometric.bound(keep,:);
+                geometric.source = geometric.source(keep);
+                allGeometricRows(cellIndex) = geometric;
                 if isfield(prediction,'referencePhaseIndex')
                     % Stage-local phase rows share the swept projection kernel,
                     % so the lifted SOCP retains its sparse temporal structure.

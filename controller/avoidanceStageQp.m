@@ -103,9 +103,8 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
     base=avoidanceStageQp.build(program);
     records=program.jointCertificate.records;count=numel(records);
     baseCount=numel(base.q);cursor=baseCount;
-    fixed=localDomainCertificate(program,angles);
     recordCounts=localAuxiliaryCount(records);
-    total=cursor+sum(recordCounts(~fixed));
+    total=cursor+sum(recordCounts);
     equalityCount=base.cones(1);linearCount=base.cones(2);
     [linearRow,linearColumn,linearValue]=find(base.A(equalityCount+(1:linearCount),:));
     linearRow=linearRow(:);linearColumn=linearColumn(:);linearValue=linearValue(:);
@@ -117,7 +116,7 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
     % Reserve triplets once. A support row touches at most six states and
     % its epigraph variables. Each active record adds at most two cones.
     % Auxiliary variables bound the absolute-value and yaw-hull row counts.
-    activeCount=nnz(~fixed);auxiliaryCount=total-cursor;
+    activeCount=count;auxiliaryCount=total-cursor;
     linearNonzeros=numel(linearValue);linearRows=numel(linearBounds);
     coneNonzeros=numel(coneValue);coneRows=numel(coneBounds);coneCount=numel(coneSizes);
     linearExtra=17*auxiliaryCount+8*activeCount;
@@ -132,7 +131,6 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
     coneBounds=[coneBounds;zeros(14*activeCount,1)];
     coneSizes=[coneSizes;zeros(4*activeCount,1)];
     for index=1:count
-        if fixed(index),continue;end
         item=records(index);stateIndex=1:6;
         % Assemble one record in its own coordinates, then map its triplets
         % once. Sparse temporaries need only six states and this
@@ -180,7 +178,7 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
         'b',[base.b(1:equalityCount);linearBounds;coneBounds], ...
         'cones',[equalityCount;numel(linearBounds);coneSizes], ...
         'anchorPlan',program.anchorPlan,'fixedCertificateAngles',angles, ...
-        'primaryCount',numel(program.q),'domainCertifiedRecords',find(fixed));
+        'primaryCount',numel(program.q));
     conic.P(1:baseCount,1:baseCount)=base.P;conic.q(1:baseCount)=base.q;
     weight=cfg.jointCertificate.proximalWeight;
     primary=1:numel(point);scale=[program.decisionRadius;1];
@@ -234,28 +232,6 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
         bottom(:,multipliers)=bottom(:,multipliers)-bodyRadius*directions.';
         addCone([0;bodyRadius*offset],[top;bottom]);
         addLinear(sparse(1:numel(bounds),multipliers,-ones(1,numel(bounds)),numel(bounds),width),zeros(numel(bounds),1));
-    end
-end
-
-function fixed=localDomainCertificate(program,angles)
-% A circumscribed ego disk and hard pose box prove these directions safe
-% throughout the entire convex base. Original records remain in the carried certificate.
-    records=program.jointCertificate.records;fixed=false(numel(records),1);
-    for index=1:numel(records)
-        item=records(index);
-        if item.isExit,continue;end
-        frame=program.geometry.frames(item.stage);
-        if ~isfield(frame,'domainCenter') || any(item.positionMap(:,4:6)~=0,'all'),continue;end
-        normal=[cos(angles(index));sin(angles(index))];
-        row=normal.'*item.positionMap(:,1:3);
-        center=item.positionOffset+item.positionMap(:,1:3)*frame.domainCenter;
-        support=norm(item.egoHalfSize)+avoidanceSafetyGeometry.supportValue( ...
-            item.targetHalfSize,item.targetYawRadius, ...
-            [cos(angles(index)-item.targetYaw);sin(angles(index)-item.targetYaw)]) ...
-            +sum(abs(item.generators.'*normal))+item.clearance+item.positionBall;
-        bound=support-normal.'*center+abs(row)*frame.domainRadius;
-        allowance=128*eps*(1+support+abs(normal).'*abs(center)+abs(row)*frame.domainRadius);
-        fixed(index)=bound+allowance<=program.jointCertificate.upperBound(index);
     end
 end
 

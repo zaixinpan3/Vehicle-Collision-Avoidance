@@ -1,8 +1,7 @@
 classdef admissionAssemblyOptimizationTest < matlab.unittest.TestCase
-    %admissionAssemblyOptimizationTest Preserve hard domains and side selection.
+    %admissionAssemblyOptimizationTest Preserve road rows in the joint geometry assembly.
     properties (TestParameter)
         hasTarget=struct('absent',false,'present',true);
-        curvature=struct('left',.01,'right',-.01);
     end
     methods (TestClassSetup)
         function paths(testCase)
@@ -26,44 +25,7 @@ classdef admissionAssemblyOptimizationTest < matlab.unittest.TestCase
             testCase.verifyEqual(joint.cellData,complete.cellData,AbsTol=0);
             testCase.verifyEqual(joint.normals,complete.normals,AbsTol=0);
         end
-
-        function screenedCrossingRetainsItsSelectedFullPlan(testCase,curvature)
-            [program,cfg]=localProgram(curvature);
-            [selected,angles,information]=solveHardCbfClf.fluidInitialize(program,cfg);
-            firstOnly=program;firstOnly.fluidReference.valid(2)=false;
-            [expected,expectedAngles]=solveHardCbfClf.fluidInitialize(firstOnly,cfg);
-            testCase.verifyLessThanOrEqual(information.referencePhysicalExcess(1),0);
-            testCase.verifyGreaterThan(information.referencePhysicalExcess(2),0);
-            testCase.verifyEqual(selected,expected,AbsTol=0);
-            testCase.verifyEqual(angles,expectedAngles,AbsTol=0);
-        end
-
-        function screeningStillSelectsAFeasibleSecondCandidate(testCase,curvature)
-            [program,cfg]=localProgram(curvature);
-            [expected,expectedAngles]=solveHardCbfClf.fluidInitialize(program,cfg);
-            reversed=localReverseReferences(program);
-            [actual,angles,information]=solveHardCbfClf.fluidInitialize(reversed,cfg);
-            testCase.verifyGreaterThan(information.referencePhysicalExcess(1),0);
-            testCase.verifyLessThanOrEqual(information.referencePhysicalExcess(2),0);
-            testCase.verifyEqual(actual,expected,AbsTol=2e-12);
-            testCase.verifyEqual(angles,expectedAngles,AbsTol=2e-12);
-        end
     end
-end
-
-function [program,cfg]=localProgram(curvature)
-    [ego,target,road,cfg]=encounterTestFixture.circularCrossing(curvature);
-    [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-    program=formulateAvoidanceProblem(problem.model);
-end
-
-function program=localReverseReferences(program)
-    reference=program.fluidReference;
-    reference.bump=reference.bump([2,1],:);
-    reference.heading=reference.heading([2,1],:);
-    reference.valid=reference.valid([2,1]);
-    reference.amplitudes=reference.amplitudes([2,1]);
-    program.fluidReference=reference;
 end
 
 function [complete,joint,plans]=localGeometry(hasTarget)

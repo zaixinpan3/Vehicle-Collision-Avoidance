@@ -269,7 +269,9 @@ classdef hardEncounterBarrier
                 direction = completion.direction;
             end
             if isfield(frame,'domainCenter') && any(abs(z(1:3)-frame.domainCenter)+rho(1:3)>frame.domainRadius)
-                outside=false;return;
+                % The carried chart does not cover the observed box; evaluate
+                % the carried direction in a chart centered on the observation.
+                frame=laneGeometry.localPoseFrame(model.lane.referenceCurve,z(1:3),rho(1:3));
             end
             [row,bound] = localExitRow(model,target,target.center,target.radius,rho,frame,direction);
             allowance = 32*eps*(abs(bound)+abs(row)*abs(z));
@@ -337,18 +339,11 @@ classdef hardEncounterBarrier
             extent = abs(finalMap)*reach+radius;
             frame = laneGeometry.frameBounds(model.lane,finalOffset(1), ...
                 extent(1),abs(finalOffset(2))+extent(2));
-            domainCount=0;
             if ~isempty(model.encounter) && isfield(geometry.frames,'positionMap')
                 frame=geometry.frames(end);
-                directions=[eye(3);-eye(3)];
-                domainMatrix=directions*finalMap(1:3,:);
-                domainBound=[frame.domainRadius;frame.domainRadius] ...
-                    +directions*(frame.domainCenter-finalOffset(1:3))-abs(directions)*radius(1:3);
-                matrix=[matrix;domainMatrix];bound=[bound;domainBound];domainCount=6;
             end
             [exitMatrix,exitBound,completion] = hardEncounterBarrier.finiteCompletionRows( ...
                 model,prediction,finalMap,finalOffset,frame);
-            completion.domainRowCount=domainCount;
             matrix = [matrix;exitMatrix];bound=[bound;exitBound];
         end
 

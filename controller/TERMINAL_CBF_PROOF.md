@@ -308,8 +308,8 @@ shrinkage is used when certifying the finite plan.
 An accepted witness stores its input sequence, exact affine node maps,
 uncertainty enclosures, occupied sets and angles, charts, physical row labels,
 terminal cones, finite exit directions/deadline, and common cruise generator.
-The hard affine base is `M U <= b`. It includes actuator bounds, slew,
-chart domains and robust terminal-entry rows. Nonlinear support certificates
+The hard affine base is `M U <= b`. It includes actuator bounds, slew
+and robust terminal-entry rows; curved-road chart boxes are not enforced. Nonlinear support certificates
 enforce collision separation and sensing-range exit; they are stored together
 with the terminal SOCs. Executable safety constraints have no slack. The
 first-hold CLF has an unbounded nonnegative norm slack with a squared cost.
