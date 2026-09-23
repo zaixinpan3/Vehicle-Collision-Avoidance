@@ -1,7 +1,8 @@
-# Feedback (tube) prediction of the ego uncertainty — design proposal
+# Feedback (tube) prediction of the ego uncertainty
 
-Status: design proposal, 2026-09-23. **Not implemented.** It addresses the
-open-loop growth of the ego uncertainty found in
+Status: implemented 2026-09-23 (Section 7), default on
+(`cfg.feedbackPrediction.enabled`). It addresses the open-loop growth of the
+ego uncertainty found in
 [ADMISSION_INFEASIBILITY_DIAGNOSIS_20260923.md](../report/ADMISSION_INFEASIBILITY_DIAGNOSIS_20260923.md).
 
 ## 1. The problem
@@ -104,27 +105,34 @@ measurement error.
 
 ## 4. Recursive feasibility
 
-Fresh admission: `z_0 = xhat_0`, `E_0 = H_0`.
+Fresh admission: `z_0 = xhat_0` (the conditioned center) and `E_0` the
+measurement box. The first held input is exact, so `E_1 = A_1 E_0` and its
+interval hull, which the next frame intersects with its measurement box, is
+the same box as before this change.
 
-To keep the carried set exact, the prediction replaces `E_1` by its interval
-hull (one box, at node 1 only). Later nodes keep full zonotopes.
+Inherited frame at the next hold: the controller does not rebuild the
+prediction. It carries the previous frame's rows, records and cones (the
+existing shift of the accepted affine family) with the executed plan input
+eliminated. Every carried tightening was computed for the whole deviation set
+of the previous frame, and that set does not depend on the remaining plan
+inputs. With the carried nominal `z_1` the frame issues
 
-Inherited frame at the next hold: the nominal is **not** reset to the new
-estimate. Set `z'_0 = z_1` and
-`E'_0 = E_1 ∩ ((xhat'_0 - z_1) + H'_0)`, which is an intersection of two
-boxes and therefore exact and contained in `E_1`. With the same gains shifted,
-the candidate `v'_j = v_{j+1}` gives `z'_j = z_{j+1}` and `E'_j ⊆ E_{j+1}`. Every
-constraint of the previous certificate for nodes `2..N` therefore still holds,
-and the shifted policy is a feasible point of the new SOCP. The executed input
-`u'_0 = v'_0 + K_1 (xhat'_0 - z_1)` includes the known correction. This is the
-output-feedback tube argument of Mayne et al. (2006) in the form this
-controller already uses for conditioning: successor set intersected with the
-measurement box.
+    u' = v' + K (xhat' - z_1),
 
-The terminal continuation must also hold. The terminal set is already robustly
-invariant under the terminal feedback law with per-hold measurement noise
-(`holdNoise`). Choosing `K_N` equal to that law keeps appended steps inside it;
-this has to be verified in the implementation.
+the shifted feedback policy. Its true deviations stay in the carried sets as
+long as the estimator error stays within the declared bound, so every carried
+constraint still holds for any remaining plan the solver returns. The
+previous plan is a feasible point, as before. No zonotope is ever re-boxed and
+propagated again, which is the monotonicity concern of
+INFORMATION_STATE_PCBF.md, Lemma 1.
+
+The estimator contract is part of the carried certificate. A measurement bound
+larger than the carried `estimatorBound` voids it, and the frame is re-admitted
+from the measurement (`measurementContractChanged`). The terminal set is
+already robustly invariant under its own feedback law with measurement noise
+up to the same measurement radius limit (`holdNoise`, `disturbanceSupport`).
+The terminal cone requires the whole final deviation set inside it; the
+terminal-law slew row uses the correlated deviation of the last planned input.
 
 ## 5. Evidence (offline, captured frames)
 
@@ -187,22 +195,34 @@ instead of an arbitrary per-hold error.
   the remaining tube; tighter certified estimator bounds would shrink it
   further.
 
-## 7. Implementation outline
+## 7. Implementation
 
-1. `config`: the feedback gain (proposed default: cruise LQR without
-   lateral-velocity feedback and with a softer speed gain) and the future
-   estimator bound `epsbar` (default: the bound published at the current frame).
-2. `ltvBicycleModel.finitePredict`: gains `K_k` and generators `G_k`, with the
-   node-1 interval hull; keep the box `rho_k` as a derived quantity for
-   diagnostics.
-3. `avoidanceSafetyGeometry.localJointRecord`: generators and yaw radius from
-   `G_k`.
-4. `hardEncounterBarrier`: terminal cone and exit supports from `G_N`; carried
-   nominal `z_1`, `E_1` and gains; conditioning `E'_0 = E_1 ∩ measurement box`.
-5. `formulateAvoidanceProblem`: actuator and slew tightening; inherited frames
-   start from the carried nominal.
-6. `collisionAvoidanceController`: executed input `v_0 + K_0 (xhat_0 - z_0)`;
-   controller state stores nominal, tube and gains.
-7. Tests for tube containment (sampled noise sequences stay inside `E_k`),
-   recursive feasibility of the shifted policy, and actuator/slew tightening;
-   then rerun the recursion campaign and the 118-case sweep.
+- `config/collisionAvoidanceControllerConfig.m`: `feedbackPrediction` with
+  `enabled` (true), `speedGainScale` (0.5) and `lateralVelocityFeedback` (false).
+- `ltvBicycleModel.feedbackContract`: `K = [0, -gain]` from the frame's cruise
+  certificate with the speed column scaled and the lateral-velocity column
+  zeroed; `epsbar = max(initial bound, measurement radius limit)`.
+- `ltvBicycleModel.finitePredict`: per-node generators (`cells(k).generators`)
+  in one append-only source basis (initial box, one estimator box per node),
+  plus an interval part for held process reserves and arithmetic allowances.
+  It also returns the per-stage support of the executed-input deviation
+  (`feedbackInputSupport`), of its change between holds
+  (`feedbackSlewSupport`) and the final input deviation for the terminal slew
+  row.
+- `avoidanceSafetyGeometry`: collision and exit records take the node
+  generators (position zonotope and yaw radius).
+- `hardEncounterBarrier`: terminal cone with modal zonotope supports; terminal
+  slew support; stored-state check `appliedInput = plan(:,1) + feedbackCorrection`;
+  carried `issuedInput` is the plan value; estimator-contract check; the
+  target-free horizon proposal uses the same recursion.
+- `formulateAvoidanceProblem`: amplitude and slew rows reserve the input
+  deviation support; inherited frames compute
+  `feedbackCorrection = K (xhat - z_1)`, which also enters the first-hold CLF.
+- `collisionAvoidanceController`: issues `plan(:,1) + feedbackCorrection`;
+  controller-state format 43 stores the correction; metadata reports the gain,
+  bound and correction.
+- `tests/feedbackPredictionTest.m`: sampled initial and per-hold estimator
+  errors (interior and vertices) stay inside every predicted set, input and
+  slew deviations stay inside their reserved supports, inherited frames issue
+  the corrected input, and tampered corrections or larger estimator bounds are
+  rejected.

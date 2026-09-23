@@ -1,6 +1,6 @@
 # Fixed-direction convex trajectory optimization
 
-Format 42 separates initialization from execution. An NRMM-timed VFFM reference
+Format 43 separates initialization from execution. An NRMM-timed VFFM reference
 initializes a trajectory anchor and one unit separation direction per collision or
 exit record. These directions are then fixed while one hard SOCP optimizes the
 complete finite control sequence. An initialization seed is never issued.
@@ -9,6 +9,11 @@ solver-reported success is issued as returned. No verification code runs after
 the solve. Inherited frames use their stored directions and attempt one full
 trajectory improvement; if that solve fails, the shifted previous plan is
 issued.
+
+The plan is a feedback policy: the first input is exact and later inputs add
+`K (estimate - nominal)`; the ego deviation sets that every record, cone and
+input row charges are those of
+[FEEDBACK_TUBE_PREDICTION.md](FEEDBACK_TUBE_PREDICTION.md).
 
 The certificate covers **hold nodes of the declared zero-residual sampled
 affine plant**. It establishes neither inter-node separation nor a real-time

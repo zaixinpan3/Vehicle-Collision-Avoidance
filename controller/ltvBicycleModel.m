@@ -408,12 +408,35 @@ classdef ltvBicycleModel
             end
         end
 
+        function [gain,bound] = feedbackContract(model)
+        % Per-hold feedback gain and estimator bound of the prediction tube.
+        % The gain acts on [station; lateral; heading; vx; vy; yaw rate]; it is
+        % the cruise gain with a scaled speed column and, by default, no
+        % lateral-velocity column. The bound is the current sensing contract.
+            gain = zeros(2,6);bound = zeros(6,1);
+            settings = model.cfg.feedbackPrediction;
+            if ~settings.enabled || ~isfield(model,'cruiseCertificate') || isempty(model.cruiseCertificate)
+                return;
+            end
+            gain(:,2:6) = -model.cruiseCertificate.gain;
+            gain(:,4) = settings.speedGainScale*gain(:,4);
+            if ~settings.lateralVelocityFeedback,gain(:,5) = 0;end
+            bound = model.initialFrenetErrorBound;
+            if isfield(model,'measurementRadiusLimit'),bound = max(bound,model.measurementRadiusLimit);end
+        end
+
         function prediction = finitePredict(model, schedule)
         %finitePredict A finite held-input witness certified at its hold nodes.
         % Every held command has one certified node: the exact sampled affine
-        % transition of the plan-affine state, its interval-hull uncertainty box
-        % with the held process reserve, and a floating-point allowance. States
-        % between two nodes are not enclosed; see NODE_SAMPLED_CERTIFICATE.md.
+        % transition of the nominal plan and the set of ego deviations from it.
+        % The first held input is exact. From the second hold on the executed
+        % input is v_k + K (xhat_k - z_k) (feedbackContract), so the deviation
+        % obeys e+ = (A + B K) e + B K eta with the estimator error eta bounded
+        % at every hold, and the deviation set stays bounded instead of growing
+        % open loop. Correlated sources (initial box, estimator errors) are
+        % zonotope columns in one append-only basis; held process reserves and
+        % floating-point allowances form an interval part. States between two
+        % nodes are not enclosed; see NODE_SAMPLED_CERTIFICATE.md.
             cfg = model.cfg;
             count = model.horizonSteps;
             planCount = 2*count;
@@ -495,6 +518,16 @@ classdef ltvBicycleModel
             numericalRadius = zeros(6,1);
             prediction.egoStateOffset(:, 1) = offset;
             prediction.egoStateErrorBound(:, 1) = radius;
+            [feedbackGain,estimatorBound] = ltvBicycleModel.feedbackContract(model);
+            feedback = any(feedbackGain(:));
+            noise = diag(estimatorBound);noise = noise(:,estimatorBound~=0);
+            zonotope = diag(radius);zonotope = zonotope(:,radius~=0);
+            intervalRadius = zeros(6,1);
+            inputDeviation = zeros(2,size(zonotope,2));inputDeviationBox = zeros(2,1);
+            prediction.feedbackGain = feedbackGain;
+            prediction.estimatorBound = estimatorBound;
+            prediction.feedbackInputSupport = zeros(2,count);
+            prediction.feedbackSlewSupport = zeros(2,count);
             baseRate = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
             nativeStages = ~isempty(nonlinearAnchor) && exist("bicycleLinearizationKernelMex","file")==3;
             if nativeStages
@@ -582,11 +615,6 @@ classdef ltvBicycleModel
                 tireModels{stage} = tireModel;
                 prediction.modelErrorRateBound(:,stage) = rate;
                 prediction.executionReserve(:,stage) = executionReserve;
-                % Node boxes follow the interval hull of each exact stage
-                % transition. A signed-generator chain would be tighter but is
-                % not monotone when a later frame conditions and re-boxes an
-                % intermediate node (INFORMATION_STATE_PCBF.md, Lemma 1).
-                prediction.initialErrorBound(:,stage+1) = abs(exact(1:6,1:6))*prediction.initialErrorBound(:,stage);
                 domainGenerators = [exact(1:6,1:6)*domainGenerators,diag(processReserve)];
                 prediction.domainErrorBound(:,stage+1) = sum(abs(domainGenerators),2);
                 prediction.continuousA(:, :, stage) = a;
@@ -606,8 +634,32 @@ classdef ltvBicycleModel
                 magnitude = abs(stateMap)*(abs(map)*inputLimit+abs(offset))+abs(inputMap)*inputLimit(1:2)+abs(affine);
                 arithmetic = 16*gamma*(1+magnitude);
                 nodeNumerical = abs(stateMap)*numericalRadius+arithmetic;
-                nodeRadius = abs(stateMap)*radius+processReserve+arithmetic;
+                % Deviation of the executed input of this hold from the plan,
+                % in the same source basis, and the deviation set of the node.
+                % Node 1 is the exact image of the initial box, so the stored
+                % successor box used for conditioning is unchanged. Inherited
+                % frames carry these sets; they are never re-boxed and propagated.
+                previousDeviation = [inputDeviation,zeros(2,size(zonotope,2)-size(inputDeviation,2))];
+                previousDeviationBox = inputDeviationBox;
+                closedMap = stateMap;
+                if stage>1 && feedback
+                    closedMap = stateMap+inputMap*feedbackGain;
+                    inputDeviation = [feedbackGain*zonotope,feedbackGain*noise];
+                    inputDeviationBox = abs(feedbackGain)*intervalRadius;
+                    zonotope = [closedMap*zonotope,inputMap*feedbackGain*noise];
+                    previousDeviation = [previousDeviation,zeros(2,size(noise,2))]; %#ok<AGROW>
+                else
+                    inputDeviation = zeros(2,size(zonotope,2));inputDeviationBox = zeros(2,1);
+                    zonotope = stateMap*zonotope;
+                end
+                prediction.feedbackInputSupport(:,stage) = sum(abs(inputDeviation),2)+inputDeviationBox;
+                prediction.feedbackSlewSupport(:,stage) = sum(abs(inputDeviation-previousDeviation),2) ...
+                    +inputDeviationBox+previousDeviationBox;
+                intervalRadius = abs(closedMap)*intervalRadius+processReserve+arithmetic;
+                nodeRadius = sum(abs(zonotope),2)+intervalRadius;
+                prediction.initialErrorBound(:,stage+1) = nodeRadius;
                 tube = struct("map",nodeMap,"offset",nodeOffset,"radius",nodeRadius, ...
+                    "generators",[zonotope,diag(intervalRadius)], ...
                     "numericalRadius",nodeNumerical,"localStateMap",stateMap,"localInputMap",inputMap, ...
                     "localOffset",affine,"endMap",nodeMap,"endOffset",nodeOffset,"endRadius",nodeRadius, ...
                     "endNumericalRadius",nodeNumerical,"stage",stage,"start",stage*h,"duration",0,"time",stage*h);
@@ -624,6 +676,10 @@ classdef ltvBicycleModel
             end
             prediction.cells = vertcat(cells{:});
             prediction.tireModels = tireModels;
+            % The last planned input's deviation, for the terminal-law slew row.
+            prediction.finalInputDeviation = struct("zonotope",inputDeviation, ...
+                "interval",inputDeviationBox,"noise",noise, ...
+                "nodeZonotope",zonotope,"nodeInterval",intervalRadius);
         end
 
         function [stateMatrix, inputMatrix, affineVector, continuousA] = ...

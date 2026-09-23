@@ -99,6 +99,13 @@ Swept Bernstein enclosures additionally cover all times inside every hold,
 including polynomial remainder and arithmetic allowances. No hypothetical
 future measurement is used to shrink these finite predicted boxes.
 
+Update (2026-09-23): the online prediction now uses a feedback policy and the
+deviation sets of [FEEDBACK_TUBE_PREDICTION.md](FEEDBACK_TUBE_PREDICTION.md)
+instead of the interval recursion above. In (7) and (8) below, `|W_j| rho_N`
+and `|K| rho_N` become zonotope supports: `sum_i |W_j g_i|` over the columns of
+`E_N`, and the support of `K_term (e_N + eta_N) - Delta u_{N-1}` in the common
+source basis of the prediction.
+
 ### Whole-hold enclosure without imposed state bounds
 
 There is exactly one certified interval per held command. For

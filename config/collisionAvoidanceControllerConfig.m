@@ -50,6 +50,14 @@ function cfg = localDefaults()
         "clearanceAllowanceMeters",0.2,"headingWeight",4.0,"regularizationWeight",0.02);
     % Small trajectory regularization for fixed-direction convex optimization.
     cfg.jointCertificate = struct("proximalWeight",1.0e-3);
+    % Prediction under per-hold feedback u_k = v_k + K (xhat_k - z_k) from the
+    % second hold on, so the ego deviation set stays bounded instead of
+    % growing open loop. K is the cruise gain with its speed column scaled by
+    % speedGainScale and, unless lateralVelocityFeedback, no lateral-velocity
+    % column. The estimation error at every future hold is bounded by the
+    % measurement radius limit of the current sensing contract.
+    cfg.feedbackPrediction = struct("enabled",true,"speedGainScale",0.5, ...
+        "lateralVelocityFeedback",false);
     cfg.collision = struct("cbfRate",2.0);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
     % (terminal family synthesis, fixedPredict audits). The online certificate
@@ -212,6 +220,9 @@ function localValidate(cfg)
             {'scalar','real','finite','positive'});
     end
     validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.feedbackPrediction.enabled,{'logical'},{'scalar'});
+    validateattributes(cfg.feedbackPrediction.speedGainScale,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.feedbackPrediction.lateralVelocityFeedback,{'logical'},{'scalar'});
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0

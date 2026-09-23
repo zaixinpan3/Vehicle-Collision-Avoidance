@@ -247,7 +247,7 @@ classdef avoidanceSafetyGeometry
                     data=program.geometry.cellData(index);
                     if data.hasTarget
                         records{end+1,1}=localJointRecord(data.target,tube.stage,program.geometry.frames(index), ...
-                            tube.radius,[model.cfg.vehicle.length;model.cfg.vehicle.width]/2, ...
+                            localEgoGenerators(tube),[model.cfg.vehicle.length;model.cfg.vehicle.width]/2, ...
                             0,false,model.cfg.solver.constraintTolerance); %#ok<AGROW>
                         normal=program.geometry.normals{index};
                         angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
@@ -258,7 +258,7 @@ classdef avoidanceSafetyGeometry
                     [item.center,item.radius]=targetPrediction.finiteFlow(item, ...
                         program.prediction.stageCount*model.sampleTime);
                     records{end+1,1}=localJointRecord(item,program.prediction.stageCount, ...
-                        program.completion.frame,program.prediction.initialErrorBound(:,end), ...
+                        program.completion.frame,localEgoGenerators(program.prediction.cells(end)), ...
                         zeros(2,1),model.confirmation.range+model.cfg.encounter.numericalMargin, ...
                         true,model.cfg.solver.constraintTolerance);
                     normal=-program.completion.direction;
@@ -624,10 +624,20 @@ function result = localProjectedRows(data)
         "stage",repmat(tube.stage,numel(physical),1),"local",local);
 end
 
-function record=localJointRecord(target,stage,frame,rho,egoHalfSize,clearance,isExit,numericalTolerance)
+function generators=localEgoGenerators(tube)
+% Ego deviation set of one node: feedback-prediction zonotope, or a box.
+    if isfield(tube,'generators')
+        generators=tube.generators;
+    else
+        generators=diag(tube.radius);
+    end
+end
+
+function record=localJointRecord(target,stage,frame,egoGenerators,egoHalfSize,clearance,isExit,numericalTolerance)
+% egoGenerators (6 x m) span the ego state deviation set at the record node.
     [pose,domain]=laneGeometry.poseData(frame);
     positionMap=reshape(pose(3:14),2,6);yawRow=pose(16:21).';
-    generators=[positionMap*diag(rho),diag(target.radius(1:2))];
+    generators=[positionMap*egoGenerators,diag(target.radius(1:2))];
     positionBall=0;
     if domain(1)>0
         positionBall=pose(22);
@@ -638,7 +648,7 @@ function record=localJointRecord(target,stage,frame,rho,egoHalfSize,clearance,is
     record=struct('stage',stage,'isExit',isExit, ...
         'positionMap',positionMap,'positionOffset',pose(1:2)-target.center(1:2), ...
         'yawRow',yawRow,'yawOffset',pose(15), ...
-        'egoHalfSize',egoHalfSize,'egoYawRadius',abs(yawRow)*rho+frame.headingErrorBound, ...
+        'egoHalfSize',egoHalfSize,'egoYawRadius',sum(abs(yawRow*egoGenerators))+frame.headingErrorBound, ...
         'targetHalfSize',[target.halfLength;target.halfWidth], ...
         'targetYaw',target.center(7),'targetYawRadius',target.radius(7), ...
         'generators',generators,'positionBall',positionBall,'clearance',clearance);

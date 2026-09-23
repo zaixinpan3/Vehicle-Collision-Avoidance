@@ -141,10 +141,18 @@ function [program,prediction,clf] = localFormulate(model)
             end
             bound=physicalBound;
         else
+            % Executed inputs deviate from the plan by the feedback correction;
+            % amplitude and slew rows reserve its support (finitePredict).
+            inputSupport = zeros(planCount,1);slewSupport = zeros(planCount,1);
+            if isfield(prediction,'feedbackInputSupport')
+                inputSupport = prediction.feedbackInputSupport(:);
+                slewSupport = prediction.feedbackSlewSupport(:);
+            end
             matrix = [geometry.matrix;eye(planCount);-eye(planCount); ...
                 difference(finiteRate,:);-difference(finiteRate,:);terminalMatrix];
-            physicalBound = [geometry.physicalBound;upper;-lower; ...
-                rate(finiteRate)+prior(finiteRate);rate(finiteRate)-prior(finiteRate);terminalBound];
+            physicalBound = [geometry.physicalBound;upper-inputSupport;-lower-inputSupport; ...
+                rate(finiteRate)+prior(finiteRate)-slewSupport(finiteRate); ...
+                rate(finiteRate)-prior(finiteRate)-slewSupport(finiteRate);terminalBound];
             exitLabel=strings(0,1);
             if completion.active,exitLabel="exit:"+model.encounter.key;end
             labels=[geometry.label;repmat("actuator",2*planCount,1); ...
@@ -162,6 +170,12 @@ function [program,prediction,clf] = localFormulate(model)
     planCount = 2*count;
     reach = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
         max(abs([cfg.actuation.brakingRatioMinimum,cfg.actuation.brakingRatioMaximum]))],count,1);
+    % On an inherited frame the executed first input is the planned input plus
+    % K (xhat - z) about the carried nominal; a fresh frame starts at z = xhat.
+    feedbackCorrection = zeros(2,1);
+    if inherited && isfield(prediction,'feedbackGain') && isfield(prediction,'nominalInitialState')
+        feedbackCorrection = prediction.feedbackGain*(model.initialEgoState-prediction.nominalInitialState);
+    end
     safetyBound = bound;
     % Only the CLF has a slack column. Physical inequalities remain hard.
     physicalMatrix = [matrix,zeros(numel(bound),1)];
@@ -177,7 +191,8 @@ function [program,prediction,clf] = localFormulate(model)
     middle = (contraction+cruise.contraction)/2;
     stateMap = cruise.transition(2:6,1:6);
     inputMap = cruise.transition(2:6,7:8);
-    nominalOffset = stateMap*model.initialEgoState+cruise.transition(2:6,9)-nextState(2:6);
+    nominalOffset = stateMap*model.initialEgoState+cruise.transition(2:6,9)-nextState(2:6) ...
+        +inputMap*feedbackCorrection;
     inputRoot = root*inputMap;
     numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach(1:2)));
     coneRadius = sqrt(middle)*norm(currentRoot*trackingError)+numeric;
@@ -227,7 +242,7 @@ function [program,prediction,clf] = localFormulate(model)
         'cruiseCertificate',cruise,'clf',clf, ...
         'prediction',prediction,'inputWeight',inputWeight, ...
         'referenceStates',referenceStates,'referenceInputs',referenceInputs,'referenceMatrices',referenceMatrices, ...
-        'slackWeight',cfg.clf.relaxationWeight);
+        'slackWeight',cfg.clf.relaxationWeight,'feedbackCorrection',feedbackCorrection);
     program.terminalConePhysicalBound=terminalCone.bound;
     program.terminalConePhysicalBound(1:3:end)=program.terminalConePhysicalBound(1:3:end)+terminal.reserve;
     if inherited
@@ -293,9 +308,11 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     for index=1:numel(stageFields)
         name=stageFields{index};prediction.(name)=prediction.(name)(:,:,2:end);
     end
-    stageFields={'continuousC','stageAffine','modelErrorRateBound','executionReserve'};
+    stageFields={'continuousC','stageAffine','modelErrorRateBound','executionReserve', ...
+        'feedbackInputSupport','feedbackSlewSupport'};
     for index=1:numel(stageFields)
-        name=stageFields{index};prediction.(name)=prediction.(name)(:,2:end);
+        name=stageFields{index};
+        if isfield(prediction,name),prediction.(name)=prediction.(name)(:,2:end);end
     end
     prediction.scheduleSpeedProfile=prediction.scheduleSpeedProfile(2:end);
     prediction.scheduleCurvature=prediction.scheduleCurvature(2:end);

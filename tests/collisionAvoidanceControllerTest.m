@@ -57,7 +57,10 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,stored);
             testCase.verifyTrue(problem.metadata.certifiedIncumbentUsed);
             testCase.verifyEqual(problem.metadata.solverExitFlag,failedStatus);
-            testCase.verifyEqual(command.actuatorInput,problem.program.anchorPlan(1:2),AbsTol=0);
+            % The retained plan is a feedback policy: its first input plus the
+            % correction K (estimate - carried nominal) is issued.
+            testCase.verifyEqual(command.actuatorInput, ...
+                problem.program.anchorPlan(1:2)+problem.metadata.feedbackCorrection,AbsTol=0);
             testCase.verifyEqual(localFailureHook('count',[]),1);
         end
         function aClearFreshSeedCannotReplaceTheMandatoryTrajectorySolve(testCase,failedStatus)

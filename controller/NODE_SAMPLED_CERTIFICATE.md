@@ -24,11 +24,14 @@ optimized plan `u_1, ..., u_N` is the exact sampled transition
     x_k = A_k x_{k-1} + B_k u_k + c_k,      k = 1, ..., N,
 
 where `[A_k, B_k, c_k]` are the first six rows of `expm(h*[A(t), B(t), c(t); 0])`
-of the scheduled continuous generator of hold `k`. The true state at node `k`
-lies in the box `x_k + [-rho_k, rho_k]`, where `rho_0` is the current
-measurement box and `rho_k = |A_k| rho_{k-1} + d_k + a_k` with the held
-process reserve `d_k` (zero for the declared zero-residual plant) and a
-floating-point allowance `a_k`.
+of the scheduled continuous generator of hold `k`. The plan is a feedback
+policy ([FEEDBACK_TUBE_PREDICTION.md](FEEDBACK_TUBE_PREDICTION.md)): `u_1` is
+exact and `u_k = v_k + K (xhat_{k-1} - x_{k-1})` from the second hold on, with
+the estimator error bounded at every hold. The true state at node `k` lies in
+`x_k + E_k`, where `E_0` is the current measurement box,
+`E_1 = A_1 E_0`, and `E_k = (A_k + B_k K) E_{k-1} + B_k K H + D_k` for `k >= 2`.
+`E_k` is a zonotope whose held process reserve `d_k` (zero for the declared
+zero-residual plant) and floating-point allowance `a_k` form an interval part.
 
 The certified predicate is: for every node `k = 1, ..., N` and every state in
 its box,

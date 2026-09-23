@@ -8,8 +8,8 @@ optimizing the complete trajectory in one hard SOCP. The
 accepted complete certificate supplies the next frame's feasible incumbent.
 Safety is certified at the hold nodes only
 ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
-Its format-41 state retains directions, occupied sets, prediction and terminal
-continuation. See [the algorithm and guarantees](JOINT_SUPPORT_CERTIFICATES.md).
+Its format-43 state retains directions, occupied sets, prediction, terminal
+continuation and the feedback correction of the issued input. See [the algorithm and guarantees](JOINT_SUPPORT_CERTIFICATES.md).
 Related operations stay in the module that owns their responsibility.
 
 The count includes every source file under `controller/`, including future
@@ -28,7 +28,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `solveHardCbfClf.m` | Convex base solving (`constrained`) and fixed-direction admission/continuation (`fixedDirections`); solver success is accepted with no post-solve verification |
 | `avoidanceSafetyGeometry.m` | Joint occupied-set records, support functions, exact residuals and direction storage (`setDirections`); chart construction, signed-distance initialization and offline geometry kernels |
 | `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and local chart bounds (chart range not enforced) |
-| `ltvBicycleModel.m` | Held-input node prediction (`finitePredict`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
+| `ltvBicycleModel.m` | Held-input node prediction with feedback deviation sets (`finitePredict`, `feedbackContract`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures for offline synthesis and audits, held process reserves, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
 | `targetPrediction.m` | Bounded target admission (`admitOnline`), reachable-box conditioning (`condition`), absolute-time flow, offline uncertainty studies and footprint support |
@@ -44,7 +44,7 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-41 predictive certificate. `formulateAvoidanceProblem(model)` retains
+format-43 predictive certificate. `formulateAvoidanceProblem(model)` retains
 the convex dynamics/terminal base and attaches collision and exit certificates.
 Accepted successors preserve their angles, occupied sets, charts, prediction,
 terminal set and absolute exit deadline. Touching majorants contain that full

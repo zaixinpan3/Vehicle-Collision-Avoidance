@@ -3,7 +3,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
     properties (TestParameter)
         geometry=struct('aligned',[12;0;0;0], ...
             'rotated',[8;5;.6;-.3],'corner',[5.2;2.1;0;0]);
-        previousVersion={30,35,36,38,39,40};
+        previousVersion={30,35,36,38,39,40,42};
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -158,7 +158,9 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             ego.controllerStateErrorBound=[.04;.04;.0583;.0637;.4683;.0015];
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyTrue(problem.metadata.planCertified);
-            testCase.verifyLessThan(problem.metadata.horizonSteps,cfg.controller.horizonSteps);
+            % Feedback prediction keeps this deviation set inside the terminal
+            % set at the configured horizon; open-loop growth used to shorten it.
+            testCase.verifyEqual(problem.metadata.horizonSteps,cfg.controller.horizonSteps);
             testCase.verifyGreaterThanOrEqual(problem.metadata.horizonSteps,cfg.controller.minimumHorizonSteps);
             testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
         end

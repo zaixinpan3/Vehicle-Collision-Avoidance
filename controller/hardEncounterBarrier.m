@@ -28,12 +28,12 @@ classdef hardEncounterBarrier
             model.exitMargin = inf;
             model.targetReleased = false;
             if ~isempty(stored)
-                expectedVersion=42;
+                expectedVersion=43;
                 if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=expectedVersion
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
                 if ~isequal(stored.plan(:),stored.decision(stored.program.layout.planIndex)) ...
-                        || ~isequal(stored.appliedInput,stored.plan(:,1)) ...
+                        || ~isequal(stored.appliedInput,stored.plan(:,1)+stored.feedbackCorrection) ...
                         || ~isequaln(stored.terminal,stored.program.terminal)
                     error('collisionAvoidanceController:invalidStoredCertificate','The stored accepted plan was modified.');
                 end
@@ -45,7 +45,11 @@ classdef hardEncounterBarrier
                     error('collisionAvoidanceController:executionContractViolation','The next timestamp and issued held input are required.');
                 end
                 measuredLimit=model.measurementRadiusLimit;
-                model.measurementContractChanged=any(model.initialFrenetErrorBound>stored.terminal.measurementRadiusLimit+1e-12);
+                % The carried prediction bounds the estimator error at every
+                % hold by its declared estimatorBound; a larger bound voids it.
+                model.measurementContractChanged=any(model.initialFrenetErrorBound>stored.terminal.measurementRadiusLimit+1e-12) ...
+                    || (isfield(stored.prediction,'feedbackGain') && any(stored.prediction.feedbackGain(:)) ...
+                    && any(model.initialFrenetErrorBound>stored.prediction.estimatorBound+1e-12));
                 model.measurementRadiusLimit=stored.terminal.measurementRadiusLimit;
                 if model.measurementContractChanged
                     model.measurementRadiusLimit=max(measuredLimit,model.measurementRadiusLimit);
@@ -132,7 +136,7 @@ classdef hardEncounterBarrier
                     'sourceTime',stored.stateTime,'feasibleByInclusion',true, ...
                     'initialCenter',model.initialEgoState,'initialRadius',model.initialFrenetErrorBound, ...
                     'program',stored.program,'prediction',stored.prediction, ...
-                    'issuedInput',stored.appliedInput,'predictedCenter',stored.predictedState(:,2));
+                    'issuedInput',stored.plan(:,1),'predictedCenter',stored.predictedState(:,2));
                 if ~isempty(model.encounter) && stored.completion.active
                     model.exitDeadline = stored.completion.deadline;
                     if model.stateTime>=model.exitDeadline-1e-10
@@ -309,7 +313,7 @@ classdef hardEncounterBarrier
             end
             terminal = localTerminalSet(terminalModel);
             [finalMap,finalOffset] = localExactFinalMap(model,prediction);
-            radius = prediction.initialErrorBound(:,end);
+            [nodeGenerators,slewSupport] = localTerminalDeviation(prediction,terminal);
             modal=terminal.modalMatrix;
             stateIndex=terminal.stateIndex;modeCount=size(modal,1);
             cone.matrix=zeros(3*modeCount,prediction.planCount);cone.bound=zeros(3*modeCount,1);
@@ -319,7 +323,8 @@ classdef hardEncounterBarrier
                 mapped=modal(mode,:)*finalMap(stateIndex,:);
                 offset=modal(mode,:)*(finalOffset(stateIndex)-terminal.reference(stateIndex));
                 cone.matrix(rows,:)=[zeros(1,prediction.planCount);-real(mapped);-imag(mapped)];
-                cone.bound(rows)=[terminal.radius(mode)-terminal.reserve-abs(modal(mode,:))*radius(stateIndex); ...
+                modalSupport=sum(abs(modal(mode,:)*nodeGenerators(stateIndex,:)));
+                cone.bound(rows)=[terminal.radius(mode)-terminal.reserve-modalSupport; ...
                     real(offset);imag(offset)];
             end
             % Any conditioned terminal center lies in the certified modal set.
@@ -330,13 +335,13 @@ classdef hardEncounterBarrier
             rate = model.sampleTime*[model.cfg.model.frontWheelSteeringRateMaximum; ...
                 model.cfg.model.brakingRatioRateMaximum];
             selected = isfinite(rate);
-            support = abs(terminal.feedback)*radius;
+            support = slewSupport;
             matrix = [deltaMap(selected,:);-deltaMap(selected,:)];
             bound = [rate(selected)-support(selected)-deltaOffset(selected); ...
                 rate(selected)-support(selected)+deltaOffset(selected)];
             reach = repmat([model.cfg.model.frontWheelSteeringAngleMaximum; ...
                 max(abs([model.cfg.actuation.brakingRatioMinimum,model.cfg.actuation.brakingRatioMaximum]))],prediction.stageCount,1);
-            extent = abs(finalMap)*reach+radius;
+            extent = abs(finalMap)*reach+sum(abs(nodeGenerators),2);
             frame = laneGeometry.frameBounds(model.lane,finalOffset(1), ...
                 extent(1),abs(finalOffset(2))+extent(2));
             if ~isempty(model.encounter) && isfield(geometry.frames,'positionMap')
@@ -411,6 +416,24 @@ classdef hardEncounterBarrier
             accepted = all(isfinite(margins)) && all(margins>=0);
         end
 
+    end
+end
+
+function [nodeGenerators,slewSupport] = localTerminalDeviation(prediction,terminal)
+% Deviation set of the final node and the support of the terminal-law input
+% change F (e_N + eta_N) - Du_N, where Du_N is the deviation of the last
+% planned input in the same source basis (ltvBicycleModel.finitePredict).
+    feedback=terminal.feedback;
+    if isfield(prediction,'finalInputDeviation')
+        final=prediction.finalInputDeviation;
+        nodeGenerators=[final.nodeZonotope,diag(final.nodeInterval)];
+        last=[final.zonotope,zeros(2,size(final.nodeZonotope,2)-size(final.zonotope,2))];
+        slewSupport=sum(abs(feedback*final.nodeZonotope-last),2)+sum(abs(feedback*final.noise),2) ...
+            +abs(feedback)*final.nodeInterval+final.interval;
+    else
+        radius=prediction.initialErrorBound(:,end);
+        nodeGenerators=diag(radius);
+        slewSupport=abs(feedback)*radius;
     end
 end
 
@@ -720,6 +743,11 @@ function [count,inputs]=localCruiseAdmission(model)
     terminal=localTerminalSet(model);cfg=model.cfg;
     count=model.horizonSteps;maximum=4*count;
     inputs=zeros(2,maximum);x=model.initialEgoState;rho=model.initialFrenetErrorBound;
+    % The same feedback deviation recursion as the certified prediction.
+    model.cruiseCertificate=terminal.cruise;
+    [gain,bound]=ltvBicycleModel.feedbackContract(model);
+    zonotope=diag(rho);zonotope=zonotope(:,rho~=0);
+    noise=diag(bound);noise=noise(:,bound~=0);
     previous=model.previousInput;cruise=terminal.cruise;feasibleCount=0;
     lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
     upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
@@ -728,15 +756,22 @@ function [count,inputs]=localCruiseAdmission(model)
         input=terminal.input+terminal.feedback*(x-terminal.reference);
         input=min(max(input,max(lower,previous-rate)),min(upper,previous+rate));
         inputs(:,index)=input;previous=input;
+        stateMap=cruise.transition(1:6,1:6);inputMap=cruise.transition(1:6,7:8);
+        if index>1 && any(gain(:))
+            zonotope=[(stateMap+inputMap*gain)*zonotope,inputMap*gain*noise];
+        else
+            zonotope=stateMap*zonotope;
+        end
         x=cruise.transition(1:6,:)*[x;input;1];
-        rho=abs(cruise.transition(1:6,1:6))*rho;
         if isfield(terminal,'scheduled') && terminal.scheduled
             nextModel=terminal.scheduleModel;
             nextModel.referencePhaseIndex=terminal.index+1;
             if isfield(model,'referenceBank'),nextModel.referenceBank=model.referenceBank;end
             terminal=localTerminalSet(nextModel);cruise=terminal.cruise;
         end
-        [~,margin]=hardEncounterBarrier.terminalMembership(terminal,x,rho);
+        selected=terminal.stateIndex;
+        margin=terminal.radius-abs(terminal.modalMatrix*(x(selected)-terminal.reference(selected))) ...
+            -sum(abs(terminal.modalMatrix*zonotope(selected,:)),2);
         if all(margin>4*terminal.reserve)
             if index>=cfg.controller.minimumHorizonSteps,feasibleCount=index;end
             if index>=count,count=index;inputs=inputs(:,1:count);return;end

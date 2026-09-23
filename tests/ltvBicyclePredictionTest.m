@@ -27,9 +27,14 @@ classdef ltvBicyclePredictionTest < matlab.unittest.TestCase
                 testCase.verifyEqual(cell.localStateMap,prediction.stageMatrixA(:,:,stage),AbsTol=0);
                 testCase.verifyEqual(cell.localInputMap,prediction.stageMatrixB(:,:,stage),AbsTol=0);
                 testCase.verifyEqual(cell.localOffset,prediction.stageAffine(:,stage),AbsTol=0);
-                testCase.verifyGreaterThanOrEqual(cell.radius, ...
-                    abs(prediction.stageMatrixA(:,:,stage))*prediction.egoStateErrorBound(:,stage));
+                % Each node box is the hull of its deviation-set generators;
+                % containment of sampled trajectories is checked in
+                % feedbackPredictionTest.
+                testCase.verifyEqual(cell.radius,sum(abs(cell.generators),2),AbsTol=1e-12);
             end
+            % The first held input is exact: node 1 is the image of the initial box.
+            testCase.verifyGreaterThanOrEqual(prediction.cells(1).radius, ...
+                abs(prediction.stageMatrixA(:,:,1))*prediction.egoStateErrorBound(:,1));
         end
 
         function futureDisturbancesStayInsideEveryCertifiedNode(testCase)
