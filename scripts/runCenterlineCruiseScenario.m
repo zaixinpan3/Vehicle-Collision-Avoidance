@@ -444,11 +444,18 @@ end
 function perceived = localRoadPerception(centerline,state,options)
     offsets = options.roadBoundaryOffsets;
     range = options.perceptionRange;
+    % The curb fit may use its own sensing range (a map-known curb reaches
+    % farther than the target sensor); the certified cells must lie inside it.
+    if ~isempty(options.roadPerceptionRange),range = options.roadPerceptionRange;end
     if isempty(offsets),offsets = [6;8];range = min(range,30);end
     perceived = fitPerceivedRoadBoundaries(centerline,localControllerPose(state), ...
         PerceptionRange=range,RightOffset=offsets(1),LeftOffset=offsets(2), ...
         ShoulderWidth=options.roadShoulderWidth);
-    if isempty(options.roadBoundaryOffsets),perceived.roadGeometry.boundaries = struct([]);end
+    if isempty(options.roadBoundaryOffsets)
+        % Road-free run: no fitted curbs and no declared terminal clearance.
+        perceived.roadGeometry.boundaries = struct([]);
+        perceived.roadGeometry.lateralClearance = zeros(2,0);
+    end
     if isfield(options.geometry,"referenceCurve")
         perceived.roadGeometry.referenceCurve = options.geometry.referenceCurve;
     end
@@ -482,6 +489,8 @@ function options = localOptions(varargin)
         @localPositiveScalar);
     addParameter(parser, "RoadBoundaryOffsets", [], ...
         @localEmptyOrPositiveTwoVector);
+    addParameter(parser, "RoadPerceptionRange", [], ...
+        @(value) isempty(value) || localPositiveScalar(value));
     addParameter(parser, "RoadShoulderWidth", 2.6, ...
         @localPositiveScalar);
     addParameter(parser, "EgoCollisionSize", [], ...
@@ -532,6 +541,8 @@ function options = localOptions(varargin)
         double(parser.Results.PerceptionRange);
     options.roadBoundaryOffsets = ...
         double(parser.Results.RoadBoundaryOffsets(:));
+    options.roadPerceptionRange = ...
+        double(parser.Results.RoadPerceptionRange);
     options.roadShoulderWidth = ...
         double(parser.Results.RoadShoulderWidth);
     options.egoCollisionSize = ...

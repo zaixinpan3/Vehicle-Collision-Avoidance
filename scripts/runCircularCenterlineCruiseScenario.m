@@ -28,6 +28,10 @@ function result = runCircularCenterlineCruiseScenario(varargin)
         "SpeedTolerance", options.speedTolerance, ...
         "LateralTolerance", options.lateralTolerance, ...
         "HeadingTolerance", options.headingTolerance, ...
+        "PerceptionRange", options.perceptionRange, ...
+        "RoadBoundaryOffsets", options.roadBoundaryOffsets, ...
+        "RoadShoulderWidth", options.roadShoulderWidth, ...
+        "RoadPerceptionRange", options.roadPerceptionRange, ...
         "Plot", options.plot, ...
         "Report", options.report);
 end
@@ -50,6 +54,12 @@ function options = localOptions(varargin)
     addParameter(parser, "Plot", false, @localLogicalScalar);
     addParameter(parser, "Report", true, @localLogicalScalar);
     addParameter(parser,"ControllerConfiguration",struct(),@(x) isstruct(x)&&isscalar(x));
+    addParameter(parser, "PerceptionRange", 30.0, @localPositiveScalar);
+    addParameter(parser, "RoadBoundaryOffsets", [], ...
+        @(value) isempty(value) || (isnumeric(value) && numel(value)==2 && all(value(:)>0)));
+    addParameter(parser, "RoadShoulderWidth", 2.6, @localPositiveScalar);
+    addParameter(parser, "RoadPerceptionRange", [], ...
+        @(value) isempty(value) || localPositiveScalar(value));
     parse(parser, varargin{:});
 
     options = struct();
@@ -68,6 +78,10 @@ function options = localOptions(varargin)
     options.plot = logical(parser.Results.Plot);
     options.report = logical(parser.Results.Report);
     options.controllerConfiguration = parser.Results.ControllerConfiguration;
+    options.perceptionRange = double(parser.Results.PerceptionRange);
+    options.roadBoundaryOffsets = double(parser.Results.RoadBoundaryOffsets(:));
+    options.roadShoulderWidth = double(parser.Results.RoadShoulderWidth);
+    options.roadPerceptionRange = double(parser.Results.RoadPerceptionRange);
 end
 
 function valid = localPositiveScalar(value)

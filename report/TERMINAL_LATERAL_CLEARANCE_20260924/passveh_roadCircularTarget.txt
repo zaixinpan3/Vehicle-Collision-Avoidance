@@ -1,0 +1,16 @@
+Left circular centerline (R = 100.0 m) with a straight-line target constructed to collide at t = 1.675 s
+  Perception/control sample time: 0.050 s
+  Target initial distance: 50.000000 m
+  Constructed nominal collision time: 1.674535 s
+  Collision construction error: 3.5527136788e-15 m
+  Nominal collision SAT margin: -0.500000 m
+  Baseline minimum SAT margin: 24.065336 m
+  Controlled minimum SAT margin: 24.067942 m
+  Passing time / ego speed: NaN s / NaN m/s
+  Minimum ego longitudinal speed: 14.985 m/s
+  Final-window maximum speed/lateral/heading errors:  m/s,  m,  rad
+  Mean / maximum solve time: 0.090070 / 0.950981 s
+  Result: FAIL
+PASSED=0
+FAILURE t=0.700 collisionAvoidanceController:roadBoundaryCoverageGap :: Each boundary must cover the complete certified cell.
+EXIT=0

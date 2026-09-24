@@ -114,9 +114,48 @@ untracked LiDAR dataset is absent from the worktree). The count rises from
 
 ## 4. PassVeh14DOF scenarios with road boundaries
 
-Completed in the follow-up commit after merging this change into the shared
-working tree, whose concurrent-session edits the PassVeh14DOF runs need to
-pass the second sample (see the section of the same name below if present).
+Run in the shared working tree after merging `e81d56e`, i.e. with the
+concurrent session's uncommitted edits (which the 14-DOF runs need to pass
+the second sample; `report/CONTROLLER_SCENARIO_RERUN_20260924.md`). The
+harness gained a `RoadPerceptionRange` option (curb-fit range, default equal
+to `PerceptionRange`) so that a map-known curb can be declared farther than
+the target sensor sees; `runCircularCenterlineCruiseScenario` gained the road
+options it lacked. Logs: `passveh_*.txt` in the artifact folder.
+
+| Scenario | Curb range | Outcome |
+| --- | --- | --- |
+| straight cruise, curbs at 8.6 / 10.6 m | 30 m | **PASS**, 80 / 80; min road margin 7.52 m; 79 of 79 later frames re-admitted after the curb refit |
+| circular cruise R = 100 m, curbs | 100 m | **PASS**, 80 / 80; max lateral error 0.0057 m |
+| straight cruise, no road (regression) | - | **PASS**, 80 / 80 |
+| oncoming avoidance (default) | 30 m | `roadBoundaryCoverageGap` at t = 0.70 s, the first target frame (14 frames) |
+| oncoming avoidance | 60 m | `roadBoundaryCoverageGap` at t = 0 (the target is visible at 50 m) |
+| oncoming avoidance | 150 m | infeasible SOCP at t = 1.45 s (29 frames; horizon 16, then 56, 48, 40 holds after detection; min lateral -0.355 m; SAT margin 1.449 m at failure) |
+| circular straight-target avoidance | 30 m | `roadBoundaryCoverageGap` at t = 0.70 s |
+| circular straight-target avoidance | 100 m | `roadBoundaryCoverageGap` at t = 0.70 s; the single-chart quadratic fits cover [-53, 91] and [-43, 80] m with fit error bounds 3.5 and 4.4 m |
+| estimator-in-the-loop, straight | 150 m | 71 steps, then `roadBoundaryCoverageGap` at the first radar frame (the admission cell needs [-77, 151] m of the ±150 m fit) |
+| estimator-in-the-loop, circular R = 60 m | 150 m | `invalidRoadBoundary` at t = 0: the 150 m quadratic fit of a 60 m arc crosses the centerline |
+
+Both cruise scenarios on the 14-DOF plant now complete with physical curbs;
+these are the first road-bounded PassVeh14DOF runs to complete. The
+avoidance scenarios are no longer rejected by the terminal set; what stops
+them is elsewhere:
+
+- **Coverage of the finite curb fit.** When a target is admitted, the
+  certified cells extend over the whole encounter (up to four horizons), so
+  a perception-limited curb fit shorter than that raises the node-row
+  coverage gap. On the straight road a 150 m map-known fit suffices for the
+  truth-target run; with the estimator's first-detection bounds (speed
+  ±30 m/s, course unbounded) the cells span about ±150 m and no finite fit
+  covers them. This is the first-detection-bound problem of
+  `CONTROLLER_SCENARIO_RERUN_20260924.md`, Section 4.3, seen through the road
+  rows.
+- **Single-chart quadratic curbs on curved roads.** `fitPerceivedRoadBoundaries`
+  fits one quadratic per curb in one frame; over 100 m of a 100 m radius arc
+  the fit error bound is 3.5-4.4 m and the covered range is short, and over
+  150 m of a 60 m arc the fit is invalid. Covering a curved encounter needs
+  piecewise charts, which is a perception-model change outside this task.
+- **The close-encounter infeasibility** of the straight truth-target run
+  (t = 1.45 s with curbs, 1.55 s without) is unchanged by this task.
 
 ## 5. Scope
 

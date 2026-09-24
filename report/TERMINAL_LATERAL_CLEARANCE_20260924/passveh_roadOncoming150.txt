@@ -1,0 +1,16 @@
+Straight-centerline oncoming-vehicle avoidance
+  Perception/control sample time: 0.050 s
+  Complete online frame median / maximum / deadline: 37.217 / 815.194 / 100.000 ms
+  Complete frame deadline met / enforced: 0 / 0
+  Target lateral offset: 1.500 m
+  No-control minimum SAT margin: 1.500000 m
+  Controlled minimum SAT margin: 1.449154 m
+  Passing time / ego speed: NaN s / NaN m/s
+  Minimum ego longitudinal speed: 14.914 m/s
+  Minimum ego lateral position: -0.354779 m
+  Final-window maximum speed/lateral/heading errors:  m/s,  m,  rad
+  Mean / maximum solve time: 0.063938 / 0.798837 s
+  Result: FAIL
+PASSED=0
+FAILURE t=1.450 collisionAvoidanceController:optimizationFailed :: The hard-safety, soft-CLF search failed at t=1.45 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.
+EXIT=0

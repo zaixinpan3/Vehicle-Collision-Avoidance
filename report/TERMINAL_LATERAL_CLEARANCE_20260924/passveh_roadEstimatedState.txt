@@ -1,0 +1,18 @@
+NRMM estimator-in-the-loop collision avoidance
+  straight: FAIL, SAT margin NaN m, min speed NaN m/s
+    ego position/velocity RMSE NaN m / NaN m/s
+    target position/velocity RMSE NaN m / NaN m/s
+    final-window speed/lateral/course-heading errors NaN m/s / NaN m / NaN rad; recovered: 0
+    road boundary margin NaN; no crossing: 1
+    initial target range NaN m; first detection NaN s at NaN m; pre-detection cruise NaN s (required 2.00 s): 0
+    body acceleration peaks |a_x| / |a_y| NaN / NaN m/s^2; coupled 0.00 s (required 0.30 s): 0
+  circular: FAIL, SAT margin NaN m, min speed NaN m/s
+    ego position/velocity RMSE NaN m / NaN m/s
+    target position/velocity RMSE NaN m / NaN m/s
+    final-window speed/lateral/course-heading errors NaN m/s / NaN m / NaN rad; recovered: 0
+    road boundary margin NaN; no crossing: 1
+    initial target range NaN m; first detection NaN s at NaN m; pre-detection cruise NaN s (required 2.00 s): 0
+    body acceleration peaks |a_x| / |a_y| NaN / NaN m/s^2; coupled 0.00 s (required 0.30 s): 0
+  Suite-level coupled-maneuver coverage: FAIL ()
+  Overall: FAIL
+EXIT=0
