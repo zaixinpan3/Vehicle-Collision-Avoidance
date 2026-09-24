@@ -221,3 +221,17 @@ The measured outcomes in Sections 1–4 are unchanged. The model-consistent
 certificate is described, not implemented, in Section 7 of
 [CLOSED_LOOP_TARGET_PREDICTION.md](../controller/CLOSED_LOOP_TARGET_PREDICTION.md).
 
+
+## 8. Correction (2026-09-24): the published acceleration maximum
+
+The introduction and Section 5 say the NRMM estimator "already publishes" the
+acceleration maximum. The 2 m/s^2 it published under `scalarAccelerationMaximum` is its
+speed-rate maximum `|A|`, while the controller reads the field as a bound on
+`|a|`. For a turning target `|a| = hypot(A, V omega)` reaches 2.36 m/s^2 in the
+estimator-in-the-loop domain and 4.25 m/s^2 in the `nrmmTrackingConfig` domain,
+so the published value was not a valid cap there.
+
+Since 2026-09-24 the estimator publishes `accelerationNormBound`
+([NRMM_TARGET_PREDICTION_20260924.md](NRMM_TARGET_PREDICTION_20260924.md)). The
+campaigns of this record declared their own maxima, with truths inside them, so
+the measured outcomes are unaffected.

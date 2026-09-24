@@ -24,6 +24,11 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.TargetYawAccelerationAmplitude (1,1) double {mustBeFinite} = 0
         options.TargetMotionFrequency (1,1) double {mustBeFinite,mustBePositive} = 1
         options.TargetAccelerationMaximum (1,1) double {mustBePositive} = Inf
+        options.TargetMotionModel (1,1) string {mustBeMember(options.TargetMotionModel,["jerk","nrmm"])} = "jerk"
+        options.TargetSpeedRate (1,1) double {mustBeFinite} = 0
+        options.TargetCurvature (1,1) double {mustBeFinite} = 0
+        options.TargetCurvatureMaximum (1,1) double {mustBeFinite,mustBePositive} = 0.05
+        options.NrmmContract (1,1) string {mustBeMember(options.NrmmContract,["nrmm","cartesian"])} = "nrmm"
         options.InitialTrackingError (5,1) double {mustBeFinite} = zeros(5,1)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
         options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 1
@@ -49,6 +54,9 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         "jerkAmplitude",options.TargetJerkAmplitude, ...
         "yawAccelerationAmplitude",options.TargetYawAccelerationAmplitude, ...
         "frequency",options.TargetMotionFrequency,"accelerationMaximum",options.TargetAccelerationMaximum, ...
+        "model",options.TargetMotionModel,"speedRate",options.TargetSpeedRate, ...
+        "curvature",options.TargetCurvature,"curvatureMaximum",options.TargetCurvatureMaximum, ...
+        "cartesianJerkBound",NaN, ...
         "halfLength",cfg.target.defaultLength/2,"halfWidth",cfg.target.defaultWidth/2);
     if options.Scenario=="oncoming",truthTarget.center=[60;0;-8;0;0;0;pi;0];end
     if options.Scenario=="crossing",truthTarget.center=[15;-4;0;32;0;0;pi/2;0];end
@@ -72,6 +80,14 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
             normal = [-sin(heading);cos(heading)];
             truthTarget.center = [point-7.5*normal;4*normal;zeros(2,1);heading+pi/2;0];
         end
+    end
+    if options.TargetMotionModel=="nrmm" && options.NrmmContract=="cartesian"
+        % The same NRMM truth under a Cartesian contract: the jerk of an NRMM
+        % path, hypot(kappa^2 V^3, 3 A kappa V), over the run's speeds and the
+        % declared curvature maximum.
+        speedMaximum = norm(truthTarget.center(3:4))+max(options.TargetSpeedRate,0)*options.SampleCount*h;
+        truthTarget.cartesianJerkBound = hypot(options.TargetCurvatureMaximum^2*speedMaximum^3, ...
+            3*abs(options.TargetSpeedRate)*options.TargetCurvatureMaximum*speedMaximum);
     end
     if options.UseRoadBoundaries
         boundary = struct("origin",zeros(2,1),"longitudinalDirection",[1;0], ...
@@ -273,14 +289,49 @@ function target = localTargetMeasurement(truth,time,bound,stream)
     if isfinite(truth.accelerationMaximum)
         target.predictionMotion.scalarAccelerationMaximum = truth.accelerationMaximum;
     end
+    if truth.model=="nrmm" && isfinite(truth.cartesianJerkBound)
+        % The same NRMM truth under a Cartesian contract whose jerk bound
+        % covers its turning (what the estimator publishes for a model error).
+        target.predictionMotion.jerkBound = abs(truth.jerkAmplitude)+truth.cartesianJerkBound;
+        target.predictionMotion.yawAccelerationBound = abs(truth.yawAccelerationAmplitude) ...
+            +truth.curvatureMaximum*abs(truth.speedRate);
+    elseif truth.model=="nrmm"
+        % Exact NRMM motion: constant speed-rate and curvature.
+        assert(all(truth.jerkAmplitude==0) && truth.yawAccelerationAmplitude==0, ...
+            "runExactStateRecursiveFeasibilityScenario:nrmmModelError", ...
+            "An NRMM contract declares exact NRMM motion; use NrmmContract=""cartesian"" for a model error.");
+        target.predictionMotion.kind = "nrmm-motion-v1";
+        target.predictionMotion.curvatureMaximum = truth.curvatureMaximum;
+    end
 end
 
 function state = localTargetTruth(truth,time)
 % Independent integrals of j(t)=J*cos(w*t), yawAcceleration(t)=H*cos(w*t).
+% With the nrmm model these are added to a constant speed-rate, constant
+% curvature path (stopping and holding at zero speed); an NRMM contract
+% requires them to be zero.
     x = truth.center;
     w = truth.frequency;
     sine = sin(w*time);
     cosine = 1-cos(w*time);
+    if truth.model=="nrmm"
+        speed = norm(x(3:4));course = x(7);
+        if speed>0,course = atan2(x(4),x(3));end
+        rate = truth.speedRate;curvature = truth.curvature;moving = time;
+        if rate<0,moving = min(time,speed/-rate);end
+        arc = speed*moving+rate*moving^2/2;speedNow = max(0,speed+rate*moving);
+        heading = course+curvature*arc;tangent = [cos(heading);sin(heading)];normal = [-tangent(2);tangent(1)];
+        half = curvature*arc/2;scale = 1;
+        if abs(half)>1e-8,scale = sin(half)/half;end
+        acceleration = rate*tangent+curvature*speedNow^2*normal;
+        if speedNow==0,acceleration = zeros(2,1);end
+        state = [x(1:2)+arc*scale*[cos(course+half);sin(course+half)]+truth.jerkAmplitude*(time/w^2-sine/w^3); ...
+            speedNow*tangent+truth.jerkAmplitude*cosine/w^2; ...
+            acceleration+truth.jerkAmplitude*sine/w; ...
+            x(7)+curvature*arc+truth.yawAccelerationAmplitude*cosine/w^2; ...
+            curvature*speedNow+truth.yawAccelerationAmplitude*sine/w];
+        return;
+    end
     state = [(x(1:2)+x(3:4)*time+x(5:6)*time^2/2 ...
             +truth.jerkAmplitude*(time/w^2-sine/w^3)); ...
         x(3:4)+x(5:6)*time+truth.jerkAmplitude*cosine/w^2; ...

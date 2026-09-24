@@ -1,6 +1,7 @@
 # Closed-loop prediction of the target: reaction and acceleration limits
 
-Status: implemented 2026-09-23. Companion to
+Status: implemented 2026-09-23; the NRMM-consistent target prediction of
+Section 7 implemented 2026-09-24. Companion to
 [FEEDBACK_TUBE_PREDICTION.md](FEEDBACK_TUBE_PREDICTION.md), which closes the
 loop for the ego. This document covers the target part of the prediction.
 Configuration: `cfg.feedbackPrediction.targetReaction`; the acceleration cap
@@ -84,6 +85,15 @@ The NRMM estimator already publishes this bound (`nrmmControllerErrorBounds`:
 2 m/s^2 by default). Before this change the controller used it only to clip the
 nominal flow.
 
+Correction (2026-09-24): the value the estimator published is its speed-rate
+maximum `|A| <= 2 m/s^2`, not a bound on `|a|`. For a turning target
+`|a| = hypot(A, V omega)` reaches `hypot(2, 1.25) = 2.36 m/s^2` in the
+estimator-in-the-loop domain and `hypot(2, 3.75) = 4.25 m/s^2` in the
+`nrmmTrackingConfig` domain, so the published cap was not a valid bound
+there. `nrmmControllerErrorBounds` now publishes `domain.accelerationNormBound`.
+The declared-plant campaigns of Section 5 declared their own maxima, with truths
+inside them, and are unaffected.
+
 A carried family is void if the declared maximum increases or disappears
 (`hardEncounterBarrier.prepare`).
 
@@ -93,13 +103,14 @@ A carried family is void if the declared maximum increases or disappears
 
 From the second hold on, the executed input is
 
-    u_k = v_k + K_k (xhat_k - z_k) + L_k (shat_k - s0_k) + N_k (ahat_k - a0),
+    u_k = v_k + K_k (xhat_k - z_k) + L_k (shat_k - s0_k) + N_k (ahat_k - a0_k),
 
 where:
 - `shat` is the target position/velocity estimate and `ahat` its acceleration
   estimate;
-- `s0, a0` are the nominal constant-acceleration flow of the admitted target
-  (`finiteFlow` center);
+- `s0, a0` are the nominal flow of the admitted target
+  (`targetPrediction.deviationModel` center): constant acceleration under the
+  Cartesian contract, the NRMM path of the estimate under `nrmm-motion-v1`;
 - every estimate errs by at most its published bound at every hold. The target
   bound at admission is the contract (`prediction.targetEstimatorBound`).
 
@@ -163,7 +174,7 @@ rebuilt for those directions. Inherited frames never switch.
 
 An inherited frame issues
 
-    plan(:,1) + K_1 (xhat - z_1) + L_1 (shat - s0_1) + N_1 (ahat - a0)
+    plan(:,1) + K_1 (xhat - z_1) + L_1 (shat - s0_1) + N_1 (ahat - a0_1)
 
 about the carried nominals (`formulateAvoidanceProblem`). Here `shat, ahat`
 are the conditioned target estimate, whose radius is at most the measured
@@ -221,41 +232,75 @@ turning (Section 7).
 - **Curved charts** are built from the reactive ego radius; the chart remainder
   is not enforced (unchanged).
 
-## 7. NRMM-consistent target prediction (not implemented)
+## 7. NRMM-consistent target prediction (implemented 2026-09-24)
 
-Under the controller's NRMM target model, the certificate's target box is not
-consistent with the model. It encloses a turning NRMM target by a Cartesian
-constant-acceleration path plus the NRMM jerk bound.
+Section 1 identified the `J t^3/6` term as the Cartesian enclosure of the
+deterministic turning of an NRMM target. The `nrmm-motion-v1` contract
+removes it; [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md)
+states it in full.
 
-[nrmmVersusCartesian.m](../report/TARGET_REACTION_VALIDATION_20260923/nrmmVersusCartesian.m)
-takes one turning target: 15 m/s, sideslip 0.005 rad, speed-rate 1 m/s^2.
-Its estimate errors are 0.2 m, 0.1 m/s and 0.1 m/s^2 per axis, 0.01 rad and
-0.005 rad/s. Position half-width per axis at 4.8 s:
+**Contract.** Exact NRMM motion: constant speed-rate and constant sideslip, so
+a path of constant curvature `|kappa| <= curvatureMaximum` through the current
+state, stopping and holding at zero speed. There is no jerk or yaw-acceleration
+allowance. A varying speed-rate or curvature leaves every NRMM path through a
+later estimate, so a model error is declared with the Cartesian contract
+instead. `nrmmControllerErrorBounds` publishes `nrmm-motion-v1` when
+`modelJerkMaximum = 0` (the default), with `curvatureMaximum = sin(beta_max)/l_r`
+and the acceleration magnitude bound, and the Cartesian contract otherwise.
 
-| Estimator domain | Certificate box | of which `J t^3/6` | NRMM-family envelope, same errors |
-| --- | --- | --- | --- |
-| estimator-in-the-loop, sideslip max 0.005 rad (J = 0.38 m/s^3) | 8.9 m | 7.1 m | 4.7 m |
-| `nrmmTrackingConfig`, sideslip max 0.015 rad (J = 1.33 m/s^3) | 26.3 m | 24.5 m | 4.7 m |
+**Reachable box** (`targetPrediction.finiteFlow`), for every NRMM path through
+the estimate box:
+1. **Parameters.** Sound intervals for `p0`, `V`, course, `A` and `kappa`. The
+   curvature interval comes from both the yaw rate (`kappa V`) and the normal
+   acceleration (`kappa V^2`).
+2. **Path.** Their image along the path: analytic sensitivities with a
+   Lagrange second-order remainder, or a path-length ball where the
+   linearization does not apply.
+3. **Intersection.** The result is intersected with the Cartesian enclosure of
+   the same paths. That enclosure uses their jerk
+   `hypot(kappa^2 V^3, 3 A kappa V)` and yaw acceleration `|A kappa|` over the
+   parameter intervals, plus the jump of the acceleration to zero wherever a
+   path may have stopped.
 
-The envelope is the existing `targetPrediction.errorEnvelope`. All of its growth
-is the extrapolation of the current estimate error: speed, speed-rate, heading
-and curvature errors along the NRMM path.
+All of the remaining growth is the extrapolation of the current estimate error
+along the NRMM path.
 
-A model-consistent certificate would need three changes:
-- **Nominal.** Use the NRMM path of the estimate.
-- **Uncertainty.** Use the image of the current NRMM parameter-error box, plus
-  only the declared model-error allowance. This removes the `J t^3/6` term.
-- **Reaction.** Apply the target-reactive policy to the NRMM deviation. That
-  deviation is a smooth, deterministic function of the current estimate error:
-  its acceleration is about the speed-rate error plus `v^2` times the curvature
-  error, roughly 0.2 m/s^2 in the example above. Following it therefore needs
-  little authority, and the relative tube is then set by the per-hold estimate
-  error.
+**Reactive tube** (`targetPrediction.deviationModel`). The target deviation is
+`S(t) theta + rho(t)`:
+- `S(t) theta`: the parameter errors `theta` are generators shared by the
+  target and the ego's reaction.
+- `rho(t)`: the remainder is an interval part of the target at each record
+  node. The reaction to it enters as new generators at every hold, so that
+  `|A + B K|` does not wrap it.
 
-This would change the target interface in three places:
-- the estimator would publish NRMM parameter-error bounds and model-error rates
-  instead of only a Cartesian jerk bound;
-- the certificate would cover NRMM motions plus the declared allowance, rather
-  than every jerk-bounded motion;
-- the declared-plant harness would need NRMM truth targets.
+The tube does not use the Cartesian intersection. The Cartesian contract keeps
+its model: initial position and velocity generators plus a per-hold
+acceleration part.
 
+**Scope.**
+- Certification is at hold nodes only. Whole-hold cells extrapolate a node
+  snapshot with the Cartesian jerk bound and are rejected for NRMM targets.
+- A change of the motion kind, or a larger curvature maximum, voids a carried
+  family.
+
+**Measured effect.** See
+[NRMM_TARGET_PREDICTION_20260924.md](../report/NRMM_TARGET_PREDICTION_20260924.md).
+- **Target box.** The target of the table above, at 4.8 s (position half-width
+  per axis):
+  - sideslip maximum 0.005 rad: 2.85 m, against 8.89 m under the Cartesian
+    contract;
+  - sideslip maximum 0.015 rad: 3.02 m, against 26.28 m.
+
+  Both are below the 4.7 m family envelope.
+- **What the reaction buys.** The reactive policy does not realize the
+  expectation stated here before implementation, that following the NRMM
+  deviation needs little authority and leaves only the per-hold estimate error.
+  Three structural reasons:
+  1. The estimator errors are worst-case and independent per hold, so the
+     reaction also answers sign-switching errors.
+  2. The remainder cannot be followed.
+  3. Keeping the relative deviation small moves the target's spread into the
+     ego's absolute position, where the lane, actuator and terminal cruise
+     constraints bind.
+
+  The report gives the measured supports and outcomes.

@@ -48,6 +48,32 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
                 end
             end
         end
+        function anExactNrmmTargetPublishesTheNrmmContract(testCase)
+            published = localReconstruction(testCase.Design, [1.2; 0.03; 0]);
+            motion = published.targetEstimate.predictionMotion;
+            domain = testCase.Design.target.domain;
+            testCase.assertEqual(testCase.Design.target.modelJerkMaximum, 0);
+            testCase.verifyEqual(string(motion.kind), "nrmm-motion-v1");
+            testCase.verifyEqual(motion.jerkBound, [0; 0]);
+            testCase.verifyEqual(motion.yawAccelerationBound, 0);
+            testCase.verifyEqual(motion.curvatureMaximum, ...
+                sin(domain.sideslipMaximum)/domain.rearAxleDistance);
+            % The controller caps the acceleration magnitude, hypot(A, V*omega).
+            testCase.verifyEqual(motion.scalarAccelerationMaximum, domain.accelerationNormBound);
+            testCase.verifyGreaterThan(motion.scalarAccelerationMaximum, domain.scalarAccelerationMaximum);
+        end
+        function aModelErrorPublishesTheCartesianJerkContract(testCase)
+            design = testCase.Design;
+            design.target.modelJerkMaximum = 0.5;
+            published = localReconstruction(design, [1.2; 0.03; 0]);
+            motion = published.targetEstimate.predictionMotion;
+            domain = design.target.domain;
+            testCase.verifyEqual(string(motion.kind), "finite-sensing-motion-v1");
+            testCase.verifyFalse(isfield(motion, "curvatureMaximum"));
+            testCase.verifyEqual(motion.jerkBound, repmat(hypot(domain.speedMaximum*domain.yawRateMaximum^2, ...
+                3*domain.scalarAccelerationMaximum*domain.yawRateMaximum)+0.5, 2, 1));
+            testCase.verifyEqual(motion.scalarAccelerationMaximum, domain.accelerationNormBound);
+        end
         function staleVelocityRequiresAnAccelerationEnvelope(testCase)
             [output, bound, input] = localVelocityFixture();
             output.stateTime = 0.1;

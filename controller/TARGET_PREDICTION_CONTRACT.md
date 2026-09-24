@@ -47,6 +47,45 @@ anonymous target receives `singleTarget:1`. Zero visible targets and verified
 departure use the lifecycle in [INFORMATION_STATE_PCBF.md](INFORMATION_STATE_PCBF.md):
 the same optimization retains road, model, actuator and CLF constraints.
 
+## Exact NRMM motion (`nrmm-motion-v1`)
+
+`predictionMotion.kind="nrmm-motion-v1"` declares exact NRMM motion. The target
+keeps its speed-rate `A` and its sideslip, so it follows a path of constant
+curvature `kappa` through its current state, with
+`abs(kappa) <= curvatureMaximum` (1/m, required). Its yaw is `psi0 + kappa*s(t)`
+and its yaw rate `kappa*V(t)`; it stops and holds when its speed reaches zero.
+`jerkBound` and `yawAccelerationBound` must be zero. A varying speed-rate or
+curvature leaves every NRMM path through a later estimate, so a model error
+is declared with a `finite-sensing-motion-v1` contract instead
+(`nrmmControllerErrorBounds` does this when `modelJerkMaximum > 0`).
+
+`finiteFlow` then encloses every NRMM path through the current estimate box:
+- **Parameters.** `p0 = position +- r_p`, `V = |v| +- |r_v|`,
+  `course = atan2(v) +- asin(|r_v|/|v|)`,
+  `A = v'a/|v| +- (|r_a| + 2|a| sin(r_course/2))` (within
+  `+-scalarAccelerationMaximum` when declared), and `kappa` in both `omega/V`
+  and `a_N/V^2` over the box, within `+-curvatureMaximum`.
+- **Path.** The linearization of the NRMM path in these parameters with a
+  Lagrange second-order remainder, or a path-length ball where the
+  linearization does not apply: a course radius above 0.5 rad, a speed
+  interval touching zero, or a possible stop.
+- **Intersection.** The result is intersected with the Cartesian enclosure of
+  the same paths. Their jerk is at most `hypot(kappa^2 V^3, 3 A kappa V)` and
+  their yaw acceleration at most `|A kappa|` over the parameter intervals. A
+  stop sets the acceleration to zero, so where a path may have stopped the
+  per-axis acceleration deviation also covers `max(0, |a0| - r_a)`.
+
+No `J*t^3/6` term is added: the growth is the extrapolation of the current
+estimate error along the NRMM path. `targetPrediction.deviationModel` gives the
+same parameter linearization to the target-reactive tube. Whole-hold cells
+extrapolate a node snapshot with a Cartesian jerk bound and are not supported
+for NRMM targets. A change of the motion kind or a larger curvature maximum
+voids a carried family.
+
+`scalarAccelerationMaximum`, when declared for either kind, bounds the
+acceleration magnitude `|a|` (for an NRMM target `hypot(A, V*omega)`), not the
+speed-rate alone.
+
 ## Finite completion scope
 
 Version 21 verifies the complete finite collision tube and robust exterior

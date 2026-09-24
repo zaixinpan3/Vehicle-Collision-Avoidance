@@ -110,7 +110,9 @@ classdef hardEncounterBarrier
                     conditioned = targetPrediction.condition(prior,model.sampleTime,target);
                     increased = any(target.contract.jerkBound>prior.contract.jerkBound) ...
                         || target.contract.yawAccelerationBound>prior.contract.yawAccelerationBound ...
-                        || localAccelerationCap(target.contract)>localAccelerationCap(prior.contract);
+                        || localAccelerationCap(target.contract)>localAccelerationCap(prior.contract) ...
+                        || string(target.contract.kind)~=string(prior.contract.kind) ...
+                        || localCurvatureCap(target.contract)>localCurvatureCap(prior.contract);
                     conditioned.contract = target.contract;
                     target = conditioned;
                     changed = changed || increased;
@@ -433,6 +435,12 @@ function cap = localAccelerationCap(contract)
 % Declared scalar target acceleration maximum; Inf when none is declared.
     cap = Inf;
     if isfield(contract,'scalarAccelerationMaximum'),cap = contract.scalarAccelerationMaximum;end
+end
+
+function cap = localCurvatureCap(contract)
+% Declared NRMM curvature maximum; Inf when none is declared.
+    cap = Inf;
+    if isfield(contract,'curvatureMaximum'),cap = contract.curvatureMaximum;end
 end
 
 function pending = localReactionPending(prediction)

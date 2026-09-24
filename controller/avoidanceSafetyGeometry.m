@@ -76,6 +76,12 @@ classdef avoidanceSafetyGeometry
             baseTarget=targetTemplate;targetLabel=strings(0,1);
             if hasTarget
                 encounter=model.encounter;
+                if string(encounter.contract.kind)=="nrmm-motion-v1" && any([prediction.cells.duration]>0)
+                    % Whole-hold cells extrapolate a node snapshot with the Cartesian
+                    % jerk bound, which does not cover NRMM turning.
+                    error("collisionAvoidanceController:unsupportedWholeHoldTarget", ...
+                        "NRMM targets are certified at hold nodes only.");
+                end
                 [flowCenters,flowRadii]=targetPrediction.finiteFlow(encounter,cellStarts);
                 baseTarget.halfLength=encounter.halfLength;baseTarget.halfWidth=encounter.halfWidth;
                 baseTarget.contract.jerkBound=encounter.contract.jerkBound;

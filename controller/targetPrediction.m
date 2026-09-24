@@ -77,7 +77,7 @@ classdef targetPrediction
             else
                 if ~isstruct(motion) || ~isscalar(motion) || ~isfield(motion,"kind") ...
                         || ~isscalar(string(motion.kind)) ...
-                        || ~any(string(motion.kind)==["exact-motion-v1","finite-sensing-motion-v1"])
+                        || ~any(string(motion.kind)==["exact-motion-v1","finite-sensing-motion-v1","nrmm-motion-v1"])
                     error("collisionAvoidanceController:invalidEncounterContract", ...
                         "Use identified Cartesian motion bounds.");
                 end
@@ -120,22 +120,42 @@ classdef targetPrediction
         end
 
         function finite = isFiniteSensing(encounter)
-            finite = string(encounter.contract.kind) == "finite-sensing-motion-v1";
+            finite = any(string(encounter.contract.kind) == ["finite-sensing-motion-v1","nrmm-motion-v1"]);
         end
 
         function encounter = admit(target, time, ~, cfg)
         %admit Validate the finite motion bounds used by every certificate.
+        % finite-sensing-motion-v1: any Cartesian motion with |jerk| <= jerkBound
+        % from the estimated state. nrmm-motion-v1: exact NRMM motion, a constant
+        % speed-rate, constant-curvature (constant-sideslip) path through the
+        % estimated state with |curvature| <= curvatureMaximum; its jerkBound
+        % and yawAccelerationBound must be zero. A varying speed-rate or
+        % curvature leaves every NRMM path through a later estimate, so it is
+        % declared with a finite-sensing contract instead.
             if isfield(target,"predictionMotion") && ~isempty(target.predictionMotion)
                 motion = target.predictionMotion;
                 if ~isstruct(motion) || ~isscalar(motion) ...
                         || ~all(isfield(motion,["kind","jerkBound","yawAccelerationBound"])) ...
-                        || string(motion.kind) ~= "finite-sensing-motion-v1"
+                        || ~any(string(motion.kind) == ["finite-sensing-motion-v1","nrmm-motion-v1"])
                     error("collisionAvoidanceController:invalidEncounterContract","Invalid finite motion bounds.");
                 end
-                contract = struct("kind","finite-sensing-motion-v1","id",target.key, ...
+                contract = struct("kind",string(motion.kind),"id",target.key, ...
                     "validFrom",time,"validityScope","whileEncounterActive", ...
                     "jerkBound",motion.jerkBound,"yawAccelerationBound",motion.yawAccelerationBound, ...
                     "predictionSampleTime",cfg.controller.sampleTime);
+                if contract.kind=="nrmm-motion-v1"
+                    if ~isfield(motion,"curvatureMaximum")
+                        error("collisionAvoidanceController:invalidEncounterContract", ...
+                            "An NRMM motion contract requires curvatureMaximum.");
+                    end
+                    validateattributes(motion.curvatureMaximum,{'double'},{'scalar','real','finite','positive'});
+                    if any(motion.jerkBound(:)~=0) || any(motion.yawAccelerationBound(:)~=0)
+                        error("collisionAvoidanceController:invalidEncounterContract", ...
+                            "An NRMM motion contract describes exact NRMM motion; " ...
+                            +"use a finite-sensing contract for a model error.");
+                    end
+                    contract.curvatureMaximum = motion.curvatureMaximum;
+                end
                 if isfield(motion,"scalarAccelerationMaximum")
                     validateattributes(motion.scalarAccelerationMaximum,{'double'},{'scalar','finite','nonnegative'});
                     contract.scalarAccelerationMaximum = motion.scalarAccelerationMaximum;
@@ -159,9 +179,17 @@ classdef targetPrediction
 
         function [center, radius] = finiteFlow(encounter, duration)
         %finiteFlow Positive Cartesian reachability; no speed division.
+        % For an nrmm-motion-v1 contract the box encloses every NRMM path
+        % through the estimate box: the NRMM parameter enclosure
+        % (targetPrediction.deviationModel) intersected with the Cartesian
+        % enclosure of the same paths.
             duration = double(duration(:).');
             if any(~isfinite(duration) | duration < 0)
                 error("collisionAvoidanceController:invalidPredictionTime", "Prediction times must be finite and nonnegative.");
+            end
+            if localIsNrmm(encounter.contract)
+                [center,radius] = localNrmmFlow(encounter,duration);
+                return;
             end
             x = encounter.center;
             r = encounter.radius;
@@ -190,6 +218,42 @@ classdef targetPrediction
                 abs(x(3:4))+abs(x(5:6))*duration;repmat(abs(x(5:6)),1,numel(duration)); ...
                 abs(x(7))+abs(x(8))*duration;repmat(abs(x(8)),1,numel(duration))];
             radius = radius+64*eps*(arithmetic+radius);
+        end
+
+        function motion = deviationModel(encounter,duration)
+        %deviationModel Target deviation from its nominal flow, for reactive tubes.
+        % At each time: center (8 x n) is the nominal state; parameterGenerators
+        % (6 x g x n) map g error sources fixed at admission to the deviation of
+        % [position; velocity; acceleration]; remainder (6 x n) bounds the rest
+        % of that deviation; holdBound (2 x n) bounds, per axis, the mean
+        % acceleration deviation over the hold ending at that time that the
+        % parameter generators do not describe; holdJerk (2 x 1) is its jerk.
+        % finite-sensing-motion-v1: the sources are the initial position and
+        % velocity box (p = p0 + v0 t) and holdBound is the capped jerk growth.
+        % nrmm-motion-v1: the sources are the NRMM parameter errors [p0; V; A;
+        % course; curvature] with sensitivities of the NRMM path, the remainder
+        % is their second-order term (or a path-length ball where the linear
+        % model does not apply), and holdBound is zero (exact NRMM).
+            duration = double(duration(:).');
+            jerk = encounter.contract.jerkBound(:);
+            if localIsNrmm(encounter.contract)
+                state = localNrmmState(encounter,duration,true);
+                generators = pagemtimes(state.sensitivity,diag(state.parameterRadius));
+                remainder = state.remainder+64*eps*(1+abs(state.center(1:6,:)) ...
+                    +reshape(sum(abs(generators),2),6,[]));
+                motion = struct('center',state.center,'parameterGenerators',generators, ...
+                    'remainder',remainder,'holdBound',jerk*duration,'holdJerk',jerk);
+                return;
+            end
+            center = targetPrediction.finiteFlow(encounter,duration);
+            radius = encounter.radius(1:4);
+            generators = zeros(6,4,numel(duration));
+            for index = 1:numel(duration)
+                generators(1:4,:,index) = [eye(2),duration(index)*eye(2);zeros(2),eye(2)]*diag(radius);
+            end
+            motion = struct('center',center,'parameterGenerators',generators, ...
+                'remainder',zeros(6,numel(duration)), ...
+                'holdBound',targetPrediction.accelerationDeviationBound(encounter,duration),'holdJerk',jerk);
         end
 
         function bound = accelerationDeviationBound(encounter,duration)
@@ -259,6 +323,9 @@ classdef targetPrediction
             if ~isempty(observation)
                 measured = targetPrediction.admit(observation,next.time,lane,cfg);
                 if ~targetPrediction.isFiniteSensing(measured) ...
+                        || string(measured.contract.kind)~=string(encounter.contract.kind) ...
+                        || ~isequaln(localCurvatureMaximum(measured.contract), ...
+                            localCurvatureMaximum(encounter.contract)) ...
                         || ~isequal(measured.contract.jerkBound,encounter.contract.jerkBound) ...
                         || measured.contract.yawAccelerationBound ~= encounter.contract.yawAccelerationBound ...
                         || measured.halfLength ~= encounter.halfLength || measured.halfWidth ~= encounter.halfWidth
@@ -435,3 +502,178 @@ function [position,velocity,acceleration] = localCappedDeviation(r,jerk,cap,t)
         +(ra.*early+jerk.*early.^2/2).*late+cap.*late.^2/2;
     position(isnan(position)) = Inf;velocity(isnan(velocity)) = Inf;
 end
+
+function nrmm = localIsNrmm(contract)
+% Node snapshots of the geometry kernel carry no kind: their zero-duration flow
+% is the node state itself under either contract.
+    nrmm = isfield(contract,'kind') && string(contract.kind)=="nrmm-motion-v1";
+end
+
+function maximum = localCurvatureMaximum(contract)
+% Declared NRMM curvature maximum; NaN for a Cartesian contract.
+    maximum = NaN;
+    if isfield(contract,'curvatureMaximum'),maximum = contract.curvatureMaximum;end
+end
+
+function [center,radius] = localNrmmFlow(encounter,duration)
+% Box enclosure of every NRMM path through the estimate box: the NRMM parameter
+% enclosure intersected with the Cartesian enclosure of the same paths, whose
+% jerk is at most hypot(kappa^2 V^3, 3 A kappa V) and whose yaw acceleration is
+% at most |A kappa| over the parameter intervals. A stop sets the acceleration
+% to zero: per axis |a - a0| <= r_a + J t before it and |a0| after, so where a
+% path may have stopped the acceleration deviation also covers max(0,|a0|-r_a).
+    state = localNrmmState(encounter,duration,true);
+    center = state.center;count = numel(duration);
+    radius = zeros(8,count);
+    radius(1:6,:) = reshape(pagemtimes(abs(state.sensitivity),state.parameterRadius),6,[])+state.remainder;
+    radius(7,:) = state.yawRadius;radius(8,:) = state.yawRateRadius;
+    radius = radius+64*eps*(1+abs(center)+radius);
+    x = encounter.center;r = encounter.radius;t = duration;jerk = state.jerkBound;
+    yawAcceleration = state.yawAccelerationBound;
+    cartesian = [x(1:2)+x(3:4)*t+x(5:6)*(t.^2/2);x(3:4)+x(5:6)*t;repmat(x(5:6),1,count); ...
+        x(7)+x(8)*t;repmat(x(8),1,count)];
+    jump = max(0,abs(x(5:6))-r(5:6)).*~state.noStop;
+    spread = [r(1:2)+r(3:4)*t+(r(5:6)+jump).*(t.^2/2)+jerk.*t.^3/6; ...
+        r(3:4)+(r(5:6)+jump).*t+jerk.*t.^2/2;r(5:6)+jump+jerk.*t; ...
+        r(7)+r(8)*t+yawAcceleration*t.^2/2;r(8)+yawAcceleration*t];
+    spread = spread+64*eps*(1+abs(cartesian)+spread);
+    lower = max(center-radius,cartesian-spread);upper = min(center+radius,cartesian+spread);
+    allowance = 256*eps*(1+abs(center)+abs(cartesian)+radius+spread);
+    if any(lower>upper+allowance,'all')
+        error("collisionAvoidanceController:inconsistentObservation", ...
+            "The target estimate admits no NRMM path within the declared bounds.");
+    end
+    middle = (lower+upper)/2;lower = min(lower,middle);upper = max(upper,middle);
+    center = middle;radius = (upper-lower)/2;
+end
+
+function state = localNrmmState(encounter,duration,uncertain)
+% NRMM (constant speed-rate A, constant curvature kappa) path of the estimate
+% and, when uncertain, its parameter sensitivities and second-order remainder.
+% Parameters and their error radii, derived soundly from the estimate box:
+%   p0 = position +- r_p; V = |v| +- |r_v|; course = atan2(v) +- asin(|r_v|/|v|);
+%   A = v'a/|v| +- (|r_a| + 2|a| sin(r_course/2)), within +-scalarAccelerationMaximum;
+%   kappa in omega/V and in a_N/V^2 over the yaw-rate, normal-acceleration and
+%   speed intervals, within +-kappaMax.
+% sensitivity(:,:,k) maps [dp0x; dp0y; dV; dA; dcourse; dkappa] to the change
+% of [position; velocity; acceleration] at time k; remainder(:,k) bounds the
+% rest (Lagrange second-order bounds). Where the linear model does not apply
+% (course radius above 0.5 rad, speed interval touching zero or a possible stop
+% by that time) only the p0 columns are kept and the remainder is a
+% path-length ball bound.
+    x = encounter.center;r = encounter.radius;maximum = encounter.contract.curvatureMaximum;
+    duration = double(duration(:).');count = numel(duration);
+    velocityRadius = norm(r(3:4));accelerationRadius = norm(r(5:6));
+    speed = norm(x(3:4));course = atan2(x(4),x(3));
+    courseRadius = pi;
+    if velocityRadius<speed,courseRadius = asin(velocityRadius/speed);end
+    tangential = 0;
+    if speed>0,tangential = dot(x(3:4),x(5:6))/speed;end
+    % Tangential and normal acceleration components err by at most this much.
+    componentRadius = accelerationRadius+2*norm(x(5:6))*sin(courseRadius/2);
+    tangentialRadius = componentRadius;
+    if isfield(encounter.contract,'scalarAccelerationMaximum')
+        % |A| <= |a| <= the declared acceleration magnitude bound.
+        limit = encounter.contract.scalarAccelerationMaximum;
+        low = max(tangential-tangentialRadius,-limit);high = min(tangential+tangentialRadius,limit);
+        if low>high
+            error("collisionAvoidanceController:inconsistentObservation", ...
+                "The target acceleration contradicts the declared acceleration maximum.");
+        end
+        tangential = (low+high)/2;tangentialRadius = (high-low)/2;
+    end
+    speedLow = speed-velocityRadius;speedHigh = speed+velocityRadius;
+    % On an NRMM path the yaw rate is kappa*V and the normal acceleration is
+    % kappa*V^2; the true state satisfies both, so kappa lies in both quotient
+    % intervals.
+    kappaLow = -maximum;kappaHigh = maximum;
+    if speedLow>0
+        rates = x(8)+[-r(8);r(8)];
+        normalAcceleration = (x(4)*-x(5)+x(3)*x(6))/speed+[-componentRadius;componentRadius];
+        quotients = [rates./[speedLow,speedHigh],normalAcceleration./[speedLow^2,speedHigh^2]];
+        kappaLow = max([min(quotients(:,1:2),[],'all'),min(quotients(:,3:4),[],'all'),-maximum]);
+        kappaHigh = min([max(quotients(:,1:2),[],'all'),max(quotients(:,3:4),[],'all'),maximum]);
+    end
+    if kappaLow>kappaHigh
+        error("collisionAvoidanceController:inconsistentObservation", ...
+            "The target yaw rate and acceleration admit no NRMM curvature within the declared maximum.");
+    end
+    kappa = (kappaLow+kappaHigh)/2;kappaRadius = (kappaHigh-kappaLow)/2;
+    stopTime = Inf;
+    if tangential<0,stopTime = speed/-tangential;end
+    moving = min(duration,stopTime);
+    arc = speed*moving+tangential*moving.^2/2;
+    rate = max(0,speed+tangential*moving);
+    stopped = duration>=stopTime;
+    heading = course+kappa*arc;
+    tangent = [cos(heading);sin(heading)];normal = [-tangent(2,:);tangent(1,:)];
+    displacement = localArcDisplacement(arc,kappa,course);
+    acceleration = tangential*tangent+kappa*rate.^2.*normal;
+    acceleration(:,stopped) = 0;
+    state = struct('center',[x(1:2)+displacement;rate.*tangent;acceleration;x(7)+kappa*arc;kappa*rate]);
+    if ~uncertain,return;end
+    t = duration;
+    dV = velocityRadius;dA = tangentialRadius;dCourse = courseRadius;dK = kappaRadius;
+    ds = t*dV+t.^2/2*dA;dRate = dV+t*dA;
+    sMax = arc+ds;rateMax = rate+dRate;kMax = abs(kappa)+dK;aMax = abs(tangential)+dA;
+    dPhi = dCourse+abs(kappa)*ds+arc*dK+dK*ds;
+    noStop = speedLow>0 & speedLow+min(0,tangential-dA)*t>0;
+    linear = noStop & courseRadius<=0.5;
+    % Cartesian jerk and yaw acceleration of every path, nondecreasing in t.
+    speedBound = speedHigh+max(tangential+dA,0)*t;
+    state.jerkBound = hypot(kMax^2*speedBound.^3,3*aMax*kMax*speedBound);
+    state.yawAccelerationBound = aMax*kMax;
+    state.noStop = noStop;
+    sensitivity = zeros(6,6,count);
+    sensitivity(1,1,:) = 1;sensitivity(2,2,:) = 1;
+    curvatureColumn = localCurvatureSensitivity(arc,kappa,course);
+    for k = find(linear)
+        T = tangent(:,k);N = normal(:,k);v = rate(k);s = arc(k);
+        sensitivity(1:2,3:6,k) = [T*t(k),T*t(k)^2/2,[-displacement(2,k);displacement(1,k)],curvatureColumn(:,k)];
+        sensitivity(3:4,3:6,k) = [T+v*kappa*t(k)*N,t(k)*T+v*kappa*t(k)^2/2*N,v*N,v*s*N];
+        sensitivity(5:6,3:6,k) = [(tangential*kappa*t(k)+2*v*kappa)*N-v^2*kappa^2*t(k)*T, ...
+            T+(tangential*kappa*t(k)^2/2+2*v*t(k)*kappa)*N-v^2*kappa^2*t(k)^2/2*T, ...
+            tangential*N-v^2*kappa*T,(tangential*s+v^2)*N-v^2*kappa*s*T];
+    end
+    positionRemainder = (kMax*ds.^2+2*ds*dCourse+2*sMax.*ds*dK+sMax*dCourse^2 ...
+        +sMax.^2*dCourse*dK+sMax.^3/3*dK^2)/2;
+    velocityRemainder = dRate.*dPhi+rateMax.*dPhi.^2/2+rateMax*dK.*ds;
+    phiSlope = aMax+rateMax.^2*kMax;
+    accelerationRemainder = kMax*dRate.^2+phiSlope.*dPhi.^2/2+dA*dPhi+2*rateMax.*dRate*dK ...
+        +2*rateMax*kMax.*dRate.*dPhi+rateMax.^2*dK.*dPhi+phiSlope*dK.*ds;
+    remainder = [repmat(positionRemainder,2,1);repmat(velocityRemainder,2,1);repmat(accelerationRemainder,2,1)];
+    yawRadius = r(7)+abs(kappa)*ds+arc*dK+dK*ds;
+    yawRateRadius = abs(kappa)*dRate+rate*dK+dK*dRate;
+    % Path-length ball where the linear model does not apply.
+    aHigh = tangential+dA;highStop = Inf;
+    if aHigh<0,highStop = speedHigh/-aHigh;end
+    highMoving = min(t,highStop);
+    sHigh = speedHigh*highMoving+aHigh*highMoving.^2/2;
+    rateHigh = max(0,speedHigh+aHigh*highMoving);
+    ball = ~linear;
+    remainder(1:2,ball) = repmat(sHigh(ball)+vecnorm(displacement(:,ball),2,1),2,1);
+    remainder(3:4,ball) = repmat(rateHigh(ball)+rate(ball),2,1);
+    remainder(5:6,ball) = repmat(hypot(aMax,rateHigh(ball).^2*maximum)+vecnorm(acceleration(:,ball),2,1),2,1);
+    yawRadius(ball) = r(7)+maximum*sHigh(ball)+abs(kappa)*arc(ball);
+    yawRateRadius(ball) = maximum*rateHigh(ball)+abs(kappa)*rate(ball);
+    state.sensitivity = sensitivity;
+    state.parameterRadius = [r(1:2);dV;dA;dCourse;dK];
+    state.remainder = remainder;state.yawRadius = yawRadius;state.yawRateRadius = yawRateRadius;
+    state.linear = linear;
+end
+
+function column = localCurvatureSensitivity(arc,kappa,course)
+% d(displacement)/d(kappa) = int_0^s sigma * N(course + kappa*sigma) d sigma,
+% by 12-point Gauss-Legendre quadrature (the integrand is analytic).
+    persistent nodes weights
+    if isempty(nodes)
+        order = 12;beta = (1:order-1)./sqrt(4*(1:order-1).^2-1);
+        [vectors,values] = eig(diag(beta,1)+diag(beta,-1));
+        nodes = diag(values).';weights = 2*vectors(1,:).^2;
+    end
+    sigma = arc(:)*(1+nodes)/2;
+    phase = course+kappa*sigma;
+    scale = (arc(:)/2).*sigma.*weights;
+    column = [-sum(scale.*sin(phase),2).';sum(scale.*cos(phase),2).'];
+end
+
