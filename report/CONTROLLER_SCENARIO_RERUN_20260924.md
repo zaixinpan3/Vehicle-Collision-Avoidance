@@ -25,7 +25,7 @@ Up to nine MATLAB processes of this task ran concurrently, and MATLAB
 sessions of other projects were running on the same machine, so every frame
 time below is a loaded measurement, not an isolated one. Raw outputs are under
 the git-ignored `simulation_output/controller_scenario_rerun_20260924/` and
-the scratch logs are copied into
+the scratch logs are copied (as `.txt`) into
 [CONTROLLER_SCENARIO_RERUN_20260924/](CONTROLLER_SCENARIO_RERUN_20260924/).
 
 ## 1. Summary
@@ -133,7 +133,7 @@ adapter's ego estimate and never attached `heldActuatorInput`, while the
 truth-state branch attaches the previous command. The branch now attaches it
 in the same way (three lines; no controller, adapter or configuration file
 changed). Logs of the runs before the correction are kept as
-`estimator*_beforeHarnessFix.log`.
+`estimator*_beforeHarnessFix.txt`.
 
 ### 4.3 After the correction: infeasible at the first radar frame
 
