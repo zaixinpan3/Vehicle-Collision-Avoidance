@@ -1,0 +1,119 @@
+[  1/118] A-geometry stationary k=0 -> completed=1 passed=1 holds=240 
+[  2/118] A-geometry stationary k=0.005 -> completed=1 passed=1 holds=240 
+[  3/118] A-geometry stationary k=-0.005 -> completed=1 passed=1 holds=240 
+[  4/118] A-geometry stationary k=0.01 -> completed=1 passed=1 holds=240 
+[  5/118] A-geometry stationary k=-0.01 -> completed=1 passed=1 holds=240 
+[  6/118] A-geometry stationary k=0.015 -> completed=1 passed=1 holds=240 
+[  7/118] A-geometry stationary k=-0.015 -> completed=1 passed=1 holds=240 
+[  8/118] A-geometry stationary k=0.02 -> completed=1 passed=1 holds=240 
+[  9/118] A-geometry stationary k=-0.02 -> completed=1 passed=1 holds=240 
+[ 10/118] A-geometry oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 11/118] A-geometry oncoming k=0.005 -> completed=1 passed=1 holds=240 
+[ 12/118] A-geometry oncoming k=-0.005 -> completed=1 passed=1 holds=240 
+[ 13/118] A-geometry oncoming k=0.01 -> completed=1 passed=1 holds=240 
+[ 14/118] A-geometry oncoming k=-0.01 -> completed=1 passed=1 holds=240 
+[ 15/118] A-geometry oncoming k=0.015 -> completed=1 passed=1 holds=240 
+[ 16/118] A-geometry oncoming k=-0.015 -> completed=1 passed=1 holds=240 
+[ 17/118] A-geometry oncoming k=0.02 -> completed=1 passed=1 holds=240 
+[ 18/118] A-geometry oncoming k=-0.02 -> completed=1 passed=1 holds=240 
+[ 19/118] A-geometry crossing k=0 -> completed=1 passed=1 holds=240 
+[ 20/118] A-geometry crossing k=0.005 -> completed=1 passed=1 holds=240 
+[ 21/118] A-geometry crossing k=-0.005 -> completed=1 passed=1 holds=240 
+[ 22/118] A-geometry crossing k=0.01 -> completed=1 passed=1 holds=240 
+[ 23/118] A-geometry crossing k=-0.01 -> completed=1 passed=1 holds=240 
+[ 24/118] A-geometry crossing k=0.015 -> completed=1 passed=1 holds=240 
+[ 25/118] A-geometry crossing k=-0.015 -> completed=1 passed=1 holds=240 
+[ 26/118] A-geometry crossing k=0.02 -> completed=1 passed=1 holds=240 
+[ 27/118] A-geometry crossing k=-0.02 -> completed=1 passed=1 holds=240 
+[ 28/118] A-geometry cruise k=0 -> completed=1 passed=1 holds=240 
+[ 29/118] A-geometry cruise k=0.005 -> completed=1 passed=1 holds=240 
+[ 30/118] A-geometry cruise k=-0.005 -> completed=1 passed=1 holds=240 
+[ 31/118] A-geometry cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 32/118] A-geometry cruise k=-0.01 -> completed=1 passed=1 holds=240 
+[ 33/118] A-geometry cruise k=0.015 -> completed=1 passed=1 holds=240 
+[ 34/118] A-geometry cruise k=-0.015 -> completed=1 passed=1 holds=240 
+[ 35/118] A-geometry cruise k=0.02 -> completed=1 passed=1 holds=240 
+[ 36/118] A-geometry cruise k=-0.02 -> completed=1 passed=1 holds=240 
+[ 37/118] B-uncertainty stationary k=0 -> completed=1 passed=1 holds=240 
+[ 38/118] B-uncertainty stationary k=0 -> completed=1 passed=1 holds=240 
+[ 39/118] B-uncertainty stationary k=0 -> completed=1 passed=1 holds=240 
+[ 40/118] B-uncertainty stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 41/118] B-uncertainty stationary k=0.01 -> completed=0 passed=0 holds=38 collisionAvoidanceController:optimizationFailed
+[ 42/118] B-uncertainty stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 43/118] B-uncertainty oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 44/118] B-uncertainty oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 45/118] B-uncertainty oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 46/118] B-uncertainty oncoming k=0.01 -> completed=1 passed=1 holds=240 
+[ 47/118] B-uncertainty oncoming k=0.01 -> completed=1 passed=1 holds=240 
+[ 48/118] B-uncertainty oncoming k=0.01 -> completed=1 passed=1 holds=240 
+[ 49/118] B-uncertainty crossing k=0 -> completed=1 passed=1 holds=240 
+[ 50/118] B-uncertainty crossing k=0 -> completed=1 passed=1 holds=240 
+[ 51/118] B-uncertainty crossing k=0 -> completed=1 passed=1 holds=240 
+[ 52/118] B-uncertainty crossing k=0.01 -> completed=1 passed=1 holds=240 
+[ 53/118] B-uncertainty crossing k=0.01 -> completed=1 passed=1 holds=240 
+[ 54/118] B-uncertainty crossing k=0.01 -> completed=0 passed=0 holds=0 collisionAvoidanceController:optimizationFailed
+[ 55/118] C-targetJerk oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 56/118] C-targetJerk oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 57/118] C-targetJerk oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 58/118] C-targetYawAcc oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 59/118] C-targetYawAcc oncoming k=0 -> completed=1 passed=1 holds=240 
+[ 60/118] C-targetJerk crossing k=0 -> completed=1 passed=1 holds=240 
+[ 61/118] C-targetJerk crossing k=0 -> completed=1 passed=1 holds=240 
+[ 62/118] C-targetJerk crossing k=0 -> completed=1 passed=1 holds=240 
+[ 63/118] C-targetYawAcc crossing k=0 -> completed=1 passed=1 holds=240 
+[ 64/118] C-targetYawAcc crossing k=0 -> completed=1 passed=1 holds=240 
+[ 65/118] D-initLateral cruise k=0 -> completed=1 passed=1 holds=240 
+[ 66/118] D-initLateral cruise k=0 -> completed=1 passed=1 holds=240 
+[ 67/118] D-initLateral cruise k=0 -> completed=1 passed=1 holds=240 
+[ 68/118] D-initLateral cruise k=0 -> completed=1 passed=1 holds=240 
+[ 69/118] D-initHeading cruise k=0 -> completed=1 passed=1 holds=240 
+[ 70/118] D-initHeading cruise k=0 -> completed=1 passed=1 holds=240 
+[ 71/118] D-initHeading cruise k=0 -> completed=1 passed=1 holds=240 
+[ 72/118] D-initSpeed cruise k=0 -> completed=1 passed=1 holds=240 
+[ 73/118] D-initSpeed cruise k=0 -> completed=1 passed=1 holds=240 
+[ 74/118] D-initLateral cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 75/118] D-initLateral cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 76/118] D-initLateral cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 77/118] D-initLateral cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 78/118] D-initHeading cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 79/118] D-initHeading cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 80/118] D-initHeading cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 81/118] D-initSpeed cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 82/118] D-initSpeed cruise k=0.01 -> completed=1 passed=1 holds=240 
+[ 83/118] D-initLateral stationary k=0 -> completed=1 passed=0 holds=240 
+[ 84/118] D-initLateral stationary k=0 -> completed=1 passed=0 holds=240 
+[ 85/118] D-initLateral stationary k=0 -> completed=1 passed=1 holds=240 
+[ 86/118] D-initLateral stationary k=0 -> completed=1 passed=0 holds=240 
+[ 87/118] D-initHeading stationary k=0 -> completed=1 passed=0 holds=240 
+[ 88/118] D-initHeading stationary k=0 -> completed=1 passed=1 holds=240 
+[ 89/118] D-initHeading stationary k=0 -> completed=1 passed=0 holds=240 
+[ 90/118] D-initSpeed stationary k=0 -> completed=1 passed=0 holds=240 
+[ 91/118] D-initSpeed stationary k=0 -> completed=1 passed=0 holds=240 
+[ 92/118] D-initLateral stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 93/118] D-initLateral stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 94/118] D-initLateral stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 95/118] D-initLateral stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 96/118] D-initHeading stationary k=0.01 -> completed=1 passed=0 holds=240 
+[ 97/118] D-initHeading stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 98/118] D-initHeading stationary k=0.01 -> completed=1 passed=1 holds=240 
+[ 99/118] D-initSpeed stationary k=0.01 -> completed=1 passed=1 holds=240 
+[100/118] D-initSpeed stationary k=0.01 -> completed=1 passed=1 holds=240 
+[101/118] E-road stationary k=0 -> completed=0 passed=0 holds=0 collisionAvoidanceController:optimizationFailed
+[102/118] E-road oncoming k=0 -> completed=0 passed=0 holds=0 collisionAvoidanceController:optimizationFailed
+[103/118] E-road crossing k=0 -> completed=0 passed=0 holds=0 collisionAvoidanceController:optimizationFailed
+[104/118] E-road cruise k=0 -> completed=0 passed=0 holds=0 collisionAvoidanceController:optimizationFailed
+[105/118] F-horizon oncoming k=0 -> completed=1 passed=1 holds=240 
+[106/118] F-horizon oncoming k=0 -> completed=1 passed=1 holds=240 
+[107/118] F-horizon oncoming k=0 -> completed=1 passed=1 holds=240 
+[108/118] F-horizon oncoming k=0 -> completed=1 passed=1 holds=240 
+[109/118] F-horizon crossing k=0 -> completed=1 passed=1 holds=240 
+[110/118] F-horizon crossing k=0 -> completed=1 passed=1 holds=240 
+[111/118] F-horizon crossing k=0 -> completed=1 passed=1 holds=240 
+[112/118] F-horizon crossing k=0 -> completed=1 passed=1 holds=240 
+[113/118] G-confirm oncoming k=0 -> completed=1 passed=1 holds=240 
+[114/118] G-confirm oncoming k=0 -> completed=1 passed=1 holds=240 
+[115/118] G-confirm oncoming k=0 -> completed=1 passed=0 holds=240 
+[116/118] G-confirm crossing k=0 -> completed=1 passed=1 holds=240 
+[117/118] G-confirm crossing k=0 -> completed=1 passed=1 holds=240 
+[118/118] G-confirm crossing k=0 -> completed=1 passed=1 holds=240 
+EXIT=0

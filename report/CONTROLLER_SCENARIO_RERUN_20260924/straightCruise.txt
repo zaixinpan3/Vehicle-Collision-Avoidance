@@ -1,0 +1,15 @@
+Warning: /opt/MATLAB/R2026a/bin/glnxa64/../../sys/os/glnxa64/libstdc++.so.6: version `GLIBCXX_3.4.32' not found (required by /usr/lib/libSPIRV-Tools.so)
+Warning: loader_icd_scan: Failed loading library associated with ICD JSON libvulkan_radeon.so. Ignoring this JSON
+Straight centerline, constant reference speed, no targets
+  Plant: Vehicle Dynamics Blockset PassVeh14DOF
+  Reference speed: 15.000 m/s
+  Completed controller steps: 80 / 80
+  Mean / maximum solve time: 0.027001 / 1.092877 s
+  Maximum absolute speed error: 0.034094 m/s
+  Maximum absolute lateral tracking error: 0.000000 m
+  Maximum absolute heading error: 0.000000 rad
+  First front-axle longitudinal force: 116.379463 N
+  First predicted longitudinal acceleration: 0.196327 m/s^2
+  Result: PASS
+PASSED=1
+EXIT=0

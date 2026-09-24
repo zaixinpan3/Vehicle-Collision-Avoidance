@@ -188,6 +188,9 @@ function result = runCenterlineCruiseScenario(varargin)
                     state, targetTruthAtControlSample{stepIdx});
             observerTime(stepIdx) = toc(observerTimer);
             controllerState = egoEstimate{stepIdx};
+            % The controller's execution contract requires the held input
+            % that was issued at the previous sample, as in the truth branch.
+            if stepIdx>1, controllerState.heldActuatorInput = command{stepIdx-1}.actuatorInput; end
         else
             controllerState = state;
             controllerState.stateTime = intervalStart;

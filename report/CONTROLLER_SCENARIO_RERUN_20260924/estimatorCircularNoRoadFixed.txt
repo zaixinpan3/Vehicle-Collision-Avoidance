@@ -1,0 +1,16 @@
+Left circular centerline (R = 60.0 m) with a straight-line target constructed to collide at t = 5.210 s
+  Perception/control sample time: 0.050 s
+  Target initial distance: 100.000000 m
+  Constructed nominal collision time: 5.209741 s
+  Collision construction error: 7.94410929039e-15 m
+  Nominal collision SAT margin: -1.200000 m
+  Baseline minimum SAT margin: 23.883866 m
+  Controlled minimum SAT margin: 23.938772 m
+  Passing time / ego speed: NaN s / NaN m/s
+  Minimum ego longitudinal speed: 9.957 m/s
+  Final-window maximum speed/lateral/heading errors:  m/s,  m,  rad
+  Mean / maximum solve time: 0.011429 / 0.034678 s
+  Result: FAIL
+PASSED=0
+FAILURE t=3.750 collisionAvoidanceController:optimizationFailed :: The hard-safety, soft-CLF search failed at t=3.75 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.
+EXIT=0

@@ -1,0 +1,16 @@
+Left circular centerline (R = 100.0 m) with a straight-line target constructed to collide at t = 1.675 s
+  Perception/control sample time: 0.050 s
+  Target initial distance: 50.000000 m
+  Constructed nominal collision time: 1.674535 s
+  Collision construction error: NaN m
+  Nominal collision SAT margin: NaN m
+  Baseline minimum SAT margin: NaN m
+  Controlled minimum SAT margin: NaN m
+  Passing time / ego speed: NaN s / NaN m/s
+  Minimum ego longitudinal speed: NaN m/s
+  Final-window maximum speed/lateral/heading errors: NaN m/s, NaN m, NaN rad
+  Mean / maximum solve time: NaN / NaN s
+  Result: FAIL
+PASSED=0
+FAILURE t=0.000 collisionAvoidanceController:optimizationFailed :: The recursive cruise certificate requires an unbounded road-free reference domain.
+EXIT=0

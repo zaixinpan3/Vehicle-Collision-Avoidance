@@ -1,0 +1,9 @@
+stationary: 600/600 holds; body gap 9.27308e-05 m; road NaN m; max frame 1569.680 ms
+oncoming: 600/600 holds; body gap 0.0380623 m; road NaN m; max frame 152.825 ms
+crossing: 600/600 holds; body gap 9.51968 m; road NaN m; max frame 113.463 ms
+cruise: 600/600 holds; body gap Inf m; road NaN m; max frame 138.981 ms
+crossing: 600/600 holds; body gap 9.52078 m; road NaN m; max frame 190.783 ms
+stationary: 0/120 holds; body gap Inf m; road NaN m; max frame 185.541 ms
+oncoming: 0/120 holds; body gap Inf m; road NaN m; max frame 85.172 ms
+crossing: 0/120 holds; body gap Inf m; road NaN m; max frame 71.423 ms
+EXIT=0

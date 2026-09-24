@@ -1,0 +1,16 @@
+Straight-centerline oncoming-vehicle avoidance
+  Perception/control sample time: 0.050 s
+  Complete online frame median / maximum / deadline: 624.932 / 624.932 / 100.000 ms
+  Complete frame deadline met / enforced: 0 / 0
+  Target lateral offset: 1.500 m
+  No-control minimum SAT margin: NaN m
+  Controlled minimum SAT margin: NaN m
+  Passing time / ego speed: NaN s / NaN m/s
+  Minimum ego longitudinal speed: NaN m/s
+  Minimum ego lateral position: NaN m
+  Final-window maximum speed/lateral/heading errors: NaN m/s, NaN m, NaN rad
+  Mean / maximum solve time: NaN / NaN s
+  Result: FAIL
+PASSED=0
+FAILURE t=0.000 collisionAvoidanceController:optimizationFailed :: The recursive cruise certificate requires an unbounded road-free reference domain.
+EXIT=0
