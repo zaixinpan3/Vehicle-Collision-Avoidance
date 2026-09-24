@@ -257,7 +257,11 @@ require admission or rejection. Target release does not prove that the target
 can never return. Physical road boundaries are supported through a declared
 lateral clearance that shrinks the terminal set
 ([TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md), "Declared lateral clearance");
-the finite fitted boundaries supply the node road rows only. Whole-hold
+the finite fitted boundaries supply the node road rows only. A `strict`
+boundary must cover every certified cell; a `perceptionLimited` or
+`knownNominalPathOffset` boundary constrains only the cells inside its declared
+range and is never extrapolated, so beyond it the road is unconstrained by the
+node rows (the declared clearance still bounds the terminal set). Whole-hold
 separation would require a certificate for a complete hold enclosure and is
 outside this change.
 

@@ -39,7 +39,7 @@ function [complete,joint,plans]=localGeometry(hasTarget)
     end
     boundary=struct('coefficients',[.001,0,-20],'safeSideSign',1, ...
         'longitudinalDirection',[1;0],'lateralDirection',[0;1],'origin',[0;0], ...
-        'parameterRange',[-200;200],'normalDistanceErrorBound',.01,'boundaryId',"lower");
+        'parameterRange',[-200;200],'normalDistanceErrorBound',.01,'boundaryId',"lower",'coveragePolicy',"strict");
     model.road.boundaries=[boundary;boundary];
     model.road.boundaries(2).coefficients=[.001,0,20];
     model.road.boundaries(2).safeSideSign=-1;model.road.boundaries(2).boundaryId="upper";

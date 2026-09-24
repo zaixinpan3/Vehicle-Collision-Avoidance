@@ -14,6 +14,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
         options.HorizonSeconds (1,1) double {mustBeFinite,mustBePositive} = 1.6
         options.UseRoadBoundaries (1,1) logical = false
+        options.RoadCoveragePolicy (1,1) string = "strict"
+        options.RoadBoundaryParameterRange (2,1) double = [-100;2000]
         options.FailAfterAdmission (1,1) logical = false
         options.OutputDirectory (1,1) string = ""
         options.DeadlineSeconds (1,1) double {mustBePositive} = 0.05
@@ -93,7 +95,8 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     if options.UseRoadBoundaries
         boundary = struct("origin",zeros(2,1),"longitudinalDirection",[1;0], ...
             "lateralDirection",[0;1],"coefficients",[0;0;-5], ...
-            "parameterRange",[-100;2000],"safeSideSign",1);
+            "parameterRange",options.RoadBoundaryParameterRange,"safeSideSign",1, ...
+            "coveragePolicy",options.RoadCoveragePolicy);
         boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
         road.boundaries = boundaries;
         road.lateralClearance = [5;5];

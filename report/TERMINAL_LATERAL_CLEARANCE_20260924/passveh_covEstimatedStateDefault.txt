@@ -1,0 +1,20 @@
+Warning: /opt/MATLAB/R2026a/bin/glnxa64/../../sys/os/glnxa64/libstdc++.so.6: version `GLIBCXX_3.4.32' not found (required by /usr/lib/libSPIRV-Tools.so)
+Warning: loader_icd_scan: Failed loading library associated with ICD JSON libvulkan_radeon.so. Ignoring this JSON
+NRMM estimator-in-the-loop collision avoidance
+  straight: FAIL, SAT margin 24.0563 m, min speed 9.982 m/s
+    ego position/velocity RMSE 0.0072 m / 0.0096 m/s
+    target position/velocity RMSE NaN m / NaN m/s
+    final-window speed/lateral/course-heading errors  m/s /  m /  rad; recovered: 0
+    road boundary margin 7.5634; no crossing: 1
+    initial target range 100.00 m; first detection NaN s at NaN m; pre-detection cruise NaN s (required 2.00 s): 0
+    body acceleration peaks |a_x| / |a_y| 0.062 / 0.102 m/s^2; coupled 0.00 s (required 0.30 s): 0
+  circular: FAIL, SAT margin 23.9995 m, min speed 10.000 m/s
+    ego position/velocity RMSE 0.0081 m / 0.0354 m/s
+    target position/velocity RMSE NaN m / NaN m/s
+    final-window speed/lateral/course-heading errors  m/s /  m /  rad; recovered: 0
+    road boundary margin 6.6260; no crossing: 1
+    initial target range 100.00 m; first detection NaN s at NaN m; pre-detection cruise NaN s (required 2.00 s): 0
+    body acceleration peaks |a_x| / |a_y| 3.802 / 6.793 m/s^2; coupled 0.45 s (required 0.30 s): 1
+  Suite-level coupled-maneuver coverage: PASS (circular)
+  Overall: FAIL
+EXIT=0

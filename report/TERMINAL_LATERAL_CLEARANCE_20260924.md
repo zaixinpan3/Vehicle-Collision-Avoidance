@@ -157,7 +157,46 @@ them is elsewhere:
 - **The close-encounter infeasibility** of the straight truth-target run
   (t = 1.45 s with curbs, 1.55 s without) is unchanged by this task.
 
-## 5. Scope
+## 5. Perception-limited boundaries constrain only the cells they cover
+
+Follow-up decision by the user: beyond the perceived range the road is
+unknown and therefore unconstrained; the controller must not reject the frame.
+`avoidanceSafetyGeometry` now reads the boundary's `coveragePolicy`: a
+`strict` boundary (the input default) must still cover every certified cell
+and raises `roadBoundaryCoverageGap` otherwise; a `perceptionLimited` or
+`knownNominalPathOffset` boundary adds no row for a cell whose station range
+leaves its declared parameter range. The declared clearance keeps bounding
+the terminal set. The generated geometry kernel carries a `coverageRequired`
+flag and was rebuilt (`buildAvoidanceGeometryKernel`); the native/MATLAB
+equivalence tests pass. `runExactStateRecursiveFeasibilityScenario` gained
+`RoadCoveragePolicy` and `RoadBoundaryParameterRange`;
+`straightRoadBoundaryConfigurationTest` checks that a strict 12 m boundary is
+rejected while a perception-limited one of the same length completes and
+issues fewer road rows than a full-length boundary.
+
+PassVeh14DOF, default 30 m curb range, shared working tree:
+
+| Scenario | Outcome |
+| --- | --- |
+| straight cruise, curbs | **PASS** 80 / 80 |
+| circular cruise R = 100 m, curbs | **PASS** 80 / 80 (previously needed a 100 m fit) |
+| oncoming avoidance (default) | 29 frames; infeasible SOCP at t = 1.45 s; min road margin 7.02 m; horizon 16 to 48 to 40 holds |
+| circular straight-target avoidance (default) | 32 frames; infeasible SOCP at t = 1.60 s; min road margin 6.34 m |
+| estimator-in-the-loop, straight | 71 steps; infeasible SOCP at the first radar frame (t = 3.55 s); min road margin 7.56 m |
+| estimator-in-the-loop, circular R = 60 m | 69 steps; infeasible SOCP at the first radar frame (t = 3.45 s); min road margin 6.63 m |
+
+No run raises a coverage gap or an invalid-boundary error any more. Every
+road-bounded run now ends exactly where its road-free counterpart ends (the
+close-encounter infeasibility at 1.45-1.60 s with truth targets, the
+first-detection infeasibility with the estimator), with the ego inside the
+road throughout. Road boundaries are therefore no longer a blocker for any
+scenario in `CLAUDE.md`.
+
+Declared-plant regression: the sweep is identical to Section 3.2 in every row
+(107 / 118, [declaredPlantFailureSweep_coverage.csv](TERMINAL_LATERAL_CLEARANCE_20260924/declaredPlantFailureSweep_coverage.csv), 0 of 118 rows differ); the strict boundaries of the E-road cases cover their
+cells. Test suite: 821 tests, 819 passed, 0 failed, 2 incomplete (the curb-detection data skips).
+
+## 6. Scope
 
 - The clearance is a declaration about the road along the continued
   reference, like the reference itself. It is not derived from the finite
@@ -169,3 +208,7 @@ them is elsewhere:
 - Re-admission after a boundary refit is a fresh admission and therefore
   subject to the same infeasibility as any fresh frame; with per-frame
   refits no certificate is inherited.
+- A perception-limited boundary leaves the cells beyond its range without a
+  road row. A plan may therefore end outside the perceived road; the next
+  frame's refit constrains those cells once they are seen. The declared
+  clearance bounds only the terminal set.

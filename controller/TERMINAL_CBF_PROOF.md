@@ -217,7 +217,8 @@ bounded measurement box.
 Road edges are state constraints, so recursive feasibility needs the terminal
 set inside them: the shifted plan's final feedback step must satisfy the node
 road rows of the next frame. A finite fitted boundary cannot bound a timeless
-set, so the road geometry may declare a lateral clearance `[d_R; d_L]` (metres
+set (and a perception-limited boundary constrains only the cells inside its
+range), so the road geometry may declare a lateral clearance `[d_R; d_L]` (metres
 from the nominal path to the physical edges, valid along the continued
 reference) with an error bound `epsilon_d`. Supplying finite boundaries without
 this declaration is rejected (`missingLateralClearance`).

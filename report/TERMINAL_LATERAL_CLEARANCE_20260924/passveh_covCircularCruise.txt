@@ -1,0 +1,13 @@
+Left circular-arc centerline, radius 100.000 m, constant reference speed, no targets
+  Plant: Vehicle Dynamics Blockset PassVeh14DOF
+  Reference speed: 15.000 m/s
+  Completed controller steps: 80 / 80
+  Mean / maximum solve time: 0.029785 / 1.367119 s
+  Maximum absolute speed error: 0.039706 m/s
+  Maximum absolute lateral tracking error: 0.005892 m
+  Maximum absolute heading error: 0.006633 rad
+  First front-axle longitudinal force: 129.433144 N
+  First predicted longitudinal acceleration: 0.218348 m/s^2
+  Result: PASS
+PASSED=1
+EXIT=0

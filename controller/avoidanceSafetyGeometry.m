@@ -35,15 +35,19 @@ classdef avoidanceSafetyGeometry
             localGroups = cell(numel(groups),1);
             boundaryTemplate = struct("coefficients",zeros(1,3),"safeSideSign",0, ...
                 "longitudinalDirection",zeros(2,1),"lateralDirection",zeros(2,1),"origin",zeros(2,1), ...
-                "parameterRange",zeros(2,1),"normalDistanceErrorBound",0);
+                "parameterRange",zeros(2,1),"normalDistanceErrorBound",0,"coverageRequired",1);
             boundaries = repmat(boundaryTemplate,numel(model.road.boundaries),1);
             boundaryLabels = strings(numel(boundaries),1);
             for index = 1:numel(boundaries)
                 boundary = model.road.boundaries(index);
+                % A strict boundary must cover every certified cell; a
+                % perception-limited or map-offset boundary constrains only the
+                % cells it covers and is never extrapolated.
                 boundaries(index) = struct("coefficients",boundary.coefficients(:).', ...
                     "safeSideSign",boundary.safeSideSign,"longitudinalDirection",boundary.longitudinalDirection(:), ...
                     "lateralDirection",boundary.lateralDirection(:),"origin",boundary.origin(:), ...
-                    "parameterRange",boundary.parameterRange(:),"normalDistanceErrorBound",boundary.normalDistanceErrorBound);
+                    "parameterRange",boundary.parameterRange(:),"normalDistanceErrorBound",boundary.normalDistanceErrorBound, ...
+                    "coverageRequired",localCoverageRequired(boundary));
                 boundaryLabels(index) = "road:"+boundary.boundaryId;
             end
             targetTemplate = struct("center",zeros(8,1),"radius",zeros(8,1), ...
@@ -562,8 +566,13 @@ function rows = localCellRows(data)
         extent = abs(longitudinal.'*lateral)*lateralDomain+hypot(halfLength,halfWidth)+abs(longitudinal).'*positionError;
         range = [min(stations)-extent,max(stations)+extent]+longitudinal.'*(origin-boundary.origin);
         if range(1)<boundary.parameterRange(1) || range(2)>boundary.parameterRange(2)
-            error("collisionAvoidanceController:roadBoundaryCoverageGap", ...
-                "Each boundary must cover the complete certified cell.");
+            if boundary.coverageRequired>0
+                error("collisionAvoidanceController:roadBoundaryCoverageGap", ...
+                    "Each strict boundary must cover the complete certified cell.");
+            end
+            % Beyond the declared range the road is unknown and, by the
+            % perception contract, unconstrained: this cell gets no row.
+            continue;
         end
         polynomial = boundary.safeSideSign*boundary.coefficients;
         graphSupport = max(polyval(polynomial,range));
@@ -767,3 +776,13 @@ function [signedDistance, normal, outside] = ...
         normal = faceNormal(faceIdx, :).';
     end
 end
+
+function required = localCoverageRequired(boundary)
+% Strict boundaries (the default of readPlanningInputs) must cover every
+% certified cell; perception-limited and map-offset boundaries do not.
+    required = 1;
+    if isfield(boundary,"coveragePolicy") && ~isempty(boundary.coveragePolicy)
+        required = double(string(boundary.coveragePolicy)=="strict");
+    end
+end
+
