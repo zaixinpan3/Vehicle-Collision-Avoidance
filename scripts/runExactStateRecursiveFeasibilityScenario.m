@@ -96,6 +96,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
             "parameterRange",[-100;2000],"safeSideSign",1);
         boundaries = [boundary;boundary];boundaries(2).coefficients(3)=5;boundaries(2).safeSideSign=-1;
         road.boundaries = boundaries;
+        road.lateralClearance = [5;5];
     end
     x = [0;0;0;8;0;0]+[0;options.InitialTrackingError];
     lane = [];previousState = [];previousInput = [];

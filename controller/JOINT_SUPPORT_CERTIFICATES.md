@@ -254,9 +254,12 @@ This is **conditional recursive subproblem feasibility**, not guaranteed solver
 completion or indefinite safety against future targets. New targets, larger
 motion/sensing bounds, changed execution contracts or an unconfirmed exit
 require admission or rejection. Target release does not prove that the target
-can never return. Nonempty physical road-boundary sets remain unsupported by
-the existing terminal construction. Whole-hold separation would require a
-certificate for a complete hold enclosure and is outside this change.
+can never return. Physical road boundaries are supported through a declared
+lateral clearance that shrinks the terminal set
+([TERMINAL_CBF_PROOF.md](TERMINAL_CBF_PROOF.md), "Declared lateral clearance");
+the finite fitted boundaries supply the node road rows only. Whole-hold
+separation would require a certificate for a complete hold enclosure and is
+outside this change.
 
 ## Implementation and checks
 

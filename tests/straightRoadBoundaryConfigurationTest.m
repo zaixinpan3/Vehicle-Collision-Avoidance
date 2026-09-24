@@ -14,10 +14,18 @@ classdef straightRoadBoundaryConfigurationTest < matlab.unittest.TestCase
             testCase.verifyTrue(isnan(report.minimumSampledRoadMargin));
             testCase.verifyGreaterThanOrEqual(report.minimumSampledModelDomainMargin,0);
         end
+        function anExplicitRoadBoundaryCertifiesAFootprintNearTheEdge(testCase)
+            report = runExactStateRecursiveFeasibilityScenario( ...
+                Scenario="cruise",SampleCount=1,DeadlineSeconds=30,UseRoadBoundaries=true, ...
+                InitialTrackingError=[3.9;0;0;0;0]);
+            testCase.verifyTrue(report.passed);
+            testCase.verifyTrue(report.roadBoundariesEnabled);
+            testCase.verifyGreaterThanOrEqual(report.minimumSampledRoadMargin,0);
+        end
         function anExplicitRoadBoundaryRejectsAnOverlappingFootprint(testCase)
             testCase.verifyError(@() runExactStateRecursiveFeasibilityScenario( ...
                 Scenario="cruise",SampleCount=1,DeadlineSeconds=30,UseRoadBoundaries=true, ...
-                InitialTrackingError=[3.9;0;0;0;0]), ...
+                InitialTrackingError=[4.2;0;0;0;0]), ...
                 'collisionAvoidanceController:optimizationFailed');
         end
         function aStateOutsideTheDiagnosticEnvelopeCanStillBeCertified(testCase)

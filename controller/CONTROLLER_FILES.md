@@ -24,7 +24,7 @@ Do not move controller helpers into those directories to evade the limit.
 | --- | --- |
 | `collisionAvoidanceController.m` | Public target-array entry; fixed-direction admission and solver-accepted improvement, complete witness storage and full-frame deadline enforcement |
 | `readPlanningInputs.m` | Input normalization, target-departure sensor declaration, optional NRMM parameter error bounds and lane/target model construction |
-| `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
+| `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate (shrunk by the declared lateral clearance), road-refit readmission and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse base transcription (`build`) and fixed-direction support majorants (`fixedDirections`) |
 | `solveHardCbfClf.m` | Convex base solving (`constrained`) and fixed-direction admission/continuation (`fixedDirections`), including the ordered ego-only / target-reactive admission attempts; solver success is accepted with no post-solve verification |

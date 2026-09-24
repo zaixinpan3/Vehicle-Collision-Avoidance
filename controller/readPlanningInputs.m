@@ -283,8 +283,28 @@ function road = localReadRoadGeometry(rawGeometry, lane, cfg)
     road = struct();
     road.boundaries = repmat(localEmptyRoadBoundary(), 0, 1);
     road.routeBranchId = "";
+    % Declared distances [right; left] from the nominal path to the physical
+    % road edges, valid along the whole continued reference. The terminal
+    % certificate shrinks its invariant set by them; the finite fitted
+    % boundaries above remain the node-row sensor products.
+    road.lateralClearance = zeros(2, 0);
+    road.lateralClearanceErrorBound = 0.0;
     if ~isstruct(rawGeometry)
         return;
+    end
+    if isfield(rawGeometry, "lateralClearance") ...
+            && ~isempty(rawGeometry.lateralClearance)
+        clearance = localFiniteVector( ...
+            rawGeometry.lateralClearance, 2, "roadGeometry.lateralClearance");
+        if any(clearance <= 0.0)
+            error("collisionAvoidanceController:invalidRoadClearance", ...
+                "roadGeometry.lateralClearance must hold two positive " ...
+                + "distances [right; left] in metres.");
+        end
+        road.lateralClearance = clearance;
+        road.lateralClearanceErrorBound = ...
+            localOptionalNonnegativeInputScalar( ...
+                rawGeometry, "lateralClearanceErrorBound");
     end
 
     boundaries = repmat(localEmptyRoadBoundary(), 0, 1);

@@ -40,7 +40,11 @@ collision and permanent actuator-amplitude/slew constraints, provided that:
    not covered by the previous encounter's theorem.
 5. The permanent reference is an analytically continued straight line or
    constant-curvature reference, or an explicitly continued smooth profile with
-   the scheduled terminal family described below, without physical road boundaries.
+   the scheduled terminal family described below. Physical road edges enter the
+   terminal set only through a declared lateral clearance `[d_R; d_L]` from the
+   nominal path, valid along the whole continued reference (Section 3,
+   "Declared lateral clearance"); finite fitted boundaries are node-row sensor
+   products and are not extrapolated by the terminal set.
    No additional state or tire-slip bounds are imposed. The forward reference
    map covers the actuator-reachable envelope; each measured inverse chart
    must remain well defined and meet the declared Frenet sensing contract.
@@ -207,6 +211,43 @@ set certificate as well as the box; it does not infer loss of true-state
 membership from outer-box overapproximation. The estimate's error is bounded
 because the conditioned box contains the truth and is a subset of the current
 bounded measurement box.
+
+### Declared lateral clearance
+
+Road edges are state constraints, so recursive feasibility needs the terminal
+set inside them: the shifted plan's final feedback step must satisfy the node
+road rows of the next frame. A finite fitted boundary cannot bound a timeless
+set, so the road geometry may declare a lateral clearance `[d_R; d_L]` (metres
+from the nominal path to the physical edges, valid along the continued
+reference) with an error bound `epsilon_d`. Supplying finite boundaries without
+this declaration is rejected (`missingLateralClearance`).
+
+With Frenet lateral `y`, heading error `psi`, half length `L` and half width `W`,
+every footprint corner has linear lateral coordinate `v` with
+`|v| <= |y| + L|psi| + W`. On a reference of curvature `k` the exact Frenet
+lateral of a corner with tangential offset `|u| <= hypot(L, W)` lies in
+`[v - u^2|k| / (2(1 - |k| v)), v]`, so the outer side receives the allowance
+`delta_k = |k| (L^2 + W^2) / (2 (1 - |k| max(d_R, d_L)))`, charged to both sides
+and requiring `|k| max(d_R, d_L) < 1/2`. The synthesis adds four rows on the
+true error, without a measurement-noise term because the modal set bounds the
+true error directly:
+
+\[
+ \pm y \pm L\,\psi \le d_{R/L} - W - \delta_k - \epsilon_d - |y_\star| - L|\psi_\star|,
+\]
+
+with `(y_*, psi_*)` the reference lateral and heading (zero on the analytic
+references). Their supports `|c V| a` join the actuator rows in the radius
+synthesis, so the set is scaled until either an actuator row or a clearance row
+binds. The scheduled family adds the same rows to every phase with the maximum
+curvature of the profile. The rows are node-sampled, like the node road rows;
+they do not certify the road between nodes.
+
+Refitted finite boundaries change the execution identity. Since the inherited
+family is never relinearized, a frame whose boundaries differ from the stored
+ones while the declared clearance and every other identity component are equal
+is admitted afresh, seeded by the shifted previous plan
+(`readmittedAfterRoadRefit`); a changed clearance still rejects the state.
 
 ### Continuous hold and input constraints
 

@@ -166,7 +166,8 @@ Run `tests/smoothReferenceGeometryTest.m`,
 reference/terminal preparation from complete frame timing, and records actual
 spatial curvature, scheduled curvature, phase error, hard certificates, physical
 sampled clearance and final trim error. It covers S bends, a smooth transition
-and an asymmetric bend, without physical road boundaries.
+and an asymmetric bend, without physical road boundaries (a declared lateral
+clearance is now supported; see TERMINAL_CBF_PROOF.md).
 
 The supported class is explicit smooth curvature profiles whose trim, terminal
 synthesis, local charts and finite encounter search pass their checks. This is

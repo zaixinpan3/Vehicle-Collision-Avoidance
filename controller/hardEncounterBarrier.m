@@ -10,6 +10,7 @@ classdef hardEncounterBarrier
             model.carriedWitness = [];
             model.nominalSource = "cruiseInitialization";
             model.measurementContractChanged=false;
+            model.readmittedAfterRoadRefit=false;
             model.measurementRadiusLimit = model.initialFrenetErrorBound;
             if isfield(model.lane,'referenceCurve') && ~laneGeometry.isVaryingReference(model.lane) ...
                     && model.lane.referenceCurve.curvature~=0
@@ -37,12 +38,32 @@ classdef hardEncounterBarrier
                         || ~isequaln(stored.terminal,stored.program.terminal)
                     error('collisionAvoidanceController:invalidStoredCertificate','The stored accepted plan was modified.');
                 end
+                roadRefit=false;
                 if ~isequaln(identity,stored.identity)
-                    error('collisionAvoidanceController:changedExecutionContract','The model, road and physical limits changed.');
+                    reduced=identity;reducedStored=stored.identity;
+                    reduced.road.boundaries=[];reducedStored.road.boundaries=[];
+                    if ~isequaln(reduced,reducedStored)
+                        error('collisionAvoidanceController:changedExecutionContract','The model, road and physical limits changed.');
+                    end
+                    roadRefit=true;
                 end
                 if abs(model.stateTime-stored.stateTime-model.sampleTime)>1e-10 ...
                         || ~isequal(ego.heldActuatorInput,stored.appliedInput)
                     error('collisionAvoidanceController:executionContractViolation','The next timestamp and issued held input are required.');
+                end
+                if roadRefit
+                    % Refitted finite boundaries void the carried node road
+                    % rows (the inherited family is never relinearized). The
+                    % declared clearance is unchanged, so the terminal set is
+                    % the same; admit this frame afresh, seeded by the
+                    % shifted previous plan.
+                    [model,carry]=hardEncounterBarrier.prepare(model,ego,observation,[],identity);
+                    model.readmittedAfterRoadRefit=true;
+                    if ~isempty(model.encounter)
+                        model.initializationPlan=[stored.plan(:,2:end),stored.plan(:,end)];
+                        model.nominalSource="shiftedPreviousSolution";
+                    end
+                    return;
                 end
                 measuredLimit=model.measurementRadiusLimit;
                 % The carried prediction bounds the estimator error at every
@@ -525,12 +546,9 @@ function terminal = localTerminalSet(model)
         error('collisionAvoidanceController:unsupportedReferenceJump', ...
             'The recursive certificate requires a continuous straight or analytic constant-curvature reference.');
     end
-    if ~isempty(model.road.boundaries)
-        error('collisionAvoidanceController:optimizationFailed', ...
-            'The recursive cruise certificate requires an unbounded road-free reference domain.');
-    end
+    clearance=localLateralClearanceRows(model,cruise.state,cruise.stage.curvature,2:6);
     persistent savedKey saved
-    key={cruise,model.measurementRadiusLimit,rmfield(cfg,'solver'),cfg.solver.constraintTolerance};
+    key={cruise,model.measurementRadiusLimit,rmfield(cfg,'solver'),cfg.solver.constraintTolerance,clearance};
     if ~isempty(savedKey) && isequaln(key,savedKey),terminal=saved;return;end
     gain=cruise.gain;
     [basis,eigenvalues]=eig(cruise.closedLoop);
@@ -565,8 +583,15 @@ function terminal = localTerminalSet(model)
     transformed=modal*cruise.closedLoop*basis;
     comparison=abs(transformed)+4096*eps*(1+abs(modal)*abs(cruise.closedLoop)*abs(basis));
     base=(eye(5)-comparison)\(disturbance+2*reserve);
-    available=[holdBound-noise;rate(finite)-slewNoise(finite)];
-    shape=[support;slewSupport(finite,:)];
+    % Declared lateral clearance rows act on the TRUE tracking error, which
+    % the modal set bounds directly; they carry no measurement-noise term.
+    clearanceSupport=abs(clearance.rows*basis);
+    if any(clearanceSupport*base>clearance.bound-reserve)
+        error('collisionAvoidanceController:insufficientLateralClearance', ...
+            'The declared lateral clearance cannot contain the noise-driven terminal set.');
+    end
+    available=[holdBound-noise;rate(finite)-slewNoise(finite);clearance.bound-reserve];
+    shape=[support;slewSupport(finite,:);clearanceSupport];
     direction=(eye(5)-comparison)\ones(5,1);
     direction=direction/max(direction);
     growth=shape*direction;
@@ -591,6 +616,7 @@ function terminal = localTerminalSet(model)
         'deviationRows',deviationRows,'deviationBound',deviationBound, ...
         'continuousA',cruise.stage.continuousA,'continuousB',cruise.stage.continuousB, ...
         'continuousC',cruise.stage.continuousC,'targetIndependent',true, ...
+        'lateralClearance',clearance, ...
         'scope',"boundedMeasurementRobustModalCruise",'sameOnlineGenerator',true);
     terminal.nextRadius=radius;
     terminal.nextModalMatrix=modal;
@@ -604,10 +630,6 @@ function terminal=localScheduledTerminalSet(model)
 % Every transition and held phase domain is checked; a curvature grid is not
 % treated as a certificate for an undeclared continuous parameter family.
     cfg=model.cfg;
-    if isfield(model,'road') && ~isempty(model.road.boundaries)
-        error('collisionAvoidanceController:optimizationFailed', ...
-            'The scheduled terminal certificate requires an unbounded road-free reference domain.');
-    end
     bank=ltvBicycleModel.referenceSchedule(model);
     if isfield(model,'referencePhaseIndex')
         index=model.referencePhaseIndex;
@@ -616,7 +638,7 @@ function terminal=localScheduledTerminalSet(model)
     end
     persistent savedKey saved
     % The bank stamp identifies the compiled schedule within this session.
-    key={bank.stamp,model.measurementRadiusLimit,cfg.solver.constraintTolerance};
+    key={bank.stamp,model.measurementRadiusLimit,cfg.solver.constraintTolerance,localRoadClearance(model)};
     if isempty(savedKey) || ~isequaln(savedKey,key)
         saved=localScheduledTerminalFamily(model,bank);
         savedKey=key;
@@ -659,6 +681,8 @@ function terminals=localScheduledTerminalFamily(model,bank)
     upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
     rate=h*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     finiteRate=isfinite(rate);inputRows=[eye(2);-eye(2)];
+    curve=model.lane.referenceCurve;
+    curvatureMaximum=laneGeometry.referenceCurvatureBounds(curve,0,curve.length);
     matrixParts=cell(count,1);boundParts=cell(count,1);equalParts=cell(count,1);
     ingredients=cell(count,1);
     for index=1:count
@@ -709,11 +733,13 @@ function terminals=localScheduledTerminalFamily(model,bank)
                 phaseInput(end+1,:)=flowInput; %#ok<AGROW>
             end
         end
+        clearance=localLateralClearanceRows(model,reference.state,curvatureMaximum,1:6);
+        clearanceSupport=abs(clearance.rows*basis);
         localMatrix=[comparison;holdSupport;slewSupport(finiteRate,:);abs(basis); ...
-            phaseSupport;-eye(dimension)];
+            phaseSupport;clearanceSupport;-eye(dimension)];
         localBound=[-disturbance-2*reserve;holdBound-holdNoise-2*reserve; ...
             rate(finiteRate)-slewNoise(finiteRate)-2*reserve;envelope; ...
-            phaseBound-2*reserve;zeros(dimension,1)];
+            phaseBound-2*reserve;clearance.bound-2*reserve;zeros(dimension,1)];
         rows=sparse(size(localMatrix,1),decisionCount);rows(:,columns)=localMatrix;
         rows(1:dimension,nextColumns)=rows(1:dimension,nextColumns)-eye(dimension);
         rows(end-dimension+1:end,end)=1;
@@ -731,7 +757,8 @@ function terminals=localScheduledTerminalFamily(model,bank)
         ingredients{index}=struct('comparison',comparison,'disturbance',disturbance, ...
             'holdBound',holdBound,'holdSupport',holdSupport,'holdNoise',holdNoise, ...
             'change',change,'slewSupport',slewSupport,'slewNoise',slewNoise, ...
-            'phaseSupport',phaseSupport,'phaseBound',phaseBound,'phaseInput',phaseInput);
+            'phaseSupport',phaseSupport,'phaseBound',phaseBound,'phaseInput',phaseInput, ...
+            'clearance',clearance,'clearanceSupport',clearanceSupport);
     end
     matrix=vertcat(matrixParts{:});bound=vertcat(boundParts{:});equal=vertcat(equalParts{:});
     objective=zeros(decisionCount,1);objective(end)=-1;
@@ -755,7 +782,8 @@ function terminals=localScheduledTerminalFamily(model,bank)
         deviationBound=[data.holdBound-data.holdSupport*radius-data.holdNoise; ...
             slewRoom;slewRoom;phaseRoom;phaseRoom];
         if any(data.comparison*radius+data.disturbance>nextRadius-reserve) ...
-                || any(deviationBound<reserve)
+                || any(deviationBound<reserve) ...
+                || any(data.clearanceSupport*radius>data.clearance.bound-reserve)
             error('collisionAvoidanceController:invalidTerminalModel', ...
                 'The independently checked terminal family has insufficient numerical reserve.');
         end
@@ -771,6 +799,7 @@ function terminals=localScheduledTerminalFamily(model,bank)
             'deviationRows',deviationRows,'deviationBound',deviationBound, ...
             'continuousA',stage.continuousA,'continuousB',stage.continuousB,'continuousC',stage.continuousC, ...
             'targetIndependent',true,'sameOnlineGenerator',true,'scheduled',true,'index',index, ...
+            'lateralClearance',data.clearance, ...
             'phaseRadius',phaseRadius,'scope',"boundedPhaseScheduledModalContinuation");
     end
 end
@@ -878,3 +907,59 @@ function [row,bound] = localExitRow(model,target,center,radius,egoRadius,frame,d
         -body-distance*norm(direction);
     bound = bound-256*eps*(1+abs(bound)+abs(direction).'*(abs(center(1:2))+abs(frame.origin)));
 end
+
+function declared=localRoadClearance(model)
+% The declared [right; left] lateral clearance, or empty when none is declared.
+    declared=zeros(2,0);
+    if isfield(model,'road') && isfield(model.road,'lateralClearance')
+        declared=model.road.lateralClearance(:);
+    end
+end
+
+function clearance=localLateralClearanceRows(model,referenceState,curvature,stateIndex)
+% Rows c'e <= b on the true tracking error e (indices stateIndex of the
+% state) that keep every hold-node footprint of the terminal set inside the
+% declared lateral clearance of the reference. With Frenet lateral y, heading
+% error psi, half length L and half width W, every corner's linear lateral
+% coordinate satisfies |v| <= |y| + L|psi| + W. On a constant-curvature
+% reference a corner's exact Frenet lateral lies in [v - u^2 k/(2(1 - k v)), v]
+% for |u| <= hypot(L,W), so the outer side receives that allowance; it is
+% charged to both sides here. Both boundaries are node-sampled, as the
+% node road rows are. The rows bound the TRUE error and carry no noise term.
+    cfg=model.cfg;
+    declared=localRoadClearance(model);
+    clearance=struct('rows',zeros(0,numel(stateIndex)),'bound',zeros(0,1),'declared',declared, ...
+        'curvatureAllowance',0,'errorBound',0);
+    if isempty(declared)
+        if isfield(model,'road') && isfield(model.road,'boundaries') && ~isempty(model.road.boundaries)
+            error('collisionAvoidanceController:missingLateralClearance', ...
+                'Road boundaries require a declared roadGeometry.lateralClearance [right; left] for the terminal certificate.');
+        end
+        return;
+    end
+    errorBound=0;
+    if isfield(model.road,'lateralClearanceErrorBound'),errorBound=model.road.lateralClearanceErrorBound;end
+    halfLength=cfg.vehicle.length/2;halfWidth=cfg.vehicle.width/2;
+    kappa=abs(curvature);corner=hypot(halfLength,halfWidth);
+    if kappa*max(declared)>=0.5
+        error('collisionAvoidanceController:invalidRoadClearance', ...
+            'The declared lateral clearance must stay well inside the reference curvature radius.');
+    end
+    allowance=kappa*corner^2/(2*(1-kappa*max(declared)));
+    lateral=find(stateIndex==2);heading=find(stateIndex==3);
+    signs=[1,1;1,-1;-1,1;-1,-1];
+    rows=zeros(4,numel(stateIndex));bound=zeros(4,1);
+    for k=1:4
+        rows(k,lateral)=signs(k,1);rows(k,heading)=signs(k,2)*halfLength;
+        side=declared(1+(signs(k,1)>0));
+        bound(k)=side-halfWidth-allowance-errorBound ...
+            -signs(k,1)*referenceState(2)-halfLength*abs(referenceState(3));
+    end
+    if any(bound<=0)
+        error('collisionAvoidanceController:insufficientLateralClearance', ...
+            'The declared lateral clearance is narrower than the ego footprint.');
+    end
+    clearance.rows=rows;clearance.bound=bound;
+    clearance.curvatureAllowance=allowance;clearance.errorBound=errorBound;
+end
+
