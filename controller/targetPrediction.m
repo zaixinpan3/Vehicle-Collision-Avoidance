@@ -249,10 +249,9 @@ classdef targetPrediction
 
         function [center, radius] = finiteFlow(encounter, duration)
         %finiteFlow Positive Cartesian reachability; no speed division.
-        % For an nrmm-motion-v1 contract the box encloses every NRMM path
-        % through the estimate box: the NRMM parameter enclosure
-        % (targetPrediction.deviationModel) intersected with the Cartesian
-        % enclosure of the same paths.
+        % For an nrmm-motion-v1 contract the box encloses every NRMM path of
+        % the encounter's parameter intervals through its position box
+        % (targetPrediction.deviationModel).
             duration = double(duration(:).');
             if any(~isfinite(duration) | duration < 0)
                 error("collisionAvoidanceController:invalidPredictionTime", "Prediction times must be finite and nonnegative.");
@@ -589,35 +588,16 @@ function maximum = localCurvatureMaximum(contract)
 end
 
 function [center,radius] = localNrmmFlow(encounter,duration)
-% Box enclosure of every NRMM path through the estimate box: the NRMM parameter
-% enclosure intersected with the Cartesian enclosure of the same paths, whose
-% jerk is at most hypot(kappa^2 V^3, 3 A kappa V) and whose yaw acceleration is
-% at most |A kappa| over the parameter intervals. A stop sets the acceleration
-% to zero: per axis |a - a0| <= r_a + J t before it and |a0| after, so where a
-% path may have stopped the acceleration deviation also covers max(0,|a0|-r_a).
+% Box enclosure of every NRMM path of the parameter intervals through the
+% position box: the linearization of the path in the parameters with its
+% Lagrange second-order remainder, or the path-length ball where the
+% linearization does not apply (targetPrediction.deviationModel).
     state = localNrmmState(encounter,duration,true);
     center = state.center;count = numel(duration);
     radius = zeros(8,count);
     radius(1:6,:) = reshape(pagemtimes(abs(state.sensitivity),state.parameterRadius),6,[])+state.remainder;
     radius(7,:) = state.yawRadius;radius(8,:) = state.yawRateRadius;
     radius = radius+64*eps*(1+abs(center)+radius);
-    x = encounter.center;r = encounter.radius;t = duration;jerk = state.jerkBound;
-    yawAcceleration = state.yawAccelerationBound;
-    cartesian = [x(1:2)+x(3:4)*t+x(5:6)*(t.^2/2);x(3:4)+x(5:6)*t;repmat(x(5:6),1,count); ...
-        x(7)+x(8)*t;repmat(x(8),1,count)];
-    jump = max(0,abs(x(5:6))-r(5:6)).*~state.noStop;
-    spread = [r(1:2)+r(3:4)*t+(r(5:6)+jump).*(t.^2/2)+jerk.*t.^3/6; ...
-        r(3:4)+(r(5:6)+jump).*t+jerk.*t.^2/2;r(5:6)+jump+jerk.*t; ...
-        r(7)+r(8)*t+yawAcceleration*t.^2/2;r(8)+yawAcceleration*t];
-    spread = spread+64*eps*(1+abs(cartesian)+spread);
-    lower = max(center-radius,cartesian-spread);upper = min(center+radius,cartesian+spread);
-    allowance = 256*eps*(1+abs(center)+abs(cartesian)+radius+spread);
-    if any(lower>upper+allowance,'all')
-        error("collisionAvoidanceController:inconsistentObservation", ...
-            "The target estimate admits no NRMM path within the declared bounds.");
-    end
-    middle = (lower+upper)/2;lower = min(lower,middle);upper = max(upper,middle);
-    center = middle;radius = (upper-lower)/2;
 end
 
 function state = localNrmmState(encounter,duration,uncertain)
@@ -662,13 +642,7 @@ function state = localNrmmState(encounter,duration,uncertain)
     ds = t*dV+t.^2/2*dA;dRate = dV+t*dA;
     sMax = arc+ds;rateMax = rate+dRate;kMax = abs(kappa)+dK;aMax = abs(tangential)+dA;
     dPhi = dCourse+abs(kappa)*ds+arc*dK+dK*ds;
-    noStop = speedLow>0 & speedLow+min(0,tangential-dA)*t>0;
-    linear = noStop & courseRadius<=0.5;
-    % Cartesian jerk and yaw acceleration of every path, nondecreasing in t.
-    speedBound = speedHigh+max(tangential+dA,0)*t;
-    state.jerkBound = hypot(kMax^2*speedBound.^3,3*aMax*kMax*speedBound);
-    state.yawAccelerationBound = aMax*kMax;
-    state.noStop = noStop;
+    linear = speedLow>0 & courseRadius<=0.5 & speedLow+min(0,tangential-dA)*t>0;
     sensitivity = zeros(6,6,count);
     sensitivity(1,1,:) = 1;sensitivity(2,2,:) = 1;
     curvatureColumn = localCurvatureSensitivity(arc,kappa,course);

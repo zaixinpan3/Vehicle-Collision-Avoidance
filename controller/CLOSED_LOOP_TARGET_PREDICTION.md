@@ -259,19 +259,14 @@ norm; the published bounds do not. Inherited frames propagate the intervals
 over the hold and intersect them with the measurement's.
 
 **Reachable box** (`targetPrediction.finiteFlow`), for every NRMM path of the
-intervals through the position box, as the intersection of two bounds on the
-same paths:
-1. **Parameter-Taylor bound.** Analytic sensitivities with a Lagrange
-   second-order remainder, or a path-length ball where the linearization does
-   not apply. Tight for fast and turning targets and long horizons.
-2. **Time-Taylor bound.** The constant-acceleration extrapolation of the box
-   plus the integrated jerk `hypot(kappa^2 V^3, 3 A kappa V)` and yaw
-   acceleration `|A kappa|` of the paths over the intervals, plus the jump of
-   the acceleration to zero wherever a path may have stopped. Tight for slow
-   targets and short horizons.
-
-All of the remaining growth is the extrapolation of the current estimate error
-along the NRMM path.
+intervals through the position box: analytic sensitivities with a Lagrange
+second-order remainder, or a path-length ball where the linearization does not
+apply. All of the growth is the extrapolation of the current parameter errors
+along the NRMM path. A second, Cartesian bound on the same paths (the
+constant-acceleration extrapolation plus the integrated NRMM jerk) was
+intersected with this box between d1735f7 and 72a2ff1 and removed at the
+user's direction on 2026-09-24; it was tighter for slow targets with large
+errors, by up to 54 % of the box at 4.8 s in the measured cases.
 
 **Reactive tube** (`targetPrediction.deviationModel`). The target deviation is
 `S(t) theta + rho(t)`:

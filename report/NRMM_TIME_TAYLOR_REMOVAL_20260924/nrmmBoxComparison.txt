@@ -1,0 +1,9 @@
+sideslip maximum 0.005 rad (J = 0.383 m/s^3, curvature maximum 0.00312 1/m)
+  Cartesian jerk contract, position half-width per axis (m):   0.41   1.11   2.67   5.49   8.89 
+  nrmm-motion-v1,          position half-width per axis (m):   0.43   0.82   1.38   2.13   2.85 
+  nrmm-motion-v1,          yaw half-width (rad):              0.013  0.018  0.022  0.028  0.033 
+sideslip maximum 0.015 rad (J = 1.327 m/s^3, curvature maximum 0.00937 1/m)
+  Cartesian jerk contract, position half-width per axis (m):   0.57   2.37   6.92  15.55  26.28 
+  nrmm-motion-v1,          position half-width per axis (m):   0.43   0.83   1.42   2.22   3.02 
+  nrmm-motion-v1,          yaw half-width (rad):              0.016  0.024  0.032  0.041  0.049 
+times (s):    1.0    2.0    3.0    4.0    4.8 

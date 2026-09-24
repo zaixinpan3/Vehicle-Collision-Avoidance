@@ -81,24 +81,16 @@ At a continuation frame the carried intervals are propagated over the hold
 the measurement's intervals. An empty intersection is an inconsistent
 observation.
 
-**Reachable box** (`finiteFlow`). Two bounds on the same NRMM paths, both
-from the parameter intervals and the position box, intersected:
-- **Parameter-Taylor bound.** The linearization of the path in the
-  parameters with a Lagrange second-order remainder, or a path-length ball
-  where the linearization does not apply: a course radius above 0.5 rad, a
-  speed interval touching zero, or a possible stop. It is tight for fast and
-  turning targets and long horizons.
-- **Time-Taylor bound.** The constant-acceleration extrapolation of the
-  estimate box plus the integrated jerk of the NRMM paths,
-  `hypot(kappa^2 V^3, 3 A kappa V)` over the parameter intervals, and their
-  yaw acceleration `|A kappa|`. A stop sets the acceleration to zero, so where
-  a path may have stopped the per-axis acceleration deviation also covers
-  `max(0, |a0| - r_a)`. It is tight for slow targets and short horizons, where
-  the parameter-Taylor bound pays for a course and a curvature that the
-  estimate cannot resolve.
-
-No `J*t^3/6` term of a declared jerk is added: the growth is the extrapolation
-of the current estimate error along the NRMM path.
+**Reachable box** (`finiteFlow`). The NRMM paths of the parameter intervals
+through the position box, enclosed by the linearization of the path in the
+parameters with a Lagrange second-order remainder, or by a path-length ball
+where the linearization does not apply: a course radius above 0.5 rad, a
+speed interval touching zero, or a possible stop. No Cartesian
+constant-acceleration extrapolation and no jerk term enter: the growth is the
+extrapolation of the current parameter errors along the NRMM path. (A
+Cartesian bound on the same paths was intersected with this box between
+commits d1735f7 and 72a2ff1 and removed at the user's direction; it was
+tighter for slow targets with large errors.)
 `targetPrediction.deviationModel` gives the parameter linearization to the
 target-reactive tube. Whole-hold cells extrapolate a node snapshot with a
 Cartesian jerk bound and are not supported for NRMM targets. A change of the

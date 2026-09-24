@@ -74,37 +74,6 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(nrmm(1:2,2)),max(box(1:2,2))/10);
         end
 
-        function aSlowTargetKeepsTheCartesianEnclosureOfItsTurning(testCase)
-            % At 4 m/s with ten-fold estimate errors the NRMM parameter enclosure
-            % is wider than the Cartesian box whose jerk covers the turning; the
-            % flow keeps the tighter of the two on every axis.
-            encounter=localPathEncounter([4;pi/2;0;0],[1;1;.5;.5;.1;.1;.1;.1],.03);
-            time=0:.1:4.8;
-            [~,box]=targetPrediction.finiteFlow(encounter,time);
-            model=targetPrediction.deviationModel(encounter,time);
-            nrmm=reshape(sum(abs(model.parameterGenerators),2),6,[])+model.remainder;
-            speed=4+norm([.5;.5]);rate=norm([.1;.1]);
-            cartesian=encounter;jerk=hypot(.03^2*(speed+rate*4.8)^3,3*rate*.03*(speed+rate*4.8));
-            cartesian.contract=struct('kind',"finite-sensing-motion-v1",'jerkBound',[jerk;jerk], ...
-                'yawAccelerationBound',rate*.03);
-            [~,reference]=targetPrediction.finiteFlow(cartesian,time);
-            testCase.verifyLessThanOrEqual(box-reference,1e-12);
-            testCase.verifyLessThanOrEqual(box(1:6,:)-nrmm,1e-12);
-            testCase.verifyLessThan(max(box(1:2,end)),.7*max(nrmm(1:2,end)));
-        end
-
-        function aTargetThatMayBeAtRestKeepsTheCartesianBox(testCase)
-            % A target estimated at rest may stop at any time; the stop is an
-            % acceleration jump to zero, covered because its estimate is zero.
-            radius=[1;1;.5;.5;.1;.1;.1;.1];
-            encounter=localPathEncounter([0;0;0;0],radius,.03);
-            time=0:.1:4.8;
-            [~,box]=targetPrediction.finiteFlow(encounter,time);
-            speed=.71+.15*time;jerk=hypot(.03^2*speed.^3,3*.15*.03*speed);
-            reference=radius(1:2)+radius(3:4).*time+radius(5:6).*time.^2/2+jerk.*time.^3/6;
-            testCase.verifyLessThanOrEqual(box(1:2,:)-reference,1e-12);
-        end
-
         function publishedParameterBoundsTightenTheBoxAndStayValid(testCase)
             % A 4 m/s target with ten-fold errors. The declarer's velocity and
             % acceleration errors are discs of the box radii: the published
@@ -165,8 +134,8 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
         function aContradictoryYawRateIsAnInconsistentObservation(testCase)
             encounter=localPathEncounter([10;0;0;.02],[.1;.1;.05;.05;.01;.01;.01;.01],.05);
             encounter.center(8)=1;
-            testCase.verifyError(@() targetPrediction.finiteFlow(encounter,1), ...
-                "collisionAvoidanceController:inconsistentObservation");
+            testCase.verifyError(@() targetPrediction.nrmmParameters(encounter.center,encounter.radius, ...
+                encounter.contract,[]),"collisionAvoidanceController:inconsistentObservation");
         end
 
         function anNrmmContractCannotCarryAModelError(testCase)
