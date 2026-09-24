@@ -69,7 +69,10 @@ with the deadline disabled. Settings:
 - **Declared maximum:** 2 m/s^2 for J = 1 and 3 m/s^2 for J = 2. The truth never
   exceeds `sqrt(2) J`.
 
-"Reactive" means the order `[30, 100, Inf]`.
+"Reactive" means the order `[30, 100, Inf]`. The truth jerk `J cos t`
+deliberately violates the controller's target model (constant speed-rate and
+constant sideslip, NRMM). The campaign therefore measures robustness to a
+declared model mismatch, not the model's design case.
 
 | Case | jerk-only, ego-only (before) | jerk-only, reactive | capped, ego-only | capped, reactive |
 | --- | --- | --- | --- | --- |
@@ -121,7 +124,8 @@ prediction time, in metres.
 | | capped, reactive 100 | 0.69 | 2.23 | 5.22 | 11.65 | 18.12 | 0.196 / 0.206 |
 
 The ego part of these supports stays bounded (feedback tube). What grows is the
-target's own maneuver freedom:
+declared jerk term, which in this campaign is the truth target's declared
+model mismatch (jerk `J cos t`), not a free maneuver of an NRMM target:
 - The acceleration maximum turns the `t^3` growth into `t^2`.
 - At the reaction strengths the actuator budget allows, the reactive policy
   trims the late supports by about 1–2 m, at an extra 0.04–0.13 of braking
@@ -156,9 +160,12 @@ target's own maneuver freedom:
 ## 5. Conclusion
 
 With feedback, the ego's prediction tube stays bounded. The target's part
-does not, because most of it is not estimation error. It is the set of places
-the target can drive to, which grows with prediction time for any target that
-can maneuver.
+does not stay bounded in these runs, because their truth targets deliberately
+violate the constant-acceleration model and the certificate must cover that
+declared jerk. Under the controller's NRMM model, the target's future path is
+fixed by its current state. Its growth is then the current estimate error,
+which later estimates resolve, plus the certificate's Cartesian enclosure of
+the turning (Section 7).
 
 In these runs, the effective change was to use the acceleration maximum the
 estimator already publishes. It resolved 4 of the 5 maneuvering-target
@@ -184,3 +191,33 @@ nothing when unused.
   chart error remain.
 - **Estimator-in-the-loop and PassVeh14DOF suites.** These still stop on their
   earlier contract causes and were not rerun.
+
+## 7. Correction (2026-09-23)
+
+An earlier version of Sections 3 and 5 attributed the target's growth to "the
+target's own maneuver freedom". That reading is wrong for the controller's
+target model:
+- **Model.** The model is NRMM: constant speed-rate and constant sideslip. The
+  path is determined by the current state.
+- **Jerk bound.** The estimator's published jerk bound,
+  `hypot(vmax wmax^2, 3 amax wmax) + modelJerkMaximum` with
+  `modelJerkMaximum = 0` by default, is the Cartesian jerk of an NRMM turn. It
+  is not driver freedom.
+- **Campaign truth.** The jerk in this campaign is a deliberate model mismatch
+  of the harness truth.
+
+[nrmmVersusCartesian.m](TARGET_REACTION_VALIDATION_20260923/nrmmVersusCartesian.m)
+([output](TARGET_REACTION_VALIDATION_20260923/nrmmVersusCartesian.txt)) compares,
+for one turning NRMM target, the certificate box with the constant-curvature
+family envelope `targetPrediction.errorEnvelope` for the same estimate errors.
+
+| Estimator domain | Position half-width per axis at 4.8 s | of which `J t^3/6` |
+| --- | --- | --- |
+| estimator-in-the-loop domain | 8.9 m | 7.1 m |
+| `nrmmTrackingConfig` domain | 26.3 m | 24.5 m |
+| family envelope, same estimate errors | 4.7 m | none; all current estimate error |
+
+The measured outcomes in Sections 1–4 are unchanged. The model-consistent
+certificate is described, not implemented, in Section 7 of
+[CLOSED_LOOP_TARGET_PREDICTION.md](../controller/CLOSED_LOOP_TARGET_PREDICTION.md).
+

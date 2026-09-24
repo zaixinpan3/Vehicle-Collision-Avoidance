@@ -20,8 +20,22 @@ here:
 1. **Today's estimate errors, extrapolated** (`r_v t`, `r_a t^2/2`). The
    estimator re-anchors the target estimate at every hold, so in execution this
    error never accumulates.
-2. **The target's own future maneuver** (`J t^3/6`). No estimator can measure it
-   in advance; it is the target driver's freedom.
+2. **The jerk term** (`J t^3/6`). The controller's target model is NRMM:
+   constant scalar acceleration and constant sideslip, so the target's path is
+   fixed by its current state. The NRMM estimator publishes
+   `J = hypot(vmax wmax^2, 3 amax wmax) + modelJerkMaximum`: the largest
+   Cartesian jerk of an NRMM turn, plus a model-error allowance that is 0 by
+   default (`nrmmTrackingConfig`: zero acceleration-rate and curvature-rate
+   maxima). `finiteFlow` extrapolates a constant Cartesian acceleration, so it
+   treats the deterministic turning of the estimated NRMM path as unknown jerk.
+   Under the NRMM model this term is an artifact of the Cartesian enclosure,
+   plus the declared allowance; it is not a free maneuver of the target. In the
+   declared-plant harness, `J` is instead the amplitude of a truth jerk
+   `J cos t`, which deliberately violates constant acceleration.
+
+   Correction (2026-09-23): an earlier version of this item called the term
+   "the target's own future maneuver ... the target driver's freedom". That is
+   wrong for the controller's NRMM target model; see Section 7.
 
 A frame that inherits a certificate reuses the admission frame's collision and
 exit records for the rest of the encounter. So every record must hold for
@@ -48,8 +62,9 @@ follow it.
   Without (1), no reaction with bounded authority keeps the relative deviation
   bounded. Without (2), the reaction's reserve crowds out the nominal maneuver.
 
-The target's absolute future position still spreads out. The reaction only
-keeps that spread out of the collision and exit records.
+Under the NRMM model, the spread of the target's absolute future position is
+the extrapolation of its current estimate error, which each new estimate
+resolves. The reaction keeps that spread out of the collision and exit records.
 
 ## 3. Declared acceleration maximum (reachability)
 
@@ -178,10 +193,13 @@ reports the measured outcomes on the declared plant. Main results:
   estimator-bound campaign and the recursion campaign are unchanged. A
   reaction-first sweep gives the same outcomes, with node gaps within 0.051 m.
 
-The physical reading: the ego tube is bounded, while the target's own maneuver
-freedom still grows with prediction time. Keeping the relative tube bounded
-would require a reserve comparable to the target's acceleration, which the
-maneuvers and the terminal cruise requirement do not leave free.
+Reading: the ego tube is bounded. The campaign's truth targets deliberately
+violate the NRMM model (jerk `J cos t`), and the declared `J` covers that
+mismatch. Following such a target would need a reserve comparable to its
+acceleration, which the maneuvers and the terminal cruise requirement do not
+leave free. For a target that does follow the NRMM model, most of the
+certificate's target growth is the Cartesian enclosure of its deterministic
+turning (Section 7).
 
 ## 6. Limits
 
@@ -202,3 +220,42 @@ maneuvers and the terminal cruise requirement do not leave free.
   at the circumradius.
 - **Curved charts** are built from the reactive ego radius; the chart remainder
   is not enforced (unchanged).
+
+## 7. NRMM-consistent target prediction (not implemented)
+
+Under the controller's NRMM target model, the certificate's target box is not
+consistent with the model. It encloses a turning NRMM target by a Cartesian
+constant-acceleration path plus the NRMM jerk bound.
+
+[nrmmVersusCartesian.m](../report/TARGET_REACTION_VALIDATION_20260923/nrmmVersusCartesian.m)
+takes one turning target: 15 m/s, sideslip 0.005 rad, speed-rate 1 m/s^2.
+Its estimate errors are 0.2 m, 0.1 m/s and 0.1 m/s^2 per axis, 0.01 rad and
+0.005 rad/s. Position half-width per axis at 4.8 s:
+
+| Estimator domain | Certificate box | of which `J t^3/6` | NRMM-family envelope, same errors |
+| --- | --- | --- | --- |
+| estimator-in-the-loop, sideslip max 0.005 rad (J = 0.38 m/s^3) | 8.9 m | 7.1 m | 4.7 m |
+| `nrmmTrackingConfig`, sideslip max 0.015 rad (J = 1.33 m/s^3) | 26.3 m | 24.5 m | 4.7 m |
+
+The envelope is the existing `targetPrediction.errorEnvelope`. All of its growth
+is the extrapolation of the current estimate error: speed, speed-rate, heading
+and curvature errors along the NRMM path.
+
+A model-consistent certificate would need three changes:
+- **Nominal.** Use the NRMM path of the estimate.
+- **Uncertainty.** Use the image of the current NRMM parameter-error box, plus
+  only the declared model-error allowance. This removes the `J t^3/6` term.
+- **Reaction.** Apply the target-reactive policy to the NRMM deviation. That
+  deviation is a smooth, deterministic function of the current estimate error:
+  its acceleration is about the speed-rate error plus `v^2` times the curvature
+  error, roughly 0.2 m/s^2 in the example above. Following it therefore needs
+  little authority, and the relative tube is then set by the per-hold estimate
+  error.
+
+This would change the target interface in three places:
+- the estimator would publish NRMM parameter-error bounds and model-error rates
+  instead of only a Cartesian jerk bound;
+- the certificate would cover NRMM motions plus the declared allowance, rather
+  than every jerk-bounded motion;
+- the declared-plant harness would need NRMM truth targets.
+

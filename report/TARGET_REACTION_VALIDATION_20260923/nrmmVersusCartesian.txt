@@ -1,0 +1,11 @@
+estimator-in-the-loop (beta_max 0.005): J = 0.383 m/s^3
+  Cartesian certificate, position half-width per axis (m):   0.41   1.11   2.67   5.49   8.89 
+  same with |a| <= 2 m/s^2 cap (m):                          0.41   1.11   2.67   5.49   8.89 
+  of which J t^3/6 (m):                                      0.06   0.51   1.72   4.09   7.06 
+nrmmTrackingConfig (beta_max 0.015): J = 1.327 m/s^3
+  Cartesian certificate, position half-width per axis (m):   0.57   2.37   6.92  15.55  26.28 
+  same with |a| <= 2 m/s^2 cap (m):                          0.57   2.37   6.80  14.23  22.33 
+  of which J t^3/6 (m):                                      0.22   1.77   5.97  14.15  24.45 
+NRMM-family envelope (same estimate errors, no jerk term), position half-width (m):   0.61   1.28   2.23   3.48   4.71 
+  yaw half-width (rad):  0.016  0.024  0.032  0.041  0.049 
+times (s):    1.0    2.0    3.0    4.0    4.8 
