@@ -100,11 +100,23 @@ requires the whole final box to lie inside the fixed-size modal cruise set
 With ten-fold uncertainty the box does not fit the terminal set even in the best
 case, so no input sequence can satisfy `terminalCone`, with or without the
 obstacle. In case 54 the collision certificates are also infeasible on their
-own. The target's declared position uncertainty (initial box, velocity bound
-and ten-fold jerk bound) grows from 2.5 m to 18.2 m radius over the horizon, and
-no single input sequence avoids every target motion inside that set. The actual
-target moves on a straight line and could be avoided; the certificate demands
-robustness against every motion the inflated bounds admit.
+own. The target's declared reachable box (`targetPrediction.finiteFlow`) has a
+half-width per axis of `r_p + r_v t + r_a t^2/2 + J t^3/6`. With the ten-fold
+bounds (1.0 m, 0.5 m/s, 0.1 m/s^2, jerk 0.2 m/s^3) this reaches 8.24 m per axis
+at the 4.8 s horizon: 1.0 m current position error, 2.40 m velocity error,
+1.15 m acceleration error and 3.69 m from the jerk bound. No single input
+sequence avoids every target motion inside that box. The true target in this
+case deviates about 1.2 m per axis from its constant-velocity path over 4.8 s,
+far less than the box; the certificate demands robustness against every motion
+the inflated bounds admit.
+
+Correction (2026-09-23): an earlier version of this paragraph said the target
+uncertainty grows from 2.5 m to 18.2 m radius and that the true target moves on
+a straight line. The 2.5/18.2 m figures in
+[uncertainty.txt](ADMISSION_INFEASIBILITY_DIAGNOSIS_20260923/uncertainty.txt) are
+the sum of all generator lengths of the ego-target relative-position record
+(both target box axes plus the then open-loop ego part), not a target radius.
+The true target oscillates with the declared jerk amplitude.
 
 Case 53 (x3) belongs to Class A: its terminal box still fits (+0.0745), and
 only the chart boxes bind.

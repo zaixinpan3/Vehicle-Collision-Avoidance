@@ -182,9 +182,10 @@ instead of an arbitrary per-hold error.
 
 ## 6. Not addressed
 
-- **Target uncertainty.** In case 54 the target's declared reachable set grows
-  to 18 m radius. The ego policy does not feed back future target
-  measurements, so this growth remains.
+- **Target uncertainty.** In case 54 the target's declared reachable box grows
+  to 8.24 m per axis at the 4.8 s horizon (1.0 m position error, 2.40 m velocity
+  error, 1.15 m acceleration error, 3.69 m from the jerk bound). The ego policy
+  does not react to future target measurements, so this growth remains.
 - **Model mismatch.** The PassVeh14DOF plant violates the zero-residual
   contract; nothing here changes that.
 - **Gain design.** Section 5a argues for a gain without lateral-velocity

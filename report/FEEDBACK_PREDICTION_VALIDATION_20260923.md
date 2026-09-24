@@ -77,7 +77,9 @@ Only three cases change their outcome:
 
 Per-case table: [CONTROLLER_FAILURE_MODE_SWEEP_FEEDBACK_20260923.csv](CONTROLLER_FAILURE_MODE_SWEEP_FEEDBACK_20260923.csv).
 Case 54 (crossing, curvature 0.01, x10) remains infeasible because the target's
-declared reachable set grows to 18 m radius. Ego feedback does not address that. The
+declared reachable box grows to 8.24 m per axis at the 4.8 s horizon (corrected
+from an earlier "18 m radius", which summed both axes and the ego part). Ego
+feedback does not address that. The
 road-boundary rejections, the eight straight-road inter-node overlaps and the case 96
 node overlap left by the chart-box removal are unchanged.
 
