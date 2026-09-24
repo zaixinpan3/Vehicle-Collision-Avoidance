@@ -49,17 +49,19 @@ classdef solveHardCbfClf
     end
 end
 
-function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
+function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
 % Direction search supplies an optimizer center, never a new issued plan.
 % Inherited frames solve with their stored directions; if that solve fails the
 % shifted previous plan is retained. Fresh frames keep the nominal directions
-% unless the fluid reference detects a support conflict.
+% unless the fluid reference detects a support conflict. With a target, a fresh
+% frame then tries the configured reaction strengths in order (Inf is the
+% ego-only feedback tube); the first solver success is accepted.
     search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
         'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
         'policy',"fixedDirectionTrajectoryOptimization",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
         'issuedAdmissionWitness',false,'usedFullPlanAdmission',false, ...
-        'fullPlanStatus',"notAttempted", ...
+        'fullPlanStatus',"notAttempted",'reactionAttempts',zeros(1,0),'reactionStrength',Inf, ...
         'initialCertificateAngles',program.jointCertificate.angles, ...
         'fixedCertificateAngles',program.jointCertificate.angles,'directionSeedSource',"nominalWitness");
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
@@ -78,16 +80,30 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
     end
     search.fixedCertificateAngles=angles;
     incumbent=point;
-    phase=tic;conic=avoidanceStageQp.fixedDirections(program,point,angles,cfg);
-    search.formulationSeconds=search.formulationSeconds+toc(phase);
-    phase=tic;trial=localSolveConic(conic,cfg);search.solveSeconds=toc(phase);
-    search.hardSolves=1;search.nativeSolves=1;improved=trial.feasible;
+    strengths=Inf;
+    if ~inherited && isfield(model,'encounter') && ~isempty(model.encounter) && cfg.feedbackPrediction.enabled
+        strengths=cfg.feedbackPrediction.targetReaction.inputWeightScales;
+    end
+    improved=false;
+    for strength=strengths
+        if ~localInitializationTimeAvailable(cfg) && ~isempty(search.reactionAttempts),break;end
+        candidate=program;
+        if isfinite(strength)
+            phase=tic;candidate=localReactiveProgram(program,model,point,angles,strength,cfg);
+            search.formulationSeconds=search.formulationSeconds+toc(phase);
+        end
+        [improved,accepted,trial,seconds]=localFixedSolve(candidate,point,angles,cfg);
+        search.formulationSeconds=search.formulationSeconds+seconds(1);
+        search.solveSeconds=search.solveSeconds+seconds(2);
+        search.hardSolves=search.hardSolves+1;search.nativeSolves=search.nativeSolves+1;
+        search.reactionAttempts(end+1)=strength;
+        if improved,break;end
+    end
     search.fullPlanStatus="solverRejected";
     if improved
         % A solver-reported success is accepted as returned. It carries exactly
         % the normals selected above.
-        program=avoidanceSafetyGeometry.setDirections(program,angles);
-        result=trial;result.decision=trial.decision(1:conic.primaryCount);
+        program=accepted;result=trial;search.reactionStrength=strength;
         search.usedFullPlanAdmission=~inherited;search.fullPlanStatus="accepted";
     elseif inherited
         result=localEmptySolve();result.decision=incumbent;result.feasible=true;
@@ -100,6 +116,34 @@ function [program,result,search]=localFixedDirectionSearch(program,~,cfg)
     end
     program.supportGeometry.witnessPreserved=inherited;
     program.inheritedFeasibleFamily=inherited;
+end
+
+function [improved,accepted,trial,seconds]=localFixedSolve(program,point,angles,cfg)
+% One full SOCP with the given directions fixed. A solver-reported success is
+% accepted as returned. The accepted program carries exactly the normals
+% selected by the caller. seconds = [formulation;solve].
+    phase=tic;conic=avoidanceStageQp.fixedDirections(program,point,angles,cfg);seconds=toc(phase);
+    phase=tic;trial=localSolveConic(conic,cfg);seconds=[seconds;toc(phase)];
+    improved=trial.feasible;accepted=program;
+    if improved
+        trial.decision=trial.decision(1:conic.primaryCount);
+        accepted=avoidanceSafetyGeometry.setDirections(program,angles);
+    end
+end
+
+function candidate=localReactiveProgram(program,model,point,angles,strength,cfg)
+% Rebuild the fresh program on the target-reactive tube for these directions.
+% Records whose support residual at the optimizer center is within
+% relevanceMeters of binding get full design weight; farther records decay.
+    settings=cfg.feedbackPrediction.targetReaction;
+    records=program.jointCertificate.records;
+    residual=avoidanceSafetyGeometry.jointResidual(program,point,angles)-program.jointCertificate.upperBound;
+    weights=exp(-max(0,-residual-settings.relevanceMeters));
+    exits=[records.isExit].';
+    weights(exits)=settings.exitWeight*weights(exits);
+    design=ltvBicycleModel.reactionGains(model,program.prediction,records,angles,weights,strength);
+    reactive=model;reactive.reactionDesign=design;
+    candidate=formulateAvoidanceProblem(reactive);
 end
 
 function result=localSolveConic(program,cfg)

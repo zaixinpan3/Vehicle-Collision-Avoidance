@@ -68,7 +68,10 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
             testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
                 'collisionAvoidanceController:optimizationFailed');
-            testCase.verifyEqual(localFailureHook('count',[]),1);
+            % Every configured reaction strength is a real solve; none is
+            % replaced by a seed, and all failing issues no command.
+            testCase.verifyEqual(localFailureHook('count',[]), ...
+                numel(cfg.feedbackPrediction.targetReaction.inputWeightScales));
         end
         function malformedSolvedResultsRaiseAnError(testCase,badDecision)
             [ego,target,road,cfg]=localFixture(false);

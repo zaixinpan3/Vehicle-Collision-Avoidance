@@ -58,6 +58,15 @@ function cfg = localDefaults()
     % measurement radius limit of the current sensing contract.
     cfg.feedbackPrediction = struct("enabled",true,"speedGainScale",0.5, ...
         "lateralVelocityFeedback",false);
+    % A fresh frame with a target tries these reaction strengths in order: each
+    % finite entry scales the CLF input weight of the target-reactive policy
+    % (ltvBicycleModel.reactionGains; larger is weaker) and Inf is the
+    % ego-only feedback tube. relevanceMeters (m): records within this support
+    % residual of binding at the optimizer center get full design weight;
+    % exitWeight (1) scales the exit record's weight; terminalWeight (1) scales
+    % the cruise CLF matrix that penalizes the final ego deviation.
+    cfg.feedbackPrediction.targetReaction = struct("inputWeightScales",[Inf,30,100], ...
+        "relevanceMeters",2.0,"exitWeight",1.0,"terminalWeight",0.0);
     cfg.collision = struct("cbfRate",2.0);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
     % (terminal family synthesis, fixedPredict audits). The online certificate
@@ -223,6 +232,10 @@ function localValidate(cfg)
     validateattributes(cfg.feedbackPrediction.enabled,{'logical'},{'scalar'});
     validateattributes(cfg.feedbackPrediction.speedGainScale,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.feedbackPrediction.lateralVelocityFeedback,{'logical'},{'scalar'});
+    validateattributes(cfg.feedbackPrediction.targetReaction.inputWeightScales,{'double'},{'row','nonempty','positive','nonnan'});
+    validateattributes(cfg.feedbackPrediction.targetReaction.relevanceMeters,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.feedbackPrediction.targetReaction.exitWeight,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.feedbackPrediction.targetReaction.terminalWeight,{'double'},{'scalar','real','finite','nonnegative'});
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0

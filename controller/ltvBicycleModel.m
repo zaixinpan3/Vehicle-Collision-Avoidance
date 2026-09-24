@@ -528,6 +528,11 @@ classdef ltvBicycleModel
             prediction.estimatorBound = estimatorBound;
             prediction.feedbackInputSupport = zeros(2,count);
             prediction.feedbackSlewSupport = zeros(2,count);
+            % Gain of each hold's correction; the first held input is exact.
+            prediction.feedbackGainSequence = zeros(2,6,count);
+            if feedback,prediction.feedbackGainSequence(:,:,2:end) = repmat(feedbackGain,1,1,count-1);end
+            % Interval part added at each hold (held reserve and arithmetic).
+            prediction.intervalIncrement = zeros(6,count);
             baseRate = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
             nativeStages = ~isempty(nonlinearAnchor) && exist("bicycleLinearizationKernelMex","file")==3;
             if nativeStages
@@ -656,6 +661,7 @@ classdef ltvBicycleModel
                 prediction.feedbackSlewSupport(:,stage) = sum(abs(inputDeviation-previousDeviation),2) ...
                     +inputDeviationBox+previousDeviationBox;
                 intervalRadius = abs(closedMap)*intervalRadius+processReserve+arithmetic;
+                prediction.intervalIncrement(:,stage) = processReserve+arithmetic;
                 nodeRadius = sum(abs(zonotope),2)+intervalRadius;
                 prediction.initialErrorBound(:,stage+1) = nodeRadius;
                 tube = struct("map",nodeMap,"offset",nodeOffset,"radius",nodeRadius, ...
@@ -680,6 +686,176 @@ classdef ltvBicycleModel
             prediction.finalInputDeviation = struct("zonotope",inputDeviation, ...
                 "interval",inputDeviationBox,"noise",noise, ...
                 "nodeZonotope",zonotope,"nodeInterval",intervalRadius);
+        end
+
+        function design = reactionGains(model,prediction,records,angles,weights,strength)
+        %reactionGains Finite-horizon LQ design of the target-reactive policy.
+        % The joint deviation is [e; d]: the ego deviation e (Frenet) and the
+        % target deviation d = [position; velocity] from its nominal flow. The
+        % mean target acceleration deviation of each hold is a measured
+        % disturbance (acceleration estimate), bounded by
+        % targetPrediction.accelerationDeviationBound. Each record i penalizes
+        % weights(i) times the squared relative position along its fixed
+        % direction angles(i); terminalWeight times the cruise CLF matrix
+        % penalizes the final ego deviation; strength scales the CLF input
+        % weight (larger is a weaker reaction). The base ego gain K stays in
+        % the loop; the design adds a record-driven ego gain (no
+        % lateral-velocity column unless that feedback is on), a target
+        % position/velocity gain L and an acceleration feedforward N. Target
+        % gains are shrunk toward zero where the per-hold estimator error
+        % dominates the deviation. The first held input is exact. Any gains
+        % give a valid tube (reactiveTube); this design only selects them.
+            count = prediction.stageCount;h = model.sampleTime;cfg = model.cfg;
+            settings = cfg.feedbackPrediction.targetReaction;
+            base = prediction.feedbackGain;
+            flow = [eye(2),h*eye(2);zeros(2),eye(2)];
+            drive = [zeros(6,2);h^2/2*eye(2);h*eye(2)];
+            inputWeight = diag([10*cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight])*strength;
+            cost = zeros(10,10,count+1);
+            for index = 1:numel(records)
+                if weights(index)<=0,continue;end
+                normal = [cos(angles(index));sin(angles(index))];
+                row = [records(index).positionMap.'*normal;-normal;zeros(2,1)];
+                node = records(index).stage+1;
+                cost(:,:,node) = cost(:,:,node)+weights(index)*(row*row.');
+            end
+            if settings.terminalWeight>0 && isfield(model,'cruiseCertificate') && ~isempty(model.cruiseCertificate)
+                cost(2:6,2:6,count+1) = cost(2:6,2:6,count+1)+settings.terminalWeight*model.cruiseCertificate.matrix;
+            end
+            bound = model.targetMeasurementBound(:);
+            acceleration = targetPrediction.accelerationDeviationBound(model.encounter,(1:count)*h);
+            jerk = model.encounter.contract.jerkBound(:);
+            covariance = zeros(4,4,count+1);
+            covariance(:,:,1) = diag(model.encounter.radius(1:4).^2/3);
+            for node = 1:count
+                covariance(:,:,node+1) = flow*covariance(:,:,node)*flow.' ...
+                    +drive(7:10,:)*diag(acceleration(:,node).^2/3)*drive(7:10,:).';
+            end
+            noise = diag(bound(1:4).^2/3);
+            egoGains = zeros(2,6,count);targetGains = zeros(2,4,count);accelerationGains = zeros(2,2,count);
+            value = cost(:,:,count+1);
+            for stage = count:-1:2
+                a = prediction.stageMatrixA(:,:,stage);b = prediction.stageMatrixB(:,:,stage);
+                open = [a+b*base,zeros(6,4);zeros(4,6),flow];input = [b;zeros(4,2)];
+                curvature = inputWeight+input.'*value*input;
+                gain = -curvature\(input.'*value*open);
+                feedforward = -curvature\(input.'*value*drive);
+                if ~cfg.feedbackPrediction.lateralVelocityFeedback,gain(:,5) = 0;end
+                signal = covariance(:,:,stage);
+                gain(:,7:10) = gain(:,7:10)*(signal/(signal+noise+eps*eye(4)));
+                % The acceleration estimate errs by its bound plus half a hold of jerk.
+                accelerationSignal = acceleration(:,stage).^2/3;
+                accelerationNoise = bound(5:6).^2/3+(jerk*h/2).^2/3;
+                feedforward = feedforward.*(accelerationSignal./(accelerationSignal+accelerationNoise+eps)).';
+                egoGains(:,:,stage) = base+gain(:,1:6);targetGains(:,:,stage) = gain(:,7:10);
+                accelerationGains(:,:,stage) = feedforward;
+                closed = open+input*gain;
+                value = cost(:,:,stage)+closed.'*value*closed+gain.'*inputWeight*gain;
+                value = (value+value.')/2;
+            end
+            design = struct('feedbackGains',egoGains,'targetGains',targetGains, ...
+                'accelerationGains',accelerationGains,'targetBound',bound,'strength',strength);
+        end
+
+        function prediction = reactiveTube(model,prediction,design)
+        %reactiveTube Joint ego-target deviation sets of a target-reactive policy.
+        % From the second hold on the executed input is
+        %   v_k + K_k (xhat - z_k) + L_k (shat - s0_k) + N_k (ahat - a0),
+        % with shat the target position/velocity estimate, ahat its acceleration
+        % estimate, and s0, a0 the nominal constant-acceleration flow
+        % (targetPrediction.finiteFlow). Every estimate errs by at most its
+        % sensing bound at every hold. Over hold k the target deviation d obeys
+        %   d+ = F d + G abar_k + r_k,
+        % with abar_k the mean acceleration deviation of the hold, bounded by
+        % targetPrediction.accelerationDeviationBound (jerk growth capped by a
+        % declared scalar acceleration maximum), and r_k its zero-mean position
+        % remainder. The acceleration at the start of the hold differs from
+        % abar_k by at most J h / 2 (delta_k). The ego deviation obeys
+        %   e+ = (A + B K) e + B L d + B N (abar_k + delta_k)
+        %        + B K eta + B L zeta + B N zeta_a,
+        % so abar_k is one generator shared by the target flow and the ego's
+        % feedforward. Ego and target deviations share one append-only zonotope
+        % basis; every record sees the exact relative position P e - d_p. Held
+        % reserves and floating-point allowances are interval parts. The first
+        % held input is exact. States between nodes are not enclosed.
+            count = prediction.stageCount;h = model.sampleTime;
+            encounter = model.encounter;
+            egoGains = design.feedbackGains;targetGains = design.targetGains;
+            accelerationGains = design.accelerationGains;
+            flow = [eye(2),h*eye(2);zeros(2),eye(2)];
+            acceleration = targetPrediction.accelerationDeviationBound(encounter,(1:count)*h);
+            jerk = encounter.contract.jerkBound(:);
+            egoNoise = diag(prediction.estimatorBound);egoNoise = egoNoise(:,prediction.estimatorBound~=0);
+            bound = design.targetBound(:);
+            targetNoise = diag(bound(1:4));targetNoise = targetNoise(:,bound(1:4)~=0);
+            accelerationNoise = diag(bound(5:6)+jerk*h/2);
+            accelerationNoise = accelerationNoise(:,any(accelerationNoise,1));
+            egoRadius = model.initialFrenetErrorBound(:);targetRadius = encounter.radius(1:4);
+            ego = diag(egoRadius);ego = ego(:,egoRadius~=0);
+            target = diag(targetRadius);target = target(:,targetRadius~=0);
+            zonotope = [ego,zeros(6,size(target,2));zeros(4,size(ego,2)),target];
+            interval = zeros(10,1);
+            inputDeviation = zeros(2,size(zonotope,2));inputDeviationBox = zeros(2,1);
+            prediction.feedbackGainSequence = egoGains;prediction.targetGainSequence = targetGains;
+            prediction.targetAccelerationGainSequence = accelerationGains;
+            prediction.targetEstimatorBound = bound;
+            nominal = targetPrediction.finiteFlow(encounter,(0:count)*h);
+            prediction.targetNominal = nominal(1:6,:);
+            reacting = squeeze(any(any(targetGains~=0,1),2)) | squeeze(any(any(accelerationGains~=0,1),2));
+            active = find(reacting,1,'last');
+            if isempty(active),active = 0;end
+            prediction.targetReaction = struct('strength',design.strength,'lastActiveStage',active);
+            prediction.feedbackInputSupport = zeros(2,count);
+            prediction.feedbackSlewSupport = zeros(2,count);
+            cells = prediction.cells;
+            for stage = 1:count
+                a = prediction.stageMatrixA(:,:,stage);b = prediction.stageMatrixB(:,:,stage);
+                previousDeviation = [inputDeviation,zeros(2,size(zonotope,2)-size(inputDeviation,2))];
+                previousDeviationBox = inputDeviationBox;
+                closed = [a,zeros(6,4);zeros(4,6),flow];
+                feedforward = zeros(2);gain = zeros(2,10);
+                if stage>1
+                    gain = [egoGains(:,:,stage),targetGains(:,:,stage)];
+                    feedforward = accelerationGains(:,:,stage);
+                    closed = closed+[b;zeros(4,2)]*gain;
+                end
+                % New sources of this hold: estimator errors (ego, target
+                % position/velocity, target acceleration incl. delta_k) and the
+                % mean acceleration deviation abar_k with its position remainder.
+                egoInput = gain(:,1:6)*egoNoise;egoInput = egoInput(:,any(egoInput,1));
+                targetInput = gain(:,7:10)*targetNoise;targetInput = targetInput(:,any(targetInput,1));
+                accelerationInput = feedforward*accelerationNoise;
+                accelerationInput = accelerationInput(:,any(accelerationInput,1));
+                meanDeviation = diag(acceleration(:,stage));
+                remainder = diag(min(acceleration(:,stage),jerk*h)*h^2/4);
+                inputDeviation = [gain*zonotope,egoInput,targetInput,accelerationInput, ...
+                    feedforward*meanDeviation,zeros(2,2)];
+                inputDeviationBox = abs(gain)*interval;
+                if stage>1
+                    previousDeviation = [previousDeviation,zeros(2,size(inputDeviation,2)-size(previousDeviation,2))]; %#ok<AGROW>
+                else
+                    previousDeviation = zeros(size(inputDeviation));
+                end
+                prediction.feedbackInputSupport(:,stage) = sum(abs(inputDeviation),2)+inputDeviationBox;
+                prediction.feedbackSlewSupport(:,stage) = sum(abs(inputDeviation-previousDeviation),2) ...
+                    +inputDeviationBox+previousDeviationBox;
+                columns = [[b*[egoInput,targetInput,accelerationInput];zeros(4,size(egoInput,2)+size(targetInput,2)+size(accelerationInput,2))], ...
+                    [b*feedforward*meanDeviation;[h^2/2*eye(2);h*eye(2)]*meanDeviation], ...
+                    [zeros(6,2);remainder;zeros(2)]];
+                zonotope = [closed*zonotope,columns];
+                interval = abs(closed)*interval+[prediction.intervalIncrement(:,stage);zeros(4,1)];
+                egoBox = sum(abs(zonotope(1:6,:)),2)+interval(1:6);
+                cells(stage).generators = [zonotope(1:6,:),diag(interval(1:6)),zeros(6,4)];
+                cells(stage).targetGenerators = [zonotope(7:10,:),zeros(4,6),diag(interval(7:10))];
+                cells(stage).radius = egoBox;cells(stage).endRadius = egoBox;
+                prediction.initialErrorBound(:,stage+1) = egoBox;
+                prediction.egoStateErrorBound(:,stage+1) = egoBox;
+                prediction.domainErrorBound(:,stage+1) = egoBox;
+            end
+            prediction.cells = cells;
+            prediction.finalInputDeviation = struct("zonotope",inputDeviation, ...
+                "interval",inputDeviationBox,"noise",egoNoise, ...
+                "nodeZonotope",zonotope(1:6,:),"nodeInterval",interval(1:6));
         end
 
         function [stateMatrix, inputMatrix, affineVector, continuousA] = ...

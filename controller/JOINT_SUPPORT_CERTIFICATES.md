@@ -54,6 +54,14 @@ of the corresponding rotated rectangles. The target yaw center \(\phi\) is
 fixed in the certificate. Position uncertainty is the zonotope
 \(G[-1,1]^m\), plus a chart-error disk of radius \(\rho_p\).
 
+With the ego-only feedback tube, \(G=[P\,E,\ \mathrm{diag}(r_O)]\): the ego
+deviation generators \(E\) mapped by the chart and the target's reachable box
+\(r_O\) as an independent term. With a target-reactive tube
+([CLOSED_LOOP_TARGET_PREDICTION.md](CLOSED_LOOP_TARGET_PREDICTION.md)), ego and
+target deviations share one basis and \(G=P\,E-D_p\), the exact relative
+position deviation; the part of the target's motion that the ego follows
+cancels.
+
 The implementation deliberately uses independent position and yaw enclosures.
 They can overbound a correlated true set, but they are fixed at admission and
 retained on shifting; no later enlargement is hidden in the recursion argument.
@@ -236,6 +244,11 @@ the next hard conic subproblem nonempty in exact arithmetic. The shifted
 suffix is not checked before the next solve; it serves as the optimizer center
 and as the plan retained on solve failure. The inward reserves of the admission
 rows shift unchanged.
+
+A target-reactive family additionally issues
+\(L\,(\hat s-s_0)+N\,(\hat a-a_0)\) about the carried nominal target flow; it
+is inherited only while the same target is measured within its declared bound
+(`hardEncounterBarrier.prepare`).
 
 This is **conditional recursive subproblem feasibility**, not guaranteed solver
 completion or indefinite safety against future targets. New targets, larger

@@ -23,12 +23,14 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.TargetJerkAmplitude (2,1) double {mustBeFinite} = zeros(2,1)
         options.TargetYawAccelerationAmplitude (1,1) double {mustBeFinite} = 0
         options.TargetMotionFrequency (1,1) double {mustBeFinite,mustBePositive} = 1
+        options.TargetAccelerationMaximum (1,1) double {mustBePositive} = Inf
         options.InitialTrackingError (5,1) double {mustBeFinite} = zeros(5,1)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
         options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 1
         options.RoadCurvature (1,1) double {mustBeFinite} = 0
         options.SearchTimeLimitSeconds (1,1) double {mustBePositive} = 5
         options.Admission (1,1) struct = struct()
+        options.FeedbackPrediction (1,1) struct = struct()
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"));
@@ -37,6 +39,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         "horizonSteps",ceil(options.HorizonSeconds/options.SampleTime), ...
         "minimumHorizonSteps",options.MinimumHorizonSteps), ...
         "model",struct("lateralDomainRadius",4),"admission",options.Admission, ...
+        "feedbackPrediction",options.FeedbackPrediction, ...
         "solver",struct("frameDeadlineSeconds",options.DeadlineSeconds, ...
         "certificateSearchTimeLimit",options.SearchTimeLimitSeconds)));
     originalCfg = cfg;
@@ -45,7 +48,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     truthTarget = struct("center",[15;0;0;0;0;0;0;0],"radius",zeros(8,1), ...
         "jerkAmplitude",options.TargetJerkAmplitude, ...
         "yawAccelerationAmplitude",options.TargetYawAccelerationAmplitude, ...
-        "frequency",options.TargetMotionFrequency, ...
+        "frequency",options.TargetMotionFrequency,"accelerationMaximum",options.TargetAccelerationMaximum, ...
         "halfLength",cfg.target.defaultLength/2,"halfWidth",cfg.target.defaultWidth/2);
     if options.Scenario=="oncoming",truthTarget.center=[60;0;-8;0;0;0;pi;0];end
     if options.Scenario=="crossing",truthTarget.center=[15;-4;0;32;0;0;pi/2;0];end
@@ -267,6 +270,9 @@ function target = localTargetMeasurement(truth,time,bound,stream)
         "predictionMotion",struct("kind","finite-sensing-motion-v1", ...
             "jerkBound",abs(truth.jerkAmplitude), ...
             "yawAccelerationBound",abs(truth.yawAccelerationAmplitude)));
+    if isfinite(truth.accelerationMaximum)
+        target.predictionMotion.scalarAccelerationMaximum = truth.accelerationMaximum;
+    end
 end
 
 function state = localTargetTruth(truth,time)

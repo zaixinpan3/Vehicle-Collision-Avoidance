@@ -248,7 +248,8 @@ classdef avoidanceSafetyGeometry
                     if data.hasTarget
                         records{end+1,1}=localJointRecord(data.target,tube.stage,program.geometry.frames(index), ...
                             localEgoGenerators(tube),[model.cfg.vehicle.length;model.cfg.vehicle.width]/2, ...
-                            0,false,model.cfg.solver.constraintTolerance); %#ok<AGROW>
+                            0,false,model.cfg.solver.constraintTolerance, ...
+                            localTargetPart(tube,model.encounter,tube.stage*model.sampleTime)); %#ok<AGROW>
                         normal=program.geometry.normals{index};
                         angles(end+1,1)=atan2(normal(2),normal(1)); %#ok<AGROW>
                     end
@@ -260,7 +261,9 @@ classdef avoidanceSafetyGeometry
                     records{end+1,1}=localJointRecord(item,program.prediction.stageCount, ...
                         program.completion.frame,localEgoGenerators(program.prediction.cells(end)), ...
                         zeros(2,1),model.confirmation.range+model.cfg.encounter.numericalMargin, ...
-                        true,model.cfg.solver.constraintTolerance);
+                        true,model.cfg.solver.constraintTolerance, ...
+                        localTargetPart(program.prediction.cells(end),model.encounter, ...
+                        program.prediction.stageCount*model.sampleTime));
                     normal=-program.completion.direction;
                     angles(end+1,1)=atan2(normal(2),normal(1));
                 end
@@ -633,11 +636,29 @@ function generators=localEgoGenerators(tube)
     end
 end
 
-function record=localJointRecord(target,stage,frame,egoGenerators,egoHalfSize,clearance,isExit,numericalTolerance)
+function part=localTargetPart(tube,encounter,time)
+% Target position deviation of a target-reactive tube, in the ego basis, and
+% the arithmetic allowance of its nominal flow. Empty for an ego-only tube.
+    part=[];
+    if ~isfield(tube,'targetGenerators'),return;end
+    x=encounter.center;
+    part=struct('generators',tube.targetGenerators(1:2,:), ...
+        'allowance',64*eps*(abs(x(1:2))+abs(x(3:4))*time+abs(x(5:6))*time^2/2 ...
+        +sum(abs(tube.targetGenerators(1:2,:)),2)));
+end
+
+function record=localJointRecord(target,stage,frame,egoGenerators,egoHalfSize,clearance,isExit,numericalTolerance,targetPart)
 % egoGenerators (6 x m) span the ego state deviation set at the record node.
+% With a target-reactive tube, targetPart spans the target position deviation
+% in the same m columns, so the record sees the exact relative deviation;
+% otherwise the target's bounded reachable box is an independent term.
     [pose,domain]=laneGeometry.poseData(frame);
     positionMap=reshape(pose(3:14),2,6);yawRow=pose(16:21).';
-    generators=[positionMap*egoGenerators,diag(target.radius(1:2))];
+    if nargin<9 || isempty(targetPart)
+        generators=[positionMap*egoGenerators,diag(target.radius(1:2))];
+    else
+        generators=[positionMap*egoGenerators-targetPart.generators,diag(targetPart.allowance)];
+    end
     positionBall=0;
     if domain(1)>0
         positionBall=pose(22);

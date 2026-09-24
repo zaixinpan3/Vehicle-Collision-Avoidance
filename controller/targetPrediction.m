@@ -175,6 +175,13 @@ classdef targetPrediction
                 r(3:4)+r(5:6)*duration+jerk*(duration.^2/2); ...
                 r(5:6)+jerk*duration; r(7)+r(8)*duration+yawAcceleration*(duration.^2/2); ...
                 r(8)+yawAcceleration*duration];
+            if isfield(encounter.contract,"scalarAccelerationMaximum")
+                % A declared |acceleration| <= amax caps each axis deviation from
+                % the constant nominal acceleration at amax + |nominal|; the
+                % velocity and position radii integrate the capped deviation.
+                [radius(1:2,:),radius(3:4,:),radius(5:6,:)] = localCappedDeviation(r(1:6),jerk, ...
+                    encounter.contract.scalarAccelerationMaximum+abs(x(5:6)),duration);
+            end
             % Charge arithmetic in the prediction, rather than accepting an
             % empty measurement intersection with a physical tolerance. Only
             % terms that were actually summed are charged: exactly copied
@@ -183,6 +190,19 @@ classdef targetPrediction
                 abs(x(3:4))+abs(x(5:6))*duration;repmat(abs(x(5:6)),1,numel(duration)); ...
                 abs(x(7))+abs(x(8))*duration;repmat(abs(x(8)),1,numel(duration))];
             radius = radius+64*eps*(arithmetic+radius);
+        end
+
+        function bound = accelerationDeviationBound(encounter,duration)
+        %accelerationDeviationBound Per-axis bound on |a(t) - a_nominal| at the
+        % given prediction times: the jerk growth from the current acceleration
+        % radius, capped at amax + |a_nominal| when a scalar acceleration
+        % maximum is declared. Nondecreasing in time.
+            duration = double(duration(:).');
+            r = encounter.radius;jerk = encounter.contract.jerkBound(:);
+            bound = r(5:6)+jerk*duration;
+            if isfield(encounter.contract,"scalarAccelerationMaximum")
+                bound = min(bound,encounter.contract.scalarAccelerationMaximum+abs(encounter.center(5:6)));
+            end
         end
 
         function [center, jerk, yawAcceleration] = nominalFlow(encounter, duration)
@@ -394,4 +414,24 @@ function distance = localArc(time, speed, acceleration)
         time = min(time, speed/-acceleration);
     end
     distance = speed*time+0.5*acceleration*time.^2;
+end
+
+function [position,velocity,acceleration] = localCappedDeviation(r,jerk,cap,t)
+% Radii under |jerk| <= J and a per-axis acceleration deviation cap c:
+% b(t) = min(r_a + J t, c), velocity r_v + int b, position r_p + r_v t + int int b.
+    rp = r(1:2);rv = r(3:4);ra = min(r(5:6),cap);
+    switchTime = zeros(2,1);
+    for axis = 1:2
+        if jerk(axis)>0
+            switchTime(axis) = max(0,(cap(axis)-ra(axis))/jerk(axis));
+        elseif ra(axis)<cap(axis)
+            switchTime(axis) = Inf;
+        end
+    end
+    early = min(t,switchTime);late = max(0,t-switchTime);
+    acceleration = min(ra+jerk.*t,cap);
+    velocity = rv+ra.*early+jerk.*early.^2/2+cap.*late;
+    position = rp+rv.*t+ra.*early.^2/2+jerk.*early.^3/6 ...
+        +(ra.*early+jerk.*early.^2/2).*late+cap.*late.^2/2;
+    position(isnan(position)) = Inf;velocity(isnan(velocity)) = Inf;
 end

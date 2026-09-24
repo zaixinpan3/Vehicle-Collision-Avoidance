@@ -95,6 +95,11 @@ function [program,prediction,clf] = localFormulate(model)
         [prediction,anchor] = hardEncounterBarrier.predict(model,cruise);
         model.anchorPlan = anchor;
         if ~isempty(model.encounter)
+            if isfield(model,'reactionDesign') && ~isempty(model.reactionDesign)
+                % Target-reactive policy: the joint ego-target tube replaces the
+                % ego-only tube before any chart, row or record is built from it.
+                prediction = ltvBicycleModel.reactiveTube(model,prediction,model.reactionDesign);
+            end
             [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
             [normals,dual]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor);
             if ~dual.available
@@ -174,7 +179,20 @@ function [program,prediction,clf] = localFormulate(model)
     % K (xhat - z) about the carried nominal; a fresh frame starts at z = xhat.
     feedbackCorrection = zeros(2,1);
     if inherited && isfield(prediction,'feedbackGain') && isfield(prediction,'nominalInitialState')
-        feedbackCorrection = prediction.feedbackGain*(model.initialEgoState-prediction.nominalInitialState);
+        gain = prediction.feedbackGain;
+        if isfield(prediction,'feedbackGainSequence'),gain = prediction.feedbackGainSequence(:,:,1);end
+        feedbackCorrection = gain*(model.initialEgoState-prediction.nominalInitialState);
+        if isfield(prediction,'targetGainSequence') && (any(prediction.targetGainSequence(:,:,1),'all') ...
+                || any(prediction.targetAccelerationGainSequence(:,:,1),'all'))
+            % A target-reactive family also corrects by L (shat - s0) + N (ahat - a0)
+            % about the carried nominal target flow (ltvBicycleModel.reactiveTube).
+            % A reacting hold is inherited only with the target measured
+            % (hardEncounterBarrier.prepare); after the reaction ends, a released
+            % target contributes no correction.
+            deviation = model.encounter.center(1:6)-prediction.targetNominal(:,1);
+            feedbackCorrection = feedbackCorrection+prediction.targetGainSequence(:,:,1)*deviation(1:4) ...
+                +prediction.targetAccelerationGainSequence(:,:,1)*deviation(5:6);
+        end
     end
     safetyBound = bound;
     % Only the CLF has a slack column. Physical inequalities remain hard.
@@ -304,12 +322,15 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     for index=1:numel(nodeFields)
         name=nodeFields{index};prediction.(name)=prediction.(name)(:,2:end);
     end
-    stageFields={'continuousA','continuousB','stageMatrixA','stageMatrixB'};
+    stageFields={'continuousA','continuousB','stageMatrixA','stageMatrixB', ...
+        'feedbackGainSequence','targetGainSequence','targetAccelerationGainSequence'};
     for index=1:numel(stageFields)
-        name=stageFields{index};prediction.(name)=prediction.(name)(:,:,2:end);
+        name=stageFields{index};
+        if isfield(prediction,name),prediction.(name)=prediction.(name)(:,:,2:end);end
     end
+    if isfield(prediction,'targetNominal'),prediction.targetNominal=prediction.targetNominal(:,2:end);end
     stageFields={'continuousC','stageAffine','modelErrorRateBound','executionReserve', ...
-        'feedbackInputSupport','feedbackSlewSupport'};
+        'feedbackInputSupport','feedbackSlewSupport','intervalIncrement'};
     for index=1:numel(stageFields)
         name=stageFields{index};
         if isfield(prediction,name),prediction.(name)=prediction.(name)(:,2:end);end

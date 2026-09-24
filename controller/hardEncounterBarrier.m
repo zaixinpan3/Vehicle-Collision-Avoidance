@@ -28,7 +28,7 @@ classdef hardEncounterBarrier
             model.exitMargin = inf;
             model.targetReleased = false;
             if ~isempty(stored)
-                expectedVersion=43;
+                expectedVersion=44;
                 if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=expectedVersion
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
@@ -76,8 +76,10 @@ classdef hardEncounterBarrier
                 model.confirmation = stored.confirmation;
             end
             measured = [];
+            model.targetMeasurementBound = zeros(6,0);
             if ~isempty(observation)
                 measured = targetPrediction.admitOnline(observation,model.stateTime,model.lane,cfg);
+                model.targetMeasurementBound = measured.radius(1:6);
             end
             prior = [];
             if ~isempty(stored),prior=stored.encounter;end
@@ -107,7 +109,8 @@ classdef hardEncounterBarrier
                     end
                     conditioned = targetPrediction.condition(prior,model.sampleTime,target);
                     increased = any(target.contract.jerkBound>prior.contract.jerkBound) ...
-                        || target.contract.yawAccelerationBound>prior.contract.yawAccelerationBound;
+                        || target.contract.yawAccelerationBound>prior.contract.yawAccelerationBound ...
+                        || localAccelerationCap(target.contract)>localAccelerationCap(prior.contract);
                     conditioned.contract = target.contract;
                     target = conditioned;
                     changed = changed || increased;
@@ -124,6 +127,13 @@ classdef hardEncounterBarrier
                     changed = changed || ~sameTarget;
                     model.encounter = target;
                 end
+            end
+            if ~isempty(stored) && localReactionPending(stored.prediction)
+                % A target-reactive family corrects every remaining reacting hold
+                % by L (shat - s0): it needs the same target, currently measured
+                % within its declared bound. Otherwise a new certificate is built.
+                changed = changed || isempty(measured) || ~sameTarget || isempty(model.encounter) ...
+                    || any(measured.radius(1:6)>stored.prediction.targetEstimatorBound+1e-12);
             end
             if ~isempty(stored) && ~changed
                 % Preserve the actual accepted generators, enclosures, charts,
@@ -417,6 +427,19 @@ classdef hardEncounterBarrier
         end
 
     end
+end
+
+function cap = localAccelerationCap(contract)
+% Declared scalar target acceleration maximum; Inf when none is declared.
+    cap = Inf;
+    if isfield(contract,'scalarAccelerationMaximum'),cap = contract.scalarAccelerationMaximum;end
+end
+
+function pending = localReactionPending(prediction)
+% True when a stored target-reactive policy still reacts after the next hold.
+    pending = isfield(prediction,'targetGainSequence') && size(prediction.targetGainSequence,3)>=2 ...
+        && (any(prediction.targetGainSequence(:,:,2:end),'all') ...
+        || any(prediction.targetAccelerationGainSequence(:,:,2:end),'all'));
 end
 
 function [nodeGenerators,slewSupport] = localTerminalDeviation(prediction,terminal)

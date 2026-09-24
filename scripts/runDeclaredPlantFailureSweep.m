@@ -12,6 +12,7 @@ function summary = runDeclaredPlantFailureSweep(options)
         options.OutputDirectory (1,1) string
         options.SampleCount (1,1) double {mustBePositive, mustBeInteger} = 240
         options.SearchTimeLimitSeconds (1,1) double {mustBePositive} = 30
+        options.FeedbackPrediction (1,1) struct = struct()
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root, "scripts"), fullfile(root, "controller"), fullfile(root, "config"));
@@ -29,7 +30,7 @@ function summary = runDeclaredPlantFailureSweep(options)
         arguments_ = [{"Scenario", c.Scenario, "RoadCurvature", c.RoadCurvature, ...
             "SampleCount", options.SampleCount, "DeadlineSeconds", Inf, ...
             "SearchTimeLimitSeconds", options.SearchTimeLimitSeconds, ...
-            "OutputDirectory", caseDirectory}, c.extra];
+            "OutputDirectory", caseDirectory, "FeedbackPrediction", options.FeedbackPrediction}, c.extra];
         failureIdentifier = ""; failureMessage = "";
         try
             report = runExactStateRecursiveFeasibilityScenario(arguments_{:});

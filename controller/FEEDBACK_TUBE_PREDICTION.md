@@ -184,8 +184,10 @@ instead of an arbitrary per-hold error.
 
 - **Target uncertainty.** In case 54 the target's declared reachable box grows
   to 8.24 m per axis at the 4.8 s horizon (1.0 m position error, 2.40 m velocity
-  error, 1.15 m acceleration error, 3.69 m from the jerk bound). The ego policy
-  does not react to future target measurements, so this growth remains.
+  error, 1.15 m acceleration error, 3.69 m from the jerk bound). The ego gain of
+  this section does not react to future target measurements. The target part
+  is treated in [CLOSED_LOOP_TARGET_PREDICTION.md](CLOSED_LOOP_TARGET_PREDICTION.md)
+  (target-reactive policy and declared acceleration maximum).
 - **Model mismatch.** The PassVeh14DOF plant violates the zero-residual
   contract; nothing here changes that.
 - **Gain design.** Section 5a argues for a gain without lateral-velocity
@@ -220,7 +222,8 @@ instead of an arbitrary per-hold error.
   deviation support; inherited frames compute
   `feedbackCorrection = K (xhat - z_1)`, which also enters the first-hold CLF.
 - `collisionAvoidanceController`: issues `plan(:,1) + feedbackCorrection`;
-  controller-state format 43 stores the correction; metadata reports the gain,
+  the controller state stores the correction (format 43, since 2026-09-24
+  format 44 with the target-reactive fields); metadata reports the gain,
   bound and correction.
 - `tests/feedbackPredictionTest.m`: sampled initial and per-hold estimator
   errors (interior and vertices) stay inside every predicted set, input and

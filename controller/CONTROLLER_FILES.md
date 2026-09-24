@@ -8,8 +8,10 @@ optimizing the complete trajectory in one hard SOCP. The
 accepted complete certificate supplies the next frame's feasible incumbent.
 Safety is certified at the hold nodes only
 ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
-Its format-43 state retains directions, occupied sets, prediction, terminal
-continuation and the feedback correction of the issued input. See [the algorithm and guarantees](JOINT_SUPPORT_CERTIFICATES.md).
+Its format-44 state retains directions, occupied sets, prediction, terminal
+continuation, the feedback correction of the issued input and, for a
+target-reactive admission, the reaction gains and nominal target flow
+([CLOSED_LOOP_TARGET_PREDICTION.md](CLOSED_LOOP_TARGET_PREDICTION.md)). See [the algorithm and guarantees](JOINT_SUPPORT_CERTIFICATES.md).
 Related operations stay in the module that owns their responsibility.
 
 The count includes every source file under `controller/`, including future
@@ -25,13 +27,13 @@ Do not move controller helpers into those directories to evade the limit.
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse base transcription (`build`) and fixed-direction support majorants (`fixedDirections`) |
-| `solveHardCbfClf.m` | Convex base solving (`constrained`) and fixed-direction admission/continuation (`fixedDirections`); solver success is accepted with no post-solve verification |
-| `avoidanceSafetyGeometry.m` | Joint occupied-set records, support functions, exact residuals and direction storage (`setDirections`); chart construction, signed-distance initialization and offline geometry kernels |
+| `solveHardCbfClf.m` | Convex base solving (`constrained`) and fixed-direction admission/continuation (`fixedDirections`), including the ordered ego-only / target-reactive admission attempts; solver success is accepted with no post-solve verification |
+| `avoidanceSafetyGeometry.m` | Joint occupied-set records (relative ego-target zonotope for a target-reactive tube), support functions, exact residuals and direction storage (`setDirections`); chart construction, signed-distance initialization and offline geometry kernels |
 | `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and local chart bounds (chart range not enforced) |
-| `ltvBicycleModel.m` | Held-input node prediction with feedback deviation sets (`finitePredict`, `feedbackContract`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
+| `ltvBicycleModel.m` | Held-input node prediction with feedback deviation sets (`finitePredict`, `feedbackContract`), target-reactive gain design and joint ego-target deviation sets (`reactionGains`, `reactiveTube`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures for offline synthesis and audits, held process reserves, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
-| `targetPrediction.m` | Bounded target admission (`admitOnline`), reachable-box conditioning (`condition`), absolute-time flow, offline uncertainty studies and footprint support |
+| `targetPrediction.m` | Bounded target admission (`admitOnline`), reachable-box conditioning (`condition`), absolute-time flow with a declared acceleration maximum (`finiteFlow`, `accelerationDeviationBound`), offline uncertainty studies and footprint support |
 | `fialaCertificate.m` | Validated nonlinear residuals (`residual`), held-feedback samples (`sample`), prescribed sequences (`sequence`) and shared constants (`parameters`) |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |
@@ -44,7 +46,7 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-43 predictive certificate. `formulateAvoidanceProblem(model)` retains
+format-44 predictive certificate. `formulateAvoidanceProblem(model)` retains
 the convex dynamics/terminal base and attaches collision and exit certificates.
 Accepted successors preserve their angles, occupied sets, charts, prediction,
 terminal set and absolute exit deadline. Touching majorants contain that full

@@ -3,7 +3,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
     properties (TestParameter)
         geometry=struct('aligned',[12;0;0;0], ...
             'rotated',[8;5;.6;-.3],'corner',[5.2;2.1;0;0]);
-        previousVersion={30,35,36,38,39,40,42};
+        previousVersion={30,35,36,38,39,40,42,43};
     end
     methods (TestClassSetup)
         function addPaths(testCase)
