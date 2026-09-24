@@ -29,6 +29,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.TargetCurvature (1,1) double {mustBeFinite} = 0
         options.TargetCurvatureMaximum (1,1) double {mustBeFinite,mustBePositive} = 0.05
         options.NrmmContract (1,1) string {mustBeMember(options.NrmmContract,["nrmm","cartesian"])} = "nrmm"
+        options.NrmmParameterBounds (1,1) logical = true
         options.InitialTrackingError (5,1) double {mustBeFinite} = zeros(5,1)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
         options.MinimumHorizonSteps (1,1) double {mustBeInteger,mustBePositive} = 1
@@ -38,7 +39,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.FeedbackPrediction (1,1) struct = struct()
     end
     root = fileparts(fileparts(mfilename("fullpath")));
-    addpath(fullfile(root,"controller"),fullfile(root,"config"));
+    addpath(fullfile(root,"controller"),fullfile(root,"config"),fullfile(root,"estimator"));
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8, ...
         "controller",struct("sampleTime",options.SampleTime, ...
         "horizonSteps",ceil(options.HorizonSeconds/options.SampleTime), ...
@@ -56,7 +57,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         "frequency",options.TargetMotionFrequency,"accelerationMaximum",options.TargetAccelerationMaximum, ...
         "model",options.TargetMotionModel,"speedRate",options.TargetSpeedRate, ...
         "curvature",options.TargetCurvature,"curvatureMaximum",options.TargetCurvatureMaximum, ...
-        "cartesianJerkBound",NaN, ...
+        "cartesianJerkBound",NaN,"publishParameterBounds",options.NrmmParameterBounds, ...
         "halfLength",cfg.target.defaultLength/2,"halfWidth",cfg.target.defaultWidth/2);
     if options.Scenario=="oncoming",truthTarget.center=[60;0;-8;0;0;0;pi;0];end
     if options.Scenario=="crossing",truthTarget.center=[15;-4;0;32;0;0;pi/2;0];end
@@ -277,6 +278,17 @@ end
 function target = localTargetMeasurement(truth,time,bound,stream)
     state = localTargetTruth(truth,time);
     noise = bound.*(2*rand(stream,8,1)-1);
+    if truth.model=="nrmm"
+        % The NRMM estimator certifies component norms: the velocity and
+        % acceleration errors are drawn uniformly in discs of the declared radii.
+        assert(bound(3)==bound(4) && bound(5)==bound(6), ...
+            "runExactStateRecursiveFeasibilityScenario:discNoise", ...
+            "NRMM truths need equal per-axis velocity and acceleration bounds.");
+        for rows = {3:4,5:6}
+            direction = 2*pi*rand(stream);fraction = sqrt(rand(stream));
+            noise(rows{1}) = bound(rows{1}(1))*fraction*[cos(direction);sin(direction)];
+        end
+    end
     target = struct("trackId",1,"targetPositionInertial",state(1:2)+noise(1:2), ...
         "targetVelocityInertial",state(3:4)+noise(3:4),"targetAccelerationInertial",state(5:6)+noise(5:6), ...
         "targetHeadingInertial",state(7)+noise(7),"targetYawRate",state(8)+noise(8), ...
@@ -302,6 +314,16 @@ function target = localTargetMeasurement(truth,time,bound,stream)
             "An NRMM contract declares exact NRMM motion; use NrmmContract=""cartesian"" for a model error.");
         target.predictionMotion.kind = "nrmm-motion-v1";
         target.predictionMotion.curvatureMaximum = truth.curvatureMaximum;
+        if truth.publishParameterBounds
+            % What the NRMM estimator publishes: parameter error bounds from
+            % its component balls (here the declared disc radii).
+            parameters = nrmmTargetParameterErrorBounds(target.targetVelocityInertial, ...
+                target.targetAccelerationInertial,bound(3),bound(5),0);
+            target.targetSpeedErrorBound = parameters.speedErrorBound;
+            target.targetCourseErrorBound = parameters.courseErrorBound;
+            target.targetSpeedRateErrorBound = parameters.speedRateErrorBound;
+            target.targetCurvatureInterval = parameters.curvatureInterval;
+        end
     end
 end
 

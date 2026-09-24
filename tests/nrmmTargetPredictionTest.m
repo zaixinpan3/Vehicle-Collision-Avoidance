@@ -105,6 +105,63 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(box(1:2,:)-reference,1e-12);
         end
 
+        function publishedParameterBoundsTightenTheBoxAndStayValid(testCase)
+            % A 4 m/s target with ten-fold errors. The declarer's velocity and
+            % acceleration errors are discs of the box radii: the published
+            % speed, course, speed-rate and curvature bounds are tighter than
+            % the box corners, and every NRMM truth in the discs stays inside.
+            radius=[1;1;.5;.5;.1;.1;.1;.1];
+            boxOnly=localPathEncounter([4;pi/2;0;0],radius,.03);
+            published=localBallBounds(boxOnly.center,.5,.1);
+            encounter=boxOnly;
+            encounter.parameters=targetPrediction.nrmmParameters(encounter.center,radius,encounter.contract,published);
+            for name=["speed","course","speedRate","curvature"]
+                testCase.verifyGreaterThanOrEqual(encounter.parameters.(name)(1),boxOnly.parameters.(name)(1)-1e-12);
+                testCase.verifyLessThanOrEqual(encounter.parameters.(name)(2),boxOnly.parameters.(name)(2)+1e-12);
+            end
+            testCase.verifyLessThan(diff(encounter.parameters.speed),.8*diff(boxOnly.parameters.speed));
+            testCase.verifyLessThan(diff(encounter.parameters.course),.8*diff(boxOnly.parameters.course));
+            time=0:.1:4.8;
+            [center,box]=targetPrediction.finiteFlow(encounter,time);
+            [~,wide]=targetPrediction.finiteFlow(boxOnly,time);
+            testCase.verifyLessThanOrEqual(box-wide,1e-9);
+            testCase.verifyLessThan(max(box(1:2,end)),.95*max(wide(1:2,end)));
+            stream=RandStream('mt19937ar',Seed=5);excess=-Inf;
+            for trial=1:300
+                truth=localSampleNrmmDisc(encounter,.5,.1,stream);
+                for node=1:numel(time)
+                    deviation=localNrmmState(truth,time(node))-center(:,node);
+                    deviation(7)=atan2(sin(deviation(7)),cos(deviation(7)));
+                    excess=max([excess;abs(deviation)-box(:,node)]);
+                end
+            end
+            testCase.verifyLessThanOrEqual(excess,1e-9);
+        end
+
+        function conditioningPropagatesAndIntersectsTheParameters(testCase)
+            radius=[.2;.2;.1;.1;.1;.1;.02;.02];h=.05;
+            carried=localPathEncounter([6;.3;.4;.02],radius,.05);
+            truth=struct('p0',[1;2],'speed',6,'course',.3,'A',.4,'kappa',.02,'yaw0',.3);
+            measured=carried;measured.center=localNrmmState(truth,h);
+            measured.parameters=targetPrediction.nrmmParameters(measured.center,radius,measured.contract, ...
+                localBallBounds(measured.center,.1,.1));
+            next=targetPrediction.condition(carried,h,measured);
+            arc=6*h+.4*h^2/2;
+            expected=struct('speed',6+.4*h,'course',.3+.02*arc,'speedRate',.4,'curvature',.02);
+            for name=["speed","course","speedRate","curvature"]
+                interval=next.parameters.(name);
+                testCase.verifyGreaterThanOrEqual(interval(1),measured.parameters.(name)(1)-1e-12);
+                testCase.verifyLessThanOrEqual(interval(2),measured.parameters.(name)(2)+1e-12);
+                testCase.verifyGreaterThanOrEqual(expected.(name),interval(1)-1e-12);
+                testCase.verifyLessThanOrEqual(expected.(name),interval(2)+1e-12);
+            end
+            testCase.verifyLessThanOrEqual(diff(next.parameters.course),diff(measured.parameters.course)+1e-12);
+            testCase.verifyLessThan(diff(next.parameters.course),diff(carried.parameters.course));
+            contradictory=measured;contradictory.parameters.curvature=[.04;.05];
+            testCase.verifyError(@() targetPrediction.condition(carried,h,contradictory), ...
+                "collisionAvoidanceController:inconsistentObservation");
+        end
+
         function aContradictoryYawRateIsAnInconsistentObservation(testCase)
             encounter=localPathEncounter([10;0;0;.02],[.1;.1;.05;.05;.01;.01;.01;.01],.05);
             encounter.center(8)=1;
@@ -149,6 +206,9 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             wider=nextTarget;wider.predictionMotion.curvatureMaximum=.05;
             [~,~,problem]=collisionAvoidanceController(next,wider,road,cfg,stored);
             testCase.verifyFalse(problem.metadata.inheritedFeasibleFamily);
+            faster=nextTarget;faster.predictionMotion.speedRateMaximum=2;
+            [~,~,problem]=collisionAvoidanceController(next,faster,road,cfg,stored);
+            testCase.verifyFalse(problem.metadata.inheritedFeasibleFamily);
             cartesian=nextTarget;
             cartesian.predictionMotion=struct('kind',"finite-sensing-motion-v1",'jerkBound',[0;0], ...
                 'yawAccelerationBound',0);
@@ -162,9 +222,46 @@ function encounter=localPathEncounter(parameters,radius,curvatureMaximum)
 % Estimate box centred on the NRMM state [1; 2] + path(parameters) at t = 0.
     truth=struct('p0',[1;2],'speed',parameters(1),'course',parameters(2),'A',parameters(3), ...
         'kappa',parameters(4),'yaw0',parameters(2));
-    encounter=struct('center',localNrmmState(truth,0),'radius',radius, ...
+    encounter=struct('center',localNrmmState(truth,0),'radius',radius,'time',0, ...
         'contract',struct('kind',"nrmm-motion-v1",'jerkBound',[0;0],'yawAccelerationBound',0, ...
         'curvatureMaximum',curvatureMaximum));
+    encounter.parameters=targetPrediction.nrmmParameters(encounter.center,encounter.radius,encounter.contract,[]);
+end
+
+function published=localBallBounds(center,velocityRadius,accelerationRadius)
+% NRMM parameter error bounds of velocity and acceleration errors inside discs,
+% written out independently of the estimator helper.
+    v=center(3:4);a=center(5:6);speed=norm(v);
+    theta=pi;
+    if velocityRadius<speed,theta=asin(velocityRadius/speed);end
+    componentRadius=accelerationRadius+2*norm(a)*sin(theta/2);
+    normal=(v(1)*a(2)-v(2)*a(1))/speed;
+    quotients=(normal+[-1;1]*componentRadius)./[(speed-velocityRadius)^2,(speed+velocityRadius)^2];
+    published=struct('speed',velocityRadius,'course',theta,'speedRate',componentRadius, ...
+        'curvature',[min(quotients,[],'all');max(quotients,[],'all')]);
+end
+
+function truth=localSampleNrmmDisc(encounter,velocityRadius,accelerationRadius,stream)
+% NRMM parameters whose velocity and acceleration at t = 0 lie in discs around
+% the estimate (and so inside its box) and whose yaw rate lies in the box.
+    x=encounter.center;r=encounter.radius;maximum=encounter.contract.curvatureMaximum;
+    for attempt=1:50000
+        p0=x(1:2)+r(1:2).*(2*rand(stream,2,1)-1);
+        direction=2*pi*rand(stream);v=x(3:4)+velocityRadius*sqrt(rand(stream))*[cos(direction);sin(direction)];
+        speed=norm(v);
+        if speed==0,continue;end
+        kappa=(x(8)+r(8)*(2*rand(stream)-1))/speed;
+        if abs(kappa)>maximum,continue;end
+        course=atan2(v(2),v(1));tangent=[cos(course);sin(course)];normal=[-tangent(2);tangent(1)];
+        % Speed-rates A with |A*tangent + kappa*speed^2*normal - a| <= accelerationRadius.
+        offset=dot(x(5:6),normal)-kappa*speed^2;
+        if abs(offset)>accelerationRadius,continue;end
+        halfWidth=sqrt(accelerationRadius^2-offset^2);
+        A=dot(x(5:6),tangent)+halfWidth*(2*rand(stream)-1);
+        truth=struct('p0',p0,'speed',speed,'course',course,'A',A,'kappa',kappa,'yaw0',x(7)+r(7)*(2*rand(stream)-1));
+        return;
+    end
+    error('nrmmTargetPredictionTest:noSample','No NRMM state found in the discs.');
 end
 
 function truth=localSampleNrmm(encounter,stream,extreme)
@@ -230,7 +327,7 @@ function [ego,target,road,cfg]=localLeadEncounter(scales)
         'targetAccelerationInertialErrorBound',[.02;.02],'targetYawErrorBound',.01, ...
         'targetYawRateErrorBound',.01, ...
         'predictionMotion',struct('kind','nrmm-motion-v1','jerkBound',[0;0], ...
-            'yawAccelerationBound',0,'curvatureMaximum',.03));
+            'yawAccelerationBound',0,'curvatureMaximum',.03,'speedRateMaximum',1));
 end
 
 function program=localReactiveProgram(problem,strength)

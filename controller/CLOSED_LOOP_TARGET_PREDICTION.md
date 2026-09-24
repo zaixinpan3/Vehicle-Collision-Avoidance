@@ -248,19 +248,27 @@ instead. `nrmmControllerErrorBounds` publishes `nrmm-motion-v1` when
 `modelJerkMaximum = 0` (the default), with `curvatureMaximum = sin(beta_max)/l_r`
 and the acceleration magnitude bound, and the Cartesian contract otherwise.
 
-**Reachable box** (`targetPrediction.finiteFlow`), for every NRMM path through
-the estimate box:
-1. **Parameters.** Sound intervals for `p0`, `V`, course, `A` and `kappa`. The
-   curvature interval comes from both the yaw rate (`kappa V`) and the normal
-   acceleration (`kappa V^2`).
-2. **Path.** Their image along the path: analytic sensitivities with a
-   Lagrange second-order remainder, or a path-length ball where the
-   linearization does not apply.
-3. **Intersection.** The result is intersected with the Cartesian enclosure of
-   the same paths. That enclosure uses their jerk
-   `hypot(kappa^2 V^3, 3 A kappa V)` and yaw acceleration `|A kappa|` over the
-   parameter intervals, plus the jump of the acceleration to zero wherever a
-   path may have stopped.
+**Parameter intervals** (`targetPrediction.nrmmParameters`). The encounter
+carries intervals for `V`, course, `A` and `kappa`: the intervals of every NRMM
+state in the estimate box, intersected with the bounds the estimator publishes
+about the same estimate (2026-09-24, `nrmmTargetParameterErrorBounds`: the
+frame-free speed, speed-rate and normal-acceleration balls of the tracker, the
+course adding the ego yaw error) and with the declared maxima. The inertial box
+carries the ego rotation error into every axis and its corners into every
+norm; the published bounds do not. Inherited frames propagate the intervals
+over the hold and intersect them with the measurement's.
+
+**Reachable box** (`targetPrediction.finiteFlow`), for every NRMM path of the
+intervals through the position box, as the intersection of two bounds on the
+same paths:
+1. **Parameter-Taylor bound.** Analytic sensitivities with a Lagrange
+   second-order remainder, or a path-length ball where the linearization does
+   not apply. Tight for fast and turning targets and long horizons.
+2. **Time-Taylor bound.** The constant-acceleration extrapolation of the box
+   plus the integrated jerk `hypot(kappa^2 V^3, 3 A kappa V)` and yaw
+   acceleration `|A kappa|` of the paths over the intervals, plus the jump of
+   the acceleration to zero wherever a path may have stopped. Tight for slow
+   targets and short horizons.
 
 All of the remaining growth is the extrapolation of the current estimate error
 along the NRMM path.
@@ -280,11 +288,13 @@ acceleration part.
 **Scope.**
 - Certification is at hold nodes only. Whole-hold cells extrapolate a node
   snapshot with the Cartesian jerk bound and are rejected for NRMM targets.
-- A change of the motion kind, or a larger curvature maximum, voids a carried
-  family.
+- A change of the motion kind, or a larger curvature or speed-rate maximum,
+  voids a carried family.
 
 **Measured effect.** See
-[NRMM_TARGET_PREDICTION_20260924.md](../report/NRMM_TARGET_PREDICTION_20260924.md).
+[NRMM_TARGET_PREDICTION_20260924.md](../report/NRMM_TARGET_PREDICTION_20260924.md)
+and, for the published parameter bounds,
+[NRMM_PARAMETER_INTERFACE_20260924.md](../report/NRMM_PARAMETER_INTERFACE_20260924.md).
 - **Target box.** The target of the table above, at 4.8 s (position half-width
   per axis):
   - sideslip maximum 0.005 rad: 2.85 m, against 8.89 m under the Cartesian

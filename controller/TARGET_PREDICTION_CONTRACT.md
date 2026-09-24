@@ -52,35 +52,57 @@ the same optimization retains road, model, actuator and CLF constraints.
 `predictionMotion.kind="nrmm-motion-v1"` declares exact NRMM motion. The target
 keeps its speed-rate `A` and its sideslip, so it follows a path of constant
 curvature `kappa` through its current state, with
-`abs(kappa) <= curvatureMaximum` (1/m, required). Its yaw is `psi0 + kappa*s(t)`
-and its yaw rate `kappa*V(t)`; it stops and holds when its speed reaches zero.
+`abs(kappa) <= curvatureMaximum` (1/m, required) and, when declared,
+`abs(A) <= speedRateMaximum` (m/s^2). Its yaw is `psi0 + kappa*s(t)` and its
+yaw rate `kappa*V(t)`; it stops and holds when its speed reaches zero.
 `jerkBound` and `yawAccelerationBound` must be zero. A varying speed-rate or
 curvature leaves every NRMM path through a later estimate, so a model error
 is declared with a `finite-sensing-motion-v1` contract instead
 (`nrmmControllerErrorBounds` does this when `modelJerkMaximum > 0`).
 
-`finiteFlow` then encloses every NRMM path through the current estimate box:
-- **Parameters.** `p0 = position +- r_p`, `V = |v| +- |r_v|`,
+**Parameter intervals** (`targetPrediction.nrmmParameters`). The encounter
+carries intervals for `V`, the course, `A` and `kappa` that contain the true
+target's values. They are the intersection of:
+- the intervals of every NRMM state in the estimate box: `V = |v| +- |r_v|`,
   `course = atan2(v) +- asin(|r_v|/|v|)`,
-  `A = v'a/|v| +- (|r_a| + 2|a| sin(r_course/2))` (within
-  `+-scalarAccelerationMaximum` when declared), and `kappa` in both `omega/V`
-  and `a_N/V^2` over the box, within `+-curvatureMaximum`.
-- **Path.** The linearization of the NRMM path in these parameters with a
-  Lagrange second-order remainder, or a path-length ball where the
-  linearization does not apply: a course radius above 0.5 rad, a speed
-  interval touching zero, or a possible stop.
-- **Intersection.** The result is intersected with the Cartesian enclosure of
-  the same paths. Their jerk is at most `hypot(kappa^2 V^3, 3 A kappa V)` and
-  their yaw acceleration at most `|A kappa|` over the parameter intervals. A
-  stop sets the acceleration to zero, so where a path may have stopped the
-  per-axis acceleration deviation also covers `max(0, |a0| - r_a)`.
+  `A = v'a/|v| +- (|r_a| + 2|a| sin(r_course/2))`, and `kappa` in both
+  `omega/V` and `a_N/V^2` over the box;
+- the bounds the declarer publishes about the same estimate
+  (`targetSpeedErrorBound`, `targetCourseErrorBound`,
+  `targetSpeedRateErrorBound`, `targetCurvatureInterval`; the NRMM estimator
+  derives them from its frame-free component balls, see
+  [ESTIMATOR_BOUND_INTERFACE.md](ESTIMATOR_BOUND_INTERFACE.md));
+- the declared maxima: `curvatureMaximum`, `speedRateMaximum` and the
+  acceleration magnitude bound.
 
-No `J*t^3/6` term is added: the growth is the extrapolation of the current
-estimate error along the NRMM path. `targetPrediction.deviationModel` gives the
-same parameter linearization to the target-reactive tube. Whole-hold cells
-extrapolate a node snapshot with a Cartesian jerk bound and are not supported
-for NRMM targets. A change of the motion kind or a larger curvature maximum
-voids a carried family.
+At a continuation frame the carried intervals are propagated over the hold
+(`A` and `kappa` constant, `V = max(0, V + A h)`, the course advanced by
+`kappa` times the arc, all monotone in the interval ends) and intersected with
+the measurement's intervals. An empty intersection is an inconsistent
+observation.
+
+**Reachable box** (`finiteFlow`). Two bounds on the same NRMM paths, both
+from the parameter intervals and the position box, intersected:
+- **Parameter-Taylor bound.** The linearization of the path in the
+  parameters with a Lagrange second-order remainder, or a path-length ball
+  where the linearization does not apply: a course radius above 0.5 rad, a
+  speed interval touching zero, or a possible stop. It is tight for fast and
+  turning targets and long horizons.
+- **Time-Taylor bound.** The constant-acceleration extrapolation of the
+  estimate box plus the integrated jerk of the NRMM paths,
+  `hypot(kappa^2 V^3, 3 A kappa V)` over the parameter intervals, and their
+  yaw acceleration `|A kappa|`. A stop sets the acceleration to zero, so where
+  a path may have stopped the per-axis acceleration deviation also covers
+  `max(0, |a0| - r_a)`. It is tight for slow targets and short horizons, where
+  the parameter-Taylor bound pays for a course and a curvature that the
+  estimate cannot resolve.
+
+No `J*t^3/6` term of a declared jerk is added: the growth is the extrapolation
+of the current estimate error along the NRMM path.
+`targetPrediction.deviationModel` gives the parameter linearization to the
+target-reactive tube. Whole-hold cells extrapolate a node snapshot with a
+Cartesian jerk bound and are not supported for NRMM targets. A change of the
+motion kind or a larger curvature or speed-rate maximum voids a carried family.
 
 `scalarAccelerationMaximum`, when declared for either kind, bounds the
 acceleration magnitude `|a|` (for an NRMM target `hypot(A, V*omega)`), not the

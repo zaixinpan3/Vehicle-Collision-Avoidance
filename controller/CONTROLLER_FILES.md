@@ -23,7 +23,7 @@ Do not move controller helpers into those directories to evade the limit.
 | Source | Responsibility and principal interfaces |
 | --- | --- |
 | `collisionAvoidanceController.m` | Public target-array entry; fixed-direction admission and solver-accepted improvement, complete witness storage and full-frame deadline enforcement |
-| `readPlanningInputs.m` | Input normalization, target-departure sensor declaration and lane/target model construction |
+| `readPlanningInputs.m` | Input normalization, target-departure sensor declaration, optional NRMM parameter error bounds and lane/target model construction |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse base transcription (`build`) and fixed-direction support majorants (`fixedDirections`) |
@@ -33,7 +33,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `ltvBicycleModel.m` | Held-input node prediction with feedback deviation sets (`finitePredict`, `feedbackContract`), target-reactive gain design and joint ego-target deviation sets (`reactionGains`, `reactiveTube`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
 | `modifiedFialaTire.m` | Modified Fiala forces, tangents and tire parameters |
 | `stateUncertainty.m` | Estimator bounds, held-interval enclosures for offline synthesis and audits, held process reserves, intersection and sampled-feedback transition (`sampledFeedbackTransition`) |
-| `targetPrediction.m` | Bounded target admission (`admitOnline`) under a Cartesian-jerk (`finite-sensing-motion-v1`) or exact-NRMM (`nrmm-motion-v1`) contract, reachable-box conditioning (`condition`), absolute-time flow with a declared acceleration maximum or over every NRMM path through the estimate box (`finiteFlow`, `accelerationDeviationBound`), the target deviation model of the reactive tube (`deviationModel`), offline uncertainty studies and footprint support |
+| `targetPrediction.m` | Bounded target admission (`admitOnline`) under a Cartesian-jerk (`finite-sensing-motion-v1`) or exact-NRMM (`nrmm-motion-v1`) contract, NRMM parameter intervals from the estimate box and the published bounds (`nrmmParameters`), reachable-box and parameter conditioning (`condition`), absolute-time flow with a declared acceleration maximum or over every NRMM path of the parameter intervals (`finiteFlow`, `accelerationDeviationBound`), the target deviation model of the reactive tube (`deviationModel`), offline uncertainty studies and footprint support |
 | `fialaCertificate.m` | Validated nonlinear residuals (`residual`), held-feedback samples (`sample`), prescribed sequences (`sequence`) and shared constants (`parameters`) |
 | `projectLanePolylineMex.cpp` | Native batched polyline projection |
 | `laneFrameBoundsMex.cpp` | Native affine chart bounds |

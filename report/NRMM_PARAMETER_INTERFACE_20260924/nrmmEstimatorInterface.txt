@@ -1,0 +1,8 @@
+rotated          box-only               | half-widths V 0.812 m/s, course 0.055 rad, A 0.178 m/s^2, kappa 0.0011 1/m | position box (m) at 1/2/3/4/4.8 s:   1.73   2.63   3.97   6.00   8.30 
+rotated          with published bounds  | half-widths V 0.128 m/s, course 0.039 rad, A 0.079 m/s^2, kappa 0.0004 1/m | position box (m) at 1/2/3/4/4.8 s:   1.72   2.51   3.48   4.67   5.79 
+angleBranch      box-only               | half-widths V 1.034 m/s, course 0.069 rad, A 0.212 m/s^2, kappa 0.0014 1/m | position box (m) at 1/2/3/4/4.8 s:   2.12   3.26   5.00   7.66  10.74 
+angleBranch      with published bounds  | half-widths V 0.128 m/s, course 0.048 rad, A 0.080 m/s^2, kappa 0.0004 1/m | position box (m) at 1/2/3/4/4.8 s:   2.10   3.07   4.23   5.63   6.87 
+velocityPeaking  box-only               | half-widths V 191.710 m/s, course 3.142 rad, A 2.000 m/s^2, kappa 0.0094 1/m | position box (m) at 1/2/3/4/4.8 s: 580.95 1159.08 1739.21 2321.34 2788.49 
+velocityPeaking  with published bounds  | half-widths V 156.438 m/s, course 3.142 rad, A 2.000 m/s^2, kappa 0.0094 1/m | position box (m) at 1/2/3/4/4.8 s: 475.14 947.45 1421.77 1898.08 2280.58 
+nearZeroVelocity box-only               | half-widths V 10.607 m/s, course 3.142 rad, A 1.769 m/s^2, kappa 0.0094 1/m | position box (m) at 1/2/3/4/4.8 s:  20.39  38.41  61.73  94.47 131.22 
+nearZeroVelocity with published bounds  | half-widths V 7.500 m/s, course 3.142 rad, A 1.566 m/s^2, kappa 0.0094 1/m | position box (m) at 1/2/3/4/4.8 s:  20.26  37.30  57.43  82.73 108.57 

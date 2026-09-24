@@ -96,8 +96,10 @@ classdef targetPrediction
         %condition Intersect the bounded reachable box with a new measurement.
         % The true target state lies in the propagated carried box and in the
         % measurement box, so the interval hull of their intersection contains
-        % it and stays inside the propagated box. An empty intersection
-        % contradicts the declared motion bound or measurement contract.
+        % it and stays inside the propagated box. An NRMM encounter also
+        % propagates its parameter intervals over the hold and intersects them
+        % with the measurement's. An empty intersection contradicts the declared
+        % motion bound or measurement contract.
             [center, radius] = targetPrediction.finiteFlow(carried, duration);
             measuredCenter = measured.center;
             measuredCenter(7) = center(7)+atan2(sin(measuredCenter(7)-center(7)), ...
@@ -117,6 +119,9 @@ classdef targetPrediction
             next.radius = (upper-lower)/2;
             next.time = carried.time+duration;
             next.nominalCenter = next.center;
+            if localIsNrmm(carried.contract) && localIsNrmm(measured.contract)
+                next.parameters = localConditionParameters(carried.parameters,duration,measured);
+            end
         end
 
         function finite = isFiniteSensing(encounter)
@@ -128,10 +133,12 @@ classdef targetPrediction
         % finite-sensing-motion-v1: any Cartesian motion with |jerk| <= jerkBound
         % from the estimated state. nrmm-motion-v1: exact NRMM motion, a constant
         % speed-rate, constant-curvature (constant-sideslip) path through the
-        % estimated state with |curvature| <= curvatureMaximum; its jerkBound
-        % and yawAccelerationBound must be zero. A varying speed-rate or
-        % curvature leaves every NRMM path through a later estimate, so it is
-        % declared with a finite-sensing contract instead.
+        % estimated state with |curvature| <= curvatureMaximum and, when
+        % declared, |speed-rate| <= speedRateMaximum; its jerkBound and
+        % yawAccelerationBound must be zero. A varying speed-rate or curvature
+        % leaves every NRMM path through a later estimate, so it is declared
+        % with a finite-sensing contract instead. The encounter carries the
+        % NRMM parameter intervals (targetPrediction.nrmmParameters).
             if isfield(target,"predictionMotion") && ~isempty(target.predictionMotion)
                 motion = target.predictionMotion;
                 if ~isstruct(motion) || ~isscalar(motion) ...
@@ -155,6 +162,10 @@ classdef targetPrediction
                             +"use a finite-sensing contract for a model error.");
                     end
                     contract.curvatureMaximum = motion.curvatureMaximum;
+                    if isfield(motion,"speedRateMaximum")
+                        validateattributes(motion.speedRateMaximum,{'double'},{'scalar','real','finite','nonnegative'});
+                        contract.speedRateMaximum = motion.speedRateMaximum;
+                    end
                 end
                 if isfield(motion,"scalarAccelerationMaximum")
                     validateattributes(motion.scalarAccelerationMaximum,{'double'},{'scalar','finite','nonnegative'});
@@ -171,10 +182,69 @@ classdef targetPrediction
                 end
                 contract.jerkBound = contract.jerkBound(:);
                 encounter = localEncounter(target,time,contract);
+                if contract.kind=="nrmm-motion-v1"
+                    published = [];
+                    if isfield(target,"parameterErrorBounds"),published = target.parameterErrorBounds;end
+                    encounter.parameters = targetPrediction.nrmmParameters(encounter.center, ...
+                        encounter.radius,contract,published);
+                end
                 return;
             end
             error("collisionAvoidanceController:missingPredictionMotion", ...
                 "Every target requires identified finite-sensing motion bounds.");
+        end
+
+        function parameters = nrmmParameters(center,radius,contract,published)
+        %nrmmParameters NRMM parameter intervals of an estimate box.
+        % Intervals [lo; hi] for the speed V, course, speed-rate A and curvature
+        % kappa of every NRMM state in the box (center, radius). From the box:
+        %   V = |v| +- |r_v|; course = atan2(v) +- asin(|r_v|/|v|);
+        %   A = v'a/|v| +- (|r_a| + 2|a| sin(r_course/2));
+        %   kappa in omega/V and in a_N/V^2 over the yaw-rate, normal-acceleration
+        %   and speed intervals.
+        % These are intersected with the bounds the declarer publishes about the
+        % same estimate (readPlanningInputs: parameterErrorBounds, e.g. the NRMM
+        % estimator's frame-free component balls) and with the contract's
+        % curvatureMaximum, speedRateMaximum and acceleration magnitude maximum.
+        % An empty intersection is an inconsistent observation.
+            x = center;r = radius;
+            velocityRadius = norm(r(3:4));accelerationRadius = norm(r(5:6));
+            speed = norm(x(3:4));course = atan2(x(4),x(3));
+            courseRadius = pi;
+            if velocityRadius<speed,courseRadius = asin(velocityRadius/speed);end
+            tangential = 0;
+            if speed>0,tangential = dot(x(3:4),x(5:6))/speed;end
+            % Tangential and normal acceleration components err by at most this much.
+            componentRadius = accelerationRadius+2*norm(x(5:6))*sin(courseRadius/2);
+            parameters = struct('speed',[max(0,speed-velocityRadius);speed+velocityRadius], ...
+                'course',course+[-courseRadius;courseRadius], ...
+                'speedRate',tangential+[-componentRadius;componentRadius],'curvature',[-Inf;Inf]);
+            if speed-velocityRadius>0
+                % On an NRMM path the yaw rate is kappa*V and the normal
+                % acceleration is kappa*V^2; the true state satisfies both.
+                speedLow = speed-velocityRadius;speedHigh = speed+velocityRadius;
+                rates = x(8)+[-r(8);r(8)];
+                normalAcceleration = (x(3)*x(6)-x(4)*x(5))/speed+[-componentRadius;componentRadius];
+                quotients = [rates./[speedLow,speedHigh],normalAcceleration./[speedLow^2,speedHigh^2]];
+                parameters.curvature = [max(min(quotients(:,1:2),[],'all'),min(quotients(:,3:4),[],'all')); ...
+                    min(max(quotients(:,1:2),[],'all'),max(quotients(:,3:4),[],'all'))];
+            end
+            if ~isempty(published)
+                parameters.speed = localIntersect(parameters.speed,speed+[-published.speed;published.speed]);
+                parameters.course = localIntersect(parameters.course,course+[-published.course;published.course]);
+                parameters.speedRate = localIntersect(parameters.speedRate, ...
+                    tangential+[-published.speedRate;published.speedRate]);
+                parameters.curvature = localIntersect(parameters.curvature,published.curvature);
+            end
+            parameters.curvature = localIntersect(parameters.curvature, ...
+                contract.curvatureMaximum*[-1;1]);
+            limit = Inf;
+            if isfield(contract,'speedRateMaximum'),limit = contract.speedRateMaximum;end
+            if isfield(contract,'scalarAccelerationMaximum')
+                % |A| <= |a| <= the declared acceleration magnitude bound.
+                limit = min(limit,contract.scalarAccelerationMaximum);
+            end
+            parameters.speedRate = localIntersect(parameters.speedRate,limit*[-1;1]);
         end
 
         function [center, radius] = finiteFlow(encounter, duration)
@@ -349,6 +419,9 @@ classdef targetPrediction
                 % estimate and reverse the complete future trajectory.
                 measured.nominalCenter = measured.center ...
                     +min(max(difference,-measured.radius),measured.radius);
+                if localIsNrmm(encounter.contract) && localIsNrmm(measured.contract)
+                    measured.parameters = localConditionParameters(encounter.parameters,duration,measured);
+                end
                 next = measured;
                 return;
             end
@@ -550,55 +623,27 @@ end
 function state = localNrmmState(encounter,duration,uncertain)
 % NRMM (constant speed-rate A, constant curvature kappa) path of the estimate
 % and, when uncertain, its parameter sensitivities and second-order remainder.
-% Parameters and their error radii, derived soundly from the estimate box:
-%   p0 = position +- r_p; V = |v| +- |r_v|; course = atan2(v) +- asin(|r_v|/|v|);
-%   A = v'a/|v| +- (|r_a| + 2|a| sin(r_course/2)), within +-scalarAccelerationMaximum;
-%   kappa in omega/V and in a_N/V^2 over the yaw-rate, normal-acceleration and
-%   speed intervals, within +-kappaMax.
+% The initial position is the estimate box; V, A, course and kappa are the
+% encounter's parameter intervals (targetPrediction.nrmmParameters), taken as
+% their midpoints plus or minus their half-widths.
 % sensitivity(:,:,k) maps [dp0x; dp0y; dV; dA; dcourse; dkappa] to the change
 % of [position; velocity; acceleration] at time k; remainder(:,k) bounds the
 % rest (Lagrange second-order bounds). Where the linear model does not apply
 % (course radius above 0.5 rad, speed interval touching zero or a possible stop
 % by that time) only the p0 columns are kept and the remainder is a
 % path-length ball bound.
-    x = encounter.center;r = encounter.radius;maximum = encounter.contract.curvatureMaximum;
+    x = encounter.center;r = encounter.radius;
+    if ~isfield(encounter,'parameters') || isempty(encounter.parameters)
+        error("collisionAvoidanceController:invalidEncounterContract", ...
+            "An NRMM encounter carries parameter intervals (targetPrediction.nrmmParameters).");
+    end
+    intervals = encounter.parameters;
     duration = double(duration(:).');count = numel(duration);
-    velocityRadius = norm(r(3:4));accelerationRadius = norm(r(5:6));
-    speed = norm(x(3:4));course = atan2(x(4),x(3));
-    courseRadius = pi;
-    if velocityRadius<speed,courseRadius = asin(velocityRadius/speed);end
-    tangential = 0;
-    if speed>0,tangential = dot(x(3:4),x(5:6))/speed;end
-    % Tangential and normal acceleration components err by at most this much.
-    componentRadius = accelerationRadius+2*norm(x(5:6))*sin(courseRadius/2);
-    tangentialRadius = componentRadius;
-    if isfield(encounter.contract,'scalarAccelerationMaximum')
-        % |A| <= |a| <= the declared acceleration magnitude bound.
-        limit = encounter.contract.scalarAccelerationMaximum;
-        low = max(tangential-tangentialRadius,-limit);high = min(tangential+tangentialRadius,limit);
-        if low>high
-            error("collisionAvoidanceController:inconsistentObservation", ...
-                "The target acceleration contradicts the declared acceleration maximum.");
-        end
-        tangential = (low+high)/2;tangentialRadius = (high-low)/2;
-    end
-    speedLow = speed-velocityRadius;speedHigh = speed+velocityRadius;
-    % On an NRMM path the yaw rate is kappa*V and the normal acceleration is
-    % kappa*V^2; the true state satisfies both, so kappa lies in both quotient
-    % intervals.
-    kappaLow = -maximum;kappaHigh = maximum;
-    if speedLow>0
-        rates = x(8)+[-r(8);r(8)];
-        normalAcceleration = (x(4)*-x(5)+x(3)*x(6))/speed+[-componentRadius;componentRadius];
-        quotients = [rates./[speedLow,speedHigh],normalAcceleration./[speedLow^2,speedHigh^2]];
-        kappaLow = max([min(quotients(:,1:2),[],'all'),min(quotients(:,3:4),[],'all'),-maximum]);
-        kappaHigh = min([max(quotients(:,1:2),[],'all'),max(quotients(:,3:4),[],'all'),maximum]);
-    end
-    if kappaLow>kappaHigh
-        error("collisionAvoidanceController:inconsistentObservation", ...
-            "The target yaw rate and acceleration admit no NRMM curvature within the declared maximum.");
-    end
-    kappa = (kappaLow+kappaHigh)/2;kappaRadius = (kappaHigh-kappaLow)/2;
+    speedLow = intervals.speed(1);speedHigh = intervals.speed(2);
+    speed = (speedLow+speedHigh)/2;velocityRadius = (speedHigh-speedLow)/2;
+    course = mean(intervals.course);courseRadius = min(pi,(intervals.course(2)-intervals.course(1))/2);
+    tangential = mean(intervals.speedRate);tangentialRadius = (intervals.speedRate(2)-intervals.speedRate(1))/2;
+    kappa = mean(intervals.curvature);kappaRadius = (intervals.curvature(2)-intervals.curvature(1))/2;
     stopTime = Inf;
     if tangential<0,stopTime = speed/-tangential;end
     moving = min(duration,stopTime);
@@ -653,13 +698,44 @@ function state = localNrmmState(encounter,duration,uncertain)
     ball = ~linear;
     remainder(1:2,ball) = repmat(sHigh(ball)+vecnorm(displacement(:,ball),2,1),2,1);
     remainder(3:4,ball) = repmat(rateHigh(ball)+rate(ball),2,1);
-    remainder(5:6,ball) = repmat(hypot(aMax,rateHigh(ball).^2*maximum)+vecnorm(acceleration(:,ball),2,1),2,1);
-    yawRadius(ball) = r(7)+maximum*sHigh(ball)+abs(kappa)*arc(ball);
-    yawRateRadius(ball) = maximum*rateHigh(ball)+abs(kappa)*rate(ball);
+    remainder(5:6,ball) = repmat(hypot(aMax,rateHigh(ball).^2*kMax)+vecnorm(acceleration(:,ball),2,1),2,1);
+    yawRadius(ball) = r(7)+kMax*sHigh(ball)+abs(kappa)*arc(ball);
+    yawRateRadius(ball) = kMax*rateHigh(ball)+abs(kappa)*rate(ball);
     state.sensitivity = sensitivity;
     state.parameterRadius = [r(1:2);dV;dA;dCourse;dK];
     state.remainder = remainder;state.yawRadius = yawRadius;state.yawRateRadius = yawRateRadius;
     state.linear = linear;
+end
+
+function interval = localIntersect(first,second)
+% Intersection of two intervals [lo; hi]; empty within roundoff is inconsistent.
+    interval = [max(first(1),second(1));min(first(2),second(2))];
+    values = [first(:);second(:)];values = abs(values(isfinite(values)));
+    allowance = 256*eps*(1+max([0;values]));
+    if interval(1)>interval(2)+allowance
+        error("collisionAvoidanceController:inconsistentObservation", ...
+            "The target estimate admits no NRMM parameter within the declared bounds.");
+    end
+    middle = (interval(1)+interval(2))/2;
+    interval = [min(interval(1),middle);max(interval(2),middle)];
+end
+
+function parameters = localConditionParameters(carried,duration,measured)
+% Propagate the carried NRMM parameter intervals over the hold and intersect
+% them with the measured encounter's. The speed-rate and curvature are
+% constant; the speed max(0, V + A t) and the arc length are nondecreasing in
+% both, and the course advances by kappa times the arc.
+    speedRate = carried.speedRate;curvature = carried.curvature;
+    speed = max(0,carried.speed+speedRate*duration);
+    arc = [localArc(duration,carried.speed(1),speedRate(1));localArc(duration,carried.speed(2),speedRate(2))];
+    products = curvature*arc.';
+    course = carried.course+[min(products,[],'all');max(products,[],'all')];
+    measuredCourse = measured.parameters.course;
+    measuredCourse = measuredCourse+2*pi*round((mean(course)-mean(measuredCourse))/(2*pi));
+    parameters = struct('speed',localIntersect(speed,measured.parameters.speed), ...
+        'course',localIntersect(course,measuredCourse), ...
+        'speedRate',localIntersect(speedRate,measured.parameters.speedRate), ...
+        'curvature',localIntersect(curvature,measured.parameters.curvature));
 end
 
 function column = localCurvatureSensitivity(arc,kappa,course)

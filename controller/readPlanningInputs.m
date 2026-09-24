@@ -549,7 +549,8 @@ function target = localEmptyTarget()
         "yawErrorBound", 0.0, "yawRateErrorBound", 0.0, ...
         "predictionYawAccelerationErrorBound", 0.0, ...
         "accelerationErrorBound", zeros(2, 1), ...
-        "errorCertificate", [], "predictionMotion", []);
+        "errorCertificate", [], "predictionMotion", [], ...
+        "parameterErrorBounds", []);
 end
 
 function key = localTargetRecordKey(data)
@@ -648,7 +649,40 @@ function [target, active] = localReadTargetRecord(data, ego, cfg)
             end
         end
     end
+    target.parameterErrorBounds = localTargetParameterErrorBounds(data);
     active = true;
+end
+
+function bounds = localTargetParameterErrorBounds(data)
+% Optional NRMM parameter error bounds of the estimate: the speed, course and
+% speed-rate errors (nonnegative, Inf allowed) and the curvature interval
+% [lo; hi] (Inf allowed). Empty when none is published.
+    bounds = [];
+    names = ["targetSpeedErrorBound", "targetCourseErrorBound", ...
+        "targetSpeedRateErrorBound", "targetCurvatureInterval"];
+    present = arrayfun(@(name) isfield(data, name) && ~isempty(data.(name)), names);
+    if ~any(present), return; end
+    bounds = struct("speed", Inf, "course", Inf, "speedRate", Inf, "curvature", [-Inf; Inf]);
+    fields = ["speed", "course", "speedRate"];
+    for index = 1:3
+        if ~present(index), continue; end
+        rawValue = data.(names(index));
+        if ~isnumeric(rawValue) || ~isreal(rawValue) || ~isscalar(rawValue) ...
+                || isnan(rawValue) || rawValue < 0.0
+            error("collisionAvoidanceController:invalidInput", ...
+                "%s must be a nonnegative real scalar.", names(index));
+        end
+        bounds.(fields(index)) = double(rawValue);
+    end
+    if present(4)
+        rawValue = data.targetCurvatureInterval;
+        if ~isnumeric(rawValue) || ~isreal(rawValue) || numel(rawValue) ~= 2 ...
+                || any(isnan(rawValue)) || rawValue(1) > rawValue(2)
+            error("collisionAvoidanceController:invalidInput", ...
+                "targetCurvatureInterval must be an ordered real interval [lo; hi].");
+        end
+        bounds.curvature = double(rawValue(:));
+    end
 end
 
 function yaw = localTargetYaw(data, ego, velocity)

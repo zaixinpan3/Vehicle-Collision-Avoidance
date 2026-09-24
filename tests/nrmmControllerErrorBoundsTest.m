@@ -58,9 +58,31 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(motion.yawAccelerationBound, 0);
             testCase.verifyEqual(motion.curvatureMaximum, ...
                 sin(domain.sideslipMaximum)/domain.rearAxleDistance);
+            testCase.verifyEqual(motion.speedRateMaximum, domain.scalarAccelerationMaximum);
             % The controller caps the acceleration magnitude, hypot(A, V*omega).
             testCase.verifyEqual(motion.scalarAccelerationMaximum, domain.accelerationNormBound);
             testCase.verifyGreaterThan(motion.scalarAccelerationMaximum, domain.scalarAccelerationMaximum);
+        end
+        function thePublishedParameterBoundsContainTheTruthAndBeatTheBox(testCase, geometry)
+            [published, ~, truth] = localReconstruction(testCase.Design, geometry);
+            estimate = published.targetEstimate;
+            velocity = estimate.targetVelocityInertial;acceleration = estimate.targetAccelerationInertial;
+            speed = norm(velocity);
+            courseError = atan2(sin(truth.course-atan2(velocity(2), velocity(1))), ...
+                cos(truth.course-atan2(velocity(2), velocity(1))));
+            testCase.verifyLessThanOrEqual(abs(truth.speed-speed), estimate.targetSpeedErrorBound+1e-12);
+            testCase.verifyLessThanOrEqual(abs(courseError), estimate.targetCourseErrorBound+1e-12);
+            testCase.verifyLessThanOrEqual(abs(truth.scalarAcceleration-dot(velocity, acceleration)/speed), ...
+                estimate.targetSpeedRateErrorBound+1e-12);
+            curvature = truth.yawRate/truth.speed;
+            testCase.verifyGreaterThanOrEqual(curvature, estimate.targetCurvatureInterval(1)-1e-12);
+            testCase.verifyLessThanOrEqual(curvature, estimate.targetCurvatureInterval(2)+1e-12);
+            if geometry(3) == 0
+                % The frame-free speed bound beats the inertial box corner, which
+                % carries the ego rotation error and both axes.
+                values = estimate.controllerErrorBound.bounds;
+                testCase.verifyLessThan(estimate.targetSpeedErrorBound, norm(values(3:4)));
+            end
         end
         function aModelErrorPublishesTheCartesianJerkContract(testCase)
             design = testCase.Design;
@@ -97,7 +119,7 @@ function [output, bound, input] = localVelocityFixture()
     input = struct("time",0,"yawRate",0,"gnssPosition",[0;0],"gnssVelocity",[10;0]);
 end
 
-function [published, actualError] = localReconstruction(design, geometry)
+function [published, actualError, truth] = localReconstruction(design, geometry)
     yaw = geometry(1);
     estimatedYaw = yaw+geometry(2);
     rotation = localRotation(yaw);
@@ -144,6 +166,8 @@ function [published, actualError] = localReconstruction(design, geometry)
     input = struct("time", 0, "yawRate", 0, "gnssPosition", ...
         position+design.sensors.positionNoiseMaximum*[1; 1]/sqrt(2));
     published = nrmmControllerErrorBounds(output, bound, input, design);
+    truth = struct("speed", speed, "course", course, "scalarAcceleration", scalarAcceleration, ...
+        "yawRate", yawRate, "yaw", targetYaw);
     actualError = [abs(position-estimatedPosition); abs(geometry(2)); ...
         abs(egoVelocity-estimatedEgoVelocity); 0; ...
         abs(targetPosition-target.targetPositionInertial); ...

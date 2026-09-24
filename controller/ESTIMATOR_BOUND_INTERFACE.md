@@ -38,6 +38,25 @@ Ego order: `[x_I; y_I; psi; vx_body; vy_body; yawRate]`, with units
 `[x_I; y_I; vx_I; vy_I; ax_I; ay_I; psi; yawRate]`, with units
 `[m; m; m/s; m/s; m/s^2; m/s^2; rad; rad/s]`.
 
+### NRMM parameter error bounds (2026-09-24)
+
+With the `nrmm-motion-v1` contract the target record also carries the error
+bounds of the NRMM parameters of the estimate, computed by
+`nrmmTargetParameterErrorBounds` from the tracker's component balls
+(`bound.targetComponents(2:3)`, frame-free) and the ego yaw error:
+
+| Field | Meaning |
+| --- | --- |
+| `targetSpeedErrorBound` | `abs(V - norm(v_I))`, m/s: the velocity component ball |
+| `targetCourseErrorBound` | course error, rad: ego yaw error plus `asin(ball/norm(v_I))`; `pi` when the ball contains rest |
+| `targetSpeedRateErrorBound` | `abs(A - v_I'a_I/norm(v_I))`, m/s^2: the acceleration ball plus the tangent's rotation |
+| `targetCurvatureInterval` | `[lo; hi]` of the normal acceleration over the speed squared; infinite when the ball contains rest |
+
+They describe the same estimate as the inertial box, which still carries the
+ego rotation error into every axis. The controller intersects both
+(`targetPrediction.nrmmParameters`). The contract adds `speedRateMaximum`, the
+domain's speed-rate limit, beside the acceleration magnitude bound.
+
 Numeric compatibility aliases are derived from this same certificate. The
 reader gives the certificate precedence over stale numeric aliases. It rejects
 unavailable, negative or nonfinite bounds, missing estimator metadata, and

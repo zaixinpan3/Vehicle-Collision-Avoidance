@@ -1,17 +1,23 @@
 function summary = runNrmmTargetCampaign(options)
 %runNrmmTargetCampaign Declared-plant scenarios with NRMM (constant speed-rate
-% and curvature) targets under three target predictions.
+% and curvature) targets under four target predictions.
 % The truth target keeps its speed-rate and path curvature; its measurement is
-% the truth plus independent uniform noise inside the scaled nominal target
-% bounds at every frame. The ego measurement box is the recorded NRMM estimator
-% bound. Variants:
+% the truth plus independent noise at every frame: uniform in the scaled
+% nominal box for the position, yaw and yaw rate, uniform in discs of the
+% scaled nominal radii for the velocity and acceleration (the NRMM estimator
+% certifies component norms). The ego measurement box is the recorded NRMM
+% estimator bound. Variants:
 %   cartesian     - finite-sensing contract whose jerk bound covers the
 %                   turning of an NRMM target of this speed and the declared
 %                   curvature maximum, hypot(kappa^2 V^3, 3 A kappa V) (the form
 %                   the estimator publishes when it declares a model error),
 %                   ego-only feedback tube;
-%   nrmm-egoOnly  - nrmm-motion-v1 contract, ego-only feedback tube;
-%   nrmm-reactive - nrmm-motion-v1 contract, target-reactive policy tried first.
+%   nrmm-boxOnly  - nrmm-motion-v1 contract from the measurement box alone,
+%                   ego-only feedback tube;
+%   nrmm-egoOnly  - nrmm-motion-v1 contract with the published NRMM parameter
+%                   error bounds (nrmmTargetParameterErrorBounds), ego-only
+%                   feedback tube;
+%   nrmm-reactive - as nrmm-egoOnly with the target-reactive policy tried first.
 % Measured outcomes only; deadline disabled.
     arguments
         options.OutputDirectory (1,1) string
@@ -21,7 +27,7 @@ function summary = runNrmmTargetCampaign(options)
         options.RoadCurvatures (1,:) double = [0,0.01]
         options.TargetCurvatures (1,:) double = [0,0.02]
         options.UncertaintyScales (1,:) double = [1,3,10]
-        options.Variants (1,:) string = ["cartesian","nrmm-egoOnly","nrmm-reactive"]
+        options.Variants (1,:) string = ["cartesian","nrmm-boxOnly","nrmm-egoOnly","nrmm-reactive"]
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"scripts"),fullfile(root,"controller"),fullfile(root,"config"));
@@ -50,6 +56,8 @@ function summary = runNrmmTargetCampaign(options)
                         if variant=="cartesian"
                             % Same NRMM truth, Cartesian contract covering its turning.
                             arguments_ = [arguments_,{"NrmmContract","cartesian"}]; %#ok<AGROW>
+                        elseif variant=="nrmm-boxOnly"
+                            arguments_ = [arguments_,{"NrmmParameterBounds",false}]; %#ok<AGROW>
                         elseif variant=="nrmm-reactive"
                             order = [30,100,Inf];
                         end
