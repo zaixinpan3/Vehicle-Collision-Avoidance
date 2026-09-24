@@ -1,0 +1,49 @@
+scenario,curvature,jerk,accelerationMaximum,variant,completed,passed,executedHolds,failureIdentifier,failureMessage,minNodeGap,minSampledGap,minTerminalMargin,maxClfResidual,reactiveAdmissions,maxFrameMs
+stationary,0,1,Inf,jerkOnly-egoOnly,1,1,240,,"",1.53706134050974,1.52387536934906,1.59971988456797e-05,-0.00822822699381338,0,1087.084
+stationary,0,1,Inf,jerkOnly-reactive,1,1,240,,"",1.5878128087189,1.57514094362187,1.60001076563027e-05,-0.00822868244718879,1,204.537
+stationary,0,1,2,capped-egoOnly,1,1,240,,"",1.32289590904887,1.32218748887134,1.598642679905e-05,-0.00823074307086443,0,72.401
+stationary,0,1,2,capped-reactive,1,1,240,,"",1.39299853585012,1.39299853585012,1.59913709354004e-05,-0.00823177138703635,1,125.026
+stationary,0,2,Inf,jerkOnly-egoOnly,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,103.082
+stationary,0,2,Inf,jerkOnly-reactive,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,213.923
+stationary,0,2,3,capped-egoOnly,1,1,240,,"",1.97472176645559,1.97248329730682,1.5957324443136e-05,-0.00822486110737924,0,55.105
+stationary,0,2,3,capped-reactive,1,1,240,,"",2.02626473410513,2.02545131694977,1.60000593333737e-05,-0.0082248751217479,1,96.904
+stationary,0.01,1,Inf,jerkOnly-egoOnly,1,1,240,,"",2.31450637586216,2.31204092934262,1.60001041509678e-05,-0.040359262865732,0,83.101
+stationary,0.01,1,Inf,jerkOnly-reactive,1,1,240,,"",2.34615876974627,2.3429672080573,1.6000073629438e-05,-0.040235440972411,1,98.199
+stationary,0.01,1,2,capped-egoOnly,1,1,240,,"",2.46370317759031,2.46331011991526,1.60001077628563e-05,-0.0388756681220047,0,54.712
+stationary,0.01,1,2,capped-reactive,1,1,240,,"",2.54125035028965,2.54062503521432,1.60000459727833e-05,-0.0387477910330724,1,89.689
+stationary,0.01,2,Inf,jerkOnly-egoOnly,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,51.507
+stationary,0.01,2,Inf,jerkOnly-reactive,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,148.804
+stationary,0.01,2,3,capped-egoOnly,1,1,240,,"",2.60143986455353,2.59323151653565,1.60000673143229e-05,-0.0439518408167123,0,52.805
+stationary,0.01,2,3,capped-reactive,1,1,240,,"",2.5634975240925,2.55496595913611,1.60000331028247e-05,-0.0412496188414558,1,91.324
+oncoming,0,1,Inf,jerkOnly-egoOnly,1,1,240,,"",2.31163915657132,2.31163915657132,0.0937692173216959,-0.00130579838750978,0,26.694
+oncoming,0,1,Inf,jerkOnly-reactive,1,1,240,,"",2.31290866016334,2.31290866016334,0.0937692173216959,-0.00130579838750978,1,53.42
+oncoming,0,1,2,capped-egoOnly,1,1,240,,"",2.31164022409548,2.31164022409548,0.0937692173216959,-0.00130579838750978,0,24.174
+oncoming,0,1,2,capped-reactive,1,1,240,,"",2.31291020345277,2.31291020345277,0.0937692173216959,-0.00130579838750978,1,47.047
+oncoming,0,2,Inf,jerkOnly-egoOnly,1,1,240,,"",7.16209971088257,7.15490139465732,1.60005345540282e-05,-0.00130579838750978,0,25.517
+oncoming,0,2,Inf,jerkOnly-reactive,1,1,240,,"",7.15063532549133,7.14487667991972,1.60007331060918e-05,-0.00130579838750978,1,49.782
+oncoming,0,2,3,capped-egoOnly,1,1,240,,"",7.21484448616431,7.21157417435476,1.60003413863796e-05,-0.00130579838750978,0,26.06
+oncoming,0,2,3,capped-reactive,1,1,240,,"",7.2079723843138,7.20382705222571,1.60003690756055e-05,-0.00130579838750978,1,46.877
+oncoming,0.01,1,Inf,jerkOnly-egoOnly,1,1,240,,"",2.31407618256971,2.31389027887696,1.6000114378259e-05,-0.0360839581899883,0,31.919
+oncoming,0.01,1,Inf,jerkOnly-reactive,1,1,240,,"",2.34123323555733,2.34075029138373,1.60011234960206e-05,-0.036090473453416,1,67.388
+oncoming,0.01,1,2,capped-egoOnly,1,1,240,,"",2.29852403391107,2.29839288269487,1.60000930072429e-05,-0.0360701593558521,0,29.955
+oncoming,0.01,1,2,capped-reactive,1,1,240,,"",2.32234211869756,2.32200373966677,1.59958576020219e-05,-0.0360792524833953,1,60.481
+oncoming,0.01,2,Inf,jerkOnly-egoOnly,0,0,62,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=3.1 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",13.3650425931778,13.3650425931778,0.0763995187867805,-0.124657893797092,0,36.619
+oncoming,0.01,2,Inf,jerkOnly-reactive,0,0,62,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=3.1 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",13.3650425931778,13.3650425931778,0.0763995187867805,-0.124657893797092,0,110.215
+oncoming,0.01,2,3,capped-egoOnly,1,1,240,,"",4.24026419333717,4.22681921269705,1.60000819202644e-05,-0.0381325015638407,0,32.49
+oncoming,0.01,2,3,capped-reactive,1,1,240,,"",4.25778274125319,4.24894365305191,1.60000662761117e-05,-0.0377858136383599,1,62.107
+crossing,0,1,Inf,jerkOnly-egoOnly,1,1,240,,"",9.53237916389538,9.53224421951182,0.0937610310935052,-0.00092960696999002,0,17.37
+crossing,0,1,Inf,jerkOnly-reactive,1,1,240,,"",9.53237917414697,9.53224422819351,0.0937610276151515,-0.000929606969201278,1,27.67
+crossing,0,1,2,capped-egoOnly,1,1,240,,"",9.53237916389538,9.53224421951182,0.0937610310935052,-0.00092960696999002,0,18.673
+crossing,0,1,2,capped-reactive,1,1,240,,"",9.53237917414697,9.53224422819351,0.0937610276151515,-0.000929606969201278,1,29.922
+crossing,0,2,Inf,jerkOnly-egoOnly,1,1,240,,"",9.53777534259462,9.53777534259462,0.0937609049142287,-0.000929606960510235,0,17.112
+crossing,0,2,Inf,jerkOnly-reactive,1,1,240,,"",9.5377753540488,9.5377753540488,0.093760889514253,-0.000929606959411187,1,27.584
+crossing,0,2,3,capped-egoOnly,1,1,240,,"",9.53777534256762,9.53777534256762,0.0937609049617562,-0.000929606960513967,0,16.524
+crossing,0,2,3,capped-reactive,1,1,240,,"",9.53777535399806,9.53777535399806,0.0937608896055644,-0.000929606959417916,1,27.217
+crossing,0.01,1,Inf,jerkOnly-egoOnly,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,53.797
+crossing,0.01,1,Inf,jerkOnly-reactive,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,146.998
+crossing,0.01,1,2,capped-egoOnly,1,1,240,,"",4.81337061896035,4.81173175819336,1.59391310558948e-05,-0.0393323198303741,0,60.167
+crossing,0.01,1,2,capped-reactive,1,1,240,,"",4.45619228076637,4.45070522908666,1.5842183994863e-05,-0.0390451570644748,1,86.746
+crossing,0.01,2,Inf,jerkOnly-egoOnly,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,45.622
+crossing,0.01,2,Inf,jerkOnly-reactive,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,143.29
+crossing,0.01,2,3,capped-egoOnly,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,49.045
+crossing,0.01,2,3,capped-reactive,0,0,0,collisionAvoidanceController:optimizationFailed,"The hard-safety, soft-CLF search failed at t=0 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2). No command was issued.",Inf,Inf,Inf,-Inf,0,148.357
