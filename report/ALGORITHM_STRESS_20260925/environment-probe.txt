@@ -1,0 +1,4 @@
+STRESS_ENVIRONMENT_PROBE_OK
+free(): chunks in smallbin corrupted
+
+MATLAB is exiting because of fatal error

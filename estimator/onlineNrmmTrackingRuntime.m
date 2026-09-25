@@ -104,8 +104,8 @@ function runtime = localInitialize(cfg, options, observerDesign)
     validateattributes(integrationStepMaximum, {'double'}, ...
         {'real', 'scalar', 'finite', 'positive'}, mfilename, ...
         'cfg.runtime.integrationStepMaximum');
-    integrationSubstepCount = max( ...
-        1, ceil(samplePeriod/integrationStepMaximum));
+    integration = localIntegrationSettings(samplePeriod,integrationStepMaximum,observerDesign);
+    integrationSubstepCount = integration.substepCount;
     integrationStep = samplePeriod/integrationSubstepCount;
 
     initialTime = localOptionFiniteScalar(options, "initialTime", 0.0);
@@ -125,6 +125,7 @@ function runtime = localInitialize(cfg, options, observerDesign)
         "samplePeriod", samplePeriod, ...
         "integrationStep", integrationStep, ...
         "integrationSubstepCount", integrationSubstepCount, ...
+        "integrationSettings", integration, ...
         "currentTime", initialTime, ...
         "yawEstimate", egoYaw, ...
         "bodyVelocityEstimate", egoBodyVelocity, ...
@@ -166,6 +167,41 @@ function runtime = localInitialize(cfg, options, observerDesign)
             end
         end
     end
+end
+
+function settings = localIntegrationSettings(samplePeriod,requestedStep,design)
+% Test the exact sampled, straight, constant-velocity error map before running.
+% Between radar resets r = yPredictor - rhoHat obeys r' = -l1*r, while
+% e' = N*e - L*r and r(0) = e_rho(0). Instability of this admissible nominal
+% case is sufficient to reject the sample period. Passing this necessary
+% check is not a nonlinear or dropout stability certificate.
+    gains = design.target.innovationGains(:);
+    generator = zeros(4);
+    generator(1,2) = 1;
+    generator(2,3) = 1;
+    generator(1:3,4) = -gains;
+    generator(4,4) = -gains(1);
+    transition = expm(samplePeriod*generator);
+    sampledMap = transition(1:3,:)*[eye(3);1,0,0];
+    spectralRadius = max(abs(eig(sampledMap)));
+    if ~isfinite(spectralRadius) || spectralRadius >= 1
+        error('onlineNrmmTrackingRuntime:unstableSamplePeriod', ...
+            'The radar sample period %.9g s destabilizes the nominal sampled observer (radius %.9g).', ...
+            samplePeriod,spectralRadius);
+    end
+    % Resolve the fastest correction/rotation time scale with at least two
+    % RK4 substeps per time constant. The requested maximum is an upper
+    % limit, not permission to take an unstable explicit integration step.
+    lipschitz = design.target.lipschitzCertificate;
+    fastestRate = max([design.velocity.gain,design.position.gain, ...
+        design.yaw.correctionBandwidth,gains(1),sqrt(gains(2)),nthroot(gains(3),3)]) ...
+        +design.operatingDomain.egoYawRateMaximum+design.sensors.gyroscopeNoiseMaximum ...
+        +lipschitz.phiAcceleration+sqrt(lipschitz.phiVelocity);
+    safeStep = min(requestedStep,.5/fastestRate);
+    count = max(1,ceil(samplePeriod/safeStep));
+    settings = struct('requestedStepMaximum',requestedStep,'rateLimitedStepMaximum',.5/fastestRate, ...
+        'substepCount',count,'nominalSampledSpectralRadius',spectralRadius, ...
+        'scope',"Necessary nominal sampling check and gain-aware RK4 resolution; no nonlinear digital certificate");
 end
 
 function [runtime, output] = localStep(runtime, frame, publishCurrent)

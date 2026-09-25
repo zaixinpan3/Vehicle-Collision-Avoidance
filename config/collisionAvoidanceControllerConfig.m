@@ -26,6 +26,12 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
     end
     cfg.actuation = localNormalizeActuation(cfg.actuation);
     localValidate(cfg);
+    if isempty(userCfg) || ~isfield(userCfg,'collision') ...
+            || ~isfield(userCfg.collision,'safetyMarginMeters')
+        % Resolve the default for the selected hold duration. An explicit
+        % physical clearance remains authoritative, including an explicit 0.
+        cfg.collision.safetyMarginMeters = .10*max(1,cfg.controller.sampleTime/.05);
+    end
 end
 
 function cfg = localDefaults()
@@ -41,9 +47,9 @@ function cfg = localDefaults()
     % allowance around the seed pose; it is not enforced as a constraint, so
     % the allowance is not guaranteed once the plan leaves that range.
     cfg.controller = struct("sampleTime",0.05,"horizonSteps",16, ...
-        "minimumHorizonSteps",4,"stationTrustRadius",2.0, ...
+        "minimumHorizonSteps",4,"maximumHorizonSteps",512,"stationTrustRadius",2.0, ...
         "poseTrustRadius",[2;4;0.5]);
-    % NRMM/VFFM references: geometry-only initialization for one SOCP.
+    % NRMM/VFFM references: geometry-only initialization for the hard SOCP.
     % Lengths are in meters; clearanceAllowanceMeters shapes the seed only.
     % It does not change the hard collision clearance or authorize execution.
     cfg.admission = struct("widthScale",1.2,"minimumWidthMeters",3.0, ...
@@ -67,7 +73,11 @@ function cfg = localDefaults()
     % the cruise CLF matrix that penalizes the final ego deviation.
     cfg.feedbackPrediction.targetReaction = struct("inputWeightScales",[Inf,30,100], ...
         "relevanceMeters",2.0,"exitWeight",1.0,"terminalWeight",0.0);
-    cfg.collision = struct("cbfRate",2.0);
+    % safetyMarginMeters is added to every ego-target separation row: the
+    % planned footprints must stay this far apart at each hold node.
+    % A 0.10 m clearance prevents the observed grazing overlaps in the 50 ms
+    % stress campaign. It is an engineering reserve, not a whole-hold proof.
+    cfg.collision = struct("cbfRate",2.0,"safetyMarginMeters",0.10);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
     % (terminal family synthesis, fixedPredict audits). The online certificate
     % is evaluated at the hold nodes and does not use it.
@@ -127,7 +137,9 @@ function cfg = localDefaults()
         "orthonormalTolerance", 1.0e-9, ...
         "parameterRangeTolerance", 1.0e-3);
 
-    % Discrete Riccati error scales and normalized input effort weights.
+    % Discrete Riccati error scales and the LQR input weights of the cruise
+    % gain design and the initializer metric. The SOCP objective has no
+    % input-effort term (removed 2026-09-24).
     % decreaseRateFraction retains a strict gap between nominal contraction
     % and the reported robust sampled dissipation factor. relaxationWeight
     % penalizes the squared nonnegative slack in the sampled CLF norm cone.
@@ -147,8 +159,9 @@ function cfg = localDefaults()
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
     % Each convex subproblem calls the hook with (phase,program), P/q/A/b/cones
-    % and lifted coordinates. Admission and continuation use at most one solve
-    % each. A hook must honor its feasibility status.
+    % and lifted coordinates. A normal frame uses one solve. Failed fresh
+    % admissions may try alternate directions and bounded phase-I recovery;
+    % every issued decision passes independent hard-constraint checks.
     % constraintTolerance enters the pre-solve physical row reserves.
     % frameDeadlineSeconds is a complete controller-frame acceptance deadline.
     % A finite exit may require more stages than the performance window.
@@ -236,6 +249,7 @@ function localValidate(cfg)
     validateattributes(cfg.feedbackPrediction.targetReaction.relevanceMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.feedbackPrediction.targetReaction.exitWeight,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.feedbackPrediction.targetReaction.terminalWeight,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     for name = ["m", "Iz", "lf", "lr", "wheelbase", "length", "width", "gravity"]
         localValidateNonnegativeScalar(cfg.vehicle.(name), "vehicle."+name);
         if cfg.vehicle.(name) == 0
@@ -352,6 +366,12 @@ function localValidate(cfg)
             "clf.samplePoints must be ""stageNodes"", ""endpoints"" or ""controlPoints"".");
     end
     localValidateNonnegativeScalar(cfg.controller.minimumHorizonSteps, "controller.minimumHorizonSteps");
+    localValidateNonnegativeScalar(cfg.controller.maximumHorizonSteps, "controller.maximumHorizonSteps");
+    if cfg.controller.maximumHorizonSteps~=fix(cfg.controller.maximumHorizonSteps) ...
+            || cfg.controller.maximumHorizonSteps<max(cfg.controller.horizonSteps,cfg.controller.minimumHorizonSteps)
+        error('collisionAvoidanceController:invalidConfiguration', ...
+            'controller.maximumHorizonSteps must be an integer at least as large as the requested horizon.');
+    end
     if cfg.controller.minimumHorizonSteps < 1 ...
             || cfg.controller.minimumHorizonSteps ~= fix(cfg.controller.minimumHorizonSteps)
         error("collisionAvoidanceController:invalidConfiguration", ...

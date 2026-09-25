@@ -1,0 +1,6 @@
+scenario,completed,failureTimeS,minimumGapBeforeFailureM,failureIdentifier
+truth-straight,0,1.45,1.44173983298178,collisionAvoidanceController:optimizationFailed
+truth-circular,0,1.45,1.65435410566855,collisionAvoidanceController:optimizationFailed
+estimated-straight,0,3.55,24.0110926374217,collisionAvoidanceController:optimizationFailed
+estimated-circular,0,1.5,64.9339557717934,collisionAvoidanceController:optimizationFailed
+declared-estimator,0,3.55,24.2472795517007,collisionAvoidanceController:optimizationFailed

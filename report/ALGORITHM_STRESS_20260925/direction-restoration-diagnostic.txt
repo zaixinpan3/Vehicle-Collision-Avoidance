@@ -1,0 +1,48 @@
+RESTORE 1 slack 1.43093 physical -6.85252e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 2 slack 1.31407 physical -6.85252e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 3 slack 1.31407 physical -6.85239e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 4 slack 1.20625 physical -6.85215e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 5 slack 1.20625 physical -6.85245e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 6 slack 1.09568 physical -6.85231e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 7 slack 0.983128 physical -6.85247e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 8 slack 0.869364 physical -6.85251e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 9 slack 0.869364 physical -6.85217e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 10 slack 0.755128 physical -6.85242e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 11 slack 0.641148 physical -6.85252e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 12 slack 0.528134 physical -6.85252e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 13 slack 0.416784 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 14 slack 0.307776 physical -6.85252e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 15 slack 0.251818 physical -6.85247e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 16 slack 0.251818 physical -6.8525e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 17 slack 0.251818 physical -6.8525e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 18 slack 0.251818 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 19 slack 0.251818 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 20 slack 0.251818 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 21 slack 0.251818 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 22 slack 0.251818 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 23 slack 0.251818 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2
+RESTORE 24 slack 0.251818 physical -6.85249e-06
+HARD 0 solver exit flag -2: Clarabel status 2

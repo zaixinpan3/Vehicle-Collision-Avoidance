@@ -8,8 +8,11 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % Store the accepted prediction and terminal witness for next-frame transfer.
 % The terminal law is a mathematical continuation, never a runtime fallback.
 % Fresh admission uses timed NRMM/VFFM references to initialize separation normals.
-% Fix those normals and optimize the complete input sequence in one hard SOCP.
-% Never issue an initializer. A solver-reported success is issued as returned.
+% Each SOCP fixes those normals and optimizes the complete input sequence.
+% Failed fresh admissions try the other passing side, then at most six
+% phase-I direction updates, within the same work deadline. An initializer
+% is never issued: a hard solve must pass lifted and original-coordinate
+% feasibility checks before its unchanged command is accepted.
 % Subsequent frames optimize with the inherited normals fixed; if that solve
 % fails, the shifted previous plan is issued.
 % The plan is a feedback policy: from the second hold on, the executed input is
@@ -19,6 +22,9 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % nominal state. If the ego-only certificate is infeasible, a fresh frame with a
 % target tries a target-reactive policy that also corrects by the measured
 % target deviation (ltvBicycleModel.reactiveTube; CLOSED_LOOP_TARGET_PREDICTION.md).
+% An ego measurement outside the carried successor box (plant differs from
+% the model) is admitted from the measurement; the shifted previous plan still
+% supplies the first separation directions.
     persistent lastState
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -139,7 +145,9 @@ function [command, predictedInput, planningProblem, controllerState] = ...
         'feedbackEstimatorBound',feedbackBound, ...
         'targetReactionStrength',localReactionStrength(prediction), ...
         'executedContinuousGenerator',[cruise.stage.continuousA,cruise.stage.continuousB,cruise.stage.continuousC], ...
-        'executedResidualRateBound',zeros(6,1),'runtimeSeconds',toc(timer));
+        'executedResidualRateBound',zeros(6,1),'runtimeSeconds',toc(timer), ...
+        'readmittedAfterInconsistentObservation',model.readmittedAfterInconsistentObservation, ...
+        'initialEgoState',model.initialEgoState,'predictedNextState',states(:,2));
     if ~isempty(model.encounter)
         metadata.targetErrorBound=model.encounter.radius;
     else

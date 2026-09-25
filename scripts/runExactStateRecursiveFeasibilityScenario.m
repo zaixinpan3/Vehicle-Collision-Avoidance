@@ -17,11 +17,17 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 240
         options.SampleTime (1,1) double {mustBeFinite,mustBePositive} = 0.05
         options.HorizonSeconds (1,1) double {mustBeFinite,mustBePositive} = 1.6
+        options.ReferenceSpeed (1,1) double {mustBeFinite,mustBePositive} = 8
+        options.FrictionCoefficient (2,1) double {mustBeFinite,mustBePositive} = [.85;.85]
+        options.SteeringRateMaximum (1,1) double {mustBePositive} = Inf
+        options.BrakingRatioRateMaximum (1,1) double {mustBePositive} = Inf
+        options.AuditSubsteps (1,1) double {mustBeInteger,mustBePositive} = 10
         options.UseRoadBoundaries (1,1) logical = false
         options.RoadCoveragePolicy (1,1) string = "strict"
         options.RoadBoundaryParameterRange (2,1) double = [-100;2000]
         options.FailAfterAdmission (1,1) logical = false
         options.OutputDirectory (1,1) string = ""
+        options.RethrowFailure (1,1) logical = true
         options.DeadlineSeconds (1,1) double {mustBePositive} = 0.05
         options.EgoErrorBound (6,1) double {mustBeNonnegative,mustBeFinite} = zeros(6,1)
         options.TargetErrorBound (8,1) double {mustBeNonnegative,mustBeFinite} = zeros(8,1)
@@ -41,11 +47,14 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     end
     root = fileparts(fileparts(mfilename("fullpath")));
     addpath(fullfile(root,"controller"),fullfile(root,"config"),fullfile(root,"estimator"),fullfile(root,"scripts"));
-    cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8, ...
+    cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",options.ReferenceSpeed, ...
         "controller",struct("sampleTime",options.SampleTime, ...
         "horizonSteps",ceil(options.HorizonSeconds/options.SampleTime), ...
         "minimumHorizonSteps",options.MinimumHorizonSteps), ...
-        "model",struct("lateralDomainRadius",4),"admission",options.Admission, ...
+        "model",struct("lateralDomainRadius",4, ...
+        "frontWheelSteeringRateMaximum",options.SteeringRateMaximum, ...
+        "brakingRatioRateMaximum",options.BrakingRatioRateMaximum), ...
+        "tire",struct("frictionCoefficient",options.FrictionCoefficient),"admission",options.Admission, ...
         "feedbackPrediction",options.FeedbackPrediction, ...
         "solver",struct("frameDeadlineSeconds",options.DeadlineSeconds, ...
         "certificateSearchTimeLimit",options.SearchTimeLimitSeconds)));
@@ -70,7 +79,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
             'runExactStateRecursiveFeasibilityScenario:unsupportedCurvedBoundaries', ...
             'This circular-arc experiment does not construct road boundaries.');
         curve = struct('origin',[0;0],'heading',0,'curvature',options.RoadCurvature, ...
-            'length',min(8*options.SampleCount*h+100,1.9*pi/abs(options.RoadCurvature)));
+            'length',min(cfg.referenceSpeed*options.SampleCount*h+100,1.9*pi/abs(options.RoadCurvature)));
         road = struct('referenceCurve',curve, ...
             'centerline',laneGeometry.referencePose(linspace(0,curve.length,201),0,curve).');
         [point,heading] = laneGeometry.referencePose(15,0,curve);
@@ -93,7 +102,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         road.boundaries = boundaries;
         road.lateralClearance = [5;5];
     end
-    x = [0;0;0;8;0;0]+[0;options.InitialTrackingError];
+    x = [0;0;0;cfg.referenceSpeed;0;0]+[0;options.InitialTrackingError];
     lane = [];previousState = [];previousInput = [];
     if options.RoadCurvature~=0
         x = cruiseState+[0;options.InitialTrackingError];
@@ -166,7 +175,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         generator=[metadata.executedContinuousGenerator;zeros(3,9)];
         before=x(2:6)-metadata.clfReferenceState(2:6);
         clfValue(sample)=before.'*metadata.clfMatrix*before;
-        for fraction=linspace(0,1,11)
+        for fraction=linspace(0,1,options.AuditSubsteps+1)
             value=expm(fraction*h*generator)*[x;command.actuatorInput;1];
             [position,heading]=laneGeometry.fromFrenet(value(1:6),lane);
             if ~isempty(target)
@@ -197,6 +206,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     attempted=executed+double(~isempty(failure));
     if ~options.UseRoadBoundaries,minimumRoad=NaN;end
     report=struct('scenario',options.Scenario,'configuration',originalCfg,'seed',options.Seed, ...
+        'auditSubsteps',options.AuditSubsteps, ...
         'roadCurvature',options.RoadCurvature,'road',road, ...
         'cruiseState',cruiseState,'cruiseInput',cruiseInput, ...
         'trackingError',states(2:6,1:executed+1)-cruiseState(2:6), ...
@@ -244,7 +254,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     fprintf('%s: %d/%d holds; body gap %.6g m; road %.6g m; max frame %.3f ms\n', ...
         options.Scenario,executed,count,report.minimumSampledBodyGap, ...
         minimumRoad,1000*report.runtime.maximumSeconds);
-    if ~isempty(failure),rethrow(failure);end
+    if ~isempty(failure) && options.RethrowFailure,rethrow(failure);end
 end
 
 function margin = localDomainMargin(state,cfg)

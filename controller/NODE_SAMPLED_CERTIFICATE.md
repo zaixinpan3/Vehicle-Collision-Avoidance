@@ -38,8 +38,10 @@ its box,
 
 1. the ego rectangle and the target's bounded reachable set at time `t_k` are
    strictly separated by the selected support half-space after uncertainty
-   and numerical allowances (joint support certificates; no added physical
-   clearance buffer),
+   and numerical allowances. The default physical clearance is 0.10 m at
+   periods up to 50 ms and scales proportionally for longer holds. An explicit
+   `collision.safetyMarginMeters` overrides that default, including zero.
+   This engineering reserve does not certify inter-node clearance,
 2. for scheduled references, the state lies within the reference phase band
    and the lateral regularity radius (phase rows); curved-road chart boxes are
    not enforced, so the chart remainder is not guaranteed outside
@@ -53,9 +55,22 @@ unit direction before optimizing the complete trajectory. Under unchanged contra
 and its retained directions certify nodes `2, ..., N`; touching majorants
 contain that complete witness in the next optimization. The active horizon
 shrinks toward the fixed exit deadline. After confirmed release, terminal
-invariance supplies target-free continuation. The controller contains no
-post-solve verification: a solver-accepted plan is issued as returned, so
-these predicates hold to the solver's feasibility tolerance. See [JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
+invariance supplies target-free continuation. Since the September 25 stress
+campaign, solver status alone cannot authorize execution. The complete lifted
+decision must satisfy its equalities, inequalities, and cones within numerical
+tolerance; the original-coordinate actuator, road, terminal, and joint support
+constraints are checked independently before the unchanged command is issued.
+The physical checks retain all pre-solve reserves. See
+[JOINT_SUPPORT_CERTIFICATES.md](JOINT_SUPPORT_CERTIFICATES.md).
+
+If both geometric passing seeds fail on a fresh frame, at most six phase-I
+direction updates may run under the same work deadline. These searches soften
+only separation/exit rows to locate useful directions. Their points have no
+execution authority: a separate hard SOCP and the checks above must succeed.
+The normal inherited-family path and its certified-incumbent fallback remain.
+The encounter horizon retains its proposed physical duration; a configurable
+512-hold allocation limit causes an explicit rejection instead of truncating
+the horizon before the encounter or allocating an unbounded program.
 
 ## What is not certified
 

@@ -1,0 +1,93 @@
+{
+  "scope": "Counterfactual diagnoses only; modified uncertainty/road constraints were not adopted",
+  "circularRoadUncertainty": [
+    {
+      "removeRoadBoundaries": false,
+      "removeEgoUncertainty": false,
+      "admitted": false,
+      "message": "The hard-safety, soft-CLF search failed at t=1.5 s (solver exit flag -2: Clarabel status 2). No command was issued."
+    },
+    {
+      "removeRoadBoundaries": true,
+      "removeEgoUncertainty": false,
+      "admitted": true,
+      "message": ""
+    },
+    {
+      "removeRoadBoundaries": false,
+      "removeEgoUncertainty": true,
+      "admitted": true,
+      "message": ""
+    },
+    {
+      "removeRoadBoundaries": true,
+      "removeEgoUncertainty": true,
+      "admitted": true,
+      "message": ""
+    }
+  ],
+  "firstTargetParameters": {
+    "speed": [
+      0,
+      32.562321011494625
+    ],
+    "course": [
+      -6.261911706895237,
+      0.02127360028434877
+    ],
+    "speedRate": [
+      -2,
+      2
+    ],
+    "curvature": [
+      -0.0031249869791829424,
+      0.0031249869791829424
+    ]
+  },
+  "predictionTimeS": [
+    0.5,
+    1,
+    2,
+    4
+  ],
+  "positionRemainderM": [
+    [
+      24.671740758621787,
+      49.843481517242644,
+      101.68696303448435,
+      211.37392606896779
+    ],
+    [
+      24.671740758621013,
+      49.843481517241983,
+      101.68696303448392,
+      211.37392606896782
+    ]
+  ],
+  "straight": {
+    "stateOrder": "station_m, lateral_m, heading_rad, vx_mps, vy_mps, yawRate_radps",
+    "successorError": [
+      0.00040442824931119503,
+      0.051412645059259132,
+      0.037582491158161938,
+      0.069228858757405476,
+      1.3492284579139886,
+      1.3136371937824871
+    ],
+    "failureTimeS": 1.4500000000000002,
+    "readmittedAfterRoadRefit": true
+  },
+  "circular": {
+    "stateOrder": "station_m, lateral_m, heading_rad, vx_mps, vy_mps, yawRate_radps",
+    "successorError": [
+      -0.0037859949846534846,
+      0.058187811229623826,
+      0.044622588786820044,
+      -0.068572134849155475,
+      1.4840795435994236,
+      1.5694377504846142
+    ],
+    "failureTimeS": 1.4500000000000002,
+    "readmittedAfterRoadRefit": true
+  }
+}

@@ -241,10 +241,14 @@ function [program,prediction,clf] = localFormulate(model)
         objectiveMap(rows,:)=stageRoot*prediction.egoStateMatrix(2:6,:,stage+1);
         objectiveOffset(rows)=stageRoot*(prediction.egoStateOffset(2:6,stage+1)-referenceStates(2:6,stage+1));
     end
+    % The objective is the sampled CLF value at every hold node plus the
+    % squared first-hold slack. It carries no input-effort term: an effort
+    % penalty rewards delaying a maneuver, and every plan is already bounded
+    % by the hard actuator and slew rows. program.inputWeight keeps the LQR
+    % input weights for the initializer metric only.
     inputWeight=repmat([cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight],count,1);
-    weight=spdiags(inputWeight,0,planCount,planCount);
-    hessian=objectiveMap.'*objectiveMap+weight;
-    linear=2*(objectiveMap.'*objectiveOffset-weight*referenceInputs(:));
+    hessian=objectiveMap.'*objectiveMap;
+    linear=2*(objectiveMap.'*objectiveOffset);
     hessian=2*[hessian,zeros(planCount,1);zeros(1,planCount),cfg.clf.relaxationWeight];
     layout = struct('planIndex',1:planCount,'planCount',planCount,'horizonSteps',count, ...
         'decisionCount',planCount+1,'relaxationIndex',planCount+1);

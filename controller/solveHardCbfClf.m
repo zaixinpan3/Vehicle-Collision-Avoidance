@@ -25,17 +25,19 @@ classdef solveHardCbfClf
         end
 
         function [program,result,search] = fixedDirections(program,model,cfg)
-        % A solver-accepted plan, or on solver failure the shifted previous plan
+        % A verified solver plan, or on solver failure the shifted previous plan
         % of an inherited frame, leaves this method. An initializer is never issued.
             [program,result,search]=localFixedDirectionSearch(program,model,cfg);
         end
 
         function solve = constrained(program,cfg)
             program = localCompactPlanarRows(program);
+            physical = program;
             decisionCount=numel(program.q);
             program=avoidanceStageQp.build(program);
             problem = struct('layout',struct('decisionCount',decisionCount),'stageProgram',program);
             solve = localRunJointProgram(problem,cfg);
+            solve = localCheckPhysical(physical,solve,[]);
         end
 
         function [decision,angles,information] = fluidInitialize(program,cfg)
@@ -55,21 +57,38 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
 % shifted previous plan is retained. Fresh frames keep the nominal directions
 % unless the fluid reference detects a support conflict. With a target, a fresh
 % frame then tries the configured reaction strengths in order (Inf is the
-% ego-only feedback tube); the first solver success is accepted.
+% ego-only feedback tube); the first solver success is accepted. Whenever a
+% shifted previous plan anchors a conflicting fresh frame, its directions are
+% tried first; fluid initialization runs only if they fail.
     search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
         'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
         'policy',"fixedDirectionTrajectoryOptimization",'violationHistory',{{}},'usedCertifiedIncumbent',false, ...
         'issuedAdmissionWitness',false,'usedFullPlanAdmission',false, ...
-        'fullPlanStatus',"notAttempted",'reactionAttempts',zeros(1,0),'reactionStrength',Inf, ...
+        'fullPlanStatus',"notAttempted",'previousPlanSeedStatus',"notAttempted", ...
+        'alternateSeedStatus',"notAttempted",'reactionAttempts',zeros(1,0),'reactionStrength',Inf, ...
         'initialCertificateAngles',program.jointCertificate.angles, ...
         'fixedCertificateAngles',program.jointCertificate.angles,'directionSeedSource',"nominalWitness");
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
     inherited=program.inheritedPredictionFamily;
-    if ~inherited && program.fluidReference.active
+    conflict=~inherited && program.fluidReference.active;
+    if conflict && model.nominalSource=="shiftedPreviousSolution"
+        [improved,candidate,trial,seconds]=localFixedSolve(program,point,angles,cfg);
+        search.hardSolves=1;search.nativeSolves=1;
+        search.formulationSeconds=seconds(1);search.solveSeconds=seconds(2);
+        search.previousPlanSeedStatus="rejected: "+trial.message;
+        if improved
+            search.previousPlanSeedStatus="accepted";search.directionSeedSource="shiftedPreviousSolution";
+            search.usedFullPlanAdmission=true;search.fullPlanStatus="accepted";
+            program=candidate;result=trial;
+            program.supportGeometry.witnessPreserved=false;program.inheritedFeasibleFamily=false;
+            return;
+        end
+    end
+    if conflict
         phase=tic;
         [point,angles,search.initialization]=solveHardCbfClf.fluidInitialize(program,cfg);
-        search.formulationSeconds=toc(phase);search.familyAttempts=1;
+        search.formulationSeconds=search.formulationSeconds+toc(phase);search.familyAttempts=1;
         search.directionSeedSource="chengFluidReference";
         if isempty(point)
             result=localEmptySolve();
@@ -99,9 +118,63 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
         search.reactionAttempts(end+1)=strength;
         if improved,break;end
     end
+    if ~improved && conflict && search.initialization.selectedReference>0 ...
+            && localInitializationTimeAvailable(cfg)
+        % The geometric fit score is not a feasibility test. A failed SOCP
+        % for one passing side says nothing about the other side. Try the
+        % remaining fitted side within the same frame budget before failing.
+        alternate = program;
+        alternate.fluidReference.valid(search.initialization.selectedReference) = false;
+        phase = tic;
+        [otherPoint,otherAngles,search.alternateInitialization] = ...
+            solveHardCbfClf.fluidInitialize(alternate,cfg);
+        search.formulationSeconds = search.formulationSeconds+toc(phase);
+        search.familyAttempts = search.familyAttempts+1;
+        search.alternateSeedStatus = "invalidFit";
+        if ~isempty(otherPoint)
+            for strength = strengths
+                if ~localInitializationTimeAvailable(cfg),break;end
+                candidate = program;
+                if isfinite(strength)
+                    phase = tic;
+                    candidate = localReactiveProgram(program,model,otherPoint,otherAngles,strength,cfg);
+                    search.formulationSeconds = search.formulationSeconds+toc(phase);
+                end
+                [improved,accepted,trial,seconds] = localFixedSolve(candidate,otherPoint,otherAngles,cfg);
+                search.formulationSeconds = search.formulationSeconds+seconds(1);
+                search.solveSeconds = search.solveSeconds+seconds(2);
+                search.hardSolves = search.hardSolves+1;
+                search.nativeSolves = search.nativeSolves+1;
+                search.reactionAttempts(end+1) = strength;
+                search.alternateSeedStatus = "rejected: "+trial.message;
+                if improved
+                    angles = otherAngles;
+                    search.fixedCertificateAngles = angles;
+                    search.directionSeedSource = "alternateChengFluidReference";
+                    search.alternateSeedStatus = "accepted";
+                    break;
+                end
+            end
+        end
+    end
+    if ~improved && conflict && localInitializationTimeAvailable(cfg)
+        [improved,accepted,trial,angles,restoration] = ...
+            localRestoreDirections(program,point,angles,cfg);
+        search.restoration = restoration;
+        search.restorationSolves = restoration.restorationSolves;
+        search.hardSolves = search.hardSolves+restoration.hardSolves;
+        search.nativeSolves = search.nativeSolves+restoration.restorationSolves+restoration.hardSolves;
+        search.formulationSeconds = search.formulationSeconds+restoration.formulationSeconds;
+        search.solveSeconds = search.solveSeconds+restoration.solveSeconds;
+        if improved
+            strength = Inf;
+            search.fixedCertificateAngles = angles;
+            search.directionSeedSource = "restoredSeparationDirections";
+        end
+    end
     search.fullPlanStatus="solverRejected";
     if improved
-        % A solver-reported success is accepted as returned. It carries exactly
+        % A verified solver success is accepted unchanged. It carries exactly
         % the normals selected above.
         program=accepted;result=trial;search.reactionStrength=strength;
         search.usedFullPlanAdmission=~inherited;search.fullPlanStatus="accepted";
@@ -112,22 +185,100 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
     else
         result=localEmptySolve();
         result.message="Fixed-direction trajectory optimization failed: "+search.fullPlanStatus+": "+trial.message;
+        if search.previousPlanSeedStatus~="notAttempted"
+            result.message=result.message+"; previous-plan directions "+search.previousPlanSeedStatus;
+        end
+        if search.alternateSeedStatus~="notAttempted"
+            result.message=result.message+"; alternate directions "+search.alternateSeedStatus;
+        end
         return;
     end
     program.supportGeometry.witnessPreserved=inherited;
     program.inheritedFeasibleFamily=inherited;
 end
 
+function [improved,accepted,trial,angles,information] = localRestoreDirections(program,point,angles,cfg)
+% A bounded phase-I search supplies directions only. Its common geometric
+% slack never appears in an executable program. Each candidate must pass a
+% separate complete hard solve and both independent feasibility checks.
+    information = struct('restorationSolves',0,'hardSolves',0, ...
+        'formulationSeconds',0,'solveSeconds',0,'slackHistory',zeros(1,0));
+    improved = false;accepted = program;trial = localEmptySolve();
+    trial.message = "Direction restoration exhausted its work budget";
+    for iteration = 1:6
+        if ~localInitializationTimeAvailable(cfg),break;end
+        phase = tic;
+        conic = avoidanceStageQp.fixedDirections(program,point,angles,cfg);
+        count = numel(conic.q);split = sum(conic.cones(1:2));
+        rows = conic.separationRows;
+        slack = sparse(rows,ones(size(rows)),-ones(size(rows)),size(conic.A,1),1);
+        conic.A = [conic.A,slack];
+        conic.A = [conic.A(1:split,:);sparse(1,count+1,-1,1,count+1);conic.A(split+1:end,:)];
+        conic.b = [conic.b(1:split);0;conic.b(split+1:end)];
+        conic.cones(2) = conic.cones(2)+1;
+        conic.P = sparse(count+1,count+1);
+        conic.q = zeros(count+1,1);conic.q(end) = 1;
+        information.formulationSeconds = information.formulationSeconds+toc(phase);
+        phase = tic;
+        seed = localSolveConic(conic,cfg);
+        information.solveSeconds = information.solveSeconds+toc(phase);
+        information.restorationSolves = information.restorationSolves+1;
+        if ~seed.feasible,trial = seed;break;end
+        information.slackHistory(end+1) = seed.decision(end);
+        point = seed.decision(1:numel(program.q));
+        states = localStates(program.prediction,point(program.layout.planIndex));
+        for index = 1:numel(angles)
+            record = program.jointCertificate.records(index);
+            state = states(:,record.stage+1);
+            relative = record.positionOffset+record.positionMap*state;
+            yaw = record.yawOffset+record.yawRow*state;
+            normal = avoidanceSafetyGeometry.supportDirection(relative,yaw,[0;0],record.targetYaw, ...
+                [record.egoHalfSize;record.targetHalfSize]);
+            angles(index) = atan2(normal(2),normal(1));
+        end
+        if ~localInitializationTimeAvailable(cfg),break;end
+        [improved,accepted,trial,seconds] = localFixedSolve(program,point,angles,cfg);
+        information.formulationSeconds = information.formulationSeconds+seconds(1);
+        information.solveSeconds = information.solveSeconds+seconds(2);
+        information.hardSolves = information.hardSolves+1;
+        if improved,return;end
+    end
+end
+
 function [improved,accepted,trial,seconds]=localFixedSolve(program,point,angles,cfg)
-% One full SOCP with the given directions fixed. A solver-reported success is
-% accepted as returned. The accepted program carries exactly the normals
+% One full SOCP with the given directions fixed. A verified solver success is
+% accepted unchanged. The accepted program carries exactly the normals
 % selected by the caller. seconds = [formulation;solve].
     phase=tic;conic=avoidanceStageQp.fixedDirections(program,point,angles,cfg);seconds=toc(phase);
     phase=tic;trial=localSolveConic(conic,cfg);seconds=[seconds;toc(phase)];
+    trial = localCheckPhysical(program,trial,angles);
     improved=trial.feasible;accepted=program;
     if improved
         trial.decision=trial.decision(1:conic.primaryCount);
         accepted=avoidanceSafetyGeometry.setDirections(program,angles);
+    end
+end
+
+function solve = localCheckPhysical(program,solve,angles)
+% Evaluate hard constraints using the original plan coordinates, independent
+% of the lifted solver dynamics and its numerical feasibility tolerance.
+    if ~solve.feasible || ~isfield(program,'physicalMatrix'),return;end
+    decision = solve.decision(1:numel(program.q));
+    allowance = 128*eps*(1+abs(program.physicalBound)+abs(program.physicalMatrix)*abs(decision));
+    excess = program.physicalMatrix*decision-program.physicalBound-allowance;
+    if isfield(program,'terminalConePhysicalBound')
+        cone = reshape(program.terminalConePhysicalBound ...
+            -program.terminalCone.matrix*decision(program.layout.planIndex),3,[]);
+        coneExcess = vecnorm(cone(2:3,:),2,1)-cone(1,:);
+        excess = [excess;coneExcess.'-128*eps*(1+sum(abs(cone),1).')];
+    end
+    if ~isempty(angles)
+        excess = [excess;avoidanceSafetyGeometry.jointResidual(program,decision,angles)];
+    end
+    if any(~isfinite(excess)) || any(excess>0)
+        solve.feasible = false;
+        solve.exitFlag = -8;
+        solve.message = "Solver success rejected by original hard constraints: "+string(max(excess));
     end
 end
 
@@ -228,6 +379,38 @@ function solve = localRunJointProgram(problem, cfg)
         solve.decision = solve.decision(1:problem.layout.decisionCount);
     end
     solve = localNormalizeSolve(solve, problem.layout.decisionCount, numel(problem.stageProgram.q));
+    if solve.feasible
+        [accepted,violation] = localConicFeasibility(problem.stageProgram,solve.fullDecision,cfg);
+        solve.output.primalViolation = violation;
+        if ~accepted
+            solve.feasible = false;
+            solve.exitFlag = -8;
+            solve.message = "Solver success rejected by primal feasibility check: "+string(violation);
+        end
+    end
+end
+
+function [accepted,violation] = localConicFeasibility(program,decision,cfg)
+% Check the complete lifted decision, including dynamics and every cone.
+% A native status or external hook is not evidence of primal feasibility.
+% Existing inward physical reserves remain unchanged. Only solver tolerance
+% and arithmetic roundoff enter this check; no safety row is relaxed.
+    residual = program.b-program.A*decision;
+    scale = 1+abs(program.b)+abs(program.A)*abs(decision);
+    allowance = 10*cfg.solver.constraintTolerance*(1+abs(program.b)) ...
+        +128*eps*scale;
+    equalityCount = program.cones(1);
+    cursor = equalityCount+program.cones(2);
+    excess = [abs(residual(1:equalityCount))-allowance(1:equalityCount); ...
+        -residual(equalityCount+1:cursor)-allowance(equalityCount+1:cursor)];
+    for dimension = program.cones(3:end).'
+        rows = cursor+(1:dimension);
+        value = residual(rows);
+        excess(end+1,1) = norm(value(2:end))-value(1)-norm(allowance(rows)); %#ok<AGROW>
+        cursor = cursor+dimension;
+    end
+    violation = max([0;excess]);
+    accepted = all(isfinite(residual)) && cursor==numel(residual) && violation==0;
 end
 
 function [reduced,retained] = localReducedProgram(program)
@@ -341,13 +524,14 @@ function solve = localNormalizeSolve(solve, decisionCount, variableCount)
     if ~isfield(solve, "fullDecision"), solve.fullDecision = zeros(variableCount, 1); end
     if ~isfield(solve, "exitFlag"), solve.exitFlag = -999; end
     if ~isfield(solve, "output"), solve.output = struct(); end
+    if ~isstruct(solve.output) || ~isscalar(solve.output),solve.output = struct();end
     if ~isnumeric(solve.exitFlag) || ~isreal(solve.exitFlag) ...
             || ~isscalar(solve.exitFlag) || ~isfinite(solve.exitFlag)
         solve.exitFlag = -999;
     end
     solve.exitFlag = double(solve.exitFlag);
-    % Solved (1) and reduced-accuracy AlmostSolved (2) count as success and
-    % the returned plan is issued as returned. Infeasibility, iteration
+    % Solved (1) and reduced-accuracy AlmostSolved (2) are candidates for the
+    % subsequent independent feasibility checks. Infeasibility, iteration
     % limits, timeouts and malformed decisions issue no command.
     solve.feasible = any(solve.exitFlag==[1,2]) ...
         && isnumeric(solve.decision) && isreal(solve.decision) ...
@@ -472,7 +656,7 @@ function reference=localPrepareFluidReference(program,model)
     normal=[-sin(projection.heading(middle));cos(projection.heading(middle))];
     allowance=model.cfg.vehicle.width/2+targetPrediction.rectangleSupport( ...
         target.halfLength,target.halfWidth,normal,motion(7,middle),0) ...
-        +model.cfg.admission.clearanceAllowanceMeters;
+        +model.cfg.admission.clearanceAllowanceMeters+model.cfg.collision.safetyMarginMeters;
     passingOffsets=projection.lateralPosition(middle)+[side,-side]*allowance;
     reference.amplitudes=passingOffsets;
     reference.width=width;reference.center=projection.station(middle);reference.stages=[first,last];
@@ -494,7 +678,8 @@ function [point,angles,information]=localFluidInitialize(program,cfg)
     information=struct('status',"nominal",'amplitudeMeters',0,'widthMeters',0, ...
         'centerStationMeters',0,'conflictStages',zeros(1,2),'terminalFitError',0, ...
         'maximumPhysicalExcess',NaN,'maximumSupportResidual',NaN, ...
-        'referenceCount',0,'referenceScores',Inf(1,2),'referencePhysicalExcess',Inf(1,2),'activeTarget',false);
+        'referenceCount',0,'selectedReference',0,'referenceScores',Inf(1,2), ...
+        'referencePhysicalExcess',Inf(1,2),'activeTarget',false);
     if ~localInitializationTimeAvailable(cfg),information.status="searchTimeLimit";return;end
     records=program.jointCertificate.records;
     reference=program.fluidReference;
@@ -546,6 +731,7 @@ function [point,angles,information]=localFluidInitialize(program,cfg)
             information.amplitudeMeters=amplitudes(candidate);
             information.terminalFitError=terminalErrors(candidate);
             information.maximumSupportResidual=maximum;
+            information.selectedReference=candidate;
         end
     end
     if isempty(point),information.status="invalidFit";return;end
@@ -573,8 +759,15 @@ function [plans,terminalErrors]=localFitFluidReference(program,bump,heading,cfg)
     hessian=map.'*map+cfg.admission.regularizationWeight*metric;
     constraint=[maps(:,:,end);zeros(2,count)];constraint(end-1:end,end-1:end)=eye(2);
     scale=max(vecnorm(constraint,2,2),eps);scaled=constraint./scale;
-    inverse=hessian\[map.'*error,scaled.'];
-    change=inverse(:,1:2)-inverse(:,3:end)*(pinv(scaled*inverse(:,3:end))*(scaled*inverse(:,1:2)));
+    % Orthonormalize the constraint row space before the Schur complement.
+    % Squaring nearly dependent endpoint rows rejected valid low-speed fits.
+    [~,singular,right]=svd(scaled,'econ');
+    values=diag(singular);
+    rankCount=nnz(values>max(size(scaled))*eps(max(values)));
+    orthogonal=right(:,1:rankCount).';
+    inverse=hessian\[map.'*error,orthogonal.'];
+    change=inverse(:,1:2)-inverse(:,3:end)*((orthogonal*inverse(:,3:end))\(orthogonal*inverse(:,1:2)));
+    change=change-orthogonal.'*(orthogonal*change);
     terminalErrors=max(abs(constraint*change),[],1);
     plans=program.anchorPlan+change;
 end

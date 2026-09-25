@@ -79,9 +79,11 @@ classdef avoidanceStageQp
             end
             [blockRow,blockColumn]=ndgrid(1:6,1:6);
             stateRows=indices(blockRow(:),:);stateColumns=indices(blockColumn(:),:);
-            hessian=sparse([1:n,n+1,stateRows(:).'],[1:n,n+1,stateColumns(:).'], ...
-                [2*program.inputWeight(:).',2*program.slackWeight,values(:).'],total,total);
-            linear=[-2*program.inputWeight.*program.referenceInputs(:);0;stateLinear(:)];
+            % No input-effort term: the lifted objective is the stage CLF
+            % values and the slack, as in formulateAvoidanceProblem.
+            hessian=sparse([n+1,stateRows(:).'],[n+1,stateColumns(:).'], ...
+                [2*program.slackWeight,values(:).'],total,total);
+            linear=[zeros(n,1);0;stateLinear(:)];
             lifted.P=hessian;lifted.q=linear;
             linearCount=program.cones(2);
             retained=localDistinctRows(matrix(1:linearCount,:),bound(1:linearCount));
@@ -130,6 +132,7 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
     coneValue=[coneValue;zeros(coneExtra,1)];
     coneBounds=[coneBounds;zeros(14*activeCount,1)];
     coneSizes=[coneSizes;zeros(4*activeCount,1)];
+    separationRows=zeros(count,1);
     for index=1:count
         item=records(index);stateIndex=1:6;
         % Assemble one record in its own coordinates, then map its triplets
@@ -163,6 +166,7 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
         end
         inequality=support+zrow-normal.'*positionMap;
         addLinear(inequality,normal.'*relative-constant);
+        separationRows(index)=equalityCount+linearRows;
         assert(localCursor==width,'avoidanceStageQp:jointLayout','Inconsistent record layout.');
         cursor=cursor+recordCounts(index);
     end
@@ -178,6 +182,7 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
         'b',[base.b(1:equalityCount);linearBounds;coneBounds], ...
         'cones',[equalityCount;numel(linearBounds);coneSizes], ...
         'anchorPlan',program.anchorPlan,'fixedCertificateAngles',angles, ...
+        'separationRows',separationRows, ...
         'primaryCount',numel(program.q));
     conic.P(1:baseCount,1:baseCount)=base.P;conic.q(1:baseCount)=base.q;
     weight=cfg.jointCertificate.proximalWeight;

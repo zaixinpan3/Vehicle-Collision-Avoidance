@@ -4,9 +4,12 @@ Format 43 separates initialization from execution. An NRMM-timed VFFM reference
 initializes a trajectory anchor and one unit separation direction per collision or
 exit record. These directions are then fixed while one hard SOCP optimizes the
 complete finite control sequence. An initialization seed is never issued.
-Every new admission requires a successful full trajectory solve, and a
-solver-reported success is issued as returned. No verification code runs after
-the solve. Inherited frames use their stored directions and attempt one full
+Every new admission requires a successful full trajectory solve followed by
+independent lifted primal and original-coordinate hard-constraint checks.
+The accepted decision is issued unchanged. Failed fresh admissions can try
+the other passing side and at most six phase-I direction updates; each update
+still requires a separate hard solve before execution. Inherited frames use
+their stored directions and attempt one full
 trajectory improvement; if that solve fails, the shifted previous plan is
 issued.
 
@@ -222,14 +225,16 @@ that no feasible trajectory exists.
 ## Hard acceptance and continuation
 
 An initialization seed never authorizes execution by itself. Only a full-plan
-solver result may become a new executable admission. Acceptance is the solver
-status: Solved and the reduced-accuracy AlmostSolved are issued as returned
-(`approximateSolveAccepted` marks the latter). The controller contains no
-post-solve verification: physical rows, terminal/CLF cones and the exact
-nonlinear unit-support residuals hold only to the solver's feasibility
-tolerance, and a false solver success is issued unchecked. `planCertified`
-reports acceptance. Infeasible, iteration-limit, timeout and non-finite
-results issue no command on a fresh frame.
+solver result may become a new executable admission. Solved and the
+reduced-accuracy AlmostSolved are candidates for independent verification
+(`approximateSolveAccepted` marks an accepted result of the latter kind).
+The lifted equality, inequality and cone residuals must satisfy numerical
+tolerance. Original-coordinate physical rows, terminal cones and nonlinear
+unit-support residuals are checked separately with the existing inward
+reserves retained. A false solver success is rejected. `planCertified`
+reports acceptance. Infeasible, iteration-limit, timeout, non-finite and
+independently rejected results issue no command on a fresh frame. Phase-I
+direction-search slack never authorizes execution or relaxes an issued plan.
 The CLF is the only softened physical optimization condition. The next frame improves the ordinary performance
 objective. If that improvement fails on an inherited frame, the shifted
 previous plan is issued without any check, with the actual numerical status

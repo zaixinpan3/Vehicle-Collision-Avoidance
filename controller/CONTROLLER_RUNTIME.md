@@ -1,5 +1,15 @@
 # Controller runtime and numerical implementation
 
+The September 25 stress campaign adds independent primal checks, a second
+passing-side attempt after a failed admission, and at most six phase-I
+direction updates followed by hard solves. These exceptional paths share the
+existing work deadline. No relaxed point can issue a command. Low-speed
+encounters retain their physical completion horizon, subject to the explicit
+512-hold allocation limit. These changes invalidate earlier claims of one
+solve per fresh frame. Current outcomes and remaining nonlinear-plant,
+initial-estimation, and deadline limitations are in
+[the stress report](../report/ALGORITHM_STRESS_20260925.md).
+
 Current experiment timing: prediction steps, certificate nodes and input holds
 share a 50 ms period. The 1.6 s performance window is retained (32 nodes), and
 strict scenario runs use the same 50 ms frame deadline. Diagnostic runs with a

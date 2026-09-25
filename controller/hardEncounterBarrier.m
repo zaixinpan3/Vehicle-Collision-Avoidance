@@ -5,6 +5,8 @@ classdef hardEncounterBarrier
         function [model,carry] = prepare(model,ego,observation,stored,identity)
             cfg = model.cfg;
             carry = [];
+            admitted = model;
+            model.readmittedAfterInconsistentObservation = false;
             model.encounter = [];
             model.confirmation = [];
             model.carriedWitness = [];
@@ -90,9 +92,24 @@ classdef hardEncounterBarrier
                     model.initialEgoState(1) = model.initialEgoState(1)+period*round( ...
                         (stored.predictedState(1,2)-model.initialEgoState(1))/period);
                 end
-                [model.initialEgoState,model.initialFrenetErrorBound] = localConditionBox( ...
+                [conditionedCenter,conditionedRadius,consistent] = localConditionBox( ...
                     stored.predictedState(:,2),stored.stateErrorBound(:,2), ...
                     model.initialEgoState,model.initialFrenetErrorBound);
+                if ~consistent
+                    % The measured state left the predicted successor box
+                    % (plant differs from the model). The carried certificate
+                    % does not transfer; admit this frame from the measurement
+                    % with the shifted previous plan as the encounter anchor.
+                    [model,carry] = hardEncounterBarrier.prepare(admitted,ego,observation,[],identity);
+                    model.readmittedAfterInconsistentObservation = true;
+                    if ~isempty(model.encounter)
+                        model.initializationPlan = [stored.plan(:,2:end),stored.plan(:,end)];
+                        model.nominalSource = "shiftedPreviousSolution";
+                    end
+                    return;
+                end
+                model.initialEgoState = conditionedCenter;
+                model.initialFrenetErrorBound = conditionedRadius;
                 model.previousInput = stored.appliedInput;
                 model.confirmation = stored.confirmation;
             end
@@ -504,17 +521,17 @@ function [finalMap,finalOffset] = localExactFinalMap(model,prediction)
     end
 end
 
-function [center,radius] = localConditionBox(predictedCenter,predictedRadius,measuredCenter,measuredRadius)
+function [center,radius,consistent] = localConditionBox(predictedCenter,predictedRadius,measuredCenter,measuredRadius)
 % Interval hull of the intersection of the successor box with the measurement box.
+% consistent is false when the boxes do not intersect; center and radius are then empty.
+    center = []; radius = [];
     difference = measuredCenter-predictedCenter;
     difference(3) = atan2(sin(difference(3)),cos(difference(3)));
     allowance = 256*eps*(1+abs(predictedCenter)+abs(measuredCenter)+predictedRadius+measuredRadius);
     lower = max(-predictedRadius,difference-measuredRadius);
     upper = min(predictedRadius,difference+measuredRadius);
-    if any(lower>upper+allowance)
-        error("collisionAvoidanceController:inconsistentObservation", ...
-            "The ego measurement box does not intersect the published successor box.");
-    end
+    consistent = ~any(lower>upper+allowance);
+    if ~consistent,return;end
     middle = (lower+upper)/2;
     lower = min(lower,middle);
     upper = max(upper,middle);
@@ -805,7 +822,7 @@ function [count,inputs]=localCruiseAdmission(model)
 % A bounded feedback rollout proposes sufficient recovery TIME, not a hard
 % early-recovery requirement or a substitute actuator command.
     terminal=localTerminalSet(model);cfg=model.cfg;
-    count=model.horizonSteps;maximum=4*count;
+    count=model.horizonSteps;maximum=min(cfg.controller.maximumHorizonSteps,4*count);
     inputs=zeros(2,maximum);x=model.initialEgoState;rho=model.initialFrenetErrorBound;
     % The same feedback deviation recursion as the certified prediction.
     model.cruiseCertificate=terminal.cruise;
@@ -875,10 +892,16 @@ function [direction,steps,passing] = localEncounterProposal(model,range)
     direction = velocity/speed;
     duration = (range+hypot(target.halfLength,target.halfWidth)-direction.'*relative)/speed+0.5;
     block = max(1,ceil(cfg.controller.horizonSteps/2));
-    % Bound the initial allocation only. The timed search may extend it;
-    % exhausting work never authorizes release or an uncertified prefix.
-    steps = min(4*cfg.controller.horizonSteps, ...
-        max(steps,block*ceil(duration/(model.sampleTime*block))));
+    % Keep the physical encounter-completion time even at low speed. The
+    % former four-window cap could end the horizon before the pass itself;
+    % no subsequent search extended it. The existing work deadline still
+    % limits computation and never authorizes an uncertified prefix.
+    steps = max(steps,block*ceil(duration/(model.sampleTime*block)));
+    if ~isfinite(steps) || steps>cfg.controller.maximumHorizonSteps
+        error('collisionAvoidanceController:encounterHorizonLimit', ...
+            'The proposed finite encounter requires %.0f holds; the configured allocation limit is %d.', ...
+            steps,cfg.controller.maximumHorizonSteps);
+    end
 end
 
 function direction = localExitDirection(center,frame,anchor)
@@ -959,4 +982,3 @@ function clearance=localLateralClearanceRows(model,referenceState,curvature,stat
     clearance.rows=rows;clearance.bound=bound;
     clearance.curvatureAllowance=allowance;clearance.errorBound=errorBound;
 end
-
