@@ -1,0 +1,5 @@
+Variant,FirstFrameAccepted,Identifier,Message,Seconds
+originalPolyline,0,collisionAvoidanceController:unsupportedReferenceJump,The recursive certificate requires a continuous straight or analytic constant-curvature reference.,0.023871
+curvatureProfile,1,,,3.985805
+curvatureProfileNoRoad,1,,,3.157947
+profileWithLegacyTarget,0,collisionAvoidanceController:missingPredictionMotion,Every target requires an nrmm-motion-v1 contract.,0.004801

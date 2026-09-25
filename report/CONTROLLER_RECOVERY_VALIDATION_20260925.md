@@ -128,10 +128,13 @@ These successful no-target controls isolate the failures to more demanding
 avoidance/reference/uncertainty conditions rather than basic speed holding.
 
 The S-curve driver supplies a sampled polyline that the current recursive
-reference check rejects with `unsupportedReferenceJump`: a continuous straight
-or analytic constant-curvature reference is required for this input. No
-physical hold executes, so this trial does not measure S-curve avoidance.
-This is a scenario/controller interface limitation, not an observed collision.
+reference check rejects with `unsupportedReferenceJump`. No physical hold
+executes, so this trial does not measure S-curve avoidance. Subsequent
+[failure analysis](CONTROLLER_FAILURE_CAUSES_20260925.md) confirms that the
+controller supports an explicit varying-curvature reference profile: supplying
+that missing reference passes the first frame. It also identifies a separate
+missing target motion contract in this scenario. These are scenario interface
+defects, not an observed collision or evidence that all S-curves are unsupported.
 
 Both estimator-fed trials stop on the **first target-visible attempt** at
 1.05 s. That failed attempt is retained in `failureContext` and `attempts`;

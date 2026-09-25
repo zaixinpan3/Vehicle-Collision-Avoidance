@@ -1,0 +1,561 @@
+{
+  "base_commit": "eba0fa18175fb7580d8576c4e1efd83246aa1c67",
+  "scope": "Diagnostic exports and source/result identity; raw MAT results remain external. No weekly report hashes.",
+  "artifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_exactTargetMotion.mat",
+      "sha256": "24e884321452cae2882ffabe9ecb6e7c5e6bfd7affc43ae18b3ca8148000b886",
+      "bytes": 887182
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_fresh.mat",
+      "sha256": "0b3e7883d5d1e59e39d82896999ef908bfe277dd7d52fe747fc6472a3def1ea5",
+      "bytes": 887205
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_noRoad.mat",
+      "sha256": "1ab82b5439f22a6a43e9f6d651ee963e9bbcdd9f52373736d116e6d6f84e2140",
+      "bytes": 727751
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_noRoadRows.mat",
+      "sha256": "cba962f89bcc97d11d8f965f430315dbb95819c7824dd3e0208d914324b80b2c",
+      "bytes": 727577
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_noTarget.mat",
+      "sha256": "472ee02a6310fbb3b15b160da92c8751a1c9c76837eef6b5a6c8b2b07cc98b3a",
+      "bytes": 253704
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_predictedSuccessor.mat",
+      "sha256": "38fac4e821a076444edd53ab946eb57575db4daa3ff10cb091d00c11d7dc0daf",
+      "bytes": 893296
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_tightVelocityBox.mat",
+      "sha256": "24364b2755953cc5f4470613d93a08c114597152b21735125874240051ecc7ec",
+      "bytes": 887194
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_zeroAllBounds.mat",
+      "sha256": "fd34a5285c171669042d323bfc06f941986b2fe6708f9898b5259378635946cf",
+      "bytes": 887195
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_zeroEgoBounds.mat",
+      "sha256": "dcca216d6286c70cf6b78cfff92e47a1921a0fceb8013b3b37a557c2044bbf07",
+      "bytes": 887192
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_zeroTargetBounds.mat",
+      "sha256": "e60b4557ca47a78b204a3bbba2bc2110161d4a64c7c72aad86e4ff7e1491e53c",
+      "bytes": 887191
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_zeroTargetVelocityAccelerationBounds.mat",
+      "sha256": "6c75a246ec769e726a36a4c638b5d1ac89cb31a6de54d0753dbb9945f18f4c6a",
+      "bytes": 887229
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_zeroTargetVelocityBound.mat",
+      "sha256": "b188503c6ca555a77723e40043586f1c88c5d2bdebf4e85614cc97f148cd5681",
+      "bytes": 887212
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_zeroTargetVelocityYawBounds.mat",
+      "sha256": "34db132a8f6cd8456cb4433902855abc9a6dd1d9e8cfbde01ac196a97c907b69",
+      "bytes": 887220
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/circular_oncoming_zeroTargetYawBound.mat",
+      "sha256": "83361c4b10e0e09b5a1d68f172048c824eed02ca6d102aff923013a5d8deb2fa",
+      "bytes": 887194
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_exactTargetMotion.mat",
+      "sha256": "b9227843a52a405a2b38243c51b31404d96457c678ef03ee8397adbe8570261b",
+      "bytes": 2076150
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_fresh.mat",
+      "sha256": "6ea91b197219d947a6d41b0616010ec1e6517677026f06562dc586d19eb6550f",
+      "bytes": 2064564
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_noRoad.mat",
+      "sha256": "15d2db9180908b58cf1dcdf1f2780e134c3d215898b057de531ba02766f0a1f7",
+      "bytes": 1898301
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_noRoadRows.mat",
+      "sha256": "b0ae9a8688b0cf299fea9a6467ce3140d50351696eb0014489733504bc293d30",
+      "bytes": 1898472
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_noTarget.mat",
+      "sha256": "d33a0ca378e7e53efdffa733624e019eecfdcf7395946191fd22d8794548e975",
+      "bytes": 292299
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_predictedSuccessor.mat",
+      "sha256": "66415955d7c6bed6524d4f3266fdd4237ee1e5b4f452b4e7f6472caeb432b3c3",
+      "bytes": 2063626
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_tightVelocityBox.mat",
+      "sha256": "4a41891fd79fc070bff3a6efb7135b4973e2749dbf9e7420fdf962d5311e5cac",
+      "bytes": 2067073
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_zeroAllBounds.mat",
+      "sha256": "2cfe159a6594cf6c6fa8cea2b9df2f40f6d52334bd6af9a010d96f5b8f43184a",
+      "bytes": 1368162
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_zeroEgoBounds.mat",
+      "sha256": "800186e6659d0f29bbde187f336c562c6ec96ccfc7bf6ea6f1cbd459f6ed3a84",
+      "bytes": 1360351
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_zeroTargetBounds.mat",
+      "sha256": "4f92cd5902d57a8bd55d042e546696aab7fabc37415db9c278a77d4e931c522b",
+      "bytes": 2076558
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_zeroTargetVelocityAccelerationBounds.mat",
+      "sha256": "64cc592a8e1087efa69ce0eb419c5bf521b579f3ce13a6bead28edf2b4d24c18",
+      "bytes": 2077248
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_zeroTargetVelocityBound.mat",
+      "sha256": "2ac15fc7544181ab6cdddc4abca4eaa97160b263248f0f3490705c36b06982d9",
+      "bytes": 2065520
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_zeroTargetVelocityYawBounds.mat",
+      "sha256": "67a84dce805ec04db47280d06eddc2e07cf9bcee792c4ca8bc5622f02af5789c",
+      "bytes": 3957548
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_circular_oncoming_zeroTargetYawBound.mat",
+      "sha256": "b8bffa4657d6b4ad45ca01f205ea70e214fc616a09fe25ae00441102a3c3c1dd",
+      "bytes": 2064584
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_exactTargetMotion.mat",
+      "sha256": "3fc85365b7c6c594b21ab4c05d87e31476ab6e1beb49cda4af4af20c3b4f6cf4",
+      "bytes": 1376596
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_fresh.mat",
+      "sha256": "1b12a7eac4e8cbe3febaeec373ed723d677be3aa466c8c7d7891f029ec375a5a",
+      "bytes": 1363903
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_noRoad.mat",
+      "sha256": "8e5b726a82a40d451e4b6f2a048cb9d7c0d8b8224f097ffc19ef3d447826b161",
+      "bytes": 1299430
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_noRoadRows.mat",
+      "sha256": "db2f9fb77b34a9f7e3f41b49b57cf070a55b5c053e73656a1cae3108d5ee8fb4",
+      "bytes": 1299342
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_noTarget.mat",
+      "sha256": "d6d4dd8dd45b7a406ed6e4d7ee3bc0d005b19cf4c081abec7edfe55e4cfb4a5d",
+      "bytes": 120769
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_predictedSuccessor.mat",
+      "sha256": "6663ce4d8e19186cd73e6a642797fffe92856cd8c084734cdd98ee38abde8236",
+      "bytes": 1364314
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_tightVelocityBox.mat",
+      "sha256": "fbd14cadca880e8a0a5e9ae2d14205b211fb3811b1f44cf4a99f5a3e1fdb2e0c",
+      "bytes": 1363129
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_zeroAllBounds.mat",
+      "sha256": "7cc41e71e8a69073c7fc860e07f97e6106067c4fea5790343e4dee77be4b6fd8",
+      "bytes": 740490
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_zeroEgoBounds.mat",
+      "sha256": "a96462c437ca46d0f85f87ac3f5a41c8ddb18f3424edd2cb34e016b47f2a6bb8",
+      "bytes": 731024
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_zeroTargetBounds.mat",
+      "sha256": "865b9e1ad44c1fc58bdd8e4b6731f19bba634b127c2d06802faa2b7ee90cb4bc",
+      "bytes": 1377209
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_zeroTargetVelocityAccelerationBounds.mat",
+      "sha256": "eeb95388847517ff0801b54998b94744f7f3c2393951ccdb4bfffc8c1743c95f",
+      "bytes": 1375888
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_zeroTargetVelocityBound.mat",
+      "sha256": "3c79a06962b227c1d5d76902467c85d13113d2b1e5b8b12b870c6b8d7ed0a1b7",
+      "bytes": 1373681
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_zeroTargetVelocityYawBounds.mat",
+      "sha256": "19359be19fbb4d0909e698295845434ec33c35f7276d7f145a7e7bfb23b560b3",
+      "bytes": 1377812
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/estimated_straight_oncoming_zeroTargetYawBound.mat",
+      "sha256": "dfe3c4de0460f0b3a633b7cd261d70e5458bbfa1285f6eb20a11c2eb84138d69",
+      "bytes": 1363915
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_exactTargetMotion.mat",
+      "sha256": "1d5a5c46df8b62628052814ddba0a51e66b6f36a09fa5e9e23ab9967d81fa8fd",
+      "bytes": 457940
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_fresh.mat",
+      "sha256": "9a036771e8d3c6afded5e22744977367920f5b08b5d29abef6d095d78d098e3b",
+      "bytes": 457955
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_noRoad.mat",
+      "sha256": "55c527a721ab5fd03d1ea534a868aee64987f0b449924396accafe2fe1d0c29a",
+      "bytes": 391792
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_noRoadRows.mat",
+      "sha256": "1de8a1eb4c9e6c22353d97db6102edb92a6f246d5063b82a918e8e9a00b8e49a",
+      "bytes": 391896
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_noTarget.mat",
+      "sha256": "0c818d4d4ff2c870cbdb07c7f158badd5ba058bbf23b9c7d57b3b58d64ddcefb",
+      "bytes": 86103
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_predictedSuccessor.mat",
+      "sha256": "693e6628995f10d4ea794f31b591b06e4bfcf232ad8ffe4a5096a640c436826d",
+      "bytes": 462976
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_tightVelocityBox.mat",
+      "sha256": "3bad8d579d216a272a8c115787ca69db01d6a144e6f16d0668c650454248ffec",
+      "bytes": 457943
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_zeroAllBounds.mat",
+      "sha256": "13346305843a1b482771f991a43fe101f3a63453b8c969f24e0662527f362f7c",
+      "bytes": 457944
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_zeroEgoBounds.mat",
+      "sha256": "c37729f517444777c0f76e0a7c9e0183a185183039c0cd57a9cf8a02f39a7217",
+      "bytes": 457939
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_zeroTargetBounds.mat",
+      "sha256": "f80ac20ed9608a82dbf7c84ed4b8458dca1015f56258dc6b0fd1685f8bf91e38",
+      "bytes": 457945
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_zeroTargetVelocityAccelerationBounds.mat",
+      "sha256": "edb1fe4944b25a3148118b521677c0a7c5f7ab1657a84bc71314b6b79a4e7bde",
+      "bytes": 457965
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_zeroTargetVelocityBound.mat",
+      "sha256": "a94979da11710eb9252b7425c75676e463289c372dfd30cf9a6e20738994bab2",
+      "bytes": 457946
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_zeroTargetVelocityYawBounds.mat",
+      "sha256": "3c9ee86e07a03860b44c9f5574af50518db0b28001cb2c0d7102ed3be7f0da35",
+      "bytes": 457958
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-failure-analysis-20260925/straight_oncoming_zeroTargetYawBound.mat",
+      "sha256": "93f021aaf9b39bcc950ab4b9b34ede3c982a2cb63e5c23e1a5513ef90aba9550",
+      "bytes": 457950
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/circular_oncoming.mat",
+      "sha256": "5441fa9b125971cb1a549ec44e2846efcca2554ac6a0f2ecea00b34095d869cb",
+      "bytes": 9360547
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/estimated_circular_oncoming.mat",
+      "sha256": "ad4f0901e1692b5cd9a6d072f198407a0a0cf9db69dfd71f7a315cf038d9f74a",
+      "bytes": 4756941
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/estimated_straight_oncoming.mat",
+      "sha256": "591da1330c4fc52702e0de4a91ca2198bb569fcc4cefda647cc6e501a8d1119f",
+      "bytes": 1044096
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/horizon32_circular_oncoming.mat",
+      "sha256": "a138a591f087ab1890e03f2749ebf8351932b6e8e6ba91af282d71a191c08075",
+      "bytes": 9371065
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/horizon32_straight_oncoming.mat",
+      "sha256": "2688b5e065404e0b1db33faeaa1e014ddf7bd553b911c3ff2064e4744a5ea753",
+      "bytes": 1742052
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/straight_oncoming.mat",
+      "sha256": "2fb30e52e7f9f74ac7ad61e1d6128fb8bdf8e4a37c031c1e35346bb33da5efed",
+      "bytes": 1736353
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/varying_curvature_oncoming.mat",
+      "sha256": "f4d4b4d7aced6ef792c16b9a29b310b7c1f6d6fa7a460e339ec9286204f56bd6",
+      "bytes": 139882
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "d306c5b85ff560d9540ae36b04031a19ec42a2bbda68dabb717ed448be9c4c60",
+      "bytes": 21699
+    },
+    {
+      "path": "config/controllerDesignExperimentConfig.m",
+      "sha256": "f95efee2df0f0999b8f67285ef00e119d7cb148027f6ed6aa2baa1496c6eeeed",
+      "bytes": 2496
+    },
+    {
+      "path": "config/estimatorControllerIntegrationConfig.m",
+      "sha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+      "bytes": 5604
+    },
+    {
+      "path": "config/finiteSensingValidationConfig.m",
+      "sha256": "68360e47775732752274cce9b7543fb601afdffaaaf66d7636042c5ab9f7cba7",
+      "bytes": 1677
+    },
+    {
+      "path": "config/nrmmTrackingConfig.m",
+      "sha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+      "bytes": 4158
+    },
+    {
+      "path": "controller/avoidanceSafetyGeometry.m",
+      "sha256": "d0c10b39ef2d033414939a2d63fbb976e247099573d23295fb8044593355a129",
+      "bytes": 44369
+    },
+    {
+      "path": "controller/avoidanceStageQp.m",
+      "sha256": "3873c8ef9e310b516619965a3d5b4c2f39a1ea2860d27ea7161514a29c0394b8",
+      "bytes": 15776
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "7ccde6950a54b6f8e4b56f8247636e2b08bc2ae68122eaefe4a160628468f19e",
+      "bytes": 20491
+    },
+    {
+      "path": "controller/fialaCertificate.m",
+      "sha256": "a1bead6717b4ec4e77a70e884b23a4021b6fdc3e5e12868046a6795dca22a565",
+      "bytes": 9609
+    },
+    {
+      "path": "controller/formulateAvoidanceProblem.m",
+      "sha256": "2205610892b2dd37074262ae80d04062ddf7fdec6573540146ccf6c522d69c87",
+      "bytes": 22578
+    },
+    {
+      "path": "controller/hardEncounterBarrier.m",
+      "sha256": "e513248b2d6a968aed8dc2b12c3ebd80d176730ca38f71396271b8fbb3e9edd0",
+      "bytes": 57832
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256": "26e97c17544553e331d10a0e9f5e4b40a8fb922cee052ac5f4be021fe36e9ede",
+      "bytes": 38250
+    },
+    {
+      "path": "controller/ltvBicycleModel.m",
+      "sha256": "b91d4e000130f70c066c90d81ef7adde1762c7b5ca5e74b4201125437d901509",
+      "bytes": 65092
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f",
+      "bytes": 7347
+    },
+    {
+      "path": "controller/readPlanningInputs.m",
+      "sha256": "11b88e333f3b5025c335a8d361114fe9bfb5cbcbb035968745cb5fb4126b2377",
+      "bytes": 39376
+    },
+    {
+      "path": "controller/solveHardCbfClf.m",
+      "sha256": "b1f5fdb5ffe73713cb47cf7feb91b8d813e0a049e1975d3c13b8f66f4ef9ec5c",
+      "bytes": 41363
+    },
+    {
+      "path": "controller/stateUncertainty.m",
+      "sha256": "44f9d3a61afff0d495d473cac1124a8b5b0e6d5a98526da181695fb10df89f0d",
+      "bytes": 18607
+    },
+    {
+      "path": "controller/targetPrediction.m",
+      "sha256": "679e026666916a755964d79060c0872f54aec95e506fd04327c416519e9a4df3",
+      "bytes": 34118
+    },
+    {
+      "path": "estimator/certifiedKinematicCourseCorrespondence.m",
+      "sha256": "e969fc6c2aee79fd4eb9976d6a7342609499c7a6e40b2ad1f8516fb1a3288e5b",
+      "bytes": 7984
+    },
+    {
+      "path": "estimator/certifiedRotationCorrespondence.m",
+      "sha256": "fe3848a3e72ba4da39b800f2f374e85d37c457aad7df8e24c5f5dc250309b37e",
+      "bytes": 3770
+    },
+    {
+      "path": "estimator/nrmmControllerErrorBounds.m",
+      "sha256": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc",
+      "bytes": 9730
+    },
+    {
+      "path": "estimator/nrmmKinematicVelocityMeasurement.m",
+      "sha256": "0f075c3dafeb4b11a8cda324f39c88e370c29c35ba9755a4412f20a83f5edfae",
+      "bytes": 1863
+    },
+    {
+      "path": "estimator/nrmmObserverCertificate.m",
+      "sha256": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308",
+      "bytes": 3300
+    },
+    {
+      "path": "estimator/nrmmObserverRk4Interval.m",
+      "sha256": "33c395fb3f5905853a19dfd1e6502b80d1a50ffcb281934e98a00b459f6dd795",
+      "bytes": 2439
+    },
+    {
+      "path": "estimator/nrmmObserverVectorField.m",
+      "sha256": "df803b56eb8c3584f9903d271b15f0168d1881ba0bdcf4cba2688c6d48ee5686",
+      "bytes": 3638
+    },
+    {
+      "path": "estimator/nrmmPositionErrorBound.m",
+      "sha256": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5",
+      "bytes": 18828
+    },
+    {
+      "path": "estimator/nrmmTargetHistory.m",
+      "sha256": "7d42d50c49d6217738a9b0247d2ad1faa8563b8066d03e9556e0185e4984522e",
+      "bytes": 10436
+    },
+    {
+      "path": "estimator/nrmmTargetLipschitzCertificate.m",
+      "sha256": "d1f561ad3c3de0868d73b5f45589b30af2b574136316faaca80bfa8100f9c8ba",
+      "bytes": 2419
+    },
+    {
+      "path": "estimator/nrmmTargetParameterErrorBounds.m",
+      "sha256": "6d1104488dc5b9b2d8dda8c3274a6f24294fef0e5d767df6008cb8a473d8d850",
+      "bytes": 2529
+    },
+    {
+      "path": "estimator/nrmmTargetTrackerDerivative.m",
+      "sha256": "3f7d7494f350ebbfb6135e249c0711db27daadd3add74ca0590a252f8baf6f5a",
+      "bytes": 7245
+    },
+    {
+      "path": "estimator/nrmmVelocityDisturbanceBound.m",
+      "sha256": "84c4c6e9e4c1b47c395df29f5c71043854522d563c7222922aeeb2be9160951a",
+      "bytes": 2685
+    },
+    {
+      "path": "estimator/nrmmYawObserverDerivative.m",
+      "sha256": "732496acba9d6c793d443d53c5fd424912016755cdc3178fe8160e23e46dc70d",
+      "bytes": 968
+    },
+    {
+      "path": "estimator/nrmmYawSet.m",
+      "sha256": "cc30d09659426872322c8c28d373144680a1dcf23a1ec5354f35f30b1079c295",
+      "bytes": 4759
+    },
+    {
+      "path": "estimator/onlineNrmmTrackingRuntime.m",
+      "sha256": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05",
+      "bytes": 42899
+    },
+    {
+      "path": "estimator/synthesizeNrmmObserverGains.m",
+      "sha256": "8697b7b460b7ea2c9c434ae3542d5cbaf3ac11cd2fe7d4669012f93ab20b103a",
+      "bytes": 20174
+    },
+    {
+      "path": "estimator/synthesizeTargetTrackerCertificate.m",
+      "sha256": "74a00654062d3f17fedf497b296c67b9cde02fb8db4cf3a8b63e0f41220eefbe",
+      "bytes": 16838
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/counterfactuals.csv",
+      "sha256": "9178ac93f9e68a3339da9994ad21486830a1b7c2de0cd71cff1447627a7ceaf3",
+      "bytes": 14577
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/initialization.csv",
+      "sha256": "615e71433151e6477d3fd343b8b67d87e7fdc8f6ec1103049f5a5b57e3d290a7",
+      "bytes": 452
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/plant-dynamics.csv",
+      "sha256": "8c15b912fadc4af7f660963cf26f199884edf7eade93bf61df147d48fc0b91e6",
+      "bytes": 26391
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/reference-interface.csv",
+      "sha256": "31de98550e2dff2abb96a82aeef39cb0b61d5ed211d2acc6ae3fc0051e466a96",
+      "bytes": 439
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/reference-tests.csv",
+      "sha256": "17cc3d2cb94438a9dabd1d27e747c418ea543813f4aee773b3af192558c683c2",
+      "bytes": 1873
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/transfer-flags.csv",
+      "sha256": "ec1e5c7d3dcb673136de889b8f9aae144ad3814bf7a14f1a9813f402b032b637",
+      "bytes": 141
+    },
+    {
+      "path": "scripts/analyzeControllerRecoveryFailures.m",
+      "sha256": "63dcd1377faa54974f43df3fb620834127671e249117a90a73224678f3946f63",
+      "bytes": 13582
+    },
+    {
+      "path": "scripts/nrmmEstimatorControllerAdapter.m",
+      "sha256": "fa1555c793dcab141965f9ad06b0c9a0406b3c310768ba1ccb275ec38ac7ccf9",
+      "bytes": 39227
+    },
+    {
+      "path": "scripts/runCenterlineCruiseScenario.m",
+      "sha256": "90f53e130ffe271b9dbf6dacd60a55b94158471ce38e20420a3a500b6bd1a6bd",
+      "bytes": 70391
+    },
+    {
+      "path": "scripts/runCircularCenterlineStraightTargetAvoidanceScenario.m",
+      "sha256": "35211b5027e809d149254b20128c06ac46b8f779bd20b22e5b8de6c363d7106e",
+      "bytes": 30581
+    },
+    {
+      "path": "scripts/runOncomingVehicleAvoidanceScenario.m",
+      "sha256": "d9a3a5ae4f705551d3b8837c1f85b9f48c9a6097d3d884fd93dc5c8578d6a731",
+      "bytes": 20098
+    },
+    {
+      "path": "scripts/runVaryingCurvatureStraightTargetAvoidanceScenario.m",
+      "sha256": "f82d82c01aee49c096f7485006f1d44ff96816a791ddf3667f7cbb61cdba1870",
+      "bytes": 26408
+    }
+  ]
+}
