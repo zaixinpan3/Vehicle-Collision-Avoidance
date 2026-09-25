@@ -54,8 +54,8 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             domain = testCase.Design.target.domain;
             testCase.assertEqual(testCase.Design.target.modelJerkMaximum, 0);
             testCase.verifyEqual(string(motion.kind), "nrmm-motion-v1");
-            testCase.verifyEqual(motion.jerkBound, [0; 0]);
-            testCase.verifyEqual(motion.yawAccelerationBound, 0);
+            testCase.verifyEqual(sort(string(fieldnames(motion))), ...
+                sort(["kind"; "curvatureMaximum"; "speedRateMaximum"; "scalarAccelerationMaximum"]));
             testCase.verifyEqual(motion.curvatureMaximum, ...
                 sin(domain.sideslipMaximum)/domain.rearAxleDistance);
             testCase.verifyEqual(motion.speedRateMaximum, domain.scalarAccelerationMaximum);
@@ -84,17 +84,17 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(estimate.targetSpeedErrorBound, norm(values(3:4)));
             end
         end
-        function aModelErrorPublishesTheCartesianJerkContract(testCase)
+        function aModelErrorPublishesNoMotionContract(testCase)
+            % A nonzero model jerk admits motion outside every NRMM path, which
+            % no contract describes; the controller then refuses the target.
             design = testCase.Design;
             design.target.modelJerkMaximum = 0.5;
             published = localReconstruction(design, [1.2; 0.03; 0]);
-            motion = published.targetEstimate.predictionMotion;
-            domain = design.target.domain;
-            testCase.verifyEqual(string(motion.kind), "finite-sensing-motion-v1");
-            testCase.verifyFalse(isfield(motion, "curvatureMaximum"));
-            testCase.verifyEqual(motion.jerkBound, repmat(hypot(domain.speedMaximum*domain.yawRateMaximum^2, ...
-                3*domain.scalarAccelerationMaximum*domain.yawRateMaximum)+0.5, 2, 1));
-            testCase.verifyEqual(motion.scalarAccelerationMaximum, domain.accelerationNormBound);
+            estimate = published.targetEstimate;
+            testCase.verifyTrue(isfield(estimate, "predictionMotion"));
+            testCase.verifyEmpty(estimate.predictionMotion);
+            testCase.verifyFalse(any(isfield(estimate, ["targetSpeedErrorBound", "targetCourseErrorBound", ...
+                "targetSpeedRateErrorBound", "targetCurvatureInterval"])));
         end
         function staleVelocityRequiresAnAccelerationEnvelope(testCase)
             [output, bound, input] = localVelocityFixture();

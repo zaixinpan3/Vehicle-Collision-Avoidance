@@ -363,8 +363,9 @@ enforce collision separation and sensing-range exit; they are stored together
 with the terminal SOCs. Executable safety constraints have no slack. The
 first-hold CLF has an unbounded nonnegative norm slack with a squared cost.
 
-Target finite-flow tubes include the admitted Cartesian jerk and yaw-
-acceleration bounds. The final directional exterior inequality covers the
+Target finite-flow tubes are the NRMM parameter enclosure of the
+`nrmm-motion-v1` contract ([TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md));
+there is no jerk or yaw-acceleration allowance. The final directional exterior inequality covers the
 complete target footprint plus the sensing radius. It establishes that a
 sound current scan must confirm release by the stored absolute deadline.
 The deadline never moves forward during inherited active-encounter planning.

@@ -723,19 +723,14 @@ classdef ltvBicycleModel
             end
             bound = model.targetMeasurementBound(:);
             motion = targetPrediction.deviationModel(model.encounter,(0:count)*h);
-            jerk = motion.holdJerk;
             % Signal covariance of the target deviation (uniform sources: r^2/3).
-            covariance = zeros(4,4,count+1);holdCovariance = zeros(4);
+            covariance = zeros(4,4,count+1);
             accelerationSignal = zeros(2,count+1);
             for node = 1:count+1
                 generators = motion.parameterGenerators(:,:,node);
-                covariance(:,:,node) = generators(1:4,:)*generators(1:4,:).'/3+holdCovariance ...
+                covariance(:,:,node) = generators(1:4,:)*generators(1:4,:).'/3 ...
                     +diag(motion.remainder(1:4,node).^2/3);
                 accelerationSignal(:,node) = sum(generators(5:6,:).^2,2)/3+motion.remainder(5:6,node).^2/3;
-                if node<=count
-                    holdCovariance = flow*holdCovariance*flow.' ...
-                        +drive(7:10,:)*diag(motion.holdBound(:,node+1).^2/3)*drive(7:10,:).';
-                end
             end
             noise = diag(bound(1:4).^2/3);
             egoGains = zeros(2,6,count);targetGains = zeros(2,4,count);accelerationGains = zeros(2,2,count);
@@ -749,9 +744,9 @@ classdef ltvBicycleModel
                 if ~cfg.feedbackPrediction.lateralVelocityFeedback,gain(:,5) = 0;end
                 signal = covariance(:,:,stage);
                 gain(:,7:10) = gain(:,7:10)*(signal/(signal+noise+eps*eye(4)));
-                % The acceleration estimate errs by its bound plus half a hold of jerk.
-                signal = accelerationSignal(:,stage)+motion.holdBound(:,stage+1).^2/3;
-                accelerationNoise = bound(5:6).^2/3+(jerk*h/2).^2/3;
+                % The acceleration estimate errs by its estimator bound.
+                signal = accelerationSignal(:,stage);
+                accelerationNoise = bound(5:6).^2/3;
                 feedforward = feedforward.*(signal./(signal+accelerationNoise+eps)).';
                 egoGains(:,:,stage) = base+gain(:,1:6);targetGains(:,:,stage) = gain(:,7:10);
                 accelerationGains(:,:,stage) = feedforward;
@@ -770,31 +765,25 @@ classdef ltvBicycleModel
         % with shat the target position/velocity estimate, ahat its acceleration
         % estimate and s0, a0 the target's nominal flow. Every estimate errs by at
         % most its sensing bound at every hold. targetPrediction.deviationModel
-        % splits the target's deviation from that flow into generators of error
-        % sources fixed at admission (the initial position/velocity box of a
-        % Cartesian contract; the NRMM parameter errors of an nrmm-motion-v1
-        % contract), a remainder box, and a per-hold part driven by the mean
-        % acceleration deviation abar_k of each hold (jerk growth, or the
-        % declared model error). The acceleration at the start of a hold differs
-        % from abar_k by at most J h / 2. The ego deviation obeys
+        % splits the target's deviation from that flow into generators of the
+        % NRMM parameter errors fixed at admission (through the path
+        % sensitivities at every node) and a remainder box at every node. The
+        % ego deviation obeys
         %   e+ = (A + B K) e + B L d + B N adev + B K eta + B L zeta + B N zeta_a,
-        % and the fixed sources and abar_k are generators shared by the target's
-        % deviation and the ego's reaction, so every record sees the exact
-        % relative position P e - d_p. The reaction to the target remainder of
-        % each hold enters as its own generators; the remainder at a record node
-        % is an interval part of the target, as are held reserves and
-        % floating-point allowances. The first held input is exact. States
-        % between nodes are not enclosed.
+        % and the parameter generators are shared by the target's deviation and
+        % the ego's reaction, so every record sees the exact relative position
+        % P e - d_p. The reaction to the target remainder of each hold enters as
+        % its own generators; the remainder at a record node is an interval part
+        % of the target, as are held reserves and floating-point allowances. The
+        % first held input is exact. States between nodes are not enclosed.
             count = prediction.stageCount;h = model.sampleTime;
             motion = targetPrediction.deviationModel(model.encounter,(0:count)*h);
             egoGains = design.feedbackGains;targetGains = design.targetGains;
             accelerationGains = design.accelerationGains;
-            flow = [eye(2),h*eye(2);zeros(2),eye(2)];
-            jerk = motion.holdJerk;
             egoNoise = diag(prediction.estimatorBound);egoNoise = egoNoise(:,prediction.estimatorBound~=0);
             bound = design.targetBound(:);
             targetNoise = diag(bound(1:4));targetNoise = targetNoise(:,bound(1:4)~=0);
-            accelerationNoise = diag(bound(5:6)+jerk*h/2);
+            accelerationNoise = diag(bound(5:6));
             accelerationNoise = accelerationNoise(:,any(accelerationNoise,1));
             egoRadius = model.initialFrenetErrorBound(:);
             ego = diag(egoRadius);ego = ego(:,egoRadius~=0);
@@ -802,7 +791,7 @@ classdef ltvBicycleModel
             used = any(reshape(permute(sources~=0,[1,3,2]),[],size(sources,2)),1);
             sources = sources(:,used,:);
             fixedColumns = size(ego,2)+(1:size(sources,2));
-            egoPart = [ego,zeros(6,size(sources,2))];holdPart = zeros(4,size(egoPart,2));
+            egoPart = [ego,zeros(6,size(sources,2))];
             egoInterval = zeros(6,1);
             inputDeviation = zeros(2,size(egoPart,2));inputDeviationBox = zeros(2,1);
             prediction.feedbackGainSequence = egoGains;prediction.targetGainSequence = targetGains;
@@ -825,15 +814,15 @@ classdef ltvBicycleModel
                     egoGain = egoGains(:,:,stage);targetGain = targetGains(:,:,stage);
                     feedforward = accelerationGains(:,:,stage);
                 end
-                % Target deviation at the start of the hold (node stage-1).
-                target = holdPart;target(:,fixedColumns) = target(:,fixedColumns)+sources(1:4,:,stage);
+                % Target deviation at the start of the hold (node stage-1): the
+                % NRMM parameter errors through the path sensitivities.
+                target = zeros(4,size(egoPart,2));target(:,fixedColumns) = sources(1:4,:,stage);
                 targetAcceleration = zeros(2,size(egoPart,2));
                 targetAcceleration(:,fixedColumns) = sources(5:6,:,stage);
                 % New sources of this hold: estimator errors (ego, target
-                % position/velocity, target acceleration incl. delta_k), the
-                % target remainder at the start of the hold (a fixed box, as
-                % generators so that it is not wrapped by |A + B K|) and the
-                % mean acceleration deviation abar_k with its position remainder.
+                % position/velocity, target acceleration) and the target
+                % remainder at the start of the hold (a fixed box, as
+                % generators so that it is not wrapped by |A + B K|).
                 egoInput = egoGain*egoNoise;egoInput = egoInput(:,any(egoInput,1));
                 targetInput = targetGain*targetNoise;targetInput = targetInput(:,any(targetInput,1));
                 accelerationInput = feedforward*accelerationNoise;
@@ -841,11 +830,9 @@ classdef ltvBicycleModel
                 remainderInput = [targetGain*diag(motion.remainder(1:4,stage)), ...
                     feedforward*diag(motion.remainder(5:6,stage))];
                 remainderInput = remainderInput(:,any(remainderInput,1));
-                meanDeviation = diag(motion.holdBound(:,stage+1));
-                holdRemainder = diag(min(motion.holdBound(:,stage+1),jerk*h)*h^2/4);
                 reaction = egoGain*egoPart+targetGain*target+feedforward*targetAcceleration;
                 noiseColumns = [egoInput,targetInput,accelerationInput,remainderInput];
-                inputDeviation = [reaction,noiseColumns,feedforward*meanDeviation,zeros(2,2)];
+                inputDeviation = [reaction,noiseColumns];
                 inputDeviationBox = abs(egoGain)*egoInterval;
                 if stage>1
                     previousDeviation = [previousDeviation,zeros(2,size(inputDeviation,2)-size(previousDeviation,2))]; %#ok<AGROW>
@@ -855,12 +842,10 @@ classdef ltvBicycleModel
                 prediction.feedbackInputSupport(:,stage) = sum(abs(inputDeviation),2)+inputDeviationBox;
                 prediction.feedbackSlewSupport(:,stage) = sum(abs(inputDeviation-previousDeviation),2) ...
                     +inputDeviationBox+previousDeviationBox;
-                egoPart = [a*egoPart+b*reaction,b*noiseColumns,b*feedforward*meanDeviation,zeros(6,2)];
-                holdPart = [flow*holdPart,zeros(4,size(noiseColumns,2)),[h^2/2*eye(2);h*eye(2)]*meanDeviation, ...
-                    [holdRemainder;zeros(2)]];
+                egoPart = [a*egoPart+b*reaction,b*noiseColumns];
                 egoInterval = abs(a+b*egoGain)*egoInterval+prediction.intervalIncrement(:,stage);
                 % Target deviation at node stage, in the same basis.
-                nodeTarget = holdPart;nodeTarget(:,fixedColumns) = nodeTarget(:,fixedColumns)+sources(1:4,:,stage+1);
+                nodeTarget = zeros(4,size(egoPart,2));nodeTarget(:,fixedColumns) = sources(1:4,:,stage+1);
                 egoBox = sum(abs(egoPart),2)+egoInterval;
                 cells(stage).generators = [egoPart,diag(egoInterval),zeros(6,4)];
                 cells(stage).targetGenerators = [nodeTarget,zeros(4,6),diag(motion.remainder(1:4,stage+1))];

@@ -106,6 +106,7 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
     output.targetEstimate.targetYawRateErrorBound = values(8);
     % The controller reads scalarAccelerationMaximum as a bound on the
     % acceleration magnitude |a| = hypot(A, V*omega), not on the speed-rate A.
+    output.targetEstimate.predictionMotion = [];
     if design.target.modelJerkMaximum == 0
         % Exact NRMM: constant speed-rate and constant sideslip, so a path of
         % constant curvature sin(beta)/l_r. The controller propagates every
@@ -113,12 +114,14 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         % bounds published below, which come from the tracker's component
         % balls (frame-free speed, speed-rate and normal acceleration; the
         % course adds the ego yaw error) rather than from the inertial box.
+        % A nonzero modelJerkMaximum admits motion outside every NRMM path;
+        % no motion contract describes it, so none is published and the
+        % controller refuses the target at admission.
         output.targetEstimate.predictionMotion = struct( ...
-            "kind","nrmm-motion-v1","jerkBound",zeros(2,1), ...
+            "kind","nrmm-motion-v1", ...
             "curvatureMaximum",sin(domain.sideslipMaximum)/domain.rearAxleDistance, ...
             "speedRateMaximum",domain.scalarAccelerationMaximum, ...
-            "scalarAccelerationMaximum",domain.accelerationNormBound, ...
-            "yawAccelerationBound",0);
+            "scalarAccelerationMaximum",domain.accelerationNormBound);
         parameters = nrmmTargetParameterErrorBounds(target.targetVelocity, ...
             target.targetAcceleration, components(2), components(3), bound.yaw);
         if ~available
@@ -129,16 +132,6 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         output.targetEstimate.targetCourseErrorBound = parameters.courseErrorBound;
         output.targetEstimate.targetSpeedRateErrorBound = parameters.speedRateErrorBound;
         output.targetEstimate.targetCurvatureInterval = parameters.curvatureInterval;
-    else
-        % A varying speed-rate or curvature leaves every NRMM path; bound the
-        % Cartesian jerk of the true motion instead.
-        jerkMaximum = hypot(domain.speedMaximum*domain.yawRateMaximum^2, ...
-            3*domain.scalarAccelerationMaximum*domain.yawRateMaximum)+design.target.modelJerkMaximum;
-        output.targetEstimate.predictionMotion = struct( ...
-            "kind","finite-sensing-motion-v1","jerkBound",repmat(jerkMaximum,2,1), ...
-            "scalarAccelerationMaximum",domain.accelerationNormBound, ...
-            "yawAccelerationBound",domain.scalarAccelerationMaximum*domain.yawRateMaximum/domain.speedMinimum ...
-                +design.target.modelJerkMaximum/domain.speedMinimum);
     end
 end
 

@@ -13,7 +13,7 @@ function report = probeTargetBoundSensitivity(options)
         options.VelocityBounds (1,:) double {mustBeNonnegative} = [0,0.1,0.25,0.5,1,2]
         options.AccelerationBounds (1,:) double {mustBeNonnegative} = [0,0.5,2]
         options.YawBounds (1,:) double {mustBeNonnegative} = [0.05,0.3]
-        options.JerkBound (1,1) double {mustBeNonnegative} = 0
+        options.CurvatureMaximum (1,1) double {mustBePositive} = 0.05
         options.SearchBudgetSeconds (1,1) double {mustBePositive} = 5
     end
     root = fileparts(fileparts(mfilename('fullpath')));
@@ -42,8 +42,7 @@ function report = probeTargetBoundSensitivity(options)
         target.targetAccelerationInertialErrorBound = repmat(acceleration(index),2,1);
         target.targetYawErrorBound = yaw(index);
         target.targetYawRateErrorBound = 0;
-        target.predictionMotion = struct('kind',"finite-sensing-motion-v1",'jerkBound',repmat(options.JerkBound,2,1), ...
-            'yawAccelerationBound',0);
+        target.predictionMotion = struct('kind',"nrmm-motion-v1",'curvatureMaximum',options.CurvatureMaximum);
         timer = tic;
         try
             [~,~,problem] = collisionAvoidanceController(ego,target,road,cfg,[]);
@@ -58,7 +57,8 @@ function report = probeTargetBoundSensitivity(options)
             velocity(index),acceleration(index),yaw(index),certified(index),identifier(index),deficit(index),seconds(index));
     end
     report = struct('time',time,'range',norm(truthTarget.targetPositionInertial-truth(1:2)), ...
-        'egoErrorBound',options.EgoErrorBound,'positionBound',options.PositionBound,'jerkBound',options.JerkBound, ...
+        'egoErrorBound',options.EgoErrorBound,'positionBound',options.PositionBound, ...
+        'curvatureMaximum',options.CurvatureMaximum, ...
         'velocityBound',velocity(:),'accelerationBound',acceleration(:),'yawBound',yaw(:), ...
         'certified',certified,'failureIdentifier',identifier,'normalizedDeficit',deficit,'horizonSteps',horizon, ...
         'seconds',seconds,'exactRunFile',options.ExactRunFile, ...

@@ -13,17 +13,17 @@ function summary = runRecursiveSafetyValidation(options)
     cases=["stationary","oncoming","crossing","cruise","uncertainCrossing"];
     entries=cell(1,numel(cases));
     for index=1:numel(cases)
-        scenario=cases(index);egoBound=zeros(6,1);targetBound=zeros(8,1);jerk=zeros(2,1);
+        scenario=cases(index);egoBound=zeros(6,1);targetBound=zeros(8,1);
         if scenario=="uncertainCrossing"
             scenario="crossing";egoBound=[.01;.01;.001;.01;.01;.001];
-            targetBound=[.1;.1;.05;.05;.01;.01;.01;.01];jerk=[.02;.02];
+            targetBound=[.1;.1;.05;.05;.01;.01;.01;.01];
         end
         folder=fullfile(options.OutputDirectory,cases(index));
         try
             result=runExactStateRecursiveFeasibilityScenario(Scenario=scenario, ...
                 SampleCount=options.SampleCount,SampleTime=options.SampleTime, ...
                 DeadlineSeconds=Inf,OutputDirectory=folder, ...
-                EgoErrorBound=egoBound,TargetErrorBound=targetBound,TargetJerkAmplitude=jerk);
+                EgoErrorBound=egoBound,TargetErrorBound=targetBound);
         catch exception
             file=fullfile(folder,scenario+"-exact-state.mat");
             if ~isfile(file),rethrow(exception);end

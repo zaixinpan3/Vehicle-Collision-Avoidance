@@ -50,9 +50,7 @@ classdef avoidanceSafetyGeometry
                     "coverageRequired",localCoverageRequired(boundary));
                 boundaryLabels(index) = "road:"+boundary.boundaryId;
             end
-            targetTemplate = struct("center",zeros(8,1),"radius",zeros(8,1), ...
-                "contract",struct("jerkBound",zeros(2,1),"yawAccelerationBound",0), ...
-                "halfLength",0,"halfWidth",0);
+            targetTemplate = struct("center",zeros(8,1),"radius",zeros(8,1),"halfLength",0,"halfWidth",0);
             nativeGeometry = exist("avoidanceCellRowsKernelMex","file")==3;
             cachedFrames = isfield(prediction,"geometryAnchor") ...
                 && isequal(prediction.geometryAnchor,model.anchorPlan);
@@ -80,16 +78,14 @@ classdef avoidanceSafetyGeometry
             baseTarget=targetTemplate;targetLabel=strings(0,1);
             if hasTarget
                 encounter=model.encounter;
-                if string(encounter.contract.kind)=="nrmm-motion-v1" && any([prediction.cells.duration]>0)
-                    % Whole-hold cells extrapolate a node snapshot with the Cartesian
-                    % jerk bound, which does not cover NRMM turning.
+                if any([prediction.cells.duration]>0)
+                    % The whole-hold kernel rows extrapolate a node snapshot as a
+                    % polynomial in time, which does not enclose NRMM turning.
                     error("collisionAvoidanceController:unsupportedWholeHoldTarget", ...
                         "NRMM targets are certified at hold nodes only.");
                 end
                 [flowCenters,flowRadii]=targetPrediction.finiteFlow(encounter,cellStarts);
                 baseTarget.halfLength=encounter.halfLength;baseTarget.halfWidth=encounter.halfWidth;
-                baseTarget.contract.jerkBound=encounter.contract.jerkBound;
-                baseTarget.contract.yawAccelerationBound=encounter.contract.yawAccelerationBound;
                 targetLabel="collision:"+encounter.key;
             end
             labelsPerCell = [targetLabel;boundaryLabels;"poseDomain";"referencePhaseDomain"];
@@ -498,7 +494,8 @@ end
 function rows = localCellRows(data)
 % Numeric obstacle/road support construction shared by MATLAB and native code.
 % One nominal column is a certified node evaluated at the target's node-time
-% set; several columns are Bernstein coefficients of a whole-hold enclosure.
+% set; several columns are Bernstein coefficients of a whole-hold enclosure of
+% the road-boundary and domain rows only (a target refuses whole-hold cells).
     frame = data.frame;origin = frame(1:2);tangent = frame(3:4);lateral = frame(5:6);
     heading = frame(7);positionError = frame(8:9);headingError = frame(10);
     stationRange = frame(11:12).';
@@ -515,32 +512,24 @@ function rows = localCellRows(data)
     normal = zeros(2,0);separationNormal = normal;count = 0;
     if hasTarget
         target = data.target;
-        middle = targetPrediction.finiteFlow(target,data.duration/2);
+        if pointCount>1
+            % A whole-hold cell would extrapolate the node snapshot as a
+            % polynomial in time, which does not enclose NRMM motion; the
+            % target's box is evaluated at hold nodes only.
+            error("collisionAvoidanceController:unsupportedWholeHoldTarget", ...
+                "NRMM targets are certified at hold nodes only.");
+        end
+        % Node certificate: the target's bounded set at the node time.
+        targetPosition = target.center(1:2);
+        targetRadius = target.radius(1:2);
+        yawCenter = target.center(7);
+        yawRadius = target.radius(7);
         centerEgo = positionOffset+positionMap*mean(nominal,2);
         if ~isempty(data.normal)
             normal=data.normal;
         else
             [~,normal] = avoidanceSafetyGeometry.rectangleDistance(centerEgo,yawOffset+yawRow*mean(nominal,2), ...
-                middle(1:2),middle(7),[halfLength;halfWidth;target.halfLength;target.halfWidth]);
-        end
-        degree = data.degree;
-        if pointCount==1
-            % Node certificate: the target's bounded set at the node time.
-            targetPosition = target.center(1:2);
-            targetRadius = target.radius(1:2);
-            yawCenter = target.center(7);
-            yawRadius = target.radius(7);
-        else
-            % Whole-hold enclosure: Bernstein coefficients of the bounded flow.
-            positionPolynomial = [target.center(1:2),target.center(3:4),target.center(5:6)/2,zeros(2,degree-2)];
-            radiusPolynomial = [target.radius(1:2),target.radius(3:4),target.radius(5:6)/2, ...
-                target.contract.jerkBound/6,zeros(2,degree-3)];
-            transform = stateUncertainty.bernsteinTransform(degree,data.duration);
-            targetPosition = positionPolynomial*transform.';
-            targetRadius = radiusPolynomial*transform.';
-            [endCenter,endRadius] = targetPrediction.finiteFlow(target,data.duration);
-            yawCenter = (target.center(7)+endCenter(7))/2;
-            yawRadius = abs(endCenter(7)-target.center(7))/2+endRadius(7);
+                targetPosition,yawCenter,[halfLength;halfWidth;target.halfLength;target.halfWidth]);
         end
         targetSupport = targetPrediction.rectangleSupport(target.halfLength,target.halfWidth,normal,yawCenter,yawRadius);
         yawCenter=heading;yawExtent=headingDomain+headingError;
@@ -653,7 +642,8 @@ end
 
 function part=localTargetPart(tube,encounter,time)
 % Target position deviation of a target-reactive tube, in the ego basis, and
-% the arithmetic allowance of its nominal flow. Empty for an ego-only tube.
+% a floating-point allowance scaled by the magnitude of the target state
+% carried to this time. Empty for an ego-only tube.
     part=[];
     if ~isfield(tube,'targetGenerators'),return;end
     x=encounter.center;

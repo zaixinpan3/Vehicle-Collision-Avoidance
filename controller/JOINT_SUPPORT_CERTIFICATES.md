@@ -211,7 +211,9 @@ Adapter status 4 denotes optimized admission, 2 optimized continuation,
 after changing their prepared input structures.
 
 This extends the 2021 Cheng reference rule; it is not a fluid PDE solution.
-The online bounded Cartesian target model remains the hard safety model.
+The online NRMM target enclosure (`nrmm-motion-v1`,
+[TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md)) remains the
+hard safety model.
 The initializer supports selected route corridors rather than general unions
 of road patches. The unchanged node certificate does not establish all-time
 separation. Two passing assignments are incomplete, and failure does not prove

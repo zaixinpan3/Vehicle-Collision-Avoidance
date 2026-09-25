@@ -33,7 +33,7 @@ function report = probeEstimatorAdmission(options)
     identifier = strings(1,count);message = strings(1,count);seconds = nan(1,count);horizon = nan(1,count);
     deficit = nan(1,count);nativeSolves = nan(1,count);
     targetVelocityBound = nan(2,count);targetPositionBound = nan(2,count);targetYawBound = nan(1,count);
-    targetAccelerationBound = nan(2,count);egoBound = nan(6,count);jerkBound = nan(1,count);
+    targetAccelerationBound = nan(2,count);egoBound = nan(6,count);curvatureMaximum = nan(1,count);
     targetVelocityError = nan(1,count);targetPositionError = nan(1,count);
     acquisitionTime = NaN;
     for k = 1:count
@@ -47,7 +47,9 @@ function report = probeEstimatorAdmission(options)
         bounds = target.controllerErrorBound.bounds(:);
         targetPositionBound(:,k) = bounds(1:2);targetVelocityBound(:,k) = bounds(3:4);
         targetAccelerationBound(:,k) = bounds(5:6);targetYawBound(k) = bounds(7);
-        jerkBound(k) = target.predictionMotion.jerkBound(1);
+        if ~isempty(target.predictionMotion)
+            curvatureMaximum(k) = target.predictionMotion.curvatureMaximum;
+        end
         truthTarget = targetFunction(time(k),[]);
         targetPositionError(k) = norm(target.targetPositionInertial-truthTarget.targetPositionInertial);
         targetVelocityError(k) = norm(target.targetVelocityInertial-truthTarget.targetVelocityInertial);
@@ -71,7 +73,8 @@ function report = probeEstimatorAdmission(options)
         'failureIdentifier',identifier,'failureMessage',message,'attemptSeconds',seconds,'horizonSteps',horizon, ...
         'normalizedDeficit',deficit,'nativeSolves',nativeSolves,'acquisitionTime',acquisitionTime, ...
         'targetPositionBound',targetPositionBound,'targetVelocityBound',targetVelocityBound, ...
-        'targetAccelerationBound',targetAccelerationBound,'targetYawBound',targetYawBound,'jerkBound',jerkBound, ...
+        'targetAccelerationBound',targetAccelerationBound,'targetYawBound',targetYawBound, ...
+        'curvatureMaximum',curvatureMaximum, ...
         'targetPositionError',targetPositionError,'targetVelocityError',targetVelocityError,'egoBound',egoBound, ...
         'exactRunFile',options.ExactRunFile,'seed',options.Seed,'searchBudgetSeconds',options.SearchBudgetSeconds, ...
         'minimumRadarSamples',options.MinimumRadarSamples, ...

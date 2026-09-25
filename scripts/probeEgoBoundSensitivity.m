@@ -27,7 +27,7 @@ function report = probeEgoBoundSensitivity(options)
     target.targetVelocityInertialErrorBound = zeros(2,1);
     target.targetAccelerationInertialErrorBound = zeros(2,1);
     target.targetYawErrorBound = options.TargetYawBound;target.targetYawRateErrorBound = 0;
-    target.predictionMotion = struct('kind',"finite-sensing-motion-v1",'jerkBound',zeros(2,1),'yawAccelerationBound',0);
+    target.predictionMotion = struct('kind',"nrmm-motion-v1",'curvatureMaximum',0.05);
     road = struct('centerline',[-100,0;2000,0]);
     full = options.EstimatorEgoBound;
     names = ["zero";"estimator";"position only";"yaw only";"speed only";"lateral velocity only";"yaw rate only"; ...

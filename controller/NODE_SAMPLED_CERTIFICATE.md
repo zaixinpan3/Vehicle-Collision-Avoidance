@@ -88,9 +88,12 @@ nodes only.
   `B_k` and `c_k`; `start = time = k h` and `duration = 0`. No held-interval
   enclosure is computed online.
 - `avoidanceSafetyGeometry.localCellRows` evaluates a one-point cell against
-  the target's bounded set at the node time (center, radius and yaw radius of
-  `targetPrediction.finiteFlow`); multi-point cells keep the Bernstein path
-  for offline audits. The native kernels were regenerated.
+  the target's bounded set at the node time (the center, radius and yaw
+  radius that `avoidanceSafetyGeometry.build` takes from
+  `targetPrediction.finiteFlow` at the node); a multi-point cell with a target
+  is refused (`unsupportedWholeHoldTarget`, since 2026-09-24), while
+  multi-point road-boundary and domain rows keep their Bernstein form for
+  offline audits. The native kernels were regenerated.
 - `formulateAvoidanceProblem.localShift` reconstructs the node clock as
   `stage*h` when the executed hold is eliminated.
 - `avoidanceSafetyGeometry.jointProgram` uses those node enclosures to build

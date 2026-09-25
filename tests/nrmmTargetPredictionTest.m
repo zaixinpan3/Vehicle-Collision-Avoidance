@@ -11,6 +11,7 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'tests')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
         end
     end
     methods (TestMethodSetup)
@@ -26,9 +27,9 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             model=targetPrediction.deviationModel(encounter,time);
             boxExcess=-Inf;linearExcess=-Inf;
             for trial=1:300
-                truth=localSampleNrmm(encounter,stream,mod(trial,3)==0);
+                truth=nrmmTruthFixture.sampleBox(encounter,stream,mod(trial,3)==0);
                 for node=1:numel(time)
-                    state=localNrmmState(truth,time(node));
+                    state=nrmmTruthFixture.state(truth,time(node));
                     deviation=state-center(:,node);
                     deviation(7)=atan2(sin(deviation(7)),cos(deviation(7)));
                     boxExcess=max([boxExcess;abs(deviation)-box(:,node)]);
@@ -42,7 +43,8 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             end
             testCase.verifyLessThanOrEqual(boxExcess,1e-9);
             testCase.verifyLessThanOrEqual(linearExcess,1e-9);
-            testCase.verifyEqual(model.holdBound,zeros(2,numel(time)));
+            testCase.verifyTrue(all(isfinite([center;box]),'all'));
+            testCase.verifyTrue(all(isfinite(model.remainder),'all') && all(isfinite(model.parameterGenerators),'all'));
         end
 
         function thePathLengthBallCoversAPossibleStop(testCase)
@@ -56,22 +58,37 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             slow=localPathEncounter([.05;.2;.05;0],[.2;.2;.1;.1;.1;.1;.02;.02],.05);
             model=targetPrediction.deviationModel(slow,0:.1:4.8);
             testCase.verifyFalse(any(model.parameterGenerators(:,3:6,:),'all'));
+            [center,box]=targetPrediction.finiteFlow(slow,0:.1:4.8);
+            testCase.verifyTrue(all(isfinite([center;box;model.remainder]),'all'));
         end
 
-        function theNrmmBoxIsTighterThanTheCartesianTurningJerkBox(testCase)
-            % A 10 m/s target of the declared domain (|kappa| <= 0.03, |A| <= 1):
-            % the Cartesian contract must cover the jerk of NRMM turning,
-            % hypot(V*omega^2, 3*A*omega), and grows with t^3/6.
-            encounter=localPathEncounter([10;0;0;.02],[.1;.1;.05;.05;.01;.01;.01;.01],.03);
-            cartesian=encounter;
-            jerk=hypot(10*.3^2,3*1*.3);
-            cartesian.contract=struct('kind',"finite-sensing-motion-v1",'jerkBound',[jerk;jerk], ...
-                'yawAccelerationBound',.03,'scalarAccelerationMaximum',1);
-            time=[2,4.8];
-            [~,nrmm]=targetPrediction.finiteFlow(encounter,time);
-            [~,box]=targetPrediction.finiteFlow(cartesian,time);
-            testCase.verifyLessThan(max(nrmm(1:2,:)),max(box(1:2,:)));
-            testCase.verifyLessThan(max(nrmm(1:2,2)),max(box(1:2,2))/10);
+        function aDeclaredSpeedRateMaximumClipsTheParametersAndTheBox(testCase)
+            % The box implies speed-rates within +-0.028 m/s^2 (the acceleration
+            % radius plus the normal acceleration turned by the course error);
+            % a declared maximum below that clips the interval and shrinks the
+            % reachable box by the clipped error times t^2/2, and truths within
+            % the maximum stay inside.
+            free=localPathEncounter([10;0;0;.02],[.1;.1;.05;.05;.01;.01;.01;.01],.05);
+            capped=free;capped.contract.speedRateMaximum=.01;
+            capped.parameters=targetPrediction.nrmmParameters(capped.center,capped.radius,capped.contract,[]);
+            testCase.verifyGreaterThan(diff(free.parameters.speedRate),.05);
+            testCase.verifyEqual(capped.parameters.speedRate,[-.01;.01],AbsTol=1e-12);
+            time=[1,4.8];
+            [~,freeBox]=targetPrediction.finiteFlow(free,time);
+            [center,cappedBox]=targetPrediction.finiteFlow(capped,time);
+            testCase.verifyLessThan(cappedBox(1:6,:),freeBox(1:6,:)+1e-12);
+            testCase.verifyLessThan(max(cappedBox(1:2,2)),max(freeBox(1:2,2))-.15);
+            stream=RandStream('mt19937ar',Seed=5);excess=-Inf;
+            for trial=1:200
+                truth=nrmmTruthFixture.sampleBox(capped,stream,mod(trial,2)==0);
+                testCase.assertLessThanOrEqual(abs(truth.A),.01+1e-12);
+                for node=1:numel(time)
+                    deviation=nrmmTruthFixture.state(truth,time(node))-center(:,node);
+                    deviation(7)=atan2(sin(deviation(7)),cos(deviation(7)));
+                    excess=max([excess;abs(deviation)-cappedBox(:,node)]);
+                end
+            end
+            testCase.verifyLessThanOrEqual(excess,1e-9);
         end
 
         function publishedParameterBoundsTightenTheBoxAndStayValid(testCase)
@@ -97,9 +114,9 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             testCase.verifyLessThan(max(box(1:2,end)),.95*max(wide(1:2,end)));
             stream=RandStream('mt19937ar',Seed=5);excess=-Inf;
             for trial=1:300
-                truth=localSampleNrmmDisc(encounter,.5,.1,stream);
+                truth=nrmmTruthFixture.sampleDisc(encounter,.5,.1,stream);
                 for node=1:numel(time)
-                    deviation=localNrmmState(truth,time(node))-center(:,node);
+                    deviation=nrmmTruthFixture.state(truth,time(node))-center(:,node);
                     deviation(7)=atan2(sin(deviation(7)),cos(deviation(7)));
                     excess=max([excess;abs(deviation)-box(:,node)]);
                 end
@@ -111,7 +128,7 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             radius=[.2;.2;.1;.1;.1;.1;.02;.02];h=.05;
             carried=localPathEncounter([6;.3;.4;.02],radius,.05);
             truth=struct('p0',[1;2],'speed',6,'course',.3,'A',.4,'kappa',.02,'yaw0',.3);
-            measured=carried;measured.center=localNrmmState(truth,h);
+            measured=carried;measured.center=nrmmTruthFixture.state(truth,h);
             measured.parameters=targetPrediction.nrmmParameters(measured.center,radius,measured.contract, ...
                 localBallBounds(measured.center,.1,.1));
             next=targetPrediction.condition(carried,h,measured);
@@ -139,21 +156,42 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
         end
 
         function anNrmmContractCannotCarryAModelError(testCase)
-            [ego,target,road,cfg]=localLeadEncounter(Inf);
-            target.predictionMotion.jerkBound=[.1;.1];
-            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,[]), ...
+            [ego,target,road,cfg]=encounterTestFixture.nrmmLead(Inf);
+            jerk=target;jerk.predictionMotion.jerkBound=[.1;.1];
+            testCase.verifyError(@() collisionAvoidanceController(ego,jerk,road,cfg,[]), ...
+                "collisionAvoidanceController:invalidEncounterContract");
+            yawing=target;yawing.predictionMotion.yawAccelerationBound=.1;
+            testCase.verifyError(@() collisionAvoidanceController(ego,yawing,road,cfg,[]), ...
+                "collisionAvoidanceController:invalidEncounterContract");
+            zeros_=target;zeros_.predictionMotion.jerkBound=[0;0];zeros_.predictionMotion.yawAccelerationBound=0;
+            [~,~,problem]=collisionAvoidanceController(ego,zeros_,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.planCertified);
+        end
+
+        function aTargetWithoutAContractIsRefused(testCase)
+            % No contract describes motion outside every NRMM path (the
+            % estimator publishes none for a model error).
+            [ego,target,road,cfg]=encounterTestFixture.nrmmLead(Inf);
+            empty=target;empty.predictionMotion=[];
+            testCase.verifyError(@() collisionAvoidanceController(ego,empty,road,cfg,[]), ...
+                "collisionAvoidanceController:missingPredictionMotion");
+            absent=rmfield(target,'predictionMotion');
+            testCase.verifyError(@() collisionAvoidanceController(ego,absent,road,cfg,[]), ...
+                "collisionAvoidanceController:missingPredictionMotion");
+            other=target;other.predictionMotion=struct('kind',"finite-sensing-motion-v1",'jerkBound',[0;0]);
+            testCase.verifyError(@() collisionAvoidanceController(ego,other,road,cfg,[]), ...
                 "collisionAvoidanceController:invalidEncounterContract");
         end
 
         function sampledReactiveNrmmTrajectoriesStayInsideTheJointTube(testCase)
             % The reactive policy of the admitted directions, closed on NRMM
             % truths and per-hold estimator errors on the declared plant.
-            [ego,target,road,cfg]=localLeadEncounter(Inf);
+            [ego,target,road,cfg]=encounterTestFixture.nrmmLead(Inf);
             [~,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.assertTrue(problem.metadata.planCertified);
             reactive=localReactiveProgram(problem,30);
             testCase.assertTrue(any(reactive.prediction.targetGainSequence(:)));
-            excess=localSampledExcess(reactive,problem.model,plan,20260924);
+            excess=nrmmTruthFixture.sampledExcess(reactive,problem.model,plan,20260924);
             testCase.verifyLessThanOrEqual(excess.joint,1e-9);
             testCase.verifyLessThanOrEqual(excess.record,1e-9);
             testCase.verifyLessThanOrEqual(excess.input,1e-9);
@@ -161,7 +199,7 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
         end
 
         function aMotionModelChangeVoidsTheCarriedFamily(testCase)
-            [ego,target,road,cfg]=localLeadEncounter(Inf);
+            [ego,target,road,cfg]=encounterTestFixture.nrmmLead(Inf);
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.assertTrue(first.metadata.planCertified);
             next=localSuccessor(ego,stored);
@@ -178,11 +216,6 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
             faster=nextTarget;faster.predictionMotion.speedRateMaximum=2;
             [~,~,problem]=collisionAvoidanceController(next,faster,road,cfg,stored);
             testCase.verifyFalse(problem.metadata.inheritedFeasibleFamily);
-            cartesian=nextTarget;
-            cartesian.predictionMotion=struct('kind',"finite-sensing-motion-v1",'jerkBound',[0;0], ...
-                'yawAccelerationBound',0);
-            [~,~,problem]=collisionAvoidanceController(next,cartesian,road,cfg,stored);
-            testCase.verifyFalse(problem.metadata.inheritedFeasibleFamily);
         end
     end
 end
@@ -191,9 +224,8 @@ function encounter=localPathEncounter(parameters,radius,curvatureMaximum)
 % Estimate box centred on the NRMM state [1; 2] + path(parameters) at t = 0.
     truth=struct('p0',[1;2],'speed',parameters(1),'course',parameters(2),'A',parameters(3), ...
         'kappa',parameters(4),'yaw0',parameters(2));
-    encounter=struct('center',localNrmmState(truth,0),'radius',radius,'time',0, ...
-        'contract',struct('kind',"nrmm-motion-v1",'jerkBound',[0;0],'yawAccelerationBound',0, ...
-        'curvatureMaximum',curvatureMaximum));
+    encounter=struct('center',nrmmTruthFixture.state(truth,0),'radius',radius,'time',0, ...
+        'contract',struct('kind',"nrmm-motion-v1",'curvatureMaximum',curvatureMaximum));
     encounter.parameters=targetPrediction.nrmmParameters(encounter.center,encounter.radius,encounter.contract,[]);
 end
 
@@ -208,95 +240,6 @@ function published=localBallBounds(center,velocityRadius,accelerationRadius)
     quotients=(normal+[-1;1]*componentRadius)./[(speed-velocityRadius)^2,(speed+velocityRadius)^2];
     published=struct('speed',velocityRadius,'course',theta,'speedRate',componentRadius, ...
         'curvature',[min(quotients,[],'all');max(quotients,[],'all')]);
-end
-
-function truth=localSampleNrmmDisc(encounter,velocityRadius,accelerationRadius,stream)
-% NRMM parameters whose velocity and acceleration at t = 0 lie in discs around
-% the estimate (and so inside its box) and whose yaw rate lies in the box.
-    x=encounter.center;r=encounter.radius;maximum=encounter.contract.curvatureMaximum;
-    for attempt=1:50000
-        p0=x(1:2)+r(1:2).*(2*rand(stream,2,1)-1);
-        direction=2*pi*rand(stream);v=x(3:4)+velocityRadius*sqrt(rand(stream))*[cos(direction);sin(direction)];
-        speed=norm(v);
-        if speed==0,continue;end
-        kappa=(x(8)+r(8)*(2*rand(stream)-1))/speed;
-        if abs(kappa)>maximum,continue;end
-        course=atan2(v(2),v(1));tangent=[cos(course);sin(course)];normal=[-tangent(2);tangent(1)];
-        % Speed-rates A with |A*tangent + kappa*speed^2*normal - a| <= accelerationRadius.
-        offset=dot(x(5:6),normal)-kappa*speed^2;
-        if abs(offset)>accelerationRadius,continue;end
-        halfWidth=sqrt(accelerationRadius^2-offset^2);
-        A=dot(x(5:6),tangent)+halfWidth*(2*rand(stream)-1);
-        truth=struct('p0',p0,'speed',speed,'course',course,'A',A,'kappa',kappa,'yaw0',x(7)+r(7)*(2*rand(stream)-1));
-        return;
-    end
-    error('nrmmTargetPredictionTest:noSample','No NRMM state found in the discs.');
-end
-
-function truth=localSampleNrmm(encounter,stream,extreme)
-% NRMM parameters whose state at t = 0 lies in the admitted box; extreme draws
-% put the position, velocity, yaw and yaw rate at box vertices (uniform draws
-% after 200 vertices without an NRMM-consistent acceleration).
-    x=encounter.center;r=encounter.radius;maximum=encounter.contract.curvatureMaximum;
-    for attempt=1:50000
-        vertex=extreme && attempt<=200;
-        if vertex,u=sign(randn(stream,8,1));else,u=2*rand(stream,8,1)-1;end
-        p0=x(1:2)+r(1:2).*u(1:2);v=x(3:4)+r(3:4).*u(3:4);speed=norm(v);
-        if speed==0,continue;end
-        kappa=(x(8)+r(8)*u(8))/speed;
-        if abs(kappa)>maximum,continue;end
-        course=atan2(v(2),v(1));tangent=[cos(course);sin(course)];
-        normal=kappa*speed^2*[-tangent(2);tangent(1)];
-        % Speed-rates A with A*tangent + normal inside the acceleration box.
-        low=-Inf;high=Inf;feasible=true;
-        for axis=1:2
-            lower=x(4+axis)-r(4+axis)-normal(axis);upper=x(4+axis)+r(4+axis)-normal(axis);
-            if abs(tangent(axis))<1e-12
-                feasible=feasible && lower<=0 && upper>=0;
-            else
-                bounds=sort([lower,upper]/tangent(axis));low=max(low,bounds(1));high=min(high,bounds(2));
-            end
-        end
-        if ~feasible || low>high,continue;end
-        if vertex,A=low+(high-low)*(randn(stream)>0);else,A=low+(high-low)*rand(stream);end
-        truth=struct('p0',p0,'speed',speed,'course',course,'A',A,'kappa',kappa,'yaw0',x(7)+r(7)*u(7));
-        return;
-    end
-    error('nrmmTargetPredictionTest:noSample','No NRMM state found in the box.');
-end
-
-function state=localNrmmState(truth,t)
-% Exact NRMM state [p; v; a; yaw; yaw rate] at time t; stops and holds at zero speed.
-    moving=t;
-    if truth.A<0,moving=min(t,truth.speed/-truth.A);end
-    arc=truth.speed*moving+truth.A*moving^2/2;rate=max(0,truth.speed+truth.A*moving);
-    heading=truth.course+truth.kappa*arc;tangent=[cos(heading);sin(heading)];
-    half=truth.kappa*arc/2;scale=1;
-    if abs(half)>1e-9,scale=sin(half)/half;end
-    acceleration=truth.A*tangent+truth.kappa*rate^2*[-tangent(2);tangent(1)];
-    if rate==0,acceleration=zeros(2,1);end
-    state=[truth.p0+arc*scale*[cos(truth.course+half);sin(truth.course+half)];rate*tangent;acceleration; ...
-        truth.yaw0+truth.kappa*arc;truth.kappa*rate];
-end
-
-function [ego,target,road,cfg]=localLeadEncounter(scales)
-% Straight road; a 2 m/s target 15 m ahead on a 50 m-radius NRMM arc.
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'controller',struct('sampleTime',.05,'horizonSteps',32,'minimumHorizonSteps',1), ...
-        'model',struct('lateralDomainRadius',4), ...
-        'solver',struct('frameDeadlineSeconds',60,'certificateSearchTimeLimit',60), ...
-        'feedbackPrediction',struct('targetReaction',struct('inputWeightScales',scales))));
-    road=[-100,0;2000,0];
-    ego=struct('position',[0;0],'yaw',0,'speed',8,'stateTime',0, ...
-        'controllerStateErrorBound',[.076;.076;.048;.089;.497;.0015], ...
-        'perception',struct('time',0,'range',16,'completeWithinRange',true));
-    target=struct('trackId',1,'targetPositionInertial',[15;0],'targetVelocityInertial',[2;0], ...
-        'targetAccelerationInertial',[0;.08],'targetHeadingInertial',0,'targetYawRate',.04, ...
-        'targetPositionInertialErrorBound',[.1;.1],'targetVelocityInertialErrorBound',[.05;.05], ...
-        'targetAccelerationInertialErrorBound',[.02;.02],'targetYawErrorBound',.01, ...
-        'targetYawRateErrorBound',.01, ...
-        'predictionMotion',struct('kind','nrmm-motion-v1','jerkBound',[0;0], ...
-            'yawAccelerationBound',0,'curvatureMaximum',.03,'speedRateMaximum',1));
 end
 
 function program=localReactiveProgram(problem,strength)
@@ -319,62 +262,4 @@ function ego=localSuccessor(previous,stored)
         'heldActuatorInput',stored.appliedInput, ...
         'controllerStateErrorBound',previous.controllerStateErrorBound, ...
         'perception',struct('time',stored.stateTime+h,'range',stored.confirmation.range,'completeWithinRange',true));
-end
-
-function excess=localSampledExcess(program,model,plan,seed)
-% Simulate the declared plant under u_k = v_k + K_k (xhat - z) + L_k (shat - s0)
-% + N_k (ahat - a0) with exact NRMM targets and per-hold estimator errors.
-    prediction=program.prediction;encounter=model.encounter;
-    count=prediction.stageCount;h=model.sampleTime;
-    nominal=zeros(6,count+1);
-    for node=0:count
-        nominal(:,node+1)=prediction.egoStateOffset(:,node+1)+prediction.egoStateMatrix(:,:,node+1)*plan(:);
-    end
-    targetNominal=prediction.targetNominal;
-    egoBound=prediction.estimatorBound;targetBound=prediction.targetEstimatorBound;
-    records=program.jointCertificate.records;angles=program.jointCertificate.angles;
-    stream=RandStream('mt19937ar',Seed=seed);
-    excess=struct('joint',-Inf,'record',-Inf,'input',-Inf,'slew',-Inf);
-    for trial=1:60
-        vertex=mod(trial,2)==0;
-        x=nominal(:,1)+model.initialFrenetErrorBound.*localUnit(stream,6,vertex);
-        truth=localSampleNrmm(encounter,stream,vertex);
-        previous=zeros(2,1);
-        for stage=1:count
-            deviation=zeros(2,1);
-            if stage>1
-                egoEstimate=x+egoBound.*localUnit(stream,6,vertex);
-                s=localNrmmState(truth,(stage-1)*h);
-                targetDeviation=s(1:6)+targetBound.*localUnit(stream,6,vertex)-targetNominal(:,stage);
-                deviation=prediction.feedbackGainSequence(:,:,stage)*(egoEstimate-nominal(:,stage)) ...
-                    +prediction.targetGainSequence(:,:,stage)*targetDeviation(1:4) ...
-                    +prediction.targetAccelerationGainSequence(:,:,stage)*targetDeviation(5:6);
-            end
-            excess.input=max(excess.input,max(abs(deviation)-prediction.feedbackInputSupport(:,stage)));
-            excess.slew=max(excess.slew,max(abs(deviation-previous)-prediction.feedbackSlewSupport(:,stage)));
-            previous=deviation;
-            x=prediction.stageMatrixA(:,:,stage)*x ...
-                +prediction.stageMatrixB(:,:,stage)*(plan(:,stage)+deviation)+prediction.stageAffine(:,stage);
-            s=localNrmmState(truth,stage*h);
-            cell=prediction.cells(stage);
-            joint=[x-nominal(:,stage+1);s(1:4)-targetNominal(1:4,stage+1)];
-            generators=[cell.generators;cell.targetGenerators];
-            for direction=[eye(10),-eye(10),randn(stream,10,8)]
-                excess.joint=max(excess.joint,direction.'*joint-sum(abs(direction.'*generators)));
-            end
-            for index=find([records.stage]==stage)
-                normal=[cos(angles(index));sin(angles(index))];
-                relative=records(index).positionMap*joint(1:6)-joint(7:8);
-                excess.record=max(excess.record,normal.'*relative-sum(abs(records(index).generators.'*normal)));
-            end
-        end
-    end
-end
-
-function value=localUnit(stream,count,vertex)
-    if vertex
-        value=sign(randn(stream,count,1));
-    else
-        value=2*rand(stream,count,1)-1;
-    end
 end

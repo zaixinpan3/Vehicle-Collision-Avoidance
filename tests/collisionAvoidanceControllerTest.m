@@ -151,7 +151,6 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             % Interior-hold clearance is a scene-specific physical audit here;
             % the certificate itself covers the hold nodes only.
             [ego,target,road,cfg]=localFixture(true);
-            target.predictionMotion.jerkBound=[.1;.1];
             target.targetPositionInertialErrorBound=[.1;.1];
             [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             [minimum,residual]=localBarrierResidual(problem,command);
@@ -275,8 +274,7 @@ function [ego,target,road,cfg]=localFixture(present)
         target=struct('trackId',1,'targetPositionInertial',[12;4], ...
             'targetVelocityInertial',[16;0],'targetAccelerationInertial',[0;0], ...
             'targetHeadingInertial',0,'targetYawRate',0, ...
-            'predictionMotion',struct('kind',"finite-sensing-motion-v1", ...
-            'jerkBound',[0;0],'yawAccelerationBound',0));
+            'predictionMotion',struct('kind',"nrmm-motion-v1",'curvatureMaximum',0.05));
     end
 end
 

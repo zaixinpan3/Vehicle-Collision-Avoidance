@@ -84,7 +84,7 @@ classdef smoothReferenceGeometryTest < matlab.unittest.TestCase
             testCase.verifyEqual(exactRadius,zeros(6,1));
         end
 
-        function sweptRowsChargeTheNonaffineYawRemainder(testCase)
+        function nodeRowsChargeTheNonaffineYawRemainder(testCase)
             [maximumResidualGap,yawRemainder]=localPhysicalResidualGap();
             testCase.verifyGreaterThan(yawRemainder,0);
             testCase.verifyLessThanOrEqual(maximumResidualGap,1e-10);
@@ -101,14 +101,13 @@ end
 function [gap,yawRemainder]=localPhysicalResidualGap()
     curve=localCurve();frame=laneGeometry.localPoseFrame(curve,[36;1;.1],[3;.7;.2]);
     [pose,domain]=laneGeometry.poseData(frame);normal=[.6;.8];
-    target=struct('center',[60;6;0;0;0;0;.2;0],'radius',zeros(8,1), ...
-        'contract',struct('jerkBound',[0;0],'yawAccelerationBound',0),'halfLength',2.5,'halfWidth',1);
+    target=struct('center',[60;6;0;0;0;0;.2;0],'radius',zeros(8,1),'halfLength',2.5,'halfWidth',1);
     boundary=struct('coefficients',[0,0,0],'safeSideSign',1,'longitudinalDirection',[1;0], ...
         'lateralDirection',[0;1],'origin',[0;0],'parameterRange',[-100;100],'normalDistanceErrorBound',0,'coverageRequired',1);
     data=struct('frame',[frame.origin;frame.tangent;frame.lateral;frame.heading;frame.positionErrorBound; ...
         frame.headingErrorBound;frame.stationLower;frame.stationUpper],'pose',pose,'domain',domain, ...
-        'nominal',repmat([36;1;.1;8;0;0],1,8),'target',target,'hasTarget',true,'boundaries',repmat(boundary,0,1), ...
-        'settings',[2.5;1;.8;4],'duration',.1,'degree',7,'normal',normal);
+        'nominal',[36;1;.1;8;0;0],'target',target,'hasTarget',true,'boundaries',repmat(boundary,0,1), ...
+        'settings',[2.5;1;.8;4],'duration',0,'degree',0,'normal',normal);
     rows=avoidanceSafetyGeometry.cellRows(data);selected=rows.source==1;
     [s,d,e]=ndgrid(linspace(33,39,17),linspace(.3,1.7,7),linspace(-.1,.3,9));
     state=[s(:).';d(:).';e(:).';zeros(3,numel(s))];

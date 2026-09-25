@@ -30,9 +30,7 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
         end
 
         function nativeNodeRowsMatchTheInterpretedNodeRows(testCase,hasTarget)
-            target = struct("center",[50;1;-10;0;0;0;pi;0],"radius",0.01*ones(8,1), ...
-                "contract",struct("jerkBound",[0.1;0.1],"yawAccelerationBound",0.01), ...
-                "halfLength",2.5,"halfWidth",1);
+            target = struct("center",[50;1;-10;0;0;0;pi;0],"radius",0.01*ones(8,1),"halfLength",2.5,"halfWidth",1);
             boundary = struct("coefficients",[-0.001,0.02,0],"safeSideSign",1, ...
                 "longitudinalDirection",[1;0],"lateralDirection",[0;1],"origin",[0;-10], ...
                 "parameterRange",[-200;200],"normalDistanceErrorBound",0.01,"coverageRequired",1);
@@ -56,9 +54,7 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
         end
 
         function nativeSupportsPreserveAllHalfspaceRows(testCase,hasTarget)
-            target = struct("center",[50;1;-10;0;0;0;pi;0],"radius",0.01*ones(8,1), ...
-                "contract",struct("jerkBound",[0.1;0.1],"yawAccelerationBound",0.01), ...
-                "halfLength",2.5,"halfWidth",1);
+            target = struct("center",[50;1;-10;0;0;0;pi;0],"radius",0.01*ones(8,1),"halfLength",2.5,"halfWidth",1);
             boundary = struct("coefficients",[-0.001,0.02,0],"safeSideSign",1, ...
                 "longitudinalDirection",[1;0],"lateralDirection",[0;1],"origin",[0;-10], ...
                 "parameterRange",[-200;200],"normalDistanceErrorBound",0.01,"coverageRequired",1);
@@ -71,6 +67,15 @@ classdef avoidanceNativeGeometryTest < matlab.unittest.TestCase
                 "settings",[2.5;1;0.4;8],"duration",0.05,"degree",7,"normal",zeros(2,0));
             data = repmat(data,2,1);
             data(2).nominal(1,:) = 33;
+            if hasTarget
+                % Whole-hold cells do not enclose NRMM targets; both
+                % implementations refuse them.
+                testCase.verifyError(@() avoidanceSafetyGeometry.cellRows(data), ...
+                    "collisionAvoidanceController:unsupportedWholeHoldTarget");
+                testCase.verifyError(@() avoidanceCellRowsKernelMex(data), ...
+                    "collisionAvoidanceController:unsupportedWholeHoldTarget");
+                return;
+            end
             expected = avoidanceSafetyGeometry.cellRows(data);
             actual = avoidanceCellRowsKernelMex(data);
             testCase.verifyEqual(actual,expected,AbsTol=1e-10);

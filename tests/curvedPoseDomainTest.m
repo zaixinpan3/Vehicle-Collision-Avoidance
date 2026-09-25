@@ -98,7 +98,7 @@ function [ego,target,problem,stored,road,cfg]=localAdmission(curvature,lateral)
     [position,heading]=laneGeometry.referencePose(15,lateral,curve);
     target=struct('trackId',1,'targetPositionInertial',position,'targetVelocityInertial',[0;0], ...
         'targetAccelerationInertial',[0;0],'targetHeadingInertial',heading,'targetYawRate',0, ...
-        'predictionMotion',struct('kind',"finite-sensing-motion-v1",'jerkBound',[0;0],'yawAccelerationBound',0));
+        'predictionMotion',struct('kind',"nrmm-motion-v1",'curvatureMaximum',0.05));
     [~,~,problem,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
 end
 

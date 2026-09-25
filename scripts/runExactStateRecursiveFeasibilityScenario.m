@@ -8,6 +8,10 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
 % Collision acceptance requires a strictly positive sampled body gap.
 % Separation-margin fields report physical gap without an added clearance.
 % SampleTime is shared by prediction nodes, executed input holds and updates.
+% The target is an exact NRMM truth (nrmmTargetTruth): constant speed-rate
+% TargetSpeedRate and path curvature TargetCurvature, measured with noise
+% inside TargetErrorBound and declared under the nrmm-motion-v1 contract
+% (nrmmTargetMeasurement).
     arguments
         options.Scenario (1,1) string {mustBeMember(options.Scenario,["stationary","oncoming","crossing","cruise"])} = "stationary"
         options.SampleCount (1,1) double {mustBeInteger,mustBePositive} = 240
@@ -22,15 +26,10 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.EgoErrorBound (6,1) double {mustBeNonnegative,mustBeFinite} = zeros(6,1)
         options.TargetErrorBound (8,1) double {mustBeNonnegative,mustBeFinite} = zeros(8,1)
         options.Seed (1,1) double {mustBeInteger,mustBeNonnegative} = 20260912
-        options.TargetJerkAmplitude (2,1) double {mustBeFinite} = zeros(2,1)
-        options.TargetYawAccelerationAmplitude (1,1) double {mustBeFinite} = 0
-        options.TargetMotionFrequency (1,1) double {mustBeFinite,mustBePositive} = 1
         options.TargetAccelerationMaximum (1,1) double {mustBePositive} = Inf
-        options.TargetMotionModel (1,1) string {mustBeMember(options.TargetMotionModel,["jerk","nrmm"])} = "jerk"
         options.TargetSpeedRate (1,1) double {mustBeFinite} = 0
         options.TargetCurvature (1,1) double {mustBeFinite} = 0
         options.TargetCurvatureMaximum (1,1) double {mustBeFinite,mustBePositive} = 0.05
-        options.NrmmContract (1,1) string {mustBeMember(options.NrmmContract,["nrmm","cartesian"])} = "nrmm"
         options.NrmmParameterBounds (1,1) logical = true
         options.InitialTrackingError (5,1) double {mustBeFinite} = zeros(5,1)
         options.ConfirmationRange (1,1) double {mustBeFinite,mustBePositive} = 16
@@ -41,7 +40,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         options.FeedbackPrediction (1,1) struct = struct()
     end
     root = fileparts(fileparts(mfilename("fullpath")));
-    addpath(fullfile(root,"controller"),fullfile(root,"config"),fullfile(root,"estimator"));
+    addpath(fullfile(root,"controller"),fullfile(root,"config"),fullfile(root,"estimator"),fullfile(root,"scripts"));
     cfg = collisionAvoidanceControllerConfig(struct("referenceSpeed",8, ...
         "controller",struct("sampleTime",options.SampleTime, ...
         "horizonSteps",ceil(options.HorizonSeconds/options.SampleTime), ...
@@ -53,13 +52,14 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
     originalCfg = cfg;
     stream = RandStream("mt19937ar",Seed=options.Seed);
     h = cfg.controller.sampleTime;
+    assert(abs(options.TargetCurvature)<=options.TargetCurvatureMaximum, ...
+        "runExactStateRecursiveFeasibilityScenario:undeclaredCurvature", ...
+        "The truth curvature must lie within the declared curvature maximum.");
     truthTarget = struct("center",[15;0;0;0;0;0;0;0],"radius",zeros(8,1), ...
-        "jerkAmplitude",options.TargetJerkAmplitude, ...
-        "yawAccelerationAmplitude",options.TargetYawAccelerationAmplitude, ...
-        "frequency",options.TargetMotionFrequency,"accelerationMaximum",options.TargetAccelerationMaximum, ...
-        "model",options.TargetMotionModel,"speedRate",options.TargetSpeedRate, ...
-        "curvature",options.TargetCurvature,"curvatureMaximum",options.TargetCurvatureMaximum, ...
-        "cartesianJerkBound",NaN,"publishParameterBounds",options.NrmmParameterBounds, ...
+        "accelerationMaximum",options.TargetAccelerationMaximum, ...
+        "speedRate",options.TargetSpeedRate,"curvature",options.TargetCurvature, ...
+        "curvatureMaximum",options.TargetCurvatureMaximum, ...
+        "publishParameterBounds",options.NrmmParameterBounds, ...
         "halfLength",cfg.target.defaultLength/2,"halfWidth",cfg.target.defaultWidth/2);
     if options.Scenario=="oncoming",truthTarget.center=[60;0;-8;0;0;0;pi;0];end
     if options.Scenario=="crossing",truthTarget.center=[15;-4;0;32;0;0;pi/2;0];end
@@ -83,14 +83,6 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
             normal = [-sin(heading);cos(heading)];
             truthTarget.center = [point-7.5*normal;4*normal;zeros(2,1);heading+pi/2;0];
         end
-    end
-    if options.TargetMotionModel=="nrmm" && options.NrmmContract=="cartesian"
-        % The same NRMM truth under a Cartesian contract: the jerk of an NRMM
-        % path, hypot(kappa^2 V^3, 3 A kappa V), over the run's speeds and the
-        % declared curvature maximum.
-        speedMaximum = norm(truthTarget.center(3:4))+max(options.TargetSpeedRate,0)*options.SampleCount*h;
-        truthTarget.cartesianJerkBound = hypot(options.TargetCurvatureMaximum^2*speedMaximum^3, ...
-            3*abs(options.TargetSpeedRate)*options.TargetCurvatureMaximum*speedMaximum);
     end
     if options.UseRoadBoundaries
         boundary = struct("origin",zeros(2,1),"longitudinalDirection",[1;0], ...
@@ -125,7 +117,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
         frameTimer = tic;
         ego = localEgoMeasurement(x,time,previousInput,options.EgoErrorBound,stream,lane);
         ego.perception = struct('time',time,'range',options.ConfirmationRange,'completeWithinRange',true);
-        target = localTargetMeasurement(truthTarget,time,options.TargetErrorBound,stream);
+        target = nrmmTargetMeasurement(truthTarget,time,options.TargetErrorBound,stream);
         if options.Scenario=="cruise",target=[];end
         try
             [command,~,problem,previousState] = collisionAvoidanceController(ego,target,road,cfg,previousState);
@@ -178,7 +170,7 @@ function report = runExactStateRecursiveFeasibilityScenario(options)
             value=expm(fraction*h*generator)*[x;command.actuatorInput;1];
             [position,heading]=laneGeometry.fromFrenet(value(1:6),lane);
             if ~isempty(target)
-                targetState=localTargetTruth(truthTarget,time+fraction*h);
+                targetState=nrmmTargetTruth(truthTarget,time+fraction*h);
                 separation=avoidanceSafetyGeometry.rectangleDistance(position,heading,targetState(1:2),targetState(7), ...
                     [cfg.vehicle.length/2;cfg.vehicle.width/2;truthTarget.halfLength;truthTarget.halfWidth]);
                 minimumSeparation=min(minimumSeparation,separation);
@@ -277,93 +269,6 @@ function ego = localEgoMeasurement(x,time,heldInput,bound,stream,lane)
         "lateralVelocity",x(5)+noise(5),"yawRate",x(6)+noise(6),"stateTime",time, ...
         "controllerStateErrorBound",bound);
     if ~isempty(heldInput), ego.heldActuatorInput = heldInput; end
-end
-
-function target = localTargetMeasurement(truth,time,bound,stream)
-    state = localTargetTruth(truth,time);
-    noise = bound.*(2*rand(stream,8,1)-1);
-    if truth.model=="nrmm"
-        % The NRMM estimator certifies component norms: the velocity and
-        % acceleration errors are drawn uniformly in discs of the declared radii.
-        assert(bound(3)==bound(4) && bound(5)==bound(6), ...
-            "runExactStateRecursiveFeasibilityScenario:discNoise", ...
-            "NRMM truths need equal per-axis velocity and acceleration bounds.");
-        for rows = {3:4,5:6}
-            direction = 2*pi*rand(stream);fraction = sqrt(rand(stream));
-            noise(rows{1}) = bound(rows{1}(1))*fraction*[cos(direction);sin(direction)];
-        end
-    end
-    target = struct("trackId",1,"targetPositionInertial",state(1:2)+noise(1:2), ...
-        "targetVelocityInertial",state(3:4)+noise(3:4),"targetAccelerationInertial",state(5:6)+noise(5:6), ...
-        "targetHeadingInertial",state(7)+noise(7),"targetYawRate",state(8)+noise(8), ...
-        "targetPositionInertialErrorBound",bound(1:2),"targetVelocityInertialErrorBound",bound(3:4), ...
-        "targetAccelerationInertialErrorBound",bound(5:6),"targetYawErrorBound",bound(7), ...
-        "targetYawRateErrorBound",bound(8), ...
-        "predictionMotion",struct("kind","finite-sensing-motion-v1", ...
-            "jerkBound",abs(truth.jerkAmplitude), ...
-            "yawAccelerationBound",abs(truth.yawAccelerationAmplitude)));
-    if isfinite(truth.accelerationMaximum)
-        target.predictionMotion.scalarAccelerationMaximum = truth.accelerationMaximum;
-    end
-    if truth.model=="nrmm" && isfinite(truth.cartesianJerkBound)
-        % The same NRMM truth under a Cartesian contract whose jerk bound
-        % covers its turning (what the estimator publishes for a model error).
-        target.predictionMotion.jerkBound = abs(truth.jerkAmplitude)+truth.cartesianJerkBound;
-        target.predictionMotion.yawAccelerationBound = abs(truth.yawAccelerationAmplitude) ...
-            +truth.curvatureMaximum*abs(truth.speedRate);
-    elseif truth.model=="nrmm"
-        % Exact NRMM motion: constant speed-rate and curvature.
-        assert(all(truth.jerkAmplitude==0) && truth.yawAccelerationAmplitude==0, ...
-            "runExactStateRecursiveFeasibilityScenario:nrmmModelError", ...
-            "An NRMM contract declares exact NRMM motion; use NrmmContract=""cartesian"" for a model error.");
-        target.predictionMotion.kind = "nrmm-motion-v1";
-        target.predictionMotion.curvatureMaximum = truth.curvatureMaximum;
-        if truth.publishParameterBounds
-            % What the NRMM estimator publishes: parameter error bounds from
-            % its component balls (here the declared disc radii).
-            parameters = nrmmTargetParameterErrorBounds(target.targetVelocityInertial, ...
-                target.targetAccelerationInertial,bound(3),bound(5),0);
-            target.targetSpeedErrorBound = parameters.speedErrorBound;
-            target.targetCourseErrorBound = parameters.courseErrorBound;
-            target.targetSpeedRateErrorBound = parameters.speedRateErrorBound;
-            target.targetCurvatureInterval = parameters.curvatureInterval;
-        end
-    end
-end
-
-function state = localTargetTruth(truth,time)
-% Independent integrals of j(t)=J*cos(w*t), yawAcceleration(t)=H*cos(w*t).
-% With the nrmm model these are added to a constant speed-rate, constant
-% curvature path (stopping and holding at zero speed); an NRMM contract
-% requires them to be zero.
-    x = truth.center;
-    w = truth.frequency;
-    sine = sin(w*time);
-    cosine = 1-cos(w*time);
-    if truth.model=="nrmm"
-        speed = norm(x(3:4));course = x(7);
-        if speed>0,course = atan2(x(4),x(3));end
-        rate = truth.speedRate;curvature = truth.curvature;moving = time;
-        if rate<0,moving = min(time,speed/-rate);end
-        arc = speed*moving+rate*moving^2/2;speedNow = max(0,speed+rate*moving);
-        heading = course+curvature*arc;tangent = [cos(heading);sin(heading)];normal = [-tangent(2);tangent(1)];
-        half = curvature*arc/2;scale = 1;
-        if abs(half)>1e-8,scale = sin(half)/half;end
-        acceleration = rate*tangent+curvature*speedNow^2*normal;
-        if speedNow==0,acceleration = zeros(2,1);end
-        state = [x(1:2)+arc*scale*[cos(course+half);sin(course+half)]+truth.jerkAmplitude*(time/w^2-sine/w^3); ...
-            speedNow*tangent+truth.jerkAmplitude*cosine/w^2; ...
-            acceleration+truth.jerkAmplitude*sine/w; ...
-            x(7)+curvature*arc+truth.yawAccelerationAmplitude*cosine/w^2; ...
-            curvature*speedNow+truth.yawAccelerationAmplitude*sine/w];
-        return;
-    end
-    state = [(x(1:2)+x(3:4)*time+x(5:6)*time^2/2 ...
-            +truth.jerkAmplitude*(time/w^2-sine/w^3)); ...
-        x(3:4)+x(5:6)*time+truth.jerkAmplitude*cosine/w^2; ...
-        x(5:6)+truth.jerkAmplitude*sine/w; ...
-        x(7)+x(8)*time+truth.yawAccelerationAmplitude*cosine/w^2; ...
-        x(8)+truth.yawAccelerationAmplitude*sine/w];
 end
 
 function result = localFailedSolve(~,~)

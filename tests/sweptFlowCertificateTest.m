@@ -19,33 +19,6 @@ classdef sweptFlowCertificateTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(residual,1e-11);
             testCase.verifyLessThanOrEqual(endResidual,1e-11);
         end
-
-        function lowSpeedYawUncertaintyHasAFiniteCartesianTube(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            target.targetVelocityInertial = [0.01;0];
-            target.targetVelocityInertialErrorBound = [0.1;0.1];
-            target.targetYawRate = 0.2;
-            target.targetYawRateErrorBound = 0.1;
-            target.predictionMotion.jerkBound = [0.2;0.3];
-            target.predictionMotion.yawAccelerationBound = 0.1;
-            [~, lane, ~, parsed] = readPlanningInputs(ego, target, route, cfg);
-            encounter = targetPrediction.admit(parsed, 0, lane, cfg);
-            [center, radius] = targetPrediction.finiteFlow(encounter, [0,0.5,1.6]);
-            testCase.verifyTrue(all(isfinite([center;radius]), "all"));
-            testCase.verifyEqual(radius(7,end), 1.6*0.1+1.6^2*0.1/2, AbsTol=1e-11);
-            testCase.verifyGreaterThan(radius(1:2,end), radius(1:2,2));
-        end
-
-        function jerkVerticesReachTheAnalyticPositionBounds(testCase)
-            [ego, target, route, cfg] = encounterTestFixture.crossing();
-            target.predictionMotion.jerkBound = [0.2;0.3];
-            [~, lane, ~, parsed] = readPlanningInputs(ego, target, route, cfg);
-            encounter = targetPrediction.admit(parsed, 0, lane, cfg);
-            [~, radius] = targetPrediction.finiteFlow(encounter, 1.5);
-            testCase.verifyEqual(radius(1:2), [0.2;0.3]*1.5^3/6, AbsTol=1e-11);
-            testCase.verifyEqual(radius(3:4), [0.2;0.3]*1.5^2/2, AbsTol=1e-11);
-            testCase.verifyEqual(radius(5:6), [0.2;0.3]*1.5, AbsTol=1e-11);
-        end
     end
 end
 

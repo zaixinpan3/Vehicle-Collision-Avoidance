@@ -10,8 +10,6 @@ classdef targetObservationConditioningTest < matlab.unittest.TestCase
     methods (Test)
         function exactConstantVelocityUpdatesSurviveArithmeticRoundoff(testCase)
             [ego,target,route,cfg] = localFixture();
-            target.predictionMotion.jerkBound = [0;0];
-            target.predictionMotion.yawAccelerationBound = 0;
             [~,lane,~,parsed] = readPlanningInputs(ego,target,route,cfg);
             encounter = targetPrediction.admit(parsed,0,lane,cfg);
             position = parsed.position;
@@ -55,6 +53,31 @@ classdef targetObservationConditioningTest < matlab.unittest.TestCase
             testCase.verifyEqual(updated.center(1:2)-updated.radius(1:2),lower,AbsTol=1e-12);
             testCase.verifyEqual(updated.center(1:2)+updated.radius(1:2),upper,AbsTol=1e-12);
         end
+        function aTighterContractIsAdoptedAndALargerOneIsRefused(testCase)
+            % A continuation may declare tighter maxima; a larger declared
+            % maximum is not a continuation of the carried encounter.
+            [ego,target,route,cfg] = localFixture();
+            [~,lane,~,parsed] = readPlanningInputs(ego,target,route,cfg);
+            encounter = targetPrediction.admit(parsed,0,lane,cfg);
+            tighter = parsed;
+            tighter.position = parsed.position+0.1*parsed.velocity;
+            tighter.predictionMotion.curvatureMaximum = 0.02;
+            tighter.predictionMotion.speedRateMaximum = 1;
+            updated = targetPrediction.advance(encounter,0.1,tighter,lane,cfg);
+            testCase.verifyEqual(updated.contract.curvatureMaximum,0.02);
+            testCase.verifyEqual(updated.contract.speedRateMaximum,1);
+            testCase.verifyLessThanOrEqual(abs(updated.parameters.curvature),0.02);
+            testCase.verifyLessThanOrEqual(abs(updated.parameters.speedRate),1);
+            larger = tighter;
+            larger.predictionMotion.curvatureMaximum = 0.1;
+            testCase.verifyError(@() targetPrediction.advance(encounter,0.1,larger,lane,cfg), ...
+                "collisionAvoidanceController:changedEncounterContract");
+            declared = tighter;
+            declared.predictionMotion.curvatureMaximum = 0.05;
+            declared.predictionMotion.scalarAccelerationMaximum = 2;
+            adopted = targetPrediction.advance(encounter,0.1,declared,lane,cfg);
+            testCase.verifyEqual(adopted.contract.scalarAccelerationMaximum,2);
+        end
         function nominalLookaheadKeepsConstantCurvatureAndTangentialAcceleration(testCase)
             [ego,target,route,cfg] = localFixture();
             target.targetVelocityInertial = [10;0];
@@ -72,6 +95,5 @@ end
 
 function [ego,target,route,cfg] = localFixture()
     [ego,target,route,cfg] = encounterTestFixture.crossing();
-    target.predictionMotion = struct("kind","finite-sensing-motion-v1", ...
-        "jerkBound",[0.02;0.02],"yawAccelerationBound",0.01);
+    target.predictionMotion = struct("kind","nrmm-motion-v1","curvatureMaximum",0.05);
 end

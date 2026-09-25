@@ -32,7 +32,7 @@ function auditFixedDirectionCampaign(directory)
             'minimumNodeSatGap',NaN,'refinedHolds',[], ...
             'nominalMinimumSatGap',Inf,'nominalMinimumTime',NaN, ...
             'times',[],'bodyGaps',[],'satGaps',[]);
-        assert(all(report.targetMotion.jerkAmplitude==0) && report.targetMotion.yawAccelerationAmplitude==0);
+        assert(report.targetMotion.speedRate==0 && report.targetMotion.curvature==0);
         % Reconstruct the same held affine flow and use an independent SAT
         % implementation for overlap acceptance, outside all timing regions.
         sampleCount = report.executedHolds*10+1;

@@ -1,7 +1,12 @@
 # Closed-loop prediction of the target: reaction and acceleration limits
 
 Status: implemented 2026-09-23; the NRMM-consistent target prediction of
-Section 7 implemented 2026-09-24. Companion to
+Section 7 implemented 2026-09-24. Sections 1 to 6 describe the Cartesian jerk
+contract (`finite-sensing-motion-v1`: the `J t^3/6` box, the declared
+acceleration cap, the per-hold acceleration part of the reactive tube) that
+was removed on 2026-09-24 and are historical; section 8 lists what was
+removed and [TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md)
+states the current contract. Companion to
 [FEEDBACK_TUBE_PREDICTION.md](FEEDBACK_TUBE_PREDICTION.md), which closes the
 loop for the ego. This document covers the target part of the prediction.
 Configuration: `cfg.feedbackPrediction.targetReaction`; the acceleration cap
@@ -243,10 +248,10 @@ states it in full.
 a path of constant curvature `|kappa| <= curvatureMaximum` through the current
 state, stopping and holding at zero speed. There is no jerk or yaw-acceleration
 allowance. A varying speed-rate or curvature leaves every NRMM path through a
-later estimate, so a model error is declared with the Cartesian contract
-instead. `nrmmControllerErrorBounds` publishes `nrmm-motion-v1` when
-`modelJerkMaximum = 0` (the default), with `curvatureMaximum = sin(beta_max)/l_r`
-and the acceleration magnitude bound, and the Cartesian contract otherwise.
+later estimate; until 2026-09-24 a model error was declared with the Cartesian
+contract instead (section 8). `nrmmControllerErrorBounds` publishes
+`nrmm-motion-v1` when `modelJerkMaximum = 0` (the default), with
+`curvatureMaximum = sin(beta_max)/l_r` and the acceleration magnitude bound.
 
 **Parameter intervals** (`targetPrediction.nrmmParameters`). The encounter
 carries intervals for `V`, course, `A` and `kappa`: the intervals of every NRMM
@@ -276,15 +281,13 @@ errors, by up to 54 % of the box at 4.8 s in the measured cases.
   node. The reaction to it enters as new generators at every hold, so that
   `|A + B K|` does not wrap it.
 
-The tube does not use the Cartesian intersection. The Cartesian contract keeps
-its model: initial position and velocity generators plus a per-hold
-acceleration part.
+The tube does not use the Cartesian intersection.
 
 **Scope.**
 - Certification is at hold nodes only. Whole-hold cells extrapolate a node
-  snapshot with the Cartesian jerk bound and are rejected for NRMM targets.
-- A change of the motion kind, or a larger curvature or speed-rate maximum,
-  voids a carried family.
+  snapshot as a polynomial in time and are rejected with a target.
+- A larger curvature, speed-rate or acceleration maximum voids a carried
+  family.
 
 **Measured effect.** See
 [NRMM_TARGET_PREDICTION_20260924.md](../report/NRMM_TARGET_PREDICTION_20260924.md)
@@ -309,3 +312,24 @@ and, for the published parameter bounds,
      constraints bind.
 
   The report gives the measured supports and outcomes.
+
+## 8. Removal of the Cartesian jerk contract (2026-09-24)
+
+At the user's direction (`那么我们选择3.`) the `finite-sensing-motion-v1`
+contract was removed, so `nrmm-motion-v1` is the only target motion contract.
+Gone with it: its `exact-motion-v1` alias, the default contract of a target
+without a descriptor, the parsed `targetPredictionYawAccelerationErrorBound`,
+the constant-acceleration branch of `finiteFlow` with its jerk terms and
+declared-maximum cap, the initial-box branch of `deviationModel` and the
+per-hold acceleration part (`holdBound`, `holdJerk`) of the reactive tube in
+`ltvBicycleModel`, the jerk and yaw-acceleration terms of the re-admission
+test in `hardEncounterBarrier`, and the estimator's Cartesian publication for
+a model error (it now publishes no contract, and the controller refuses the
+target). The declared-plant harness has only NRMM truths (`nrmmTargetTruth`,
+`nrmmTargetMeasurement`; options `TargetSpeedRate`, `TargetCurvature`,
+`TargetCurvatureMaximum`, `TargetAccelerationMaximum`, `NrmmParameterBounds`),
+the failure sweep replaces its jerk and yaw-acceleration groups by NRMM
+curvature and speed-rate groups, and the maneuvering-target campaign
+(`runTargetMotionCampaign`, whose truths violated the NRMM model by
+construction) is deleted. The measured outcomes are in
+[NRMM_CONTRACT_ONLY_20260924.md](../report/NRMM_CONTRACT_ONLY_20260924.md).

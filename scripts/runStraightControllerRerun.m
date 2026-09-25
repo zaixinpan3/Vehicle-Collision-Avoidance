@@ -21,8 +21,7 @@ function campaign = runStraightControllerRerun(options)
             if noisy
                 label = "bounded-"+scene;
                 extra = {'EgoErrorBound',[.05;.05;.005;.05;.02;.005], ...
-                    'TargetErrorBound',[.1;.1;.1;.1;.05;.05;.01;.01], ...
-                    'TargetJerkAmplitude',[.1;.1],'TargetYawAccelerationAmplitude',.05};
+                    'TargetErrorBound',[.1;.1;.1;.1;.05;.05;.01;.01]};
             end
             fprintf('\nStarting %s\n',label);
             directory=fullfile(options.OutputDirectory,label);

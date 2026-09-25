@@ -63,32 +63,13 @@ classdef targetPrediction
             offset = intercept(retained);slope = derivative(retained);
         end
         function encounter = admitOnline(target, time, lane, cfg)
-        % Admit a nominal Cartesian flow with bounded jerk and yaw acceleration.
-        % Nonzero motion bounds tighten reachable sets, not input eligibility.
+        % Admit the target under its NRMM motion contract (targetPrediction.admit).
+        % A sole anonymous target receives the stable key singleTarget:1.
             if isempty(target)
                 encounter = struct("key",{},"radius",{},"contract",{});
                 return;
             end
-            motion = target.predictionMotion;
-            if isempty(motion)
-                motion = struct("kind","finite-sensing-motion-v1", ...
-                    "jerkBound",zeros(2,1), ...
-                    "yawAccelerationBound",target.predictionYawAccelerationErrorBound);
-            else
-                if ~isstruct(motion) || ~isscalar(motion) || ~isfield(motion,"kind") ...
-                        || ~isscalar(string(motion.kind)) ...
-                        || ~any(string(motion.kind)==["exact-motion-v1","finite-sensing-motion-v1","nrmm-motion-v1"])
-                    error("collisionAvoidanceController:invalidEncounterContract", ...
-                        "Use identified Cartesian motion bounds.");
-                end
-                if string(motion.kind)=="exact-motion-v1"
-                    if ~isfield(motion,"jerkBound"), motion.jerkBound = zeros(2,1); end
-                    if ~isfield(motion,"yawAccelerationBound"), motion.yawAccelerationBound = 0; end
-                    motion.kind = "finite-sensing-motion-v1";
-                end
-            end
             if target.key=="anonymousTarget", target.key = "singleTarget:1"; end
-            target.predictionMotion = motion;
             encounter = targetPrediction.admit(target,time,lane,cfg);
         end
 
@@ -96,10 +77,10 @@ classdef targetPrediction
         %condition Intersect the bounded reachable box with a new measurement.
         % The true target state lies in the propagated carried box and in the
         % measurement box, so the interval hull of their intersection contains
-        % it and stays inside the propagated box. An NRMM encounter also
-        % propagates its parameter intervals over the hold and intersects them
-        % with the measurement's. An empty intersection contradicts the declared
-        % motion bound or measurement contract.
+        % it and stays inside the propagated box. The NRMM parameter intervals
+        % are propagated over the hold and intersected with the measurement's.
+        % An empty intersection contradicts the declared motion bound or
+        % measurement contract.
             [center, radius] = targetPrediction.finiteFlow(carried, duration);
             measuredCenter = measured.center;
             measuredCenter(7) = center(7)+atan2(sin(measuredCenter(7)-center(7)), ...
@@ -119,79 +100,58 @@ classdef targetPrediction
             next.radius = (upper-lower)/2;
             next.time = carried.time+duration;
             next.nominalCenter = next.center;
-            if localIsNrmm(carried.contract) && localIsNrmm(measured.contract)
-                next.parameters = localConditionParameters(carried.parameters,duration,measured);
-            end
-        end
-
-        function finite = isFiniteSensing(encounter)
-            finite = any(string(encounter.contract.kind) == ["finite-sensing-motion-v1","nrmm-motion-v1"]);
+            next.parameters = localConditionParameters(carried.parameters,duration,measured);
         end
 
         function encounter = admit(target, time, ~, cfg)
-        %admit Validate the finite motion bounds used by every certificate.
-        % finite-sensing-motion-v1: any Cartesian motion with |jerk| <= jerkBound
-        % from the estimated state. nrmm-motion-v1: exact NRMM motion, a constant
+        %admit Validate the target's motion contract used by every certificate.
+        % nrmm-motion-v1 is the only contract: exact NRMM motion, a constant
         % speed-rate, constant-curvature (constant-sideslip) path through the
         % estimated state with |curvature| <= curvatureMaximum and, when
-        % declared, |speed-rate| <= speedRateMaximum; its jerkBound and
-        % yawAccelerationBound must be zero. A varying speed-rate or curvature
-        % leaves every NRMM path through a later estimate, so it is declared
-        % with a finite-sensing contract instead. The encounter carries the
-        % NRMM parameter intervals (targetPrediction.nrmmParameters).
-            if isfield(target,"predictionMotion") && ~isempty(target.predictionMotion)
-                motion = target.predictionMotion;
-                if ~isstruct(motion) || ~isscalar(motion) ...
-                        || ~all(isfield(motion,["kind","jerkBound","yawAccelerationBound"])) ...
-                        || ~any(string(motion.kind) == ["finite-sensing-motion-v1","nrmm-motion-v1"])
-                    error("collisionAvoidanceController:invalidEncounterContract","Invalid finite motion bounds.");
-                end
-                contract = struct("kind",string(motion.kind),"id",target.key, ...
-                    "validFrom",time,"validityScope","whileEncounterActive", ...
-                    "jerkBound",motion.jerkBound,"yawAccelerationBound",motion.yawAccelerationBound, ...
-                    "predictionSampleTime",cfg.controller.sampleTime);
-                if contract.kind=="nrmm-motion-v1"
-                    if ~isfield(motion,"curvatureMaximum")
-                        error("collisionAvoidanceController:invalidEncounterContract", ...
-                            "An NRMM motion contract requires curvatureMaximum.");
-                    end
-                    validateattributes(motion.curvatureMaximum,{'double'},{'scalar','real','finite','positive'});
-                    if any(motion.jerkBound(:)~=0) || any(motion.yawAccelerationBound(:)~=0)
-                        error("collisionAvoidanceController:invalidEncounterContract", ...
-                            "An NRMM motion contract describes exact NRMM motion; " ...
-                            +"use a finite-sensing contract for a model error.");
-                    end
-                    contract.curvatureMaximum = motion.curvatureMaximum;
-                    if isfield(motion,"speedRateMaximum")
-                        validateattributes(motion.speedRateMaximum,{'double'},{'scalar','real','finite','nonnegative'});
-                        contract.speedRateMaximum = motion.speedRateMaximum;
-                    end
-                end
-                if isfield(motion,"scalarAccelerationMaximum")
-                    validateattributes(motion.scalarAccelerationMaximum,{'double'},{'scalar','finite','nonnegative'});
-                    contract.scalarAccelerationMaximum = motion.scalarAccelerationMaximum;
-                end
-                validateattributes(contract.jerkBound,{'double'},{'real','finite','nonnegative','numel',2});
-                validateattributes(contract.yawAccelerationBound,{'double'},{'real','finite','nonnegative','scalar'});
-                validateattributes(time,{'double'},{'real','finite','scalar'});
-                if target.predictionYawAccelerationErrorBound>contract.yawAccelerationBound
-                    error("collisionAvoidanceController:invalidEncounterContract","Yaw acceleration exceeds the motion bound.");
-                end
-                if target.key=="anonymousTarget"
-                    error("collisionAvoidanceController:invalidEncounterContract","Finite encounters need stable track identity.");
-                end
-                contract.jerkBound = contract.jerkBound(:);
-                encounter = localEncounter(target,time,contract);
-                if contract.kind=="nrmm-motion-v1"
-                    published = [];
-                    if isfield(target,"parameterErrorBounds"),published = target.parameterErrorBounds;end
-                    encounter.parameters = targetPrediction.nrmmParameters(encounter.center, ...
-                        encounter.radius,contract,published);
-                end
-                return;
+        % declared, |speed-rate| <= speedRateMaximum and |acceleration| <=
+        % scalarAccelerationMaximum. A varying speed-rate or curvature has no
+        % contract. The encounter carries the NRMM parameter intervals
+        % (targetPrediction.nrmmParameters).
+            if ~isfield(target,"predictionMotion") || isempty(target.predictionMotion)
+                error("collisionAvoidanceController:missingPredictionMotion", ...
+                    "Every target requires an nrmm-motion-v1 contract.");
             end
-            error("collisionAvoidanceController:missingPredictionMotion", ...
-                "Every target requires identified finite-sensing motion bounds.");
+            motion = target.predictionMotion;
+            if ~isstruct(motion) || ~isscalar(motion) || ~isfield(motion,"kind") ...
+                    || ~isscalar(string(motion.kind)) || string(motion.kind)~="nrmm-motion-v1"
+                error("collisionAvoidanceController:invalidEncounterContract","Invalid target motion contract.");
+            end
+            if ~isfield(motion,"curvatureMaximum")
+                error("collisionAvoidanceController:invalidEncounterContract", ...
+                    "An NRMM motion contract requires curvatureMaximum.");
+            end
+            validateattributes(motion.curvatureMaximum,{'double'},{'scalar','real','finite','positive'});
+            for name = ["jerkBound","yawAccelerationBound"]
+                if isfield(motion,name) && any(motion.(name)(:)~=0)
+                    error("collisionAvoidanceController:invalidEncounterContract", ...
+                        "An NRMM motion contract describes exact NRMM motion; a model error has no contract.");
+                end
+            end
+            contract = struct("kind","nrmm-motion-v1","id",target.key, ...
+                "validFrom",time,"validityScope","whileEncounterActive", ...
+                "curvatureMaximum",motion.curvatureMaximum, ...
+                "predictionSampleTime",cfg.controller.sampleTime);
+            if isfield(motion,"speedRateMaximum")
+                validateattributes(motion.speedRateMaximum,{'double'},{'scalar','real','finite','nonnegative'});
+                contract.speedRateMaximum = motion.speedRateMaximum;
+            end
+            if isfield(motion,"scalarAccelerationMaximum")
+                validateattributes(motion.scalarAccelerationMaximum,{'double'},{'scalar','finite','nonnegative'});
+                contract.scalarAccelerationMaximum = motion.scalarAccelerationMaximum;
+            end
+            validateattributes(time,{'double'},{'real','finite','scalar'});
+            if target.key=="anonymousTarget"
+                error("collisionAvoidanceController:invalidEncounterContract","Finite encounters need stable track identity.");
+            end
+            encounter = localEncounter(target,time,contract);
+            published = [];
+            if isfield(target,"parameterErrorBounds"),published = target.parameterErrorBounds;end
+            encounter.parameters = targetPrediction.nrmmParameters(encounter.center,encounter.radius,contract,published);
         end
 
         function parameters = nrmmParameters(center,radius,contract,published)
@@ -248,94 +208,30 @@ classdef targetPrediction
         end
 
         function [center, radius] = finiteFlow(encounter, duration)
-        %finiteFlow Positive Cartesian reachability; no speed division.
-        % For an nrmm-motion-v1 contract the box encloses every NRMM path of
-        % the encounter's parameter intervals through its position box
+        %finiteFlow Box enclosing every NRMM path of the encounter's parameter
+        % intervals through its position box at the prediction times
         % (targetPrediction.deviationModel).
             duration = double(duration(:).');
             if any(~isfinite(duration) | duration < 0)
                 error("collisionAvoidanceController:invalidPredictionTime", "Prediction times must be finite and nonnegative.");
             end
-            if localIsNrmm(encounter.contract)
-                [center,radius] = localNrmmFlow(encounter,duration);
-                return;
-            end
-            x = encounter.center;
-            r = encounter.radius;
-            jerk = encounter.contract.jerkBound;
-            yawAcceleration = encounter.contract.yawAccelerationBound;
-            center = [x(1:2)+x(3:4)*duration+x(5:6)*(duration.^2/2); ...
-                x(3:4)+x(5:6)*duration; repmat(x(5:6), 1, numel(duration)); ...
-                x(7)+x(8)*duration; repmat(x(8), 1, numel(duration))];
-            if nargout<2,return;end
-            radius = [r(1:2)+r(3:4)*duration+r(5:6)*(duration.^2/2)+jerk*(duration.^3/6); ...
-                r(3:4)+r(5:6)*duration+jerk*(duration.^2/2); ...
-                r(5:6)+jerk*duration; r(7)+r(8)*duration+yawAcceleration*(duration.^2/2); ...
-                r(8)+yawAcceleration*duration];
-            if isfield(encounter.contract,"scalarAccelerationMaximum")
-                % A declared |acceleration| <= amax caps each axis deviation from
-                % the constant nominal acceleration at amax + |nominal|; the
-                % velocity and position radii integrate the capped deviation.
-                [radius(1:2,:),radius(3:4,:),radius(5:6,:)] = localCappedDeviation(r(1:6),jerk, ...
-                    encounter.contract.scalarAccelerationMaximum+abs(x(5:6)),duration);
-            end
-            % Charge arithmetic in the prediction, rather than accepting an
-            % empty measurement intersection with a physical tolerance. Only
-            % terms that were actually summed are charged: exactly copied
-            % acceleration or yaw-rate constants need no integration reserve.
-            arithmetic = [abs(x(1:2))+abs(x(3:4))*duration+abs(x(5:6))*(duration.^2/2); ...
-                abs(x(3:4))+abs(x(5:6))*duration;repmat(abs(x(5:6)),1,numel(duration)); ...
-                abs(x(7))+abs(x(8))*duration;repmat(abs(x(8)),1,numel(duration))];
-            radius = radius+64*eps*(arithmetic+radius);
+            [center,radius] = localNrmmFlow(encounter,duration);
         end
 
         function motion = deviationModel(encounter,duration)
-        %deviationModel Target deviation from its nominal flow, for reactive tubes.
+        %deviationModel Target deviation from its nominal NRMM flow, for reactive tubes.
         % At each time: center (8 x n) is the nominal state; parameterGenerators
-        % (6 x g x n) map g error sources fixed at admission to the deviation of
-        % [position; velocity; acceleration]; remainder (6 x n) bounds the rest
-        % of that deviation; holdBound (2 x n) bounds, per axis, the mean
-        % acceleration deviation over the hold ending at that time that the
-        % parameter generators do not describe; holdJerk (2 x 1) is its jerk.
-        % finite-sensing-motion-v1: the sources are the initial position and
-        % velocity box (p = p0 + v0 t) and holdBound is the capped jerk growth.
-        % nrmm-motion-v1: the sources are the NRMM parameter errors [p0; V; A;
-        % course; curvature] with sensitivities of the NRMM path, the remainder
-        % is their second-order term (or a path-length ball where the linear
-        % model does not apply), and holdBound is zero (exact NRMM).
+        % (6 x g x n) map the NRMM parameter errors [p0; V; A; course; curvature],
+        % fixed at admission, to the deviation of [position; velocity;
+        % acceleration] through the sensitivities of the NRMM path; remainder
+        % (6 x n) bounds their second-order term, or the path-length ball where
+        % the linear model does not apply.
             duration = double(duration(:).');
-            jerk = encounter.contract.jerkBound(:);
-            if localIsNrmm(encounter.contract)
-                state = localNrmmState(encounter,duration,true);
-                generators = pagemtimes(state.sensitivity,diag(state.parameterRadius));
-                remainder = state.remainder+64*eps*(1+abs(state.center(1:6,:)) ...
-                    +reshape(sum(abs(generators),2),6,[]));
-                motion = struct('center',state.center,'parameterGenerators',generators, ...
-                    'remainder',remainder,'holdBound',jerk*duration,'holdJerk',jerk);
-                return;
-            end
-            center = targetPrediction.finiteFlow(encounter,duration);
-            radius = encounter.radius(1:4);
-            generators = zeros(6,4,numel(duration));
-            for index = 1:numel(duration)
-                generators(1:4,:,index) = [eye(2),duration(index)*eye(2);zeros(2),eye(2)]*diag(radius);
-            end
-            motion = struct('center',center,'parameterGenerators',generators, ...
-                'remainder',zeros(6,numel(duration)), ...
-                'holdBound',targetPrediction.accelerationDeviationBound(encounter,duration),'holdJerk',jerk);
-        end
-
-        function bound = accelerationDeviationBound(encounter,duration)
-        %accelerationDeviationBound Per-axis bound on |a(t) - a_nominal| at the
-        % given prediction times: the jerk growth from the current acceleration
-        % radius, capped at amax + |a_nominal| when a scalar acceleration
-        % maximum is declared. Nondecreasing in time.
-            duration = double(duration(:).');
-            r = encounter.radius;jerk = encounter.contract.jerkBound(:);
-            bound = r(5:6)+jerk*duration;
-            if isfield(encounter.contract,"scalarAccelerationMaximum")
-                bound = min(bound,encounter.contract.scalarAccelerationMaximum+abs(encounter.center(5:6)));
-            end
+            state = localNrmmState(encounter,duration,true);
+            generators = pagemtimes(state.sensitivity,diag(state.parameterRadius));
+            remainder = state.remainder+64*eps*(1+abs(state.center(1:6,:)) ...
+                +reshape(sum(abs(generators),2),6,[]));
+            motion = struct('center',state.center,'parameterGenerators',generators,'remainder',remainder);
         end
 
         function [center, jerk, yawAcceleration] = nominalFlow(encounter, duration)
@@ -391,14 +287,15 @@ classdef targetPrediction
             next.time = encounter.time+duration;
             if ~isempty(observation)
                 measured = targetPrediction.admit(observation,next.time,lane,cfg);
-                if ~targetPrediction.isFiniteSensing(measured) ...
-                        || string(measured.contract.kind)~=string(encounter.contract.kind) ...
-                        || ~isequaln(localCurvatureMaximum(measured.contract), ...
-                            localCurvatureMaximum(encounter.contract)) ...
-                        || ~isequal(measured.contract.jerkBound,encounter.contract.jerkBound) ...
-                        || measured.contract.yawAccelerationBound ~= encounter.contract.yawAccelerationBound ...
-                        || measured.halfLength ~= encounter.halfLength || measured.halfWidth ~= encounter.halfWidth
-                    error("collisionAvoidanceController:changedEncounterContract","Physical target motion bounds changed.");
+                % A tighter or equal contract is adopted; a larger declared
+                % maximum (hardEncounterBarrier: motion bounds increased) or a
+                % changed footprint is not a continuation of this encounter.
+                names = ["curvatureMaximum","speedRateMaximum","scalarAccelerationMaximum"];
+                increased = arrayfun(@(name) localCap(measured.contract,name)>localCap(encounter.contract,name),names);
+                if any(increased) || measured.halfLength ~= encounter.halfLength ...
+                        || measured.halfWidth ~= encounter.halfWidth
+                    error("collisionAvoidanceController:changedEncounterContract", ...
+                        "Physical target motion bounds changed.");
                 end
                 next.center(7) = measured.center(7)+atan2(sin(next.center(7)-measured.center(7)), ...
                     cos(next.center(7)-measured.center(7)));
@@ -418,9 +315,7 @@ classdef targetPrediction
                 % estimate and reverse the complete future trajectory.
                 measured.nominalCenter = measured.center ...
                     +min(max(difference,-measured.radius),measured.radius);
-                if localIsNrmm(encounter.contract) && localIsNrmm(measured.contract)
-                    measured.parameters = localConditionParameters(encounter.parameters,duration,measured);
-                end
+                measured.parameters = localConditionParameters(encounter.parameters,duration,measured);
                 next = measured;
                 return;
             end
@@ -536,16 +431,6 @@ function encounter = localEncounter(target,time,contract)
             target.accelerationErrorBound;target.yawErrorBound;target.yawRateErrorBound], ...
         "time",time,"halfLength",target.length/2,"halfWidth",target.width/2);
     encounter.nominalCenter = encounter.center;
-    if string(contract.kind)=="finite-sensing-motion-v1"
-        % A position-only acquisition does not measure motion derivatives.
-        % Seed unresolved acceleration and turning from the constant-velocity
-        % hypothesis, projected into the published enclosure. Hard execution
-        % still uses the complete uncertain state, including nonzero turns.
-        derivativeRows = [5,6,8];
-        lower = encounter.center(derivativeRows)-encounter.radius(derivativeRows);
-        upper = encounter.center(derivativeRows)+encounter.radius(derivativeRows);
-        encounter.nominalCenter(derivativeRows) = min(max(0,lower),upper);
-    end
 end
 
 function distance = localArc(time, speed, acceleration)
@@ -555,36 +440,10 @@ function distance = localArc(time, speed, acceleration)
     distance = speed*time+0.5*acceleration*time.^2;
 end
 
-function [position,velocity,acceleration] = localCappedDeviation(r,jerk,cap,t)
-% Radii under |jerk| <= J and a per-axis acceleration deviation cap c:
-% b(t) = min(r_a + J t, c), velocity r_v + int b, position r_p + r_v t + int int b.
-    rp = r(1:2);rv = r(3:4);ra = min(r(5:6),cap);
-    switchTime = zeros(2,1);
-    for axis = 1:2
-        if jerk(axis)>0
-            switchTime(axis) = max(0,(cap(axis)-ra(axis))/jerk(axis));
-        elseif ra(axis)<cap(axis)
-            switchTime(axis) = Inf;
-        end
-    end
-    early = min(t,switchTime);late = max(0,t-switchTime);
-    acceleration = min(ra+jerk.*t,cap);
-    velocity = rv+ra.*early+jerk.*early.^2/2+cap.*late;
-    position = rp+rv.*t+ra.*early.^2/2+jerk.*early.^3/6 ...
-        +(ra.*early+jerk.*early.^2/2).*late+cap.*late.^2/2;
-    position(isnan(position)) = Inf;velocity(isnan(velocity)) = Inf;
-end
-
-function nrmm = localIsNrmm(contract)
-% Node snapshots of the geometry kernel carry no kind: their zero-duration flow
-% is the node state itself under either contract.
-    nrmm = isfield(contract,'kind') && string(contract.kind)=="nrmm-motion-v1";
-end
-
-function maximum = localCurvatureMaximum(contract)
-% Declared NRMM curvature maximum; NaN for a Cartesian contract.
-    maximum = NaN;
-    if isfield(contract,'curvatureMaximum'),maximum = contract.curvatureMaximum;end
+function value = localCap(contract,name)
+% A declared contract maximum; Inf when it is not declared.
+    value = Inf;
+    if isfield(contract,name),value = contract.(name);end
 end
 
 function [center,radius] = localNrmmFlow(encounter,duration)

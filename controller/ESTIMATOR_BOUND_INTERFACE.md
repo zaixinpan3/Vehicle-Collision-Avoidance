@@ -8,7 +8,10 @@ one position. Shared gyro transport preserves common heading-error correlation.
 
 The adapter's state certificate remains a current-state claim with
 `futurePredictionIncluded=false`. A separate `predictionMotion` descriptor gives
-the finite derivative assumptions used for prediction. Detection completeness
+the motion contract used for prediction: `nrmm-motion-v1` (exact NRMM motion,
+[TARGET_PREDICTION_CONTRACT.md](TARGET_PREDICTION_CONTRACT.md)) when the
+tracker's `modelJerkMaximum` is zero, and none otherwise, since no contract
+describes motion outside every NRMM path. Detection completeness
 and physical plant residuals are separate premises. Neither is inferred from a
 finite observer error. Nominal future chords are identified explicitly in metadata.
 
