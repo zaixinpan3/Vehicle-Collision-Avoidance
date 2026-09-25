@@ -1,0 +1,14 @@
+{
+  "kind": "Observed execution status, transcribed from actual tool results; not a raw process log",
+  "vehicle_command": "matlab -batch \"addpath('scripts'); runControllerRecoveryValidation('/home/zai/.cache/collisionAvoidance/recovery-validation-20260925','vehicle');\"",
+  "vehicle_exit_code": 137,
+  "vehicle_terminal_error": "free(): chunks in smallbin corrupted\nMATLAB is exiting because of fatal error",
+  "vehicle_result_files_written": 7,
+  "independent_reload": "All seven MAT results loaded in the persistent MATLAB session; 2 completed/recovered cruise runs, 5 incomplete avoidance runs; assertions passed.",
+  "exact_results": 15,
+  "additional_horizon32_diagnostics": 2,
+  "regression_passed": 92,
+  "regression_failed": 0,
+  "regression_incomplete": 0,
+  "code_analyzer": "No code issues; environment CFERR uses default settings because an old R2025b settings file cannot be read."
+}

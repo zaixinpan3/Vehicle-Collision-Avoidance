@@ -1,0 +1,9 @@
+{
+  "description": "Final reporting driver and native solver hashes. Production sources unchanged from initial source snapshot. Summary-only revisions do not alter simulation dynamics.",
+  "files": {
+    "solver/clarabel/matlab/solveAvoidanceSocpMex.mexa64": "30f2cca72ef8622733f6bfd32f6567be0dafede7a6dfe94d050ca33c23344e5a",
+    "solver/clarabel/matlab/projectLanePolylineMex.mexa64": "ef542523e7433b078b53a9273e1bf4ee6e88d185f6d5a30885dff271f1c39bee",
+    "solver/clarabel/matlab/laneFrameBoundsMex.mexa64": "cca6fe91f41a7a1d46071f06d40f940d63615af0ece973c7db9021cdb2b532b4",
+    "scripts/runControllerRecoveryValidation.m": "fb421421409a0d95844cb25fa48ee3379a235627da982875e68c5623b5977914"
+  }
+}

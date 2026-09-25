@@ -1,0 +1,24 @@
+ M estimator/OBSERVER_ISS_THEORY.md
+ M report/NRMM_IMPLEMENTATION_NOTES.md
+ M report/README.md
+ M scripts/runCircularCenterlineStraightTargetAvoidanceScenario.m
+ M scripts/runOncomingVehicleAvoidanceScenario.m
+?? .gitattributes
+?? .gitignore
+?? AGENTS.md
+?? CLAUDE.md
+?? README.md
+?? estimator/sharma2026/
+?? paper/figures/
+?? paper/manuscript.pdf
+?? perception/README.md
+?? reference/
+?? report/OBSERVER_SHARMA_COMPARISON_20260924.md
+?? report/OBSERVER_SHARMA_COMPARISON_20260924/
+?? scripts/plotObserverComparison.m
+?? scripts/prepareObserverComparisonEstimators.m
+?? scripts/runControllerRecoveryValidation.m
+?? scripts/runObserverComparisonCampaign.m
+?? scripts/runObserverComparisonScenario.m
+?? solver/
+?? tests/sharmaBaselineObserverTest.m
