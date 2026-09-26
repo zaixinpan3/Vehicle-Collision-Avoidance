@@ -1,0 +1,320 @@
+{
+  "ablation": [
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "all",
+      "status": 2,
+      "violation": 6.6984694835444376
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "noRoad",
+      "status": 2,
+      "violation": 6.6984694855374745
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "noCollision",
+      "status": 1,
+      "violation": 3.5527136788005009E-13
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "noExit",
+      "status": 2,
+      "violation": 6.6984694869638535
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "noTerminal",
+      "status": 2,
+      "violation": 2.69258240299949
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "noPhase",
+      "status": 2,
+      "violation": 6.6984694835444376
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "actuatorCollision",
+      "status": 2,
+      "violation": 2.6925824028364778
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "actuatorTerminal",
+      "status": 1,
+      "violation": 1.2789769243681803E-13
+    },
+    {
+      "scenario": "straight",
+      "seed": "previous",
+      "caseName": "actuatorPhaseTerminal",
+      "status": 1,
+      "violation": 1.2789769243681803E-13
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "all",
+      "status": 2,
+      "violation": 9.8095694026334783
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "noRoad",
+      "status": 2,
+      "violation": 9.8095694023094957
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "noCollision",
+      "status": 1,
+      "violation": 3.979039320256561E-13
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "noExit",
+      "status": 2,
+      "violation": 9.8095694026098865
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "noTerminal",
+      "status": 2,
+      "violation": 9.8095694004552847
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "noPhase",
+      "status": 2,
+      "violation": 9.8095694026334783
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "actuatorCollision",
+      "status": 2,
+      "violation": 9.8095694015572015
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "actuatorTerminal",
+      "status": 1,
+      "violation": 3.5527136788005009E-14
+    },
+    {
+      "scenario": "straight",
+      "seed": "fluid",
+      "caseName": "actuatorPhaseTerminal",
+      "status": 1,
+      "violation": 3.5527136788005009E-14
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "all",
+      "status": 2,
+      "violation": 16.623130700462312
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "noRoad",
+      "status": 2,
+      "violation": 16.623130699964829
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "noCollision",
+      "status": 10,
+      "violation": 0.29185635000359023
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "noExit",
+      "status": 2,
+      "violation": 16.623130700474125
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "noTerminal",
+      "status": 4,
+      "violation": 5.4001247917767614E-13
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "noPhase",
+      "status": 4,
+      "violation": 2.4598989512014668E-11
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "actuatorCollision",
+      "status": 1,
+      "violation": 2.8421709430404007E-14
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "actuatorTerminal",
+      "status": 1,
+      "violation": 1.0516032489249483E-12
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "previous",
+      "caseName": "actuatorPhaseTerminal",
+      "status": 5,
+      "violation": 16.623130623280694
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "all",
+      "status": 2,
+      "violation": 16.623130693925987
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "noRoad",
+      "status": 2,
+      "violation": 16.623130687118991
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "noCollision",
+      "status": 2,
+      "violation": 16.623130694087422
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "noExit",
+      "status": 2,
+      "violation": 16.623130693959371
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "noTerminal",
+      "status": 4,
+      "violation": 1.0516032489249483E-12
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "noPhase",
+      "status": 4,
+      "violation": 1.0203393685515039E-11
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "actuatorCollision",
+      "status": 4,
+      "violation": 8.3844042819691822E-13
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "actuatorTerminal",
+      "status": 1,
+      "violation": 1.5347723092418164E-12
+    },
+    {
+      "scenario": "sCurve",
+      "seed": "fluid",
+      "caseName": "actuatorPhaseTerminal",
+      "status": 10,
+      "violation": 1.4793214758890061
+    }
+  ],
+  "collision": [
+    {
+      "seed": "previous",
+      "status": 1,
+      "minimumCollisionRelaxation": 0.92524034647566789,
+      "necessaryLowerBound": 0.9243895772077918,
+      "lpExitFlag": 1,
+      "activeStages": "[9 10]",
+      "lpPrimalViolation": 2.0039525594484076E-14,
+      "lpDualResidual": 3.833044992518353E-14,
+      "lpDualBound": 0.924389577207788,
+      "coneViolation": 1.290612061666252E-11
+    },
+    {
+      "seed": "fluid",
+      "status": 1,
+      "minimumCollisionRelaxation": 2.7701921913732943,
+      "necessaryLowerBound": 2.6520594281049066,
+      "lpExitFlag": 1,
+      "activeStages": "[5 15 26]",
+      "lpPrimalViolation": 3.219646771412954E-14,
+      "lpDualResidual": 9.7699626167013776E-15,
+      "lpDualBound": 2.6520594281048977,
+      "coneViolation": 5.3780890851840013E-9
+    }
+  ],
+  "phase": {
+    "necessaryLowerBound": 0.6580827098636749,
+    "minimumSubsetPhaseExpansion": 0.85453013560684787,
+    "lpExitFlag": 1,
+    "coneprogExitFlag": 1,
+    "lpPrimalViolation": 2.7284841053187847E-12,
+    "lpDualResidual": 8.5265128291212022E-14,
+    "lpDualBound": 0.65808270986417483,
+    "conePrimalViolation": 3.0419067376108444E-7
+  },
+  "rollout": [
+    {
+      "scenario": "straight",
+      "priorTime": 2,
+      "maxStationError": 4.8669357591180642,
+      "maxLateralError": 8.4380561294574772,
+      "maxYawError": 0.68554868457738061,
+      "affineFinalStation": 248.2710306336871,
+      "nonlinearFinalStation": 243.40409487456904,
+      "affineFinalLateral": 0.00045875796862958687,
+      "nonlinearFinalLateral": 8.4385148874261073,
+      "affineFinalSpeed": 10.00008750933419,
+      "nonlinearFinalSpeed": 8.4721407859035409
+    },
+    {
+      "scenario": "sCurve",
+      "priorTime": 1.35,
+      "maxStationError": 15.863122276223457,
+      "maxLateralError": 7.2504432555027671,
+      "maxYawError": 1.9363820212931071,
+      "affineFinalStation": 49.055395037206765,
+      "nonlinearFinalStation": 33.192272760983307,
+      "affineFinalLateral": -0.071705269283750428,
+      "nonlinearFinalLateral": 7.1787379862190166,
+      "affineFinalSpeed": 10.007084087813491,
+      "nonlinearFinalSpeed": 3.6271071599314579
+    }
+  ]
+}

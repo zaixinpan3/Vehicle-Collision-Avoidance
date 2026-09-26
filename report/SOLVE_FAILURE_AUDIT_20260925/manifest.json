@@ -1,0 +1,138 @@
+{
+  "baseRevision": "070233f896d7e4c8596d6844ac54261e8f68477a",
+  "method": "Read saved frame snapshots; diagnostic constraint ablation, LP dual lower bounds, tire audit and nominal nonlinear rollouts. No production controller mutation or new closed-loop plant run.",
+  "artifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/straight-replay.mat",
+      "sha256": "1a77d108eefa2262a07cf9a7840cf79535a15e9db0a975db0f5413f92c382fd4",
+      "bytes": 11640346,
+      "kind": "saved input snapshot"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/sCurve-replay.mat",
+      "sha256": "c7448ee64c020c21e9e9b485686d634555f4dcead37affcd0e8cec50da65a5b4",
+      "bytes": 33681569,
+      "kind": "saved input snapshot"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/circular-replay.mat",
+      "sha256": "e53fc57de027b977378ce9b878804219a6e411f86f0fe55af1f3069d9123275e",
+      "bytes": 17784970,
+      "kind": "saved input snapshot"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/straight-previous.mat",
+      "sha256": "8b7ddfd252c3264217fd098fe556865babf4b4b16171b9c9998d2b807d103525",
+      "bytes": 13483925,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/straight-fluid.mat",
+      "sha256": "885c7a71b41e45e1215666d5a2b8e1f62cf2796f44d4fad37513e2ba8e841aad",
+      "bytes": 13482068,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/sCurve-previous.mat",
+      "sha256": "8a090115a02cd7ba223962118f15b3811e511667c2a20a7e300f208dddb6f129",
+      "bytes": 28814855,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/sCurve-fluid.mat",
+      "sha256": "91596e9b33de94475330564f69b147f2d92bc3fbda34c38fc3be207b361ebb03",
+      "bytes": 28815360,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/straight-previous-collision-gap.mat",
+      "sha256": "fefe56f21b41495d1cf92aca1dccff9c6bc38d454a3b80412bcd2858f054c000",
+      "bytes": 45919,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/straight-fluid-collision-gap.mat",
+      "sha256": "26dadb3b46400547f67c2127454ceb6cb8391f878d941cb258b47769d07707a4",
+      "bytes": 47163,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/phase-quantification.mat",
+      "sha256": "cfa31f4abb77c704c573e95f3b55f6b018c3460ab847463c0ef605ad842fb2b2",
+      "bytes": 77395,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/solve-failure-audit-20260925/summary.mat",
+      "sha256": "e957ecf49ca83b24a34fadafb91f0b5fedb648061f91c0c60c2c39b28d84d3f9",
+      "bytes": 3656,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "scripts/diagnoseTrajectorySolveFailures.m",
+      "sha256": "f3b0ec612b18847d52587f7b765bad18a85f9cf35aa0f6d0790741bdc35c66c3",
+      "bytes": 14424,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925.md",
+      "sha256": "3cc2f9b283745845ea15cf75500f63bb55b0eef03b09d8456679ccb73dc16927",
+      "bytes": 12443,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/ablation.csv",
+      "sha256": "4572615aee1c611ad996296d06196105d6317717c02bce6f35371b6c13d7d047",
+      "bytes": 1755,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/collision-gap.csv",
+      "sha256": "ba82154e59d0254fe778f9c7537ab47957bca44a55b5f082618d8c0bbf75f340",
+      "bytes": 410,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/sCurve-phase-expansion.csv",
+      "sha256": "0c3e78ff8d183f2e3726c053e67e45d58f5946834449a7f02acb212117a74101",
+      "bytes": 5545,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/straight-previous-rollout.csv",
+      "sha256": "930a7cb96e6e08f18d1ca64048c7e2c49e5d027fee65b47d6d9a7907f6fb0dc6",
+      "bytes": 8532,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/sCurve-previous-rollout.csv",
+      "sha256": "b2b6902145626de3a2b09be23444b6f022ec97ca733b5add528280234fb0a5d8",
+      "bytes": 10808,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/previous-tire-audit.csv",
+      "sha256": "e0094ddf5675a0b4ad98b8299f5e8ec7e3ea957c4bad347030c2a2eb3a99085c",
+      "bytes": 57954,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/previous-rollout-summary.csv",
+      "sha256": "ee87c09230537f8c6f67526a05b438b8c67ad493272d8913ccb862ece4be86e0",
+      "bytes": 519,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/summary.json",
+      "sha256": "b56b13d8c3e0c1e0a724c66ef1589da33517aecc7e8adde0b7be5f9fd3440d7e",
+      "bytes": 7885,
+      "kind": "diagnostic source or output"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/code-analyzer.json",
+      "sha256": "807729879bd942eb545cd73b04b8b6bf2156ff213feeafb8f24932fda01933fa",
+      "bytes": 1256,
+      "kind": "diagnostic source or output"
+    }
+  ]
+}
