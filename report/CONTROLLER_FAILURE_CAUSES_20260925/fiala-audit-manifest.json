@@ -1,0 +1,49 @@
+{
+  "base_commit": "a73dc84d27746ab82bbf3b77819a5ac56bca4187",
+  "artifacts": [
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f"
+    },
+    {
+      "path": "controller/ltvBicycleModel.m",
+      "sha256": "b91d4e000130f70c066c90d81ef7adde1762c7b5ca5e74b4201125437d901509"
+    },
+    {
+      "path": "controller/hardEncounterBarrier.m",
+      "sha256": "e513248b2d6a968aed8dc2b12c3ebd80d176730ca38f71396271b8fbb3e9edd0"
+    },
+    {
+      "path": "controller/formulateAvoidanceProblem.m",
+      "sha256": "2205610892b2dd37074262ae80d04062ddf7fdec6573540146ccf6c522d69c87"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "7ccde6950a54b6f8e4b56f8247636e2b08bc2ae68122eaefe4a160628468f19e"
+    },
+    {
+      "path": "scripts/runCenterlineCruiseScenario.m",
+      "sha256": "90f53e130ffe271b9dbf6dacd60a55b94158471ce38e20420a3a500b6bd1a6bd"
+    },
+    {
+      "path": "tests/modifiedFialaTireTest.m",
+      "sha256": "4587fcc44b2ce5feb93488befb3175ee4e386f98fb0d42c62e18246e1c6dc13f"
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/fiala-force-audit.csv",
+      "sha256": "3b841364e881e01331a8137954a8b7ad20d074cf1ee529e79622309a5ce116e0"
+    },
+    {
+      "path": "report/CONTROLLER_FAILURE_CAUSES_20260925/fiala-tire-tests.csv",
+      "sha256": "9e8de0498711eae2720372e71edcf9160603e1ac89e214af210ed5dd604aa085"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/straight_oncoming.mat",
+      "sha256": "2fb30e52e7f9f74ac7ad61e1d6128fb8bdf8e4a37c031c1e35346bb33da5efed"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/recovery-validation-20260925/circular_oncoming.mat",
+      "sha256": "5441fa9b125971cb1a549ec44e2846efcca2554ac6a0f2ecea00b34095d869cb"
+    }
+  ]
+}

@@ -121,6 +121,79 @@ silently be reinterpreted as such. Preserve road-set meaning across refits, or
 explicitly recertify changes and account for loss of the carried witness. Merely
 changing solver weights does not address the demonstrated model error.
 
+### Follow-up: Fiala saturation is present, but its affine tangent is unbounded
+
+A direct audit on September 25 confirms that `modifiedFialaTire.evaluate`
+implements the saturated force with capacity
+`Q = mu*Fz*sqrt(1-beta^2)`. Outside the adhesion branch it returns
+`-Q*sign(alpha)` and zero slip derivative. All 25 existing
+`modifiedFialaTireTest` cases pass, including combined-force circle containment
+and saturation continuity. The observed large forces do not come from this
+nonlinear evaluator violating its own limit.
+
+The online prediction instead follows
+`sampledCruise -> continuousMatrices(operatingPoint) -> affineModel -> evaluate`:
+the nonlinear function is evaluated and differentiated at the cruise trim,
+then replaced by its tangent for prediction. `hardEncounterBarrier.predict`
+prescribes these cruise stages, and `finitePredict` propagates their affine
+generators. A bounded nonlinear function need not have a bounded tangent.
+Near zero slip, `Fy_affine = -C*alpha`; the front stiffness here is approximately
+134,960 N/rad. Extrapolating to approximately 0.4306 rad gives 58.1 kN, although
+the nonlinear saturation threshold at the actual braking ratio is only 0.1370
+rad. The circular case's actual slip is 0.6052 rad versus a 0.1436 rad threshold.
+Neither a force-capacity row nor a nonlinear tire-validity constraint is added
+to the online avoidance program to prevent this extrapolation. Actuator angle
+limits alone do not bound that affine force to the nonlinear capacity.
+
+There is also a reporting discrepancy. `localCommand` calculates
+`command.axleLateralForce` using `modifiedFialaTire.linearize` at a scheduled
+route-following point, whereas the actual cruise generator uses `affineModel`
+at the solved cruise equilibrium. These are distinct linearization paths.
+The comment claiming the reporting tangent is the same as prediction is not
+generally accurate. The earlier table explicitly reports that output field;
+it must not be treated as the exact internal prediction force or a measured
+Blockset force.
+
+| At t=2.10 s, front tire force (kN) | Straight | Circular |
+| --- | ---: | ---: |
+| Saved `command.axleLateralForce` diagnostic | -58.113 | -65.391 |
+| Actual prediction trim's tire tangent, evaluated at current state/input | -58.113 | -76.678 |
+| Nonlinear Fiala evaluated at actual slip and braking ratio | -6.202 | -6.505 |
+
+The audit reconstructs the cruise Jacobian using each saved frame's
+`clfReferenceState`, `clfOperatingInput`, curvature, and original configuration.
+Its `[A B c]` matrix exactly matches `executedContinuousGenerator` (infinity-norm
+difference zero in both saved cases), identifying the relevant prediction
+linearization. The compared tire forces are front-axle tire-coordinate
+quantities; body-axis force rotation is included separately in the vehicle
+Jacobian. The plant adapter sends steering angles and longitudinal wheel
+torques, not the reported lateral-force field, to PassVeh14DOF. Clipping only
+that reported field would therefore fix neither the trajectory prediction nor
+the issued steering plan.
+
+The new `fiala-force-audit.csv`, `fiala-tire-tests.csv`, and
+`fiala-audit-manifest.json` in the companion directory retain these checks.
+No production source was changed. This further localizes the issue to using
+an unconstrained local affine surrogate in a nonlinear avoidance experiment,
+not a missing saturation branch in modified Fiala itself. A remedy must put
+physical saturation or a justified approximation/error restriction into the
+actual prediction and safety validation; relinearization alone does not make
+an affine tangent globally capacity-preserving.
+
+The force audit can be reproduced for frame `i` from the saved result `r`:
+
+```matlab
+cfg = r.controllerConfiguration;
+m = r.attempts.metadata{i};
+u = r.command{i}.actuatorInput;
+tire = modifiedFialaTire.affineModel(m.clfReferenceState,m.clfOperatingInput,cfg);
+force = tire.state*m.initialEgoState + tire.input*u + tire.constant;
+[A,B,c] = ltvBicycleModel.continuousMatrices(m.clfOperatingCurvature, ...
+    m.clfReferenceState(4),cfg,[],0, ...
+    struct('state',m.clfReferenceState,'input',m.clfOperatingInput));
+assert(norm([A,B,c]-m.executedContinuousGenerator,inf)<1e-10);
+```
+
 ## 2. PassVeh14DOF plus NRMM: startup uncertainty defeats admission
 
 These runs stop at 1.05 s, on the first controller-visible target frame. Actual
