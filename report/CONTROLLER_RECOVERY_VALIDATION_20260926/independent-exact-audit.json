@@ -1,0 +1,92 @@
+[
+  {
+    "name": "cruise_k+0.00",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "stationary_k+0.00",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "oncoming_k+0.00",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "crossing_k+0.00",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "cruise_k+0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "stationary_k+0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "oncoming_k+0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "crossing_k+0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "cruise_k-0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "stationary_k-0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "oncoming_k-0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "crossing_k-0.01",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "cruise_straight_boundaries",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "stationary_straight_boundaries",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  },
+  {
+    "name": "oncoming_straight_boundaries",
+    "matReloadPassed": true,
+    "finiteStates": true,
+    "recoveryIndependentlyMatches": true
+  }
+]

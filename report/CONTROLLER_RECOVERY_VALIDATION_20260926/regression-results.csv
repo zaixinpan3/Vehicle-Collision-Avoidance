@@ -1,0 +1,10 @@
+Name,Passed,Failed,Incomplete,Duration,Details
+trajectoryLinearizationTest/avoidanceUsesEachPredictedStateAndInput,1,0,0,0.269355,
+trajectoryLinearizationTest/aSaturatedAnchorHasTheSaturatedTireDerivative,1,0,0,0.04331,
+trajectoryLinearizationTest/varyingReferenceJacobianIncludesSpatialCurvature,1,0,0,0.038323,
+trajectoryLinearizationTest/nextFrameRefreshesFromTheShiftedPlanAndMeasuredState,1,0,0,0.199916,
+trajectoryLinearizationTest/targetFreePredictionRetainsTheCruiseGenerator,1,0,0,0.049268,
+trajectoryFeedbackTest/nearLimitInputsRetainUsablePredictionAndActuatorBounds,1,0,0,0.116807,
+trajectoryFeedbackTest/noisyHeldTrajectoriesStayInsideTheScheduledFeedbackTube,1,0,0,0.082089,
+trajectoryFeedbackTest/configuredFeedbackColumnsRemainDisabled,1,0,0,0.022816,
+trajectoryFeedbackTest/disabledFeedbackReservesNoCorrectiveInput,1,0,0,0.048261,

@@ -1,0 +1,79 @@
+[
+  {
+    "name": "straight_cruise",
+    "completed": true,
+    "recoveredCruise": true,
+    "firstVisibleTime": null,
+    "finalSpeed": 9.998596993282243,
+    "maximumFullRunSpeedError": 0.0018197721351356222,
+    "maximumFullRunLateralError": 1.2152481755778031e-10,
+    "independentlyComputedMinimumSATMargin": null,
+    "allChecksPassed": true
+  },
+  {
+    "name": "circular_cruise",
+    "completed": true,
+    "recoveredCruise": true,
+    "firstVisibleTime": null,
+    "finalSpeed": 9.998555303812854,
+    "maximumFullRunSpeedError": 0.0019095834320097538,
+    "maximumFullRunLateralError": 0.0027537741750604167,
+    "independentlyComputedMinimumSATMargin": null,
+    "allChecksPassed": true
+  },
+  {
+    "name": "straight_oncoming",
+    "completed": false,
+    "recoveredCruise": false,
+    "firstVisibleTime": 1.05,
+    "finalSpeed": 9.938016063619854,
+    "maximumFullRunSpeedError": 0.28997927866055484,
+    "maximumFullRunLateralError": 0.08602730995667007,
+    "independentlyComputedMinimumSATMargin": 4.019774478286916,
+    "allChecksPassed": true
+  },
+  {
+    "name": "circular_oncoming",
+    "completed": false,
+    "recoveredCruise": false,
+    "firstVisibleTime": 1.05,
+    "finalSpeed": 8.888614052274823,
+    "maximumFullRunSpeedError": 1.1113859477251768,
+    "maximumFullRunLateralError": 0.12791862507506685,
+    "independentlyComputedMinimumSATMargin": 15.360713719140524,
+    "allChecksPassed": true
+  },
+  {
+    "name": "varying_curvature_oncoming",
+    "completed": false,
+    "recoveredCruise": false,
+    "firstVisibleTime": null,
+    "finalSpeed": 10.0,
+    "maximumFullRunSpeedError": 0.0,
+    "maximumFullRunLateralError": 0.0,
+    "independentlyComputedMinimumSATMargin": null,
+    "allChecksPassed": true
+  },
+  {
+    "name": "estimated_straight_oncoming",
+    "completed": false,
+    "recoveredCruise": false,
+    "firstVisibleTime": 1.05,
+    "finalSpeed": 10.002595934440574,
+    "maximumFullRunSpeedError": 0.019205710051211966,
+    "maximumFullRunLateralError": 0.007311408459104122,
+    "independentlyComputedMinimumSATMargin": 23.994603029868106,
+    "allChecksPassed": true
+  },
+  {
+    "name": "estimated_circular_oncoming",
+    "completed": false,
+    "recoveredCruise": false,
+    "firstVisibleTime": 1.05,
+    "finalSpeed": 10.001622762557714,
+    "maximumFullRunSpeedError": 0.01802804768564492,
+    "maximumFullRunLateralError": 0.025882999224906795,
+    "independentlyComputedMinimumSATMargin": 24.04879896081214,
+    "allChecksPassed": true
+  }
+]

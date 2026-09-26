@@ -1,0 +1,9 @@
+{
+  "repeatReloaded": true,
+  "finiteStates": true,
+  "executedSeconds": 1.4000000000000001,
+  "independentMinimumSATMargin": 17.181475003215652,
+  "passed": false,
+  "recovered": false,
+  "allChecksPassed": true
+}

@@ -1,0 +1,8 @@
+name,completed,recoveredCruise,firstVisibleTime,finalSpeed,maximumFullRunSpeedError,maximumFullRunLateralError,independentlyComputedMinimumSATMargin,allChecksPassed
+straight_cruise,True,True,,9.998596993282243,0.0018197721351356222,1.2152481755778031e-10,,True
+circular_cruise,True,True,,9.998555303812854,0.0019095834320097538,0.0027537741750604167,,True
+straight_oncoming,False,False,1.05,9.938016063619854,0.28997927866055484,0.08602730995667007,4.019774478286916,True
+circular_oncoming,False,False,1.05,8.888614052274823,1.1113859477251768,0.12791862507506685,15.360713719140524,True
+varying_curvature_oncoming,False,False,,10.0,0.0,0.0,,True
+estimated_straight_oncoming,False,False,1.05,10.002595934440574,0.019205710051211966,0.007311408459104122,23.994603029868106,True
+estimated_circular_oncoming,False,False,1.05,10.001622762557714,0.01802804768564492,0.025882999224906795,24.04879896081214,True

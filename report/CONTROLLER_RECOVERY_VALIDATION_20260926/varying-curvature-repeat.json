@@ -1,0 +1,56 @@
+{
+  "executedSeconds": 1.4000000000000001,
+  "failure": {
+    "occurred": true,
+    "identifier": "collisionAvoidanceController:optimizationFailed",
+    "message": "The hard-safety, soft-CLF search failed at t=1.4 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2; alternate directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.",
+    "controlStep": 29,
+    "time": 1.4000000000000001
+  },
+  "avoidance": {
+    "targetInitialDistance": 49.999999999999986,
+    "targetInitialPosition": [
+      49.42113842655349,
+      7.5862425892819978
+    ],
+    "targetVelocity": [
+      -9.8440373836557686,
+      -1.7592407422486798
+    ],
+    "nominalCollisionTime": 2.5086245635109652,
+    "nominalCollisionPosition": [
+      24.990030553131717,
+      1.6963624425993309
+    ],
+    "nominalTargetCollisionPosition": [
+      24.726144441794414,
+      3.1729680501476962
+    ],
+    "targetCollisionLateralOffset": 1.5,
+    "collisionConstructionError": 4.4408920985006262E-16,
+    "collisionConstructionExact": true,
+    "nominalCollisionSeparatingAxisMargin": -0.49999999999999933,
+    "minimumControlledSeparatingAxisMargin": 17.181475003215652,
+    "minimumBaselineSeparatingAxisMargin": 17.058179789117172,
+    "baselineCollides": false,
+    "collisionFree": true,
+    "closestApproachTime": 1.4,
+    "passedTarget": false,
+    "passingTime": null,
+    "egoSpeedAtPassing": null,
+    "minimumEgoLongitudinalSpeed": 8.87146395434959,
+    "remainedMoving": true,
+    "noRoadBoundaryCrossing": true,
+    "minimumRoadBoundaryFunctionMargin": 6.9626354828559087,
+    "minimumLateralTrackingError": 0,
+    "maximumLateralTrackingError": 0.065367932818430646,
+    "recoveredCruise": false,
+    "recoveryWindow": 2,
+    "maximumRecoverySpeedError": [],
+    "maximumRecoveryLateralError": [],
+    "recoveryOrientationMetric": "inertialVelocityCourseRelativeToCenterline",
+    "maximumRecoveryHeadingError": [],
+    "maximumRecoveryBodyHeadingError": []
+  },
+  "passed": false
+}
