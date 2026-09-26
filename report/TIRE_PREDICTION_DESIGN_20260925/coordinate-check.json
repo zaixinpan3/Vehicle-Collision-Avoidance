@@ -1,0 +1,19 @@
+{
+  "scope": "Analytic coordinate study, fixed positive saturated-slip branch; does not replay the steering sign change or validate the full vehicle controller.",
+  "source": "report/SOLVE_FAILURE_AUDIT_20260925/previous-tire-audit.csv; straight plan at 2.00 s, hold 1, front axle",
+  "capacityN": 6505.273284471103,
+  "anchorBeta": 0.999929413489141,
+  "candidateBeta": 0.923738750255249,
+  "anchorThetaRad": 1.5589146315215874,
+  "candidateThetaRad": 1.1777295265454584,
+  "sameBranchExactForceN": -2491.67016177417,
+  "betaTangentForceN": -41790.00628377512,
+  "thetaTangentForceN": -2556.8301017280246,
+  "thetaTangentErrorN": 65.15993995385452,
+  "thetaTaylorBoundN": 472.6148834431652,
+  "actualChangedSlipNonlinearForceN": 2491.67016177417,
+  "gridPairs": 25921,
+  "largestNormalizedErrorBoundRatio": 0.9999678727945857,
+  "randomSeed": null,
+  "validation": "All deterministic fixed-branch Taylor remainder assertions pass; this grid checks the implementation of the identity, not a proof by sampling."
+}

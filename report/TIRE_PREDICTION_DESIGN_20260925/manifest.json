@@ -1,0 +1,26 @@
+{
+  "baseRevision": "8086bd680b31e147760e09ca218e1ac7c25c8b38",
+  "status": "Mathematical proposal only; no production implementation or closed-loop validation.",
+  "artifacts": [
+    {
+      "path": "report/TIRE_PREDICTION_DESIGN_20260925.md",
+      "sha256": "69b4c6dbc8fb0e4bc42137126d097acbd54677dc62bb2b423c4be8a3f9374a81"
+    },
+    {
+      "path": "report/TIRE_PREDICTION_DESIGN_20260925/coordinate-check.json",
+      "sha256": "1bb21c84123e5498581183edd4e380bae3bd4320fe087edfd043ceffce6b65d6"
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f"
+    },
+    {
+      "path": "controller/ltvBicycleModel.m",
+      "sha256": "dc43d45720e31a087ba721824de386f5f95defae7e6dd4c18462aa2da245e8b0"
+    },
+    {
+      "path": "report/SOLVE_FAILURE_AUDIT_20260925/previous-tire-audit.csv",
+      "sha256": "e0094ddf5675a0b4ad98b8299f5e8ec7e3ea957c4bad347030c2a2eb3a99085c"
+    }
+  ]
+}
