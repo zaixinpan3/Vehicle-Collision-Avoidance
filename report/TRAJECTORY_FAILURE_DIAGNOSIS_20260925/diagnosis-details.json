@@ -1,0 +1,288 @@
+{
+  "straight": {
+    "scenario": "straight",
+    "failure": {
+      "identifier": "collisionAvoidanceController:optimizationFailed",
+      "message": "The hard-safety, soft-CLF search failed at t=1.75 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2; alternate directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.",
+      "stack": [
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "collisionAvoidanceController",
+          "line": 76
+        },
+        {
+          "file": "/tmp/pdca-trajectory-diagnostic/replayTrajectoryFailure.m",
+          "name": "replayTrajectoryFailure",
+          "line": 22
+        }
+      ],
+      "time": 1.75
+    },
+    "maximumCommandDifference": 0,
+    "initialState": [
+      217.49713776708293,
+      -0.00076228863229258392,
+      -0.010218380507767846,
+      9.9215034983701429,
+      -0.150380226971412,
+      -0.16774173134624265
+    ],
+    "initialErrorBound": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "estimatorBound": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "feedbackGain": [
+      [
+        0,
+        -0.12870518158284119,
+        -1.0775517397350645,
+        4.8694773479418878E-17,
+        0,
+        -0.076375314987487175
+      ],
+      [
+        0,
+        1.8881010751431631E-15,
+        9.44230169523353E-15,
+        -0.77437286176532039,
+        0,
+        7.6839703981556606E-16
+      ]
+    ],
+    "maximumArithmeticIncrement": 2.2266069585061132E-9,
+    "counterfactualStageMatricesAndAnchorExactlyEqual": true,
+    "contradictionRows": [
+      79,
+      207
+    ],
+    "contradictionCoefficientSumNorm": 0,
+    "contradictionBoundSum": -0.1483218712282377
+  },
+  "circular": {
+    "scenario": "circular",
+    "failure": {
+      "identifier": "collisionAvoidanceController:optimizationFailed",
+      "message": "The hard-safety, soft-CLF search failed at t=1.4 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2; alternate directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.",
+      "stack": [
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "collisionAvoidanceController",
+          "line": 76
+        },
+        {
+          "file": "/tmp/pdca-trajectory-diagnostic/replayTrajectoryFailure.m",
+          "name": "replayTrajectoryFailure",
+          "line": 22
+        }
+      ],
+      "time": 1.4000000000000001
+    },
+    "maximumCommandDifference": 0,
+    "initialState": [
+      53.9449070127868,
+      0.070257226856893534,
+      0.032847284239969805,
+      9.0828979770848175,
+      0.33641762818883281,
+      0.43992560862310376
+    ],
+    "initialErrorBound": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "estimatorBound": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "feedbackGain": [
+      [
+        0,
+        -0.13198958074539452,
+        -1.1085990462778803,
+        0.0012906328410716697,
+        0,
+        -0.085177817558146671
+      ],
+      [
+        0,
+        -0.011056271007942412,
+        -0.10676935229671042,
+        -0.77410020465450058,
+        0,
+        -0.034182677046086636
+      ]
+    ],
+    "maximumArithmeticIncrement": 1.9675562943484956E-8,
+    "counterfactualStageMatricesAndAnchorExactlyEqual": true,
+    "contradictionRows": [
+      64,
+      208
+    ],
+    "contradictionCoefficientSumNorm": 0,
+    "contradictionBoundSum": -5.86377653899612
+  },
+  "sCurve": {
+    "scenario": "sCurve",
+    "failure": {
+      "identifier": "collisionAvoidanceController:singularReferenceDomain",
+      "message": "The complete local pose domain must satisfy one minus absolute curvature times lateral extent greater than zero.",
+      "stack": [
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "name": "laneGeometry.localPoseFrames",
+          "line": 181
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "name": "laneGeometry.sweptCellFrames",
+          "line": 87
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m",
+          "name": "localFormulate",
+          "line": 103
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m",
+          "name": "formulateAvoidanceProblem",
+          "line": 7
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "localSolve",
+          "line": 330
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "collisionAvoidanceController",
+          "line": 72
+        },
+        {
+          "file": "/tmp/pdca-trajectory-diagnostic/replayTrajectoryFailure.m",
+          "name": "replayTrajectoryFailure",
+          "line": 22
+        }
+      ],
+      "time": 1.3
+    },
+    "maximumCommandDifference": 0,
+    "initialState": [
+      12.95816937920647,
+      0.026589835251551102,
+      0.0055790790357183179,
+      9.6452818604095967,
+      0.24652478987214999,
+      0.2384630939980262
+    ],
+    "initialErrorBound": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "estimatorBound": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "feedbackGain": [
+      [
+        0,
+        -0.13152206652922777,
+        -1.1038303131637164,
+        0.0010890441313824027,
+        0,
+        -0.08377957930213463
+      ],
+      [
+        0,
+        -0.0092488418048562952,
+        -0.089339288483436,
+        -0.774174890944399,
+        0,
+        -0.029008331915960237
+      ]
+    ],
+    "maximumArithmeticIncrement": 3.0231015846912664E-9,
+    "counterfactualStageMatricesAndAnchorExactlyEqual": true,
+    "domain": {
+      "hold": 28,
+      "relativeNodeTimeS": 1.4000000000000001,
+      "center": [
+        25.251495239780368,
+        -0.34658981058498739,
+        -0.02520119219462913
+      ],
+      "radius": [
+        81.918366878325216,
+        120.28265273673242,
+        203.78752559932983
+      ],
+      "curvatureBound": 0.010000000000057413,
+      "extent": 120.6292425473174,
+      "curvatureTimesExtent": 1.2062924254800997,
+      "stack": [
+        {
+          "file": "laneGeometry.m",
+          "name": "laneGeometry.localPoseFrames",
+          "line": 181
+        },
+        {
+          "file": "laneGeometry.m",
+          "name": "laneGeometry.sweptCellFrames",
+          "line": 87
+        },
+        {
+          "file": "formulateAvoidanceProblem.m",
+          "name": "localFormulate",
+          "line": 103
+        },
+        {
+          "file": "formulateAvoidanceProblem.m",
+          "name": "formulateAvoidanceProblem",
+          "line": 7
+        },
+        {
+          "file": "collisionAvoidanceController.m",
+          "name": "localSolve",
+          "line": 330
+        },
+        {
+          "file": "collisionAvoidanceController.m",
+          "name": "collisionAvoidanceController",
+          "line": 72
+        },
+        {
+          "file": "replayTrajectoryFailure.m",
+          "name": "replayTrajectoryFailure",
+          "line": 22
+        }
+      ]
+    }
+  }
+}

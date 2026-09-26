@@ -1,0 +1,90 @@
+{
+  "source_commit": "19e0c5e72d511df36a5ba645ab34bb5c1a3e18e1",
+  "verification": "Three zero-difference replays; exported stage maxima, domain arithmetic and contradictory actuator row sums verified.",
+  "artifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/analyzeTrajectoryFailure.m",
+      "sha256": "1934b7e20403ca2b39b581a6bfcab0c570cabbef9dc637c5277a06bfbbbcbaf5"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/circular-replay.mat",
+      "sha256": "76aed8abf5a6911dbae8d6de1a29fd58d09b9ad4bf10493da134d81ac05da891"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/replayTrajectoryFailure.m",
+      "sha256": "b9f0b1dfb144c729a88b21929a84254c0f42b1af0349f872c01dd5711561f2bf"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/sCurve-replay.mat",
+      "sha256": "c423304f3cf973e6ab0ad6017fc02bce75b80026551ba5041a5467c31f27f163"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/straight-replay.mat",
+      "sha256": "16b1039fa0ce709b6c893e58b9e527a1a36594de0bb8d76bd196fb970272623f"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/trajectoryFailureTrace.m",
+      "sha256": "94fb2132c3617a384cccaab5a116084a3900711ff7a67eb4ccfbd9e9d79f02ce"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-linearization-20260925/circular.mat",
+      "sha256": "900a1f314657964515d6bfeabd3bd8e0b39fee2e74aa1297fc385374fc6012dc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-linearization-20260925/sCurve.mat",
+      "sha256": "96232ef4a13c672b835a19449eae80412474a466faca382a71be1112526ced3d"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-linearization-20260925/straight.mat",
+      "sha256": "7fed014a392d350a1275d583c4b64bcf4c30c84d3d602e3ab9a961b6f217aca1"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "2b05da73fc44108cd72f457bfb32fcc09076946a2e3eee1ebc7aa0a29a9b9f8e"
+    },
+    {
+      "path": "controller/formulateAvoidanceProblem.m",
+      "sha256": "375f1342db4e65187df8c5e295f8c6c5342feaca4b5b009dd5f1161d6f9c549d"
+    },
+    {
+      "path": "controller/hardEncounterBarrier.m",
+      "sha256": "a53cddd3f130ec1cb26b99c7bb3053f1c6114cea7c369a79174eb2e836d71e0c"
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256": "26e97c17544553e331d10a0e9f5e4b40a8fb922cee052ac5f4be021fe36e9ede"
+    },
+    {
+      "path": "controller/ltvBicycleModel.m",
+      "sha256": "6dbef6da68e70dfe5e768a34906eb05776b756c6ff696c53f3b82ff513e08955"
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f"
+    },
+    {
+      "path": "report/TRAJECTORY_FAILURE_DIAGNOSIS_20260925.md",
+      "sha256": "f0bd1718e53834fd4da0c59674f59f27adcce4998688d48637f795a56dde124c"
+    },
+    {
+      "path": "report/TRAJECTORY_FAILURE_DIAGNOSIS_20260925/circular-stages.csv",
+      "sha256": "442d583971bfbc2909154a8c764e7e65a39d4863fa2585ec68416490587d3c3a"
+    },
+    {
+      "path": "report/TRAJECTORY_FAILURE_DIAGNOSIS_20260925/diagnosis-details.json",
+      "sha256": "afe7346d9d34c805e58ec8b29e1af7136047ad33597b2dcccce7cfe127533ef5"
+    },
+    {
+      "path": "report/TRAJECTORY_FAILURE_DIAGNOSIS_20260925/diagnosis-summary.csv",
+      "sha256": "dedaf1dcef7743df4c8d7251a5160c96b40bbda93953e33a2a6018d9621d887c"
+    },
+    {
+      "path": "report/TRAJECTORY_FAILURE_DIAGNOSIS_20260925/sCurve-stages.csv",
+      "sha256": "76ca81897760d1e33cc6386277d631f9418919316bdbf41d7b15607b066fb9ee"
+    },
+    {
+      "path": "report/TRAJECTORY_FAILURE_DIAGNOSIS_20260925/straight-stages.csv",
+      "sha256": "28895643df1feb68ac506e8049f25df7430b94251443d76c4fa9b1c7a1e60d78"
+    }
+  ]
+}
