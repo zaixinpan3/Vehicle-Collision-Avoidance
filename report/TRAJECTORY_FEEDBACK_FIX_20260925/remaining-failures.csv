@@ -1,0 +1,4 @@
+Scenario,FailureTimeS,Identifier,MaximumReplayCommandDifference,MaximumLateralBoundM,MaximumSteeringSupportRad,InvalidSlipMagnitudeRad
+straight,2.05,collisionAvoidanceController:optimizationFailed,0,9.70104609667016e-07,1.21549706782743e-07,NaN
+circular,1.5,collisionAvoidanceController:invalidTireOperatingPoint,0,NaN,NaN,1.66439876847338
+sCurve,1.4,collisionAvoidanceController:optimizationFailed,0,9.2550653055081e-07,3.27216571167726e-07,NaN

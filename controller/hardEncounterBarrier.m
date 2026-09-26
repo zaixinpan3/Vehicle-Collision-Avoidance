@@ -31,7 +31,7 @@ classdef hardEncounterBarrier
             model.exitMargin = inf;
             model.targetReleased = false;
             if ~isempty(stored)
-                expectedVersion=45;
+                expectedVersion=46;
                 if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=expectedVersion
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
@@ -255,6 +255,10 @@ classdef hardEncounterBarrier
             if trajectory
                 [prescribed.prescribedStages,linearizationStates] = ...
                     ltvBicycleModel.trajectoryStages(model,inputs);
+                terminalMatrix = cruise.matrix;
+                if scheduled,terminalMatrix = referenceMatrices(:,:,end);end
+                prescribed.prescribedFeedbackGains = ltvBicycleModel.trajectoryFeedbackGains( ...
+                    prescribed.prescribedStages,model.cfg,terminalMatrix);
             end
             prediction = ltvBicycleModel.finitePredict(prescribed,[]);
             prediction.linearizationPolicy = "cruise";

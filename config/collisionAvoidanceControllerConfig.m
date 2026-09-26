@@ -56,12 +56,12 @@ function cfg = localDefaults()
         "clearanceAllowanceMeters",0.2,"headingWeight",4.0,"regularizationWeight",0.02);
     % Small trajectory regularization for fixed-direction convex optimization.
     cfg.jointCertificate = struct("proximalWeight",1.0e-3);
-    % Prediction under per-hold feedback u_k = v_k + K (xhat_k - z_k) from the
-    % second hold on, so the ego deviation set stays bounded instead of
-    % growing open loop. K is the cruise gain with its speed column scaled by
-    % speedGainScale and, unless lateralVelocityFeedback, no lateral-velocity
-    % column. The estimation error at every future hold is bounded by the
-    % measurement radius limit of the current sensing contract.
+    % Prediction under per-hold feedback u_k = v_k + K_k (xhat_k - z_k) from
+    % the second hold on. Active trajectory models use a backward stage-wise
+    % design; cruise models retain the cruise gain. Both scale the speed
+    % column by speedGainScale and omit the lateral-velocity column unless
+    % lateralVelocityFeedback is on. The actual finite-horizon enclosure and
+    % actuator reserves determine admission; boundedness is not assumed.
     cfg.feedbackPrediction = struct("enabled",true,"speedGainScale",0.5, ...
         "lateralVelocityFeedback",false);
     % A fresh frame with a target tries these reaction strengths in order: each

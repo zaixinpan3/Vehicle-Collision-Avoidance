@@ -440,6 +440,33 @@ classdef ltvBicycleModel
             end
         end
 
+        function gains = trajectoryFeedbackGains(stages,cfg,terminalMatrix)
+        % Backward quadratic-cost design for the actual held stage dynamics.
+        % Apply the existing measurement-column restrictions before updating
+        % the cost-to-go, so later gains use the policy actually propagated.
+        % The first held input is exact and has no feedback correction.
+            count = numel(stages);
+            gains = zeros(2,6,count);
+            if ~cfg.feedbackPrediction.enabled,return;end
+            scales = [cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale; ...
+                cfg.clf.speedErrorScale;cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+            stateCost = diag([0;1./scales.^2]);
+            inputCost = diag([10*cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight]);
+            value = zeros(6);value(2:6,2:6) = terminalMatrix;
+            for stage = count:-1:2
+                flow = stages(stage).transition;
+                a = flow(1:6,1:6);b = flow(1:6,7:8);
+                gain = -(inputCost+b.'*value*b)\(b.'*value*a);
+                gain(:,1) = 0;
+                if ~cfg.feedbackPrediction.lateralVelocityFeedback,gain(:,5) = 0;end
+                gain(:,4) = cfg.feedbackPrediction.speedGainScale*gain(:,4);
+                closed = a+b*gain;
+                value = stateCost+closed.'*value*closed+gain.'*inputCost*gain;
+                value = (value+value.')/2;
+                gains(:,:,stage) = gain;
+            end
+        end
+
         function [gain,bound] = feedbackContract(model)
         % Per-hold feedback gain and estimator bound of the prediction tube.
         % The gain acts on [station; lateral; heading; vx; vy; yaw rate]; it is
@@ -556,6 +583,8 @@ classdef ltvBicycleModel
             zonotope = diag(radius);zonotope = zonotope(:,radius~=0);
             intervalRadius = zeros(6,1);
             inputDeviation = zeros(2,size(zonotope,2));inputDeviationBox = zeros(2,1);
+            % Retain the cruise reference for legacy diagnostics; the actual
+            % policy, including carried/reactive gains, is the sequence below.
             prediction.feedbackGain = feedbackGain;
             prediction.estimatorBound = estimatorBound;
             prediction.feedbackInputSupport = zeros(2,count);
@@ -563,6 +592,10 @@ classdef ltvBicycleModel
             % Gain of each hold's correction; the first held input is exact.
             prediction.feedbackGainSequence = zeros(2,6,count);
             if feedback,prediction.feedbackGainSequence(:,:,2:end) = repmat(feedbackGain,1,1,count-1);end
+            if isfield(model,'prescribedFeedbackGains')
+                prediction.feedbackGainSequence = model.prescribedFeedbackGains;
+                feedback = any(prediction.feedbackGainSequence(:));
+            end
             % Interval part added at each hold (held reserve and arithmetic).
             prediction.intervalIncrement = zeros(6,count);
             baseRate = cfg.model.ltvModelErrorRateBound(:)+cfg.model.plantModelResidualRateBound(:);
@@ -680,10 +713,11 @@ classdef ltvBicycleModel
                 previousDeviationBox = inputDeviationBox;
                 closedMap = stateMap;
                 if stage>1 && feedback
-                    closedMap = stateMap+inputMap*feedbackGain;
-                    inputDeviation = [feedbackGain*zonotope,feedbackGain*noise];
-                    inputDeviationBox = abs(feedbackGain)*intervalRadius;
-                    zonotope = [closedMap*zonotope,inputMap*feedbackGain*noise];
+                    stageGain = prediction.feedbackGainSequence(:,:,stage);
+                    closedMap = stateMap+inputMap*stageGain;
+                    inputDeviation = [stageGain*zonotope,stageGain*noise];
+                    inputDeviationBox = abs(stageGain)*intervalRadius;
+                    zonotope = [closedMap*zonotope,inputMap*stageGain*noise];
                     previousDeviation = [previousDeviation,zeros(2,size(noise,2))]; %#ok<AGROW>
                 else
                     inputDeviation = zeros(2,size(zonotope,2));inputDeviationBox = zeros(2,1);
@@ -729,7 +763,7 @@ classdef ltvBicycleModel
         % weights(i) times the squared relative position along its fixed
         % direction angles(i); terminalWeight times the cruise CLF matrix
         % penalizes the final ego deviation; strength scales the CLF input
-        % weight (larger is a weaker reaction). The base ego gain K stays in
+        % weight (larger is a weaker reaction). The stage's base ego gain stays in
         % the loop; the design adds a record-driven ego gain (no
         % lateral-velocity column unless that feedback is on), a target
         % position/velocity gain L and an acceleration feedforward N. Target
@@ -738,7 +772,6 @@ classdef ltvBicycleModel
         % give a valid tube (reactiveTube); this design only selects them.
             count = prediction.stageCount;h = model.sampleTime;cfg = model.cfg;
             settings = cfg.feedbackPrediction.targetReaction;
-            base = prediction.feedbackGain;
             flow = [eye(2),h*eye(2);zeros(2),eye(2)];
             drive = [zeros(6,2);h^2/2*eye(2);h*eye(2)];
             inputWeight = diag([10*cfg.clf.frontWheelSteeringAngleWeight,cfg.clf.brakingRatioWeight])*strength;
@@ -769,6 +802,7 @@ classdef ltvBicycleModel
             value = cost(:,:,count+1);
             for stage = count:-1:2
                 a = prediction.stageMatrixA(:,:,stage);b = prediction.stageMatrixB(:,:,stage);
+                base = prediction.feedbackGainSequence(:,:,stage);
                 open = [a+b*base,zeros(6,4);zeros(4,6),flow];input = [b;zeros(4,2)];
                 curvature = inputWeight+input.'*value*input;
                 gain = -curvature\(input.'*value*open);

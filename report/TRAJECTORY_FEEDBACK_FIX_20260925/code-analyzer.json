@@ -1,0 +1,105 @@
+[
+  {
+    "file": "controller/ltvBicycleModel.m",
+    "issues": []
+  },
+  {
+    "file": "controller/hardEncounterBarrier.m",
+    "issues": [
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 781,
+        "column": [
+          56,
+          59
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 782,
+        "column": [
+          9,
+          12
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 783,
+        "column": [
+          9,
+          12
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 790,
+        "column": [
+          45,
+          47
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 790,
+        "column": [
+          66,
+          68
+        ]
+      },
+      {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 997,
+        "column": [
+          16,
+          22
+        ]
+      },
+      {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 997,
+        "column": [
+          43,
+          49
+        ]
+      }
+    ]
+  },
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "issues": []
+  },
+  {
+    "file": "config/collisionAvoidanceControllerConfig.m",
+    "issues": []
+  },
+  {
+    "file": "scripts/runExactStateRecursiveFeasibilityScenario.m",
+    "issues": []
+  },
+  {
+    "file": "tests/trajectoryFeedbackTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/targetReactionTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/certificateContinuationTest.m",
+    "issues": []
+  }
+]

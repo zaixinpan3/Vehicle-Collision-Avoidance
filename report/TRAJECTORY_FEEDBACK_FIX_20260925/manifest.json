@@ -1,0 +1,162 @@
+{
+  "base_commit": "023a215ba4f18603c341a0d8b6d001cd4a47a619",
+  "verification": "257 passing selected tests; three feasible former failed frames; three exactly reproduced new failures with no nonlinear success claim.",
+  "artifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/circular-replay.mat",
+      "sha256": "76aed8abf5a6911dbae8d6de1a29fd58d09b9ad4bf10493da134d81ac05da891"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/sCurve-replay.mat",
+      "sha256": "c423304f3cf973e6ab0ad6017fc02bce75b80026551ba5041a5467c31f27f163"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-failure-diagnosis-20260925/straight-replay.mat",
+      "sha256": "16b1039fa0ce709b6c893e58b9e527a1a36594de0bb8d76bd196fb970272623f"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/circular-fixed-frame.mat",
+      "sha256": "7900a2484d102b98d88246493efe7bec975bdb212adb776174ec8bd0a33df400"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/circular-replay.mat",
+      "sha256": "e53fc57de027b977378ce9b878804219a6e411f86f0fe55af1f3069d9123275e"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/circular.mat",
+      "sha256": "2d0092cae03c015ccb1ea9bcb0f5fd61c66ee29806ffb44d348db14e27403d9c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/replayFeedbackFailure.m",
+      "sha256": "8e12ab4de0f9133b67a1d609883e9cf5aa76c7b3b0e75e8c5978f4be6525cca4"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/sCurve-fixed-frame.mat",
+      "sha256": "55f34d1663914b70d420b13336f5522bc6f86115474a5e66e020129e85cb5a4b"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/sCurve-replay.mat",
+      "sha256": "c7448ee64c020c21e9e9b485686d634555f4dcead37affcd0e8cec50da65a5b4"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/sCurve.mat",
+      "sha256": "28bd7dd607a8222973ba07f57b660e4bb88ec4b41e13fd97fab14dd5a7ace670"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/straight-fixed-frame.mat",
+      "sha256": "ff48dff1a2a9fa4dd61777dd2b389ec09c65e6dcd3673527cce5c6f0529fdcaf"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/straight-replay.mat",
+      "sha256": "1a77d108eefa2262a07cf9a7840cf79535a15e9db0a975db0f5413f92c382fd4"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/straight.mat",
+      "sha256": "12240a9f322df42aee1ecece41d11c65a2b3352a68e6bfc4ec603ef97b8ecb5c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-feedback-fix-20260925/trajectoryFailureTrace.m",
+      "sha256": "94fb2132c3617a384cccaab5a116084a3900711ff7a67eb4ccfbd9e9d79f02ce"
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "0bf7065d27188dfb0f79dc89662968ef200b1b605be5a99978539b68101a02f0"
+    },
+    {
+      "path": "controller/FEEDBACK_TUBE_PREDICTION.md",
+      "sha256": "1933cc0a880b37127082d4f6efd8f47b189dcb98ac01d5db1ec4dc2e629d75df"
+    },
+    {
+      "path": "controller/NODE_SAMPLED_CERTIFICATE.md",
+      "sha256": "ddeecc1dbb5ff63f90e8b95b3a56786c8e5e470b208fa31e344c88850539fc67"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "90517a2f1ac01539c3d9e2dab83dfe7a6d74c2d5cac278ff02a7d18c3e584c10"
+    },
+    {
+      "path": "controller/formulateAvoidanceProblem.m",
+      "sha256": "375f1342db4e65187df8c5e295f8c6c5342feaca4b5b009dd5f1161d6f9c549d"
+    },
+    {
+      "path": "controller/hardEncounterBarrier.m",
+      "sha256": "abdbf08736b7ab851b0bce497d821732a77fa349376b84f9c27722fa7f19da28"
+    },
+    {
+      "path": "controller/ltvBicycleModel.m",
+      "sha256": "dc43d45720e31a087ba721824de386f5f95defae7e6dd4c18462aa2da245e8b0"
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925.md",
+      "sha256": "b26b0ff4512d52b6ecc41c5a06f8908229cb58f0396ac214119241059acfab4d"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925/code-analyzer.json",
+      "sha256": "04310032ed79bc1bda69f8b0fdc425710aa8e1155fb5e1a30adafa40dc5b68cc"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925/fixed-frame-admission.csv",
+      "sha256": "86b68d8f3cab08d9b9ea48803d1217ba0e576d6ed2d11a0a3318bed5f9f6af01"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925/fixed-frame-prediction.csv",
+      "sha256": "9d47482bfbaff3005c1177b233403aa651fb8689d84a7d177539067af8a64b66"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925/nonlinear-summary.csv",
+      "sha256": "d785c3b5e8e71091a4341a8500421d3bd81a51e5a35273b543683cfe0f6c3ee3"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925/remaining-details.json",
+      "sha256": "ea33ae5f9d54d039c5afe4b460b09d3af541049b2d2ff760c556a4f7c87c96c3"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925/remaining-failures.csv",
+      "sha256": "4acf633f287b970484439c190e65d8a3c7cf9639100606552a1db375a261bc08"
+    },
+    {
+      "path": "report/TRAJECTORY_FEEDBACK_FIX_20260925/tests.csv",
+      "sha256": "057b40d451c7929043661526d1103f1cb0d184157d5994055161c74d0f69319d"
+    },
+    {
+      "path": "scripts/runCenterlineCruiseScenario.m",
+      "sha256": "90f53e130ffe271b9dbf6dacd60a55b94158471ce38e20420a3a500b6bd1a6bd"
+    },
+    {
+      "path": "scripts/runCircularCenterlineStraightTargetAvoidanceScenario.m",
+      "sha256": "35211b5027e809d149254b20128c06ac46b8f779bd20b22e5b8de6c363d7106e"
+    },
+    {
+      "path": "scripts/runExactStateRecursiveFeasibilityScenario.m",
+      "sha256": "2d842400a14800d774b653a625c195708be6c8b9554a0936af8143a628aff972"
+    },
+    {
+      "path": "scripts/runOncomingVehicleAvoidanceScenario.m",
+      "sha256": "d9a3a5ae4f705551d3b8837c1f85b9f48c9a6097d3d884fd93dc5c8578d6a731"
+    },
+    {
+      "path": "scripts/runTrajectoryLinearizationValidation.m",
+      "sha256": "2329db5b977f238d3b70420f224595c0ac5ded2fabc881bd06212164afa45026"
+    },
+    {
+      "path": "scripts/runVaryingCurvatureStraightTargetAvoidanceScenario.m",
+      "sha256": "710f485d5d9e05b8b76134d8fc440e6223be343740c327bc979646874c0b9359"
+    },
+    {
+      "path": "tests/certificateContinuationTest.m",
+      "sha256": "f5871846b52e7af561456852b2e2710544067e54df4a0623d57d51b96b24b466"
+    },
+    {
+      "path": "tests/targetReactionTest.m",
+      "sha256": "af2bddcd60b3e835c442c9a838821e86ecf206ed25d2e08916c066c6046e1b5e"
+    },
+    {
+      "path": "tests/trajectoryFeedbackTest.m",
+      "sha256": "0a8ea4de5c07b0de210edf948ebeb4a8bf6eb2e4527007b62806626e28f062b4"
+    }
+  ]
+}

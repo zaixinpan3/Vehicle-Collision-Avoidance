@@ -27,7 +27,11 @@ Explicit `linearizationPolicy="cruise"` retains the carried-model study path.
 Target-free cruise and the existing terminal continuation are unchanged.
 The first-hold CLF cone and reported generator use the actual prediction
 stage; the cruise reference and Lyapunov metric remain the tracking objective.
-Stored controller state version 45 rejects older generator/reporting contracts.
+Trajectory error feedback is now designed backward along the same stage
+matrices; all error, input and slew supports use that gain sequence. This
+replaces the incompatible cruise gain on active trajectory models without
+removing arithmetic reserves. Stored controller state version 46 rejects
+older generator/feedback contracts. See [the feedback design](FEEDBACK_TUBE_PREDICTION.md).
 
 The current scenario defaults use a **50 ms** prediction-node interval,
 input hold and controller update period, all driven by `controller.sampleTime`.

@@ -1,0 +1,144 @@
+{
+  "straight": {
+    "failure": {
+      "identifier": "collisionAvoidanceController:optimizationFailed",
+      "message": "The hard-safety, soft-CLF search failed at t=2.05 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2; alternate directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.",
+      "stack": [
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "collisionAvoidanceController",
+          "line": 76
+        },
+        {
+          "file": "/tmp/pdca-trajectory-diagnostic/replayFeedbackFailure.m",
+          "name": "replayFeedbackFailure",
+          "line": 24
+        }
+      ],
+      "time": 2.0500000000000003
+    },
+    "maximumReplayCommandDifference": 0,
+    "maximumErrorBound": [
+      7.1197947217438735E-7,
+      9.7010460966701635E-7,
+      1.0238181548449944E-7,
+      1.2086416891640565E-7,
+      3.4687690355978542E-7,
+      1.9401374073776148E-7
+    ],
+    "maximumFeedbackSupport": [
+      1.2154970678274274E-7,
+      1.5728808003922924E-7
+    ]
+  },
+  "circular": {
+    "failure": {
+      "identifier": "collisionAvoidanceController:invalidTireOperatingPoint",
+      "message": "Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.",
+      "stack": [
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "name": "modifiedFialaTire.evaluate",
+          "line": 75
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "name": "modifiedFialaTire.affineModel",
+          "line": 21
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "name": "localOperatingPointMatrices",
+          "line": 1041
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "name": "ltvBicycleModel.trajectoryStages",
+          "line": 408
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/hardEncounterBarrier.m",
+          "name": "hardEncounterBarrier.predict",
+          "line": 257
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m",
+          "name": "localFormulate",
+          "line": 95
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/formulateAvoidanceProblem.m",
+          "name": "formulateAvoidanceProblem",
+          "line": 7
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "localSolve",
+          "line": 330
+        },
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "collisionAvoidanceController",
+          "line": 72
+        },
+        {
+          "file": "/tmp/pdca-trajectory-diagnostic/replayFeedbackFailure.m",
+          "name": "replayFeedbackFailure",
+          "line": 24
+        }
+      ],
+      "time": 1.5
+    },
+    "maximumReplayCommandDifference": 0,
+    "invalidTire": {
+      "state": [
+        86.055114064769583,
+        -2.4785648033594292,
+        0.97067025923618377,
+        3.3804150089853433,
+        -8.0326380229515166,
+        2.0720145484881991
+      ],
+      "input": [
+        0.69812170128490791,
+        0.99998544090001418
+      ],
+      "slip": [
+        -1.6643987684733772,
+        -1.2764019081833569
+      ]
+    }
+  },
+  "sCurve": {
+    "failure": {
+      "identifier": "collisionAvoidanceController:optimizationFailed",
+      "message": "The hard-safety, soft-CLF search failed at t=1.4 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2; alternate directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.",
+      "stack": [
+        {
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+          "name": "collisionAvoidanceController",
+          "line": 76
+        },
+        {
+          "file": "/tmp/pdca-trajectory-diagnostic/replayFeedbackFailure.m",
+          "name": "replayFeedbackFailure",
+          "line": 24
+        }
+      ],
+      "time": 1.4000000000000001
+    },
+    "maximumReplayCommandDifference": 0,
+    "maximumErrorBound": [
+      1.2805232753104622E-6,
+      9.2550653055081E-7,
+      1.8217870745857062E-7,
+      2.445945163541843E-7,
+      1.9261457161184714E-6,
+      9.157882182160777E-7
+    ],
+    "maximumFeedbackSupport": [
+      3.2721657116772607E-7,
+      3.1902955825639296E-7
+    ]
+  }
+}

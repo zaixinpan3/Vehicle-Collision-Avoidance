@@ -5,6 +5,43 @@ Status: implemented 2026-09-23 (Section 7), default on
 ego uncertainty found in
 [ADMISSION_INFEASIBILITY_DIAGNOSIS_20260923.md](../report/ADMISSION_INFEASIBILITY_DIAGNOSIS_20260923.md).
 
+## Trajectory-model feedback update (September 25, 2026)
+
+For active `linearizationPolicy="trajectory"` encounters, the base policy now
+uses a gain sequence designed from the same held A/B matrices as prediction.
+Reusing the cruise gain near saturated longitudinal tire utilization amplified
+arithmetic reserves until the actuator or reference-domain constraints became
+impossible; see [the diagnosis](../report/TRAJECTORY_FAILURE_DIAGNOSIS_20260925.md).
+
+`ltvBicycleModel.trajectoryFeedbackGains` performs a backward finite-horizon
+quadratic-cost recursion. The state cost uses the existing five CLF error
+scales, the input cost uses the existing LQR steering/braking weights, and
+the terminal cost is the cruise metric at the final reference node (including
+the scheduled reference's final metric on an S-curve). At each stage:
+
+    Kraw = -(R + B' Pnext B) \ (B' Pnext A),
+    K = existingColumnRestrictions(Kraw),
+    P = Q + (A+B K)' Pnext (A+B K) + K' R K.
+
+Station feedback is zero; the configured speed scaling and optional omission
+of lateral-velocity feedback are applied before evaluating the cost-to-go.
+This is a finite-horizon quadratic-cost design with those restrictions, not
+an unrestricted infinite-horizon LQR stability claim. The first hold's gain
+is zero because its issued input is exact. Gains stay fixed during the solve.
+
+`finitePredict` uses each K for state-set propagation, estimator-error
+injection, input authority and slew support. `reactionGains` uses the matching
+per-stage base gain when adding target reaction. Carried plans retain their
+gain sequence, and executed feedback metadata reports the current hold's gain.
+The legacy `prediction.feedbackGain` field remains the cruise reference;
+`prediction.feedbackGainSequence` defines the actual policy.
+
+Arithmetic and process reserves, the sensing contract and all actuator,
+geometry and terminal checks are unchanged. Finite-horizon admission still
+checks the resulting enclosure; the design does not assert stability for every
+possible trajectory or certify the nonlinear plant. The old cruise gain
+remains in target-free/cruise-policy studies. Controller state version is 46.
+
 ## 1. The problem
 
 The controller plans an input sequence `u_0..u_{N-1}` and certifies it for

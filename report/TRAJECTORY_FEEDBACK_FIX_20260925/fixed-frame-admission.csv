@@ -1,0 +1,4 @@
+Scenario,Feasible,ExitFlag,Message,MaximumLateralBoundM,HardSolves
+straight,1,1,solver exit flag 1: Clarabel status 1,5.59371377188461e-07,1
+circular,1,1,solver exit flag 1: Clarabel status 1,1.86755784834202e-05,5
+sCurve,1,1,solver exit flag 1: Clarabel status 1,1.14989631879591e-06,1
