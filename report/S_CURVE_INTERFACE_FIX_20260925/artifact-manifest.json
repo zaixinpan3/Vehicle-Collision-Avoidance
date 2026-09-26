@@ -1,0 +1,140 @@
+{
+  "base_commit": "be53cd086adcfc653a52fdcf2c3d470574776b0f",
+  "artifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/s-curve-interface-fix-20260925/s-curve-nonlinear.mat",
+      "sha256": "1aaf34d8a409f9dd07c38c2c5757e91548d6e8777c00f28ed34982671ed124b1",
+      "bytes": 9285011
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/s-curve-interface-fix-20260925/short-run.mat",
+      "sha256": "7ba3d9af2733bf7bb50ea66f65faf0a54639fa4ae078f8abe7467537c3ef461e",
+      "bytes": 416091
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "d306c5b85ff560d9540ae36b04031a19ec42a2bbda68dabb717ed448be9c4c60",
+      "bytes": 21699
+    },
+    {
+      "path": "config/controllerDesignExperimentConfig.m",
+      "sha256": "f95efee2df0f0999b8f67285ef00e119d7cb148027f6ed6aa2baa1496c6eeeed",
+      "bytes": 2496
+    },
+    {
+      "path": "config/estimatorControllerIntegrationConfig.m",
+      "sha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+      "bytes": 5604
+    },
+    {
+      "path": "config/finiteSensingValidationConfig.m",
+      "sha256": "68360e47775732752274cce9b7543fb601afdffaaaf66d7636042c5ab9f7cba7",
+      "bytes": 1677
+    },
+    {
+      "path": "config/nrmmTrackingConfig.m",
+      "sha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+      "bytes": 4158
+    },
+    {
+      "path": "controller/avoidanceSafetyGeometry.m",
+      "sha256": "d0c10b39ef2d033414939a2d63fbb976e247099573d23295fb8044593355a129",
+      "bytes": 44369
+    },
+    {
+      "path": "controller/avoidanceStageQp.m",
+      "sha256": "3873c8ef9e310b516619965a3d5b4c2f39a1ea2860d27ea7161514a29c0394b8",
+      "bytes": 15776
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "7ccde6950a54b6f8e4b56f8247636e2b08bc2ae68122eaefe4a160628468f19e",
+      "bytes": 20491
+    },
+    {
+      "path": "controller/fialaCertificate.m",
+      "sha256": "a1bead6717b4ec4e77a70e884b23a4021b6fdc3e5e12868046a6795dca22a565",
+      "bytes": 9609
+    },
+    {
+      "path": "controller/formulateAvoidanceProblem.m",
+      "sha256": "2205610892b2dd37074262ae80d04062ddf7fdec6573540146ccf6c522d69c87",
+      "bytes": 22578
+    },
+    {
+      "path": "controller/hardEncounterBarrier.m",
+      "sha256": "e513248b2d6a968aed8dc2b12c3ebd80d176730ca38f71396271b8fbb3e9edd0",
+      "bytes": 57832
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256": "26e97c17544553e331d10a0e9f5e4b40a8fb922cee052ac5f4be021fe36e9ede",
+      "bytes": 38250
+    },
+    {
+      "path": "controller/ltvBicycleModel.m",
+      "sha256": "b91d4e000130f70c066c90d81ef7adde1762c7b5ca5e74b4201125437d901509",
+      "bytes": 65092
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f",
+      "bytes": 7347
+    },
+    {
+      "path": "controller/readPlanningInputs.m",
+      "sha256": "11b88e333f3b5025c335a8d361114fe9bfb5cbcbb035968745cb5fb4126b2377",
+      "bytes": 39376
+    },
+    {
+      "path": "controller/solveHardCbfClf.m",
+      "sha256": "b1f5fdb5ffe73713cb47cf7feb91b8d813e0a049e1975d3c13b8f66f4ef9ec5c",
+      "bytes": 41363
+    },
+    {
+      "path": "controller/stateUncertainty.m",
+      "sha256": "44f9d3a61afff0d495d473cac1124a8b5b0e6d5a98526da181695fb10df89f0d",
+      "bytes": 18607
+    },
+    {
+      "path": "controller/targetPrediction.m",
+      "sha256": "679e026666916a755964d79060c0872f54aec95e506fd04327c416519e9a4df3",
+      "bytes": 34118
+    },
+    {
+      "path": "report/S_CURVE_INTERFACE_FIX_20260925/regression-results.csv",
+      "sha256": "240d271438f163343f21b350417b13d948cfe18581b5d2926f96924d347da0e5",
+      "bytes": 2267
+    },
+    {
+      "path": "report/S_CURVE_INTERFACE_FIX_20260925/simulation-summary.json",
+      "sha256": "96dc80b626acf612d2150a0c2207aac1e2722d8979ce6aaf8aa3de32cb514ada",
+      "bytes": 738
+    },
+    {
+      "path": "scripts/runCenterlineCruiseScenario.m",
+      "sha256": "90f53e130ffe271b9dbf6dacd60a55b94158471ce38e20420a3a500b6bd1a6bd",
+      "bytes": 70391
+    },
+    {
+      "path": "scripts/runVaryingCurvatureStraightTargetAvoidanceScenario.m",
+      "sha256": "710f485d5d9e05b8b76134d8fc440e6223be343740c327bc979646874c0b9359",
+      "bytes": 27152
+    },
+    {
+      "path": "tests/scheduledReferenceControllerTest.m",
+      "sha256": "5ad6317a01c757008c42d5a46988c9e46f51bf3f03686cb169bfa261f41aa586",
+      "bytes": 9156
+    },
+    {
+      "path": "tests/smoothReferenceGeometryTest.m",
+      "sha256": "5f4a80a7871f00ca51b376c2ef5eda974f9c542aaf1027fc7888216c9c68c1a4",
+      "bytes": 7103
+    },
+    {
+      "path": "tests/varyingCurvatureShoulderGeometryTest.m",
+      "sha256": "595614cc4e1f79616eaf8250bfdbfd292cf48d8ee636217ecd88e9337342435e",
+      "bytes": 5184
+    }
+  ]
+}

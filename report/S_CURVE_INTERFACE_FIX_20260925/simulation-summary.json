@@ -1,0 +1,22 @@
+{
+  "requestedDurationS": 18,
+  "executedDurationS": 2.2,
+  "referenceSpeedMps": 10,
+  "targetSpeedMps": 10,
+  "targetInitialDistanceM": 49.999999999999986,
+  "perceptionRangeM": 30,
+  "completedHolds": 44,
+  "firstTargetVisibleS": 1.05,
+  "acceptedTargetVisibleHolds": 23,
+  "failureIdentifier": "collisionAvoidanceController:optimizationFailed",
+  "failureTimeS": 2.2,
+  "minimumExecutedSATMarginM": 1.1046345548174727,
+  "minimumExecutedRoadMargin": 6.7217927027583615,
+  "nominalCollisionTimeS": 2.5086245635109652,
+  "nominalCollisionSATMarginM": -0.49999999999999933,
+  "collisionConstructionErrorM": 4.4408920985006262E-16,
+  "passedTarget": false,
+  "recoveredCruise": false,
+  "regressionsPassed": 23,
+  "regressionsFailed": 0
+}

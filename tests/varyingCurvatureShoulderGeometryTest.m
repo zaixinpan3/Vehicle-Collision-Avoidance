@@ -2,6 +2,10 @@ classdef varyingCurvatureShoulderGeometryTest ...
         < matlab.unittest.TestCase
 % varyingCurvatureShoulderGeometryTest S-curve shoulder construction.
 
+    properties
+        scenarioResult
+    end
+
     methods (TestClassSetup)
         function addRepositoryPaths(testCase)
             repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
@@ -10,16 +14,17 @@ classdef varyingCurvatureShoulderGeometryTest ...
                     fullfile(repositoryRoot, "scripts")));
             testCase.assumeFalse(isempty(which("PassVeh14DOF.sltx")), ...
                 "Vehicle Dynamics Blockset PassVeh14DOF is unavailable.");
+            testCase.scenarioResult = ...
+                runVaryingCurvatureStraightTargetAvoidanceScenario( ...
+                    Duration=0.1, Plot=false, Report=false);
         end
     end
 
     methods (Test)
         function sCurveUsesVehicleWidthShoulders(testCase)
-            result = ...
-                runVaryingCurvatureStraightTargetAvoidanceScenario( ...
-                    Duration=0.1, Plot=false, Report=false);
+            result = testCase.scenarioResult;
 
-            testCase.verifyTrue(result.failure.occurred, ...
+            testCase.verifyFalse(result.failure.occurred, ...
                 result.failure.message);
             testCase.verifyEqual( ...
                 result.scenario.geometry.roadShoulderWidth, ...
@@ -42,8 +47,60 @@ classdef varyingCurvatureShoulderGeometryTest ...
             testCase.verifyEqual( ...
                 result.perception.terminalLateralOffsetBands.left, ...
                 [8.0, 10.6], AbsTol=1.0e-12);
-            testCase.verifyEqual(result.failure.identifier,"collisionAvoidanceController:unsupportedReferenceJump");
-            testCase.verifyEmpty(result.command);
+            testCase.verifyEqual(result.metrics.completedControlSteps, 2);
+            testCase.verifyNumElements(result.command, 2);
+        end
+
+        function collisionConstructionUsesTheControllerReference(testCase)
+            result = testCase.scenarioResult;
+            geometry = result.scenario.geometry;
+            curve = geometry.referenceCurve;
+            station = result.scenario.referenceSpeed * geometry.nominalCollisionTime;
+            [position, heading] = laneGeometry.referencePose(station, 0, curve);
+            targetPosition = geometry.targetInitialPosition ...
+                + geometry.nominalCollisionTime * geometry.targetVelocity;
+            normal = [-sin(heading); cos(heading)];
+
+            testCase.verifyEqual(geometry.nominalCollisionPosition, ...
+                position.', AbsTol=1e-10);
+            testCase.verifyEqual(geometry.nominalCollisionHeading, ...
+                heading, AbsTol=1e-12);
+            testCase.verifyEqual(targetPosition, position ...
+                + geometry.targetCollisionLateralOffset * normal, AbsTol=1e-10);
+            testCase.verifyEqual(norm(geometry.targetInitialPosition), 50, AbsTol=1e-10);
+            testCase.verifyEqual(laneGeometry.referenceCurvature([20, 60, 80, 240], curve), ...
+                [.01, -.01, 0, 0], AbsTol=1e-12);
+        end
+
+        function targetContractPredictsTheConstructedStraightMotion(testCase)
+            result = testCase.scenarioResult;
+            truth = result.attempts.targetTruth{1};
+            road = struct('referenceCurve', result.scenario.geometry.referenceCurve);
+            [~, lane, ~, target] = readPlanningInputs( ...
+                result.attempts.controllerEgoEstimate{1}, truth, road, ...
+                result.controllerConfiguration);
+            encounter = targetPrediction.admitOnline(target, 0, lane, ...
+                result.controllerConfiguration);
+            [center, radius] = targetPrediction.finiteFlow(encounter, 2);
+            expected = truth.targetPositionInertial + 2 * truth.targetVelocityInertial;
+
+            testCase.verifyEqual(center(1:2), expected, AbsTol=1e-10);
+            testCase.verifyLessThan(norm(radius(1:2)), 1e-8);
+        end
+
+        function offGridBendEndpointStartsAnExactlyStraightContinuation(testCase)
+            result = runVaryingCurvatureStraightTargetAvoidanceScenario( ...
+                Duration=0.05, CurvatureWavelength=80.03, ...
+                CenterlineSpacing=0.3, Plot=false, Report=false);
+            curve = result.scenario.geometry.referenceCurve;
+            stations = .3 * (-ceil(40/.3):ceil(220/.3));
+            position = laneGeometry.referencePose(stations, 0, curve);
+
+            testCase.verifyFalse(result.failure.occurred, result.failure.message);
+            testCase.verifyEqual(result.scenario.centerline, position.', AbsTol=1e-10);
+            testCase.verifyEqual(laneGeometry.referenceCurvature( ...
+                [80.03, 80.1, curve.length, curve.length+10], curve), ...
+                zeros(1, 4), AbsTol=0);
         end
     end
 end
