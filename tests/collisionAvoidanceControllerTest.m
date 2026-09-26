@@ -30,7 +30,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(state.appliedInput,plan(:,1),AbsTol=0);
             testCase.verifyEqual(problem.metadata.trajectorySolverCallCount,1);
             testCase.verifyEqual(problem.metadata.solverCallCount,1+problem.metadata.restorationSolverCallCount);
-            testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyEqual(problem.metadata.recursiveFeasibilityGuaranteed,~targetPresent);
             testCase.verifyGreaterThan(size(state.plan,2),1);
             testCase.verifyTrue(problem.metadata.predictionContinuationRetained);
             testCase.verifyTrue(state.terminal.targetIndependent);
@@ -49,6 +49,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         end
         function failedImprovementReturnsTheShiftedPreviousPlan(testCase,failedStatus)
             [ego,target,road,cfg]=localFixture(true);
+            cfg.model.linearizationPolicy="cruise";
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             ego=localSuccessor(ego,first,stored);
             target.targetPositionInertial=target.targetPositionInertial ...
@@ -62,6 +63,17 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput, ...
                 problem.program.anchorPlan(1:2)+problem.metadata.feedbackCorrection,AbsTol=0);
             testCase.verifyEqual(localFailureHook('count',[]),1);
+        end
+        function refreshedTrajectoryCannotIssueAnOldPlanAfterSolverFailure(testCase,failedStatus)
+            [ego,target,road,cfg]=localFixture(true);
+            [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,first,stored);
+            target.targetPositionInertial=target.targetPositionInertial ...
+                +cfg.controller.sampleTime*target.targetVelocityInertial;
+            localFailureHook('reset',failedStatus);cfg.solver.jointFunction=@localFailureHook;
+
+            testCase.verifyError(@() collisionAvoidanceController(ego,target,road,cfg,stored), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
         function aClearFreshSeedCannotReplaceTheMandatoryTrajectorySolve(testCase,failedStatus)
             [ego,target,road,cfg]=localFixture(true);
@@ -187,6 +199,7 @@ classdef collisionAvoidanceControllerTest < matlab.unittest.TestCase
         end
         function theShiftedPlanIsFeasibleInTheNextOptimization(testCase,errorRadius)
             [ego,target,road,cfg]=localFixture(true);
+            cfg.model.linearizationPolicy="cruise";
             ego.controllerStateErrorBound=errorRadius;
             [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
             ego=localSuccessor(ego,problem,state);

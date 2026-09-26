@@ -25,6 +25,9 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % An ego measurement outside the carried successor box (plant differs from
 % the model) is admitted from the measurement; the shifted previous plan still
 % supplies the first separation directions.
+% With trajectory linearization, active encounters instead refresh the stage
+% Jacobians once per frame from that shifted plan and the current observation.
+% Rebuilt models require new admission and do not inherit a feasible witness.
     persistent lastState
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -93,14 +96,14 @@ function [command, predictedInput, planningProblem, controllerState] = ...
         states(:,stage+1) = prediction.stageMatrixA(:,:,stage)*states(:,stage) ...
             +prediction.stageMatrixB(:,:,stage)*predictedInput(:,stage)+prediction.stageAffine(:,stage);
     end
-    command = localCommand(firstInput,model.initialEgoState,cruise.stage.speed, ...
-        cruise.stage.curvature,cruise.stage.brakingRatio,model);
+    command = localCommand(firstInput,model.initialEgoState,prediction,model);
     command.measurementTime = model.stateTime;
     command.actuationTime = model.stateTime;
     command.holdSeconds = model.sampleTime;
     nextReference=cruise.state;nextMatrix=cruise.matrix;
     if isfield(cruise,'nextState'),nextReference=cruise.nextState;nextMatrix=cruise.nextMatrix;end
-    nextError = cruise.transition(2:6,:)*[model.initialEgoState;firstInput;1]-nextReference(2:6);
+    nextError = prediction.stageMatrixA(2:6,:,1)*model.initialEgoState ...
+        +prediction.stageMatrixB(2:6,:,1)*firstInput+prediction.stageAffine(2:6,1)-nextReference(2:6);
     nextValue = nextError.'*nextMatrix*nextError;
     % planCertified reports acceptance: solver success or a retained previous plan.
     metadata = struct('solverCallCount',conicCalls,'solverExitFlag',result.exitFlag, ...
@@ -144,7 +147,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
         'feedbackCorrection',feedbackCorrection,'feedbackGain',feedbackGain, ...
         'feedbackEstimatorBound',feedbackBound, ...
         'targetReactionStrength',localReactionStrength(prediction), ...
-        'executedContinuousGenerator',[cruise.stage.continuousA,cruise.stage.continuousB,cruise.stage.continuousC], ...
+        'executedContinuousGenerator',[prediction.continuousA(:,:,1),prediction.continuousB(:,:,1),prediction.continuousC(:,1)], ...
         'executedResidualRateBound',zeros(6,1),'runtimeSeconds',toc(timer), ...
         'readmittedAfterInconsistentObservation',model.readmittedAfterInconsistentObservation, ...
         'initialEgoState',model.initialEgoState,'predictedNextState',states(:,2));
@@ -171,8 +174,13 @@ function [command, predictedInput, planningProblem, controllerState] = ...
             metadata.recursiveFeasibilityScope="targetFreeBoundedPhaseScheduledAffinePlant";
         end
     end
+    metadata.linearizationPolicy=prediction.linearizationPolicy;
+    if prediction.linearizationPolicy=="trajectory"
+        metadata.recursiveFeasibilityGuaranteed=false;
+        metadata.recursiveFeasibilityScope="freshTrajectoryModelRequiresNewAdmission";
+    end
     data = hardEncounterBarrier.carriedData(prediction,program,prediction.stageCount);
-    controllerState = struct('version',44, ...
+    controllerState = struct('version',45, ...
         'appliedInput',firstInput,'feedbackCorrection',feedbackCorrection,'stateTime',model.stateTime, ...
         'identity',identity,'plan',predictedInput,'decision',result.decision, ...
         'predictedState',states,'stateErrorBound',prediction.initialErrorBound, ...
@@ -273,41 +281,30 @@ function localAddKernelPath()
     end
 end
 
-function command = localCommand(firstInput, state, scheduleSpeed, scheduleCurvature, scheduleBrakingRatio, model)
-% Derived quantities of one held input at a nominal state under the stage's
-% scheduled tire tangent; the actuator input is the held input itself.
+function command = localCommand(firstInput, state, prediction, model)
+% Derived quantities use the first prediction stage's actual affine model.
     cfg = model.cfg;
-    forceScheduleSpeed = max(scheduleSpeed, cfg.model.scheduleSpeedFloor);
     tire = modifiedFialaTire.parameters(cfg);
     steeringAngle = firstInput(1);
     brakingRatio = firstInput(2);
     longitudinalAcceleration = modifiedFialaTire.accelerationGain(cfg)*brakingRatio;
-    % Paper Eqs. (8)-(9); use the same scheduled Fiala tangent as prediction.
-    frontSlipAngle = (state(5)+cfg.vehicle.lf*state(6)) ...
-        / forceScheduleSpeed-steeringAngle;
-    rearSlipAngle = (state(5)-cfg.vehicle.lr*state(6)) ...
-        / forceScheduleSpeed;
-    [tireSlope, ratioSlope, tireIntercept] = modifiedFialaTire.linearize( ...
-        scheduleCurvature, scheduleSpeed, scheduleBrakingRatio, cfg);
-    axleLateralForce = tireSlope.*[frontSlipAngle; rearSlipAngle] ...
-        +ratioSlope*brakingRatio+tireIntercept;
+    tireModel = prediction.tireModels{1};
+    axleLateralForce = tireModel.state*state+tireModel.input*firstInput+tireModel.constant;
+    slip = atan2([state(5)+cfg.vehicle.lf*state(6);state(5)-cfg.vehicle.lr*state(6)], ...
+        max(state(4),cfg.model.scheduleSpeedFloor))-[steeringAngle;0];
     axleLongitudinalForce = modifiedFialaTire.longitudinalForce(brakingRatio, cfg);
     [roadForce, ~, roadComponents] = ltvBicycleModel.roadLoad(state(4), cfg);
-    netLongitudinalAcceleration = longitudinalAcceleration ...
-        - roadForce/cfg.vehicle.m+model.longitudinalAccelerationBias;
     axleRollingResistance = roadComponents.rollingResistanceForce ...
         * tire.staticNormalLoad/(cfg.vehicle.m*cfg.vehicle.gravity);
     axleContactForce = axleLongitudinalForce-axleRollingResistance;
     command = struct();
     command.brakingRatio = brakingRatio;
     command.longitudinalAcceleration = longitudinalAcceleration;
-    command.bodyLongitudinalVelocityDerivative = ...
-        netLongitudinalAcceleration+state(5)*state(6);
-    command.lateralAcceleration = ...
-        sum(axleLateralForce)/cfg.vehicle.m-state(4)*state(6);
-    command.yawAcceleration = ...
-        (cfg.vehicle.lf*axleLateralForce(1) ...
-            - cfg.vehicle.lr*axleLateralForce(2))/cfg.vehicle.Iz;
+    derivative = prediction.continuousA(:,:,1)*state ...
+        +prediction.continuousB(:,:,1)*firstInput+prediction.continuousC(:,1);
+    command.bodyLongitudinalVelocityDerivative = derivative(4);
+    command.lateralAcceleration = derivative(5);
+    command.yawAcceleration = derivative(6);
     command.actuatorInput = [steeringAngle; brakingRatio];
     command.actuatorInputOrder = [ ...
         "frontWheelSteeringAngle", "brakingRatio"];
@@ -322,7 +319,7 @@ function command = localCommand(firstInput, state, scheduleSpeed, scheduleCurvat
     command.axleLongitudinalForce = axleLongitudinalForce;
     command.axleLateralForce = axleLateralForce;
     command.axleNormalLoad = tire.staticNormalLoad;
-    command.tireSideslipAngle = [frontSlipAngle; rearSlipAngle];
+    command.tireSideslipAngle = slip;
     command.frontWheelSteeringAngle = steeringAngle;
 end
 

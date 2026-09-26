@@ -1,0 +1,113 @@
+{
+  "base_commit": "a5ac4dc3c49f8a4b5dd8c546bd93c6b543392e39",
+  "artifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-linearization-20260925/circular.mat",
+      "sha256": "900a1f314657964515d6bfeabd3bd8e0b39fee2e74aa1297fc385374fc6012dc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-linearization-20260925/sCurve.mat",
+      "sha256": "96232ef4a13c672b835a19449eae80412474a466faca382a71be1112526ced3d"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/trajectory-linearization-20260925/straight.mat",
+      "sha256": "7fed014a392d350a1275d583c4b64bcf4c30c84d3d602e3ab9a961b6f217aca1"
+    },
+    {
+      "path": "controller/LTV_BICYCLE_MODEL.md",
+      "sha256": "bb6cb5fbac4c5d0fc5cf516ebc03da1a6aee7821143443c4d7f9bde892161c6a"
+    },
+    {
+      "path": "controller/NODE_SAMPLED_CERTIFICATE.md",
+      "sha256": "a5e57206c39f451af47fb59b4a1a934ce8126b9cda23ad0cb47ea2f71a1d781a"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "2b05da73fc44108cd72f457bfb32fcc09076946a2e3eee1ebc7aa0a29a9b9f8e"
+    },
+    {
+      "path": "controller/formulateAvoidanceProblem.m",
+      "sha256": "375f1342db4e65187df8c5e295f8c6c5342feaca4b5b009dd5f1161d6f9c549d"
+    },
+    {
+      "path": "controller/hardEncounterBarrier.m",
+      "sha256": "a53cddd3f130ec1cb26b99c7bb3053f1c6114cea7c369a79174eb2e836d71e0c"
+    },
+    {
+      "path": "controller/ltvBicycleModel.m",
+      "sha256": "6dbef6da68e70dfe5e768a34906eb05776b756c6ff696c53f3b82ff513e08955"
+    },
+    {
+      "path": "report/TRAJECTORY_LINEARIZATION_20260925.md",
+      "sha256": "34fd568313cc0cf579f18ad7db1eec9964b3cb54777ba204d9da19865ebc8d37"
+    },
+    {
+      "path": "report/TRAJECTORY_LINEARIZATION_20260925/code-analyzer.json",
+      "sha256": "3ca228e99d9c1169fa69956a4f98a309f49d856cb9818e51171944ce7c722e1f"
+    },
+    {
+      "path": "report/TRAJECTORY_LINEARIZATION_20260925/force-diagnostics.csv",
+      "sha256": "bed5ee31d3c9a99adc3dd911cfa1d00d1925647d028f86bc0313bb3fb0feefbb"
+    },
+    {
+      "path": "report/TRAJECTORY_LINEARIZATION_20260925/nonlinear-summary.csv",
+      "sha256": "7032a10d2c3f40ee55320c4d3af19778db76ad77482c030b5c8b1e92b5aa0e7c"
+    },
+    {
+      "path": "report/TRAJECTORY_LINEARIZATION_20260925/scenario-details.json",
+      "sha256": "8a9cde63d4ef7153b8b75c0f245bffd1ececefe33416676e1ab7025433d8959c"
+    },
+    {
+      "path": "report/TRAJECTORY_LINEARIZATION_20260925/tests.csv",
+      "sha256": "28d42cc0c6de1e6be47864c20919e4f9eb91a320eadfb8d9370ba9e786566a96"
+    },
+    {
+      "path": "scripts/runCenterlineCruiseScenario.m",
+      "sha256": "90f53e130ffe271b9dbf6dacd60a55b94158471ce38e20420a3a500b6bd1a6bd"
+    },
+    {
+      "path": "scripts/runCircularCenterlineStraightTargetAvoidanceScenario.m",
+      "sha256": "35211b5027e809d149254b20128c06ac46b8f779bd20b22e5b8de6c363d7106e"
+    },
+    {
+      "path": "scripts/runOncomingVehicleAvoidanceScenario.m",
+      "sha256": "d9a3a5ae4f705551d3b8837c1f85b9f48c9a6097d3d884fd93dc5c8578d6a731"
+    },
+    {
+      "path": "scripts/runTrajectoryLinearizationValidation.m",
+      "sha256": "2329db5b977f238d3b70420f224595c0ac5ded2fabc881bd06212164afa45026"
+    },
+    {
+      "path": "scripts/runVaryingCurvatureStraightTargetAvoidanceScenario.m",
+      "sha256": "710f485d5d9e05b8b76134d8fc440e6223be343740c327bc979646874c0b9359"
+    },
+    {
+      "path": "tests/algorithmStressTest.m",
+      "sha256": "622c5cedb2e35203cda53e2493b9c754f79b8c7934d118964d65a29c2a156cf2"
+    },
+    {
+      "path": "tests/certificateContinuationTest.m",
+      "sha256": "302b11d6a9d46c9286b3436e8c76d02f91aca0002f1634024c3e6fffee39909c"
+    },
+    {
+      "path": "tests/collisionAvoidanceControllerTest.m",
+      "sha256": "4eac0983be3c6fb8b5712965c6ecfb295abd91a7a50b869f94beaa59d6810146"
+    },
+    {
+      "path": "tests/curvedPoseDomainTest.m",
+      "sha256": "7a211bd94673ea426804b53868c2940a0b26d71223491944cb5e4d9a0cada986"
+    },
+    {
+      "path": "tests/nrmmTargetPredictionTest.m",
+      "sha256": "0c0adcd0ac92e0e5e49f98fc512c4006ae404a98fbd49bd72707ca89d28afe33"
+    },
+    {
+      "path": "tests/targetReactionTest.m",
+      "sha256": "16810631b4f60abe6387aa3e2a59736122f5696c5567787e3255c364884a9e4f"
+    },
+    {
+      "path": "tests/trajectoryLinearizationTest.m",
+      "sha256": "d8fc5993b853bcb9910d077dbd56d02acd98b002633bd2e590d2de5a0ba54321"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
     properties (TestParameter)
         geometry=struct('aligned',[12;0;0;0], ...
             'rotated',[8;5;.6;-.3],'corner',[5.2;2.1;0;0]);
-        previousVersion={30,35,36,38,39,40,42,43};
+        previousVersion={30,35,36,38,39,40,42,43,44};
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -54,6 +54,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
 
         function shiftingTheCompleteCertificateKeepsTheSuffixAndExitDeadline(testCase)
             [ego,target,cfg,road]=localFixture();
+            cfg.model.linearizationPolicy="cruise";
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             x=stored.predictedState(:,2);
             [ego.position,ego.yaw]=laneGeometry.fromFrenet(x,first.model.lane);
@@ -113,7 +114,8 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
                 -problem.metadata.admissionSearch.initialCertificateAngles;
             testCase.verifyGreaterThan(norm(atan2(sin(increment),cos(increment))),1e-3);
             testCase.verifyEqual(problem.metadata.nominalSource,"cruiseInitialization");
-            testCase.verifyTrue(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyFalse(problem.metadata.recursiveFeasibilityGuaranteed);
+            testCase.verifyEqual(problem.metadata.linearizationPolicy,"trajectory");
             testCase.verifyEqual(problem.metadata.convexificationPolicy,"fixedDirectionTrajectoryOptimization");
         end
 

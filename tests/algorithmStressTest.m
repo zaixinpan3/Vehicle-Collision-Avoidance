@@ -28,6 +28,7 @@ classdef algorithmStressTest < matlab.unittest.TestCase
 
         function aCorruptedSuccessRetainsTheCertifiedInheritedPlan(testCase,solvedStatus)
             [ego,target,road,cfg] = encounterTestFixture.circularCrossing(.01);
+            cfg.model.linearizationPolicy="cruise";
             [~,~,~,stored] = collisionAvoidanceController(ego,target,road,cfg,[]);
             ego = encounterTestFixture.nextEgo(stored,road);
             target.targetPositionInertial = target.targetPositionInertial ...

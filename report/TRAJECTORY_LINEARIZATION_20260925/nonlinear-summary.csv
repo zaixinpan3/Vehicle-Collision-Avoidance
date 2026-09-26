@@ -1,0 +1,4 @@
+Scenario,RequestedDurationS,ExecutedDurationS,ExecutedHolds,TrajectoryLinearizedHolds,FirstVisibleTimeS,FailureIdentifier,FailureTimeS,MinimumPrefixSATMarginM,MinimumPrefixRoadMargin,PassedTarget,RecoveredCruise,Passed
+straight,18,1.75,35,14,1.05,collisionAvoidanceController:optimizationFailed,1.75,9.99277454822382,7.57374441185631,0,0,0
+circular,18,1.4,28,7,1.05,collisionAvoidanceController:optimizationFailed,1.4,17.2385573801825,7.528434641517,0,0,0
+sCurve,18,1.3,26,5,1.05,collisionAvoidanceController:singularReferenceDomain,1.3,19.0878763065556,6.96263548285634,0,0,0

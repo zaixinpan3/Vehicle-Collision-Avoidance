@@ -1,0 +1,121 @@
+[
+  {
+    "file": "controller/ltvBicycleModel.m",
+    "issues": []
+  },
+  {
+    "file": "controller/hardEncounterBarrier.m",
+    "issues": [
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 777,
+        "column": [
+          56,
+          59
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 778,
+        "column": [
+          9,
+          12
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 779,
+        "column": [
+          9,
+          12
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 786,
+        "column": [
+          45,
+          47
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 786,
+        "column": [
+          66,
+          68
+        ]
+      },
+      {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 993,
+        "column": [
+          16,
+          22
+        ]
+      },
+      {
+        "id": "FNDSB",
+        "message": "For array or cell array, performance can be improved using logical indexing instead of 'find'.",
+        "fix": 1,
+        "line": 993,
+        "column": [
+          43,
+          49
+        ]
+      }
+    ]
+  },
+  {
+    "file": "controller/formulateAvoidanceProblem.m",
+    "issues": []
+  },
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "issues": []
+  },
+  {
+    "file": "scripts/runTrajectoryLinearizationValidation.m",
+    "issues": []
+  },
+  {
+    "file": "tests/trajectoryLinearizationTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/certificateContinuationTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/collisionAvoidanceControllerTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/algorithmStressTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/targetReactionTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/nrmmTargetPredictionTest.m",
+    "issues": []
+  },
+  {
+    "file": "tests/curvedPoseDomainTest.m",
+    "issues": []
+  }
+]

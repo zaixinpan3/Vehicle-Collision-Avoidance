@@ -393,6 +393,38 @@ classdef ltvBicycleModel
                 "No nonlinear cruise trim was found at curvature %.6g and speed %.6g.",curvature,speed);
         end
 
+        function [stages,states] = trajectoryStages(model,inputs)
+        % One nonlinear anchor rollout followed by one Jacobian per hold.
+        % The optimizer does not update these tangents within this frame.
+            states = ltvBicycleModel.nominalRollout(model,inputs);
+            count = size(inputs,2);
+            prototype = struct('continuousA',zeros(6),'continuousB',zeros(6,2), ...
+                'continuousC',zeros(6,1),'tireModel',[], 'speed',0, ...
+                'brakingRatio',0,'curvature',0,'transition',zeros(9));
+            stages = repmat(prototype,count,1);
+            for index = 1:count
+                state = states(:,index);input = inputs(:,index);
+                curvature = laneGeometry.curvature(state(1),model.lane);
+                [a,b,c,tire] = localOperatingPointMatrices(curvature,state,input, ...
+                    model.cfg,model.longitudinalAccelerationBias);
+                if laneGeometry.isVaryingReference(model.lane)
+                    [~,curvatureRate] = laneGeometry.referenceCurvature( ...
+                        state(1),model.lane.referenceCurve);
+                    stationRate = (state(4)*cos(state(3))-state(5)*sin(state(3))) ...
+                        /(1-curvature*state(2));
+                    derivative = zeros(6,1);
+                    derivative(1) = stationRate*state(2)*curvatureRate/(1-curvature*state(2));
+                    derivative(3) = -curvatureRate*stationRate-curvature*derivative(1);
+                    a(:,1) = a(:,1)+derivative;
+                    c = c-derivative*state(1);
+                end
+                stages(index) = struct('continuousA',a,'continuousB',b, ...
+                    'continuousC',c,'tireModel',tire,'speed',state(4), ...
+                    'brakingRatio',input(2),'curvature',curvature, ...
+                    'transition',expm(model.sampleTime*[a,b,c;zeros(3,9)]));
+            end
+        end
+
         function [allA,allB,allC,allTires,allReserve] = linearizationKernel(states,inputs,curvatures,cfg,bias,rate,h)
         % Shared native/MATLAB stage Jacobians and Metzler disturbance flow.
             count = size(inputs,2);

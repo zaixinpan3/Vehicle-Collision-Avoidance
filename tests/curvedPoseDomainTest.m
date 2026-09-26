@@ -51,7 +51,7 @@ classdef curvedPoseDomainTest < matlab.unittest.TestCase
         end
 
         function shiftingRetainsACompleteDomainAndExitWitness(testCase,curvature)
-            [ego,target,first,stored,road,cfg]=localAdmission(curvature);
+            [ego,target,first,stored,road,cfg]=localAdmission(curvature,[],"cruise");
             [next,witness]=localSuccessor(ego,target,first,stored,road,cfg);
             testCase.verifyTrue(next.metadata.planCertified);
             testCase.verifyTrue(next.metadata.inheritedFeasibleFamily);
@@ -86,10 +86,12 @@ function [rowError,costError]=localRealizationErrors(program)
     costError=abs(diff(cost(:,1))-diff(cost(:,2)));
 end
 
-function [ego,target,problem,stored,road,cfg]=localAdmission(curvature,lateral)
-    if nargin<2,lateral=-5*sign(curvature);end
+function [ego,target,problem,stored,road,cfg]=localAdmission(curvature,lateral,policy)
+    if nargin<2 || isempty(lateral),lateral=-5*sign(curvature);end
+    if nargin<3,policy="trajectory";end
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('sampleTime',.1,'minimumHorizonSteps',1), ...
         'solver',struct('frameDeadlineSeconds',30,'certificateSearchTimeLimit',30)));
+    cfg.model.linearizationPolicy=policy;
     curve=struct('origin',[0;0],'heading',0,'curvature',curvature,'length',150);
     road=struct('referenceCurve',curve,'centerline',laneGeometry.referencePose(0:2:150,0,curve).');
     z=ltvBicycleModel.cruiseEquilibrium(curvature,cfg);

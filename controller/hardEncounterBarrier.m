@@ -31,7 +31,7 @@ classdef hardEncounterBarrier
             model.exitMargin = inf;
             model.targetReleased = false;
             if ~isempty(stored)
-                expectedVersion=44;
+                expectedVersion=45;
                 if ~isstruct(stored) || ~isfield(stored,'version') || stored.version~=expectedVersion
                     error('collisionAvoidanceController:invalidControllerState','Reset incompatible controller state.');
                 end
@@ -173,7 +173,15 @@ classdef hardEncounterBarrier
                 changed = changed || isempty(measured) || ~sameTarget || isempty(model.encounter) ...
                     || any(measured.radius(1:6)>stored.prediction.targetEstimatorBound+1e-12);
             end
-            if ~isempty(stored) && ~changed
+            refreshTrajectory = ~isempty(model.encounter) ...
+                && string(cfg.model.linearizationPolicy)=="trajectory";
+            if refreshTrajectory
+                % A new trajectory tangent is a fresh model, not a transfer
+                % of the preceding affine witness. Start at this observation.
+                model.initialEgoState = admitted.initialEgoState;
+                model.initialFrenetErrorBound = admitted.initialFrenetErrorBound;
+            end
+            if ~isempty(stored) && ~changed && ~refreshTrajectory
                 % Preserve the actual accepted generators, enclosures, charts,
                 % normals and terminal set. No relinearization is a proof step.
                 keep = [stored.prediction.cells.stage]>=2;
@@ -242,7 +250,19 @@ classdef hardEncounterBarrier
                 inputs(:,1:retained)=model.initializationPlan(:,1:retained);
             end
             anchor = inputs(:);
+            trajectory = ~isempty(model.encounter) ...
+                && string(model.cfg.model.linearizationPolicy)=="trajectory";
+            if trajectory
+                [prescribed.prescribedStages,linearizationStates] = ...
+                    ltvBicycleModel.trajectoryStages(model,inputs);
+            end
             prediction = ltvBicycleModel.finitePredict(prescribed,[]);
+            prediction.linearizationPolicy = "cruise";
+            if trajectory
+                prediction.linearizationPolicy = "trajectory";
+                prediction.linearizationStates = linearizationStates;
+                prediction.linearizationInputs = inputs;
+            end
             if scheduled
                 prediction.referenceStates=referenceStates;
                 prediction.referenceInputs=referenceInputs;

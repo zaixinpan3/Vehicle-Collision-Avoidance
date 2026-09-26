@@ -6,6 +6,29 @@ instant inside a held command. This note states exactly what the certificate
 covers, what it no longer covers, how the implementation realizes it, and
 which whole-hold enclosures remain in offline tooling.
 
+## Trajectory-linearized encounter update (September 25, 2026)
+
+With the default `model.linearizationPolicy="trajectory"`, active encounters
+now rebuild their affine generators once per frame. The current measured
+state initializes a nonlinear Fiala rollout under the shifted previous input
+plan (cruise inputs initialize the first frame). Each hold is linearized at
+its own rollout state and input, including spatial curvature sensitivity on
+varying references. The stages stay fixed during the existing direction
+search and optimization; there is no dynamics-relinearization iteration,
+new trust-region restriction, or nonlinear acceptance check.
+
+The node certificates below concern that frame's frozen affine prediction.
+They are not a nonlinear-plant certificate, and the shifted-witness recursive
+argument below does not apply across these refreshed encounter models.
+`recursiveFeasibilityGuaranteed` is false for trajectory-linearized predictions;
+each new active frame must pass fresh admission, even if a previous plan was
+feasible. The old plan supplies an anchor, not an executable fallback.
+Explicit `linearizationPolicy="cruise"` retains the carried-model study path.
+Target-free cruise and the existing terminal continuation are unchanged.
+The first-hold CLF cone and reported generator use the actual prediction
+stage; the cruise reference and Lyapunov metric remain the tracking objective.
+Stored controller state version 45 rejects older generator/reporting contracts.
+
 The current scenario defaults use a **50 ms** prediction-node interval,
 input hold and controller update period, all driven by `controller.sampleTime`.
 The exact-state experiment exposes this as `SampleTime`; its 1.6 s performance

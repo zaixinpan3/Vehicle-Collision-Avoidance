@@ -171,6 +171,9 @@ function [program,prediction,clf] = localFormulate(model)
             bound = physicalBound-reserve;
         end
     end
+    if prediction.linearizationPolicy=="trajectory"
+        terminal.sameOnlineGenerator=false;
+    end
     count = prediction.stageCount;
     planCount = 2*count;
     reach = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...
@@ -207,9 +210,9 @@ function [program,prediction,clf] = localFormulate(model)
     radius = model.initialFrenetErrorBound(2:6);
     contraction = 1-cruise.decayPerHold;
     middle = (contraction+cruise.contraction)/2;
-    stateMap = cruise.transition(2:6,1:6);
-    inputMap = cruise.transition(2:6,7:8);
-    nominalOffset = stateMap*model.initialEgoState+cruise.transition(2:6,9)-nextState(2:6) ...
+    stateMap = prediction.stageMatrixA(2:6,:,1);
+    inputMap = prediction.stageMatrixB(2:6,:,1);
+    nominalOffset = stateMap*model.initialEgoState+prediction.stageAffine(2:6,1)-nextState(2:6) ...
         +inputMap*feedbackCorrection;
     inputRoot = root*inputMap;
     numeric = 100*cfg.solver.constraintTolerance*(1+norm(inputRoot,'fro')*norm(reach(1:2)));
@@ -343,6 +346,10 @@ function [prediction,geometry,matrix,physicalBound,bound,terminal,completion,anc
     prediction.scheduleCurvature=prediction.scheduleCurvature(2:end);
     prediction.scheduleBrakingRatio=prediction.scheduleBrakingRatio(2:end);
     prediction.tireModels=prediction.tireModels(2:end);
+    if isfield(prediction,'linearizationStates')
+        prediction.linearizationStates=prediction.linearizationStates(:,2:end);
+        prediction.linearizationInputs=prediction.linearizationInputs(:,2:end);
+    end
     if isfield(prediction,'referencePhaseIndex')
         prediction.referencePhaseIndex=prediction.referencePhaseIndex+1;
         prediction.referenceStates=prediction.referenceStates(:,2:end);

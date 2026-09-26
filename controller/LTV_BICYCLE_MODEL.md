@@ -2,6 +2,17 @@
 
 > Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 
+> Trajectory update (2026-09-25): active encounters with the default
+> `linearizationPolicy="trajectory"` now use `trajectoryStages`: a nonlinear
+> anchor rollout from the current observation under shifted previous inputs,
+> followed by a separate state/input Jacobian for each hold. The resulting
+> affine stages are fixed during that frame's optimization. Fresh admission
+> replaces carried feasibility across relinearized encounter frames. The
+> cruise policy remains available for the exact carried-model study described
+> below. This change introduces neither nonlinear safety certification nor
+> additional tire-force constraints. See the current scope in
+> [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
+
 ## Declared scheduled-plant study (September 12, 2026)
 
 The current online experiment executes the first held interval of each

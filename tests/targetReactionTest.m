@@ -42,6 +42,7 @@ classdef targetReactionTest < matlab.unittest.TestCase
 
         function anInheritedFrameAlsoCorrectsByTheTargetDeviation(testCase)
             [ego,target,road,cfg]=encounterTestFixture.nrmmLead(30);
+            cfg.model.linearizationPolicy="cruise";
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.assertEqual(first.metadata.targetReactionStrength,30);
             next=localDisplacedSuccessor(ego,stored,first.model.lane);
@@ -63,6 +64,7 @@ classdef targetReactionTest < matlab.unittest.TestCase
 
         function aLargerTargetBoundVoidsTheReactiveFamily(testCase)
             [ego,target,road,cfg]=encounterTestFixture.nrmmLead([30,Inf]);
+            cfg.model.linearizationPolicy="cruise";
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             next=localDisplacedSuccessor(ego,stored,first.model.lane);
             nextTarget=localNextTarget(target,first.prediction.targetNominal(:,2),zeros(6,1));
@@ -73,6 +75,7 @@ classdef targetReactionTest < matlab.unittest.TestCase
 
         function aLargerAccelerationMaximumVoidsTheCarriedFamily(testCase)
             [ego,target,road,cfg]=encounterTestFixture.nrmmLead(Inf);
+            cfg.model.linearizationPolicy="cruise";
             target.predictionMotion.scalarAccelerationMaximum=2;
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             next=localDisplacedSuccessor(ego,stored,first.model.lane);

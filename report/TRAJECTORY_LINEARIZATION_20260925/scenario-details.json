@@ -1,0 +1,962 @@
+[
+  {
+    "scenario": "straight",
+    "failure": {
+      "occurred": true,
+      "identifier": "collisionAvoidanceController:optimizationFailed",
+      "message": "The hard-safety, soft-CLF search failed at t=1.75 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2; alternate directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.",
+      "controlStep": 36,
+      "time": 1.75
+    },
+    "configuration": {
+      "referenceSpeed": 10,
+      "controller": {
+        "sampleTime": 0.05,
+        "horizonSteps": 16,
+        "minimumHorizonSteps": 4,
+        "maximumHorizonSteps": 512,
+        "stationTrustRadius": 2,
+        "poseTrustRadius": [
+          2,
+          4,
+          0.5
+        ]
+      },
+      "admission": {
+        "widthScale": 1.2,
+        "minimumWidthMeters": 3,
+        "clearanceAllowanceMeters": 0.2,
+        "headingWeight": 4,
+        "regularizationWeight": 0.02
+      },
+      "jointCertificate": {
+        "proximalWeight": 0.001
+      },
+      "feedbackPrediction": {
+        "enabled": true,
+        "speedGainScale": 0.5,
+        "lateralVelocityFeedback": false,
+        "targetReaction": {
+          "inputWeightScales": [
+            null,
+            30,
+            100
+          ],
+          "relevanceMeters": 2,
+          "exitWeight": 1,
+          "terminalWeight": 0
+        }
+      },
+      "collision": {
+        "cbfRate": 2,
+        "safetyMarginMeters": 0.1
+      },
+      "encounter": {
+        "taylorOrder": 6,
+        "numericalMargin": 1E-6,
+        "maximumCarriedMargin": 1,
+        "inputRateWeight": 0.02,
+        "referencePhaseRadius": 2
+      },
+      "vehicle": {
+        "m": 1181,
+        "Iz": 2066,
+        "lf": 1.515,
+        "lr": 1.504,
+        "wheelbase": 3.075,
+        "length": 5,
+        "width": 2,
+        "gravity": 9.81,
+        "centerOfGravityHeight": 0.134
+      },
+      "tire": {
+        "corneringStiffness": [
+          134958.69931334612,
+          158363.4557764245
+        ],
+        "frictionCoefficient": [
+          1.1270986189302326,
+          1.1102947429302326
+        ]
+      },
+      "actuation": {
+        "brakingRatioMinimum": -1,
+        "brakingRatioMaximum": 1
+      },
+      "roadLoad": {
+        "airDensity": 1.2929576815620751,
+        "dragCoefficient": 0.3,
+        "frontalArea": 2.11,
+        "rollingCoefficient": 0.011617846554233433,
+        "rollingSpeedCoefficient": 2.7827177375409424E-5,
+        "rollingQuarticCoefficient": 5.9747500678823272E-10,
+        "rollingTransitionSpeed": 0.5
+      },
+      "model": {
+        "speedMinimum": 0,
+        "speedMaximum": 18,
+        "lateralDomainRadius": 12,
+        "scheduleSpeedFloor": 1,
+        "frontWheelSteeringAngleMaximum": 0.69813170079773179,
+        "frontWheelSteeringRateMaximum": null,
+        "brakingRatioRateMaximum": null,
+        "slipAngleMaximum": [
+          0.17453292519943295,
+          0.17453292519943295
+        ],
+        "headingDomainRadius": 0.4,
+        "linearizationPolicy": "trajectory",
+        "lateralVelocityMaximum": 12,
+        "yawRateMaximum": 5,
+        "ltvModelErrorRateBound": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "plantModelResidualRateBound": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "road": {
+        "orthonormalTolerance": 1E-9,
+        "parameterRangeTolerance": 0.001
+      },
+      "clf": {
+        "lateralPositionErrorScale": 0.5,
+        "headingErrorScale": 0.1,
+        "speedErrorScale": 0.25,
+        "lateralVelocityErrorScale": 0.5,
+        "yawRateErrorScale": 0.2,
+        "frontWheelSteeringAngleWeight": 1,
+        "brakingRatioWeight": 1,
+        "decreaseRateFraction": 0.9,
+        "certificateSpeedFloor": 5,
+        "relaxationWeight": 100,
+        "referenceOffset": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "referenceRate": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "referenceEpoch": 0,
+        "samplePoints": "stageNodes"
+      },
+      "solver": {
+        "jointFunction": [],
+        "maxIterations": 400,
+        "certificateSearchTimeLimit": 5,
+        "frameDeadlineSeconds": null,
+        "constraintTolerance": 1E-8,
+        "optimalityTolerance": 1E-7,
+        "lexicographicTieTolerance": 1E-6
+      },
+      "target": {
+        "defaultLength": 5,
+        "defaultWidth": 2
+      }
+    },
+    "plant": {
+      "model": "PassVeh14DOF",
+      "source": "Vehicle Dynamics Blockset PassVeh14DOF",
+      "modelFile": "/tmp/tp499ee8c1_c7a9_48dc_bc51_17acac5e6e07/PassVeh14DOF/Plant/PassVeh14DOF.slx",
+      "adapter": {
+        "wheelOrder": [
+          "FL",
+          "FR",
+          "RL",
+          "RR"
+        ],
+        "staticLoadedRadius": [
+          0.3,
+          0.3,
+          0.3,
+          0.3
+        ],
+        "brakeTorquePerPressure": 0.00013901547492134835,
+        "brakePressureUnit": "Pa",
+        "axleTorqueUnit": "N*m",
+        "wheelAngleUnit": "rad",
+        "tireBlock": "PassVeh14DOF/Wheels and Tires/VDBS/Tires/MF Tires Vector/Combined Slip Wheel 2DOF",
+        "controllerCoordinateConvention": "xForwardYLeftZUp",
+        "plantCoordinateConvention": "saeXForwardYRightZDown",
+        "lateralStateSign": -1,
+        "yawStateSign": -1,
+        "steeringAngleSign": -1,
+        "forceToTorqueRadius": [
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119
+        ]
+      },
+      "parameters": {
+        "mass": 1181,
+        "yawInertia": 2066,
+        "frontAxleDistance": 1.515,
+        "rearAxleDistance": 1.504,
+        "wheelbase": 3.075,
+        "trackWidth": 1.922,
+        "cgHeight": 0.134,
+        "gravity": 9.81,
+        "frontalArea": 2.11,
+        "dragCoefficient": 0.3,
+        "airDensity": 1.2929576815620751,
+        "rollingNominalLoad": 4300,
+        "rollingNominalSpeed": 16.7,
+        "rollingUnloadedRadius": 0.33454,
+        "rollingNominalPressure": 262000,
+        "rollingPressure": 220000,
+        "rollingCoefficients": [
+          0.01,
+          0,
+          0.0004,
+          4E-5,
+          0,
+          0,
+          0.85,
+          -0.4
+        ],
+        "tireWidth": 0.235,
+        "staticNormalLoad": [
+          2596.38,
+          2596.38,
+          3158.82,
+          3158.82
+        ],
+        "corneringStiffness": [
+          67479.349656673061,
+          67479.349656673061,
+          79181.727888212248,
+          79181.727888212248
+        ],
+        "frictionCoefficient": [
+          1.1270986189302326,
+          1.1270986189302326,
+          1.1102947429302326,
+          1.1102947429302326
+        ],
+        "rollingParameterSource": "R2026a initialized built-in MF62 preset",
+        "rollingInactiveMaskCoefficients": [
+          0.00699077564863536,
+          0,
+          0.00153535478298811,
+          8.55710322455322E-5,
+          0,
+          0,
+          0.89443879773793,
+          -0.403227641260894
+        ],
+        "lateralParameterSource": "R2026a initialized built-in MF62 preset",
+        "lateralInactiveCorneringStiffness": [
+          41640.053657265555,
+          41640.053657265555,
+          48152.8160453566,
+          48152.8160453566
+        ],
+        "lateralInactiveFrictionCoefficient": [
+          0.90380609917131938,
+          0.90380609917131938,
+          0.89537475833655156,
+          0.89537475833655156
+        ],
+        "lateralPresetCoefficients": [
+          1.0762,
+          -0.12847,
+          -30.327,
+          1.9477,
+          1.8092
+        ]
+      },
+      "initialization": {
+        "method": "zeroTimeLoadedRollingRadiusAndMatchedWheelSpeed",
+        "tireBlock": "PassVeh14DOF/Wheels and Tires/VDBS/Tires/MF Tires Vector/Combined Slip Wheel 2DOF",
+        "effectiveRollingRadius": [
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119
+        ],
+        "maskWheelAngularSpeed": 30.708170836554732,
+        "initialWheelAngularSpeed": [
+          30.708170836554732,
+          30.708170836554732,
+          30.708170836554732,
+          30.708170836554732
+        ],
+        "longitudinalSlip": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "maximumAbsoluteLongitudinalSlip": 0,
+        "actualInitialLongitudinalSlip": [
+          0.00019893790398306521,
+          0.00019893790398306521,
+          0.00019893790398306521,
+          0.00019893790398306521
+        ],
+        "actualMaximumAbsoluteLongitudinalSlip": 0.00019893790398306521
+      }
+    }
+  },
+  {
+    "scenario": "circular",
+    "failure": {
+      "occurred": true,
+      "identifier": "collisionAvoidanceController:optimizationFailed",
+      "message": "The hard-safety, soft-CLF search failed at t=1.4 s (Fixed-direction trajectory optimization failed: solverRejected: solver exit flag -2: Clarabel status 2; previous-plan directions rejected: solver exit flag -2: Clarabel status 2; alternate directions rejected: solver exit flag -2: Clarabel status 2). No command was issued.",
+      "controlStep": 29,
+      "time": 1.4000000000000001
+    },
+    "configuration": {
+      "referenceSpeed": 10,
+      "controller": {
+        "sampleTime": 0.05,
+        "horizonSteps": 16,
+        "minimumHorizonSteps": 4,
+        "maximumHorizonSteps": 512,
+        "stationTrustRadius": 2,
+        "poseTrustRadius": [
+          2,
+          4,
+          0.5
+        ]
+      },
+      "admission": {
+        "widthScale": 1.2,
+        "minimumWidthMeters": 3,
+        "clearanceAllowanceMeters": 0.2,
+        "headingWeight": 4,
+        "regularizationWeight": 0.02
+      },
+      "jointCertificate": {
+        "proximalWeight": 0.001
+      },
+      "feedbackPrediction": {
+        "enabled": true,
+        "speedGainScale": 0.5,
+        "lateralVelocityFeedback": false,
+        "targetReaction": {
+          "inputWeightScales": [
+            null,
+            30,
+            100
+          ],
+          "relevanceMeters": 2,
+          "exitWeight": 1,
+          "terminalWeight": 0
+        }
+      },
+      "collision": {
+        "cbfRate": 2,
+        "safetyMarginMeters": 0.1
+      },
+      "encounter": {
+        "taylorOrder": 6,
+        "numericalMargin": 1E-6,
+        "maximumCarriedMargin": 1,
+        "inputRateWeight": 0.02,
+        "referencePhaseRadius": 2
+      },
+      "vehicle": {
+        "m": 1181,
+        "Iz": 2066,
+        "lf": 1.515,
+        "lr": 1.504,
+        "wheelbase": 3.075,
+        "length": 5,
+        "width": 2,
+        "gravity": 9.81,
+        "centerOfGravityHeight": 0.134
+      },
+      "tire": {
+        "corneringStiffness": [
+          134958.69931334612,
+          158363.4557764245
+        ],
+        "frictionCoefficient": [
+          1.1270986189302326,
+          1.1102947429302326
+        ]
+      },
+      "actuation": {
+        "brakingRatioMinimum": -1,
+        "brakingRatioMaximum": 1
+      },
+      "roadLoad": {
+        "airDensity": 1.2929576815620751,
+        "dragCoefficient": 0.3,
+        "frontalArea": 2.11,
+        "rollingCoefficient": 0.011617846554233433,
+        "rollingSpeedCoefficient": 2.7827177375409424E-5,
+        "rollingQuarticCoefficient": 5.9747500678823272E-10,
+        "rollingTransitionSpeed": 0.5
+      },
+      "model": {
+        "speedMinimum": 0,
+        "speedMaximum": 18,
+        "lateralDomainRadius": 12,
+        "scheduleSpeedFloor": 1,
+        "frontWheelSteeringAngleMaximum": 0.69813170079773179,
+        "frontWheelSteeringRateMaximum": null,
+        "brakingRatioRateMaximum": null,
+        "slipAngleMaximum": [
+          0.17453292519943295,
+          0.17453292519943295
+        ],
+        "headingDomainRadius": 0.4,
+        "linearizationPolicy": "trajectory",
+        "lateralVelocityMaximum": 12,
+        "yawRateMaximum": 5,
+        "ltvModelErrorRateBound": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "plantModelResidualRateBound": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "road": {
+        "orthonormalTolerance": 1E-9,
+        "parameterRangeTolerance": 0.001
+      },
+      "clf": {
+        "lateralPositionErrorScale": 0.5,
+        "headingErrorScale": 0.1,
+        "speedErrorScale": 0.25,
+        "lateralVelocityErrorScale": 0.5,
+        "yawRateErrorScale": 0.2,
+        "frontWheelSteeringAngleWeight": 1,
+        "brakingRatioWeight": 1,
+        "decreaseRateFraction": 0.9,
+        "certificateSpeedFloor": 5,
+        "relaxationWeight": 100,
+        "referenceOffset": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "referenceRate": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "referenceEpoch": 0,
+        "samplePoints": "stageNodes"
+      },
+      "solver": {
+        "jointFunction": [],
+        "maxIterations": 400,
+        "certificateSearchTimeLimit": 5,
+        "frameDeadlineSeconds": null,
+        "constraintTolerance": 1E-8,
+        "optimalityTolerance": 1E-7,
+        "lexicographicTieTolerance": 1E-6
+      },
+      "target": {
+        "defaultLength": 5,
+        "defaultWidth": 2
+      }
+    },
+    "plant": {
+      "model": "PassVeh14DOF",
+      "source": "Vehicle Dynamics Blockset PassVeh14DOF",
+      "modelFile": "/tmp/tpfa49c295_9965_4b58_8a56_268db866f449/PassVeh14DOF/Plant/PassVeh14DOF.slx",
+      "adapter": {
+        "wheelOrder": [
+          "FL",
+          "FR",
+          "RL",
+          "RR"
+        ],
+        "staticLoadedRadius": [
+          0.3,
+          0.3,
+          0.3,
+          0.3
+        ],
+        "brakeTorquePerPressure": 0.00013901547492134835,
+        "brakePressureUnit": "Pa",
+        "axleTorqueUnit": "N*m",
+        "wheelAngleUnit": "rad",
+        "tireBlock": "PassVeh14DOF/Wheels and Tires/VDBS/Tires/MF Tires Vector/Combined Slip Wheel 2DOF",
+        "controllerCoordinateConvention": "xForwardYLeftZUp",
+        "plantCoordinateConvention": "saeXForwardYRightZDown",
+        "lateralStateSign": -1,
+        "yawStateSign": -1,
+        "steeringAngleSign": -1,
+        "forceToTorqueRadius": [
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119
+        ]
+      },
+      "parameters": {
+        "mass": 1181,
+        "yawInertia": 2066,
+        "frontAxleDistance": 1.515,
+        "rearAxleDistance": 1.504,
+        "wheelbase": 3.075,
+        "trackWidth": 1.922,
+        "cgHeight": 0.134,
+        "gravity": 9.81,
+        "frontalArea": 2.11,
+        "dragCoefficient": 0.3,
+        "airDensity": 1.2929576815620751,
+        "rollingNominalLoad": 4300,
+        "rollingNominalSpeed": 16.7,
+        "rollingUnloadedRadius": 0.33454,
+        "rollingNominalPressure": 262000,
+        "rollingPressure": 220000,
+        "rollingCoefficients": [
+          0.01,
+          0,
+          0.0004,
+          4E-5,
+          0,
+          0,
+          0.85,
+          -0.4
+        ],
+        "tireWidth": 0.235,
+        "staticNormalLoad": [
+          2596.38,
+          2596.38,
+          3158.82,
+          3158.82
+        ],
+        "corneringStiffness": [
+          67479.349656673061,
+          67479.349656673061,
+          79181.727888212248,
+          79181.727888212248
+        ],
+        "frictionCoefficient": [
+          1.1270986189302326,
+          1.1270986189302326,
+          1.1102947429302326,
+          1.1102947429302326
+        ],
+        "rollingParameterSource": "R2026a initialized built-in MF62 preset",
+        "rollingInactiveMaskCoefficients": [
+          0.00699077564863536,
+          0,
+          0.00153535478298811,
+          8.55710322455322E-5,
+          0,
+          0,
+          0.89443879773793,
+          -0.403227641260894
+        ],
+        "lateralParameterSource": "R2026a initialized built-in MF62 preset",
+        "lateralInactiveCorneringStiffness": [
+          41640.053657265555,
+          41640.053657265555,
+          48152.8160453566,
+          48152.8160453566
+        ],
+        "lateralInactiveFrictionCoefficient": [
+          0.90380609917131938,
+          0.90380609917131938,
+          0.89537475833655156,
+          0.89537475833655156
+        ],
+        "lateralPresetCoefficients": [
+          1.0762,
+          -0.12847,
+          -30.327,
+          1.9477,
+          1.8092
+        ]
+      },
+      "initialization": {
+        "method": "zeroTimeLoadedRollingRadiusAndMatchedWheelSpeed",
+        "tireBlock": "PassVeh14DOF/Wheels and Tires/VDBS/Tires/MF Tires Vector/Combined Slip Wheel 2DOF",
+        "effectiveRollingRadius": [
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119
+        ],
+        "maskWheelAngularSpeed": 30.708170836554732,
+        "initialWheelAngularSpeed": [
+          30.708170836554732,
+          30.708170836554732,
+          30.708170836554732,
+          30.708170836554732
+        ],
+        "longitudinalSlip": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "maximumAbsoluteLongitudinalSlip": 0,
+        "pathEquilibriumState": [
+          0,
+          0,
+          -0.01117710732211581,
+          10,
+          0.11177572788917164,
+          0.10000624671156555
+        ],
+        "pathEquilibriumScope": "frozenBicycleInitialCondition",
+        "actualInitialLongitudinalSlip": [
+          0.009904728600715007,
+          -0.0093220716998396388,
+          0.009904728600715007,
+          -0.0093220716998396388
+        ],
+        "actualMaximumAbsoluteLongitudinalSlip": 0.009904728600715007
+      }
+    }
+  },
+  {
+    "scenario": "sCurve",
+    "failure": {
+      "occurred": true,
+      "identifier": "collisionAvoidanceController:singularReferenceDomain",
+      "message": "The complete local pose domain must satisfy one minus absolute curvature times lateral extent greater than zero.",
+      "controlStep": 27,
+      "time": 1.3
+    },
+    "configuration": {
+      "referenceSpeed": 10,
+      "controller": {
+        "sampleTime": 0.05,
+        "horizonSteps": 16,
+        "minimumHorizonSteps": 4,
+        "maximumHorizonSteps": 512,
+        "stationTrustRadius": 2,
+        "poseTrustRadius": [
+          2,
+          4,
+          0.5
+        ]
+      },
+      "admission": {
+        "widthScale": 1.2,
+        "minimumWidthMeters": 3,
+        "clearanceAllowanceMeters": 0.2,
+        "headingWeight": 4,
+        "regularizationWeight": 0.02
+      },
+      "jointCertificate": {
+        "proximalWeight": 0.001
+      },
+      "feedbackPrediction": {
+        "enabled": true,
+        "speedGainScale": 0.5,
+        "lateralVelocityFeedback": false,
+        "targetReaction": {
+          "inputWeightScales": [
+            null,
+            30,
+            100
+          ],
+          "relevanceMeters": 2,
+          "exitWeight": 1,
+          "terminalWeight": 0
+        }
+      },
+      "collision": {
+        "cbfRate": 2,
+        "safetyMarginMeters": 0.1
+      },
+      "encounter": {
+        "taylorOrder": 6,
+        "numericalMargin": 1E-6,
+        "maximumCarriedMargin": 1,
+        "inputRateWeight": 0.02,
+        "referencePhaseRadius": 2
+      },
+      "vehicle": {
+        "m": 1181,
+        "Iz": 2066,
+        "lf": 1.515,
+        "lr": 1.504,
+        "wheelbase": 3.075,
+        "length": 5,
+        "width": 2,
+        "gravity": 9.81,
+        "centerOfGravityHeight": 0.134
+      },
+      "tire": {
+        "corneringStiffness": [
+          134958.69931334612,
+          158363.4557764245
+        ],
+        "frictionCoefficient": [
+          1.1270986189302326,
+          1.1102947429302326
+        ]
+      },
+      "actuation": {
+        "brakingRatioMinimum": -1,
+        "brakingRatioMaximum": 1
+      },
+      "roadLoad": {
+        "airDensity": 1.2929576815620751,
+        "dragCoefficient": 0.3,
+        "frontalArea": 2.11,
+        "rollingCoefficient": 0.011617846554233433,
+        "rollingSpeedCoefficient": 2.7827177375409424E-5,
+        "rollingQuarticCoefficient": 5.9747500678823272E-10,
+        "rollingTransitionSpeed": 0.5
+      },
+      "model": {
+        "speedMinimum": 0,
+        "speedMaximum": 18,
+        "lateralDomainRadius": 12,
+        "scheduleSpeedFloor": 1,
+        "frontWheelSteeringAngleMaximum": 0.69813170079773179,
+        "frontWheelSteeringRateMaximum": null,
+        "brakingRatioRateMaximum": null,
+        "slipAngleMaximum": [
+          0.17453292519943295,
+          0.17453292519943295
+        ],
+        "headingDomainRadius": 0.4,
+        "linearizationPolicy": "trajectory",
+        "lateralVelocityMaximum": 12,
+        "yawRateMaximum": 5,
+        "ltvModelErrorRateBound": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "plantModelResidualRateBound": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "road": {
+        "orthonormalTolerance": 1E-9,
+        "parameterRangeTolerance": 0.001
+      },
+      "clf": {
+        "lateralPositionErrorScale": 0.5,
+        "headingErrorScale": 0.1,
+        "speedErrorScale": 0.25,
+        "lateralVelocityErrorScale": 0.5,
+        "yawRateErrorScale": 0.2,
+        "frontWheelSteeringAngleWeight": 1,
+        "brakingRatioWeight": 1,
+        "decreaseRateFraction": 0.9,
+        "certificateSpeedFloor": 5,
+        "relaxationWeight": 100,
+        "referenceOffset": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "referenceRate": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "referenceEpoch": 0,
+        "samplePoints": "stageNodes"
+      },
+      "solver": {
+        "jointFunction": [],
+        "maxIterations": 400,
+        "certificateSearchTimeLimit": 5,
+        "frameDeadlineSeconds": null,
+        "constraintTolerance": 1E-8,
+        "optimalityTolerance": 1E-7,
+        "lexicographicTieTolerance": 1E-6
+      },
+      "target": {
+        "defaultLength": 4.8,
+        "defaultWidth": 1.9
+      }
+    },
+    "plant": {
+      "model": "PassVeh14DOF",
+      "source": "Vehicle Dynamics Blockset PassVeh14DOF",
+      "modelFile": "/tmp/tp39054786_945b_4cb0_95ab_33ebf679ac6d/PassVeh14DOF/Plant/PassVeh14DOF.slx",
+      "adapter": {
+        "wheelOrder": [
+          "FL",
+          "FR",
+          "RL",
+          "RR"
+        ],
+        "staticLoadedRadius": [
+          0.3,
+          0.3,
+          0.3,
+          0.3
+        ],
+        "brakeTorquePerPressure": 0.00013901547492134835,
+        "brakePressureUnit": "Pa",
+        "axleTorqueUnit": "N*m",
+        "wheelAngleUnit": "rad",
+        "tireBlock": "PassVeh14DOF/Wheels and Tires/VDBS/Tires/MF Tires Vector/Combined Slip Wheel 2DOF",
+        "controllerCoordinateConvention": "xForwardYLeftZUp",
+        "plantCoordinateConvention": "saeXForwardYRightZDown",
+        "lateralStateSign": -1,
+        "yawStateSign": -1,
+        "steeringAngleSign": -1,
+        "forceToTorqueRadius": [
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119
+        ]
+      },
+      "parameters": {
+        "mass": 1181,
+        "yawInertia": 2066,
+        "frontAxleDistance": 1.515,
+        "rearAxleDistance": 1.504,
+        "wheelbase": 3.075,
+        "trackWidth": 1.922,
+        "cgHeight": 0.134,
+        "gravity": 9.81,
+        "frontalArea": 2.11,
+        "dragCoefficient": 0.3,
+        "airDensity": 1.2929576815620751,
+        "rollingNominalLoad": 4300,
+        "rollingNominalSpeed": 16.7,
+        "rollingUnloadedRadius": 0.33454,
+        "rollingNominalPressure": 262000,
+        "rollingPressure": 220000,
+        "rollingCoefficients": [
+          0.01,
+          0,
+          0.0004,
+          4E-5,
+          0,
+          0,
+          0.85,
+          -0.4
+        ],
+        "tireWidth": 0.235,
+        "staticNormalLoad": [
+          2596.38,
+          2596.38,
+          3158.82,
+          3158.82
+        ],
+        "corneringStiffness": [
+          67479.349656673061,
+          67479.349656673061,
+          79181.727888212248,
+          79181.727888212248
+        ],
+        "frictionCoefficient": [
+          1.1270986189302326,
+          1.1270986189302326,
+          1.1102947429302326,
+          1.1102947429302326
+        ],
+        "rollingParameterSource": "R2026a initialized built-in MF62 preset",
+        "rollingInactiveMaskCoefficients": [
+          0.00699077564863536,
+          0,
+          0.00153535478298811,
+          8.55710322455322E-5,
+          0,
+          0,
+          0.89443879773793,
+          -0.403227641260894
+        ],
+        "lateralParameterSource": "R2026a initialized built-in MF62 preset",
+        "lateralInactiveCorneringStiffness": [
+          41640.053657265555,
+          41640.053657265555,
+          48152.8160453566,
+          48152.8160453566
+        ],
+        "lateralInactiveFrictionCoefficient": [
+          0.90380609917131938,
+          0.90380609917131938,
+          0.89537475833655156,
+          0.89537475833655156
+        ],
+        "lateralPresetCoefficients": [
+          1.0762,
+          -0.12847,
+          -30.327,
+          1.9477,
+          1.8092
+        ]
+      },
+      "initialization": {
+        "method": "zeroTimeLoadedRollingRadiusAndMatchedWheelSpeed",
+        "tireBlock": "PassVeh14DOF/Wheels and Tires/VDBS/Tires/MF Tires Vector/Combined Slip Wheel 2DOF",
+        "effectiveRollingRadius": [
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119,
+          0.32564622794452119
+        ],
+        "maskWheelAngularSpeed": 30.708170836554732,
+        "initialWheelAngularSpeed": [
+          30.708170836554732,
+          30.708170836554732,
+          30.708170836554732,
+          30.708170836554732
+        ],
+        "longitudinalSlip": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "maximumAbsoluteLongitudinalSlip": 0,
+        "actualInitialLongitudinalSlip": [
+          0.00019893790398306521,
+          0.00019893790398306521,
+          0.00019893790398306521,
+          0.00019893790398306521
+        ],
+        "actualMaximumAbsoluteLongitudinalSlip": 0.00019893790398306521
+      }
+    }
+  }
+]

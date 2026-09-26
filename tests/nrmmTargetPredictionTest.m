@@ -200,6 +200,7 @@ classdef nrmmTargetPredictionTest < matlab.unittest.TestCase
 
         function aMotionModelChangeVoidsTheCarriedFamily(testCase)
             [ego,target,road,cfg]=encounterTestFixture.nrmmLead(Inf);
+            cfg.model.linearizationPolicy="cruise";
             [~,~,first,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.assertTrue(first.metadata.planCertified);
             next=localSuccessor(ego,stored);
