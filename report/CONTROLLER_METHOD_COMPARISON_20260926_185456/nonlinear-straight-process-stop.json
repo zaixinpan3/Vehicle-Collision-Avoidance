@@ -1,0 +1,9 @@
+{
+  "action": "SIGINT sent after completed straight result and summary were saved",
+  "time": "2026-09-26T19:26:44.888149-05:00",
+  "reason": "Remaining circular and S-curve cases run in dedicated processes; avoid duplicate execution",
+  "pid": 82646,
+  "followup": "SIGINT did not stop the queue; sent SIGTERM to this owned process after verifying the completed straight result. The redundant circular attempt is excluded; the dedicated circular process remains active.",
+  "followup_time": "2026-09-26T19:27:38.240293-05:00",
+  "final_action": "SIGTERM also left the duplicate queue running; SIGKILL used on the verified owned MATLAB process. Primary straight result was already saved and independently audited successfully. No duplicate circular result is included."
+}

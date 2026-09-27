@@ -1,0 +1,8 @@
+{
+  "affine_primary_exit_code": 0,
+  "affine_scurve_repeats_exit_code": 0,
+  "nonlinear_straight_queue_exit_code": 137,
+  "nonlinear_straight_queue_stop": "Deliberately terminated after primary straight result was saved and audited; redundant circular attempt excluded. See nonlinear-straight-process-stop.json.",
+  "nonlinear_circular_exit_code": 0,
+  "nonlinear_scurve_exit_code": 0
+}

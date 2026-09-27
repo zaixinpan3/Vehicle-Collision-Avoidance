@@ -1,0 +1,143 @@
+{
+  "allChecksPassed": true,
+  "results": [
+    {
+      "name": "straight_oncoming",
+      "matchedPhysicalScenario": true,
+      "checks": {
+        "duration": true,
+        "sampleTime": true,
+        "referenceSpeed": true,
+        "centerline": true,
+        "initialControlState": true,
+        "vehicle": true,
+        "actuation": true,
+        "roadLoad": true,
+        "frontWheelSteeringAngleMaximum": true,
+        "frontWheelSteeringRateMaximum": true,
+        "brakingRatioRateMaximum": true,
+        "roadBoundaryOffsets": true,
+        "geometry.targetInitialLongitudinalDistance": true,
+        "geometry.targetLateralOffset": true,
+        "geometry.targetSpeed": true,
+        "geometry.perceptionRange": true,
+        "geometry.rightRoadBoundaryOffset": true,
+        "geometry.leftRoadBoundaryOffset": true,
+        "geometry.roadShoulderWidth": true,
+        "target.defaultLength": true,
+        "target.defaultWidth": true
+      },
+      "frameRuntime": {
+        "affineSocp": {
+          "attempts": 42,
+          "medianSeconds": 0.035845,
+          "p95Seconds": 0.3008172999999992,
+          "maximumSeconds": 0.409654,
+          "over50ms": 10
+        },
+        "nonlinearShooting": {
+          "attempts": 360,
+          "medianSeconds": 2.4080755,
+          "p95Seconds": 3.56467655,
+          "maximumSeconds": 7.894554,
+          "over50ms": 360
+        }
+      }
+    },
+    {
+      "name": "circular_oncoming",
+      "matchedPhysicalScenario": true,
+      "checks": {
+        "duration": true,
+        "sampleTime": true,
+        "referenceSpeed": true,
+        "centerline": true,
+        "initialControlState": true,
+        "vehicle": true,
+        "actuation": true,
+        "roadLoad": true,
+        "frontWheelSteeringAngleMaximum": true,
+        "frontWheelSteeringRateMaximum": true,
+        "brakingRatioRateMaximum": true,
+        "roadBoundaryOffsets": true,
+        "geometry.perceptionRange": true,
+        "geometry.targetInitialDistance": true,
+        "geometry.targetInitialPosition": true,
+        "geometry.targetVelocity": true,
+        "geometry.nominalCollisionTime": true,
+        "geometry.nominalCollisionPosition": true,
+        "geometry.nominalTargetCollisionPosition": true,
+        "geometry.targetCollisionLateralOffset": true,
+        "geometry.rightRoadBoundaryOffset": true,
+        "geometry.leftRoadBoundaryOffset": true,
+        "geometry.roadShoulderWidth": true,
+        "target.defaultLength": true,
+        "target.defaultWidth": true
+      },
+      "frameRuntime": {
+        "affineSocp": {
+          "attempts": 31,
+          "medianSeconds": 0.014264,
+          "p95Seconds": 0.13146999999999998,
+          "maximumSeconds": 0.275354,
+          "over50ms": 10
+        },
+        "nonlinearShooting": {
+          "attempts": 360,
+          "medianSeconds": 2.382245,
+          "p95Seconds": 2.98506375,
+          "maximumSeconds": 7.099163,
+          "over50ms": 360
+        }
+      }
+    },
+    {
+      "name": "varying_curvature_oncoming",
+      "matchedPhysicalScenario": true,
+      "checks": {
+        "duration": true,
+        "sampleTime": true,
+        "referenceSpeed": true,
+        "centerline": true,
+        "initialControlState": true,
+        "vehicle": true,
+        "actuation": true,
+        "roadLoad": true,
+        "frontWheelSteeringAngleMaximum": true,
+        "frontWheelSteeringRateMaximum": true,
+        "brakingRatioRateMaximum": true,
+        "roadBoundaryOffsets": true,
+        "geometry.perceptionRange": true,
+        "geometry.targetInitialDistance": true,
+        "geometry.targetInitialPosition": true,
+        "geometry.targetVelocity": true,
+        "geometry.nominalCollisionTime": true,
+        "geometry.nominalCollisionPosition": true,
+        "geometry.nominalTargetCollisionPosition": true,
+        "geometry.targetCollisionLateralOffset": true,
+        "geometry.rightRoadBoundaryOffset": true,
+        "geometry.leftRoadBoundaryOffset": true,
+        "geometry.roadShoulderWidth": true,
+        "target.defaultLength": true,
+        "target.defaultWidth": true
+      },
+      "frameRuntime": {
+        "affineSocp": {
+          "attempts": 1,
+          "medianSeconds": 5.28823,
+          "p95Seconds": 5.28823,
+          "maximumSeconds": 5.28823,
+          "over50ms": 1
+        },
+        "nonlinearShooting": {
+          "attempts": 360,
+          "medianSeconds": 6.530767,
+          "p95Seconds": 8.053627650000001,
+          "maximumSeconds": 14.223648,
+          "over50ms": 360
+        }
+      }
+    }
+  ],
+  "timingScope": "All attempted frame times; overlapping single-threaded MATLAB processes on a shared workstation; not a controlled speed benchmark."
+}

@@ -1,0 +1,30 @@
+{
+  "controller": "affineSocp",
+  "plant": "Vehicle Dynamics Blockset PassVeh14DOF",
+  "requested_duration_seconds": 18,
+  "reference_speed_mps": 10,
+  "target_speed_mps": 10,
+  "control_period_seconds": 0.05,
+  "target_initial_distance_m": 50,
+  "visibility_range_m": 30,
+  "circular_radius_m": 100,
+  "estimator_seed": 20260925,
+  "truth_fed_runs": "Deterministic; no sensor random seed",
+  "recovery_window_seconds": 2,
+  "recovery_tolerances": {
+    "speed_mps": 0.5,
+    "lateral_m": 0.2,
+    "velocity_course_rad": 0.02
+  },
+  "runtime_deadline_enforced": false,
+  "controller_tuning_changed": "No source tuning changed. Explicit nonlinear experiment overrides listed above.",
+  "scope": "Seven affineSocp vehicle cases plus three matched exact-state nonlinearShooting avoidance cases. Same PassVeh14DOF, geometry and duration; nonlinear controller uses the reported development optimization profile.",
+  "nonlinear_profile": {
+    "horizonSeconds": 5,
+    "blockSteps": 4,
+    "maxIterations": 12,
+    "timeLimitSeconds": 20,
+    "feasibleRefinementIterations": 4
+  },
+  "runtime_comparison_limitation": "Separate single-threaded MATLAB processes overlap on a shared workstation; runtimes are descriptive, not a controlled speed benchmark."
+}

@@ -1,0 +1,37 @@
+{
+  "allChecksPassed": true,
+  "results": [
+    {
+      "completed": true,
+      "executedSeconds": 18.0,
+      "requestedSeconds": 18.0,
+      "collisionFree": true,
+      "minimumSignedSatGap": null,
+      "roadEnabled": false,
+      "sampledRoadSafe": true,
+      "minimumConservativeRoadFunctionMargin": null,
+      "entireBodyPassed": true,
+      "entireBodyPassingTime": 0.0,
+      "sustainedCruise": true,
+      "maximumRecoveryErrors": [
+        0.001444696187146377,
+        0.0019183473064922284,
+        1.6542487558668384e-05
+      ],
+      "recovered": true,
+      "failureOccurred": false,
+      "file": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/circular_cruise.mat",
+      "sha256": "b01936cd97955ff9ef83a5ef218187dfde200440df1ed8ee1ef5ce6c6210d341",
+      "name": "circular_cruise",
+      "compactNumericExport": false,
+      "maximumRoadMarginDifference": 0.0,
+      "finalSpeed": 9.998555303812854,
+      "finalLateralError": -0.0019183473062943809,
+      "finalCourseError": -1.6542487515369686e-05,
+      "firstCommandSlewChecked": false,
+      "allChecksPassed": true,
+      "problems": [],
+      "scope": "PassVeh14DOF recorded samples; independent geometry and recovery accounting; no continuous-time guarantee"
+    }
+  ]
+}

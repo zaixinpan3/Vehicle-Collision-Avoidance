@@ -1,0 +1,37 @@
+{
+  "allChecksPassed": true,
+  "results": [
+    {
+      "completed": true,
+      "executedSeconds": 18.0,
+      "requestedSeconds": 18.0,
+      "collisionFree": true,
+      "minimumSignedSatGap": null,
+      "roadEnabled": false,
+      "sampledRoadSafe": true,
+      "minimumConservativeRoadFunctionMargin": null,
+      "entireBodyPassed": true,
+      "entireBodyPassingTime": 0.0,
+      "sustainedCruise": true,
+      "maximumRecoveryErrors": [
+        0.0014030067177568384,
+        1.2130895387724642e-10,
+        1.9076623467670156e-15
+      ],
+      "recovered": true,
+      "failureOccurred": false,
+      "file": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/straight_cruise.mat",
+      "sha256": "fb8ffb7dc840b69266f638b38473564d169315098973ad0a3039dfb25a22677c",
+      "name": "straight_cruise",
+      "compactNumericExport": false,
+      "maximumRoadMarginDifference": 0.0,
+      "finalSpeed": 9.998596993282243,
+      "finalLateralError": 1.2130895387724642e-10,
+      "finalCourseError": 1.901594561457853e-15,
+      "firstCommandSlewChecked": false,
+      "allChecksPassed": true,
+      "problems": [],
+      "scope": "PassVeh14DOF recorded samples; independent geometry and recovery accounting; no continuous-time guarantee"
+    }
+  ]
+}

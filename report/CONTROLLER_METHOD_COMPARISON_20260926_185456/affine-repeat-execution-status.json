@@ -1,0 +1,9 @@
+{
+  "batch_exit_code": 0,
+  "saved_attempts": [
+    "cold",
+    "warm"
+  ],
+  "cold_start_seconds": 0,
+  "warm_start_executed_seconds": 1.4
+}

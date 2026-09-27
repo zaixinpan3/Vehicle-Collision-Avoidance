@@ -1,0 +1,20 @@
+[
+  {
+    "file": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/varying_curvature_oncoming.mat",
+    "failureOccurred": true,
+    "executedSeconds": 0,
+    "finiteInitialState": true,
+    "appliedCommandCount": 0,
+    "plantGeometryAudit": "Not applicable: no executed plant trace",
+    "allChecksPassed": true
+  },
+  {
+    "file": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/affine-scurve-repeat/cold/varying_curvature_oncoming.mat",
+    "failureOccurred": true,
+    "executedSeconds": 0,
+    "finiteInitialState": true,
+    "appliedCommandCount": 0,
+    "plantGeometryAudit": "Not applicable: no executed plant trace",
+    "allChecksPassed": true
+  }
+]

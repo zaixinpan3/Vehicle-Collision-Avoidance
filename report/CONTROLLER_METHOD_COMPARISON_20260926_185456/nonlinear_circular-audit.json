@@ -1,0 +1,37 @@
+{
+  "allChecksPassed": true,
+  "results": [
+    {
+      "completed": true,
+      "executedSeconds": 18.0,
+      "requestedSeconds": 18.0,
+      "collisionFree": true,
+      "minimumSignedSatGap": 0.10760804022877712,
+      "roadEnabled": true,
+      "sampledRoadSafe": true,
+      "minimumConservativeRoadFunctionMargin": 6.769030776392762,
+      "entireBodyPassed": true,
+      "entireBodyPassingTime": 2.7549999999999994,
+      "sustainedCruise": true,
+      "maximumRecoveryErrors": [
+        0.08665826228807028,
+        0.03152353204108459,
+        0.009100953655322819
+      ],
+      "recovered": true,
+      "failureOccurred": false,
+      "file": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/nonlinear/circular/circular_oncoming.mat",
+      "sha256": "2942d9c793fbfd373724f234e51053749d47e6085fcb162bfc34ff0c46bf1f7d",
+      "name": "circular_oncoming",
+      "compactNumericExport": false,
+      "maximumRoadMarginDifference": 3.552713678800501e-15,
+      "finalSpeed": 10.027969272190973,
+      "finalLateralError": -0.029883585035874752,
+      "finalCourseError": 0.001630372969040561,
+      "firstCommandSlewChecked": false,
+      "allChecksPassed": true,
+      "problems": [],
+      "scope": "PassVeh14DOF recorded samples; independent geometry and recovery accounting; no continuous-time guarantee"
+    }
+  ]
+}

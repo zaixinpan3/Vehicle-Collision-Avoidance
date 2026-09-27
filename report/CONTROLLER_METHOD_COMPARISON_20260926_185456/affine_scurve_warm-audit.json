@@ -1,0 +1,33 @@
+{
+  "allChecksPassed": true,
+  "results": [
+    {
+      "completed": false,
+      "executedSeconds": 1.4,
+      "requestedSeconds": 18.0,
+      "collisionFree": true,
+      "minimumSignedSatGap": 17.181475003215652,
+      "roadEnabled": true,
+      "sampledRoadSafe": true,
+      "minimumConservativeRoadFunctionMargin": 6.962635482855907,
+      "entireBodyPassed": false,
+      "entireBodyPassingTime": null,
+      "sustainedCruise": false,
+      "maximumRecoveryErrors": null,
+      "recovered": false,
+      "failureOccurred": true,
+      "file": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/affine-scurve-repeat/warm/varying_curvature_oncoming.mat",
+      "sha256": "1ad95fbe659eb82e064f1530feff01ced691fe255d30e69c42926e107b0fc2b3",
+      "name": "varying_curvature_oncoming",
+      "compactNumericExport": false,
+      "maximumRoadMarginDifference": 3.552713678800501e-15,
+      "finalSpeed": 8.87146395434959,
+      "finalLateralError": 0.0653732525528313,
+      "finalCourseError": 0.04233628021216705,
+      "firstCommandSlewChecked": false,
+      "allChecksPassed": true,
+      "problems": [],
+      "scope": "PassVeh14DOF recorded samples; independent geometry and recovery accounting; no continuous-time guarantee"
+    }
+  ]
+}

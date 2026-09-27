@@ -1,0 +1,37 @@
+{
+  "allChecksPassed": true,
+  "results": [
+    {
+      "completed": true,
+      "executedSeconds": 18.0,
+      "requestedSeconds": 18.0,
+      "collisionFree": true,
+      "minimumSignedSatGap": 0.16176201520805122,
+      "roadEnabled": true,
+      "sampledRoadSafe": true,
+      "minimumConservativeRoadFunctionMargin": 5.920704584881211,
+      "entireBodyPassed": true,
+      "entireBodyPassingTime": 2.744999999999995,
+      "sustainedCruise": true,
+      "maximumRecoveryErrors": [
+        0.18273676058667654,
+        0.04651865431951416,
+        0.018555798812447077
+      ],
+      "recovered": true,
+      "failureOccurred": false,
+      "file": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/nonlinear/scurve/varying_curvature_oncoming.mat",
+      "sha256": "a3d3aa8549153789e06b8ad6e6b66a6540c18f22e97279bbff8ec5ee8c4d8e9c",
+      "name": "varying_curvature_oncoming",
+      "compactNumericExport": false,
+      "maximumRoadMarginDifference": 3.552713678800501e-15,
+      "finalSpeed": 10.027364844787442,
+      "finalLateralError": 0.01634227042876363,
+      "finalCourseError": -0.018555798812447077,
+      "firstCommandSlewChecked": false,
+      "allChecksPassed": true,
+      "problems": [],
+      "scope": "PassVeh14DOF recorded samples; independent geometry and recovery accounting; no continuous-time guarantee"
+    }
+  ]
+}

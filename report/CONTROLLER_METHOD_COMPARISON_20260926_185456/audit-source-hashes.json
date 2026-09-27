@@ -1,0 +1,5 @@
+{
+  "scripts/auditNonlinearVehicleRecovery.py": "8a8675b1440405c84028296f0849646fc80ef4aad9cea100c0b7aa9a17284fd8",
+  "scripts/auditNonlinearRecoveryStudy.py": "acf2c17dba252243fd42f510c037540af243b3a16de1945a35963c89ea6c81cb",
+  "scripts/auditControllerRecoveryResults.py": "993d19951cc2049237741b85ab262f6e423772d31e272598ed9a2b06c4c7bd79"
+}
