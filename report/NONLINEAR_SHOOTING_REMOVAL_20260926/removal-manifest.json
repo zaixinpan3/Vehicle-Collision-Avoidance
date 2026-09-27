@@ -1,0 +1,133 @@
+{
+  "preparedAt": "2026-09-27T00:01:09.015142-05:00",
+  "removalStartedAt": "2026-09-26T23:59:05-05:00",
+  "parentCommit": "0bcd6501920442765e07c09d44964d978d0478d8",
+  "removed": [
+    {
+      "path": "controller/nonlinearAvoidanceController.m",
+      "previousSha256": "652e50ce717bc277e76f93127bd8ed3a6458ee763bd03b61bf6267407deb4cd8",
+      "previousLines": 132,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "controller/nonlinearAvoidanceRollout.m",
+      "previousSha256": "6046efe1ada1a61ebe20730fb8dd50b0cdc7acb6138c43d2712e469398dc6639",
+      "previousLines": 107,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "controller/nonlinearAvoidanceSeed.m",
+      "previousSha256": "64dbd731c40257d92b75f322c0eac23ad941659f945735ed0e15a09edf3222d6",
+      "previousLines": 148,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "controller/solveNonlinearAvoidancePlan.m",
+      "previousSha256": "9d17e451b667ebb3088b144a761f7a1328dc26e915acbc5a606f091e939228a3",
+      "previousLines": 584,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "tests/nonlinearAvoidanceControllerTest.m",
+      "previousSha256": "4a1924fe9891906eeba281df340ccc5b412c6d8fa1f297c9425a4be1914852d4",
+      "previousLines": 120,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "tests/nonlinearAvoidancePlanTest.m",
+      "previousSha256": "46ce92f6069c96471428f7ee660996ce27fd9d85814a696d94a9e33da3994023",
+      "previousLines": 116,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "tests/nonlinearAvoidanceSeedTest.m",
+      "previousSha256": "0fc2c4ca4c800fa575d844ccbe84d0256f56c62d21fe21181ca0dd66c4297fc5",
+      "previousLines": 107,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/runNonlinearRecoveryStudy.m",
+      "previousSha256": "7db3d1ccbaa39ce736d2c6226fd9ef40256860c986075a7b01c7c6d66e6b7bbe",
+      "previousLines": 316,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/auditNonlinearRecoveryStudy.py",
+      "previousSha256": "acf2c17dba252243fd42f510c037540af243b3a16de1945a35963c89ea6c81cb",
+      "previousLines": 537,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/auditNonlinearVehicleRecovery.py",
+      "previousSha256": "8a8675b1440405c84028296f0849646fc80ef4aad9cea100c0b7aa9a17284fd8",
+      "previousLines": 291,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/exportNonlinearVehicleRecovery.m",
+      "previousSha256": "e56713d3a8015f9a7887d85aba71712373238bb6410872fdd6b1f7bf5df85e35",
+      "previousLines": 181,
+      "previouslyTracked": false,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/profileNonlinearControllerRuntime.m",
+      "previousSha256": "9cdbda95fa00dfd6dca87d6ed6c1ab38c14d85c65bc637ea3fc1b7516b1ef484",
+      "previousLines": 130,
+      "previouslyTracked": true,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/compareRoadConstraintRuntime.m",
+      "previousSha256": "35d8b323939d1b9f4f5ffff9132072197a4de2f5c7dd85a5292c1e88bb9d24a9",
+      "previousLines": 56,
+      "previouslyTracked": true,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/runRoadConstraintAblation.m",
+      "previousSha256": "d199c9129211424c310bd91cbca16ebbb992c01e0981daa0a7126dbd0c0c7c4d",
+      "previousLines": 49,
+      "previouslyTracked": true,
+      "existsAfterRemoval": false
+    },
+    {
+      "path": "scripts/auditRoadConstraintAblation.py",
+      "previousSha256": "6567561846458aa1ad1e6b243b7fb6984894fcee41aaf264424367933dacad87",
+      "previousLines": 83,
+      "previouslyTracked": true,
+      "existsAfterRemoval": false
+    }
+  ],
+  "restored": [
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "beforeSha256": "3db945e04425497fd517546681652d03f83cfe74a0a39ee8bba4bd0f02970d8b",
+      "afterSha256": "0bf7065d27188dfb0f79dc89662968ef200b1b605be5a99978539b68101a02f0",
+      "matchesParentCommit": true
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "beforeSha256": "a8d096c0276f7352fbc3246496c9d293c17c685a636fc6f46a69f1408f26803a",
+      "afterSha256": "90517a2f1ac01539c3d9e2dab83dfe7a6d74c2d5cac278ff02a7d18c3e584c10",
+      "matchesParentCommit": true
+    }
+  ],
+  "testCount": 152,
+  "passed": 152,
+  "failed": 0,
+  "incomplete": 0,
+  "testDurationSeconds": 13.093692,
+  "rawOutputDirectory": "/home/zai/.cache/collisionAvoidance/remove-nonlinear-shooting-20260926-235905",
+  "backupSha256": "a2afb8fe0507a4e9898af5977b700f70cac27e4eb00d73b8b2cc6073a370ad90"
+}

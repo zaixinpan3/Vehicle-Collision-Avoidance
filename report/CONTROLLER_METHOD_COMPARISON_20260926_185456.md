@@ -1,5 +1,7 @@
 # Vehicle controller method comparison
 
+> Historical record: the experimental nonlinear shooting controller and its dedicated execution/audit scripts were removed on 2026-09-26 at the user's request. Commands and implementation descriptions below refer to the recorded experiment, not the current controller. See [removal decision](NONLINEAR_SHOOTING_REMOVAL_20260926.md).
+
 Prepared 2026-09-26T19:59:04-05:00.
 
 The default `affineSocp` controller completes both no-target cruise controls but

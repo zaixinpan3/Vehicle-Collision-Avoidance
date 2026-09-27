@@ -1,5 +1,7 @@
 # Nonlinear controller runtime diagnosis and road-constraint ablation
 
+> Historical record: the experimental nonlinear shooting controller and its dedicated execution/audit scripts were removed on 2026-09-26 at the user's request. Commands and implementation descriptions below refer to the recorded experiment, not the current controller. See [removal decision](NONLINEAR_SHOOTING_REMOVAL_20260926.md).
+
 Prepared 2026-09-26 (America/Chicago). Experimental workspace based on `f58160a5e42f0f12e4d0550f28b4bbe99c3b23a4`; MATLAB 26.1.0.3276743 (R2026a) Update 3.
 
 ## Findings

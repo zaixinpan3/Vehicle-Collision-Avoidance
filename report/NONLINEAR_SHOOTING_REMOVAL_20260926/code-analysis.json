@@ -1,0 +1,32 @@
+{
+  "config_collisionAvoidanceControllerConfig_m": {
+    "id": "CFERR",
+    "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+    "fix": 0,
+    "line": 0,
+    "column": [
+      0,
+      0
+    ]
+  },
+  "controller_collisionAvoidanceController_m": {
+    "id": "CFERR",
+    "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+    "fix": 0,
+    "line": 0,
+    "column": [
+      0,
+      0
+    ]
+  },
+  "tests_collisionAvoidanceControllerConfigTest_m": {
+    "id": "CFERR",
+    "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead.",
+    "fix": 0,
+    "line": 0,
+    "column": [
+      0,
+      0
+    ]
+  }
+}
