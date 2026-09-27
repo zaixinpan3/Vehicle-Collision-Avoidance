@@ -7,7 +7,8 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % plant, not between nodes (NODE_SAMPLED_CERTIFICATE.md).
 % Store the accepted prediction and terminal witness for next-frame transfer.
 % The terminal law is a mathematical continuation, never a runtime fallback.
-% Fresh admission uses timed NRMM/VFFM references to initialize separation normals.
+% Fresh admission uses bounded timed NRMM/VFFM references to rebuild trajectory
+% Jacobians and dependent certificates before initializing separation normals.
 % Each SOCP fixes those normals and optimizes the complete input sequence.
 % Failed fresh admissions try the other passing side, then at most six
 % phase-I direction updates, within the same work deadline. An initializer
@@ -25,9 +26,11 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % An ego measurement outside the carried successor box (plant differs from
 % the model) is admitted from the measurement; the shifted previous plan still
 % supplies the first separation directions.
-% With trajectory linearization, active encounters instead refresh the stage
-% Jacobians once per frame from that shifted plan and the current observation.
-% Rebuilt models require new admission and do not inherit a feasible witness.
+% With trajectory linearization, active encounters first refresh the stage
+% Jacobians from a usable shifted plan and the current observation.
+% An unusable previous anchor or rejected solve triggers a bounded flow reference
+% and complete model rebuild. Rebuilt models require new admission and do not
+% inherit a feasible witness.
     persistent lastState
     if nargin == 1 && (ischar(egoState) || isstring(egoState))
         if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
@@ -69,7 +72,7 @@ function [command, predictedInput, planningProblem, controllerState] = ...
     preparationSeconds = toc(timer);
     solverCfg=cfg;solverCfg.solver.workTimer=timer;
     solverCfg.solver.workTimeLimit=min(cfg.solver.frameDeadlineSeconds,cfg.solver.certificateSearchTimeLimit);
-    [program,prediction,clf,result,search]=localSolve(model,solverCfg);
+    [program,prediction,clf,result,search,model]=localSolve(model,solverCfg);
     formulationSeconds=search.formulationSeconds;solveSeconds=search.solveSeconds;
     conicCalls=search.nativeSolves;
     if ~result.feasible
@@ -323,15 +326,15 @@ function command = localCommand(firstInput, state, prediction, model)
     command.frontWheelSteeringAngle = steeringAngle;
 end
 
-function [program,prediction,clf,result,search]=localSolve(model,cfg)
+function [program,prediction,clf,result,search,model]=localSolve(model,cfg)
 % An active target adds fixed-direction certificates to the convex base.
 % Without a target, the common dynamics, CLF and terminal solve remain.
     phase=tic;
-    [program,prediction,clf]=formulateAvoidanceProblem(model);
+    [program,prediction,clf]=solveHardCbfClf.prepare(model);
     formulationSeconds=toc(phase);
     if isfield(program,'jointCertificate')
-        [program,result,search]=solveHardCbfClf.fixedDirections(program,model,cfg);
-        prediction=program.prediction;
+        [program,result,search,model]=solveHardCbfClf.fixedDirections(program,model,cfg);
+        prediction=program.prediction;clf=program.clf;
         search.formulationSeconds=search.formulationSeconds+formulationSeconds;
         return;
     end

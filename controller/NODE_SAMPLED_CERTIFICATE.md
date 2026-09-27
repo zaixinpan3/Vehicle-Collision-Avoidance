@@ -9,13 +9,28 @@ which whole-hold enclosures remain in offline tooling.
 ## Trajectory-linearized encounter update (September 25, 2026)
 
 With the default `model.linearizationPolicy="trajectory"`, active encounters
-now rebuild their affine generators once per frame. The current measured
-state initializes a nonlinear Fiala rollout under the shifted previous input
-plan (cruise inputs initialize the first frame). Each hold is linearized at
-its own rollout state and input, including spatial curvature sensitivity on
-varying references. The stages stay fixed during the existing direction
-search and optimization; there is no dynamics-relinearization iteration,
-new trust-region restriction, or nonlinear acceptance check.
+build their affine generators along a selected input/state reference. The current
+measurement initializes a nonlinear Fiala rollout under the shifted previous
+input plan. A bounded, model-valid previous reference is tried first. If it
+cannot be assembled or its hard solve is rejected, the online flow initializer
+supplies a new reference. With no previous plan, the flow branch initializes the
+encounter directly (a conflict-free flow fit retains the nominal reference).
+
+As of September 27, the flow branch first fits its geometric reference using a
+cruise bootstrap, projects the inputs onto amplitude and causal slew bounds, and
+rebuilds the full trajectory-linearized problem. The nonlinear rollout, stage
+Jacobians, tire tangents, feedback tube, geometry, hard rows, CLF and fixed input-
+deviation objective center are reconstructed together. The bootstrap cannot
+issue a command. Projection changes the geometric path and endpoint fit; the
+reference still requires a complete hard solve. Each alternative passing side
+gets its own rebuilt model, within the existing frame work budget. A model-domain
+failure can reject a reference without bypassing any hard acceptance check.
+
+Each hold is linearized at its own rollout state and input, including spatial
+curvature sensitivity on varying references. Tangents stay fixed during a solve
+and its reaction/direction search. This is a bounded selection of reference
+trajectories, not an iterative nonlinear optimizer, a new controller method,
+a trust-region restriction, or a nonlinear-plant acceptance certificate.
 
 The node certificates below concern that frame's frozen affine prediction.
 They are not a nonlinear-plant certificate, and the shifted-witness recursive

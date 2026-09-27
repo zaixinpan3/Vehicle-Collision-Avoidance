@@ -16,6 +16,7 @@ classdef fluidInitializationTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'scripts')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'tests')));
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'solver','clarabel','matlab')));
         end
     end
     methods (Test)
@@ -81,7 +82,7 @@ classdef fluidInitializationTest < matlab.unittest.TestCase
         function exportedFluidAdmissionRetainsTheOriginalCertificate(testCase)
             [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            program=formulateAvoidanceProblem(problem.model);
+            program=problem.program;
             [decision,~,status]=standaloneControllerFrame(standaloneControllerBenchmark.pack(program), ...
                 standaloneControllerBenchmark.configuration(cfg));
             testCase.verifyEqual(status,4);
@@ -93,12 +94,14 @@ end
 function [distance,anglesEqual]=localControlLineDeparture()
     [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
     [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-    program=formulateAvoidanceProblem(problem.model);
-    [seed,angles]=solveHardCbfClf.fluidInitialize(program,cfg);
-    direction=seed(program.layout.planIndex)-program.anchorPlan;
+    bootstrap=problem.model;bootstrap.cfg.model.linearizationPolicy="cruise";
+    bootstrap=rmfield(bootstrap,'initializationPlan');
+    program=formulateAvoidanceProblem(bootstrap);
+    direction=problem.prediction.linearizationInputs(:)-program.anchorPlan;
     displacement=problem.decision(program.layout.planIndex)-program.anchorPlan;
     distance=norm(displacement-direction*((direction.'*displacement)/(direction.'*direction)));
-    anglesEqual=isequal(angles,problem.program.jointCertificate.angles);
+    anglesEqual=isequal(problem.metadata.admissionSearch.fixedCertificateAngles, ...
+        problem.program.jointCertificate.angles);
 end
 
 function [ego,target,road,cfg]=localVariation(value)

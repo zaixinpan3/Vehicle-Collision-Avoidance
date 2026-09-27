@@ -1,0 +1,7 @@
+name,flowAcceptedFrames,previousAcceptedFrames,modelRefreshesOnAcceptedFrames,invalidPriorRecoveries,maxReferenceRolloutError
+straight_w0_t18,0,20,0,0,nan
+circular_w0_t18,5,10,7,0,0.0
+sCurve_w0_t18,6,8,6,0,0.0
+straight_w10_t18,0,27,0,0,nan
+circular_w10_t18,0,28,0,0,nan
+sCurve_w10_t18,0,26,0,0,nan

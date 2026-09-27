@@ -1,0 +1,7 @@
+name,weight,requestedSeconds,completed,failureTime,failureIdentifier,collisionFree,minimumSeparation,passedTarget,recoveredCruise,maxSteeringRad,maxBrakingRatio,controllerMedianMs,controllerP95Ms,controllerMaxMs,wallSeconds
+straight_w0_t18,0,18,0,2.05,collisionAvoidanceController:optimizationFailed,1,4.01977447828692,0,0,0.698122105721091,0.923738750255249,32.709,190.242,396.565,97.932155
+circular_w0_t18,0,18,0,1.8,collisionAvoidanceController:optimizationFailed,1,9.53329618209409,0,0,0.698122098300557,0.999987997339366,9.797,386.53895,441.802,58.42145
+sCurve_w0_t18,0,18,0,1.75,collisionAvoidanceController:optimizationFailed,1,10.5250618885885,0,0,0.698122114257012,0.999987999991358,2239.2985,2368.2019,2621.257,107.851766
+straight_w10_t18,10,18,0,2.4,collisionAvoidanceController:optimizationFailed,1,0.113203239932184,0,0,0.157293057140083,0.526627836992297,31.875,76.2283999999998,342.851,69.865698
+circular_w10_t18,10,18,0,2.45,collisionAvoidanceController:optimizationFailed,1,0.209581412428708,0,0,0.231236383468415,0.999987999969616,33.4535,108.62,365.013,72.061732
+sCurve_w10_t18,10,18,0,2.35,collisionAvoidanceController:optimizationFailed,1,0.261758273658801,0,0,0.165104763863513,0.437085211754241,184.955,2407.8982,3719.046,125.051992

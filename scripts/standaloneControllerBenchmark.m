@@ -4,6 +4,11 @@ classdef standaloneControllerBenchmark
 % joint-certificate frames are exported; this is not a deployment interface.
     methods (Static)
         function p=pack(p)
+            % A prepared trajectory model must keep its operating inputs.
+            % This replay kernel has no nonlinear rollout/relinearization path.
+            if p.prediction.linearizationPolicy=="trajectory"
+                p.fluidReference.active=false;
+            end
             keep={'P','q','A','b','cones','anchorPlan','terminalOptimization','prediction','geometry','terminal', ...
                 'referenceMatrices','referenceStates','referenceInputs','inputWeight','slackWeight','decisionRadius', ...
                 'inputDeviationCenter','inputDeviationWeight', ...

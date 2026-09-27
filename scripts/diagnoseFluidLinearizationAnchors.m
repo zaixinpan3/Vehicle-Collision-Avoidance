@@ -35,7 +35,7 @@ function summary = diagnoseFluidLinearizationAnchors(snapshotDirectory,outputDir
         % Projection is an explicitly labeled diagnostic. It does not retain
         % the exact flow path, terminal fit or a feasibility certificate.
         input=min(max(rawInput,lower),upper);
-        model.initializationPlan=input;model.nominalSource="fluidLinearizationDiagnostic";
+        model.initializationPlan=input;model.nominalSource="flowTrajectory";
         identifier="";program=[];result=[];
         physicalExcess=NaN;jointExcess=NaN;coneExcess=NaN;
         maximumDeviation=NaN;firstForceError=NaN;maximumForceError=NaN;

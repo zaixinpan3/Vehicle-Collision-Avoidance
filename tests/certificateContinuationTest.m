@@ -114,7 +114,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             increment=problem.program.jointCertificate.angles ...
                 -problem.metadata.admissionSearch.initialCertificateAngles;
             testCase.verifyGreaterThan(norm(atan2(sin(increment),cos(increment))),1e-3);
-            testCase.verifyEqual(problem.metadata.nominalSource,"cruiseInitialization");
+            testCase.verifyEqual(problem.metadata.nominalSource,"flowTrajectory");
             testCase.verifyFalse(problem.metadata.recursiveFeasibilityGuaranteed);
             testCase.verifyEqual(problem.metadata.linearizationPolicy,"trajectory");
             testCase.verifyEqual(problem.metadata.convexificationPolicy,"fixedDirectionTrajectoryOptimization");

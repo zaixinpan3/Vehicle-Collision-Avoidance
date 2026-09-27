@@ -24,10 +24,33 @@ classdef solveHardCbfClf
             [reduced,retained]=localReducedProgram(program);
         end
 
-        function [program,result,search] = fixedDirections(program,model,cfg)
+        function [program,prediction,clf] = prepare(model)
+        % An unusable trajectory supplies no executable affine certificate.
+        % A cruise bootstrap only supplies geometry for a fresh flow reference.
+            try
+                if localTrajectoryFrame(model) && isfield(model,'initializationPlan')
+                    bounded=localBoundReference(model.initializationPlan,model);
+                    if any(~isfinite(model.initializationPlan),'all') ...
+                            || any(abs(bounded-model.initializationPlan)>1e-10,'all')
+                        error('collisionAvoidanceController:invalidTrajectoryAnchor', ...
+                            'The previous reference violates input amplitude or slew limits.');
+                    end
+                end
+                [program,prediction,clf]=formulateAvoidanceProblem(model);
+            catch exception
+                if ~localTrajectoryFrame(model) || ~localAnchorFailure(exception)
+                    rethrow(exception);
+                end
+                program=localFlowBootstrap(model);
+                program.previousAnchorFailure=string(exception.identifier);
+                prediction=program.prediction;clf=program.clf;
+            end
+        end
+
+        function [program,result,search,model] = fixedDirections(program,model,cfg)
         % A verified solver plan, or on solver failure the shifted previous plan
         % of an inherited frame, leaves this method. An initializer is never issued.
-            [program,result,search]=localFixedDirectionSearch(program,model,cfg);
+            [program,result,search,model]=localFixedDirectionSearch(program,model,cfg);
         end
 
         function solve = constrained(program,cfg)
@@ -51,15 +74,15 @@ classdef solveHardCbfClf
     end
 end
 
-function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
-% Direction search supplies an optimizer center, never a new issued plan.
-% Inherited frames solve with their stored directions; if that solve fails the
-% shifted previous plan is retained. Fresh frames keep the nominal directions
-% unless the fluid reference detects a support conflict. With a target, a fresh
-% frame then tries the configured reaction strengths in order (Inf is the
-% ego-only feedback tube); the first solver success is accepted. Whenever a
-% shifted previous plan anchors a conflicting fresh frame, its directions are
-% tried first; fluid initialization runs only if they fail.
+function [program,result,search,model]=localFixedDirectionSearch(program,model,cfg)
+% Each reference supplies a model anchor, never an issued plan. Inherited
+% frames retain their affine family and stored directions. Fresh trajectory
+% frames first try a usable shifted plan; otherwise each bounded flow side
+% supplies a complete model rebuild. Reaction gains and separation directions
+% may change during search, but each trajectory's operating inputs stay fixed.
+% Inf selects the ego-only feedback tube within the existing reaction search.
+    source="preparedModel";
+    if isfield(model,'nominalSource'),source=model.nominalSource;end
     search=struct('hardSolves',0,'restorationSolves',0,'baseSolves',0,'nativeSolves',0, ...
         'familyAttempts',0,'horizonAttempts',1,'formulationSeconds',0,'solveSeconds',0, ...
         'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
@@ -67,12 +90,20 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
         'issuedAdmissionWitness',false,'usedFullPlanAdmission',false, ...
         'fullPlanStatus',"notAttempted",'previousPlanSeedStatus',"notAttempted", ...
         'alternateSeedStatus',"notAttempted",'reactionAttempts',zeros(1,0),'reactionStrength',Inf, ...
+        'linearizationRefreshes',0,'linearizationSource',source, ...
+        'previousAnchorFailure',"", ...
         'initialCertificateAngles',program.jointCertificate.angles, ...
         'fixedCertificateAngles',program.jointCertificate.angles,'directionSeedSource',"nominalWitness");
     point=program.feasibleWitness;angles=program.jointCertificate.angles;
     inherited=program.inheritedPredictionFamily;
-    conflict=~inherited && program.fluidReference.active;
-    if conflict && model.nominalSource=="shiftedPreviousSolution"
+    trajectory=localTrajectoryFrame(model);
+    invalidAnchor=isfield(program,'previousAnchorFailure');
+    if invalidAnchor,search.previousAnchorFailure=program.previousAnchorFailure;end
+    preparedFlow=trajectory && program.prediction.linearizationPolicy=="trajectory" ...
+        && source=="flowTrajectory";
+    conflict=~inherited && program.fluidReference.active && ~preparedFlow;
+    previous=source=="shiftedPreviousSolution";
+    if (conflict || trajectory) && previous && ~invalidAnchor
         [improved,candidate,trial,seconds]=localFixedSolve(program,point,angles,cfg);
         search.hardSolves=1;search.nativeSolves=1;
         search.formulationSeconds=seconds(1);search.solveSeconds=seconds(2);
@@ -85,15 +116,22 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
             return;
         end
     end
+    % A failed previous solve also invalidates that reference for this frame,
+    % even if its old geometry did not request a flow fit.
+    conflict=conflict || (trajectory && ((~previous && ~preparedFlow) || invalidAnchor ...
+        || search.previousPlanSeedStatus~="notAttempted"));
+    bootstrap=program;referenceModel=model;
     if conflict
         phase=tic;
-        [point,angles,search.initialization]=solveHardCbfClf.fluidInitialize(program,cfg);
+        if trajectory && ~invalidAnchor && localInitializationTimeAvailable(cfg)
+            bootstrap=localFlowBootstrap(model);
+        end
+        [program,model,point,angles,search.initialization]= ...
+            localFluidModel(bootstrap,referenceModel,cfg);
+        search.linearizationRefreshes=double(search.initialization.modelRebuilt);
+        search.linearizationSource=model.nominalSource;
         search.formulationSeconds=search.formulationSeconds+toc(phase);search.familyAttempts=1;
         search.directionSeedSource="chengFluidReference";
-        if isempty(point)
-            result=localEmptySolve();
-            result.message="Fluid initialization failed: "+search.initialization.status;return;
-        end
     elseif inherited
         search.directionSeedSource="inheritedWitness";
     end
@@ -103,12 +141,15 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
     if ~inherited && isfield(model,'encounter') && ~isempty(model.encounter) && cfg.feedbackPrediction.enabled
         strengths=cfg.feedbackPrediction.targetReaction.inputWeightScales;
     end
-    improved=false;
+    improved=false;accepted=program;trial=localEmptySolve();
+    trial.message="No valid reference within the frame work budget";
     for strength=strengths
+        if isempty(point),break;end
         if ~localInitializationTimeAvailable(cfg) && ~isempty(search.reactionAttempts),break;end
-        candidate=program;
+        candidate=program;candidateModel=model;
         if isfinite(strength)
-            phase=tic;candidate=localReactiveProgram(program,model,point,angles,strength,cfg);
+            phase=tic;
+            [candidate,candidateModel]=localReactiveProgram(program,model,point,angles,strength,cfg);
             search.formulationSeconds=search.formulationSeconds+toc(phase);
         end
         [improved,accepted,trial,seconds]=localFixedSolve(candidate,point,angles,cfg);
@@ -116,28 +157,30 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
         search.solveSeconds=search.solveSeconds+seconds(2);
         search.hardSolves=search.hardSolves+1;search.nativeSolves=search.nativeSolves+1;
         search.reactionAttempts(end+1)=strength;
-        if improved,break;end
+        if improved,model=candidateModel;break;end
     end
     if ~improved && conflict && search.initialization.selectedReference>0 ...
             && localInitializationTimeAvailable(cfg)
         % The geometric fit score is not a feasibility test. A failed SOCP
         % for one passing side says nothing about the other side. Try the
         % remaining fitted side within the same frame budget before failing.
-        alternate = program;
+        alternate = bootstrap;
         alternate.fluidReference.valid(search.initialization.selectedReference) = false;
         phase = tic;
-        [otherPoint,otherAngles,search.alternateInitialization] = ...
-            solveHardCbfClf.fluidInitialize(alternate,cfg);
+        [alternate,otherModel,otherPoint,otherAngles,search.alternateInitialization] = ...
+            localFluidModel(alternate,referenceModel,cfg);
+        search.linearizationRefreshes=search.linearizationRefreshes ...
+            +double(search.alternateInitialization.modelRebuilt);
         search.formulationSeconds = search.formulationSeconds+toc(phase);
         search.familyAttempts = search.familyAttempts+1;
         search.alternateSeedStatus = "invalidFit";
         if ~isempty(otherPoint)
             for strength = strengths
                 if ~localInitializationTimeAvailable(cfg),break;end
-                candidate = program;
+                candidate = alternate;candidateModel=otherModel;
                 if isfinite(strength)
                     phase = tic;
-                    candidate = localReactiveProgram(program,model,otherPoint,otherAngles,strength,cfg);
+                    [candidate,candidateModel] = localReactiveProgram(alternate,otherModel,otherPoint,otherAngles,strength,cfg);
                     search.formulationSeconds = search.formulationSeconds+toc(phase);
                 end
                 [improved,accepted,trial,seconds] = localFixedSolve(candidate,otherPoint,otherAngles,cfg);
@@ -148,6 +191,8 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
                 search.reactionAttempts(end+1) = strength;
                 search.alternateSeedStatus = "rejected: "+trial.message;
                 if improved
+                    model=candidateModel;
+                    search.linearizationSource=model.nominalSource;
                     angles = otherAngles;
                     search.fixedCertificateAngles = angles;
                     search.directionSeedSource = "alternateChengFluidReference";
@@ -157,7 +202,8 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
             end
         end
     end
-    if ~improved && conflict && localInitializationTimeAvailable(cfg)
+    if ~improved && conflict && bootstrap.fluidReference.active ...
+            && ~isempty(point) && localInitializationTimeAvailable(cfg)
         [improved,accepted,trial,angles,restoration] = ...
             localRestoreDirections(program,point,angles,cfg);
         search.restoration = restoration;
@@ -185,6 +231,12 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
     else
         result=localEmptySolve();
         result.message="Fixed-direction trajectory optimization failed: "+search.fullPlanStatus+": "+trial.message;
+        if conflict
+            result.message=result.message+"; flow reference "+search.initialization.status;
+            if search.initialization.modelFailure~=""
+                result.message=result.message+" ("+search.initialization.modelFailure+")";
+            end
+        end
         if search.previousPlanSeedStatus~="notAttempted"
             result.message=result.message+"; previous-plan directions "+search.previousPlanSeedStatus;
         end
@@ -195,6 +247,75 @@ function [program,result,search]=localFixedDirectionSearch(program,model,cfg)
     end
     program.supportGeometry.witnessPreserved=inherited;
     program.inheritedFeasibleFamily=inherited;
+end
+
+function active=localTrajectoryFrame(model)
+    active=isfield(model,'encounter') && ~isempty(model.encounter) ...
+        && isfield(model,'carriedWitness') && isempty(model.carriedWitness) ...
+        && string(model.cfg.model.linearizationPolicy)=="trajectory";
+end
+
+function expected=localAnchorFailure(exception)
+    expected=any(string(exception.identifier)==[ ...
+        "collisionAvoidanceController:invalidTrajectoryAnchor", ...
+        "collisionAvoidanceController:invalidTireOperatingPoint", ...
+        "collisionAvoidanceController:singularTireLinearization", ...
+        "collisionAvoidanceController:invalidReferenceCurve"]);
+end
+
+function program=localFlowBootstrap(model)
+% A bootstrap is used only for geometric fitting, never for command acceptance.
+    bootstrap=model;bootstrap.cfg.model.linearizationPolicy="cruise";
+    if isfield(bootstrap,'initializationPlan'),bootstrap=rmfield(bootstrap,'initializationPlan');end
+    if isfield(bootstrap,'reactionDesign'),bootstrap=rmfield(bootstrap,'reactionDesign');end
+    program=formulateAvoidanceProblem(bootstrap);
+end
+
+function input=localBoundReference(input,model)
+% Causal projection satisfies both amplitude and actual previous-input slew.
+% It changes the geometric fit, so no fitted endpoint certificate is retained.
+    cfg=model.cfg;
+    lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+    step=model.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+    prior=model.previousInput;
+    for stage=1:size(input,2)
+        lo=max(lower,prior-step);hi=min(upper,prior+step);
+        if any(lo>hi)
+            error('collisionAvoidanceController:invalidTrajectoryAnchor', ...
+                'No input satisfies both amplitude and previous-input slew limits.');
+        end
+        input(:,stage)=min(max(input(:,stage),lo),hi);
+        prior=input(:,stage);
+    end
+end
+
+function [program,model,point,angles,information]=localFluidModel(bootstrap,model,cfg)
+    [point,angles,information]=solveHardCbfClf.fluidInitialize(bootstrap,cfg);
+    program=bootstrap;information.modelRebuilt=false;information.inputProjectionNorm=0;
+    information.modelFailure="";
+    if isempty(point) || ~localTrajectoryFrame(model),return;end
+    raw=reshape(point(bootstrap.layout.planIndex),2,[]);
+    try
+        input=localBoundReference(raw,model);
+        reference=model;reference.initializationPlan=input;reference.nominalSource="flowTrajectory";
+        if isfield(reference,'reactionDesign'),reference=rmfield(reference,'reactionDesign');end
+        if ~localInitializationTimeAvailable(cfg)
+            point=[];information.status="searchTimeLimit";return;
+        end
+        candidate=formulateAvoidanceProblem(reference);
+        % The whole model and all dependent rows now use the bounded rollout.
+        % Any later change of optimizer coordinates must retain these tangents.
+        program=candidate;program.fluidReference.active=false;
+        model=reference;point=program.feasibleWitness;
+        angles=program.jointCertificate.angles;
+        information.modelRebuilt=true;
+        information.inputProjectionNorm=norm(input-raw,'fro');
+    catch exception
+        if ~localAnchorFailure(exception),rethrow(exception);end
+        point=[];information.status="invalidTrajectoryAnchor";
+        information.modelFailure=string(exception.identifier);
+    end
 end
 
 function [improved,accepted,trial,angles,information] = localRestoreDirections(program,point,angles,cfg)
@@ -282,7 +403,7 @@ function solve = localCheckPhysical(program,solve,angles)
     end
 end
 
-function candidate=localReactiveProgram(program,model,point,angles,strength,cfg)
+function [candidate,reactive]=localReactiveProgram(program,model,point,angles,strength,cfg)
 % Rebuild the fresh program on the target-reactive tube for these directions.
 % Records whose support residual at the optimizer center is within
 % relevanceMeters of binding get full design weight; farther records decay.
@@ -295,6 +416,7 @@ function candidate=localReactiveProgram(program,model,point,angles,strength,cfg)
     design=ltvBicycleModel.reactionGains(model,program.prediction,records,angles,weights,strength);
     reactive=model;reactive.reactionDesign=design;
     candidate=formulateAvoidanceProblem(reactive);
+    if localTrajectoryFrame(model),candidate.fluidReference.active=false;end
 end
 
 function result=localSolveConic(program,cfg)

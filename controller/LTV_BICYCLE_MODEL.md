@@ -5,7 +5,9 @@
 > Trajectory update (2026-09-25): active encounters with the default
 > `linearizationPolicy="trajectory"` now use `trajectoryStages`: a nonlinear
 > anchor rollout from the current observation under shifted previous inputs,
-> followed by a separate state/input Jacobian for each hold. The resulting
+> or a bounded flow reference when that previous reference is unavailable or
+> rejected (online flow rebuild added September 27). A separate state/input
+> Jacobian is formed for each hold. The resulting
 > affine stages are fixed during that frame's optimization. Fresh admission
 > replaces carried feasibility across relinearized encounter frames. The
 > cruise policy remains available for the exact carried-model study described

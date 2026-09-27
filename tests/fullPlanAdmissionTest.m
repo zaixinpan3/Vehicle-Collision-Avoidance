@@ -52,6 +52,8 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
 
         function admittedPlanRemainsAvailableAfterASuccessorSolveFailure(testCase)
             [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+            % Witness transfer requires an unchanged declared affine model.
+            cfg.model.linearizationPolicy="cruise";
             [~,~,~,stored]=collisionAvoidanceController(ego,target,road,cfg,[]);
             nextEgo=encounterTestFixture.nextEgo(stored,road);
             target.targetPositionInertial=target.targetPositionInertial+.05*target.targetVelocityInertial;

@@ -5,10 +5,12 @@ current implementation contains **20**: 13 MATLAB modules, five native C++
 translation units, one native header, and one controller configuration.
 The controller initializes separation directions and then fixes them while
 optimizing the complete trajectory in one hard SOCP. The
-accepted complete certificate supplies the next frame's feasible incumbent.
+accepted complete certificate supplies the next frame's feasible incumbent
+only under the unchanged-model continuation contract. Refreshed trajectory
+models require new hard admission.
 Safety is certified at the hold nodes only
 ([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
-Its format-44 state retains directions, occupied sets, prediction, terminal
+Its format-46 state retains directions, occupied sets, prediction, terminal
 continuation, the feedback correction of the issued input and, for a
 target-reactive admission, the reaction gains and nominal target flow
 ([CLOSED_LOOP_TARGET_PREDICTION.md](CLOSED_LOOP_TARGET_PREDICTION.md)). See [the algorithm and guarantees](JOINT_SUPPORT_CERTIFICATES.md).
@@ -27,7 +29,7 @@ Do not move controller helpers into those directories to evade the limit.
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate (shrunk by the declared lateral clearance), road-refit readmission and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse base transcription (`build`) and fixed-direction support majorants (`fixedDirections`) |
-| `solveHardCbfClf.m` | Convex base solving (`constrained`), fixed-direction admission/continuation (`fixedDirections`), alternate-side and bounded phase-I direction recovery; independent lifted and original-coordinate hard-constraint checks before accepting solver candidates |
+| `solveHardCbfClf.m` | Previous-reference validation and flow bootstrap (`prepare`), bounded flow-trajectory model reconstruction, convex base solving (`constrained`), fixed-direction admission/continuation (`fixedDirections`), alternate-side and bounded phase-I direction recovery; independent lifted and original-coordinate hard-constraint checks before accepting solver candidates |
 | `avoidanceSafetyGeometry.m` | Joint occupied-set records (relative ego-target zonotope for a target-reactive tube), support functions, exact residuals and direction storage (`setDirections`); chart construction, signed-distance initialization and offline geometry kernels |
 | `laneGeometry.m` | Polyline, arc and smooth-profile projection, Frenet poses and local chart bounds (chart range not enforced) |
 | `ltvBicycleModel.m` | Held-input node prediction with feedback deviation sets (`finitePredict`, `feedbackContract`), target-reactive gain design and joint ego-target deviation sets (`reactionGains`, `reactiveTube`), affine input-family swept prediction for offline audits (`fixedPredict`), sampled cruise and immutable phase scheduling (`sampledCruise`, `referenceSchedule`, `referenceAt`), nonlinear dynamics and signed road forces (`roadLoad`) |
@@ -46,9 +48,9 @@ Do not move controller helpers into those directories to evade the limit.
 ## Current interfaces and scope
 
 The public controller signature is unchanged. Its fourth output is a
-format-44 predictive certificate. `formulateAvoidanceProblem(model)` retains
+format-46 predictive certificate. `formulateAvoidanceProblem(model)` retains
 the convex dynamics/terminal base and attaches collision and exit certificates.
-Accepted successors preserve their angles, occupied sets, charts, prediction,
+Under unchanged-model continuation, accepted successors preserve their angles, occupied sets, charts, prediction,
 terminal set and absolute exit deadline. Touching majorants contain that full
 shifted witness under unchanged contracts. The terminal law is never dispatched
 after solver failure.
@@ -56,7 +58,7 @@ after solver failure.
 `avoidanceStageQp.build` supplies the common sparse base. Its `fixedDirections`
 method adds stage-local support epigraphs and a global yaw majorant without
 angle variables. `solveHardCbfClf.fixedDirections` owns analytical NRMM/VFFM reference preparation and fitting,
-mandatory full-plan admission, and full continuation improvement. Target-free
+bounded flow-based model reconstruction before hard admission, and full continuation improvement. A usable previous trajectory is tried first; a rejected or invalid reference triggers a fresh flow model. Each model refresh rebuilds its dependent rows and does not inherit an old feasible witness. Target-free
 frames solve only the common convex base with a single `constrained` call.
 Nonlinear Fiala tools retain their separate study scope. The online guarantee
 remains the declared zero-residual held affine plant.

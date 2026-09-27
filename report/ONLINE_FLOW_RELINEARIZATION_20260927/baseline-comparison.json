@@ -1,0 +1,32 @@
+[
+  {
+    "name": "circular_w0_t18.mat",
+    "configurationMatches": true,
+    "geometryMatches": true
+  },
+  {
+    "name": "circular_w10_t18.mat",
+    "configurationMatches": true,
+    "geometryMatches": true
+  },
+  {
+    "name": "sCurve_w0_t18.mat",
+    "configurationMatches": true,
+    "geometryMatches": true
+  },
+  {
+    "name": "sCurve_w10_t18.mat",
+    "configurationMatches": true,
+    "geometryMatches": true
+  },
+  {
+    "name": "straight_w0_t18.mat",
+    "configurationMatches": true,
+    "geometryMatches": true
+  },
+  {
+    "name": "straight_w10_t18.mat",
+    "configurationMatches": true,
+    "geometryMatches": true
+  }
+]

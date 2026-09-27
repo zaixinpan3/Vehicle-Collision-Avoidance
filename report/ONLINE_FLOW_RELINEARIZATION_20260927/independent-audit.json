@@ -1,0 +1,50 @@
+[
+  {
+    "name": "straight_w0_t18",
+    "minimumSATGap": 4.019774478286864,
+    "executedSeconds": 2.05,
+    "completed": false,
+    "recoveredCruise": false,
+    "passed": true
+  },
+  {
+    "name": "circular_w0_t18",
+    "minimumSATGap": 9.533296182094094,
+    "executedSeconds": 1.8,
+    "completed": false,
+    "recoveredCruise": false,
+    "passed": true
+  },
+  {
+    "name": "sCurve_w0_t18",
+    "minimumSATGap": 10.52506188858852,
+    "executedSeconds": 1.75,
+    "completed": false,
+    "recoveredCruise": false,
+    "passed": true
+  },
+  {
+    "name": "straight_w10_t18",
+    "minimumSATGap": 0.11320323993219228,
+    "executedSeconds": 2.4,
+    "completed": false,
+    "recoveredCruise": false,
+    "passed": true
+  },
+  {
+    "name": "circular_w10_t18",
+    "minimumSATGap": 0.20958141242870676,
+    "executedSeconds": 2.45,
+    "completed": false,
+    "recoveredCruise": false,
+    "passed": true
+  },
+  {
+    "name": "sCurve_w10_t18",
+    "minimumSATGap": 0.2617582736587942,
+    "executedSeconds": 2.35,
+    "completed": false,
+    "recoveredCruise": false,
+    "passed": true
+  }
+]

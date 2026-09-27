@@ -1,0 +1,7 @@
+name,weight,commandDifference,failureTime,failureIdentifier,maxNormalizedDeviation,meanSquaredNormalizedDeviation,maxFirstForceMismatchN,maxForceMismatchN,maxForceCapacityExcessN,invalidPredictedSlipStages
+circular_w0_t18,0,0,1.8,collisionAvoidanceController:optimizationFailed,1.99997248150736,0.280621695136646,27828.4365869315,134423.768776167,134423.768776167,2
+circular_w10_t18,10,0,2.45,collisionAvoidanceController:optimizationFailed,1.004801749758,0.00145560357137383,7953.95897866512,12380.0691987292,12380.0197900379,0
+sCurve_w0_t18,0,0,1.75,collisionAvoidanceController:optimizationFailed,1.99998622756516,0.186589913613656,65788.2975055703,65788.2975055703,65788.2975055703,0
+sCurve_w10_t18,10,0,2.35,collisionAvoidanceController:optimizationFailed,0.672865839014255,0.000481051831504412,12670.4509040424,30345.5439283338,30345.5439283338,0
+straight_w0_t18,0,0,2.05,collisionAvoidanceController:optimizationFailed,1.99997133850789,0.0722859919367036,44281.6764454901,64071.5480127971,64071.5480127971,0
+straight_w10_t18,10,0,2.4,collisionAvoidanceController:optimizationFailed,0.464190518290345,0.000319899125743954,3352.08906183669,19558.9479125597,19558.9479125597,0
