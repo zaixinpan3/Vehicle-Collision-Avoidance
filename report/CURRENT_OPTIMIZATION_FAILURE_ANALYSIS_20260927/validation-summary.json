@@ -1,0 +1,13 @@
+{
+  "replayedFailures": 5,
+  "allIssuedCommandsMatchExactly": true,
+  "zeroObjectiveAblations": 72,
+  "collisionRelaxationSocpLpPairs": 6,
+  "stationCorridorSocpLpPairs": 1,
+  "previousPlanRollouts": 2,
+  "productionSourceUnchanged": true,
+  "firstDiagnosticProcessExitCode": 0,
+  "secondDiagnosticProcessExitCode": 0,
+  "thirdDiagnosticProcessExitCode": 0,
+  "initialHarnessError": "A character/string filename concatenation error was corrected before successful replay; the initial wrapper failure is retained in initial-wrapper-error.txt."
+}
