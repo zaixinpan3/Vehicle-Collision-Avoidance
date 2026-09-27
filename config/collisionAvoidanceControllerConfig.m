@@ -55,7 +55,11 @@ function cfg = localDefaults()
     cfg.admission = struct("widthScale",1.2,"minimumWidthMeters",3.0, ...
         "clearanceAllowanceMeters",0.2,"headingWeight",4.0,"regularizationWeight",0.02);
     % Small trajectory regularization for fixed-direction convex optimization.
-    cfg.jointCertificate = struct("proximalWeight",1.0e-3);
+    cfg.jointCertificate = struct("proximalWeight",1.0e-3, ...
+        "inputDeviationWeight",0.0);
+    % Sum of squared input deviations from the actual stage linearization
+    % inputs, normalized by the configured actuator magnitudes. This weight
+    % does not change the LQR gains or the movable solver proximal center.
     % Prediction under per-hold feedback u_k = v_k + K_k (xhat_k - z_k) from
     % the second hold on. Active trajectory models use a backward stage-wise
     % design; cruise models retain the cruise gain. Both scale the speed
@@ -138,8 +142,8 @@ function cfg = localDefaults()
         "parameterRangeTolerance", 1.0e-3);
 
     % Discrete Riccati error scales and the LQR input weights of the cruise
-    % gain design and the initializer metric. The SOCP objective has no
-    % input-effort term (removed 2026-09-24).
+    % gain design and the initializer metric. The online model-input deviation
+    % penalty has its own jointCertificate.inputDeviationWeight.
     % decreaseRateFraction retains a strict gap between nominal contraction
     % and the reported robust sampled dissipation factor. relaxationWeight
     % penalizes the squared nonnegative slack in the sampled CLF norm cone.
@@ -241,6 +245,8 @@ function localValidate(cfg)
         validateattributes(cfg.jointCertificate.(name),{'double'}, ...
             {'scalar','real','finite','positive'});
     end
+    localValidateNonnegativeScalar(cfg.jointCertificate.inputDeviationWeight, ...
+        "jointCertificate.inputDeviationWeight");
     validateattributes(cfg.collision.cbfRate,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.feedbackPrediction.enabled,{'logical'},{'scalar'});
     validateattributes(cfg.feedbackPrediction.speedGainScale,{'double'},{'scalar','real','finite','nonnegative'});

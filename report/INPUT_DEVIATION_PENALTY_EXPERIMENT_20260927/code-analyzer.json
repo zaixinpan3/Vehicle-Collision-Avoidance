@@ -1,0 +1,73 @@
+[
+  {
+    "file": "config/collisionAvoidanceControllerConfig.m",
+    "findings": []
+  },
+  {
+    "file": "controller/formulateAvoidanceProblem.m",
+    "findings": []
+  },
+  {
+    "file": "controller/avoidanceStageQp.m",
+    "findings": [
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 47,
+        "column": [
+          21,
+          27
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 47,
+        "column": [
+          60,
+          71
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 147,
+        "column": [
+          37,
+          47
+        ]
+      }
+    ]
+  },
+  {
+    "file": "scripts/runInputDeviationPenaltyExperiment.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/auditInputDeviationPenaltyExperiment.m",
+    "findings": []
+  },
+  {
+    "file": "tests/inputDeviationObjectiveTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/certificateContinuationTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/jointSupportCertificateTest.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/standaloneControllerBenchmark.m",
+    "findings": []
+  },
+  {
+    "file": "tests/standaloneControllerFrameTest.m",
+    "findings": []
+  }
+]

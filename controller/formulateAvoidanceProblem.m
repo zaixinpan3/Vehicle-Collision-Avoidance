@@ -244,14 +244,17 @@ function [program,prediction,clf] = localFormulate(model)
         objectiveMap(rows,:)=stageRoot*prediction.egoStateMatrix(2:6,:,stage+1);
         objectiveOffset(rows)=stageRoot*(prediction.egoStateOffset(2:6,stage+1)-referenceStates(2:6,stage+1));
     end
-    % The objective is the sampled CLF value at every hold node plus the
-    % squared first-hold slack. It carries no input-effort term: an effort
-    % penalty rewards delaying a maneuver, and every plan is already bounded
-    % by the hard actuator and slew rows. program.inputWeight keeps the LQR
-    % input weights for the initializer metric only.
+    % Penalize departure from the actual tire/model operating inputs, never
+    % from zero or a later direction-search seed. The LQR inputWeight remains
+    % an independent initializer metric. Omit the constant cost term only.
     inputWeight=repmat([cfg.clf.frontWheelSteeringAngleWeight;cfg.clf.brakingRatioWeight],count,1);
-    hessian=objectiveMap.'*objectiveMap;
-    linear=2*(objectiveMap.'*objectiveOffset);
+    inputDeviationCenter=reshape(cell2mat(cellfun(@(t)t.operatingInput, ...
+        prediction.tireModels(:).',UniformOutput=false)),[],1);
+    inputScale=reach;
+    inputScale(inputScale==0)=1; % A fixed-zero actuator needs no normalization.
+    inputDeviationWeight=double(cfg.jointCertificate.inputDeviationWeight)./inputScale.^2;
+    hessian=objectiveMap.'*objectiveMap+diag(inputDeviationWeight);
+    linear=2*(objectiveMap.'*objectiveOffset-inputDeviationWeight.*inputDeviationCenter);
     hessian=2*[hessian,zeros(planCount,1);zeros(1,planCount),cfg.clf.relaxationWeight];
     layout = struct('planIndex',1:planCount,'planCount',planCount,'horizonSteps',count, ...
         'decisionCount',planCount+1,'relaxationIndex',planCount+1);
@@ -266,6 +269,7 @@ function [program,prediction,clf] = localFormulate(model)
         'inheritedFeasibleFamily',inherited, ...
         'cruiseCertificate',cruise,'clf',clf, ...
         'prediction',prediction,'inputWeight',inputWeight, ...
+        'inputDeviationCenter',inputDeviationCenter,'inputDeviationWeight',inputDeviationWeight, ...
         'referenceStates',referenceStates,'referenceInputs',referenceInputs,'referenceMatrices',referenceMatrices, ...
         'slackWeight',cfg.clf.relaxationWeight,'feedbackCorrection',feedbackCorrection);
     program.terminalConePhysicalBound=terminalCone.bound;

@@ -1,6 +1,51 @@
 # Quadratic input deviation and CLF relaxation
 
-## Current objective: certificate operating input (September 8, 2026)
+## Current objective: fixed model-input deviation (September 27, 2026)
+
+The online objective is
+
+\[
+J=\sum_{k=1}^{N} e_k^\mathsf{T}P_k e_k
+ +\rho\sigma^2
+ +\lambda\sum_{k=0}^{N-1}\left\|D^{-1}(u_k-\bar u_k)\right\|_2^2.
+\]
+
+Here `u = [deltaF; beta]`, with steering in radians and signed longitudinal
+utilization dimensionless. `D` contains the configured maximum steering
+magnitude and the maximum absolute signed-beta bound; a fixed-zero actuator
+uses unit scale to avoid division by zero. The new scalar
+`jointCertificate.inputDeviationWeight` is lambda; zero reproduces the
+previous state/slack objective. It is independent of the CLF/LQR weights,
+initializer metric, input-rate limits, and hard constraints.
+
+Each `bar u_k` is the operating input stored in that stage's actual tire
+linearization. During trajectory relinearization it follows that stage's
+model anchor; in cruise it is the corresponding trim input. The center is
+captured when formulating the problem and is not changed when direction
+initialization or sparse state coordinates move. Carried models retain the
+operating inputs of their retained stages. This is neither an absolute-input
+penalty about zero nor an input-rate penalty between adjacent holds.
+
+The optimized nominal input sequence is penalized. Later feedback corrections
+and uncertainty support bounds retain their existing definitions; this term
+does not optimize expected feedback energy. The implementation adds
+`2*diag(w)` to the input Hessian and `-2*w.*barU` to the linear cost in both
+condensed and lifted coordinates, where `w=lambda./repeatedScale.^2`.
+The input-independent constant is omitted. The small existing
+`jointCertificate.proximalWeight` term remains a separate numerical
+regularizer around the current solver seed, including its slack coordinate.
+
+A soft penalty encourages local model use but imposes no trust-region
+bound. It cannot repair an already inconsistent frozen constraint set,
+guarantee validity near the singular beta endpoints, or establish recursive
+feasibility for a relinearized model. Closed-loop evaluation must start before
+the failing frame so that changes in earlier plans can affect the outcome.
+
+The sections below describe historical objectives and validations, not the
+current solver. The September 27 experiment is recorded separately in
+`report/INPUT_DEVIATION_PENALTY_EXPERIMENT_20260927.md`.
+
+## Historical certificate-input objective (September 8, 2026)
 
 For each predicted stage, the input cost is centered at the operating input
 used to construct the continuous CLF/LQR certificate:

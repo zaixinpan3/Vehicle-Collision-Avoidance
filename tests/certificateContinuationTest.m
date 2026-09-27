@@ -4,6 +4,7 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
         geometry=struct('aligned',[12;0;0;0], ...
             'rotated',[8;5;.6;-.3],'corner',[5.2;2.1;0;0]);
         previousVersion={30,35,36,38,39,40,42,43,44,45};
+        inputDeviationWeight={0,100};
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -133,10 +134,12 @@ classdef certificateContinuationTest < matlab.unittest.TestCase
             testCase.verifyTrue(next.metadata.planCertified);
         end
 
-        function sparseRealizationPreservesAllRowsAndTheObjective(testCase)
+        function sparseRealizationPreservesAllRowsAndTheObjective(testCase,inputDeviationWeight)
             [ego,target,cfg,road]=localFixture();target=localRejectedTarget(target,"stationary");
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            [rowError,costError]=localLiftErrors(problem.program);
+            model=problem.model;model.cfg.jointCertificate.inputDeviationWeight=inputDeviationWeight;
+            program=formulateAvoidanceProblem(model);
+            [rowError,costError]=localLiftErrors(program);
             testCase.verifyLessThan(rowError,1e-8);
             testCase.verifyLessThan(costError,1e-7);
         end

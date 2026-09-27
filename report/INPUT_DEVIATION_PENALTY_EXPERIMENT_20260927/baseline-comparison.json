@@ -1,0 +1,20 @@
+[
+  {
+    "scenario": "straight",
+    "configurationMatches": true,
+    "stateDifference": 0,
+    "commandDifference": 0
+  },
+  {
+    "scenario": "circular",
+    "configurationMatches": true,
+    "stateDifference": 0,
+    "commandDifference": 0
+  },
+  {
+    "scenario": "sCurve",
+    "configurationMatches": true,
+    "stateDifference": 0,
+    "commandDifference": 0
+  }
+]

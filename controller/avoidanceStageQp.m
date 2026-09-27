@@ -79,11 +79,11 @@ classdef avoidanceStageQp
             end
             [blockRow,blockColumn]=ndgrid(1:6,1:6);
             stateRows=indices(blockRow(:),:);stateColumns=indices(blockColumn(:),:);
-            % No input-effort term: the lifted objective is the stage CLF
-            % values and the slack, as in formulateAvoidanceProblem.
-            hessian=sparse([n+1,stateRows(:).'],[n+1,stateColumns(:).'], ...
-                [2*program.slackWeight,values(:).'],total,total);
-            linear=[zeros(n,1);0;stateLinear(:)];
+            % Preserve the fixed model-input deviation cost when the lifted
+            % state origin moves to a different certificate-search seed.
+            hessian=sparse([1:n,n+1,stateRows(:).'],[1:n,n+1,stateColumns(:).'], ...
+                [2*program.inputDeviationWeight.',2*program.slackWeight,values(:).'],total,total);
+            linear=[-2*program.inputDeviationWeight.*program.inputDeviationCenter;0;stateLinear(:)];
             lifted.P=hessian;lifted.q=linear;
             linearCount=program.cones(2);
             retained=localDistinctRows(matrix(1:linearCount,:),bound(1:linearCount));
