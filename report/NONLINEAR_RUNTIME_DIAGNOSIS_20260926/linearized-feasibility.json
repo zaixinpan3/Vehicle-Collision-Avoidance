@@ -1,0 +1,12 @@
+{
+  "scipyVersion": "1.18.1",
+  "constraintRows": 3622,
+  "decisionVariables": 50,
+  "finiteCoefficients": true,
+  "feasibilityStatus": 2,
+  "feasibilityMessage": "The problem is infeasible. (HiGHS Status 8: model_status is Infeasible; primal_status is None)",
+  "relaxationStatus": 0,
+  "minimumUniformSlack": 0.5016160849654698,
+  "seconds": 0.06817489999957616,
+  "scope": "LP feasibility of third-seed linearized constraints under actuator decision bounds; not nonlinear feasibility, not a controller solve, not an internal fmincon trace"
+}

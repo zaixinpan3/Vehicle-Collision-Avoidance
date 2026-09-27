@@ -1,0 +1,10 @@
+{
+  "cpuModel": "AMD Ryzen 7 7800X3D 8-Core Processor",
+  "logicalCpus": 16,
+  "kernel": "7.2.7-zen1-1-zen",
+  "architecture": "x86_64",
+  "matlab": "R2026a Update 3",
+  "computationalThreads": 1,
+  "cpuAffinityPinned": false,
+  "scope": "Fixed-input timing batches run serially before the concurrent plant trials; ordinary shared workstation, no hard real-time claim."
+}

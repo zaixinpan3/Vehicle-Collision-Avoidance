@@ -1,0 +1,13 @@
+{
+  "originalSourceCount": 124,
+  "originalSourcesChanged": [
+    "scripts/runVaryingCurvatureStraightTargetAvoidanceScenario.m"
+  ],
+  "executedSourceAndNativeCount": 165,
+  "allExecutedSourceAndNativeHashesMatch": true,
+  "independentPlantAuditsPassed": 6,
+  "pairedNonlinearScenariosPassed": 3,
+  "unitTestsPassed": 8,
+  "codeAnalyzerFindings": 0,
+  "scope": "The circular nonlinear result is a checked 1.90 s diagnostic prefix; its full 18 s attempt stalled. Three affine results are stopped prefixes."
+}

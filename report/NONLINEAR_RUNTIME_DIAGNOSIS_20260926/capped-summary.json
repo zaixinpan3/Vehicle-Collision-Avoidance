@@ -1,0 +1,44 @@
+{
+  "feasible": false,
+  "reason": "noVerifiedNonlinearPlan",
+  "optimizerCalls": 2,
+  "attempts": [
+    {
+      "source": "shiftedPlan",
+      "exitFlag": -1,
+      "iterations": 8,
+      "firstFeasibleIteration": null,
+      "refinementIterations": 0,
+      "maximumViolation": 0.00414509642819634,
+      "seconds": 6.752112,
+      "message": "fmincon stopped by the output or plot function."
+    },
+    {
+      "source": "nonlinearPassingFeedback",
+      "exitFlag": 0,
+      "iterations": 12,
+      "firstFeasibleIteration": null,
+      "refinementIterations": 0,
+      "maximumViolation": 0.044362928557168779,
+      "seconds": 4.600757,
+      "message": "Solver stopped prematurely.\n\nfmincon stopped because it exceeded the iteration limit,\noptions.MaxIterations = 1.200000e+01."
+    }
+  ],
+  "bestInfeasibleMaximumViolation": 0.00414509642819634,
+  "worstFamily": "collision",
+  "summary": {
+    "minimumSeparationMargin": 0.095854903571803665,
+    "minimumRoadMargin": null,
+    "maximumDomainViolation": -0.1207887754029706,
+    "terminalError": [
+      0.0010254009740836068,
+      4.8456595866773131E-5,
+      -0.005644065092031525,
+      0.00028856563345966424,
+      0.00021167820051685993
+    ],
+    "maximumConstraintViolation": 0.00414509642819634,
+    "roadRowCount": 0
+  },
+  "scope": "Diagnostic stops before third seed; does not establish nonlinear infeasibility or full-controller outcome"
+}

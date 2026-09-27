@@ -1,0 +1,19 @@
+Running nonlinearAvoidancePlanTest
+........
+Done nonlinearAvoidancePlanTest
+__________
+
+
+ans =
+  1×8 TestResult array with properties:
+
+    Name
+    Passed
+    Failed
+    Incomplete
+    Duration
+    Details
+
+Totals:
+   8 Passed, 0 Failed, 0 Incomplete.
+   1.3128 seconds testing time.

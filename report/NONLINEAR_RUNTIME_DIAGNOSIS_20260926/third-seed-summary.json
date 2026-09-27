@@ -1,0 +1,9 @@
+{
+  "decisionVariables": 50,
+  "nonlinearConstraintCount": 3622,
+  "gradientFinite": true,
+  "jacobianFinite": true,
+  "maximumJacobianEntry": 33.429119677463547,
+  "maximumConstraintViolation": 1.2130610468676446,
+  "initialLinearViolation": []
+}

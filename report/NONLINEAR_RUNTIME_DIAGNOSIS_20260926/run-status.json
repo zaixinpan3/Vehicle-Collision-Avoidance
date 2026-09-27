@@ -1,0 +1,67 @@
+{
+  "outcome": "partial",
+  "straight": {
+    "processExit": 0,
+    "completedRequested18Seconds": true,
+    "independentAuditPassed": true
+  },
+  "circular": {
+    "processExit": 137,
+    "requestedSeconds": 18,
+    "lastCompletedSeconds": 1.9,
+    "controllerFrame": 39,
+    "status": "prolonged fmincon third-seed call; no new command or plant hold completed",
+    "interrupt": "SIGINT ineffective; SIGKILL after preserving diagnostics",
+    "checkpointedReproductionExit": 137,
+    "directTraceExit": 137,
+    "thirdSeedDecisionVariables": 50,
+    "thirdSeedConstraints": 3622,
+    "thirdSeedDerivativesFinite": true,
+    "linearizedLpStatus": "infeasible (not proof of nonlinear infeasibility)",
+    "minimumUniformLinearizedSlack": 0.5016160849654698,
+    "prefixReplayExit": 0,
+    "prefixRequestedSeconds": 1.9,
+    "prefixIndependentAuditPassed": true,
+    "prefixLastCommandMatchesCheckpoint": true
+  },
+  "sCurve": {
+    "processExit": 0,
+    "completedRequested18Seconds": true,
+    "independentAuditPassed": true
+  },
+  "diagnosticReplay": {
+    "profileBatchExit": 0,
+    "roadOnOffBatchExit": 0,
+    "fixtures": 5,
+    "cleanRepetitionsPerVariant": 3,
+    "unitTestsPassed": 8,
+    "unitTestsFailed": 0,
+    "unitTestsIncomplete": 0,
+    "fullProductionSuiteRun": false
+  },
+  "affineRoadFree": {
+    "processExit": 0,
+    "scope": "Three extra requested-18-second default affine trials; physical road containment is not assessed for these stopped prefixes.",
+    "results": [
+      {
+        "name": "straight_oncoming",
+        "completed": false,
+        "executedSeconds": 1.8,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed"
+      },
+      {
+        "name": "circular_oncoming",
+        "completed": false,
+        "executedSeconds": 1.4500000000000002,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed"
+      },
+      {
+        "name": "varying_curvature_oncoming",
+        "completed": false,
+        "executedSeconds": 1.75,
+        "failureIdentifier": "collisionAvoidanceController:optimizationFailed"
+      }
+    ],
+    "independentPrefixAuditsPassed": 3
+  }
+}

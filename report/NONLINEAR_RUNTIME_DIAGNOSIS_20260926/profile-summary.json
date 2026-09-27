@@ -1,0 +1,2009 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "computationalThreads": 1,
+  "scope": "Fixed measured-state diagnostic replay; no plant simulation or timing deadline guarantee",
+  "fixtures": [
+    {
+      "name": "straight-continuation",
+      "time": 0.05,
+      "sourceFile": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/nonlinear/straight_oncoming.mat",
+      "sourceFrame": 2,
+      "hasPrevious": true,
+      "initialInputDifference": 0,
+      "publicSeconds": 3.901108,
+      "cleanSolverSeconds": [
+        3.861168,
+        3.964375,
+        3.965502
+      ],
+      "profiledPlanDifference": 0,
+      "profileBudgetSeconds": 300,
+      "diagnostics": {
+        "reason": "acceptedIteration",
+        "nominalOnly": true,
+        "robustCertified": false,
+        "wholeHoldCertified": false,
+        "terminalInvariantCertified": false,
+        "recursiveFeasibilityGuaranteed": false,
+        "optimizerCalls": 1,
+        "runtimeSeconds": 3.96493,
+        "minimumSeparationMargin": null,
+        "minimumRoadMargin": 1,
+        "maximumDomainViolation": -0.1745325192785648,
+        "maximumConstraintViolation": -0.0399980139748082,
+        "terminalError": [
+          1.813627323324412e-06,
+          1.986025191805119e-06,
+          -0.0005013054482727597,
+          3.2273179472421163e-06,
+          2.856054579022574e-06
+        ],
+        "terminalTolerance": [
+          0.25,
+          0.04,
+          0.35,
+          0.25,
+          0.08
+        ],
+        "endpointReserve": 0.0001,
+        "roadRowCount": 804,
+        "seedCount": 2,
+        "feasibleRefinementIterations": 4,
+        "bestInfeasible": {
+          "source": "verifiedSeed",
+          "maximumViolation": 0,
+          "worstFamily": "actuatorOrSlew",
+          "summary": {
+            "minimumSeparationMargin": null,
+            "minimumRoadMargin": 1,
+            "maximumDomainViolation": -0.1745329251734737,
+            "terminalError": [
+              2.1532556016344807e-09,
+              5.966129117219524e-11,
+              0.0006852450059771087,
+              1.177376047383449e-12,
+              1.0424857580107813e-12
+            ],
+            "maximumConstraintViolation": -0.03999999994033871,
+            "roadRowCount": 804
+          }
+        },
+        "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+        "lastDomainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 4.059208681356974e-07,
+          "minimumSpeed": 9.99949730628848,
+          "minimumChartDenominator": 1,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "cost": 0.00010336226933678729,
+        "maximumInputViolation": 0,
+        "domainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 4.059208681356974e-07,
+          "minimumSpeed": 9.99949730628848,
+          "minimumChartDenominator": 1,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "maximumReplayDifference": 0,
+        "attempts": {
+          "source": "shiftedPlan",
+          "exitFlag": -1,
+          "iterations": 4,
+          "firstFeasibleIteration": 0,
+          "refinementIterations": 4,
+          "maximumViolation": -0.0399980139748082,
+          "seconds": 3.813442,
+          "message": "fmincon stopped by the output or plot function."
+        },
+        "roadCurvatureAllowance": 0,
+        "inputLowerBound": [
+          -0.6981317007977318,
+          -0.9999
+        ],
+        "inputUpperBound": [
+          0.6981317007977318,
+          0.9999
+        ],
+        "auditSampleTime": 0.025
+      },
+      "horizonHolds": 100,
+      "auditNodes": 201,
+      "decisionVariables": 50,
+      "functions": [
+        {
+          "name": "solveNonlinearAvoidancePlan",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 6.480427999999999,
+          "selfSeconds": 0.008502999999998373
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSeeds",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 0.13488299999999998,
+          "selfSeconds": 0.0028399999999999814
+        },
+        {
+          "name": "nonlinearAvoidanceSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.130752,
+          "selfSeconds": 0.002714999999999995
+        },
+        {
+          "name": "nonlinearAvoidanceSeed>localFeedbackSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.075722,
+          "selfSeconds": 0.006025000000000003
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localStep",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 1600,
+          "totalSeconds": 0.518262,
+          "selfSeconds": 0.056087000000000053
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 40899,
+          "totalSeconds": 0.166919,
+          "selfSeconds": 0.04056900000000002
+        },
+        {
+          "name": "laneGeometry>laneGeometry.curvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 42599,
+          "totalSeconds": 0.13253199999999998,
+          "selfSeconds": 0.13253199999999998
+        },
+        {
+          "name": "nonlinearAvoidanceRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 108,
+          "totalSeconds": 0.531403,
+          "selfSeconds": 0.010147999999999935
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDomain",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 26000,
+          "totalSeconds": 0.169698,
+          "selfSeconds": 0.07674999999999998
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDiagnostics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27708,
+          "totalSeconds": 0.099136,
+          "selfSeconds": 0.099136
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.nominalRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 96,
+          "totalSeconds": 0.433447,
+          "selfSeconds": 0.015471000000000068
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localAccumulate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27600,
+          "totalSeconds": 0.027305999999999997,
+          "selfSeconds": 0.027305999999999997
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.parameters",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 21099,
+          "totalSeconds": 0.068781,
+          "selfSeconds": 0.059191999999999995
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.fialaWorldDynamics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20800,
+          "totalSeconds": 0.25486699999999995,
+          "selfSeconds": 0.020630999999999955
+        },
+        {
+          "name": "ltvBicycleModel>localNominalFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20800,
+          "totalSeconds": 0.167547,
+          "selfSeconds": 0.127721
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.roadLoad",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 21003,
+          "totalSeconds": 0.040506,
+          "selfSeconds": 0.040506
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>consider",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 7,
+          "totalSeconds": 0.440543,
+          "selfSeconds": 0.007394000000000012
+        },
+        {
+          "name": "createSolverOptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/optimfun/optimfun/+optim/+options/createSolverOptions.m",
+          "calls": 1,
+          "totalSeconds": 0.020047000000000002,
+          "selfSeconds": 0.000729000000000004
+        },
+        {
+          "name": "optimoptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/optimoptions.m",
+          "calls": 1,
+          "totalSeconds": 0.020478,
+          "selfSeconds": 0.00043099999999999736
+        },
+        {
+          "name": "bicycleNominalKernelMex",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/bicycleNominalKernelMex.mexa64",
+          "calls": 96,
+          "totalSeconds": 0.41720399999999996,
+          "selfSeconds": 0.41720399999999996
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>roll",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 214,
+          "totalSeconds": 0.5094380000000001,
+          "selfSeconds": 0.07599100000000003
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>constraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 107,
+          "totalSeconds": 5.018548,
+          "selfSeconds": 0.3402340000000006
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>objective",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 107,
+          "totalSeconds": 0.695764,
+          "selfSeconds": 0.11732399999999998
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localStateConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 19296,
+          "totalSeconds": 4.629471,
+          "selfSeconds": 0.6089149999999997
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSlip",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 28800,
+          "totalSeconds": 0.102317,
+          "selfSeconds": 0.102317
+        },
+        {
+          "name": "laneGeometry>laneGeometry.fromFrenet",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 19296,
+          "totalSeconds": 0.15728799999999998,
+          "selfSeconds": 0.08763299999999999
+        },
+        {
+          "name": "discretize",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/datafun/discretize.m",
+          "calls": 19296,
+          "totalSeconds": 0.069655,
+          "selfSeconds": 0.069655
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localBoundaryConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 270144,
+          "totalSeconds": 3.703425,
+          "selfSeconds": 1.61585
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localClipPolygon",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 540288,
+          "totalSeconds": 1.238558,
+          "selfSeconds": 1.238558
+        },
+        {
+          "name": "polyval",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/polyval.m",
+          "calls": 664588,
+          "totalSeconds": 0.849017,
+          "selfSeconds": 0.849017
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>stopAtDeadline",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 6,
+          "totalSeconds": 0.31339100000000003,
+          "selfSeconds": 0.0009599999999999609
+        },
+        {
+          "name": "sqpInterface",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/sqpInterface.p",
+          "calls": 1,
+          "totalSeconds": 6.032834,
+          "selfSeconds": 0.10806200000000032
+        },
+        {
+          "name": "fmincon",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/fmincon.m",
+          "calls": 1,
+          "totalSeconds": 6.098103,
+          "selfSeconds": 0.014228999999999381
+        },
+        {
+          "name": "OptimFunctions>OptimFunctions.setup",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/OptimFunctions.m",
+          "calls": 1,
+          "totalSeconds": 0.020082,
+          "selfSeconds": 0.0037680000000000005
+        },
+        {
+          "name": "profileNonlinearControllerRuntime",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/profileNonlinearControllerRuntime.m",
+          "calls": 1,
+          "totalSeconds": 6.492579,
+          "selfSeconds": 0.012151000000001133
+        }
+      ]
+    },
+    {
+      "name": "straight-fresh-visible",
+      "time": 1.05,
+      "sourceFile": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/nonlinear/straight_oncoming.mat",
+      "sourceFrame": 22,
+      "hasPrevious": false,
+      "initialInputDifference": null,
+      "publicSeconds": 1.850902,
+      "cleanSolverSeconds": [
+        1.866178,
+        1.844564,
+        1.842517
+      ],
+      "profiledPlanDifference": 0,
+      "profileBudgetSeconds": 300,
+      "diagnostics": {
+        "reason": "acceptedIteration",
+        "nominalOnly": true,
+        "robustCertified": false,
+        "wholeHoldCertified": false,
+        "terminalInvariantCertified": false,
+        "recursiveFeasibilityGuaranteed": false,
+        "optimizerCalls": 1,
+        "runtimeSeconds": 1.842012,
+        "minimumSeparationMargin": 0.2959039389329715,
+        "minimumRoadMargin": 1,
+        "maximumDomainViolation": -0.06305440376256621,
+        "maximumConstraintViolation": -0.03753365827335227,
+        "terminalError": [
+          -0.05445304417373713,
+          -0.002466341726647735,
+          -0.0855090172325248,
+          -0.00277028419074683,
+          -0.0023420414852663787
+        ],
+        "terminalTolerance": [
+          0.25,
+          0.04,
+          0.35,
+          0.25,
+          0.08
+        ],
+        "endpointReserve": 0.0001,
+        "roadRowCount": 804,
+        "seedCount": 3,
+        "feasibleRefinementIterations": 4,
+        "bestInfeasible": {
+          "source": "acceptedIteration",
+          "maximumViolation": 0,
+          "worstFamily": "actuatorOrSlew",
+          "summary": {
+            "minimumSeparationMargin": 0.5049879458534042,
+            "minimumRoadMargin": 1,
+            "maximumDomainViolation": -0.11765163732160412,
+            "terminalError": [
+              0.044829777395891626,
+              0.007854460485686431,
+              -0.18990360565623554,
+              0.01770376099633428,
+              0.01558414984853493
+            ],
+            "maximumConstraintViolation": -0.03214553951431357,
+            "roadRowCount": 804
+          }
+        },
+        "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+        "lastDomainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.11147852143686673,
+          "minimumSpeed": 9.695302766282659,
+          "minimumChartDenominator": 1,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "cost": 8.072974891613555,
+        "maximumInputViolation": 0,
+        "domainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.11147852143686673,
+          "minimumSpeed": 9.695302766282659,
+          "minimumChartDenominator": 1,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "maximumReplayDifference": 0,
+        "attempts": {
+          "source": "nonlinearPassingFeedback",
+          "exitFlag": -1,
+          "iterations": 5,
+          "firstFeasibleIteration": 1,
+          "refinementIterations": 4,
+          "maximumViolation": -0.03753365827335227,
+          "seconds": 1.687274,
+          "message": "fmincon stopped by the output or plot function."
+        },
+        "roadCurvatureAllowance": 0,
+        "inputLowerBound": [
+          -0.6981317007977318,
+          -0.9999
+        ],
+        "inputUpperBound": [
+          0.6981317007977318,
+          0.9999
+        ],
+        "auditSampleTime": 0.025
+      },
+      "horizonHolds": 100,
+      "auditNodes": 201,
+      "decisionVariables": 50,
+      "functions": [
+        {
+          "name": "solveNonlinearAvoidancePlan",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 2.9813460000000003,
+          "selfSeconds": 0.0089750000000004
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSeeds",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 0.198328,
+          "selfSeconds": 0.004795999999999995
+        },
+        {
+          "name": "nonlinearAvoidanceSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.192153,
+          "selfSeconds": 0.001646999999999954
+        },
+        {
+          "name": "nonlinearAvoidanceSeed>localFeedbackSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 3,
+          "totalSeconds": 0.18409500000000004,
+          "selfSeconds": 0.008683000000000052
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localStep",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 1500,
+          "totalSeconds": 0.504795,
+          "selfSeconds": 0.054723999999999995
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 14704,
+          "totalSeconds": 0.060602,
+          "selfSeconds": 0.01575900000000001
+        },
+        {
+          "name": "laneGeometry>laneGeometry.curvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 16504,
+          "totalSeconds": 0.05113700000000001,
+          "selfSeconds": 0.05113700000000001
+        },
+        {
+          "name": "nonlinearAvoidanceRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 306,
+          "totalSeconds": 0.5200659999999999,
+          "selfSeconds": 0.011428999999999911
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDomain",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 25500,
+          "totalSeconds": 0.165717,
+          "selfSeconds": 0.074838
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDiagnostics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27306,
+          "totalSeconds": 0.097504,
+          "selfSeconds": 0.097504
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.nominalRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 31,
+          "totalSeconds": 0.140023,
+          "selfSeconds": 0.007361000000000006
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localAccumulate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27000,
+          "totalSeconds": 0.026354999999999996,
+          "selfSeconds": 0.026354999999999996
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.parameters",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 20504,
+          "totalSeconds": 0.065758,
+          "selfSeconds": 0.056812999999999995
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.fialaWorldDynamics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20400,
+          "totalSeconds": 0.248638,
+          "selfSeconds": 0.019588000000000022
+        },
+        {
+          "name": "ltvBicycleModel>localNominalFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20400,
+          "totalSeconds": 0.164126,
+          "selfSeconds": 0.12538
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.roadLoad",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20473,
+          "totalSeconds": 0.039028999999999994,
+          "selfSeconds": 0.039028999999999994
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>consider",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 8,
+          "totalSeconds": 0.36679799999999996,
+          "selfSeconds": 0.0066849999999998855
+        },
+        {
+          "name": "optimoptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/optimoptions.m",
+          "calls": 1,
+          "totalSeconds": 0.020043000000000002,
+          "selfSeconds": 0.00044500000000000095
+        },
+        {
+          "name": "bicycleNominalKernelMex",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/bicycleNominalKernelMex.mexa64",
+          "calls": 31,
+          "totalSeconds": 0.132366,
+          "selfSeconds": 0.132366
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>roll",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 86,
+          "totalSeconds": 0.164522,
+          "selfSeconds": 0.024498999999999993
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>constraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 44,
+          "totalSeconds": 1.8073610000000002,
+          "selfSeconds": 0.11991599999999991
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>objective",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 42,
+          "totalSeconds": 0.23775000000000002,
+          "selfSeconds": 0.05107300000000001
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localStateConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 6231,
+          "totalSeconds": 1.6635860000000002,
+          "selfSeconds": 0.24094000000000038
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSlip",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 9300,
+          "totalSeconds": 0.035899,
+          "selfSeconds": 0.035899
+        },
+        {
+          "name": "laneGeometry>laneGeometry.fromFrenet",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 6231,
+          "totalSeconds": 0.056846999999999995,
+          "selfSeconds": 0.031304
+        },
+        {
+          "name": "discretize",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/datafun/discretize.m",
+          "calls": 6231,
+          "totalSeconds": 0.025543,
+          "selfSeconds": 0.025543
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localRectangleGap",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 6231,
+          "totalSeconds": 0.067479,
+          "selfSeconds": 0.067479
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localBoundaryConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 87234,
+          "totalSeconds": 1.242292,
+          "selfSeconds": 0.551317
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localClipPolygon",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 174468,
+          "totalSeconds": 0.406597,
+          "selfSeconds": 0.406597
+        },
+        {
+          "name": "polyval",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/polyval.m",
+          "calls": 221809,
+          "totalSeconds": 0.284378,
+          "selfSeconds": 0.284378
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>stopAtDeadline",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 7,
+          "totalSeconds": 0.306612,
+          "selfSeconds": 0.0008909999999999751
+        },
+        {
+          "name": "sqpInterface",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/sqpInterface.p",
+          "calls": 1,
+          "totalSeconds": 2.514822,
+          "selfSeconds": 0.26869699999999996
+        },
+        {
+          "name": "fmincon",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/fmincon.m",
+          "calls": 1,
+          "totalSeconds": 2.582247,
+          "selfSeconds": 0.013823000000000363
+        },
+        {
+          "name": "profileNonlinearControllerRuntime",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/profileNonlinearControllerRuntime.m",
+          "calls": 1,
+          "totalSeconds": 3.002001,
+          "selfSeconds": 0.020654999999999646
+        }
+      ]
+    },
+    {
+      "name": "circular-continuation",
+      "time": 0.05,
+      "sourceFile": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/nonlinear/circular/circular_oncoming.mat",
+      "sourceFrame": 2,
+      "hasPrevious": true,
+      "initialInputDifference": 0,
+      "publicSeconds": 2.317181,
+      "cleanSolverSeconds": [
+        2.31931,
+        2.335745,
+        2.322737
+      ],
+      "profiledPlanDifference": 0,
+      "profileBudgetSeconds": 300,
+      "diagnostics": {
+        "reason": "acceptedIteration",
+        "nominalOnly": true,
+        "robustCertified": false,
+        "wholeHoldCertified": false,
+        "terminalInvariantCertified": false,
+        "recursiveFeasibilityGuaranteed": false,
+        "optimizerCalls": 1,
+        "runtimeSeconds": 2.322252,
+        "minimumSeparationMargin": null,
+        "minimumRoadMargin": 1,
+        "maximumDomainViolation": -0.15665288421619,
+        "maximumConstraintViolation": -0.03987062396580103,
+        "terminalError": [
+          0.0004650037898594903,
+          0.00012937603419896707,
+          -0.0005253014557684565,
+          -0.0002467672336403104,
+          -0.000249895556447402
+        ],
+        "terminalTolerance": [
+          0.25,
+          0.04,
+          0.35,
+          0.25,
+          0.08
+        ],
+        "endpointReserve": 0.0001,
+        "roadRowCount": 804,
+        "seedCount": 2,
+        "feasibleRefinementIterations": 4,
+        "bestInfeasible": {
+          "source": "verifiedSeed",
+          "maximumViolation": 0,
+          "worstFamily": "actuatorOrSlew",
+          "summary": {
+            "minimumSeparationMargin": null,
+            "minimumRoadMargin": 1,
+            "maximumDomainViolation": -0.1673487579491771,
+            "terminalError": [
+              -0.013897773785164512,
+              -0.00021755771384433624,
+              0.0003050610297066214,
+              1.2138764178964978e-06,
+              3.2442556206629947e-06
+            ],
+            "maximumConstraintViolation": -0.03978244228615566,
+            "roadRowCount": 804
+          }
+        },
+        "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+        "lastDomainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.017880040983242956,
+          "minimumSpeed": 9.881596285688616,
+          "minimumChartDenominator": 0.9993187874095484,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "cost": 0.04763614135049387,
+        "maximumInputViolation": 0,
+        "domainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.017880040983242956,
+          "minimumSpeed": 9.881596285688616,
+          "minimumChartDenominator": 0.9993187874095484,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "maximumReplayDifference": 0,
+        "attempts": {
+          "source": "shiftedPlan",
+          "exitFlag": -1,
+          "iterations": 4,
+          "firstFeasibleIteration": 0,
+          "refinementIterations": 4,
+          "maximumViolation": -0.03987062396580103,
+          "seconds": 2.176203,
+          "message": "fmincon stopped by the output or plot function."
+        },
+        "roadCurvatureAllowance": 0.042493373989456976,
+        "inputLowerBound": [
+          -0.6981317007977318,
+          -0.9999
+        ],
+        "inputUpperBound": [
+          0.6981317007977318,
+          0.9999
+        ],
+        "auditSampleTime": 0.025
+      },
+      "horizonHolds": 100,
+      "auditNodes": 201,
+      "decisionVariables": 50,
+      "functions": [
+        {
+          "name": "solveNonlinearAvoidancePlan",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 3.897658990867105,
+          "selfSeconds": 0.008972002280871916
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSeeds",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 0.1366470347385577,
+          "selfSeconds": 0.0028780007316484835
+        },
+        {
+          "name": "nonlinearAvoidanceSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.13245403367260838,
+          "selfSeconds": 0.0026870006830922166
+        },
+        {
+          "name": "nonlinearAvoidanceSeed>localFeedbackSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.07563701922852524,
+          "selfSeconds": 0.005590001421096238
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 22764,
+          "totalSeconds": 0.05113101299858171,
+          "selfSeconds": 0.03140500798381527
+        },
+        {
+          "name": "laneGeometry>laneGeometry.referenceCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 24464,
+          "totalSeconds": 0.021599005490922654,
+          "selfSeconds": 0.021599005490922654
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localStep",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 1600,
+          "totalSeconds": 0.5188041318909503,
+          "selfSeconds": 0.055936014220114294
+        },
+        {
+          "name": "nonlinearAvoidanceRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 108,
+          "totalSeconds": 0.5318171351991302,
+          "selfSeconds": 0.01014800257983628
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDomain",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 26000,
+          "totalSeconds": 0.17047204333758817,
+          "selfSeconds": 0.07683301953257377
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDiagnostics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27708,
+          "totalSeconds": 0.09987402539008329,
+          "selfSeconds": 0.09987402539008329
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.nominalRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 51,
+          "totalSeconds": 0.22275305662852418,
+          "selfSeconds": 0.009782002486791314
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localAccumulate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27600,
+          "totalSeconds": 0.027209006917103318,
+          "selfSeconds": 0.027209006917103318
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.parameters",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 22772,
+          "totalSeconds": 0.07439201891201991,
+          "selfSeconds": 0.0644300163794688
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.fialaWorldDynamics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20800,
+          "totalSeconds": 0.25536406491893016,
+          "selfSeconds": 0.020108005111878935
+        },
+        {
+          "name": "ltvBicycleModel>localOperatingPointMatrices",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 791,
+          "totalSeconds": 0.04370501111073543,
+          "selfSeconds": 0.01661100422286755
+        },
+        {
+          "name": "ltvBicycleModel>localNominalFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20800,
+          "totalSeconds": 0.16836004280067307,
+          "selfSeconds": 0.12840403264301276
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.roadLoad",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 21704,
+          "totalSeconds": 0.04268401085117563,
+          "selfSeconds": 0.04268401085117563
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>consider",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 7,
+          "totalSeconds": 0.44190811234236066,
+          "selfSeconds": 0.007715001961316137
+        },
+        {
+          "name": "createSolverOptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/optimfun/optimfun/+optim/+options/createSolverOptions.m",
+          "calls": 1,
+          "totalSeconds": 0.0202630051512832,
+          "selfSeconds": 0.0006750001715992784
+        },
+        {
+          "name": "optimoptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/optimoptions.m",
+          "calls": 1,
+          "totalSeconds": 0.020717005266699597,
+          "selfSeconds": 0.0004540001154163982
+        },
+        {
+          "name": "bicycleNominalKernelMex",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/solver/bicycle/bicycleNominalKernelMex.mexa64",
+          "calls": 51,
+          "totalSeconds": 0.21251305402529957,
+          "selfSeconds": 0.21251305402529957
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>roll",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 124,
+          "totalSeconds": 0.26224806666898853,
+          "selfSeconds": 0.03949501004046435
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>constraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 62,
+          "totalSeconds": 2.704418687520258,
+          "selfSeconds": 0.1756740446600462
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>objective",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 62,
+          "totalSeconds": 0.378677096267703,
+          "selfSeconds": 0.07032401787784831
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localStateConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 10251,
+          "totalSeconds": 2.4564436244797685,
+          "selfSeconds": 0.31828808091554217
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>terminal",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 113,
+          "totalSeconds": 0.07652701945478206,
+          "selfSeconds": 0.0033450008503697476
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSlip",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 15300,
+          "totalSeconds": 0.05429601380319165,
+          "selfSeconds": 0.05429601380319165
+        },
+        {
+          "name": "laneGeometry>laneGeometry.fromFrenet",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 10251,
+          "totalSeconds": 0.04114701046043772,
+          "selfSeconds": 0.024706006280787767
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localBoundaryConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 143514,
+          "totalSeconds": 2.0337395170194705,
+          "selfSeconds": 0.9002802288702183
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localClipPolygon",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 287028,
+          "totalSeconds": 0.6633401686350587,
+          "selfSeconds": 0.6633401686350587
+        },
+        {
+          "name": "polyval",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/polyval.m",
+          "calls": 362488,
+          "totalSeconds": 0.4701191195141935,
+          "selfSeconds": 0.4701191195141935
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.cruiseEquilibrium",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 113,
+          "totalSeconds": 0.07290301853348462,
+          "selfSeconds": 0.008577002180454818
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.affineModel",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 791,
+          "totalSeconds": 0.022479005714637266,
+          "selfSeconds": 0.011560002938796513
+        },
+        {
+          "name": "ltvBicycleModel>localCruiseResidual",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 791,
+          "totalSeconds": 0.04901001245937864,
+          "selfSeconds": 0.005305001348643208
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>stopAtDeadline",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 6,
+          "totalSeconds": 0.31286807953766327,
+          "selfSeconds": 0.000998000253712772
+        },
+        {
+          "name": "sqpInterface",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/sqpInterface.p",
+          "calls": 1,
+          "totalSeconds": 3.4248978706812596,
+          "selfSeconds": 0.1538780391190424
+        },
+        {
+          "name": "fmincon",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/fmincon.m",
+          "calls": 1,
+          "totalSeconds": 3.490997887485278,
+          "selfSeconds": 0.014397003660022278
+        },
+        {
+          "name": "profileNonlinearControllerRuntime",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/profileNonlinearControllerRuntime.m",
+          "calls": 1,
+          "totalSeconds": 3.9184749961589733,
+          "selfSeconds": 0.020816005291868223
+        }
+      ]
+    },
+    {
+      "name": "sCurve-continuation",
+      "time": 0.05,
+      "sourceFile": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/nonlinear/scurve/varying_curvature_oncoming.mat",
+      "sourceFrame": 2,
+      "hasPrevious": true,
+      "initialInputDifference": 0,
+      "publicSeconds": 6.108284,
+      "cleanSolverSeconds": [
+        6.098466,
+        6.065977,
+        6.12895
+      ],
+      "profiledPlanDifference": 0,
+      "profileBudgetSeconds": 300,
+      "diagnostics": {
+        "reason": "acceptedIteration",
+        "nominalOnly": true,
+        "robustCertified": false,
+        "wholeHoldCertified": false,
+        "terminalInvariantCertified": false,
+        "recursiveFeasibilityGuaranteed": false,
+        "optimizerCalls": 1,
+        "runtimeSeconds": 6.128424,
+        "minimumSeparationMargin": null,
+        "minimumRoadMargin": 1,
+        "maximumDomainViolation": -0.14772734757704817,
+        "maximumConstraintViolation": -0.039655879255836926,
+        "terminalError": [
+          0.0013318326047064637,
+          0.00034412074416307475,
+          -0.002356242000457698,
+          0.0026366119301573093,
+          0.0023748140539516654
+        ],
+        "terminalTolerance": [
+          0.25,
+          0.04,
+          0.35,
+          0.25,
+          0.08
+        ],
+        "endpointReserve": 0.0001,
+        "roadRowCount": 804,
+        "seedCount": 2,
+        "feasibleRefinementIterations": 4,
+        "bestInfeasible": {
+          "source": "verifiedSeed",
+          "maximumViolation": 0,
+          "worstFamily": "actuatorOrSlew",
+          "summary": {
+            "minimumSeparationMargin": null,
+            "minimumRoadMargin": 1,
+            "maximumDomainViolation": -0.14818601121130695,
+            "terminalError": [
+              0.010596531795947512,
+              -0.004908501192474313,
+              -0.010947725397130625,
+              -0.004282255429285758,
+              -0.003875774233532983
+            ],
+            "maximumConstraintViolation": -0.035091498807525684,
+            "roadRowCount": 804
+          }
+        },
+        "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+        "lastDomainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.026805577622384773,
+          "minimumSpeed": 9.845574728854608,
+          "minimumChartDenominator": 0.9998947122247178,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "cost": 0.34820453416814573,
+        "maximumInputViolation": 0,
+        "domainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.026805577622384773,
+          "minimumSpeed": 9.845574728854608,
+          "minimumChartDenominator": 0.9998947122247178,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "maximumReplayDifference": 0,
+        "attempts": {
+          "source": "shiftedPlan",
+          "exitFlag": -1,
+          "iterations": 4,
+          "firstFeasibleIteration": 0,
+          "refinementIterations": 4,
+          "maximumViolation": -0.039655879255836926,
+          "seconds": 5.753612,
+          "message": "fmincon stopped by the output or plot function."
+        },
+        "roadCurvatureAllowance": 0.04249337398974296,
+        "inputLowerBound": [
+          -0.6981317007977318,
+          -0.9999
+        ],
+        "inputUpperBound": [
+          0.6981317007977318,
+          0.9999
+        ],
+        "auditSampleTime": 0.025
+      },
+      "horizonHolds": 100,
+      "auditNodes": 201,
+      "decisionVariables": 50,
+      "functions": [
+        {
+          "name": "solveNonlinearAvoidancePlan",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 9.249055,
+          "selfSeconds": 0.009387999999999508
+        },
+        {
+          "name": "laneGeometry>laneGeometry.referenceCurvatureBounds",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.027076,
+          "selfSeconds": 0.0009150000000000026
+        },
+        {
+          "name": "laneGeometry>laneGeometry.referenceCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 144835,
+          "totalSeconds": 3.7272549999999995,
+          "selfSeconds": 0.5469550000000001
+        },
+        {
+          "name": "laneGeometry>localProfilePose",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 8241,
+          "totalSeconds": 0.415756,
+          "selfSeconds": 0.024877000000000038
+        },
+        {
+          "name": "laneGeometry>localProfileData",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 153077,
+          "totalSeconds": 0.43078399999999994,
+          "selfSeconds": 0.43078399999999994
+        },
+        {
+          "name": "laneGeometry>localPolynomialBound",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 2,
+          "totalSeconds": 0.021938,
+          "selfSeconds": 0.011350999999999998
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localBoundaryConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 115374,
+          "totalSeconds": 1.6411259999999999,
+          "selfSeconds": 0.731935
+        },
+        {
+          "name": "polyval",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/polyval.m",
+          "calls": 284080,
+          "totalSeconds": 0.37890399999999996,
+          "selfSeconds": 0.37890399999999996
+        },
+        {
+          "name": "ppval",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/ppval.m",
+          "calls": 306152,
+          "totalSeconds": 3.141025,
+          "selfSeconds": 2.93279
+        },
+        {
+          "name": "unmkpp",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/unmkpp.m",
+          "calls": 306152,
+          "totalSeconds": 0.20823499999999998,
+          "selfSeconds": 0.20823499999999998
+        },
+        {
+          "name": "laneGeometry>laneGeometry.curvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 27700,
+          "totalSeconds": 0.633389,
+          "selfSeconds": 0.04403800000000002
+        },
+        {
+          "name": "ltvBicycleModel>localProfileFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 98400,
+          "totalSeconds": 4.148912,
+          "selfSeconds": 0.17422100000000018
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 18734,
+          "totalSeconds": 0.46855800000000003,
+          "selfSeconds": 0.029231000000000062
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSeeds",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 0.29292399999999996,
+          "selfSeconds": 0.0035209999999999964
+        },
+        {
+          "name": "nonlinearAvoidanceSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.28788199999999997,
+          "selfSeconds": 0.0029639999999999667
+        },
+        {
+          "name": "nonlinearAvoidanceSeed>localFeedbackSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.161163,
+          "selfSeconds": 0.006335000000000007
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localStep",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 1600,
+          "totalSeconds": 1.229682,
+          "selfSeconds": 0.07578400000000007
+        },
+        {
+          "name": "nonlinearAvoidanceRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 108,
+          "totalSeconds": 1.245828,
+          "selfSeconds": 0.012963999999999976
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.evaluate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 2160,
+          "totalSeconds": 0.031465,
+          "selfSeconds": 0.019996
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDomain",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 26000,
+          "totalSeconds": 0.193159,
+          "selfSeconds": 0.086547
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDiagnostics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27708,
+          "totalSeconds": 0.113155,
+          "selfSeconds": 0.113155
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.nominalRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 41,
+          "totalSeconds": 4.268208,
+          "selfSeconds": 0.002810999999999453
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localAccumulate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 27600,
+          "totalSeconds": 0.031885000000000004,
+          "selfSeconds": 0.031885000000000004
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.parameters",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 25440,
+          "totalSeconds": 0.090809,
+          "selfSeconds": 0.07760500000000001
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.fialaWorldDynamics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 20800,
+          "totalSeconds": 0.28841999999999995,
+          "selfSeconds": 0.02218399999999998
+        },
+        {
+          "name": "ltvBicycleModel>localOperatingPointMatrices",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 1881,
+          "totalSeconds": 0.08877299999999999,
+          "selfSeconds": 0.03108599999999999
+        },
+        {
+          "name": "ltvBicycleModel>localNominalFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 119200,
+          "totalSeconds": 1.4714549999999997,
+          "selfSeconds": 1.1380209999999997
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.roadLoad",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 121360,
+          "totalSeconds": 0.339433,
+          "selfSeconds": 0.339433
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>consider",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 7,
+          "totalSeconds": 1.040486,
+          "selfSeconds": 0.008134000000000086
+        },
+        {
+          "name": "createSolverOptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/optimfun/optimfun/+optim/+options/createSolverOptions.m",
+          "calls": 1,
+          "totalSeconds": 0.020565,
+          "selfSeconds": 0.0007210000000000029
+        },
+        {
+          "name": "optimoptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/optimoptions.m",
+          "calls": 1,
+          "totalSeconds": 0.021046,
+          "selfSeconds": 0.0004809999999999988
+        },
+        {
+          "name": "ltvBicycleModel>localProfileRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 41,
+          "totalSeconds": 4.264735,
+          "selfSeconds": 0.11582299999999979
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>roll",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 104,
+          "totalSeconds": 4.303208,
+          "selfSeconds": 0.03500000000000014
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>constraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 52,
+          "totalSeconds": 3.0460819999999997,
+          "selfSeconds": 0.17148800000000053
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>objective",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 52,
+          "totalSeconds": 4.537807,
+          "selfSeconds": 0.06909100000000024
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localStateConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 8241,
+          "totalSeconds": 2.6550549999999995,
+          "selfSeconds": 0.28981699999999977
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>terminal",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 93,
+          "totalSeconds": 0.14150300000000002,
+          "selfSeconds": 0.005912000000000028
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSlip",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 12300,
+          "totalSeconds": 0.049783,
+          "selfSeconds": 0.049783
+        },
+        {
+          "name": "laneGeometry>laneGeometry.referencePose",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 8241,
+          "totalSeconds": 0.42735699999999993,
+          "selfSeconds": 0.011600999999999917
+        },
+        {
+          "name": "laneGeometry>laneGeometry.fromFrenet",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 8241,
+          "totalSeconds": 0.451751,
+          "selfSeconds": 0.024394000000000082
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localClipPolygon",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 230748,
+          "totalSeconds": 0.5408739999999999,
+          "selfSeconds": 0.5408739999999999
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.cruiseEquilibrium",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 279,
+          "totalSeconds": 0.133155,
+          "selfSeconds": 0.012156
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.affineModel",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 1881,
+          "totalSeconds": 0.046738,
+          "selfSeconds": 0.022305000000000002
+        },
+        {
+          "name": "ltvBicycleModel>localCruiseResidual",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 1881,
+          "totalSeconds": 0.09941599999999999,
+          "selfSeconds": 0.010643
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>stopAtDeadline",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 6,
+          "totalSeconds": 0.7383469999999999,
+          "selfSeconds": 0.0009999999999998899
+        },
+        {
+          "name": "sqpInterface",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/sqpInterface.p",
+          "calls": 1,
+          "totalSeconds": 8.275705,
+          "selfSeconds": 0.25862800000000163
+        },
+        {
+          "name": "fmincon",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/fmincon.m",
+          "calls": 1,
+          "totalSeconds": 8.344601,
+          "selfSeconds": 0.013956000000002078
+        },
+        {
+          "name": "profileNonlinearControllerRuntime",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/profileNonlinearControllerRuntime.m",
+          "calls": 1,
+          "totalSeconds": 9.270131,
+          "selfSeconds": 0.021075999999998984
+        }
+      ]
+    },
+    {
+      "name": "sCurve-fresh-visible",
+      "time": 1.05,
+      "sourceFile": "/home/zai/.cache/collisionAvoidance/controller-simulation-20260926-185456/nonlinear/scurve/varying_curvature_oncoming.mat",
+      "sourceFrame": 22,
+      "hasPrevious": false,
+      "initialInputDifference": null,
+      "publicSeconds": 4.413794,
+      "cleanSolverSeconds": [
+        4.397926,
+        4.402707,
+        4.390344
+      ],
+      "profiledPlanDifference": 0,
+      "profileBudgetSeconds": 300,
+      "diagnostics": {
+        "reason": "acceptedIteration",
+        "nominalOnly": true,
+        "robustCertified": false,
+        "wholeHoldCertified": false,
+        "terminalInvariantCertified": false,
+        "recursiveFeasibilityGuaranteed": false,
+        "optimizerCalls": 1,
+        "runtimeSeconds": 4.389848,
+        "minimumSeparationMargin": 0.38284021823063313,
+        "minimumRoadMargin": 1,
+        "maximumDomainViolation": -0.07560775641823153,
+        "maximumConstraintViolation": -0.03910461012107315,
+        "terminalError": [
+          -0.010490567587049953,
+          -0.0008953898789268513,
+          0.0027149756797424374,
+          -0.0035765844347361853,
+          -0.003739156594140647
+        ],
+        "terminalTolerance": [
+          0.25,
+          0.04,
+          0.35,
+          0.25,
+          0.08
+        ],
+        "endpointReserve": 0.0001,
+        "roadRowCount": 804,
+        "seedCount": 3,
+        "feasibleRefinementIterations": 4,
+        "bestInfeasible": {
+          "source": "verifiedSeed",
+          "maximumViolation": 0,
+          "worstFamily": "actuatorOrSlew",
+          "summary": {
+            "minimumSeparationMargin": 0.6865125290931434,
+            "minimumRoadMargin": 1,
+            "maximumDomainViolation": -0.032071845941780835,
+            "terminalError": [
+              -0.1539437981872149,
+              0.0033630042219160543,
+              -0.0004910904025052787,
+              -0.01017871646180725,
+              -0.009214990805078552
+            ],
+            "maximumConstraintViolation": -0.032071845941780835,
+            "roadRowCount": 804
+          }
+        },
+        "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+        "lastDomainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.09892516878120142,
+          "minimumSpeed": 9.948046991210704,
+          "minimumChartDenominator": 0.9978445486130715,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "cost": 2.3947275792414926,
+        "maximumInputViolation": 0,
+        "domainAudit": {
+          "reason": "valid",
+          "maximumAbsoluteSlip": 0.09892516878120142,
+          "minimumSpeed": 9.948046991210704,
+          "minimumChartDenominator": 0.9978445486130715,
+          "failedStage": 0,
+          "homotopyFraction": null
+        },
+        "maximumReplayDifference": 0,
+        "attempts": {
+          "source": "nonlinearPassingFeedback",
+          "exitFlag": -1,
+          "iterations": 4,
+          "firstFeasibleIteration": 0,
+          "refinementIterations": 4,
+          "maximumViolation": -0.03910461012107315,
+          "seconds": 3.839466,
+          "message": "fmincon stopped by the output or plot function."
+        },
+        "roadCurvatureAllowance": 0.04249337398974296,
+        "inputLowerBound": [
+          -0.6981317007977318,
+          -0.9999
+        ],
+        "inputUpperBound": [
+          0.6981317007977318,
+          0.9999
+        ],
+        "auditSampleTime": 0.025
+      },
+      "horizonHolds": 100,
+      "auditNodes": 201,
+      "decisionVariables": 50,
+      "functions": [
+        {
+          "name": "solveNonlinearAvoidancePlan",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 6.72697,
+          "selfSeconds": 0.009596999999999412
+        },
+        {
+          "name": "laneGeometry>laneGeometry.referenceCurvatureBounds",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 1,
+          "totalSeconds": 0.022426999999999996,
+          "selfSeconds": 0.0008429999999999965
+        },
+        {
+          "name": "laneGeometry>laneGeometry.referenceCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 107710,
+          "totalSeconds": 2.647791,
+          "selfSeconds": 0.3890340000000001
+        },
+        {
+          "name": "laneGeometry>localProfileProjection",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 2,
+          "totalSeconds": 0.15875,
+          "selfSeconds": 0.006968000000000002
+        },
+        {
+          "name": "laneGeometry>localProfilePose",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 7208,
+          "totalSeconds": 0.364704,
+          "selfSeconds": 0.024990000000000012
+        },
+        {
+          "name": "laneGeometry>localProfileData",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 115123,
+          "totalSeconds": 0.31607699999999994,
+          "selfSeconds": 0.31607699999999994
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localBoundaryConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 73164,
+          "totalSeconds": 1.0412489999999999,
+          "selfSeconds": 0.46148199999999995
+        },
+        {
+          "name": "polyval",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/polyval.m",
+          "calls": 186262,
+          "totalSeconds": 0.24533,
+          "selfSeconds": 0.24533
+        },
+        {
+          "name": "ppval",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/ppval.m",
+          "calls": 229836,
+          "totalSeconds": 2.280566,
+          "selfSeconds": 2.126106
+        },
+        {
+          "name": "unmkpp",
+          "file": "/opt/MATLAB/R2026a/toolbox/matlab/polyfun/unmkpp.m",
+          "calls": 229836,
+          "totalSeconds": 0.15446,
+          "selfSeconds": 0.15446
+        },
+        {
+          "name": "laneGeometry>laneGeometry.curvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 30500,
+          "totalSeconds": 0.6879669999999999,
+          "selfSeconds": 0.047255999999999854
+        },
+        {
+          "name": "ltvBicycleModel>localProfileFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 62400,
+          "totalSeconds": 2.5742629999999997,
+          "selfSeconds": 0.10510499999999956
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localCurvature",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 12689,
+          "totalSeconds": 0.313109,
+          "selfSeconds": 0.019546000000000063
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSeeds",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 1,
+          "totalSeconds": 0.563859,
+          "selfSeconds": 0.005037000000000069
+        },
+        {
+          "name": "nonlinearAvoidanceSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.48758599999999996,
+          "selfSeconds": 0.0016870000000000496
+        },
+        {
+          "name": "nonlinearAvoidanceSeed>localReference",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 1,
+          "totalSeconds": 0.09487999999999999,
+          "selfSeconds": 0.002018999999999993
+        },
+        {
+          "name": "laneGeometry>laneGeometry.referencePose",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 7208,
+          "totalSeconds": 0.375324,
+          "selfSeconds": 0.010620000000000018
+        },
+        {
+          "name": "laneGeometry>laneGeometry.fromFrenet",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 5226,
+          "totalSeconds": 0.28465199999999996,
+          "selfSeconds": 0.016222999999999987
+        },
+        {
+          "name": "laneGeometry>laneGeometry.projectReferenceCurve",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 2,
+          "totalSeconds": 0.15923,
+          "selfSeconds": 0.0004800000000000082
+        },
+        {
+          "name": "laneGeometry>laneGeometry.project",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/laneGeometry.m",
+          "calls": 2,
+          "totalSeconds": 0.15980899999999998,
+          "selfSeconds": 0.0005789999999999684
+        },
+        {
+          "name": "nonlinearAvoidanceSeed>localFeedbackSeed",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceSeed.m",
+          "calls": 3,
+          "totalSeconds": 0.39059199999999994,
+          "selfSeconds": 0.009221999999999952
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localStep",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 1700,
+          "totalSeconds": 1.332394,
+          "selfSeconds": 0.08124300000000018
+        },
+        {
+          "name": "nonlinearAvoidanceRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 307,
+          "totalSeconds": 1.351016,
+          "selfSeconds": 0.014253999999999767
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.evaluate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 1512,
+          "totalSeconds": 0.023045,
+          "selfSeconds": 0.014828
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDomain",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 28500,
+          "totalSeconds": 0.214005,
+          "selfSeconds": 0.09568600000000002
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localDiagnostics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 30507,
+          "totalSeconds": 0.12611,
+          "selfSeconds": 0.12611
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.nominalRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 26,
+          "totalSeconds": 2.6492609999999996,
+          "selfSeconds": 0.0020969999999995714
+        },
+        {
+          "name": "nonlinearAvoidanceRollout>localAccumulate",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearAvoidanceRollout.m",
+          "calls": 30200,
+          "totalSeconds": 0.034000999999999997,
+          "selfSeconds": 0.034000999999999997
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.parameters",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 26039,
+          "totalSeconds": 0.09085299999999999,
+          "selfSeconds": 0.078259
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.fialaWorldDynamics",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 22800,
+          "totalSeconds": 0.310161,
+          "selfSeconds": 0.024356000000000044
+        },
+        {
+          "name": "ltvBicycleModel>localOperatingPointMatrices",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 1323,
+          "totalSeconds": 0.06465399999999999,
+          "selfSeconds": 0.023255999999999992
+        },
+        {
+          "name": "ltvBicycleModel>localNominalFlow",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 85200,
+          "totalSeconds": 1.00898,
+          "selfSeconds": 0.781291
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.roadLoad",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 86712,
+          "totalSeconds": 0.23196699999999998,
+          "selfSeconds": 0.23196699999999998
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>consider",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 7,
+          "totalSeconds": 1.0456189999999999,
+          "selfSeconds": 0.008267999999999942
+        },
+        {
+          "name": "optimoptions",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/optimoptions.m",
+          "calls": 1,
+          "totalSeconds": 0.020005999999999996,
+          "selfSeconds": 0.0004459999999999985
+        },
+        {
+          "name": "ltvBicycleModel>localProfileRollout",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 26,
+          "totalSeconds": 2.646775,
+          "selfSeconds": 0.07251200000000013
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>roll",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 74,
+          "totalSeconds": 2.670048,
+          "selfSeconds": 0.020787000000000333
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>constraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 37,
+          "totalSeconds": 2.069134,
+          "selfSeconds": 0.10748000000000046
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>objective",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 37,
+          "totalSeconds": 2.8068069999999996,
+          "selfSeconds": 0.04965799999999998
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localStateConstraints",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 5226,
+          "totalSeconds": 1.7745799999999996,
+          "selfSeconds": 0.21039099999999977
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>terminal",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 63,
+          "totalSeconds": 0.10657499999999999,
+          "selfSeconds": 0.005303999999999989
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localSlip",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 7800,
+          "totalSeconds": 0.032635,
+          "selfSeconds": 0.032635
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localRectangleGap",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 5226,
+          "totalSeconds": 0.06182999999999999,
+          "selfSeconds": 0.06182999999999999
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>localClipPolygon",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 146328,
+          "totalSeconds": 0.34276199999999996,
+          "selfSeconds": 0.34276199999999996
+        },
+        {
+          "name": "ltvBicycleModel>ltvBicycleModel.cruiseEquilibrium",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 189,
+          "totalSeconds": 0.09958499999999999,
+          "selfSeconds": 0.009740999999999986
+        },
+        {
+          "name": "modifiedFialaTire>modifiedFialaTire.affineModel",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+          "calls": 1323,
+          "totalSeconds": 0.033712,
+          "selfSeconds": 0.016364
+        },
+        {
+          "name": "ltvBicycleModel>localCruiseResidual",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/ltvBicycleModel.m",
+          "calls": 1323,
+          "totalSeconds": 0.072466,
+          "selfSeconds": 0.007812000000000013
+        },
+        {
+          "name": "solveNonlinearAvoidancePlan>stopAtDeadline",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solveNonlinearAvoidancePlan.m",
+          "calls": 6,
+          "totalSeconds": 0.743559,
+          "selfSeconds": 0.0010050000000000336
+        },
+        {
+          "name": "sqpInterface",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/sqpInterface.p",
+          "calls": 1,
+          "totalSeconds": 5.478819,
+          "selfSeconds": 0.1614089999999999
+        },
+        {
+          "name": "fmincon",
+          "file": "/opt/MATLAB/R2026a/toolbox/shared/optimlib/fmincon.m",
+          "calls": 1,
+          "totalSeconds": 5.547625,
+          "selfSeconds": 0.013985000000000802
+        },
+        {
+          "name": "profileNonlinearControllerRuntime",
+          "file": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/profileNonlinearControllerRuntime.m",
+          "calls": 1,
+          "totalSeconds": 6.748379,
+          "selfSeconds": 0.021409000000000233
+        }
+      ]
+    }
+  ]
+}

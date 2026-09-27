@@ -1,0 +1,76 @@
+[
+  {
+    "name": "straight_oncoming",
+    "frames": 360,
+    "iterations": {
+      "4": 353,
+      "5": 2,
+      "7": 2,
+      "8": 1,
+      "12": 1,
+      "17": 1
+    },
+    "optimizerCalls": {
+      "1": 359,
+      "2": 1
+    },
+    "firstSeedFirstFeasibleIteration": {
+      "0": 353,
+      "1": 2,
+      "3": 2,
+      "4": 1,
+      "12": 1,
+      "notReached": 1
+    },
+    "controllerMedianSeconds": 2.4060870000000003,
+    "optimizerRegionMedianSeconds": 2.2360499999999996,
+    "medianRoadFitSeconds": 0.0018695,
+    "medianObserverSeconds": 0.0
+  },
+  {
+    "name": "circular_oncoming",
+    "frames": 360,
+    "iterations": {
+      "4": 358,
+      "5": 1,
+      "17": 1
+    },
+    "optimizerCalls": {
+      "1": 359,
+      "2": 1
+    },
+    "firstSeedFirstFeasibleIteration": {
+      "0": 358,
+      "1": 1,
+      "notReached": 1
+    },
+    "controllerMedianSeconds": 2.377106,
+    "optimizerRegionMedianSeconds": 2.2114935,
+    "medianRoadFitSeconds": 0.005043499999999999,
+    "medianObserverSeconds": 0.0
+  },
+  {
+    "name": "varying_curvature_oncoming",
+    "frames": 360,
+    "iterations": {
+      "4": 356,
+      "5": 1,
+      "6": 2,
+      "12": 1
+    },
+    "optimizerCalls": {
+      "1": 359,
+      "2": 1
+    },
+    "firstSeedFirstFeasibleIteration": {
+      "0": 356,
+      "1": 1,
+      "2": 2,
+      "notReached": 1
+    },
+    "controllerMedianSeconds": 6.525433,
+    "optimizerRegionMedianSeconds": 6.0912445,
+    "medianRoadFitSeconds": 0.004928500000000001,
+    "medianObserverSeconds": 0.0
+  }
+]

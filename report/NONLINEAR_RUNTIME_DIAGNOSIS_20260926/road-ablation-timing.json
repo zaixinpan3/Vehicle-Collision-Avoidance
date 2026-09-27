@@ -1,0 +1,1071 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "computationalThreads": 1,
+  "fixtures": [
+    {
+      "name": "straight-continuation",
+      "roadOn": {
+        "roadEnabled": true,
+        "seconds": [
+          3.972584,
+          3.951473,
+          3.948369
+        ],
+        "medianSeconds": 3.951473,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 3.947746,
+          "minimumSeparationMargin": null,
+          "minimumRoadMargin": 1,
+          "maximumDomainViolation": -0.1745325192785648,
+          "maximumConstraintViolation": -0.0399980139748082,
+          "terminalError": [
+            1.813627323324412e-06,
+            1.986025191805119e-06,
+            -0.0005013054482727597,
+            3.2273179472421163e-06,
+            2.856054579022574e-06
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 804,
+          "seedCount": 2,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": null,
+              "minimumRoadMargin": 1,
+              "maximumDomainViolation": -0.1745329251734737,
+              "terminalError": [
+                2.1532556016344807e-09,
+                5.966129117219524e-11,
+                0.0006852450059771087,
+                1.177376047383449e-12,
+                1.0424857580107813e-12
+              ],
+              "maximumConstraintViolation": -0.03999999994033871,
+              "roadRowCount": 804
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 4.059208681356974e-07,
+            "minimumSpeed": 9.99949730628848,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 0.00010336226933678729,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 4.059208681356974e-07,
+            "minimumSpeed": 9.99949730628848,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "shiftedPlan",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.0399980139748082,
+            "seconds": 3.794566,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -1.2003258032545466e-07,
+          0.013679256323701544
+        ]
+      },
+      "roadOff": {
+        "roadEnabled": false,
+        "seconds": [
+          1.733286,
+          1.724295,
+          1.751236
+        ],
+        "medianSeconds": 1.733286,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 1.750799,
+          "minimumSeparationMargin": null,
+          "minimumRoadMargin": null,
+          "maximumDomainViolation": -0.1745325192785648,
+          "maximumConstraintViolation": -0.03999801397480819,
+          "terminalError": [
+            1.8136273233144324e-06,
+            1.986025191809226e-06,
+            -0.0005013054482727597,
+            3.2273179472421087e-06,
+            2.8560545790225787e-06
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 0,
+          "seedCount": 2,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": null,
+              "minimumRoadMargin": null,
+              "maximumDomainViolation": -0.1745329251734737,
+              "terminalError": [
+                2.1532556016344807e-09,
+                5.966129117219524e-11,
+                0.0006852450059771087,
+                1.177376047383449e-12,
+                1.0424857580107813e-12
+              ],
+              "maximumConstraintViolation": -0.03999999994033871,
+              "roadRowCount": 0
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 4.0592086812900396e-07,
+            "minimumSpeed": 9.99949730628848,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 0.00010336226933678743,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 4.0592086812900396e-07,
+            "minimumSpeed": 9.99949730628848,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "shiftedPlan",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.03999801397480819,
+            "seconds": 1.621343,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -1.2003257906749077e-07,
+          0.013679256323701544
+        ]
+      },
+      "speedup": 2.279758216474373,
+      "maximumPlanDifference": 1.91290543264034e-15
+    },
+    {
+      "name": "straight-fresh-visible",
+      "roadOn": {
+        "roadEnabled": true,
+        "seconds": [
+          1.873591,
+          1.906078,
+          1.875584
+        ],
+        "medianSeconds": 1.875584,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 1.874915,
+          "minimumSeparationMargin": 0.2959039389329715,
+          "minimumRoadMargin": 1,
+          "maximumDomainViolation": -0.06305440376256621,
+          "maximumConstraintViolation": -0.03753365827335227,
+          "terminalError": [
+            -0.05445304417373713,
+            -0.002466341726647735,
+            -0.0855090172325248,
+            -0.00277028419074683,
+            -0.0023420414852663787
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 804,
+          "seedCount": 3,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "acceptedIteration",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": 0.5049879458534042,
+              "minimumRoadMargin": 1,
+              "maximumDomainViolation": -0.11765163732160412,
+              "terminalError": [
+                0.044829777395891626,
+                0.007854460485686431,
+                -0.18990360565623554,
+                0.01770376099633428,
+                0.01558414984853493
+              ],
+              "maximumConstraintViolation": -0.03214553951431357,
+              "roadRowCount": 804
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.11147852143686673,
+            "minimumSpeed": 9.695302766282659,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 8.072974891613555,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.11147852143686673,
+            "minimumSpeed": 9.695302766282659,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "nonlinearPassingFeedback",
+            "exitFlag": -1,
+            "iterations": 5,
+            "firstFeasibleIteration": 1,
+            "refinementIterations": 4,
+            "maximumViolation": -0.03753365827335227,
+            "seconds": 1.718189,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -0.0787526020661829,
+          0.1840359987760807
+        ]
+      },
+      "roadOff": {
+        "roadEnabled": false,
+        "seconds": [
+          1.18964,
+          1.183691,
+          1.190151
+        ],
+        "medianSeconds": 1.18964,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 1.189676,
+          "minimumSeparationMargin": 0.32676125796475647,
+          "minimumRoadMargin": null,
+          "maximumDomainViolation": -0.07663075105025535,
+          "maximumConstraintViolation": -0.03910465152226779,
+          "terminalError": [
+            -0.08196868888695295,
+            0.0008953484777322121,
+            -0.07570281123471112,
+            -0.005506673020219334,
+            -0.004833538291137195
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 0,
+          "seedCount": 3,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "acceptedIteration",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": 0.5049879458534042,
+              "minimumRoadMargin": null,
+              "maximumDomainViolation": -0.11765163732160412,
+              "terminalError": [
+                0.044829777395891626,
+                0.007854460485686431,
+                -0.18990360565623554,
+                0.01770376099633428,
+                0.01558414984853493
+              ],
+              "maximumConstraintViolation": -0.03214553951431357,
+              "roadRowCount": 0
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.0979021741491776,
+            "minimumSpeed": 9.81453274235471,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 10.14499318197563,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.0979021741491776,
+            "minimumSpeed": 9.81453274235471,
+            "minimumChartDenominator": 1,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "nonlinearPassingFeedback",
+            "exitFlag": -1,
+            "iterations": 5,
+            "firstFeasibleIteration": 1,
+            "refinementIterations": 4,
+            "maximumViolation": -0.03910465152226779,
+            "seconds": 1.062415,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -0.09794234275201293,
+          -0.023034232733320725
+        ]
+      },
+      "speedup": 1.5765979624087958,
+      "maximumPlanDifference": 0.20707023150940143
+    },
+    {
+      "name": "circular-continuation",
+      "roadOn": {
+        "roadEnabled": true,
+        "seconds": [
+          2.359643,
+          2.360458,
+          2.362805
+        ],
+        "medianSeconds": 2.360458,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 2.362348,
+          "minimumSeparationMargin": null,
+          "minimumRoadMargin": 1,
+          "maximumDomainViolation": -0.15665288421619,
+          "maximumConstraintViolation": -0.03987062396580103,
+          "terminalError": [
+            0.0004650037898594903,
+            0.00012937603419896707,
+            -0.0005253014557684565,
+            -0.0002467672336403104,
+            -0.000249895556447402
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 804,
+          "seedCount": 2,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": null,
+              "minimumRoadMargin": 1,
+              "maximumDomainViolation": -0.1673487579491771,
+              "terminalError": [
+                -0.013897773785164512,
+                -0.00021755771384433624,
+                0.0003050610297066214,
+                1.2138764178964978e-06,
+                3.2442556206629947e-06
+              ],
+              "maximumConstraintViolation": -0.03978244228615566,
+              "roadRowCount": 804
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.017880040983242956,
+            "minimumSpeed": 9.881596285688616,
+            "minimumChartDenominator": 0.9993187874095484,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 0.04763614135049387,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.017880040983242956,
+            "minimumSpeed": 9.881596285688616,
+            "minimumChartDenominator": 0.9993187874095484,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "shiftedPlan",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.03987062396580103,
+            "seconds": 2.211807,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0.042493373989456976,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          0.04142503252993996,
+          0.02598901447679255
+        ]
+      },
+      "roadOff": {
+        "roadEnabled": false,
+        "seconds": [
+          1.164062,
+          1.170915,
+          1.166642
+        ],
+        "medianSeconds": 1.166642,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 1.166209,
+          "minimumSeparationMargin": null,
+          "minimumRoadMargin": null,
+          "maximumDomainViolation": -0.15699726553086035,
+          "maximumConstraintViolation": -0.03986665494044973,
+          "terminalError": [
+            0.003070819291756025,
+            0.00013334505955026402,
+            -0.0006596957555675687,
+            -0.0006136071923836112,
+            -0.0005840294316283579
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 0,
+          "seedCount": 2,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": null,
+              "minimumRoadMargin": null,
+              "maximumDomainViolation": -0.1673487579491771,
+              "terminalError": [
+                -0.013897773785164512,
+                -0.00021755771384433624,
+                0.0003050610297066214,
+                1.2138764178964978e-06,
+                3.2442556206629947e-06
+              ],
+              "maximumConstraintViolation": -0.03978244228615566,
+              "roadRowCount": 0
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.017535659668572585,
+            "minimumSpeed": 9.896507993982782,
+            "minimumChartDenominator": 0.9996364474330567,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 0.03756881076175771,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.017535659668572585,
+            "minimumSpeed": 9.896507993982782,
+            "minimumChartDenominator": 0.9996364474330567,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "shiftedPlan",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.03986665494044973,
+            "seconds": 1.03981,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0.042493373989456976,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          0.04108065121526959,
+          0.009624550954211712
+        ]
+      },
+      "speedup": 2.023292492469841,
+      "maximumPlanDifference": 0.023276453553199503
+    },
+    {
+      "name": "sCurve-continuation",
+      "roadOn": {
+        "roadEnabled": true,
+        "seconds": [
+          6.036065,
+          6.008557,
+          6.027943
+        ],
+        "medianSeconds": 6.027943,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 6.027327,
+          "minimumSeparationMargin": null,
+          "minimumRoadMargin": 1,
+          "maximumDomainViolation": -0.14772734757704817,
+          "maximumConstraintViolation": -0.039655879255836926,
+          "terminalError": [
+            0.0013318326047064637,
+            0.00034412074416307475,
+            -0.002356242000457698,
+            0.0026366119301573093,
+            0.0023748140539516654
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 804,
+          "seedCount": 2,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": null,
+              "minimumRoadMargin": 1,
+              "maximumDomainViolation": -0.14818601121130695,
+              "terminalError": [
+                0.010596531795947512,
+                -0.004908501192474313,
+                -0.010947725397130625,
+                -0.004282255429285758,
+                -0.003875774233532983
+              ],
+              "maximumConstraintViolation": -0.035091498807525684,
+              "roadRowCount": 804
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.026805577622384773,
+            "minimumSpeed": 9.845574728854608,
+            "minimumChartDenominator": 0.9998947122247178,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 0.34820453416814573,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.026805577622384773,
+            "minimumSpeed": 9.845574728854608,
+            "minimumChartDenominator": 0.9998947122247178,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "shiftedPlan",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.039655879255836926,
+            "seconds": 5.647006,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0.04249337398974296,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -0.004545154819635131,
+          -0.0020704896437220913
+        ]
+      },
+      "roadOff": {
+        "roadEnabled": false,
+        "seconds": [
+          4.964832,
+          4.975009,
+          5.005356
+        ],
+        "medianSeconds": 4.975009,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 5.004846,
+          "minimumSeparationMargin": null,
+          "minimumRoadMargin": null,
+          "maximumDomainViolation": -0.13633287064996621,
+          "maximumConstraintViolation": -0.03743216411127112,
+          "terminalError": [
+            -0.01293378848377578,
+            0.002567835888728883,
+            0.008831250449478745,
+            -0.0010802278537039162,
+            -0.001062919982386376
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 0,
+          "seedCount": 2,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": null,
+              "minimumRoadMargin": null,
+              "maximumDomainViolation": -0.14818601121130695,
+              "terminalError": [
+                0.010596531795947512,
+                -0.004908501192474313,
+                -0.010947725397130625,
+                -0.004282255429285758,
+                -0.003875774233532983
+              ],
+              "maximumConstraintViolation": -0.035091498807525684,
+              "roadRowCount": 0
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.03820005454946673,
+            "minimumSpeed": 9.90532164489257,
+            "minimumChartDenominator": 0.9996525022624364,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 0.5217383295782778,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.03820005454946673,
+            "minimumSpeed": 9.90532164489257,
+            "minimumChartDenominator": 0.9996525022624364,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "shiftedPlan",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.03743216411127112,
+            "seconds": 4.657406,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0.04249337398974296,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -0.003391066676078914,
+          0.017511558666943303
+        ]
+      },
+      "speedup": 1.2116446422508984,
+      "maximumPlanDifference": 0.04808744385014341
+    },
+    {
+      "name": "sCurve-fresh-visible",
+      "roadOn": {
+        "roadEnabled": true,
+        "seconds": [
+          4.597945,
+          4.617435,
+          4.640668
+        ],
+        "medianSeconds": 4.617435,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 4.640086,
+          "minimumSeparationMargin": 0.38284021823063313,
+          "minimumRoadMargin": 1,
+          "maximumDomainViolation": -0.07560775641823153,
+          "maximumConstraintViolation": -0.03910461012107315,
+          "terminalError": [
+            -0.010490567587049953,
+            -0.0008953898789268513,
+            0.0027149756797424374,
+            -0.0035765844347361853,
+            -0.003739156594140647
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 804,
+          "seedCount": 3,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": 0.6865125290931434,
+              "minimumRoadMargin": 1,
+              "maximumDomainViolation": -0.032071845941780835,
+              "terminalError": [
+                -0.1539437981872149,
+                0.0033630042219160543,
+                -0.0004910904025052787,
+                -0.01017871646180725,
+                -0.009214990805078552
+              ],
+              "maximumConstraintViolation": -0.032071845941780835,
+              "roadRowCount": 804
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.09892516878120142,
+            "minimumSpeed": 9.948046991210704,
+            "minimumChartDenominator": 0.9978445486130715,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 2.3947275792414926,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.09892516878120142,
+            "minimumSpeed": 9.948046991210704,
+            "minimumChartDenominator": 0.9978445486130715,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "nonlinearPassingFeedback",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.03910461012107315,
+            "seconds": 4.048797,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0.04249337398974296,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -0.02860695990609169,
+          0.02749105138759371
+        ]
+      },
+      "roadOff": {
+        "roadEnabled": false,
+        "seconds": [
+          4.187453,
+          4.205555,
+          4.146953
+        ],
+        "medianSeconds": 4.187453,
+        "diagnostics": {
+          "reason": "acceptedIteration",
+          "nominalOnly": true,
+          "robustCertified": false,
+          "wholeHoldCertified": false,
+          "terminalInvariantCertified": false,
+          "recursiveFeasibilityGuaranteed": false,
+          "optimizerCalls": 1,
+          "runtimeSeconds": 4.146371,
+          "minimumSeparationMargin": 0.5412898203629081,
+          "minimumRoadMargin": null,
+          "maximumDomainViolation": -0.06659929179214001,
+          "maximumConstraintViolation": -0.038738723770320865,
+          "terminalError": [
+            -0.07144966186377398,
+            0.001261276229679139,
+            0.008666439012657179,
+            -0.0005717671290633997,
+            -0.0006050629452437062
+          ],
+          "terminalTolerance": [
+            0.25,
+            0.04,
+            0.35,
+            0.25,
+            0.08
+          ],
+          "endpointReserve": 0.0001,
+          "roadRowCount": 0,
+          "seedCount": 3,
+          "feasibleRefinementIterations": 4,
+          "bestInfeasible": {
+            "source": "verifiedSeed",
+            "maximumViolation": 0,
+            "worstFamily": "actuatorOrSlew",
+            "summary": {
+              "minimumSeparationMargin": 0.6865125290931434,
+              "minimumRoadMargin": null,
+              "maximumDomainViolation": -0.032071845941780835,
+              "terminalError": [
+                -0.1539437981872149,
+                0.0033630042219160543,
+                -0.0004910904025052787,
+                -0.01017871646180725,
+                -0.009214990805078552
+              ],
+              "maximumConstraintViolation": -0.032071845941780835,
+              "roadRowCount": 0
+            }
+          },
+          "certificateScope": "nominal nonlinear sampled finite horizon with terminal recovery tolerances",
+          "lastDomainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.10793363340729294,
+            "minimumSpeed": 9.762983687605272,
+            "minimumChartDenominator": 0.9988669036436337,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "cost": 6.087165918868077,
+          "maximumInputViolation": 0,
+          "domainAudit": {
+            "reason": "valid",
+            "maximumAbsoluteSlip": 0.10793363340729294,
+            "minimumSpeed": 9.762983687605272,
+            "minimumChartDenominator": 0.9988669036436337,
+            "failedStage": 0,
+            "homotopyFraction": null
+          },
+          "maximumReplayDifference": 0,
+          "attempts": {
+            "source": "nonlinearPassingFeedback",
+            "exitFlag": -1,
+            "iterations": 4,
+            "firstFeasibleIteration": 0,
+            "refinementIterations": 4,
+            "maximumViolation": -0.038738723770320865,
+            "seconds": 3.576225,
+            "message": "fmincon stopped by the output or plot function."
+          },
+          "roadCurvatureAllowance": 0.04249337398974296,
+          "inputLowerBound": [
+            -0.6981317007977318,
+            -0.9999
+          ],
+          "inputUpperBound": [
+            0.6981317007977318,
+            0.9999
+          ],
+          "auditSampleTime": 0.025
+        },
+        "firstInput": [
+          -0.07809589737213728,
+          -0.0720439312326451
+        ]
+      },
+      "speedup": 1.102683421163175,
+      "maximumPlanDifference": 0.10288112110301177
+    }
+  ]
+}

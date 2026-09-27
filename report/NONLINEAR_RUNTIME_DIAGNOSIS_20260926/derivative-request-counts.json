@@ -1,0 +1,18 @@
+{
+  "straight_continuation": {
+    "objectiveValueOnly": 95,
+    "objectiveGradient": 12,
+    "constraintValueOnly": 95,
+    "constraintGradient": 12,
+    "fullRollouts": 96,
+    "maximumPlanDifference": 0
+  },
+  "sCurve_continuation": {
+    "objectiveValueOnly": 40,
+    "objectiveGradient": 12,
+    "constraintValueOnly": 40,
+    "constraintGradient": 12,
+    "fullRollouts": 41,
+    "maximumPlanDifference": 0
+  }
+}
