@@ -10,8 +10,9 @@ function [command, predictedInput, planningProblem, controllerState] = ...
 % Fresh admission uses bounded timed NRMM/VFFM references to rebuild trajectory
 % Jacobians and dependent certificates before initializing separation normals.
 % Each SOCP fixes those normals and optimizes the complete input sequence.
-% Failed fresh admissions try the other passing side, then at most six
-% phase-I direction updates, within the same work deadline. An initializer
+% Failed trajectory admissions rebuild the other passing-side reference
+% within the same work deadline; their directions are not restored separately.
+% Legacy fixed-model studies can still use phase-I direction updates. An initializer
 % is never issued: a hard solve must pass lifted and original-coordinate
 % feasibility checks before its unchanged command is accepted.
 % Subsequent frames optimize with the inherited normals fixed; if that solve

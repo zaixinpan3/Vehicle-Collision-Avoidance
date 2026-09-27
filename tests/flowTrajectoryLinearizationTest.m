@@ -1,5 +1,8 @@
 classdef flowTrajectoryLinearizationTest < matlab.unittest.TestCase
     %flowTrajectoryLinearizationTest Flow references own the model tangents.
+    properties (TestParameter)
+        referenceSource={"firstFlow","previous","alternateFlow"};
+    end
     methods (TestClassSetup)
         function addPaths(testCase)
             root=fileparts(fileparts(mfilename('fullpath')));
@@ -33,6 +36,32 @@ classdef flowTrajectoryLinearizationTest < matlab.unittest.TestCase
                 +tire.input*command.actuatorInput+tire.constant,AbsTol=1e-10);
             testCase.verifyFalse(problem.metadata.recursiveFeasibilityGuaranteed);
             testCase.verifyFalse(problem.metadata.admissionSearch.issuedAdmissionWitness);
+        end
+
+        function geometryAndNormalsUseTheNonlinearReferenceNodes(testCase,referenceSource)
+            problem=localReferenceProblem(referenceSource);
+            [normalError,poseError,affineDifference,exitError]=localGeometryErrors(problem);
+            testCase.verifyEqual(cell2mat(problem.prediction.geometryNominal.'), ...
+                problem.prediction.linearizationStates(:,2:end),AbsTol=0);
+            testCase.verifyEqual(problem.program.jointCertificate.referenceStates, ...
+                problem.prediction.linearizationStates,AbsTol=0);
+            testCase.verifyLessThan(normalError,1e-9);
+            testCase.verifyLessThan(poseError,1e-9);
+            testCase.verifyLessThan(exitError,1e-9);
+            testCase.verifyGreaterThan(affineDifference,1e-6);
+        end
+
+        function rejectedFlowDoesNotSearchDirectionsOnAnotherTrajectory(testCase)
+            [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            cfg.solver.jointFunction=@encounterTestFixture.fail;
+            model=problem.model;model.cfg=cfg;model.nominalSource="cruise";
+            model=rmfield(model,'initializationPlan');
+            program=solveHardCbfClf.prepare(model);
+            [~,result,search]=solveHardCbfClf.fixedDirections(program,model,cfg);
+            testCase.verifyFalse(result.feasible);
+            testCase.verifyEqual(search.restorationSolves,0);
+            testCase.verifyTrue(search.initialization.modelRebuilt);
         end
 
         function preparedFlowReplayRetainsItsOperatingTrajectory(testCase)
@@ -117,6 +146,43 @@ classdef flowTrajectoryLinearizationTest < matlab.unittest.TestCase
             testCase.verifyEmpty(result.decision);
         end
     end
+end
+
+function problem=localReferenceProblem(source)
+    [ego,target,road,cfg]=encounterTestFixture.circularCrossing(.01);
+    stored=[];
+    if source=="previous"
+        [ego,target,road,cfg,stored]=localNextFrame();
+    elseif source=="alternateFlow"
+        cfg.solver.jointFunction=localRejectFirst();
+        cfg.feedbackPrediction.targetReaction.inputWeightScales=Inf;
+    end
+    [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,stored);
+end
+
+function [normalError,poseError,affineDifference,exitError]=localGeometryErrors(problem)
+    prediction=problem.prediction;model=problem.model;
+    states=prediction.linearizationStates;
+    [positions,yaws]=laneGeometry.fromFrenet(states(:,2:end),model.lane);
+    centers=targetPrediction.finiteFlow(model.encounter,(1:prediction.stageCount)*model.sampleTime);
+    dimensions=[model.cfg.vehicle.length;model.cfg.vehicle.width; ...
+        2*model.encounter.halfLength;2*model.encounter.halfWidth]/2;
+    normalError=0;poseError=0;
+    for k=1:prediction.stageCount
+        normal=avoidanceSafetyGeometry.supportDirection(positions(:,k),yaws(k), ...
+            centers(1:2,k),centers(7,k),dimensions);
+        normalError=max(normalError,norm(problem.program.geometry.normals{k}-normal));
+        frame=problem.program.geometry.frames(k);
+        [pose,~]=laneGeometry.poseData(frame);
+        position=pose(1:2)+reshape(pose(3:14),2,6)*states(:,k+1);
+        poseError=max(poseError,norm(position-positions(:,k)));
+    end
+    affine=prediction.egoStateOffset+reshape( ...
+        pagemtimes(prediction.egoStateMatrix,prediction.linearizationInputs(:)),6,[]);
+    affineDifference=max(abs(affine-states),[],'all');
+    exitDirection=centers(1:2,end)-positions(:,end);
+    exitDirection=exitDirection/norm(exitDirection);
+    exitError=norm(problem.program.completion.direction-exitDirection);
 end
 
 function [next,target,road,cfg,stored]=localNextFrame()

@@ -15,6 +15,10 @@ input plan. A bounded, model-valid previous reference is tried first. If it
 cannot be assembled or its hard solve is rejected, the online flow initializer
 supplies a new reference. With no previous plan, the flow branch initializes the
 encounter directly (a conflict-free flow fit retains the nominal reference).
+When a previous reference is available, the new horizon includes its remaining
+terminal node even if the geometric encounter-horizon proposal becomes shorter.
+This preserves the complete reference for relinearization; it does not transfer
+feasibility from the old model to the new one.
 
 As of September 27, the flow branch first fits its geometric reference using a
 cruise bootstrap, projects the inputs onto amplitude and causal slew bounds, and
@@ -26,9 +30,21 @@ reference still requires a complete hard solve. Each alternative passing side
 gets its own rebuilt model, within the existing frame work budget. A model-domain
 failure can reject a reference without bypassing any hard acceptance check.
 
+The same nonlinear rollout nodes define the curved-road pose charts, nominal
+rectangle support directions, terminal exit direction, and fixed-yaw support
+majorants. They are not replaced by propagating the reference inputs through
+the frozen affine dynamics: that propagation generally differs from the
+nonlinear rollout. Affine states remain the optimization variables in the
+hard support inequalities. Solver
+coordinate recentering retains the reference yaw and includes the corresponding
+constant yaw displacement in both the support tangent and quadratic remainder.
+Trajectory-linearized frames do not run the independent phase-I direction
+restoration; changing passing side requires rebuilding the whole reference.
+Inherited certificates retain their admitted geometric expansion nodes.
+
 Each hold is linearized at its own rollout state and input, including spatial
 curvature sensitivity on varying references. Tangents stay fixed during a solve
-and its reaction/direction search. This is a bounded selection of reference
+and its reaction-gain search. This is a bounded selection of reference
 trajectories, not an iterative nonlinear optimizer, a new controller method,
 a trust-region restriction, or a nonlinear-plant acceptance certificate.
 

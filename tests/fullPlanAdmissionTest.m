@@ -73,6 +73,10 @@ classdef fullPlanAdmissionTest < matlab.unittest.TestCase
             testCase.verifyTrue(any(report.confirmedRelease));
             testCase.verifyGreaterThan(report.minimumSampledBodyGap,0);
             testCase.verifyEqual(sum(report.restorationSolverCallCount),0);
+            active=report.obstacleCbfRowCount>0;
+            retained=active(1:end-1) & active(2:end);
+            change=diff(report.horizonSteps);
+            testCase.verifyGreaterThanOrEqual(change(retained),-ones(1,nnz(retained)));
         end
     end
 end

@@ -66,7 +66,12 @@ classdef avoidanceSafetyGeometry
                     end
                     [computedFrames,computedNominal] = laneGeometry.sweptCellFrames(model,anchorCells,zeros(2,1));
                 else
-                    [computedFrames,computedNominal] = laneGeometry.sweptCellFrames(model,prediction.cells,model.anchorPlan);
+                    referenceStates=[];
+                    if isfield(prediction,'linearizationPolicy') && prediction.linearizationPolicy=="trajectory"
+                        referenceStates=prediction.linearizationStates;
+                    end
+                    [computedFrames,computedNominal] = laneGeometry.sweptCellFrames( ...
+                        model,prediction.cells,model.anchorPlan,referenceStates);
                 end
             end
             cellData = cell(numel(groups),1);
@@ -241,6 +246,9 @@ classdef avoidanceSafetyGeometry
                 certificate.records=certificate.records(keep);
                 certificate.angles=certificate.angles(keep);
                 certificate.upperBound=certificate.upperBound(keep);
+                if isfield(certificate,'referenceStates')
+                    certificate.referenceStates=certificate.referenceStates(:,2:end);
+                end
                 for index=1:numel(certificate.records)
                     certificate.records(index).stage=certificate.records(index).stage-1;
                 end
@@ -276,6 +284,9 @@ classdef avoidanceSafetyGeometry
                 records=vertcat(records{:});
                 reserve=zeros(numel(records),1);
                 states=localJointStates(program,program.anchorPlan);
+                if program.prediction.linearizationPolicy=="trajectory"
+                    states=program.prediction.linearizationStates;
+                end
                 for index=1:numel(records)
                     record=records(index);
                     relative=record.positionOffset+record.positionMap*states(:,record.stage+1);
@@ -284,6 +295,9 @@ classdef avoidanceSafetyGeometry
                         +sum(vecnorm(record.generators)));
                 end
                 certificate=struct('records',records,'angles',angles,'upperBound',-reserve);
+                if program.prediction.linearizationPolicy=="trajectory"
+                    certificate.referenceStates=program.prediction.linearizationStates;
+                end
             end
             % Remove only collision and exit slices, keeping all actuator,
             % slew, chart, reference-phase, CLF and terminal constraints.
@@ -423,6 +437,9 @@ classdef avoidanceSafetyGeometry
                     'collisionAvoidanceController:invalidNormalNode', ...
                     'The online nominal requires one state per hold node.');
                 states(:,index)=tube.map*plan+tube.offset;
+                if isfield(prediction,'linearizationPolicy') && prediction.linearizationPolicy=="trajectory"
+                    states(:,index)=prediction.linearizationStates(:,tube.stage+1);
+                end
             end
             [positions,yaws]=laneGeometry.fromFrenet(states,model.lane);
             centers=zeros(8,0);

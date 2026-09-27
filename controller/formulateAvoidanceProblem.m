@@ -100,7 +100,11 @@ function [program,prediction,clf] = localFormulate(model)
                 % ego-only tube before any chart, row or record is built from it.
                 prediction = ltvBicycleModel.reactiveTube(model,prediction,model.reactionDesign);
             end
-            [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor);
+            referenceStates=[];
+            if prediction.linearizationPolicy=="trajectory"
+                referenceStates=prediction.linearizationStates;
+            end
+            [frames,nominal]=laneGeometry.sweptCellFrames(model,prediction.cells,anchor,referenceStates);
             [normals,dual]=avoidanceSafetyGeometry.supportNormals(model,prediction,anchor);
             if ~dual.available
                 error('collisionAvoidanceController:invalidSeparationNormal','A finite unit support direction is required.');

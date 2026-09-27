@@ -66,8 +66,9 @@ classdef laneGeometry
             nominal = values{1};
         end
 
-        function [frames,nominal] = sweptCellFrames(model,tubes,anchor)
+        function [frames,nominal] = sweptCellFrames(model,tubes,anchor,referenceStates)
         % Batch charts with individual station radii over one validated lane.
+            if nargin<4,referenceStates=[];end
             cfg = model.cfg;
             nominal = cell(numel(tubes),1);
             curved = isfield(model.lane,'referenceCurve') && (model.lane.referenceCurve.curvature~=0 ...
@@ -78,6 +79,7 @@ classdef laneGeometry
                 for index=1:numel(tubes)
                     tube=tubes(index);
                     values=reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
+                    if ~isempty(referenceStates),values=referenceStates(:,tube.stage+1);end
                     nominal{index}=values;
                     lower=min(values(1:3,:)-tube.radius(1:3,:),[],2);
                     upper=max(values(1:3,:)+tube.radius(1:3,:),[],2);
@@ -91,6 +93,7 @@ classdef laneGeometry
             for index = 1:numel(tubes)
                 tube = tubes(index);
                 values = reshape(pagemtimes(tube.map,anchor),6,[])+tube.offset;
+                if ~isempty(referenceStates),values=referenceStates(:,tube.stage+1);end
                 nominal{index} = values;
                 radius = tube.radius;
                 bound = repmat([cfg.model.frontWheelSteeringAngleMaximum; ...

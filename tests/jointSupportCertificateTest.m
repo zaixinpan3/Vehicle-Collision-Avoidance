@@ -3,6 +3,7 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
     properties (TestParameter)
         yawRadius=struct('fixed',0,'interval',.12,'full',pi);
         reservedGap=struct('certified',.002,'violated',-.002);
+        referenceYawShift=struct('touching',0,'displaced',.3);
     end
     methods (TestClassSetup)
         function addPaths(testCase)
@@ -33,10 +34,11 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
             testCase.verifyEqual(actual,expected,AbsTol=2e-6);
         end
 
-        function fixedPlanConesAgreeWithIndependentSupport(testCase,yawRadius,reservedGap)
+        function fixedPlanConesAgreeWithIndependentSupport(testCase,yawRadius,reservedGap,referenceYawShift)
             [program,cfg]=localSquare();point=[.2;0;1];
             records=repmat(localRecord(),2,1);angles=[.4;-.7];
             state=program.prediction.egoStateOffset(:,2)+program.prediction.egoStateMatrix(:,:,2)*point(1:2);
+            reference=state;reference(3)=reference(3)+referenceYawShift;
             for index=1:2
                 item=records(index);item.egoHalfSize=[2.4;.95];item.targetHalfSize=[2.2;.9];
                 item.egoYawRadius=yawRadius;item.targetYawRadius=yawRadius/2;
@@ -45,12 +47,13 @@ classdef jointSupportCertificateTest < matlab.unittest.TestCase
                 item.positionMap=[1,.2,.1,.03,.02,.01;-.1,1,.2,.01,.03,.02];
                 item.yawRow=[.02,-.01,1,.03,.04,-.02];
                 gap=.2;if index==2,gap=reservedGap;end
-                residual=avoidanceSafetyGeometry.jointValue(item,state,angles(index));
+                residual=avoidanceSafetyGeometry.fixedDirectionMajorant(item,reference,angles(index),state);
                 item.positionOffset=[cos(angles(index));sin(angles(index))]*(residual+1e-4+gap);
                 records(index)=item;
             end
             program.jointCertificate=struct('records',records,'angles',angles,'upperBound',-1e-4*ones(2,1));
-            conic=avoidanceStageQp.fixedDirections(program,point,angles,cfg);
+            program.jointCertificate.referenceStates=[zeros(6,1),reference];
+            conic=avoidanceStageQp.fixedDirections(program,point+[.07;0;0],angles,cfg);
             % Fix the complete physical plan; directions are already constant.
             % Only the support epigraph variables remain free to certify it.
             indices=1:numel(point);number=numel(indices);

@@ -208,6 +208,11 @@ classdef hardEncounterBarrier
                 [model.exitDirectionProposal,steps,~] = localEncounterProposal(model,model.confirmation.range);
                 model.horizonSteps = max(model.horizonSteps,steps);
             end
+            if refreshTrajectory && ~isempty(stored)
+                % Retain the previous reference through its terminal node.
+                % A shorter geometric horizon proposal must not truncate it.
+                model.horizonSteps=max(model.horizonSteps,size(stored.plan,2)-1);
+            end
             if isfield(model,'exitDeadline')
                 model.horizonSteps = min(model.horizonSteps,round((model.exitDeadline-model.stateTime)/model.sampleTime));
             end
@@ -283,6 +288,8 @@ classdef hardEncounterBarrier
             if isempty(model.encounter),return;end
             target=model.encounter;
             anchor=finalOffset+finalMap*model.anchorPlan;
+            trajectory=isfield(prediction,'linearizationPolicy') && prediction.linearizationPolicy=="trajectory";
+            if trajectory,anchor=prediction.linearizationStates(:,end);end
             [center,radius]=targetPrediction.finiteFlow(target,duration);
             direction=localExitDirection(center,frame,anchor);
             if isfield(frame,'positionMap')
@@ -295,7 +302,7 @@ classdef hardEncounterBarrier
             else
                 [proposed,~,~]=localEncounterProposal(model,model.confirmation.range);
             end
-            if ~isempty(proposed) && ~isfield(frame,'positionMap'),direction=proposed;end
+            if ~trajectory && ~isempty(proposed) && ~isfield(frame,'positionMap'),direction=proposed;end
             [row,limit]=localExitRow(model,target,center,radius,prediction.initialErrorBound(:,end),frame,direction);
             matrix=row*finalMap;bound=limit-row*finalOffset;
             completion.active=true;completion.direction=direction;

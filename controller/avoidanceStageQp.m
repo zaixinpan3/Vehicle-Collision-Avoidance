@@ -143,7 +143,14 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
         state=base.stateCenter(:,item.stage+1);theta=angles(index);
         normal=[cos(theta);sin(theta)];
         relative=item.positionOffset+item.positionMap*state;
-        yaw=item.yawOffset+item.yawRow*state;
+        reference=state;
+        if isfield(program.jointCertificate,'referenceStates')
+            reference=program.jointCertificate.referenceStates(:,item.stage+1);
+        end
+        % Solver coordinates may move; the geometric tangent remains fixed
+        % at the same nonlinear reference used for dynamics and tire forces.
+        yaw=item.yawOffset+item.yawRow*reference;
+        yawShift=item.yawRow*(state-reference);
         positionMap=sparse(2,width);positionMap(:,stateIndex)=item.positionMap;
         yawRow=row(stateIndex,item.yawRow);
         egoAngle=theta-yaw;obstacleAngle=theta-item.targetYaw;
@@ -155,11 +162,11 @@ function conic=localFixedDirectionConic(program,point,angles,cfg)
         if egoRadius>0 && any(item.yawRow~=0)
             argument=-[-sin(egoAngle);cos(egoAngle)]*yawRow;
             support=shapeSupport(item.egoHalfSize,item.egoYawRadius, ...
-                [cos(egoAngle);sin(egoAngle)],argument);
+                [cos(egoAngle);sin(egoAngle)]-[-sin(egoAngle);cos(egoAngle)]*yawShift,argument);
             % The normal is constant. Only ego rotation needs a remainder:
             % ||R(-dpsi)n - (n-t*dpsi)|| <= dpsi^2/2 globally.
             z=allocate(1);zrow=row(z,1);
-            addCone([1;-1;0],[zrow;zrow;sqrt(2*egoRadius)*yawRow]);
+            addCone([1;-1;sqrt(2*egoRadius)*yawShift],[zrow;zrow;sqrt(2*egoRadius)*yawRow]);
         else
             constant=constant+avoidanceSafetyGeometry.supportValue( ...
                 item.egoHalfSize,item.egoYawRadius,[cos(egoAngle);sin(egoAngle)]);
