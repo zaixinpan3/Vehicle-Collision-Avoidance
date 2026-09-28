@@ -1,0 +1,16 @@
+[
+  {
+    "case": "storedPolicy",
+    "passedTargetIndependentlyVerified": true,
+    "finalErrorIndependentlyVerified": true,
+    "maxSteeringDegrees": 39.7135212907969,
+    "maxAbsForceRatio": 0.3582622086028512
+  },
+  {
+    "case": "oncoming",
+    "passedTargetIndependentlyVerified": true,
+    "finalErrorIndependentlyVerified": true,
+    "maxSteeringDegrees": 39.71352121078064,
+    "maxAbsForceRatio": 0.35826221344452913
+  }
+]

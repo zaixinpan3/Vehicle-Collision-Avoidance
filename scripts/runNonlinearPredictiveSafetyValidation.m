@@ -6,17 +6,22 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         options.Frames (1,1) double {mustBeInteger,mustBePositive} = 8
         options.Scenarios (1,:) string = ["recovery","oncoming","circular","solverFailure"]
         options.OutputFile (1,1) string = ""
+        options.MaximumImprovementIterations (1,1) double {mustBeInteger,mustBeNonnegative} = 0
     end
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'controller'),fullfile(root,'config'));
     results=cell(1,numel(options.Scenarios));
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);[ego,target,road,cfg]=localFixture(name);prior=[];
+        if name~="solverFailure",cfg.nonlinear.maximumImprovementIterations=options.MaximumImprovementIterations;end
         frames=0;minimumClearance=Inf;maximumEnclosureViolation=0;maximumSeconds=0;failure="";
         firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;inheritedFrames=0;backupFrames=0;finalError=[];
+        trace=struct([]);failedFrameSeconds=NaN;failureTime=NaN;passedTarget=false;
         for frame=1:options.Frames
+            frameTimer=tic;
             try
-                tic;[command,~,problem,prior]=collisionAvoidanceController(ego,target,road,cfg,prior);
-                maximumSeconds=max(maximumSeconds,toc);maxHorizon=max(maxHorizon,problem.metadata.horizonSteps);
+                [command,~,problem,prior]=collisionAvoidanceController(ego,target,road,cfg,prior);
+                frameSeconds=toc(frameTimer);
+                maximumSeconds=max(maximumSeconds,frameSeconds);maxHorizon=max(maxHorizon,problem.metadata.horizonSteps);
                 x=problem.model.initialState;input=command.actuatorInput;
                 sample=problem.certificate.samples{1};h=cfg.controller.sampleTime;
                 [times,states]=ode45(@(~,state)nonlinearBicycleModel.derivative(state,input,cfg), ...
@@ -38,23 +43,48 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 finalError=nonlinearBicycleModel.error(next,problem.model.lane,problem.model.backup.reference);
                 inheritedFrames=inheritedFrames+problem.metadata.inheritedCertificate;
                 backupFrames=backupFrames+problem.metadata.terminalBackupDispatched;
+                search=problem.metadata.admissionSearch;
+                entry=struct('time',ego.stateTime-h,'controllerSeconds',frameSeconds, ...
+                    'horizonSteps',problem.metadata.horizonSteps,'source',search.source, ...
+                    'solverCalls',search.solverCalls,'certifiedCandidates',search.certifiedCandidates, ...
+                    'rejectedCandidates',search.rejectedCandidates,'inherited',problem.metadata.inheritedCertificate, ...
+                    'backup',problem.metadata.terminalBackupDispatched,'clfSlack',problem.metadata.clfSlack, ...
+                    'state',x,'nextState',next,'input',input,'transverseError',finalError, ...
+                    'auditTimes',times,'auditStates',states, ...
+                    'certificateCollisionMargin',problem.metadata.minimumCollisionMargin);
+                if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 if ~isempty(target)
                     q=nonlinearSafetyCertificate.targetFlow(problem.model.target,h);
                     target=localTarget(q);
+                    passedTarget=passedTarget || next(1)-q(1)>cfg.vehicle.length/2+q(7);
                 end
                 frames=frames+1;
+                if mod(frame,4)==0,fprintf('%s: %d/%d holds, last %.3f s, source %s\n', ...
+                    name,frame,options.Frames,frameSeconds,search.source);end
                 if name=="storedPolicy",cfg.solver.frameDeadlineSeconds=1e-12;end
             catch exception
+                failedFrameSeconds=toc(frameTimer);failureTime=(frame-1)*cfg.controller.sampleTime;
                 failure=string(exception.identifier)+": "+string(exception.message);break;
             end
         end
+        seconds=[];solverCalls=0;
+        if ~isempty(trace),seconds=[trace.controllerSeconds];solverCalls=sum([trace.solverCalls]);end
+        later=seconds(2:end);
+        firstSeconds=NaN;if ~isempty(seconds),firstSeconds=seconds(1);end
+        medianLater=NaN;p95Later=NaN;
+        if ~isempty(later),medianLater=median(later);p95Later=prctile(later,95);end
         results{index}=struct('scenario',name,'requestedFrames',options.Frames,'executedFrames',frames, ...
             'completed',frames==options.Frames,'failure',failure,'minimumReplayClearanceMeters',minimumClearance, ...
             'maximumReplayEnclosureViolation',maximumEnclosureViolation,'maximumFrameSeconds',maximumSeconds, ...
             'maximumHorizonSteps',maxHorizon,'initialClfValue',firstClf,'finalClfValueUpper',lastClf, ...
             'maximumClfSlack',maximumSlack,'sampleTimeSeconds',cfg.controller.sampleTime,'randomSeed',[], ...
             'finalTransverseError',finalError,'inheritedFrames',inheritedFrames,'backupFrames',backupFrames, ...
-            'requiredClearanceMeters',cfg.collision.safetyMarginMeters);
+            'requiredClearanceMeters',cfg.collision.safetyMarginMeters, ...
+            'maximumImprovementIterations',cfg.nonlinear.maximumImprovementIterations, ...
+            'firstFrameSeconds',firstSeconds,'subsequentMedianSeconds',medianLater, ...
+            'subsequentP95Seconds',p95Later,'deadlineMisses',nnz(seconds>cfg.controller.sampleTime), ...
+            'failedFrameSeconds',failedFrameSeconds,'failureTime',failureTime,'passedTarget',passedTarget, ...
+            'totalSolverCalls',solverCalls,'trace',trace);
         fprintf('%s: %d/%d frames, max %.3f s, failure %s\n',name,frames,options.Frames,maximumSeconds,failure);
     end
     report=struct('model',"nonlinear combined-slip Fiala; exact constant-parameter NRMM", ...

@@ -1,0 +1,9 @@
+time,controllerSeconds,horizonSteps,source,solverCalls,certifiedCandidates,rejectedCandidates,inherited,backup,clfSlack
+0,0.474321,8,nominalContinuation,1,1,0,False,False,5.232903400089772e-19
+0.05,0.483072,8,nominalContinuation,1,3,0,False,False,5.756354480689373e-19
+0.10000000000000002,0.476199,8,nominalContinuation,1,3,0,False,False,6.304740793533833e-19
+0.15000000000000002,0.474475,8,shiftedCertifiedPlan,1,3,0,False,False,6.87809975383867e-19
+0.2,0.474943,8,nominalContinuation,1,3,0,False,False,7.476380370303914e-19
+0.25,0.478422,8,nominalContinuation,1,3,0,False,False,8.099607587699701e-19
+0.3,0.47728,8,nominalContinuation,1,3,0,False,False,8.74781076300749e-19
+0.35,0.474535,8,nominalContinuation,1,3,0,False,False,9.420932284024076e-19

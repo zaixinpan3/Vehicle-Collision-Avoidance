@@ -1,0 +1,14 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "passed": 135,
+  "failed": 0,
+  "incomplete": 0,
+  "suiteCases": {
+    "nonlinearPredictiveSafetyTest": 42,
+    "fialaIntervalKernelTest": 5,
+    "fialaFeedbackSampleTest": 19,
+    "modifiedFialaTireTest": 25,
+    "collisionAvoidanceControllerConfigTest": 43,
+    "controllerSourceBudgetTest": 1
+  }
+}

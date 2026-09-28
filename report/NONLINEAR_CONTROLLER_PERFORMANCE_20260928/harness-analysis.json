@@ -1,0 +1,10 @@
+{
+  "id": "NASGU",
+  "message": "Value assigned to variable might be unused.",
+  "fix": 0,
+  "line": 130,
+  "column": [
+    5,
+    8
+  ]
+}
