@@ -1,349 +1,133 @@
-function [command, predictedInput, planningProblem, controllerState] = ...
-        collisionAvoidanceController(egoState, targetEstimate, laneCenterline, cfg, previousState)
-%collisionAvoidanceController Predictive safety continuation with a soft CLF.
-% The current study accepts zero or one obstacle vehicle per input frame.
-% Optimize the complete finite control plan and execute only its first hold.
-% Safety rows are certified at the hold nodes of the exact sampled affine
-% plant, not between nodes (NODE_SAMPLED_CERTIFICATE.md).
-% Store the accepted prediction and terminal witness for next-frame transfer.
-% The terminal law is a mathematical continuation, never a runtime fallback.
-% Fresh admission uses bounded timed NRMM/VFFM references to rebuild trajectory
-% Jacobians and dependent certificates before initializing separation normals.
-% Each SOCP fixes those normals and optimizes the complete input sequence.
-% Failed trajectory admissions rebuild the other passing-side reference
-% within the same work deadline; their directions are not restored separately.
-% Legacy fixed-model studies can still use phase-I direction updates. An initializer
-% is never issued: a hard solve must pass lifted and original-coordinate
-% feasibility checks before its unchanged command is accepted.
-% Subsequent frames optimize with the inherited normals fixed; if that solve
-% fails, the shifted previous plan is issued.
-% The plan is a feedback policy: from the second hold on, the executed input is
-% the planned input plus K (estimate - nominal), and the prediction bounds the
-% resulting deviation (ltvBicycleModel.finitePredict). An inherited frame
-% therefore issues its planned input plus that correction about the carried
-% nominal state. If the ego-only certificate is infeasible, a fresh frame with a
-% target tries a target-reactive policy that also corrects by the measured
-% target deviation (ltvBicycleModel.reactiveTube; CLOSED_LOOP_TARGET_PREDICTION.md).
-% An ego measurement outside the carried successor box (plant differs from
-% the model) is admitted from the measurement; the shifted previous plan still
-% supplies the first separation directions.
-% With trajectory linearization, active encounters first refresh the stage
-% Jacobians from a usable shifted plan and the current observation.
-% An unusable previous anchor or rejected solve triggers a bounded flow reference
-% and complete model rebuild. Rebuilt models require new admission and do not
-% inherit a feasible witness.
+function [command,predictedInput,planningProblem,controllerState] = ...
+        collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
+%collisionAvoidanceController Nonlinear predictive safety with nominal CLF recovery.
+% Every input belongs to a validated nonlinear plan ending in an invariant
+% cruise backup. See NONLINEAR_PREDICTIVE_CBF.md for the exact-model contract.
     persistent lastState
-    if nargin == 1 && (ischar(egoState) || isstring(egoState))
-        if ~isscalar(string(egoState)) || string(egoState) ~= "resetNominalTrajectory"
-            error("collisionAvoidanceController:invalidAction", "Use resetNominalTrajectory.");
+    if nargin==1 && (ischar(egoState) || isstring(egoState))
+        if ~isscalar(string(egoState)) || string(egoState)~="resetNominalTrajectory"
+            error('collisionAvoidanceController:invalidAction','Use resetNominalTrajectory.');
         end
-        lastState = [];
-        command = []; predictedInput = []; planningProblem = []; controllerState = [];
-        return;
+        lastState=[];command=[];predictedInput=[];planningProblem=[];controllerState=[];return;
     end
-    explicitState = nargin >= 5;
-    if ~explicitState, previousState = lastState; end
-    if nargin < 4, cfg = []; end
-    if nargin < 3, laneCenterline = []; end
-    if nargin < 2, targetEstimate = []; end
-    timer = tic;
-    cfg = localControllerConfiguration(cfg);
-    [ego,lane,road,observation] = readPlanningInputs(egoState,targetEstimate,laneCenterline,cfg);
-    model = localFiniteModel(ego,lane,road,cfg,previousState);
-    if cfg.referenceSpeed<=0 || any(cfg.clf.referenceOffset) || any(cfg.clf.referenceRate)
-        error("collisionAvoidanceController:unsupportedCruiseReference", ...
-            "The cruise CLF requires positive constant speed and zero path-error reference.");
+    explicitState=nargin>=5;
+    if ~explicitState,previousState=lastState;end
+    if nargin<4,cfg=[];end
+    if nargin<3,laneCenterline=[];end
+    if nargin<2,targetEstimate=[];end
+    timer=tic;cfg=collisionAvoidanceControllerConfig(cfg);
+    if cfg.collision.safetyMarginMeters<=0
+        error('collisionAvoidanceController:positiveClearanceRequired','Rectangular separation requires strictly positive clearance.');
     end
-    if any(cfg.model.ltvModelErrorRateBound) || any(cfg.model.plantModelResidualRateBound)
-        error("collisionAvoidanceController:nonexactStudyInput", ...
-            "This controller requires the declared zero-residual held affine plant.");
+    if exist('nonlinearSafetyMex','file')~=3 || exist('fialaFeedbackSampleMex','file')~=3
+        error('collisionAvoidanceController:missingFialaVerifier', ...
+            'Build the MPFR verifiers using buildFialaIntervalVerifier and add their output directory.');
     end
-    identity = struct('configuration',rmfield(cfg,'solver'),'lane',lane,'road',road, ...
-        'accelerationBias',ego.longitudinalAccelerationBias);
-    [model,carry] = hardEncounterBarrier.prepare(model,ego,observation,previousState,identity);
-    if laneGeometry.isVaryingReference(lane) && isempty(model.cruiseCertificate)
-        model.cruiseCertificate=ltvBicycleModel.sampledCruise(model);
+    [ego,lane,road,observation]=readPlanningInputs(egoState,targetEstimate,laneCenterline,cfg);
+    if any(ego.stateErrorBound) || any(cfg.model.ltvModelErrorRateBound) ...
+            || any(cfg.model.plantModelResidualRateBound) || ego.longitudinalAccelerationBias~=0
+        error('collisionAvoidanceController:nonexactStudyInput', ...
+            'This witness requires exact state and model data; uncertainty needs a robust invariant backup.');
     end
-    if laneGeometry.isVaryingReference(lane) ...
-            && abs(model.initialEgoState(1)-model.cruiseCertificate.state(1))+model.initialFrenetErrorBound(1) ...
-            >cfg.encounter.referencePhaseRadius
-        error('collisionAvoidanceController:referencePhaseOutsideDomain', ...
-            'The measured station is outside the declared scheduled-model phase domain.');
+    if isempty(targetEstimate) && isfield(egoState,'targetEstimate'),targetEstimate=egoState.targetEstimate;end
+    q=nonlinearSafetyCertificate.target(observation,targetEstimate,cfg);
+    [q,targetAnchor,targetStep]=localTargetContinuation(q,previousState,ego.stateTime,cfg);
+    frame=nonlinearSafetyCertificate.roadFrame(lane,road);
+    backup=nonlinearSafetyCertificate.backup(cfg,frame);
+    previous=zeros(2,1);
+    if ~isempty(ego.heldActuatorInput),previous=ego.heldActuatorInput;
+    elseif isstruct(previousState) && isfield(previousState,'appliedInput'),previous=previousState.appliedInput;
+    elseif any(isfinite([cfg.model.frontWheelSteeringRateMaximum,cfg.model.brakingRatioRateMaximum]))
+        error('collisionAvoidanceController:missingInputMemory','Finite slew limits require the previous applied input.');
     end
-    preparationSeconds = toc(timer);
-    solverCfg=cfg;solverCfg.solver.workTimer=timer;
-    solverCfg.solver.workTimeLimit=min(cfg.solver.frameDeadlineSeconds,cfg.solver.certificateSearchTimeLimit);
-    [program,prediction,clf,result,search,model]=localSolve(model,solverCfg);
-    formulationSeconds=search.formulationSeconds;solveSeconds=search.solveSeconds;
-    conicCalls=search.nativeSolves;
-    if ~result.feasible
-        error("collisionAvoidanceController:optimizationFailed", ...
-            "The hard-safety, soft-CLF search failed at t=%.9g s (%s). No command was issued.", ...
-            model.stateTime,result.message);
-    end
-    predictedInput = reshape(result.decision(program.layout.planIndex),2,[]);
-    feedbackCorrection = zeros(2,1);feedbackGain = zeros(2,6);feedbackBound = zeros(6,1);
-    if isfield(program,'feedbackCorrection'),feedbackCorrection = program.feedbackCorrection;end
-    if isfield(prediction,'feedbackGain')
-        feedbackGain = prediction.feedbackGainSequence(:,:,1);feedbackBound = prediction.estimatorBound;
-    end
-    firstInput = predictedInput(:,1)+feedbackCorrection;
-    clfSlack = result.decision(program.layout.relaxationIndex);
-    % Reporting an outward slack allowance is not a command acceptance test.
-    slackAllowance = max(clfSlack,0);
-    slackBound = clf.youngFactor*slackAllowance*(2*clf.normDisturbance+slackAllowance);
-    cruise = clf.cruise;
-    states = zeros(6,prediction.stageCount+1);
-    states(:,1) = model.initialEgoState;
-    if isfield(prediction,'nominalInitialState'),states(:,1)=prediction.nominalInitialState;end
-    for stage = 1:prediction.stageCount
-        states(:,stage+1) = prediction.stageMatrixA(:,:,stage)*states(:,stage) ...
-            +prediction.stageMatrixB(:,:,stage)*predictedInput(:,stage)+prediction.stageAffine(:,stage);
-    end
-    command = localCommand(firstInput,model.initialEgoState,prediction,model);
-    command.measurementTime = model.stateTime;
-    command.actuationTime = model.stateTime;
-    command.holdSeconds = model.sampleTime;
-    nextReference=cruise.state;nextMatrix=cruise.matrix;
-    if isfield(cruise,'nextState'),nextReference=cruise.nextState;nextMatrix=cruise.nextMatrix;end
-    nextError = prediction.stageMatrixA(2:6,:,1)*model.initialEgoState ...
-        +prediction.stageMatrixB(2:6,:,1)*firstInput+prediction.stageAffine(2:6,1)-nextReference(2:6);
-    nextValue = nextError.'*nextMatrix*nextError;
-    % planCertified reports acceptance: solver success or a retained previous plan.
-    metadata = struct('solverCallCount',conicCalls,'solverExitFlag',result.exitFlag, ...
-        'conicSolverCallCount',conicCalls, ...
-        'trajectorySolverCallCount',search.hardSolves, ...
-        'restorationSolverCallCount',search.restorationSolves,'admissionSearch',search, ...
-        'horizonAttemptCount',search.horizonAttempts, ...
-        'approximateSolveAccepted',result.exitFlag==2, ...
-        'solverMessage',result.message,'solverAlgorithm',"predictive hard-safety soft-CLF SOCP", ...
-        'hasTarget',~isempty(model.encounter),'obstacleCbfRowCount',program.obstacleCbfRowCount, ...
-        'planCertified',true, ...
-        'safetyScope',"finiteEncounterThenInvariantRoadContinuation", ...
-        'certifiedDuration',model.sampleTime*prediction.stageCount, ...
-        'recursiveFeasibilityGuaranteed',isempty(model.encounter),'certificateSource',"constrainedOptimization", ...
-        'recursiveFeasibilityScope',"targetFreeContinuationUnderDeclaredContracts", ...
-        'stateAndSlipBoundsEnforced',false,'wholeHoldCertificate',false, ...
-        'certificateSampling',"holdNodes", ...
-        'supportGeometry',program.supportGeometry, ...
-        'convexificationPolicy',search.policy, ...
-        'nominalSource',model.nominalSource, ...
-        'shiftedWitnessContained',program.supportGeometry.witnessPreserved, ...
-        'predictionContinuationRetained',true,'inheritedFeasibleFamily',program.inheritedFeasibleFamily, ...
-        'terminalInvariantOptimization',program.terminalOptimization, ...
-        'freshProblemContainsWitness',program.replacementContainsWitness, ...
-        'measurementRadiusLimit',program.terminal.measurementRadiusLimit, ...
-        'carriedWitnessAvailable',~isempty(carry), ...
-        'measurementContractChanged',model.measurementContractChanged, ...
-        'terminalContinuationCertified',true,'terminalPolicyRole',"predictionCertificateOnly", ...
-        'terminalActive',false,'fallbackUsed',false,'horizonSteps',prediction.stageCount, ...
-        'confirmedRelease',model.targetReleased, ...
-        'targetCertifiedUntil',program.completion.deadline,'roadTailCertified',true, ...
-        'terminalLateralClearance',program.terminal.lateralClearance, ...
-        'readmittedAfterRoadRefit',model.readmittedAfterRoadRefit, ...
-        'clfDissipationCertified',true,'clfInitialValue',clf.initialValue,'clfNextValue',nextValue, ...
-        'clfDisturbanceBound',clf.disturbanceBound,'clfDecayPerHold',clf.decayPerHold, ...
-        'clfSlack',clfSlack,'clfSlackPenalty',cfg.clf.relaxationWeight*clfSlack^2, ...
-        'clfSlackDissipationBound',slackBound,'clfDissipationScope',"slackDependentSampledBound", ...
-        'clfMatrix',cruise.matrix,'clfOperatingCurvature',cruise.stage.curvature, ...
-        'clfOperatingInput',cruise.input,'clfReferenceState',cruise.state, ...
-        'initialErrorBound',model.initialFrenetErrorBound,'targetErrorBound',zeros(8,0), ...
-        'feedbackCorrection',feedbackCorrection,'feedbackGain',feedbackGain, ...
-        'feedbackEstimatorBound',feedbackBound, ...
-        'targetReactionStrength',localReactionStrength(prediction), ...
-        'executedContinuousGenerator',[prediction.continuousA(:,:,1),prediction.continuousB(:,:,1),prediction.continuousC(:,1)], ...
-        'executedResidualRateBound',zeros(6,1),'runtimeSeconds',toc(timer), ...
-        'readmittedAfterInconsistentObservation',model.readmittedAfterInconsistentObservation, ...
-        'initialEgoState',model.initialEgoState,'predictedNextState',states(:,2));
-    if ~isempty(model.encounter)
-        metadata.targetErrorBound=model.encounter.radius;
-    else
-        metadata.targetCertifiedUntil=NaN;
-    end
-    if isfield(program,'jointCertificate')
-        metadata.recursiveFeasibilityGuaranteed=true;
-        metadata.recursiveFeasibilityScope="shiftedCompleteCertificateUnderUnchangedContracts";
-        metadata.certifiedIncumbentUsed=search.usedCertifiedIncumbent;
-        if search.usedCertifiedIncumbent,metadata.certificateSource="retainedCertifiedIncumbent";end
-    end
-    metadata.runtime = struct('inputPreparationSeconds',preparationSeconds, ...
-        'formulationSeconds',formulationSeconds,'solveSeconds',solveSeconds);
-    metadata.clfNextMatrix=nextMatrix;metadata.clfNextReferenceState=nextReference;
-    if isfield(cruise,'scheduled') && cruise.scheduled
-        metadata.referencePhaseIndex=cruise.index;
-        metadata.referencePhaseError=model.initialEgoState(1)-cruise.state(1);
-        metadata.referencePhaseRadius=cfg.encounter.referencePhaseRadius;
-        metadata.spatialCurvature=laneGeometry.curvature(model.initialEgoState(1),lane);
-        if ~isfield(program,'jointCertificate')
-            metadata.recursiveFeasibilityScope="targetFreeBoundedPhaseScheduledAffinePlant";
-        end
-    end
-    metadata.linearizationPolicy=prediction.linearizationPolicy;
-    if prediction.linearizationPolicy=="trajectory"
-        metadata.recursiveFeasibilityGuaranteed=false;
-        metadata.recursiveFeasibilityScope="freshTrajectoryModelRequiresNewAdmission";
-    end
-    data = hardEncounterBarrier.carriedData(prediction,program,prediction.stageCount);
-    controllerState = struct('version',46, ...
-        'appliedInput',firstInput,'feedbackCorrection',feedbackCorrection,'stateTime',model.stateTime, ...
-        'identity',identity,'plan',predictedInput,'decision',result.decision, ...
-        'predictedState',states,'stateErrorBound',prediction.initialErrorBound, ...
-        'prediction',prediction,'stages',data.stages,'cellFrames',data.cellFrames, ...
-        'cellNormals',{data.cellNormals},'terminal',program.terminal, ...
-        'completion',program.completion,'confirmation',model.confirmation, ...
-        'encounter',model.encounter,'program',program);
-    metadata.runtimeSeconds = toc(timer);
-    if metadata.runtimeSeconds>cfg.solver.frameDeadlineSeconds
+    identityCfg=rmfield(cfg,'solver');identityCfg.nonlinear.initialPlan=zeros(2,0);
+    identityCfg.nonlinear.proposalFunction=[];identityCfg.nonlinear.maximumImprovementIterations=0;
+    identityCfg.nonlinear.maximumCertificateSeconds=Inf;identityCfg.nonlinear.maximumCertificateCells=20000;
+    identity=struct('configuration',identityCfg,'lane',lane,'road',road,'targetAnchor',targetAnchor);
+    model=struct('cfg',cfg,'initialState',ego.modelState,'previousInput',previous,'target',q, ...
+        'lane',lane,'road',road,'frame',frame,'backup',backup,'identity',identity, ...
+        'targetAnchor',targetAnchor,'targetStep',targetStep,'stateTime',ego.stateTime);
+    [certificate,search]=solveNonlinearPredictivePlan(model,previousState);
+    if isempty(certificate)
         error('collisionAvoidanceController:optimizationFailed', ...
-            'The complete frame exceeded its execution deadline. No command was issued.');
+            'No nonlinear continuation into the invariant backup was certified (%s). No command was issued.',search.lastRejection);
     end
-    planningProblem = struct('problemClass',"encounterPredictiveCbfClfSocp",'program',program, ...
-        'prediction',prediction,'predictedState',states,'model',model,'decision',result.decision, ...
-        'inputPlan',predictedInput,'carriedWitness',carry,'metadata',metadata);
+    predictedInput=certificate.inputs;first=predictedInput(:,1);
+    command=localCommand(first,ego.modelState,cfg);
+    command.measurementTime=ego.stateTime;command.actuationTime=ego.stateTime;command.holdSeconds=cfg.controller.sampleTime;
+    metadata=struct('planCertified',true,'predictiveBarrierValue',0, ...
+        'safetyScope',"nonlinearHorizonThenInvariantCruise", ...
+        'predictionModel',"nonlinearCombinedSlipFialaZoh",'certificateArithmetic',"directed128BitMpfr", ...
+        'wholeHoldCertificate',true,'certificateSampling',"validatedSweptIntervals", ...
+        'recursiveFeasibilityGuaranteed',true, ...
+        'recursiveFeasibilityScope',"exactSuccessorsAndUnchangedTargetRoadModelContracts", ...
+        'terminalContinuationCertified',true,'terminalPolicyRole',"executableInvariantBackup", ...
+        'stateAndSlipBoundsEnforced',false,'stateBoundsEnforced',true,'positiveSpeedDomainEnforced',true, ...
+        'hasTarget',~isempty(q),'clfSlack',certificate.clfSlack,'clfInitialValue',certificate.clfInitialValue, ...
+        'clfNextValue',certificate.clfNextValueUpper,'clfDecayPerHold',cfg.nonlinear.clfDecay, ...
+        'clfDissipationCertified',certificate.clfAvailable && certificate.clfSlack==0, ...
+        'clfAvailable',certificate.clfAvailable, ...
+        'clfDissipationScope',"verifiedFirstHoldOnConstantCurvatureReference", ...
+        'clfMatrix',backup.reference.matrix,'clfReferenceState',backup.reference.state, ...
+        'clfOperatingInput',backup.reference.input,'clfOperatingCurvature',frame(4), ...
+        'certificateSource',search.source,'carriedWitnessAvailable',search.shiftAttempted, ...
+        'fallbackUsed',certificate.inherited,'inheritedCertificate',certificate.inherited, ...
+        'terminalBackupDispatched',certificate.terminalOnly, ...
+        'solverAlgorithm',"lexicographicCertifiedControlBoxes", ...
+        'convexSubproblemsAreCertifiedInnerApproximations',isempty(cfg.nonlinear.proposalFunction), ...
+        'solverCallCount',search.solverCalls,'admissionSearch',search, ...
+        'minimumCollisionMargin',certificate.minimumCollisionMargin,'minimumRoadMargin',certificate.minimumRoadMargin, ...
+        'horizonSteps',size(predictedInput,2),'certifiedDuration',size(predictedInput,2)*cfg.controller.sampleTime, ...
+        'predictedNextState',certificate.states(:,2),'initialEgoState',ego.modelState,'runtimeSeconds',toc(timer));
+    controllerState=struct('version',47,'identity',identity,'stateTime',ego.stateTime, ...
+        'appliedInput',first,'plan',predictedInput,'predictedState',certificate.states, ...
+        'certificate',certificate,'backup',backup,'target',q,'targetAnchor',targetAnchor,'targetStep',targetStep);
+    planningProblem=struct('problemClass',"nonlinearPredictiveCbfClf",'model',model, ...
+        'inputPlan',predictedInput,'predictedState',certificate.states,'certificate',certificate,'metadata',metadata);
     if ~explicitState,lastState=controllerState;end
 end
 
-function strength = localReactionStrength(prediction)
-% Input-weight scale of the carried target-reactive policy (Inf: ego-only tube).
-    strength = Inf;
-    if isfield(prediction,'targetReaction'),strength = prediction.targetReaction.strength;end
-end
-
-function model = localFiniteModel(ego, lane, road, cfg, previousState)
-    stationHint=[];
-    if laneGeometry.isVaryingReference(lane)
-        stationHint=cfg.referenceSpeed*(ego.stateTime-cfg.clf.referenceEpoch);
-        if isstruct(previousState) && isfield(previousState,'predictedState') ...
-                && isfield(previousState,'identity') && isequaln(previousState.identity.lane,lane)
-            stationHint=previousState.predictedState(1,min(2,size(previousState.predictedState,2)));
+function [q,anchor,step]=localTargetContinuation(q,prior,time,cfg)
+    anchor=q;step=0;
+    if (~isempty(q) || (isstruct(prior) && isfield(prior,'targetAnchor') && ~isempty(prior.targetAnchor))) && ~isfinite(time)
+        error('collisionAvoidanceController:missingTargetClock','A retained NRMM trajectory requires a finite stateTime.');
+    end
+    if ~isstruct(prior) || ~isfield(prior,'version') || prior.version~=47 ...
+            || ~isfield(prior,'targetAnchor') || isempty(prior.targetAnchor),return;end
+    tolerance=cfg.nonlinear.targetConsistencyTolerance;
+    h=cfg.controller.sampleTime;
+    if h~=prior.identity.configuration.controller.sampleTime ...
+            || (isfinite(time) && isfinite(prior.stateTime) && abs(time-prior.stateTime-h)>tolerance)
+        error('collisionAvoidanceController:inconsistentTargetClock', ...
+            'A retained constant-parameter target requires one unchanged sampling interval per call.');
+    end
+    anchor=prior.targetAnchor;step=prior.targetStep+1;
+    expected=nonlinearSafetyCertificate.targetFlow(anchor,step*h);
+    if ~isempty(q)
+        difference=q-expected;difference(3)=atan2(sin(difference(3)),cos(difference(3)));
+        if any(abs(difference)>tolerance)
+            error('collisionAvoidanceController:inconsistentTargetObservation', ...
+                'The target differs from its immutable NRMM prediction. Reset for a new exact-model admission or provide a robust model.');
         end
     end
-    projection = laneGeometry.project(ego.position, lane,stationHint);
-    heading = atan2(sin(ego.yaw-projection.heading), cos(ego.yaw-projection.heading));
-    [radius, chartValid] = stateUncertainty.toFrenet(ego.modelState, ego.stateErrorBound, lane);
-    if any(ego.stateErrorBound) && (~chartValid || ~isfinite(ego.stateTime))
-        error("collisionAvoidanceController:invalidUncertaintyChart", ...
-            "Uncertain admission requires a timestamp and one invertible projection chart.");
-    end
-    previousInput = zeros(2, 1);
-    if ~isempty(ego.heldActuatorInput), previousInput = ego.heldActuatorInput; end
-    model = struct("cfg", cfg, "lane", lane, "road", road, ...
-        "stateTime", ego.stateTime, "sampleTime", cfg.controller.sampleTime, ...
-        "horizonSteps", cfg.controller.horizonSteps, "referenceSpeed", cfg.referenceSpeed, ...
-        "initialEgoState", [projection.station; projection.lateralPosition; heading; ego.modelState(4:6)], ...
-        "initialFrenetErrorBound", radius, "longitudinalAccelerationBias", ego.longitudinalAccelerationBias, ...
-        "previousInput", previousInput, ...
-        "requiredMargin", 0,"confirmation",[]);
-    if laneGeometry.isVaryingReference(lane)
-        % One schedule lookup per frame; every phase query below reuses it.
-        model.referenceBank = ltvBicycleModel.referenceSchedule(model);
-    end
+    % Observation agreement is a diagnostic, not an uncertainty certificate.
+    % The immutable epoch model remains authoritative, including during dropout.
+    q=expected;
 end
 
-function cfg = localControllerConfiguration(userCfg)
-    persistent cachedUserConfiguration cachedConfiguration cacheValid
-    if isempty(cacheValid)
-        cacheValid = false;
-    end
-    if nargin < 1 || isempty(userCfg)
-        userCfg = [];
-    end
-    if cacheValid && isequaln(userCfg, cachedUserConfiguration)
-        cfg = cachedConfiguration;
-        return;
-    end
-    localAddConfigurationPath();
-    cfg = collisionAvoidanceControllerConfig(userCfg);
-    cachedUserConfiguration = userCfg;
-    cachedConfiguration = cfg;
-    cacheValid = true;
-end
-
-function localAddConfigurationPath()
-    if exist("collisionAvoidanceControllerConfig", "file") ~= 2
-        repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
-        configurationRoot = fullfile(repositoryRoot, "config");
-        if isfolder(configurationRoot)
-            addpath(configurationRoot);
-        end
-    end
-    localAddKernelPath();
-end
-
-function localAddKernelPath()
-% The generated tube, linearization and row kernels live beside the conic
-% solver bridge. Without them every prediction and row falls back to the
-% interpreted implementations, which compute the same enclosures slowly.
-    if exist("bicycleHeldIntervalKernelMex", "file") == 3 ...
-            && exist("avoidanceCellRowsKernelMex", "file") == 3
-        return;
-    end
-    repositoryRoot = fileparts(fileparts(mfilename("fullpath")));
-    kernelRoot = fullfile(repositoryRoot, "solver", "bicycle");
-    if isfolder(kernelRoot)
-        addpath(kernelRoot);
-    end
-end
-
-function command = localCommand(firstInput, state, prediction, model)
-% Derived quantities use the first prediction stage's actual affine model.
-    cfg = model.cfg;
-    tire = modifiedFialaTire.parameters(cfg);
-    steeringAngle = firstInput(1);
-    brakingRatio = firstInput(2);
-    longitudinalAcceleration = modifiedFialaTire.accelerationGain(cfg)*brakingRatio;
-    tireModel = prediction.tireModels{1};
-    axleLateralForce = tireModel.state*state+tireModel.input*firstInput+tireModel.constant;
-    slip = atan2([state(5)+cfg.vehicle.lf*state(6);state(5)-cfg.vehicle.lr*state(6)], ...
-        max(state(4),cfg.model.scheduleSpeedFloor))-[steeringAngle;0];
-    axleLongitudinalForce = modifiedFialaTire.longitudinalForce(brakingRatio, cfg);
-    [roadForce, ~, roadComponents] = ltvBicycleModel.roadLoad(state(4), cfg);
-    axleRollingResistance = roadComponents.rollingResistanceForce ...
-        * tire.staticNormalLoad/(cfg.vehicle.m*cfg.vehicle.gravity);
-    axleContactForce = axleLongitudinalForce-axleRollingResistance;
-    command = struct();
-    command.brakingRatio = brakingRatio;
-    command.longitudinalAcceleration = longitudinalAcceleration;
-    derivative = prediction.continuousA(:,:,1)*state ...
-        +prediction.continuousB(:,:,1)*firstInput+prediction.continuousC(:,1);
-    command.bodyLongitudinalVelocityDerivative = derivative(4);
-    command.lateralAcceleration = derivative(5);
-    command.yawAcceleration = derivative(6);
-    command.actuatorInput = [steeringAngle; brakingRatio];
-    command.actuatorInputOrder = [ ...
-        "frontWheelSteeringAngle", "brakingRatio"];
-    command.totalLongitudinalActuatorForce = sum(axleLongitudinalForce);
-    command.totalLongitudinalTireForce = sum(axleContactForce);
-    command.axleLongitudinalTireForce = axleContactForce;
-    command.aerodynamicResistanceForce = roadComponents.aerodynamicForce;
-    command.rollingResistanceForce = roadComponents.rollingResistanceForce;
-    command.totalRoadLoadForce = roadForce;
-    % Compatibility field consumed by the torque adapter: actuator force
-    % before rolling loss, not contact force at the tire patch.
-    command.axleLongitudinalForce = axleLongitudinalForce;
-    command.axleLateralForce = axleLateralForce;
-    command.axleNormalLoad = tire.staticNormalLoad;
-    command.tireSideslipAngle = slip;
-    command.frontWheelSteeringAngle = steeringAngle;
-end
-
-function [program,prediction,clf,result,search,model]=localSolve(model,cfg)
-% An active target adds fixed-direction certificates to the convex base.
-% Without a target, the common dynamics, CLF and terminal solve remain.
-    phase=tic;
-    [program,prediction,clf]=solveHardCbfClf.prepare(model);
-    formulationSeconds=toc(phase);
-    if isfield(program,'jointCertificate')
-        [program,result,search,model]=solveHardCbfClf.fixedDirections(program,model,cfg);
-        prediction=program.prediction;clf=program.clf;
-        search.formulationSeconds=search.formulationSeconds+formulationSeconds;
-        return;
-    end
-    phase=tic;
-    result=solveHardCbfClf.constrained(program,cfg);
-    search=struct('hardSolves',1,'restorationSolves',0,'nativeSolves',1, ...
-        'familyAttempts',0,'horizonAttempts',1, ...
-        'formulationSeconds',formulationSeconds,'solveSeconds',toc(phase), ...
-        'initialOverlappingNodes',program.supportGeometry.overlappingNodes, ...
-        'policy',"jointSupport");
+function command=localCommand(input,state,cfg)
+    tire=modifiedFialaTire.parameters(cfg);force=modifiedFialaTire.longitudinalForce(input(2),cfg);
+    slip=atan2([state(5)+cfg.vehicle.lf*state(6);state(5)-cfg.vehicle.lr*state(6)],state(4))-[input(1);0];
+    lateral=modifiedFialaTire.evaluate(slip,input(2),cfg);dx=nonlinearBicycleModel.derivative(state,input,cfg);
+    [road,~,components]=ltvBicycleModel.roadLoad(state(4),cfg);
+    rolling=components.rollingResistanceForce*tire.staticNormalLoad/(cfg.vehicle.m*cfg.vehicle.gravity);
+    command=struct('actuatorInput',input,'frontWheelSteeringAngle',input(1),'brakingRatio',input(2), ...
+        'actuatorInputOrder',["frontWheelSteeringAngle","brakingRatio"], ...
+        'longitudinalAcceleration',modifiedFialaTire.accelerationGain(cfg)*input(2), ...
+        'bodyLongitudinalVelocityDerivative',dx(4),'lateralAcceleration',dx(5),'yawAcceleration',dx(6), ...
+        'totalLongitudinalActuatorForce',sum(force),'totalLongitudinalTireForce',sum(force-rolling), ...
+        'axleLongitudinalTireForce',force-rolling,'axleLongitudinalForce',force, ...
+        'axleLateralForce',lateral,'axleNormalLoad',tire.staticNormalLoad,'tireSideslipAngle',slip, ...
+        'aerodynamicResistanceForce',components.aerodynamicForce, ...
+        'rollingResistanceForce',components.rollingResistanceForce,'totalRoadLoadForce',road);
 end

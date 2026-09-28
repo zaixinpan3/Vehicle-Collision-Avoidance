@@ -60,6 +60,8 @@ classdef fialaCertificate
                 options.maximumGenerators (1,1) double {mustBeInteger,mustBeFinite} = 64
                 options.maximumComputationTime (1,1) double {mustBePositive} = Inf
                 options.maximumCells (1,1) double {mustBePositive,mustBeInteger,mustBeFinite} = 512
+                options.curvature = []
+                options.inputRadius (2,1) double {mustBeReal,mustBeFinite,mustBeNonnegative} = zeros(2,1)
             end
             if exist('fialaFeedbackSampleMex','file')~=3
                 error('collisionAvoidanceController:missingFialaVerifier', ...
@@ -79,9 +81,18 @@ classdef fialaCertificate
             execution=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum; ...
                 cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum; ...
                 cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+            coordinateArguments={};
+            if ~isempty(options.curvature)
+                validateattributes(options.curvature,{'double'},{'scalar','finite','real'});
+                coordinateArguments={options.curvature};
+            end
+            if any(options.inputRadius)
+                coordinateArguments={options.curvature,options.inputRadius};
+            end
             certificate=fialaFeedbackSampleMex(inletLower,inletUpper,nominal,gain,measurementRadius, ...
-                parameters,timing,previousInput,execution,options.inlet);
+                parameters,timing,previousInput,execution,options.inlet,coordinateArguments{:});
             certificate.modelParameters=parameters;
+            certificate.nominalInputRadius=options.inputRadius;
             certificate.feedbackNominal=nominal;
             certificate.feedbackGain=gain;
             certificate.measurementRadius=measurementRadius;

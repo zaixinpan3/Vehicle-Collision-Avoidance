@@ -1,31 +1,24 @@
 # Core controller source budget
 
-The core control algorithm has an upper limit of **20 source files**. The
-current implementation contains **20**: 13 MATLAB modules, five native C++
-translation units, one native header, and one controller configuration.
-The controller initializes separation directions and then fixes them while
-optimizing the complete trajectory in one hard SOCP. The
-accepted complete certificate supplies the next frame's feasible incumbent
-only under the unchanged-model continuation contract. Refreshed trajectory
-models require new hard admission.
-Safety is certified at the hold nodes only
-([NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md)).
-Its format-46 state retains directions, occupied sets, prediction, terminal
-continuation, the feedback correction of the issued input and, for a
-target-reactive admission, the reaction gains and nominal target flow
-([CLOSED_LOOP_TARGET_PREDICTION.md](CLOSED_LOOP_TARGET_PREDICTION.md)). See [the algorithm and guarantees](JOINT_SUPPORT_CERTIFICATES.md).
-Related operations stay in the module that owns their responsibility.
+The core has **24 source files**, including the controller configuration. The
+public entry uses nonlinear inertial Fiala dynamics, full-interval rectangular
+certificates and an invariant cruise backup. See
+[the current contract and proof](NONLINEAR_PREDICTIVE_CBF.md). The remaining affine
+formulation, geometry and prediction modules are shared research utilities;
+they do not define the public controller's safety guarantee.
 
-The count includes every source file under `controller/`, including future
-subdirectories, plus `config/collisionAvoidanceControllerConfig.m`. Tests,
-scenario drivers, estimator/perception algorithms, theory documents, generated
-binaries and third-party solver implementations have separate responsibilities.
-Do not move controller helpers into those directories to evade the limit.
+The count includes every MATLAB/C/C++ source or header under `controller/`, plus
+`config/collisionAvoidanceControllerConfig.m`. Tests, scenario drivers, theory
+documents, generated binaries and third-party solvers have separate roles.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public target-array entry; fixed-direction admission and solver-accepted improvement, complete witness storage and full-frame deadline enforcement |
-| `readPlanningInputs.m` | Input normalization, target-departure sensor declaration, optional NRMM parameter error bounds and lane/target model construction |
+| `collisionAvoidanceController.m` | Public nonlinear controller, immutable target epoch, format-47 witness and metadata |
+| `nonlinearBicycleModel.m` | Nonlinear inertial/Frenet derivatives, RK4 proposal and variational flow, realizable trims and transverse errors |
+| `nonlinearSafetyCertificate.m` | NRMM parsing and exact flow, rectangle dual witnesses, swept interval admission, invariant-ball synthesis and infinite target continuation |
+| `solveNonlinearPredictivePlan.m` | Stored-policy execution and terminal handoff, nominal/passing initialization, certified control boxes and lexicographic CLF/nominal improvement |
+| `nonlinearSafetyMex.cpp` | Directed target/rectangle/road geometry, Frenet norm and tail certificates, interval CLF derivatives and terminal remainder proof |
+| `readPlanningInputs.m` | Shared ego, road and target input normalization |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate (shrunk by the declared lateral clearance), road-refit readmission and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
 | `avoidanceStageQp.m` | Sparse base transcription (`build`) and fixed-direction support majorants (`fixedDirections`) |
@@ -47,24 +40,20 @@ Do not move controller helpers into those directories to evade the limit.
 
 ## Current interfaces and scope
 
-The public controller signature is unchanged. Its fourth output is a
-format-46 predictive certificate. `formulateAvoidanceProblem(model)` retains
-the convex dynamics/terminal base and attaches collision and exit certificates.
-Under unchanged-model continuation, accepted successors preserve their angles, occupied sets, charts, prediction,
-terminal set and absolute exit deadline. Touching majorants contain that full
-shifted witness under unchanged contracts. The terminal law is never dispatched
-after solver failure.
+The public four-output signature is unchanged. Returned controls beyond the first
+are nominal controls of the stored policy; the certificate carries their fixed
+reference states and feedback gains. Use the fourth output as the next call's
+state. The target model, global corridor and exact plant must remain consistent.
+A stored suffix is executable on solver or verification failure, and the invariant
+cruise law is dispatched when that prefix ends. See the main theory document for
+clock, uncertainty, road and positive-speed limits.
 
-`avoidanceStageQp.build` supplies the common sparse base. Its `fixedDirections`
-method adds stage-local support epigraphs and a global yaw majorant without
-angle variables. `solveHardCbfClf.fixedDirections` owns analytical NRMM/VFFM reference preparation and fitting,
-bounded flow-based model reconstruction before hard admission, and full continuation improvement. A usable previous trajectory is tried first; a rejected or invalid reference triggers a fresh flow model. Each model refresh rebuilds its dependent rows and does not inherit an old feasible witness. Target-free
-frames solve only the common convex base with a single `constrained` call.
-Nonlinear Fiala tools retain their separate study scope. The online guarantee
-remains the declared zero-residual held affine plant.
+Affine formulation functions remain callable for model studies. Their format-46
+metadata, node-only certificates and affine-plant scenario drivers are not the
+new public interface. Existing tests of those public-controller contracts require
+migration; the nonlinear regression suite is `nonlinearPredictiveSafetyTest`.
 
-Clear changed MATLAB functions/classes after updating a live session. Native
-kernels remain under the excluded `solver/` tree and must be regenerated with `scripts/buildAvoidanceGeometryKernel.m`
-after changing the shared geometry kernel; the current kernels include
-the numeric affine pose map and hard local-domain payload. `controllerSourceBudgetTest` enforces the
-20-source upper limit.
+Build the MPFR kernels with `scripts/buildFialaIntervalVerifier.m` outside tracked
+source. `prepareCollisionAvoidanceController` can build missing kernels under
+excluded `solver/nonlinear/`. Clear loaded MATLAB functions/native kernels after
+source changes. `controllerSourceBudgetTest` enforces the 24-source limit.

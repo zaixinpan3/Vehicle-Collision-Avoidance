@@ -240,7 +240,8 @@ mxArray* centerArray(const Point& p){mxArray* a=mxCreateDoubleMatrix(8,1,mxREAL)
 void mexFunction(int nlhs,mxArray* out[],int nrhs,const mxArray* in[]){
     try{
         Profile profile;auto started=Clock::now();
-        if(nrhs!=10 || nlhs!=1)throw std::runtime_error("Ten arguments and one output are required.");
+        if(nrhs<10 || nrhs>12 || nlhs!=1)throw std::runtime_error("Ten arguments, optional curvature and input radius, and one output are required.");
+        fialaFrenetCurvature=nrhs>=11 && !mxIsEmpty(in[10])?vector(in[10],1)[0]:std::numeric_limits<double>::quiet_NaN();
         const double* lower=vector(in[0],6);const double* upper=vector(in[1],6);const double* nominal=vector(in[2],8);
         const double* gain=vector(in[3],12);const double* noise=vector(in[4],6);const double* p=vector(in[5],17);
         validateParameters(p);
@@ -256,7 +257,11 @@ void mexFunction(int nlhs,mxArray* out[],int nrhs,const mxArray* in[]){
             throw std::runtime_error("Invalid sampling/subdivision budget.");
         for(int j=0;j<6;++j)if(noise[j]<0)throw std::runtime_error("Measurement radii must be nonnegative.");
         Tube inlet=inletTube(lower,upper,previous,in[9],static_cast<size_t>(maxGenerators));Box slew;
-        Tube tube=feedbackTube(inlet,nominal,gain,noise,slew);Box initial=outer(tube);
+        Tube tube=feedbackTube(inlet,nominal,gain,noise,slew);
+        if(nrhs==12){const double* radius=vector(in[11],2);size_t count=tube.generators[0].size();resize(tube,count+2);
+            for(int u=0;u<2;++u){if(radius[u]<0)throw std::runtime_error("Input radii must be nonnegative.");
+                tube.generators[6+u][count+u]=radius[u];slew[u]=slew[u]+I(-radius[u],radius[u]);}}
+        Box initial=outer(tube);
         bool accepted=true;std::string reason="complete";std::vector<Cell> cells;int rejected=0;double time=0;
         for(int u=0;u<2;++u){
             I command=initial[6+u];I difference=slew[u];
@@ -270,7 +275,11 @@ void mexFunction(int nlhs,mxArray* out[],int nrhs,const mxArray* in[]){
             if(timedOut()){accepted=false;reason="timeBudget";break;}
             if(tube.generators[0].size()>4090){accepted=false;reason="generatorBudget";break;}
             if(cells.size()>=static_cast<size_t>(maxCells)){accepted=false;reason="cellBudget";break;}
-            double end=std::min(duration,time+maxStep);bool stepAccepted=false;
+            // After subdivision, cap growth so end/time <= 2. Sterbenz's
+            // lemma then makes end-time exact in binary64 (time=0 is exact
+            // separately); the validated subflows cover precisely [0,h].
+            double step=time>0?std::min(maxStep,time):maxStep;
+            double end=std::min(duration,time+step);bool stepAccepted=false;
             if(end<=time){accepted=false;reason="minimumCellDuration";break;}
             while(!stepAccepted){
                 if(timedOut()){accepted=false;reason="timeBudget";break;}

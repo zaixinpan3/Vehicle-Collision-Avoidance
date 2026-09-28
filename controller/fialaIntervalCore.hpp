@@ -9,6 +9,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <limits>
 using Unary = int (*)(mpfr_ptr,mpfr_srcptr,mpfr_rnd_t);
 using Binary = int (*)(mpfr_ptr,mpfr_srcptr,mpfr_srcptr,mpfr_rnd_t);
 struct I {
@@ -78,17 +79,31 @@ I square(I a){
 }
 I absolute(I a){return {a.lo<=0 && a.hi>=0?0:std::min(std::abs(a.lo),std::abs(a.hi)),std::max(std::abs(a.lo),std::abs(a.hi))};}
 I monotone(I a,Unary f){return {rounded(f,a.lo,MPFR_RNDD),rounded(f,a.hi,MPFR_RNDU)};}
+I piInterval(){
+    mpfr_t p;mpfr_init2(p,128);mpfr_const_pi(p,MPFR_RNDD);
+    double lo=mpfr_get_d(p,MPFR_RNDD);mpfr_const_pi(p,MPFR_RNDU);
+    double hi=mpfr_get_d(p,MPFR_RNDU);mpfr_clear(p);return {lo,hi};
+}
+bool containsInteger(I a){return std::ceil(a.lo)<=std::floor(a.hi);}
 I sine(I a){
-    // Deliberately local world chart: all angles below are restricted to +/-1.5 rad.
-    if(a.lo < -1.5 || a.hi > 1.5)throw std::runtime_error("Angle enclosure exceeds the certified local chart.");
-    return monotone(a,mpfr_sin);
+    I pi=piInterval(),period=I(2)*pi;
+    double lo=std::min(rounded(mpfr_sin,a.lo,MPFR_RNDD),rounded(mpfr_sin,a.hi,MPFR_RNDD));
+    double hi=std::max(rounded(mpfr_sin,a.lo,MPFR_RNDU),rounded(mpfr_sin,a.hi,MPFR_RNDU));
+    if(containsInteger((a-pi/I(2))/period))hi=1;
+    if(containsInteger((a+pi/I(2))/period))lo=-1;
+    return {lo,hi};
 }
 I cosine(I a){
-    if(a.lo < -1.5 || a.hi > 1.5)throw std::runtime_error("Angle enclosure exceeds the certified local chart.");
-    double l=std::max(std::abs(a.lo),std::abs(a.hi));
-    double h=a.lo<=0 && a.hi>=0?0:std::min(std::abs(a.lo),std::abs(a.hi));
-    return {rounded(mpfr_cos,l,MPFR_RNDD),rounded(mpfr_cos,h,MPFR_RNDU)};
+    I pi=piInterval(),period=I(2)*pi;
+    double lo=std::min(rounded(mpfr_cos,a.lo,MPFR_RNDD),rounded(mpfr_cos,a.hi,MPFR_RNDD));
+    double hi=std::max(rounded(mpfr_cos,a.lo,MPFR_RNDU),rounded(mpfr_cos,a.hi,MPFR_RNDU));
+    if(containsInteger(a/period))hi=1;
+    if(containsInteger((a-pi)/period))lo=-1;
+    return {lo,hi};
 }
+// Set at each native entry. NaN selects inertial coordinates; finite k selects
+// the exact constant-curvature Frenet equations, used only for backup proofs.
+static double fialaFrenetCurvature=std::numeric_limits<double>::quiet_NaN();
 struct D { I v;std::array<I,8> d{};D(double x=0):v(x){} D(I x):v(x){} };
 D operator+(D a,D b){D c(a.v+b.v);for(int j=0;j<8;++j)c.d[j]=a.d[j]+b.d[j];return c;}
 D operator-(D a){D c(-a.v);for(int j=0;j<8;++j)c.d[j]=-a.d[j];return c;}
@@ -190,7 +205,14 @@ template<class Scalar> std::array<Scalar,6> flow(const std::array<Scalar,8>& y,c
     Scalar frontY=Scalar(p[6])*beta*sinD(delta)+front*cosD(delta);
     Scalar road=Scalar(.5)*Scalar(p[8])*Scalar(p[9])*Scalar(p[10])*sq(vx)
         +Scalar(p[0])*Scalar(p[15])*(Scalar(p[11])+Scalar(p[12])*vx+Scalar(p[13])*sq(sq(vx)))*tanhD(vx/Scalar(p[14]));
-    return {vx*cosD(y[2])-vy*sinD(y[2]),vx*sinD(y[2])+vy*cosD(y[2]),r,
+    Scalar forward=vx*cosD(y[2])-vy*sinD(y[2]);
+    Scalar lateral=vx*sinD(y[2])+vy*cosD(y[2]),heading=r;
+    if(std::isfinite(fialaFrenetCurvature)){
+        Scalar denominator=Scalar(1)-Scalar(fialaFrenetCurvature)*y[1];
+        if(denominator.v.lo<=0)throw std::runtime_error("Frenet chart is not invertible.");
+        forward=forward/denominator;heading=r-Scalar(fialaFrenetCurvature)*forward;
+    }
+    return {forward,lateral,heading,
         (frontX+Scalar(p[7])*beta-road)/Scalar(p[0])+vy*r,
         (frontY+rear)/Scalar(p[0])-vx*r,(Scalar(p[2])*frontY-Scalar(p[3])*rear)/Scalar(p[1])};
 }

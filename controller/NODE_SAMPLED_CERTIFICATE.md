@@ -1,5 +1,11 @@
 # Hold-node safety certificate
 
+> Scope update, September 28, 2026: the public controller now uses the
+> [nonlinear predictive-CBF architecture](NONLINEAR_PREDICTIVE_CBF.md).
+> This document describes the affine research formulation and its assumptions;
+> its public-entry and node-only claims do not describe the format-47 controller.
+
+
 Adopted on 2026-09-17 by project decision. The online controller certifies
 safety at the sampling nodes of the exact sampled affine plant, not at every
 instant inside a held command. This note states exactly what the certificate

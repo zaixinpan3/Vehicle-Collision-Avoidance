@@ -1,0 +1,29 @@
+{
+  "scope": "Final project artifacts; development validation stages are distinguished in the report",
+  "sha256": {
+    "config/collisionAvoidanceControllerConfig.m": "51ceb79aebd531f0580726bec11be9b8cf14451d7390b14b4dabcd4671050d52",
+    "controller/CONTROLLER_FILES.md": "5f681a28dfc537b6235e21e1cfc054a77c158b98a8d1555c741739abd71baafb",
+    "controller/JOINT_SUPPORT_CERTIFICATES.md": "15b2f1544846391869e921614a5ee472368d0e112879148378e9bcf731613dde",
+    "controller/LTV_BICYCLE_MODEL.md": "28492e32d6c53eeb16e973d3f442a2dbf99269faced5f75629041426f8ec9e98",
+    "controller/NODE_SAMPLED_CERTIFICATE.md": "614644c09d68f1d374db3b335eab2ff51c06c8c1a6aabfc4fec76b2ac862c129",
+    "controller/PCBF_CLF_ARCHITECTURE.md": "513c13aac6891e43dd2328060dcc73b50f181d78431969f826585cc2e6c7ccce",
+    "controller/NONLINEAR_PREDICTIVE_CBF.md": "aa140fcfd081cc1894205c5c2a3a1a0d300d11154e961ae987f2d6faae6ade42",
+    "controller/collisionAvoidanceController.m": "444314c1bb90dca9c15a19aaf59c12a273916b90fca7513d918ff1f377db69dc",
+    "controller/fialaCertificate.m": "b73422b8746b663a45a95eaaff48fdeae77f87e0cc1231fec984df7e4a4fbabe",
+    "controller/fialaFeedbackSampleMex.cpp": "0f2ff67234ed0f742d78a05c767afedbfca756c6f6102b87821d23f43cd85719",
+    "controller/fialaIntervalCore.hpp": "986e6e823f3d2fb7ebd6f5865dc71ed859a9b578b00a7f0ef78f83b86d63ccca",
+    "controller/nonlinearBicycleModel.m": "dcb7d8fce4a2ed93379675c4d7218e1379727740410cbe61bbc590acfd226ced",
+    "controller/nonlinearSafetyCertificate.m": "10613282efdfd0a56efc3820c2b594c75f429aca959a8c2da80a16377405d8e8",
+    "controller/nonlinearSafetyMex.cpp": "0b97b793b32f6cd2d4f60abfe4e36d1d8f6aa683ce9a8f76aac26ac9b3a32ff6",
+    "controller/solveNonlinearPredictivePlan.m": "03a8863ba36a9b917b51987bfb8cd952d29c9983d826a447d33a44c9e6ecf349",
+    "scripts/buildFialaIntervalVerifier.m": "c49b7af84b00edc4c156342ca3f9d536ccc9e340883e06c6ad6ce89bfe2bf8df",
+    "scripts/prepareCollisionAvoidanceController.m": "d9eb39d59961b07c39ece5d5c1a21423ed30344472bd4056e432e06316e62a5f",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "2aec1f84ec49474983d659773c39051ef746822eff30ed064b08d56dd59d64b5",
+    "scripts/validateNonlinearPredictiveController.m": "659680826953ed9ef5bb65da9e4a01d4c01c0b8e19ea4866113bb0ab97ab6747",
+    "tests/controllerSourceBudgetTest.m": "c680eb1cfb6750f372d6047a1090fb5b2134f115b7a8c892f8219765a6ec1682",
+    "tests/nonlinearPredictiveSafetyTest.m": "e056d56836c51656ee3e16034012019942195d779edc2f303271435396623c20",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928.md": "002d5fe57d62d92d5cdcd2806b87d49b72cbb18dda6d57f28566be52cba8081f",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/development-checks.json": "2893ea304d1c6825236bf8bb3511a7564e73aaad51e6567ea7d86d7372386364",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/development-replays.json": "281176e8effc918aa1beaa3bdafe9051c9a6ed3e1c7c2995d84356c35f2b126c"
+  }
+}

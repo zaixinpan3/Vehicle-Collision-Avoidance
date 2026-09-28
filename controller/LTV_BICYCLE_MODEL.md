@@ -1,5 +1,11 @@
 # Scheduled Frenet bicycle and continuation model
 
+> Scope update, September 28, 2026: the public controller now uses the
+> [nonlinear predictive-CBF architecture](NONLINEAR_PREDICTIVE_CBF.md).
+> This document describes the affine research formulation and its assumptions;
+> its public-entry and node-only claims do not describe the format-47 controller.
+
+
 > Certificate sampling note (2026-09-17): the online controller now certifies the safety rows at the hold nodes of the exact sampled affine plant only; statements below about whole-hold, swept or Bernstein coverage hold at the nodes and no longer claim inter-node coverage. See [NODE_SAMPLED_CERTIFICATE.md](NODE_SAMPLED_CERTIFICATE.md).
 
 > Trajectory update (2026-09-25): active encounters with the default

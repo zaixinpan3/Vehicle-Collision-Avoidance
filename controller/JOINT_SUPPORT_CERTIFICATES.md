@@ -1,5 +1,11 @@
 # Fixed-direction convex trajectory optimization
 
+> Scope update, September 28, 2026: the public controller now uses the
+> [nonlinear predictive-CBF architecture](NONLINEAR_PREDICTIVE_CBF.md).
+> This document describes the affine research formulation and its assumptions;
+> its public-entry and node-only claims do not describe the format-47 controller.
+
+
 Format 43 separates initialization from execution. An NRMM-timed VFFM reference
 initializes a trajectory anchor and one unit separation direction per collision or
 exit record. These directions are then fixed while one hard SOCP optimizes the

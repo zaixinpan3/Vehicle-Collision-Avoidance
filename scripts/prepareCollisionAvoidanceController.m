@@ -1,9 +1,9 @@
 function preparation = prepareCollisionAvoidanceController(ego, road, cfg, target, options)
-%prepareCollisionAvoidanceController Exercise the held-flow and conic kernels.
+%prepareCollisionAvoidanceController Prepare validated nonlinear-flow kernels.
 % Optional target probes use the supplied exact scene and discard commands.
 % Each accepted fresh probe is followed by SuccessorProbes chained calls on
-% the declared affine successor of its own accepted plan (predicted center,
-% issued held input, target advanced by its published velocity), so the
+% the declared nonlinear successor of its accepted plan (predicted center,
+% issued held input, target advanced by its constant-parameter NRMM), so the
 % carried-witness code paths are compiled before periodic sampling as well.
 % Without a target, only native paths are prepared. No missing observation is
 % synthesized and no probe replaces a running certificate.
@@ -15,8 +15,11 @@ function preparation = prepareCollisionAvoidanceController(ego, road, cfg, targe
         options.SuccessorProbes (1,1) double {mustBeInteger, mustBeNonnegative} = 2
     end
     timer = tic;
-    nativePath = fullfile(fileparts(fileparts(mfilename("fullpath"))),"solver","bicycle");
-    if isfolder(nativePath),addpath(nativePath);end
+    nativePath = fullfile(fileparts(fileparts(mfilename("fullpath"))),"solver","nonlinear");
+    if ~isfolder(nativePath) || ~isfile(fullfile(nativePath,"nonlinearSafetyMex."+mexext))
+        buildFialaIntervalVerifier(string(nativePath));
+    end
+    addpath(nativePath);
     cfg = collisionAvoidanceControllerConfig(cfg);
     if isfield(ego, "targetEstimate"), ego = rmfield(ego, "targetEstimate"); end
     probeCount = 3*~isempty(target);
@@ -61,9 +64,9 @@ function preparation = prepareCollisionAvoidanceController(ego, road, cfg, targe
         "failureIdentifier", failures, "allProbesCertified", ~isempty(certified) && all(certified), ...
         "successorProbeSeconds", successorSamples, "successorFailureIdentifier", successorFailures, ...
         "computationalThreads", maxNumCompThreads, ...
-        "nativeRolloutAvailable",exist("bicycleNominalKernelMex","file")==3, ...
-        "nativeLinearizationAvailable",exist("bicycleLinearizationKernelMex","file")==3, ...
-        "nativeGeometryAvailable",exist("avoidanceCellRowsKernelMex","file")==3, ...
+        "nativeRolloutAvailable",exist("fialaFeedbackSampleMex","file")==3, ...
+        "nativeLinearizationAvailable",exist("fialaIntervalMex","file")==3, ...
+        "nativeGeometryAvailable",exist("nonlinearSafetyMex","file")==3, ...
         "scope", "Before periodic sampling; explicitly supplied target probes and their declared successors; no commands applied");
 end
 
@@ -76,25 +79,25 @@ function available = localSuccessorAvailable(ego, target)
 end
 
 function [ego, target] = localDeclaredSuccessor(ego, target, problem, stored)
-% The next scene of the declared affine plant: the accepted plan's predicted
-% successor center, its issued input held, and the target advanced at its
-% published velocity over one hold. Aliases of the updated fields are removed
+% The next scene uses the accepted nonlinear prediction and NRMM flow.
+% Aliases of the updated fields are removed
 % so the parser reads the successor values.
     state = stored.predictedState(:, 2);
-    [position, heading] = laneGeometry.fromFrenet(state, problem.model.lane);
     for name = ["positionX", "x", "positionY", "y", "yawAngle", "heading", "longitudinalVelocity"]
         if isfield(ego, name), ego = rmfield(ego, name); end
     end
-    ego.position = position;
-    ego.yaw = heading;
+    ego.position = state(1:2);
+    ego.yaw = state(3);
     ego.speed = state(4);
     ego.lateralVelocity = state(5);
     ego.yawRate = state(6);
-    ego.stateTime = problem.model.stateTime+problem.model.sampleTime;
+    ego.stateTime = stored.stateTime+problem.model.cfg.controller.sampleTime;
     ego.heldActuatorInput = stored.appliedInput;
     if isfield(ego, "perception") && isstruct(ego.perception) && isfield(ego.perception, "time")
         ego.perception.time = ego.stateTime;
     end
-    target.targetPositionInertial = target.targetPositionInertial(:) ...
-        +problem.model.sampleTime*target.targetVelocityInertial(:);
+    q=nonlinearSafetyCertificate.targetFlow(problem.model.target,problem.model.cfg.controller.sampleTime);
+    target.targetPositionInertial=q(1:2);target.targetYawInertial=q(3);target.targetYawRate=q(6);
+    target.targetVelocityInertial=q(4)*[cos(q(3)+q(5));sin(q(3)+q(5))];
+    target.targetAccelerationInertial=q(6)*[-target.targetVelocityInertial(2);target.targetVelocityInertial(1)];
 end

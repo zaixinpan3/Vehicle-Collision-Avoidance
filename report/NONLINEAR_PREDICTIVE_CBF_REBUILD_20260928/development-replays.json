@@ -1,0 +1,103 @@
+{
+  "scope": "Development observations, not a validation run of the final source revision",
+  "runs": [
+    {
+      "developmentStage": "Early nonlinear admission: before the fixed-reference future feedback repair",
+      "originalLocalOutput": "/tmp/pdca-nonlinear-validation.json",
+      "result": {
+        "model": "nonlinear combined-slip Fiala; exact constant-parameter NRMM",
+        "certificate": "directed interval flow and invariant cruise backup",
+        "results": [
+          {
+            "scenario": "recovery",
+            "requestedFrames": 8,
+            "executedFrames": 8,
+            "completed": true,
+            "failure": "",
+            "minimumReplayClearanceMeters": null,
+            "maximumReplayEnclosureViolation": 0,
+            "maximumFrameSeconds": 4.642753,
+            "maximumHorizonSteps": 76,
+            "initialClfValue": 0.0076018923799798565,
+            "finalClfValueUpper": 0.0036603653839848275,
+            "maximumClfSlack": 0,
+            "sampleTimeSeconds": 0.05,
+            "randomSeed": []
+          },
+          {
+            "scenario": "oncoming",
+            "requestedFrames": 8,
+            "executedFrames": 0,
+            "completed": false,
+            "failure": "collisionAvoidanceController:optimizationFailed: No nonlinear continuation into the invariant backup was certified (sweptGeometry). No command was issued.",
+            "minimumReplayClearanceMeters": null,
+            "maximumReplayEnclosureViolation": 0,
+            "maximumFrameSeconds": 0,
+            "maximumHorizonSteps": 0,
+            "initialClfValue": null,
+            "finalClfValueUpper": null,
+            "maximumClfSlack": 0,
+            "sampleTimeSeconds": 0.05,
+            "randomSeed": []
+          },
+          {
+            "scenario": "circular",
+            "requestedFrames": 8,
+            "executedFrames": 8,
+            "completed": true,
+            "failure": "",
+            "minimumReplayClearanceMeters": null,
+            "maximumReplayEnclosureViolation": 0,
+            "maximumFrameSeconds": 0.584808,
+            "maximumHorizonSteps": 8,
+            "initialClfValue": 0,
+            "finalClfValueUpper": 2.0053432893081336e-17,
+            "maximumClfSlack": 2.0053432892647154e-17,
+            "sampleTimeSeconds": 0.05,
+            "randomSeed": []
+          },
+          {
+            "scenario": "solverFailure",
+            "requestedFrames": 8,
+            "executedFrames": 8,
+            "completed": true,
+            "failure": "",
+            "minimumReplayClearanceMeters": null,
+            "maximumReplayEnclosureViolation": 0,
+            "maximumFrameSeconds": 0.433155,
+            "maximumHorizonSteps": 8,
+            "initialClfValue": 0,
+            "finalClfValueUpper": 9.420932284024076e-19,
+            "maximumClfSlack": 9.420932284024076e-19,
+            "sampleTimeSeconds": 0.05,
+            "randomSeed": []
+          }
+        ]
+      }
+    },
+    {
+      "developmentStage": "After fixed-reference feedback repair; before inherited-policy dispatch and certified control boxes",
+      "originalLocalOutput": "/tmp/pdca-nonlinear-oncoming.json",
+      "result": {
+        "model": "nonlinear combined-slip Fiala; exact constant-parameter NRMM",
+        "certificate": "directed interval flow and invariant cruise backup",
+        "results": {
+          "scenario": "oncoming",
+          "requestedFrames": 32,
+          "executedFrames": 32,
+          "completed": true,
+          "failure": "",
+          "minimumReplayClearanceMeters": 0.17416289314312883,
+          "maximumReplayEnclosureViolation": 0,
+          "maximumFrameSeconds": 12.11364,
+          "maximumHorizonSteps": 189,
+          "initialClfValue": 0,
+          "finalClfValueUpper": 323.7007361291349,
+          "maximumClfSlack": 65.45528252920877,
+          "sampleTimeSeconds": 0.05,
+          "randomSeed": []
+        }
+      }
+    }
+  ]
+}

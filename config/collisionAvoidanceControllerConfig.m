@@ -10,8 +10,8 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
 % dimensionless double scalars before model and tire modules consume them.
 %
 % The defaults describe a mid-size passenger car with input [deltaF; beta],
-% locally linearized modified Fiala tires and the held-input Frenet LTV bicycle
-% stage model of LTV_BICYCLE_MODEL.md.
+% nonlinear combined-slip Fiala tires and zero-order-held inertial dynamics.
+% Affine-study fields remain available to the independent research utilities.
 
     if nargin < 1
         userCfg = [];
@@ -39,6 +39,17 @@ function cfg = localDefaults()
 
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
+
+    % Numerical rollouts propose controls; directed interval flow certifies them.
+    % The terminal ball is synthesized and checked, never assumed invariant.
+    cfg.nonlinear = struct('integrationStep',0.01,'certificateStep',0.005, ...
+        'terminalRadius',0.25,'minimumTerminalRadius',1e-5, ...
+        'maximumImprovementIterations',2,'trustRadius',0.15, ...
+        'finiteDifferenceStep',1e-5,'clfDecay',0.01, ...
+        'initialPlan',zeros(2,0),'proposalFunction',[], ...
+        'maximumCertificateSeconds',Inf,'maximumCertificateCells',20000, ...
+        'targetRearLength',1.65,'clearanceReserve',1e-8,'targetConsistencyTolerance',1e-8, ...
+        'initializationInputReserve',[.005;.005]);
 
     % Joint support certificates define collision and encounter-exit constraints.
     % Continuations retain the complete certificate, including its directions.
@@ -98,6 +109,7 @@ function cfg = localDefaults()
         "wheelbase", 3.05, ...
         "length", 4.8, ...
         "width", 1.9, ...
+        "rectangleOffset", [0;0], ...
         "gravity", 9.81, ...
         "centerOfGravityHeight", 0.55);
     cfg.tire = struct( ...
@@ -162,13 +174,11 @@ function cfg = localDefaults()
         "referenceOffset", zeros(5, 1), ...
         "referenceRate", zeros(5, 1), "referenceEpoch", 0.0, ...
         "samplePoints", "stageNodes");
-    % Each convex subproblem calls the hook with (phase,program), P/q/A/b/cones
-    % and lifted coordinates. A normal frame uses one solve. Failed fresh
-    % admissions may try alternate directions and bounded phase-I recovery;
-    % every issued decision passes independent hard-constraint checks.
-    % constraintTolerance enters the pre-solve physical row reserves.
-    % frameDeadlineSeconds is a complete controller-frame acceptance deadline.
-    % A finite exit may require more stages than the performance window.
+    % The nonlinear path uses linprog then quadprog within a certified box.
+    % Search/deadline budgets limit improvement after admission; an available
+    % stored policy can execute without another solve or numerical rollout.
+    % Initial proof construction can exceed these research timing budgets.
+    % jointFunction and lexicographicTieTolerance serve affine study utilities.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
@@ -232,6 +242,23 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
+    for name=["integrationStep","certificateStep","terminalRadius", ...
+            "minimumTerminalRadius","trustRadius","finiteDifferenceStep", ...
+            "clfDecay","targetRearLength","clearanceReserve","targetConsistencyTolerance"]
+        validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
+    end
+    validateattributes(cfg.nonlinear.maximumImprovementIterations,{'double'}, ...
+        {'scalar','real','finite','integer','nonnegative'});
+    validateattributes(cfg.nonlinear.maximumCertificateCells,{'double'}, ...
+        {'scalar','real','finite','integer','positive'});
+    validateattributes(cfg.nonlinear.maximumCertificateSeconds,{'double'},{'scalar','real','positive'});
+    validateattributes(cfg.nonlinear.initialPlan,{'double'},{'nrows',2,'real','finite'});
+    validateattributes(cfg.nonlinear.initializationInputReserve,{'double'},{'size',[2,1],'real','finite','nonnegative'});
+    validateattributes(cfg.vehicle.rectangleOffset,{'double'},{'size',[2,1],'real','finite'});
+    if cfg.nonlinear.clfDecay>=1 || cfg.nonlinear.minimumTerminalRadius>cfg.nonlinear.terminalRadius ...
+            || (~isempty(cfg.nonlinear.proposalFunction) && ~isa(cfg.nonlinear.proposalFunction,'function_handle'))
+        error('collisionAvoidanceController:invalidConfiguration','Invalid nonlinear synthesis or proposal configuration.');
+    end
     for name = ["widthScale","minimumWidthMeters","headingWeight","regularizationWeight"]
         value=cfg.admission.(name);
         if ~isnumeric(value) || ~isreal(value) || ~isscalar(value) || ~isfinite(value) || value<=0

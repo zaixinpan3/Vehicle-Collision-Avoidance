@@ -1,0 +1,43 @@
+{
+  "scope": "Executed development checks before the final batch startup stall",
+  "runs": [
+    {
+      "suites": [
+        "nonlinearPredictiveSafetyTest (then 27 cases)",
+        "fialaIntervalKernelTest",
+        "fialaFeedbackSampleTest",
+        "modifiedFialaTireTest",
+        "collisionAvoidanceControllerConfigTest",
+        "controllerSourceBudgetTest"
+      ],
+      "passed": 120,
+      "failed": 0,
+      "incomplete": 0,
+      "sourceStage": "Before certified control boxes and inherited-policy dispatch",
+      "resultArtifact": "/tmp/pdca-nonlinear-test-results.mat"
+    },
+    {
+      "suite": "nonlinearPredictiveSafetyTest",
+      "passed": 33,
+      "failed": 0,
+      "incomplete": 0,
+      "sourceStage": "Certified control-box optimizer, before inherited-policy dispatch"
+    },
+    {
+      "suite": "nonlinearPredictiveSafetyTest",
+      "passed": 39,
+      "failed": 0,
+      "incomplete": 0,
+      "sourceStage": "Includes stored-policy/terminal dispatch, input-box perturbation checks, and exact target clock; before explicit-heading/default-speed/world-heading additions and exact adaptive substep timing"
+    },
+    {
+      "command": "g++ -std=c++17 -DMATLAB_MEX_FILE -I/opt/MATLAB/R2026a/extern/include -fsyntax-only controller/nonlinearSafetyMex.cpp controller/fialaFeedbackSampleMex.cpp controller/fialaIntervalMex.cpp",
+      "exitCode": 0,
+      "scope": "Final native source syntax, including the adaptive-substep timing change"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ]
+}
