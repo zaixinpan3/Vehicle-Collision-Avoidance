@@ -1,0 +1,84 @@
+{
+  "model": "nonlinear combined-slip Fiala; exact constant-parameter NRMM",
+  "certificate": "directed interval flow and invariant cruise backup",
+  "results": [
+    {
+      "scenario": "recovery",
+      "requestedFrames": 8,
+      "executedFrames": 8,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": null,
+      "maximumReplayEnclosureViolation": 0,
+      "maximumFrameSeconds": 4.328719,
+      "maximumHorizonSteps": 62,
+      "initialClfValue": 0.0076018923799798565,
+      "finalClfValueUpper": 0.0036603681253144929,
+      "maximumClfSlack": 0,
+      "sampleTimeSeconds": 0.05,
+      "randomSeed": [],
+      "finalTransverseError": [
+        0.0077054712497500247,
+        -0.0007645748620245872,
+        9.5305113134713793E-8,
+        -0.0010362786355093525,
+        -0.000795304419647206
+      ],
+      "inheritedFrames": 0,
+      "backupFrames": 0,
+      "requiredClearanceMeters": 0.1
+    },
+    {
+      "scenario": "circular",
+      "requestedFrames": 8,
+      "executedFrames": 8,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": null,
+      "maximumReplayEnclosureViolation": 0,
+      "maximumFrameSeconds": 0.556362,
+      "maximumHorizonSteps": 8,
+      "initialClfValue": 0,
+      "finalClfValueUpper": 2.0053432893081336E-17,
+      "maximumClfSlack": 2.0053432892648713E-17,
+      "sampleTimeSeconds": 0.05,
+      "randomSeed": [],
+      "finalTransverseError": [
+        -7.0303775389515E-16,
+        4.6837533851373792E-17,
+        0,
+        -1.1449174941446927E-15,
+        -1.8873791418627661E-15
+      ],
+      "inheritedFrames": 0,
+      "backupFrames": 0,
+      "requiredClearanceMeters": 0.1
+    },
+    {
+      "scenario": "solverFailure",
+      "requestedFrames": 8,
+      "executedFrames": 8,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": null,
+      "maximumReplayEnclosureViolation": 0,
+      "maximumFrameSeconds": 0.483882,
+      "maximumHorizonSteps": 8,
+      "initialClfValue": 0,
+      "finalClfValueUpper": 9.4209322840240763E-19,
+      "maximumClfSlack": 9.4209322840240763E-19,
+      "sampleTimeSeconds": 0.05,
+      "randomSeed": [],
+      "finalTransverseError": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "inheritedFrames": 0,
+      "backupFrames": 0,
+      "requiredClearanceMeters": 0.1
+    }
+  ]
+}

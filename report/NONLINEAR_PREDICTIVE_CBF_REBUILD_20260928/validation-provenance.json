@@ -1,0 +1,52 @@
+{
+  "recordedAt": "2026-09-28T06:38:00.526132-05:00",
+  "implementationCommit": "15781bcb32395a0980ef61108f1fd2eb0ee15e2a",
+  "command": "matlab -batch \"fprintf('PDCA final validation started\\n'); addpath('scripts'); validateNonlinearPredictiveController('report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928');\"",
+  "exitCode": 0,
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "nativeLibraries": {
+    "MPFR": "4.2.2",
+    "GMP": "6.3.0"
+  },
+  "selectedTests": {
+    "passed": 135,
+    "failed": 0,
+    "incomplete": 0
+  },
+  "codeAnalyzer": {
+    "files": 12,
+    "notices": 2,
+    "scope": "Intentional unused assignments in callbacks that always throw; all findings preserved"
+  },
+  "replayCases": 5,
+  "executedHolds": 266,
+  "allRequestedHoldsCompleted": true,
+  "maximumEnclosureViolation": 0,
+  "serviceRestart": "Authorized in conversation; shared service/monitor restarted; MATLAB batch launch then succeeded; existing Vehicle Localization MATLAB processes remained running.",
+  "sourceIntegrity": "All listed implementation, driver and test sources match implementationCommit; this follow-up changes validation artifacts and documentation only.",
+  "checkedSources": [
+    "config/collisionAvoidanceControllerConfig.m",
+    "controller/collisionAvoidanceController.m",
+    "controller/nonlinearBicycleModel.m",
+    "controller/nonlinearSafetyCertificate.m",
+    "controller/nonlinearSafetyMex.cpp",
+    "controller/solveNonlinearPredictivePlan.m",
+    "controller/fialaCertificate.m",
+    "controller/fialaFeedbackSampleMex.cpp",
+    "controller/fialaIntervalCore.hpp",
+    "scripts/buildFialaIntervalVerifier.m",
+    "scripts/prepareCollisionAvoidanceController.m",
+    "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "scripts/validateNonlinearPredictiveController.m",
+    "tests/nonlinearPredictiveSafetyTest.m",
+    "tests/controllerSourceBudgetTest.m"
+  ],
+  "limits": [
+    "Exact model and state data; one constant-parameter NRMM target",
+    "Global straight/constant-curvature corridors",
+    "Full repository suite and affine public-controller adapter/test migration were not performed",
+    "Observed runtime does not meet a 50 ms real-time deadline",
+    "No physical-vehicle or uncertain-plant validation"
+  ],
+  "independentAudit": "Parsed all JSON results; checked all pass/completion counts, nonnegative required clearance margins, empty failure records and zero replay enclosure violations."
+}

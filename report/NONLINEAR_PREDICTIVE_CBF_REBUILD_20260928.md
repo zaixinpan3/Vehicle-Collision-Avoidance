@@ -1,10 +1,8 @@
 # Nonlinear predictive-CBF controller rebuild — September 28, 2026
 
-Status: implementation and development checks completed; final validation is
-blocked by MATLAB batch startup. The final-source scenario campaign has not run.
-The selected regression runner is ready to reproduce the remaining checks.
-This is a research implementation with explicit exact-model assumptions, not a
-real-time or physical-vehicle safety validation.
+Status: final-source validation completed after the authorized MathWorks Service
+Host restart: 135 selected tests passed and all five replays completed. This is a research implementation with
+explicit exact-model assumptions, not a real-time or physical-vehicle validation.
 
 ## Behavior changed
 
@@ -58,7 +56,7 @@ unchanged model/road/target contract, and dispatches the terminal law after the
 prefix. Endpoint box containment is only an inconsistency check; it is not a
 proof that a disturbed measured state is a correlated reachable successor.
 
-## Checks actually completed
+## Development checks
 
 Compact development results are in
 [`development-checks.json`](NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/development-checks.json)
@@ -78,9 +76,8 @@ source revision.
   `nonlinearSafetyMex.cpp`, `fialaFeedbackSampleMex.cpp` and `fialaIntervalMex.cpp`.
 - `git diff --check` passed.
 
-The final three added test cases cover explicit body heading, default cruise
-speed and world yaw beyond the old local chart. They and the final adaptive-time
-change await the final MATLAB run. No final-source Code Analyzer result is claimed.
+The later final-source run below includes the explicit body-heading, default
+cruise-speed and unrestricted-world-yaw cases, plus the adaptive-time change.
 
 | Development replay | Actual outcome |
 | --- | --- |
@@ -99,28 +96,72 @@ implementation independently; the continuous guarantee comes from interval
 certificates, not those audit points. The 32-frame oncoming replay ends during
 the maneuver and does not demonstrate complete avoidance recovery.
 
-## Final validation blocker and reproduction
+## Final-source validation and reproduction
 
-Several MATLAB batch invocations stalled before their first script statement.
-Serial, display-free and JVM-free attempts also stalled. They produced no test
-or scenario result and were terminated. An unrelated Vehicle Localization MATLAB
-visualization remained open. Approval to restart the shared MathWorks Service
-Host was requested because doing so may interrupt that session; the shared
-service was not restarted without that approval. The cause of the startup stall
-has not been established.
+The user authorized restarting MathWorks Service Host after the earlier batch
+launches stalled before their first script statement. The shared service and its
+monitor were restarted; MATLAB then launched successfully. The separate Vehicle
+Localization MATLAB processes remained running during this restart. No license
+or authentication files were changed.
 
-Run from the repository root once MATLAB startup works:
+The final source under implementation commit
+`15781bcb32395a0980ef61108f1fd2eb0ee15e2a` passed **135/135 selected MATLAB tests**,
+with zero failures or incomplete cases, on MATLAB R2026a Update 3. This includes
+42 nonlinear-controller tests, 5 interval-kernel tests, 19 held-feedback tests,
+25 tire-model tests, 43 configuration tests and the source-budget test. All three
+native MPFR verifiers were rebuilt. See
+[`tests.json`](NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/tests.json).
+
+Factory Code Analyzer checked 12 MATLAB files. It reported two unused-output
+assignment notices in the deliberate exception callbacks of the test and replay
+fixtures; the callbacks always throw to simulate solver failure. No findings
+were reported for controller, configuration, build/preparation or validation-runner
+files. The notices are preserved in
+[`code-analysis.json`](NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/code-analysis.json).
+
+Final replay results use the same deterministic configurations and independent
+`ode45` audit described above. The 210-frame stored-policy case sets the improvement
+deadline to `1e-12` seconds after admission, forcing use of the previously certified
+policy and then the invariant backup. The online oncoming case retains normal
+readmission/selection with numerical improvement disabled, as declared by the
+validation fixture. These are two different controller execution conditions.
+
+| Final replay | Executed holds | Minimum clearance (m) | Maximum frame (s) | Inherited / backup holds |
+| --- | --- | --- | --- | --- |
+| Small tracking-error recovery | 8/8 | not applicable | 4.328719 | 0 / 0 |
+| Constant-curvature cruise | 8/8 | not applicable | 0.556362 | 0 / 0 |
+| Forced improvement failure | 8/8 | not applicable | 0.483882 | 0 / 0 |
+| Stored avoidance policy and backup | 210/210 | 0.582878563 | 9.354446 | 209 / 21 |
+| Online oncoming replanning | 32/32 | 0.174162893 | 12.263395 | 0 / 0 |
+
+All 266 executed holds had zero sampled enclosure violation. Required target
+clearance was 0.100 m. The final stored-policy lateral error was
+`4.3119020243e-5 m` (0.0431 mm), heading error `-6.4729477806e-6 rad`, and
+longitudinal speed error `-6.5547567374e-13 m/s`. The recovery case reduced
+the certified CLF bound from `0.00760189238` to `0.00366036813` with zero
+dissipation slack. Tiny positive numerical slack in the cruise cases remains
+reported rather than rounded to zero.
+
+Saved results: [short replays](NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/short-replays.json),
+[stored policy](NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/stored-policy.json),
+[online oncoming](NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/oncoming.json).
+Timing values are observations from this serial research run, including admission;
+they are not an isolated real-time benchmark.
+
+The stored-policy trajectory demonstrates avoidance and recovery in this exact
+model case. Its finite certified prefix has 189 holds (9.45 seconds); the final
+21 holds use the invariant cruise backup. This observation does not establish
+recovery from arbitrary avoidance states or safety under model/estimation errors.
+
+Run the reproducible validation from the repository root:
 
 ```bash
 matlab -batch "addpath('scripts'); validateNonlinearPredictiveController('report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928');"
 ```
 
-The runner builds all three native verifiers into temporary storage, executes
-the six selected suites, exports factory Code Analyzer findings, and requests
-8-frame recovery/circular/solver-failure replays, a 210-frame oncoming stored-policy
-replay with improvement disabled after initial admission, and a 32-frame online
-oncoming replay. Those final outputs are not present yet and are not counted as
-completed experiments.
+The runner builds temporary native verifiers, runs the six selected suites,
+exports Code Analyzer findings and replays all five cases. The saved output is
+research validation evidence; no full-repository or physical-plant claim is made.
 
 ## Scope and integration limits
 
@@ -133,12 +174,11 @@ have not been migrated. The complete repository suite was not run; no all-tests
 claim is made. Shared affine utilities remain callable for their research uses.
 
 Initial admission and interval synthesis can exceed the timing budget. The
-recorded 12.1-second frame is far above a 50 ms command period. Stored-policy
+recorded frame times are far above a 50 ms command period. Stored-policy
 availability does not establish a measured real-time bound. The CLF gives
 verified decrease only while zero-slack dissipation is compatible with the safe
 continuation; arbitrary post-avoidance return is not asserted.
 
 Unrelated target/observer edits, existing scenario edits, untracked manuscripts,
 reference material, agent instructions, external dependencies and generated
-native binaries are outside this change. No government-compliance or external
-validation claim is made.
+native binaries are outside this change.

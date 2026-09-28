@@ -1,13 +1,13 @@
 {
-  "scope": "Final project artifacts; development validation stages are distinguished in the report",
+  "scope": "Current project artifacts after final-source validation; implementation sources match 15781bcb32395a0980ef61108f1fd2eb0ee15e2a; development evidence remains stage-labeled",
   "sha256": {
     "config/collisionAvoidanceControllerConfig.m": "51ceb79aebd531f0580726bec11be9b8cf14451d7390b14b4dabcd4671050d52",
     "controller/CONTROLLER_FILES.md": "5f681a28dfc537b6235e21e1cfc054a77c158b98a8d1555c741739abd71baafb",
     "controller/JOINT_SUPPORT_CERTIFICATES.md": "15b2f1544846391869e921614a5ee472368d0e112879148378e9bcf731613dde",
     "controller/LTV_BICYCLE_MODEL.md": "28492e32d6c53eeb16e973d3f442a2dbf99269faced5f75629041426f8ec9e98",
     "controller/NODE_SAMPLED_CERTIFICATE.md": "614644c09d68f1d374db3b335eab2ff51c06c8c1a6aabfc4fec76b2ac862c129",
-    "controller/PCBF_CLF_ARCHITECTURE.md": "513c13aac6891e43dd2328060dcc73b50f181d78431969f826585cc2e6c7ccce",
     "controller/NONLINEAR_PREDICTIVE_CBF.md": "aa140fcfd081cc1894205c5c2a3a1a0d300d11154e961ae987f2d6faae6ade42",
+    "controller/PCBF_CLF_ARCHITECTURE.md": "513c13aac6891e43dd2328060dcc73b50f181d78431969f826585cc2e6c7ccce",
     "controller/collisionAvoidanceController.m": "444314c1bb90dca9c15a19aaf59c12a273916b90fca7513d918ff1f377db69dc",
     "controller/fialaCertificate.m": "b73422b8746b663a45a95eaaff48fdeae77f87e0cc1231fec984df7e4a4fbabe",
     "controller/fialaFeedbackSampleMex.cpp": "0f2ff67234ed0f742d78a05c767afedbfca756c6f6102b87821d23f43cd85719",
@@ -16,14 +16,20 @@
     "controller/nonlinearSafetyCertificate.m": "10613282efdfd0a56efc3820c2b594c75f429aca959a8c2da80a16377405d8e8",
     "controller/nonlinearSafetyMex.cpp": "0b97b793b32f6cd2d4f60abfe4e36d1d8f6aa683ce9a8f76aac26ac9b3a32ff6",
     "controller/solveNonlinearPredictivePlan.m": "03a8863ba36a9b917b51987bfb8cd952d29c9983d826a447d33a44c9e6ecf349",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928.md": "fb9cd49ee25f72dd83713d62352b1f7a52b93dc0fb7cd882607d526c1f54a10f",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/code-analysis.json": "da93b26af92b74c37f6047800149e130225cacec3b451c5b963d008e9c21ef5f",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/development-checks.json": "2893ea304d1c6825236bf8bb3511a7564e73aaad51e6567ea7d86d7372386364",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/development-replays.json": "281176e8effc918aa1beaa3bdafe9051c9a6ed3e1c7c2995d84356c35f2b126c",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/oncoming.json": "8237db3e84d30e6540e103023006c05243597840455132d2713f0aaf7a51ac03",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/short-replays.json": "a3ad111fabe7894e979c63e536d2e82a2715c570e5b5282ba6044f3fef42f469",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/stored-policy.json": "9acb6761ae262e4905c9c0b0bb2e503391e9bd3e3384c5848d389ed7bc07b8a3",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/tests.json": "e8b7c0d52d64b4b3e41268e0bb108c30fc8f5eefb7c08a310a1fb6d7edc93649",
+    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/validation-provenance.json": "72e07f52995b07112d3a54e9ffa2eb2afcb10c94e1f10d7a2b28e8cc412e10de",
     "scripts/buildFialaIntervalVerifier.m": "c49b7af84b00edc4c156342ca3f9d536ccc9e340883e06c6ad6ce89bfe2bf8df",
     "scripts/prepareCollisionAvoidanceController.m": "d9eb39d59961b07c39ece5d5c1a21423ed30344472bd4056e432e06316e62a5f",
     "scripts/runNonlinearPredictiveSafetyValidation.m": "2aec1f84ec49474983d659773c39051ef746822eff30ed064b08d56dd59d64b5",
     "scripts/validateNonlinearPredictiveController.m": "659680826953ed9ef5bb65da9e4a01d4c01c0b8e19ea4866113bb0ab97ab6747",
     "tests/controllerSourceBudgetTest.m": "c680eb1cfb6750f372d6047a1090fb5b2134f115b7a8c892f8219765a6ec1682",
-    "tests/nonlinearPredictiveSafetyTest.m": "e056d56836c51656ee3e16034012019942195d779edc2f303271435396623c20",
-    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928.md": "002d5fe57d62d92d5cdcd2806b87d49b72cbb18dda6d57f28566be52cba8081f",
-    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/development-checks.json": "2893ea304d1c6825236bf8bb3511a7564e73aaad51e6567ea7d86d7372386364",
-    "report/NONLINEAR_PREDICTIVE_CBF_REBUILD_20260928/development-replays.json": "281176e8effc918aa1beaa3bdafe9051c9a6ed3e1c7c2995d84356c35f2b126c"
+    "tests/nonlinearPredictiveSafetyTest.m": "e056d56836c51656ee3e16034012019942195d779edc2f303271435396623c20"
   }
 }

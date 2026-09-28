@@ -1,0 +1,30 @@
+{
+  "model": "nonlinear combined-slip Fiala; exact constant-parameter NRMM",
+  "certificate": "directed interval flow and invariant cruise backup",
+  "results": {
+    "scenario": "oncoming",
+    "requestedFrames": 32,
+    "executedFrames": 32,
+    "completed": true,
+    "failure": "",
+    "minimumReplayClearanceMeters": 0.17416289314313191,
+    "maximumReplayEnclosureViolation": 0,
+    "maximumFrameSeconds": 12.263395,
+    "maximumHorizonSteps": 189,
+    "initialClfValue": 0,
+    "finalClfValueUpper": 323.70073612913581,
+    "maximumClfSlack": 65.455282529208574,
+    "sampleTimeSeconds": 0.05,
+    "randomSeed": [],
+    "finalTransverseError": [
+      2.2373716902255896,
+      -0.12102347363086162,
+      0.0099519426375191955,
+      -0.52217633485893233,
+      -0.53506530110960415
+    ],
+    "inheritedFrames": 0,
+    "backupFrames": 0,
+    "requiredClearanceMeters": 0.1
+  }
+}

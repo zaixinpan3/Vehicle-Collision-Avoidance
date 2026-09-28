@@ -1,0 +1,68 @@
+[
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "findings": []
+  },
+  {
+    "file": "controller/nonlinearBicycleModel.m",
+    "findings": []
+  },
+  {
+    "file": "controller/nonlinearSafetyCertificate.m",
+    "findings": []
+  },
+  {
+    "file": "controller/solveNonlinearPredictivePlan.m",
+    "findings": []
+  },
+  {
+    "file": "controller/fialaCertificate.m",
+    "findings": []
+  },
+  {
+    "file": "config/collisionAvoidanceControllerConfig.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/buildFialaIntervalVerifier.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/prepareCollisionAvoidanceController.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "findings": {
+      "id": "NASGU",
+      "message": "Value assigned to variable might be unused.",
+      "fix": 0,
+      "line": 100,
+      "column": [
+        5,
+        8
+      ]
+    }
+  },
+  {
+    "file": "scripts/validateNonlinearPredictiveController.m",
+    "findings": []
+  },
+  {
+    "file": "tests/nonlinearPredictiveSafetyTest.m",
+    "findings": {
+      "id": "NASGU",
+      "message": "Value assigned to variable might be unused.",
+      "fix": 0,
+      "line": 266,
+      "column": [
+        5,
+        8
+      ]
+    }
+  },
+  {
+    "file": "tests/controllerSourceBudgetTest.m",
+    "findings": []
+  }
+]
