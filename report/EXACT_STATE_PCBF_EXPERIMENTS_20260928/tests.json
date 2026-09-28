@@ -1,0 +1,957 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "tests": [
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetTurn=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.103681
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetTurn=1e-12)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.007584
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetTurn=0.08)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.006959
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetTurn=-0.08)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.003303
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetSpeedAndHeadingRateAreIndependent(targetTurn=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.089954
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetSpeedAndHeadingRateAreIndependent(targetTurn=1e-12)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.006876
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetSpeedAndHeadingRateAreIndependent(targetTurn=0.08)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00542
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetSpeedAndHeadingRateAreIndependent(targetTurn=-0.08)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.005817
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.013654
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=0.5)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.003702
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=2.9)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00228
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/overlapHasANonzeroRestorationDirection",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.021871
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.0437
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=0.005)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002758
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=-0.005)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002011
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/jointTargetCoordinatesAreUnactuated",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.02015
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/fullAndHalfHoldsUseTheSamePredictionMap",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.007334
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/laneFollowingRunsWithNoNativeVerifier",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 1.1579
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetMeasurementsInitializeEachNewJointState",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.090135
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/targetDropoutUsesTheConstantParameterPrediction",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.067536
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/everyCallSolvesAndAppliesTheReturnedFirstControl",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.05122
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/noOptimizerResultRaisesAnErrorEvenWithAWarmStart",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.073258
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/positiveSlackReportsSafetyRecoveryWithoutClaimingSafety",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.348404
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/oncomingAvoidanceStartsFromALaneRollout",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 5.391806
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/terminalLaneFeedbackWorksOnBothCurvatureSigns(curvature=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.036186
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/terminalLaneFeedbackWorksOnBothCurvatureSigns(curvature=0.005)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.077682
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/terminalLaneFeedbackWorksOnBothCurvatureSigns(curvature=-0.005)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.0441
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/returningTargetOrbitIsExcludedByTheTerminalSet",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.010086
+    },
+    {
+      "Name": "nonlinearPredictiveSafetyTest/finiteSlewLimitsUseAppliedInputMemory",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.120556
+    },
+    {
+      "Name": "modifiedFialaTireTest/nonlinearCombinedForcesStayInsideThePhysicalCircle",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.095192
+    },
+    {
+      "Name": "modifiedFialaTireTest/zeroSlipRecoversTheCorneringStiffness",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.005534
+    },
+    {
+      "Name": "modifiedFialaTireTest/forceIsOddAndOpposesSlip(slip=0.02)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002672
+    },
+    {
+      "Name": "modifiedFialaTireTest/forceIsOddAndOpposesSlip(slip=-0.04)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002707
+    },
+    {
+      "Name": "modifiedFialaTireTest/forceIsOddAndOpposesSlip(slip=0.3)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001211
+    },
+    {
+      "Name": "modifiedFialaTireTest/forceIsOddAndOpposesSlip(slip=-0.3)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001175
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=0.02,brakingRatio=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.007517
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=0.02,brakingRatio=-0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002705
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=0.02,brakingRatio=0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002679
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=-0.04,brakingRatio=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002722
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=-0.04,brakingRatio=-0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.004731
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=-0.04,brakingRatio=0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002051
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=0.3,brakingRatio=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.003284
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=0.3,brakingRatio=-0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002064
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=0.3,brakingRatio=0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002083
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=-0.3,brakingRatio=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002149
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=-0.3,brakingRatio=-0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002055
+    },
+    {
+      "Name": "modifiedFialaTireTest/localSlopeMatchesNonlinearFiniteDifferences(slip=-0.3,brakingRatio=0.6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002048
+    },
+    {
+      "Name": "modifiedFialaTireTest/brakingReducesLateralForceAndLocalSteeringGain",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.000982
+    },
+    {
+      "Name": "modifiedFialaTireTest/saturationJoinsContinuouslyForBothSlipSigns",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.003492
+    },
+    {
+      "Name": "modifiedFialaTireTest/fullBrakingAndThrottleHaveZeroLateralForce",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.012884
+    },
+    {
+      "Name": "modifiedFialaTireTest/theCommonRatioSetsBothAxleForces",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.005056
+    },
+    {
+      "Name": "modifiedFialaTireTest/scalarTireParametersMatchAnExplicitAxlePair",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.033045
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/solverPrecisionAndIterationLimitsAreValidated",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.076082
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=-0.1)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.004869
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=Inf)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001247
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=NaN)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001234
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=1x2_double)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001324
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/theOldAccelerationGainCannotRedefineThePaperRatio",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001473
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001539
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_1)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001215
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_2)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001195
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_3)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001181
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_4)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00154
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_5)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00109
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_6)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001084
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_7)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001124
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_8)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001097
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_9)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001087
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_10)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001086
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_11)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001073
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_12)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001096
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_13)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001235
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_14)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001099
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_15)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001241
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_16)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001118
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_17)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001112
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_18)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001079
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_19)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001079
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_20)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00108
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_21)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001188
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_22)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001252
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/unknownNestedOptionsAreRejected",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001445
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=notANumber)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00175
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=infinite)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001473
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=complex)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001944
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=empty)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001846
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=vector)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00231
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=text)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00572
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=logical)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001971
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=notANumber)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001573
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=infinite)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001384
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=complex)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001685
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=empty)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001557
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=vector)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001349
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=text)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002196
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=logical)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001357
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=zeroWidth)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002069
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=reversed)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001751
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=positiveOnly)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001668
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=negativeOnly)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001484
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=outsideRange)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002037
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=0x0_double)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002462
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=1x1_double_1)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001514
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=0x0_struct)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001683
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/singlePrecisionBoundsAreNormalizedWithoutChangingUnits",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.011039
+    },
+    {
+      "Name": "collisionAvoidanceControllerConfigTest/zeroMaximumStillAllowsBraking",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.032887
+    },
+    {
+      "Name": "controllerSourceBudgetTest/controllerAndConfigurationFitEightSourceFiles",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.004983
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/roadLoadOpposesMotionAndPreservesRest(speed=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.052348
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/roadLoadOpposesMotionAndPreservesRest(speed=0.1)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001913
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/roadLoadOpposesMotionAndPreservesRest(speed=5)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001874
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/roadLoadOpposesMotionAndPreservesRest(speed=15)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00182
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/aerodynamicForceHasThePhysicalQuadraticScaling",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.003568
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/theRoadLoadSlopeMatchesFiniteDifferences(speed=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001312
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/theRoadLoadSlopeMatchesFiniteDifferences(speed=0.1)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001069
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/theRoadLoadSlopeMatchesFiniteDifferences(speed=5)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00104
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/theRoadLoadSlopeMatchesFiniteDifferences(speed=15)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001023
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/coastingDeceleratesAndBalancedForceHoldsCruise",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.009866
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/commandAndClfUseTheSameLongitudinalForceBalance",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.106824
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/theCruiseEquilibriumAccountsForPassiveForces",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.044696
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/tireNormalLoadsUseTheStaticWeightDistribution",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.044204
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/changingRoadLoadUpdatesTheLaneClf",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.084234
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/passiveCoefficientsMustBeFiniteNonnegativeScalars(invalidCoefficient=-1)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.00474
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/passiveCoefficientsMustBeFiniteNonnegativeScalars(invalidCoefficient=NaN)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001631
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/passiveCoefficientsMustBeFiniteNonnegativeScalars(invalidCoefficient=Inf)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001537
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/passiveCoefficientsMustBeFiniteNonnegativeScalars(invalidCoefficient=0+1i)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001689
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/passiveCoefficientsMustBeFiniteNonnegativeScalars(invalidCoefficient=1x2_double)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002049
+    },
+    {
+      "Name": "longitudinalRoadLoadTest/theRollingTransitionSpeedMustBePositive",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.037545
+    },
+    {
+      "Name": "controllerInputGeometryTest/referenceProjectionRecoversLaneCoordinates(curvature=0)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.063411
+    },
+    {
+      "Name": "controllerInputGeometryTest/referenceProjectionRecoversLaneCoordinates(curvature=0.005)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.003711
+    },
+    {
+      "Name": "controllerInputGeometryTest/referenceProjectionRecoversLaneCoordinates(curvature=-0.005)",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.001576
+    },
+    {
+      "Name": "controllerInputGeometryTest/oneTargetNeedsNoUncertaintyOrAccelerationCertificate",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.005834
+    },
+    {
+      "Name": "controllerInputGeometryTest/multipleTargetsAreRejected",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.007114
+    },
+    {
+      "Name": "controllerInputGeometryTest/aTargetRectangleNeedsAnExplicitBodyHeading",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.006246
+    },
+    {
+      "Name": "controllerInputGeometryTest/estimatorAccelerationCanSupplyTheConstantHeadingRate",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.003328
+    },
+    {
+      "Name": "controllerInputGeometryTest/theRoadCorridorMustHavePositiveClearances",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.002097
+    },
+    {
+      "Name": "controllerInputGeometryTest/varyingCurvatureIsOutsideTheCurrentTerminalModel",
+      "Passed": true,
+      "Failed": false,
+      "Incomplete": false,
+      "Duration": 0.031144
+    }
+  ]
+}

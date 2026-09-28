@@ -1,0 +1,16 @@
+{
+  "baseCommit": "c0ce5a479868ef94504f3bf6171c0eefbfeeb281",
+  "files": {
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/collisionAvoidanceController.m": "27136d7e934291d4ec87329320cf8572309615da0418a65f5dfc72b4a75aadb0",
+    "controller/nonlinearBicycleModel.m": "81abb2be7bef6cac2bc9502fb563ed1856bad9907c170931c5a1cde397c3b707",
+    "controller/predictiveSafetyGeometry.m": "9a084e4536f2f82da9ff3f878a8da876cc789f6b8b9c50c10c023f7964b0a79b",
+    "controller/readControllerInputs.m": "6357d8650cb792c1c651d14537e142abe088f92b9b395e70e10213b2180e29e5",
+    "controller/solvePredictiveControl.m": "8f2c47b56ffaaa234d5a11895507a65445cbfa187fa90b1270a60455971f28b5",
+    "config/collisionAvoidanceControllerConfig.m": "8211972e24793a631a1105d2af3ee25894240f16ee64e79df64afbcc9985971b",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "fc074b9c50438a26eafa75e7a49692ffc3b2c5fffe672bfe5802935ea0b60501",
+    "scripts/validateNonlinearPredictiveController.m": "586e141ca7c5f2ed989c82e91a97436af1fd5c9237859752cbf0514461076185",
+    "scripts/auditJointPredictiveSafety.py": "0c4e0df31f32b2b91c22668f1d7a11625d0ecdbaab84db3ab54bfa04294137eb"
+  }
+}

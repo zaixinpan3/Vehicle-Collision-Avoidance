@@ -1,0 +1,53 @@
+{
+  "scope": "Independent dense rectangle and whole-body road geometry; sampled validation only",
+  "results": [
+    {
+      "scenario": "recovery",
+      "passed": true,
+      "samples": 1240,
+      "minimumClearanceMeters": null,
+      "minimumRoadMarginMeters": 3.03923335161947,
+      "agreesWithMatlabGeometry": true,
+      "allPredictionsZeroSlack": true,
+      "everyHoldSolved": true,
+      "finalLateralErrorMeters": 0.000707810594675233,
+      "minimumWholeBodyRoadMarginMeters": 3.03923335161947
+    },
+    {
+      "scenario": "circular",
+      "passed": true,
+      "samples": 1240,
+      "minimumClearanceMeters": null,
+      "minimumRoadMarginMeters": 3.022087949329773,
+      "agreesWithMatlabGeometry": true,
+      "allPredictionsZeroSlack": true,
+      "everyHoldSolved": true,
+      "finalLateralErrorMeters": 4.392815422003065e-09,
+      "minimumWholeBodyRoadMarginMeters": 3.022087949329773
+    },
+    {
+      "scenario": "oncoming",
+      "passed": false,
+      "samples": 4960,
+      "minimumClearanceMeters": 0.09904939881952539,
+      "minimumRoadMarginMeters": 0.33745163160050584,
+      "agreesWithMatlabGeometry": true,
+      "allPredictionsZeroSlack": true,
+      "everyHoldSolved": true,
+      "finalLateralErrorMeters": -0.005195041586885875,
+      "minimumWholeBodyRoadMarginMeters": 0.33745163160050584
+    },
+    {
+      "scenario": "turningTarget",
+      "passed": true,
+      "samples": 4960,
+      "minimumClearanceMeters": 2.618562850280311,
+      "minimumRoadMarginMeters": 3.0465063274780744,
+      "agreesWithMatlabGeometry": true,
+      "allPredictionsZeroSlack": true,
+      "everyHoldSolved": true,
+      "finalLateralErrorMeters": -0.0031098430284907876,
+      "minimumWholeBodyRoadMarginMeters": 3.0465063274780744
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "cohort": "baseline",
+    "scenario": "oncoming",
+    "minimumAtNodesAndMidpoints": 0.09999910005156892
+  },
+  {
+    "cohort": "baseline",
+    "scenario": "turningTarget",
+    "minimumAtNodesAndMidpoints": 2.6186386842614926
+  },
+  {
+    "cohort": "default",
+    "scenario": "oncoming",
+    "minimumAtNodesAndMidpoints": 0.09999812968551978
+  },
+  {
+    "cohort": "default",
+    "scenario": "turningTarget",
+    "minimumAtNodesAndMidpoints": 0.10054608538844517
+  }
+]
