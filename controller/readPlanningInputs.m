@@ -896,6 +896,16 @@ function acceleration = localTargetAcceleration(data, ego)
             acceleration, frame, ego.yaw);
         return;
     end
+    % A single constant-speed, constant-heading-rate target needs no
+    % separately measured acceleration when its heading rate is explicit.
+    for fieldName = ["targetYawRate", "yawRate", "courseRate"]
+        if isfield(data,fieldName) && ~isempty(data.(fieldName))
+            omega = localFiniteTargetScalar(data.(fieldName),fieldName);
+            velocity = localTargetVelocity(data,ego);
+            acceleration = omega*[-velocity(2);velocity(1)];
+            return;
+        end
+    end
     error("collisionAvoidanceController:invalidInput", ...
         "Every active target requires targetAccelerationInertial " ...
         + "from the motion estimator, or an equivalent target " ...

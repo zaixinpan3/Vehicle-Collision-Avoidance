@@ -1,11 +1,11 @@
 # Nonlinear predictive safety controller
 
 The public `collisionAvoidanceController` now uses the nonlinear combined-slip
-Fiala bicycle model in inertial coordinates. Its format-47 state contains a
+Fiala bicycle model in inertial coordinates. Its format-48 state contains a
 validated finite feedback policy and an invariant cruising continuation. The former
 affine, node-only encounter certificate is not the public controller's plant or
-safety argument. The supplied redesign in the September 28, 2026 request is the
-design source; the separately linked sandbox attachment was unavailable locally.
+safety argument. The September 28, 2026 design specifies Huang-style predictive safety, Li-style
+polygon dual certificates, sequential convexification, and a secondary lane CLF.
 
 ## Implemented contract
 
@@ -25,20 +25,53 @@ Actuator limits, input slew, longitudinal/lateral velocity and yaw-rate limits
 are hard. The configured diagnostic slip-angle envelope is not an extra tire
 constraint; the Fiala branch/domain conditions are checked by the verifier.
 
-Inputs use the existing ego and target record fields. A target must publish its
-body heading separately from velocity. Optional `targetSideslip`,
-`targetRearLength` and `targetRectangleOffset` describe the literal NRMM and
-footprint reference point. Speed, sideslip and inertial heading rate obey
-`omega = speed*sin(sideslip)/rearLength`; acceleration must be `omega*J*velocity`.
-Ego and target error bounds must be zero. Nonzero parameter uncertainty,
-unmodeled dynamics and acceleration biases are rejected.
+## Autonomous joint state and one target
 
-The target's initial epoch and parameters are retained. Future checks use the
-analytic constant-parameter flow evaluated at absolute sample times with outward
-time arithmetic. A missing later observation does not delete the target.
-Observation consistency is checked against this immutable model; the configured
-comparison tolerance is a diagnostic tolerance, not a robust uncertainty tube.
-A changed target trajectory or sample clock requires a new exact-model admission.
+The joint state is
+
+\[
+ z=[p_x,p_y,\psi,v_x,v_y,r,p_{tx},p_{ty},\psi_t]^\top.
+\]
+
+Exactly one active target record is accepted. Its tangential speed `v_t` and
+heading rate `omega_t` are independent constant parameters, with
+
+\[
+ \dot p_t=v_t[\cos(\psi_t+\beta_t),\sin(\psi_t+\beta_t)]^\top,
+ \qquad \dot\psi_t=\omega_t.
+\]
+
+The default is zero sideslip when the supplied velocity aligns with body heading.
+A known constant course/body offset `beta_t` is also represented. The target
+needs an explicit body heading. The supplied inertial velocity sets tangential
+speed and the initial course. An explicit heading rate permits acceleration to
+be inferred as `omega_t*J*velocity`; any separately supplied acceleration must
+agree. No wheelbase/sideslip identity constrains `omega_t`. Optional
+`targetRectangleOffset` specifies the footprint reference point. Nonzero ego or
+target error bounds, parameter uncertainty, model residuals and acceleration
+biases remain outside the exact-model certificate.
+
+The target flow has the stable straight-line limit
+
+\[
+ p_t(t+h)=p_t(t)+v_t h\,\operatorname{sinc}(\omega_t h/2)
+ [\cos(\psi_t+\beta_t+\omega_t h/2),
+  \sin(\psi_t+\beta_t+\omega_t h/2)]^\top,
+\]
+
+where `sinc(a)=sin(a)/a`, with value one at zero. The target is unactuated, so its
+coordinates can be eliminated exactly from each joint-state optimization step.
+`nonlinearBicycleModel.jointSample` exposes the joint transition and its block
+Jacobians; the controller returns `model.jointState`, fixed `targetParameters`,
+and `predictedJointState`. With no target, those interfaces reduce to the ego
+state. The previous applied input augments the state when slew limits apply.
+
+The immutable target epoch and parameters allow interval checks to evaluate
+absolute sample times without accumulating numerical propagation error. This
+is an implementation of the autonomous joint flow. A missing later observation
+retains the target. Observation consistency and sample-clock checks detect
+contract changes; their numerical tolerance is not a robust uncertainty tube.
+A changed target trajectory requires fresh exact-model admission.
 
 ## Geometry and full sampling intervals
 
@@ -98,7 +131,7 @@ Radii are reduced until the proof passes, or synthesis fails without a command.
 
 For a straight road, the target must remain outside the backup's lateral swept
 strip, or the ego must already be ahead with a separating forward halfspace
-preserved by a lower bound on forward speed. For a rotating NRMM target, its
+preserved by a lower bound on forward speed. For a target with nonzero constant heading rate, its
 entire future rectangular sweep is the annulus about its orbit center, including
 the footprint reference-point offset. For a circular ego continuation, disjoint
 radial bands give a conservative sufficient condition. Straight target motion
@@ -108,67 +141,120 @@ advances. A finite-horizon encounter deadline is not used to release a target.
 The backup can be conservative or empty. A stationary target on a circular
 cruising path, for example, cannot be dismissed after one pass.
 
-## Predictive barrier, CLF and optimization
+## Huang-style safety priority
 
-A certified hard plan ending in the backup is a zero-slack witness for the
-nonnegative predictive-barrier value. Thus `predictiveBarrierValue = 0` is known
-without globally solving the nonconvex positive-slack problem. Under exact
-successors, unchanged road/model/target contracts and the invariant backup,
-shifting the controls and appending the backup establishes the mathematical
-recursive-feasibility argument. No positive collision slack is executable.
-
-The controller retains the inherited suffix, validates an appended plan, and tests a
-nominal feedback continuation. It can also test passing-side initialization
-sequences. Every such sequence is only a proposal until its complete nonlinear
-flow and terminal membership pass validation.
-
-From the second hold, the prediction can apply the stored linear feedback gain
-to the difference between the state and its stored nominal state. Each command
-is evaluated once at that hold's boundary and then held. The nonlinear interval
-verifier carries state/input correlation and bounds both the resulting actuator
-values and their slew. This reduces accumulation of numerical enclosure error.
-The returned input plan contains nominal controls; its certificate also stores
-the feedback gains and reference states. Only the first command is immediately
-executable. `feedbackPrediction.enabled = false` requests an open-loop finite
-prefix; the terminal backup remains a feedback law in either case.
-
-The numerical improvement uses a convex control box around a certified policy.
-The stored feedback gains and reference states remain fixed. Two independent
-nominal-input interval generators enter each held sample. Propagating the whole
-box, checking every swept rectangle/road cell, actuator/slew bound and terminal
-condition certifies **every** control sequence in that box. A failed box is
-shrunk, and no optimization occurs unless box admission succeeds. This is a
-conservative convex inner set of the nonlinear problem, with no dynamic tangent
-substituted for the plant and no claim of a globally convex collision-free set.
-
-The first held flow also supplies interval Jacobians. A Peano--Baker series with
-an outward norm tail encloses its time-varying variational map. If the scaled CLF
-gradient is in `m + [-r,r]` throughout the certified box, then
+Let `F(z,u)` be the sampled joint dynamics, `c(z)` the road and polygon
+clearance violations (positive means unsafe), and `Z_f` the invariant cruise
+set, including target separation and input memory. The conceptual safety
+problem is
 
 \[
- g_{CLF}(\bar U+Dv) \le \overline g_{CLF}(\bar U)
-       +m^\top v_0+r^\top |v_0|.
+ V_N(z)=\min_{U,Z,\xi}\sum_{i=0}^{N-1}\xi_i,
+ \quad z_0=z,\quad z_{i+1}=F(z_i,u_i),\quad u_i\in\mathcal U,
+ \quad c(z_i)\le\xi_i\mathbf1,\quad\xi_i\ge0,\quad z_N\in Z_f.
 \]
 
-Absolute-value epigraphs make this a convex row. The bound touches the certified
-anchor residual at zero increment. Stage one minimizes the nonnegative CLF slack
-using `linprog`; stage two minimizes a positive-semidefinite quadratic nominal
-surrogate with that slack capped using `quadprog`. Nominal cost derivatives come
-from variational integration along the nonlinear policy rollout and an adjoint;
-these derivatives affect performance only. Directed box membership and independent
-point-policy validation precede replacement, and the actual certified slack/cost
-pair must improve lexicographically. A custom proposal hook has only nonlinear
-acceptance guarantees; the certified-inner metadata flag is false for that hook.
-The local hierarchy does not claim global nonlinear lexicographic optimality.
+The implementation also requires full sampling-interval safety. Physical state
+and actuator limits, terminal membership and its infinite target continuation
+remain hard. The safety slacks used during search are measured in meters for
+collision and road rows. Sampling at hold boundaries and midpoints supplies a
+proposal discretization; the original full-interval constraints govern admission.
 
-The native validator evaluates outward bounds on
-`W(next) - (1-gamma)*W(current)`, where `W = norm(T*e)^2`. The only performance
-slack is its nonnegative upper bound. If the local error chart is unavailable,
-the CLF row is omitted and `clfAvailable` is false. This cannot invalidate a
-hard safety plan. When zero slack is certified on successive visited states,
-the recorded one-step bounds imply exponential decrease on that sequence.
-Tiny positive slack at numerical trim is reported honestly, not rounded to zero.
-Return from arbitrary avoidance states is not asserted without this compatibility.
+This adopts the nonnegative stage-slack objective of
+[Huang et al., Section III, (8)](https://arxiv.org/abs/2502.08400)
+<!--ref:huang2025--><!--anchor:section:III-->. Its shift construction supplies the
+safety argument. Given an admitted zero-slack policy, its successor suffix plus
+the invariant controller is another zero-slack policy. Hence the optimum is
+exactly zero on this certified domain without requiring a global nonconvex
+solve. Input memory shifts with the issued command and the target coordinates
+advance through the same autonomous dynamics.
+
+The controller executes only this zero-slack domain. A positive LP slack sum is
+a local search result, **not** a certified global PCBF value or an executable
+collision allowance. Initial admission from arbitrary states and Huang's
+positive-value safety-recovery theorem are not claimed. In particular, global
+optimality, compactness/continuity assumptions, and convergence outside the
+certified domain have not been established for this nonlinear moving-body model.
+The reported `predictiveBarrierValue = 0` is justified by the admitted witness
+and nonnegative objective, rather than by rounding a numerical LP result.
+
+## Li-style polygon duals and sequential convexification
+
+For world-frame rectangles `p_e+R_e B_e` and `p_t+R_t B_t`, with body
+halfspaces `H b <= h`, choose `||n||_2 <= 1` and nonnegative multipliers satisfying
+
+\[
+ H_e^\top\mu=-R_e^\top n,\qquad H_t^\top\lambda=R_t^\top n.
+\]
+
+Then `n^T(p_e-p_t)-h_e^T mu-h_t^T lambda` is a lower bound on distance. A
+positive bound proves separation. The dual update and frozen-direction
+trajectory step follow [Li et al., Sections 3.1-3.2, (9)-(13)](https://doi.org/10.1007/s42154-023-00222-7)
+<!--ref:li2023--><!--anchor:section:3-->. The present implementation includes both
+vehicle footprints and heading-dependent ego vertices. It recomputes these duals
+from each nonlinear iterate. Overlapping nominal rectangles use a signed
+support direction with a negative gap; this supplies a restoration derivative
+and cannot certify positive separation. A deterministic lateral tie rule breaks
+geometric symmetry without a preplanned avoidance trajectory.
+
+Each SCA iteration integrates the nonlinear held dynamics and their variational
+maps around the current input sequence, updates the polygon certificates, and
+constructs a sparse convex subproblem in state/input increments. State and input
+trust bounds limit tangent errors. The terminal ellipsoid is represented by a
+conservative polyhedral subset, with hard input-memory and linearized infinite
+continuation rows. These tangents are **not** certified nonlinear inner sets.
+
+1. `linprog` minimizes the sum of nonnegative stage safety slacks.
+2. `quadprog` minimizes the lane CLF performance cost while capping the same
+   safety-slack sum at the LP optimum plus a declared numerical tie tolerance.
+3. A fresh nonlinear rollout evaluates safety and hard-constraint residuals.
+   Decreasing a constraint merit accepts a new search center; otherwise the
+   trust bounds shrink. Signed penetration prevents a flat overlap cost.
+4. A candidate with small proposal residuals undergoes independent directed
+   full-flow validation, including the invariant terminal set. Only an admitted
+   zero-slack witness can replace the executable incumbent.
+
+The proposal uses an extra clearance reserve to compensate for tangent and
+sampling errors; admission uses the configured physical clearance directly.
+If a complete prefix passes geometry but its terminal enclosure is still too
+large, the same lane-feedback continuation is appended for a bounded settling
+period and the entire extended candidate is validated again. This can account
+for numerical enclosure width that the nominal terminal constraint does not
+predict. An unsuccessful extension never authorizes a command.
+
+The first center is a lane-feedback rollout. Horizon selection accounts for the
+relative target encounter time and configured recovery duration. This rollout
+may cross the target. Optional `initialPlan` is only a numerical warm start.
+No passing path, potential field, or lane/avoidance mode variable is required.
+`maximumAdmissionIterations` bounds restoration attempts; initial admission can
+exceed the improvement time budget, as can initial proof construction.
+
+## Secondary CLF and recursive execution
+
+The same lane-reference function `W=||T e||_2^2` is active throughout avoidance
+and recovery. The secondary objective combines its predicted values, a squared
+first-hold dissipation slack, and nominal input effort. The SCA row linearizes
+`W(next)-(1-gamma)W(current)<=rho`, with `rho>=0`; it can yield during an
+avoidance maneuver without relaxing safety priority. The native validator then
+computes an outward bound on the actual first-hold dissipation and records its
+nonnegative slack. When zero slack holds on successive visited states, the
+recorded inequalities imply exponential decrease along that sequence. Global
+lane convergence requires compatibility of lane following and persistent target
+safety; a soft CLF alone does not establish it.
+
+A stored finite feedback policy and the invariant cruise continuation preserve
+recursive feasibility independently of SCA convergence. Future holds can use
+stored linear feedback evaluated once at each hold boundary. The verifier carries
+state/input correlation and checks actual amplitude and slew over each hold.
+Only the first nominal input is immediately executable; the certificate stores
+all feedback gains and reference states. Setting `feedbackPrediction.enabled`
+false requests an open-loop finite prefix. A failed solver or rejected candidate
+leaves the admitted incumbent available. Executing its terminal feedback is the
+continuation of this safety policy, with the same lane objective.
+
+There is no lane-following/collision-avoidance mode switch. A custom proposal
+hook is also subject to nonlinear admission, but does not implement the default
+SCA search or justify claims about its local optimization hierarchy.
 
 ## Operational limits and validation
 
@@ -207,10 +293,14 @@ report = runNonlinearPredictiveSafetyValidation;
 
 The native build requires a MATLAB C++ compiler and system MPFR/GMP development
 libraries. `prepareCollisionAvoidanceController` builds the kernels in the
-excluded `solver/nonlinear/` directory if missing. Format-46 affine prediction
+excluded `solver/nonlinear/` directory if missing. Format-47 and older prediction
 states, affine-plant scenario replay and the older estimator-bound scenario
 contracts are incompatible with this entry point. The new validation driver
 replays the nonlinear ODE independently and reports failures as failures.
+
+The [September 28 joint-state SCA validation](../report/JOINT_PCBF_SCA_20260928.md)
+records the implementation, 139 passing selected tests, complete stored-policy
+avoidance/recovery, and the substantial online optimization runtime limitation.
 
 Design context: [Huang et al., predictive barrier values](https://arxiv.org/abs/2502.08400),
 [Batkovic et al., safe MPC](https://arxiv.org/abs/2305.03312), and

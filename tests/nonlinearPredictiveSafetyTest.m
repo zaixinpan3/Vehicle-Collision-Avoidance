@@ -79,7 +79,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(p.certificate.accepted);
             testCase.verifyTrue(p.metadata.wholeHoldCertificate);
             testCase.verifyEqual(u.actuatorInput,plan(:,1));
-            testCase.verifyEqual(state.version,47);
+            testCase.verifyEqual(state.version,48);
             testCase.verifyEqual(p.metadata.predictiveBarrierValue,0);
         end
         function defaultCruiseSpeedHasAnAdmissibleInvariantContinuation(testCase)
@@ -113,10 +113,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [accepted,~]=nonlinearSafetyCertificate.terminal([x,x],b.reference.input,q,0,b,frame,[2.4;.95;0;0],cfg);
             testCase.verifyFalse(accepted);
         end
-        function inconsistentNrmmParametersAreRejected(testCase)
+        function inconsistentConstantSpeedAccelerationIsRejected(testCase)
             [ego,road,cfg]=localFixture();target=localObservation();target.targetYawRate=.2;
             testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:inconsistentNrmm');
+                'collisionAvoidanceController:inconsistentTargetMotion');
         end
         function nonzeroUncertaintyIsNotReportedAsAnExactModelGuarantee(testCase)
             [ego,road,cfg]=localFixture();ego.controllerStateErrorBound=.01*ones(6,1);
@@ -176,7 +176,59 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyTrue(problem.certificate.accepted);
             testCase.verifyGreaterThanOrEqual(problem.metadata.solverCallCount,2);
-            testCase.verifyTrue(problem.metadata.convexSubproblemsAreCertifiedInnerApproximations);
+            testCase.verifyFalse(problem.metadata.convexSubproblemsAreCertifiedInnerApproximations);
+            testCase.verifyTrue(problem.metadata.nonlinearAcceptanceRequired);
+            step=problem.metadata.admissionSearch.sequentialIterations{1};
+            testCase.verifyLessThanOrEqual(step.secondarySafety,step.safetyCap+1e-8);
+        end
+        function aTurningTargetHasIndependentSpeedAndHeadingRate(testCase)
+            [ego,road,cfg]=localFixture();target=localObservation();
+            target.targetYawRate=.05;
+            target=rmfield(target,'targetAccelerationInertial');
+            [~,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(problem.model.target(4:6),[4;0;.05],'AbsTol',1e-12);
+            testCase.verifyEqual(problem.model.jointState,[problem.model.initialState;100;20;0],'AbsTol',1e-12);
+            testCase.verifyEqual(state.predictedJointState(9,2),.05*cfg.controller.sampleTime,'AbsTol',1e-12);
+            testCase.verifyEqual(state.predictedJointState(7:8,2), ...
+                [100+80*sin(.0025);20+80*(1-cos(.0025))],'AbsTol',1e-11);
+            testCase.verifyTrue(problem.certificate.accepted);
+        end
+        function targetBlockOfTheJointDynamicsIsUnactuated(testCase)
+            [~,~,cfg]=localFixture();z=[0;0;0;8;0;0;10;20;.3];
+            parameters=[4;0;.1;2.4;.95;0;0];
+            [next,a,b]=nonlinearBicycleModel.jointSample(z,[.01;.03],parameters,cfg);
+            other=nonlinearBicycleModel.jointSample(z,[-.01;.01],parameters,cfg);
+            testCase.verifyEqual(next(7:9),other(7:9),'AbsTol',1e-12);
+            testCase.verifyEqual(b(7:9,:),zeros(3,2),'AbsTol',1e-12);
+            testCase.verifyEqual(a(1:6,7:9),zeros(6,3),'AbsTol',1e-12);
+            testCase.verifyEqual(next(9)-z(9),.1*cfg.controller.sampleTime,'AbsTol',1e-12);
+        end
+        function overlappingPolygonsProvideADualRestorationDirection(testCase)
+            shape=[2.4;.95;.2;-.1];
+            rows=nonlinearSafetyCertificate.dualLinearization([0;0;0],shape,[0;0;0],shape,[0;1]);
+            h=[eye(2);-eye(2)];
+            testCase.verifyEqual(norm(rows.normal),1,'AbsTol',1e-12);
+            testCase.verifyEqual(rows.normal+h.'*rows.mu,zeros(2,1),'AbsTol',1e-12);
+            testCase.verifyEqual(-rows.normal+h.'*rows.lambda,zeros(2,1),'AbsTol',1e-12);
+            testCase.verifyGreaterThanOrEqual([rows.mu;rows.lambda],0);
+            testCase.verifyLessThan(rows.signedDistance,0);
+            testCase.verifyEqual(rows.normal,[0;1],'AbsTol',1e-12);
+        end
+        function intersectingLaneRolloutIsRestoredWithoutAvoidancePlan(testCase)
+            [ego,road,cfg]=localFixture();target=localObservation();
+            target.targetPositionInertial=[24;0];target.targetVelocityInertial=[-8;0];
+            target.targetYawInertial=pi;cfg.controller.horizonSteps=8;
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEmpty(cfg.nonlinear.initialPlan);
+            testCase.verifyEqual(problem.metadata.certificateSource,"sequentialConvexification");
+            testCase.verifyGreaterThan(max(abs(problem.predictedState(2,:))),1.9);
+            testCase.verifyGreaterThanOrEqual(problem.certificate.minimumCollisionMargin,0);
+            testCase.verifyLessThanOrEqual(problem.certificate.terminal.normUpper,problem.model.backup.radius);
+            testCase.verifyEqual(problem.metadata.predictiveBarrierValue,0);
+            steps=[problem.metadata.admissionSearch.sequentialIterations{:}];
+            solved=steps([steps.status]=="solved");
+            testCase.verifyLessThanOrEqual([solved.secondarySafety],[solved.safetyCap]+1e-7);
+            testCase.verifyFalse(problem.metadata.drivingModeSwitching);
         end
         function feedbackContinuationBoundsFutureHeldInputs(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.001;

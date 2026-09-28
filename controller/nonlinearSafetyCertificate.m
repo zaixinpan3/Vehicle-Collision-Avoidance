@@ -1,7 +1,7 @@
 classdef nonlinearSafetyCertificate
     %nonlinearSafetyCertificate Exact footprints and validated nonlinear witnesses.
     methods (Static)
-        function q = target(observation,raw,cfg)
+        function q = target(observation,raw,~)
             q=zeros(10,0);if isempty(observation),return;end
             headingKnown=false;
             for name=["targetYawInertial","targetHeadingInertial","targetYawRelative", ...
@@ -28,27 +28,23 @@ classdef nonlinearSafetyCertificate
             speed=norm(observation.velocity);beta=0;
             if speed>0,beta=atan2(sin(atan2(observation.velocity(2),observation.velocity(1))-observation.yaw), ...
                     cos(atan2(observation.velocity(2),observation.velocity(1))-observation.yaw));end
-            lr=cfg.nonlinear.targetRearLength;offset=zeros(2,1);
-            if isfield(raw,'targetRearLength'),lr=raw.targetRearLength;end
+            offset=zeros(2,1);
             if isfield(raw,'targetRectangleOffset'),offset=raw.targetRectangleOffset;end
-            validateattributes(lr,{'double'},{'scalar','real','finite','positive'});
             validateattributes(offset,{'double'},{'size',[2,1],'real','finite'});
             if isfield(raw,'targetSideslip')
                 validateattributes(raw.targetSideslip,{'double'},{'scalar','real','finite'});
                 if speed>0 && abs(atan2(sin(beta-raw.targetSideslip),cos(beta-raw.targetSideslip)))>1e-10
-                    error('collisionAvoidanceController:inconsistentNrmm','Velocity course and supplied sideslip disagree.');
+                    error('collisionAvoidanceController:inconsistentTargetMotion','Velocity course and supplied sideslip disagree.');
                 end
                 beta=raw.targetSideslip;
             end
-            omega=speed*sin(beta)/lr;
-            if abs(omega-observation.yawRate)>1e-10*max(1,abs(omega))
-                error('collisionAvoidanceController:inconsistentNrmm', ...
-                    'Literal constant-parameter NRMM requires yawRate = speed*sin(sideslip)/rearLength.');
-            end
+            % Tangential speed and body heading rate are independent constants.
+            % A known constant course/body offset is retained when supplied.
+            omega=observation.yawRate;
             expectedAcceleration=omega*[-observation.velocity(2);observation.velocity(1)];
             if norm(observation.acceleration-expectedAcceleration,inf)>1e-9*max(1,norm(expectedAcceleration,inf))
-                error('collisionAvoidanceController:inconsistentNrmm', ...
-                    'Constant-speed NRMM acceleration must equal yawRate*J*velocity.');
+                error('collisionAvoidanceController:inconsistentTargetMotion', ...
+                    'Constant tangential speed and heading rate require acceleration = yawRate*J*velocity.');
             end
             q=[observation.position;observation.yaw;speed;beta;omega;observation.length/2;observation.width/2;offset];
         end
@@ -93,6 +89,33 @@ classdef nonlinearSafetyCertificate
                 'normalConvention',"targetToEgo");
         end
 
+        function rows = dualLinearization(poseE,shapeE,poseT,shapeT,preferred)
+            % Li-style fixed-normal distance dual, extended to both bodies.
+            % The four ego vertex rows retain yaw dependence in each SCA step.
+            % At overlap, a signed support certificate supplies a nonzero
+            % restoration direction; it never certifies positive clearance.
+            re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
+            rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
+            body=shapeE(3:4)+shapeE(1:2).*[-1,1,1,-1;-1,-1,1,1];
+            ego=poseE(1:2)+re*body;
+            target=poseT(1:2)+rt*(shapeT(3:4)+shapeT(1:2).*[-1,1,1,-1;-1,-1,1,1]);
+            [distance,witness]=nonlinearSafetyCertificate.rectangle(poseE,shapeE,poseT,shapeT);
+            normal=witness.normal;
+            if distance==0
+                directions=[preferred/norm(preferred),-preferred/norm(preferred),re,-re,rt,-rt];
+                gaps=min(directions.'*ego,[],2)-max(directions.'*target,[],2);
+                best=max(gaps);index=find(gaps>=best-1e-10,1);normal=directions(:,index);
+            end
+            se=-re.'*normal;st=rt.'*normal;
+            mu=[max(se,0);max(-se,0)];lambda=[max(st,0);max(-st,0)];
+            ht=[shapeT(1:2)+shapeT(3:4);shapeT(1:2)-shapeT(3:4)];
+            targetSupport=normal.'*poseT(1:2)+ht.'*lambda;
+            values=(normal.'*ego-targetSupport).';
+            yaw=(normal.'*re*[0,-1;1,0]*body).';
+            rows=struct('value',values,'jacobian',[repmat(normal.',4,1),yaw], ...
+                'normal',normal,'mu',mu,'lambda',lambda,'signedDistance',min(values));
+        end
+
         function frame = roadFrame(lane,road)
             if laneGeometry.isVaryingReference(lane)
                 error('collisionAvoidanceController:uncertifiedReference', ...
@@ -119,7 +142,8 @@ classdef nonlinearSafetyCertificate
         function backup = backup(cfg,frame)
             persistent key saved
             synthesis=rmfield(cfg.nonlinear,{'maximumCertificateSeconds','maximumCertificateCells', ...
-                'initialPlan','proposalFunction','maximumImprovementIterations','trustRadius'});
+                'initialPlan','proposalFunction','maximumImprovementIterations','trustRadius', ...
+                'maximumAdmissionIterations','recoveryHorizonSeconds','optimizationClearanceMeters'});
             current={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.actuation, ...
                 cfg.referenceSpeed,cfg.controller.sampleTime,synthesis,cfg.clf,frame(4)};
             if isequaln(key,current),backup=saved;return;end

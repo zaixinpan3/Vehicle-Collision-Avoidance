@@ -87,7 +87,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'totalSolverCalls',solverCalls,'trace',trace);
         fprintf('%s: %d/%d frames, max %.3f s, failure %s\n',name,frames,options.Frames,maximumSeconds,failure);
     end
-    report=struct('model',"nonlinear combined-slip Fiala; exact constant-parameter NRMM", ...
+    report=struct('model',"nonlinear combined-slip Fiala; one constant-speed/heading-rate target", ...
         'certificate',"directed interval flow and invariant cruise backup",'results',[results{:}]);
     if strlength(options.OutputFile)>0
         file=fopen(options.OutputFile,'w');assert(file>=0);cleanup=onCleanup(@()fclose(file));

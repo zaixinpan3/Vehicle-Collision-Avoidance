@@ -13,10 +13,10 @@ documents, generated binaries and third-party solvers have separate roles.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public nonlinear controller, immutable target epoch, format-47 witness and metadata |
+| `collisionAvoidanceController.m` | Public nonlinear controller, immutable target epoch, format-48 joint witness and metadata |
 | `nonlinearBicycleModel.m` | Nonlinear inertial/Frenet derivatives, RK4 proposal and variational flow, realizable trims and transverse errors |
-| `nonlinearSafetyCertificate.m` | NRMM parsing and exact flow, rectangle dual witnesses, swept interval admission, invariant-ball synthesis and infinite target continuation |
-| `solveNonlinearPredictivePlan.m` | Stored-policy execution and terminal handoff, nominal/passing initialization, certified control boxes and lexicographic CLF/nominal improvement |
+| `nonlinearSafetyCertificate.m` | Constant-speed/heading-rate target parsing and exact flow, rectangle dual witnesses, swept interval admission, invariant-ball synthesis and infinite target continuation |
+| `solveNonlinearPredictivePlan.m` | Stored-policy execution and terminal handoff, lane-rollout initialization, Huang safety-slack LP and Li dual SCA, secondary CLF QP and nonlinear admission |
 | `nonlinearSafetyMex.cpp` | Directed target/rectangle/road geometry, Frenet norm and tail certificates, interval CLF derivatives and terminal remainder proof |
 | `readPlanningInputs.m` | Shared ego, road and target input normalization |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate (shrunk by the declared lateral clearance), road-refit readmission and carried-witness data |

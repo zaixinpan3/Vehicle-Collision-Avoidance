@@ -1,0 +1,278 @@
+[
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "findings": []
+  },
+  {
+    "file": "controller/nonlinearBicycleModel.m",
+    "findings": []
+  },
+  {
+    "file": "controller/nonlinearSafetyCertificate.m",
+    "findings": {
+      "id": "INUSD",
+      "message": "Input argument might be unused. Consider replacing the argument with ~ instead.",
+      "fix": 1,
+      "line": 4,
+      "column": [
+        45,
+        47
+      ]
+    }
+  },
+  {
+    "file": "controller/solveNonlinearPredictivePlan.m",
+    "findings": [
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 231,
+        "column": [
+          9,
+          13
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 231,
+        "column": [
+          40,
+          44
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 231,
+        "column": [
+          65,
+          69
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 234,
+        "column": [
+          24,
+          24
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 235,
+        "column": [
+          20,
+          20
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 237,
+        "column": [
+          9,
+          12
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 237,
+        "column": [
+          48,
+          53
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 238,
+        "column": [
+          26,
+          28
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 240,
+        "column": [
+          36,
+          39
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 240,
+        "column": [
+          50,
+          55
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 241,
+        "column": [
+          9,
+          11
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 241,
+        "column": [
+          31,
+          33
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 243,
+        "column": [
+          36,
+          39
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 243,
+        "column": [
+          50,
+          55
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 245,
+        "column": [
+          26,
+          32
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 247,
+        "column": [
+          9,
+          15
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 255,
+        "column": [
+          28,
+          28
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 255,
+        "column": [
+          59,
+          59
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 256,
+        "column": [
+          13,
+          16
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 256,
+        "column": [
+          27,
+          32
+        ]
+      }
+    ]
+  },
+  {
+    "file": "controller/fialaCertificate.m",
+    "findings": []
+  },
+  {
+    "file": "config/collisionAvoidanceControllerConfig.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/buildFialaIntervalVerifier.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/prepareCollisionAvoidanceController.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "findings": {
+      "id": "NASGU",
+      "message": "Value assigned to variable might be unused.",
+      "fix": 0,
+      "line": 130,
+      "column": [
+        5,
+        8
+      ]
+    }
+  },
+  {
+    "file": "scripts/validateNonlinearPredictiveController.m",
+    "findings": []
+  },
+  {
+    "file": "tests/nonlinearPredictiveSafetyTest.m",
+    "findings": {
+      "id": "NASGU",
+      "message": "Value assigned to variable might be unused.",
+      "fix": 0,
+      "line": 318,
+      "column": [
+        5,
+        8
+      ]
+    }
+  },
+  {
+    "file": "tests/controllerSourceBudgetTest.m",
+    "findings": []
+  }
+]

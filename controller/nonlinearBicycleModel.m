@@ -52,6 +52,33 @@ classdef nonlinearBicycleModel
             end
         end
 
+        function [next,a,b] = jointSample(z,u,targetParameters,cfg)
+            % Joint autonomous state [ego(6); target position(2); target yaw].
+            % Target parameters are [speed; sideslip; yawRate; half extents;
+            % body offset]. Eliminating its unactuated prediction is exact.
+            if isempty(targetParameters)
+                [next,a,b]=nonlinearBicycleModel.sample(z,u,cfg);
+                return;
+            end
+            validateattributes(z,{'double'},{'size',[9,1],'real','finite'});
+            validateattributes(targetParameters,{'double'},{'size',[7,1],'real','finite'});
+            [ego,ae,be]=nonlinearBicycleModel.sample(z(1:6),u,cfg);
+            target=[z(7:9);targetParameters];
+            future=nonlinearSafetyCertificate.targetFlow(target,cfg.controller.sampleTime);
+            displacement=future(1:2)-target(1:2);
+            at=eye(3);at(1:2,3)=[-displacement(2);displacement(1)];
+            next=[ego;future(1:3)];a=blkdiag(ae,at);b=[be;zeros(3,2)];
+        end
+
+        function [error,jacobian] = errorLinearization(x,lane,reference)
+            [error,projection]=nonlinearBicycleModel.error(x,lane,reference);
+            tangent=[cos(projection.heading);sin(projection.heading)];
+            jacobian=zeros(5,6);jacobian(1,1:2)=[-tangent(2),tangent(1)];
+            jacobian(2,3)=1;
+            jacobian(2,1:2)=-reference.curvature*tangent.'/(1-reference.curvature*projection.lateralPosition);
+            jacobian(3:5,4:6)=eye(3);
+        end
+
         function [a,b] = jacobian(x,u,cfg,curvature)
             a=zeros(6);b=zeros(6,2);step=cfg.nonlinear.finiteDifferenceStep;
             for index=1:8

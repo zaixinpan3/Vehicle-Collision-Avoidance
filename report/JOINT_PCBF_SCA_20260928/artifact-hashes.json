@@ -1,0 +1,101 @@
+{
+  "scope": "Independent project source, literature and validation artifacts; no weekly/monthly report hashes.",
+  "artifacts": [
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "d9c32ae4e508d6a65ec90696dc41acf5495f9b2718f2152aa68f242f9db1450e"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "c492a7ba694dbea0e1474b3b6a374e8e879501904820bb846b4446feefc96588"
+    },
+    {
+      "path": "controller/nonlinearBicycleModel.m",
+      "sha256": "a8075995a41bb61ff9a74b06ac16dfd19d4cf6429dc2ea36bd2c5ee87d3326ce"
+    },
+    {
+      "path": "controller/nonlinearSafetyCertificate.m",
+      "sha256": "15ddf510cbb127686354a4b134431b2e43130c5627191a188c2b5075df93789f"
+    },
+    {
+      "path": "controller/readPlanningInputs.m",
+      "sha256": "672f82f3bff4c98b7c279e9b31f04276b41e5dcf7b65ec6c768c18833c56f400"
+    },
+    {
+      "path": "controller/solveNonlinearPredictivePlan.m",
+      "sha256": "f50018e2c9aa6d4293903a96143735b6a1f56dfdac0313bdcb3aa8d180ed9476"
+    },
+    {
+      "path": "controller/NONLINEAR_PREDICTIVE_CBF.md",
+      "sha256": "ce2a78ee88d05d35953c8c88939f15318d362ca14a3496396b02a05bab633edc"
+    },
+    {
+      "path": "controller/CONTROLLER_FILES.md",
+      "sha256": "18235f7d8f4717180a2be0ad9d758358aa68300eb2d8061e663d1bc6b1ada53c"
+    },
+    {
+      "path": "controller/PCBF_CLF_ARCHITECTURE.md",
+      "sha256": "dcf055f0d8659c54e3fcc2d063f17aa5bb12fe4db63919a6bd318d706fd6c1f1"
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "ce8e3042c666eab32039b1835e01562abd492f810a6d00342f363644f73e7eef"
+    },
+    {
+      "path": "scripts/validateNonlinearPredictiveController.m",
+      "sha256": "659680826953ed9ef5bb65da9e4a01d4c01c0b8e19ea4866113bb0ab97ab6747"
+    },
+    {
+      "path": "scripts/auditJointPredictiveSafety.py",
+      "sha256": "6adcf182e6c546551be324b4ad3da6b42f42f6056a5ef363d9270aa1e1d6c0bf"
+    },
+    {
+      "path": "tests/nonlinearPredictiveSafetyTest.m",
+      "sha256": "02aafc6ee2f0a1745e38de0c339066da598531dcdda51ef99b0b8985cb1cf5d0"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928.md",
+      "sha256": "8716efb36b1408e9cfe2784c23b1f1b5aded34afec180b7a103f4413499b59eb"
+    },
+    {
+      "path": "reference/Huang et al. - 2025 - Predictive Control Barrier Functions Bridging model predictive control and control barrier function.pdf",
+      "sha256": "aabbce274eeb616a8f583daf05a53417fb17fea7ca2801d6469ccacc8e3ad7b3"
+    },
+    {
+      "path": "reference/Li et al. - 2023 - Real-Time Optimal Trajectory Planning for Autonomous Driving with Collision Avoidance Using Convex O.pdf",
+      "sha256": "29fd61ce9d0f60abf71c2af0a27a25b842efc16849e7e5b16d7e3824d21a5050"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/code-analysis.json",
+      "sha256": "06dbc60fba1cc2cbb7a3e71cbbb5b9c4414f895cc4b17d96b889fe0f9371a6be"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/final-code-analysis.json",
+      "sha256": "1a2bd61e7b4adfd738d5ccf798d075a4bae92f615741c1620883acbb10e03b5d"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/independent-audit.json",
+      "sha256": "387dffac437b428b0c53c1997be50089329b9acf7f64bba7e779526ee329bb96"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/oncoming.json",
+      "sha256": "f2ab952679dce0e3b46d6acf0fb1de7670512a98299adfe530df67c036f08b03"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/short-replays.json",
+      "sha256": "39fcf0a54489c68864d495464f2b89b8bf7c58e23852a31edc1b464e1f1efe08"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/stored-policy.json",
+      "sha256": "909a27dbd7061af5607b2080d2131517b71d58e22229d34f0a323d709cf0f472"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/summary.json",
+      "sha256": "d43daf198527b0e34b5720e6bf25e896639bd335b26e494fb5e88ff8452c9acf"
+    },
+    {
+      "path": "report/JOINT_PCBF_SCA_20260928/tests.json",
+      "sha256": "d6cf59418e3a00272a9250ff9e92b089ec508f0709941d7e74065457ecead3a3"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "file": "controller/nonlinearSafetyCertificate.m",
+    "findings": []
+  },
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "findings": []
+  },
+  {
+    "file": "controller/readPlanningInputs.m",
+    "findings": []
+  }
+]
