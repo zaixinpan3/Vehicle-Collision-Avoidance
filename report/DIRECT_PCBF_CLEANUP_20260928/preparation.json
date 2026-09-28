@@ -1,0 +1,9 @@
+{
+  "performed": true,
+  "elapsedSeconds": 0.222056,
+  "optimizationReturned": true,
+  "predictiveBarrierValue": 0,
+  "discardedCommandCount": 1,
+  "nativeBuildRequired": false,
+  "scope": "Nominal MATLAB MPC warm-up; no command applied"
+}

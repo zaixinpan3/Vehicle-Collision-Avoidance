@@ -17,18 +17,18 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
     methods (Test)
         function roadLoadOpposesMotionAndPreservesRest(testCase, speed)
             cfg = collisionAvoidanceControllerConfig();
-            positive = ltvBicycleModel.roadLoad(speed, cfg);
-            negative = ltvBicycleModel.roadLoad(-speed, cfg);
+            positive = nonlinearBicycleModel.roadLoad(speed, cfg);
+            negative = nonlinearBicycleModel.roadLoad(-speed, cfg);
 
             testCase.verifyGreaterThanOrEqual(positive*speed, 0.0);
             testCase.verifyEqual(negative, -positive, AbsTol=1.0e-12);
-            testCase.verifyEqual(ltvBicycleModel.roadLoad(0, cfg), 0.0, AbsTol=0.0);
+            testCase.verifyEqual(nonlinearBicycleModel.roadLoad(0, cfg), 0.0, AbsTol=0.0);
         end
 
         function aerodynamicForceHasThePhysicalQuadraticScaling(testCase)
             cfg = collisionAvoidanceControllerConfig();
-            [~, ~, first] = ltvBicycleModel.roadLoad(10, cfg);
-            [~, ~, second] = ltvBicycleModel.roadLoad(20, cfg);
+            [~, ~, first] = nonlinearBicycleModel.roadLoad(10, cfg);
+            [~, ~, second] = nonlinearBicycleModel.roadLoad(20, cfg);
 
             testCase.verifyEqual(first.aerodynamicForce, ...
                 0.5*cfg.roadLoad.airDensity*cfg.roadLoad.dragCoefficient ...
@@ -41,9 +41,9 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             cfg = collisionAvoidanceControllerConfig(struct("roadLoad", struct( ...
                 "rollingSpeedCoefficient", 1.0e-4, "rollingQuarticCoefficient", 1.0e-8)));
             step = 1.0e-6;
-            [~, slope] = ltvBicycleModel.roadLoad(speed, cfg);
-            finiteDifference = (ltvBicycleModel.roadLoad(speed+step, cfg) ...
-                - ltvBicycleModel.roadLoad(speed-step, cfg))/(2*step);
+            [~, slope] = nonlinearBicycleModel.roadLoad(speed, cfg);
+            finiteDifference = (nonlinearBicycleModel.roadLoad(speed+step, cfg) ...
+                - nonlinearBicycleModel.roadLoad(speed-step, cfg))/(2*step);
 
             testCase.verifyEqual(slope, finiteDifference, AbsTol=1.0e-5);
         end
@@ -51,10 +51,9 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
         function coastingDeceleratesAndBalancedForceHoldsCruise(testCase)
             cfg = collisionAvoidanceControllerConfig();
             initial = [0; 0; 0; 15; 0; 0];
-            [stateMatrix, inputMatrix, affine] = ltvBicycleModel.stageMatrices(0, 15, 0.05, cfg);
-            balance = ltvBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
-            coasting = stateMatrix*initial+affine;
-            cruise = coasting+inputMatrix*[0; balance];
+            balance = nonlinearBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
+            coasting = nonlinearBicycleModel.sample(initial,[0;0],cfg);
+            cruise = nonlinearBicycleModel.sample(initial,[0;balance],cfg);
 
             testCase.verifyLessThan(coasting(4), initial(4));
             testCase.verifyEqual(cruise, [0.75; 0; 0; 15; 0; 0], AbsTol=1.0e-12);
@@ -62,19 +61,11 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
 
         function commandAndClfUseTheSameLongitudinalForceBalance(testCase)
             [command, problem, cfg] = localProblem(14.8);
-            initial = problem.model.initialEgoState;
-            [stateMatrix, inputMatrix, affine] = ltvBicycleModel.continuousMatrices(0, cfg.referenceSpeed, cfg);
-            derivative = stateMatrix*initial+inputMatrix*command.actuatorInput+affine;
-            forceDerivative = (command.totalLongitudinalActuatorForce ...
+            derivative=nonlinearBicycleModel.derivative(problem.model.initialState,command.actuatorInput,cfg);
+            forceDerivative=(command.totalLongitudinalActuatorForce ...
                 -command.aerodynamicResistanceForce-command.rollingResistanceForce)/cfg.vehicle.m;
-            testCase.verifyEqual(command.bodyLongitudinalVelocityDerivative, forceDerivative, AbsTol=1.0e-12);
-            [trimForce,trimSlope]=ltvBicycleModel.roadLoad(cfg.referenceSpeed,cfg);
-            tangentForce=trimForce+trimSlope*(initial(4)-cfg.referenceSpeed);
-            physicalForce=command.aerodynamicResistanceForce+command.rollingResistanceForce;
-            % The declared frozen affine plant uses the road-load tangent;
-            % command diagnostics also report the physical nonlinear force.
-            testCase.verifyEqual(derivative(4),forceDerivative ...
-                +(physicalForce-tangentForce)/cfg.vehicle.m,AbsTol=1e-12);
+            testCase.verifyEqual(command.bodyLongitudinalVelocityDerivative,derivative(4),AbsTol=1e-12);
+            testCase.verifyEqual(derivative(4),forceDerivative,AbsTol=1e-8);
             testCase.verifyEqual(command.totalLongitudinalActuatorForce, ...
                 cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg)*command.actuatorInput(2), AbsTol=1.0e-10);
             testCase.verifyEqual(forceDerivative, (command.totalLongitudinalTireForce ...
@@ -84,7 +75,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
 
         function theCruiseEquilibriumAccountsForPassiveForces(testCase)
             [~, problem, cfg] = localProblem(15);
-            requiredInput = ltvBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
+            requiredInput = nonlinearBicycleModel.roadLoad(15, cfg)/(cfg.vehicle.m*modifiedFialaTire.accelerationGain(cfg));
 
             testCase.verifyEqual(problem.metadata.clfOperatingInput, [0;requiredInput], AbsTol=1.0e-12);
             testCase.verifyGreaterThan(requiredInput, 0.0);
@@ -97,13 +88,13 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.axleNormalLoad, expected, AbsTol=1.0e-10);
         end
 
-        function changingRoadLoadRebuildsTheRiccatiCertificate(testCase)
+        function changingRoadLoadUpdatesTheLaneClf(testCase)
             [~, first, cfg] = localProblem(14.8);
             cfg.roadLoad.dragCoefficient = 1.2;
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.8);
-    ego.stateTime = 0;
-    ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
-            [~, ~, second] = collisionAvoidanceController(ego, encounterTestFixture.stationaryTarget(), [0, 0; 2000, 0], cfg, []);
+            ego.stateTime = 0;
+
+            [~, ~, second] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 
             testCase.verifyGreaterThan(norm(first.metadata.clfMatrix-second.metadata.clfMatrix), 1.0e-10);
             testCase.verifyGreaterThan(second.metadata.clfOperatingInput(2), ...
@@ -126,9 +117,9 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
 end
 
 function [command, problem, cfg] = localProblem(speed)
-    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps",16,"sampleTime",0.1,"stationTrustRadius",20)));
+    cfg = collisionAvoidanceControllerConfig(struct("controller", struct("horizonSteps",16,"sampleTime",0.05)));
     ego = struct("position", [0; 0], "yawAngle", 0, "speed", speed);
     ego.stateTime = 0;
-    ego.perception = struct("time",0,"range",30,"completeWithinRange",true);
-    [command, ~, problem] = collisionAvoidanceController(ego, encounterTestFixture.stationaryTarget(), [0, 0; 2000, 0], cfg, []);
+
+    [command, ~, problem] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 end

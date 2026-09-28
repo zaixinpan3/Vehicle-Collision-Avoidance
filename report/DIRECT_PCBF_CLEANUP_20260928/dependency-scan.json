@@ -1,0 +1,18 @@
+{
+  "method": "Literal identifier search for all retired source basenames in retained controller, config, scripts, tests and estimator sources; comment-only matches are listed separately.",
+  "sourceFilesScanned": 84,
+  "executableMatches": [],
+  "commentMatches": [
+    {
+      "file": "scripts/runObserverComparisonScenario.m",
+      "line": 14,
+      "text": "%                       1.5 m lateral offset (runOncomingVehicleAvoidanceScenario)."
+    },
+    {
+      "file": "scripts/runObserverComparisonScenario.m",
+      "line": 18,
+      "text": "%                       (runCircularCenterlineStraightTargetAvoidanceScenario)."
+    }
+  ],
+  "coreSourceCount": 8
+}

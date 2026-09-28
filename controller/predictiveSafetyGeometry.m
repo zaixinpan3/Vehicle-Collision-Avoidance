@@ -99,14 +99,6 @@ classdef predictiveSafetyGeometry
         end
 
         function frame = roadFrame(lane,road)
-            if laneGeometry.isVaryingReference(lane)
-                error('collisionAvoidanceController:unsupportedReference', ...
-                    'The nominal terminal controller supports a straight or constant-curvature reference.');
-            end
-            if ~isempty(road.boundaries)
-                error('collisionAvoidanceController:unsupportedRoad', ...
-                    'Use a global lateralClearance corridor for the nominal terminal set.');
-            end
             if isfield(lane,'referenceCurve')
                 curve=lane.referenceCurve;origin=curve.origin;heading=curve.heading;k=curve.curvature;
             else
@@ -117,7 +109,6 @@ classdef predictiveSafetyGeometry
             end
             clearance=road.lateralClearance;
             if isempty(clearance),clearance=[1e100;1e100];end
-            clearance=clearance-road.lateralClearanceErrorBound;
             frame=[origin;heading;k;clearance];
         end
 

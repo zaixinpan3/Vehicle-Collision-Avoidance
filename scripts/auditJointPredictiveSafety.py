@@ -45,7 +45,7 @@ def distance(a, b):
 
 def audit(result):
     name = result['scenario']
-    if name not in ('oncoming', 'storedPolicy', 'recovery', 'solverFailure', 'circular', 'turningTarget'):
+    if name not in ('oncoming', 'recovery', 'circular', 'turningTarget'):
         raise ValueError(f'Unsupported fixture: {name}')
     minimum = math.inf
     road_margin = math.inf
@@ -60,7 +60,7 @@ def audit(result):
             else:
                 lateral = [y for _, y in body]
             road_margin = min(road_margin, 4 - max(abs(y) for y in lateral))
-            if name in ('oncoming', 'storedPolicy', 'turningTarget'):
+            if name in ('oncoming', 'turningTarget'):
                 time = hold['time'] + relative_time
                 if name == 'turningTarget':
                     yaw = math.pi - .8 * time
@@ -72,12 +72,13 @@ def audit(result):
     reported = result['minimumReplayClearanceMeters']
     clearance_match = reported is None or abs(minimum - reported) < 1e-9
     zero_slack = all(hold.get('predictiveBarrierValue', 0) <= 1e-5 for hold in result['trace'])
-    passed = (zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
+    solved = all(hold['solverCalls'] >= 2 for hold in result['trace'])
+    passed = (solved and zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
               and minimum >= result['requiredClearanceMeters'] - 1e-9)
     return dict(scenario=name, passed=passed, samples=samples,
                 minimumClearanceMeters=minimum if math.isfinite(minimum) else None,
                 minimumRoadMarginMeters=road_margin,
-                agreesWithMatlabGeometry=clearance_match, allPlansZeroSlack=zero_slack,
+                agreesWithMatlabGeometry=clearance_match, allPredictionsZeroSlack=zero_slack, everyHoldSolved=solved,
                 finalLateralErrorMeters=result['finalTransverseError'][0])
 
 
@@ -87,7 +88,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     entries = []
-    for name in ('short-replays.json', 'stored-policy.json', 'oncoming.json'):
+    for name in ('short-replays.json', 'oncoming.json'):
         data = json.loads((args.directory / name).read_text())['results']
         entries.extend(audit(result) for result in (data if isinstance(data, list) else [data]))
     args.output.write_text(json.dumps(dict(scope='independent sampled geometry', results=entries), indent=2) + '\n')

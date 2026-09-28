@@ -23,7 +23,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         function targetSpeedAndHeadingRateAreIndependent(testCase,targetTurn)
             [ego,road,cfg]=localFixture();
             target=localTarget([30;5;.2;6;0;targetTurn;2.4;.95;0;0]);
-            [~,~,~,obs]=readPlanningInputs(ego,target,road,cfg);
+            [~,~,~,obs]=readControllerInputs(ego,target,road,cfg);
             q=predictiveSafetyGeometry.target(obs,target,cfg);
             testCase.verifyEqual(q(4),6,AbsTol=1e-14);
             testCase.verifyEqual(q(6),targetTurn);
@@ -75,7 +75,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         function laneFollowingRunsWithNoNativeVerifier(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            testCase.verifyTrue(problem.metadata.planFeasible);
+            testCase.verifyTrue(problem.metadata.optimizationReturned);
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
             testCase.verifySize(command.actuatorInput,[2,1]);
@@ -89,7 +89,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             target.targetPositionInertial=[30.4;5.01];
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
             testCase.verifyEqual(problem.model.jointState(7:8),[30.4;5.01]);
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedPlan");
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedWarmStart");
         end
         function targetDropoutUsesTheConstantParameterPrediction(testCase)
             [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;0;0;2.4;.95;0;0]);
@@ -99,23 +99,32 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             expected=predictiveSafetyGeometry.targetFlow(prior.target,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
         end
-        function budgetExhaustionKeepsAFeasibleShiftedPlan(testCase)
+        function everyCallSolvesAndAppliesTheReturnedFirstControl(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            cfg.solver.frameDeadlineSeconds=1e-12;ego=localSuccessor(ego,prior);
-            [~,plan,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            testCase.verifyTrue(problem.metadata.shiftedPlanAvailable);
-            testCase.verifyEqual(problem.metadata.solverCallCount,0);
-            testCase.verifySize(plan,size(prior.plan));
-            testCase.verifyEqual(problem.metadata.solutionSource,"shiftedPlan");
+            ego=localSuccessor(ego,prior);
+            [command,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyGreaterThanOrEqual(problem.metadata.solverCallCount,2);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1));
+            testCase.verifyEqual(state.appliedInput,inputs(:,1));
+            testCase.verifyEqual(problem.metadata.controlSource,"sequentialConvexification");
+            testCase.verifyTrue(problem.metadata.zeroSlack);
+        end
+        function noOptimizerResultRaisesAnErrorEvenWithAWarmStart(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,prior);cfg.solver.timeLimitSeconds=1e-12;
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
+                'collisionAvoidanceController:optimizationFailed');
         end
         function positiveSlackReportsSafetyRecoveryWithoutClaimingSafety(testCase)
             [ego,road,cfg]=localFixture();cfg.nonlinear.maximumIterations=2;
             target=localTarget([0;0;pi;8;0;0;2.4;.95;0;0]);
-            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1));
             testCase.verifyGreaterThan(problem.metadata.predictiveBarrierValue,0);
             testCase.verifyFalse(problem.metadata.zeroSlack);
-            testCase.verifyTrue(problem.metadata.planFeasible);
+            testCase.verifyTrue(problem.metadata.optimizationReturned);
         end
         function oncomingAvoidanceStartsFromALaneRollout(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=60;
@@ -130,7 +139,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             for j=1:numel(steps)
                 step=steps{j};
                 if step.status=="solved"
-                    testCase.verifyLessThanOrEqual(step.secondarySafety,step.safetyCap+1e-7);
+                    testCase.verifyLessThanOrEqual(step.secondarySafety,step.safetyCap+cfg.solver.feasibilityTolerance);
                 end
             end
         end
@@ -165,8 +174,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
 end
 
 function [ego,road,cfg]=localFixture()
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8), ...
-        'nonlinear',struct('maximumImprovementIterations',0)));
+    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
     ego=struct('position',[0;0],'yaw',0,'speed',8,'lateralVelocity',0,'yawRate',0);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);
 end
@@ -176,6 +184,6 @@ function target=localTarget(q)
         'targetYawInertial',q(3),'targetYawRate',q(6),'targetLength',2*q(7),'targetWidth',2*q(8));
 end
 function ego=localSuccessor(ego,prior)
-    x=prior.predictedState(:,2);ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
+    x=prior.stateTrajectory(:,2);ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
     ego.lateralVelocity=x(5);ego.yawRate=x(6);ego.heldActuatorInput=prior.appliedInput;
 end

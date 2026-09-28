@@ -4,17 +4,15 @@ function report = runNonlinearPredictiveSafetyValidation(options)
 % The audit is offline evidence; it is not an execution admission layer.
     arguments
         options.Frames (1,1) double {mustBeInteger,mustBePositive} = 8
-        options.Scenarios (1,:) string = ["recovery","oncoming","circular","turningTarget","solverFailure"]
+        options.Scenarios (1,:) string = ["recovery","oncoming","circular","turningTarget"]
         options.OutputFile (1,1) string = ""
-        options.MaximumImprovementIterations (1,1) double {mustBeInteger,mustBeNonnegative} = 2
     end
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'controller'),fullfile(root,'config'));
     results=cell(1,numel(options.Scenarios));
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);[ego,target,road,cfg]=localFixture(name);prior=[];
-        if name~="solverFailure",cfg.nonlinear.maximumImprovementIterations=options.MaximumImprovementIterations;end
         frames=0;minimumClearance=Inf;minimumRoadMargin=Inf;maximumSeconds=0;failure="";
-        firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;inheritedFrames=0;finalError=[];
+        firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;warmStartedFrames=0;finalError=[];
         trace=struct([]);failedFrameSeconds=NaN;failureTime=NaN;passedTarget=false;
         for frame=1:options.Frames
             frameTimer=tic;
@@ -44,11 +42,11 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 lastClf=problem.metadata.clfNextValue;maximumSlack=max(maximumSlack,problem.metadata.clfSlack);
                 next=states(end,:).';ego=localEgo(next,ego.stateTime+h,input);
                 finalError=nonlinearBicycleModel.error(next,problem.model.lane,problem.model.terminal.reference);
-                inheritedFrames=inheritedFrames+(problem.metadata.solutionSource=="shiftedPlan");
+                warmStartedFrames=warmStartedFrames+(problem.metadata.search.initialization=="shiftedWarmStart");
                 search=problem.metadata.search;
                 entry=struct('time',ego.stateTime-h,'controllerSeconds',frameSeconds, ...
                     'horizonSteps',problem.metadata.horizonSteps,'source',search.source, ...
-                    'solverCalls',search.solverCalls,'shiftedPlanAvailable',search.shiftedPlanAvailable, ...
+                    'solverCalls',search.solverCalls,'initialization',search.initialization, ...
                     'predictiveBarrierValue',problem.metadata.predictiveBarrierValue, ...
                     'hardResidual',problem.solution.hard,'clfSlack',problem.metadata.clfSlack, ...
                     'state',x,'nextState',next,'input',input,'transverseError',finalError, ...
@@ -63,7 +61,6 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 frames=frames+1;
                 if mod(frame,4)==0,fprintf('%s: %d/%d holds, last %.3f s, source %s\n', ...
                     name,frame,options.Frames,frameSeconds,search.source);end
-                if name=="storedPolicy",cfg.solver.frameDeadlineSeconds=1e-12;end
             catch exception
                 failedFrameSeconds=toc(frameTimer);failureTime=(frame-1)*cfg.controller.sampleTime;
                 failure=string(exception.identifier)+": "+string(exception.message);break;
@@ -80,9 +77,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'minimumReplayRoadMarginMeters',minimumRoadMargin,'maximumFrameSeconds',maximumSeconds, ...
             'maximumHorizonSteps',maxHorizon,'initialClfValue',firstClf,'finalClfValue',lastClf, ...
             'maximumClfSlack',maximumSlack,'sampleTimeSeconds',cfg.controller.sampleTime,'randomSeed',[], ...
-            'finalTransverseError',finalError,'shiftedPlanFrames',inheritedFrames, ...
+            'finalTransverseError',finalError,'warmStartedFrames',warmStartedFrames, ...
             'requiredClearanceMeters',cfg.collision.safetyMarginMeters, ...
-            'maximumImprovementIterations',cfg.nonlinear.maximumImprovementIterations, ...
             'firstFrameSeconds',firstSeconds,'subsequentMedianSeconds',medianLater, ...
             'subsequentP95Seconds',p95Later,'deadlineMisses',nnz(seconds>cfg.controller.sampleTime), ...
             'failedFrameSeconds',failedFrameSeconds,'failureTime',failureTime,'passedTarget',passedTarget, ...
@@ -99,12 +95,12 @@ end
 
 function [ego,target,road,cfg]=localFixture(name)
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'controller',struct('horizonSteps',8),'nonlinear',struct('maximumImprovementIterations',0)));
+        'controller',struct('horizonSteps',8)));
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);
     x=[0;0;0;8;0;0];target=[];
     switch name
         case "recovery",x(2)=.01;
-        case {"oncoming","storedPolicy"}
+        case "oncoming"
             target=localTarget([24;0;pi;8;0;0;2.4;.95;0;0]);
         case "circular"
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',.005,'length',200), ...
@@ -112,8 +108,6 @@ function [ego,target,road,cfg]=localFixture(name)
             trim=nonlinearBicycleModel.cruise(cfg,.005);x=trim.state;x(1:2)=0;
         case "turningTarget"
             target=localTarget([24;0;pi;8;0;-.8;2.4;.95;0;0]);
-        case "solverFailure"
-            x(2)=.01;cfg.nonlinear.maximumImprovementIterations=1;cfg.solver.maxIterations=1;
         otherwise,error('runNonlinearPredictiveSafetyValidation:unknownScenario','Unknown scenario %s.',name);
     end
     ego=localEgo(x,0,[0;0]);

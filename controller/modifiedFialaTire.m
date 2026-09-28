@@ -29,9 +29,7 @@ classdef modifiedFialaTire
             persistent priorKey priorParameters
             key = [cfg.vehicle.m;cfg.vehicle.gravity;cfg.vehicle.lf;cfg.vehicle.lr; ...
                 cfg.tire.corneringStiffness(:);cfg.tire.frictionCoefficient(:)];
-            if coder.target('MATLAB')
-                if isequal(key,priorKey),parameters = priorParameters;return;end
-            end
+            if isequal(key,priorKey),parameters=priorParameters;return;end
             mass = localPositiveScalar(cfg.vehicle.m, "vehicle.m");
             gravity = localPositiveScalar(cfg.vehicle.gravity, "vehicle.gravity");
             lf = localPositiveScalar(cfg.vehicle.lf, "vehicle.lf");
@@ -44,7 +42,7 @@ classdef modifiedFialaTire
                 "frictionCoefficient", friction, "staticNormalLoad", normalLoad, ...
                 "longitudinalForceScale", forceScale, ...
                 "brakingRatioAccelerationGain", sum(forceScale)/mass);
-            if coder.target('MATLAB'),priorKey = key;priorParameters = parameters;end
+            priorKey=key;priorParameters=parameters;
         end
 
         function gain = accelerationGain(cfg)
@@ -100,20 +98,6 @@ classdef modifiedFialaTire
                     .*q.*(1.0-2.0*q/3.0)*(brakingRatio/eta^2);
             end
             intercept = force-slipSlope.*slipAngle-ratioSlope*brakingRatio;
-        end
-
-        function [slipSlope, ratioSlope, intercept, nominalSlip, nominalForce] = ...
-                linearize(kappa, speed, brakingRatio, cfg)
-        %linearize Tangent about the scheduled route-following operating point.
-        % Transport speed is not floored. Steering tends to zero with speed,
-        % retaining the exact rest equilibrium on curved roads.
-            tireSpeed = max(speed, cfg.model.scheduleSpeedFloor);
-            yawRate = kappa*speed;
-            steering = atan((cfg.vehicle.lf+cfg.vehicle.lr)*kappa)*speed/tireSpeed;
-            nominalSlip = [(cfg.vehicle.lf*yawRate)/tireSpeed-steering; ...
-                -cfg.vehicle.lr*yawRate/tireSpeed];
-            [nominalForce, slipSlope, ratioSlope, intercept] = ...
-                modifiedFialaTire.evaluate(nominalSlip, brakingRatio, cfg);
         end
     end
 end

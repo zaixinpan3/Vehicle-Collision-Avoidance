@@ -10,7 +10,7 @@ The controller has one receding-horizon optimization:
 \]
 
 `collisionAvoidanceController` parses the current joint state,
-`solveNonlinearPredictivePlan` solves the nominal MPC problem, and the first
+`solvePredictiveControl` solves the nominal MPC problem, and the first
 input of its solution is applied. `predictiveSafetyGeometry` supplies the
 constant-parameter target flow, polygon duals and terminal geometry.
 `nonlinearBicycleModel` supplies the nominal dynamics, analytic tangents and
@@ -28,10 +28,17 @@ The public four-output call remains:
 Use `state` as the next call's `previousState`. The optional persistent state
 can still be reset with `collisionAvoidanceController("resetNominalTrajectory")`.
 `problem.solution` contains nominal states, inputs, stage slacks, CLF values
-and optimization residuals. State format 49 replaces format 48; an older state
-starts a fresh solve. The old `certificate` output field and certification
-metadata have been removed. Use `metadata.planFeasible`, `zeroSlack`,
-`predictiveBarrierValue`, `solutionSource` and `search`.
+and optimization residuals. State format 50 stores `inputTrajectory` and
+`stateTrajectory` solely for the next numerical warm start. An older state
+starts a fresh solve. Each call runs the optimizer and directly applies its
+first returned control, for both zero and positive safety slack. If no
+optimizer result exists, the call raises `optimizationFailed`.
+
+Use `metadata.optimizationReturned`, `zeroSlack`, `predictiveBarrierValue`,
+`hardConstraintResidual`, `scvxConverged`, `controlSource` and `search` for
+diagnostics. `zeroSlack` means within `solver.feasibilityTolerance`; it does
+not mean an exact real-arithmetic zero. Neither the slack sign nor the reported nonlinear residual
+selects an execution mode. The first input always matches `inputs(:,1)`.
 
 ## Joint prediction model
 
@@ -44,7 +51,8 @@ u=(\delta_f,\beta).
 
 The ego uses the nonlinear combined-slip Fiala bicycle equations and RK4
 prediction under a held input. Its analytic force and kinematic derivatives
-are integrated with the RK4 variational equations.
+are integrated with the RK4 variational equations. This tire model requires
+longitudinal velocity above `model.scheduleSpeedFloor` (1 m/s by default).
 
 For constant tangential speed \(v_t\), heading rate \(\omega_t\), and an optional
 known constant course/body-heading offset \(b_t\),
@@ -104,11 +112,10 @@ maximum. Subsequent shifts keep the selected horizon length.
 
 This follows Huang et al., problem (8), with the additional midpoint samples
 sharing the stage slack. The additional samples preserve the shift argument.
-A zero-slack feasible plan attains the global lower bound of the safety
+A zero-slack feasible solution attains the global lower bound of the safety
 objective. Positive slack represents safety recovery; it does **not** assert
-collision-free execution. Positive-slack plans are returned with their actual
-barrier value, instead of requiring a separate zero-slack certificate before
-any input can be returned.
+collision-free execution. Both zero-slack and positive-slack optimizer results are executed directly
+and returned with their achieved slack sum.
 
 ## Polygon duals and SCvx
 
@@ -134,15 +141,27 @@ footprints. Joint pose/dual optimization remains nonconvex.
 
 Each iteration solves a safety LP and then a CLF QP with the same dynamics,
 input, geometry and terminal rows. The QP constrains the slack sum to the LP
-optimum plus `solver.lexicographicTieTolerance`. A trust region and the usual
-nominal rollout merit/residual update control linearization error. These are
+optimum plus `solver.lexicographicTieTolerance`. A trust region compares actual and predicted reductions of the nominal
+rollout merit to control linearization error. These are
 numerical optimizer operations. No formal verifier follows the solver.
 
 The initial center is a clipped lane-feedback rollout. It may intersect the
 target, so no preplanned avoidance trajectory is needed. Later calls shift the
-previous input sequence and append lane terminal feedback. A feasible shifted
-plan is retained if further iterations fail or exhaust their budget. Reuse
-starts from the measured state; it has no exact-successor equality predicate.
+previous input sequence and append lane terminal feedback to initialize SCvx.
+That initialization is never an executable fallback. At least one LP result
+from the current call is required. If a QP fails, its successful primary LP
+result remains the current iteration's optimizer result. If later SCvx
+iterations fail or exhaust their budget, the solve returns the numerical
+iterate already obtained during this call. LP/QP exit status determines whether the solver returned a solution.
+Its linear constraint residual is reported without an execution veto.
+
+Trial iterates outside the bicycle model domain shrink the trust region.
+Cold and warm starts use the same SCvx iteration budget.
+Nominal rollout merit chooses SCvx updates; the CLF linearization residual
+also enters its stopping condition. A finite iteration budget can leave
+nonlinear residuals. They are reported without a separate execution veto.
+The soft time budget is checked between iterations and can be overrun by a
+running LP/QP. It does not supply a real-time deadline guarantee.
 
 ## Secondary lane-following CLF
 
@@ -183,16 +202,16 @@ maneuvers; it avoids infinite-horizon numerical search and interval arithmetic.
 
 **Nominal recursive-feasibility statement.** Assume that the selected terminal
 set is invariant for the prediction model under \(u_f\), satisfies the hard
-constraints and has zero stage slack. Shifting any feasible plan and appending
-\(u_f\) gives a feasible successor plan with slack sequence
+constraints and has zero stage slack. Shifting any feasible input sequence and appending
+\(u_f\) gives a feasible successor sequence with slack values
 \((\xi_1,\ldots,\xi_{N-1},0)\). Consequently, an optimal primary solve satisfies
 
 \[
 V_N(z^+)\le V_N(z)-\xi_0.
 \]
 
-Feasible suboptimal updates that improve upon that shift retain the same plan
-cost inequality. In particular, a zero-slack feasible plan preserves the
+Feasible suboptimal updates that improve upon that shift retain the same
+cost inequality. In particular, a zero-slack feasible solution preserves the
 nominal sampled safe set under the shift. CLF optimization is secondary and
 cannot override this safety priority.
 
@@ -200,7 +219,11 @@ The LQR design proves contraction for the local linearized terminal model;
 nonlinear invariance of a selected radius remains a model/design assumption.
 SCvx is a local numerical solver, so a finite iteration/time limit is not a
 proof of the global positive-slack PCBF optimum or Huang's global recovery
-result. `predictiveBarrierValue` reports the achieved feasible plan cost.
+result. The direct execution implementation does not enforce a separate
+comparison with the shifted cost or a nonlinear feasibility admission rule.
+`predictiveBarrierValue` reports the achieved nominal slack sum; it need not
+equal the globally optimal PCBF value. A returned result by itself therefore
+does not establish the hypotheses of the recursive-feasibility theorem.
 The nominal sampling and integration model also does not establish continuous
 intersample safety or robustness to disturbances and estimation error.
 These limits are documented rather than enforced through a formal runtime
@@ -218,7 +241,7 @@ validateNonlinearPredictiveController(outputDirectory);
 
 The MATLAB entry requires Optimization Toolbox and Control System Toolbox.
 No MEX build or MPFR installation is needed. See
-`report/SIMPLIFIED_PCBF_20260928.md` for the executed scope and measured timing.
+`report/DIRECT_PCBF_CLEANUP_20260928.md` for the executed scope and measured timing.
 Offline replay and Python geometry audits produce research evidence, and are
 not called when the controller issues an input.
 

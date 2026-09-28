@@ -658,11 +658,11 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
                 0.0, AbsTol=1.0e-14);
         end
 
-        function planningInputsConsumeSynchronizedEstimatorOutput(testCase)
+        function controllerInputsConsumeSynchronizedEstimatorOutput(testCase)
             output = localSynchronizedTurningOutput();
             controllerCfg = collisionAvoidanceControllerConfig();
             controllerCfg.referenceSpeed = 10.0;
-            [ego, ~, ~, target] = readPlanningInputs( ...
+            [ego, ~, ~, target] = readControllerInputs( ...
                 output, [], localControllerRoad(output.egoPositionInertial), ...
                 controllerCfg);
 
@@ -676,22 +676,9 @@ classdef onlineNrmmTrackingRuntimeTest < matlab.unittest.TestCase
             testCase.verifyEqual(target.position, ...
                 output.targetEstimate.targetPositionInertial, ...
                 AbsTol=1.0e-12);
-            testCase.verifyEqual(ego.stateErrorBound, ...
-                output.controllerErrorBound.bounds, AbsTol=0.0);
             testCase.verifyEqual(target.yaw, ...
                 output.targetEstimate.targetHeadingInertial, AbsTol=1.0e-12);
         end
-
-        function planningRejectsAnUnavailableOutOfDomainTargetBound(testCase)
-            runtime = localRuntime();
-            output = onlineNrmmTrackingRuntime("output", runtime, localCruiseFrame(0));
-            cfg = collisionAvoidanceControllerConfig();
-            testCase.verifyFalse(output.targetEstimate.controllerErrorBound.available);
-            testCase.verifyError(@() readPlanningInputs(output, [], ...
-                localControllerRoad(output.egoPositionInertial), cfg), ...
-                "collisionAvoidanceController:unavailableEstimatorBound");
-        end
-
     end
 end
 
@@ -938,17 +925,9 @@ function state = localTargetRk4(state, ego, domain, stepSize, substepCount)
 end
 
 function road = localControllerRoad(anchorPosition)
-% Perceived road input for the estimator-to-planner parsing contract.
-
-    centerline = [-100.0, 0.0; 200.0, 0.0];
-    perception = fitPerceivedRoadBoundaries( ...
-        centerline, [anchorPosition(:); 0.0], ...
-        PerceptionRange=30.0, ...
-        RightOffset=0.001, LeftOffset=8.0, ...
-        ShoulderWidth=2.60, ...
-        RouteBranchId="through");
-    road = perception.roadGeometry;
-    road.boundaries = struct([]);
+% Global corridor for the synchronized estimator-to-controller input check.
+    road=struct('centerline',anchorPosition(:).'+[-100,0;200,0], ...
+        'lateralClearance',[4;4]);
 end
 
 function rotation = localRotation(yaw)

@@ -1,60 +1,49 @@
-# Research experiment entry points
+# Research entry points
 
-## Native controller performance after source changes
+## PCBF / CLF controller
 
-Use this entry for controller performance measurements:
+Run the current controller tests, MATLAB code analysis and independent
+nonlinear closed-loop replays from the repository root:
 
-```bash
-python3 scripts/runNativeControllerBenchmark.py
+```matlab
+addpath('scripts');
+validateNonlinearPredictiveController('report/new-validation-directory');
 ```
 
-Every invocation captures the current straight and circular scenarios, generates
-fresh C with MATLAB Coder, compiles and links a new executable, runs that
-executable, and independently verifies its returned decisions with MATLAB. It
-does not reuse an earlier build or previously captured scenario programs.
-MATLAB, MATLAB Coder, GCC, and the existing built Clarabel dependency are required.
+Then independently audit the exported rectangles and road margins:
 
-The default experiment uses 600 holds per scenario, curvatures 0 and 0.01/m,
-stationary/oncoming/crossing targets, and two warmups followed by five measured
-native calls per captured active-target frame. The existing scenario driver
-defines the remaining settings: seed 20260912, 50 ms holds, 1.6 s nominal horizon,
-8 m/s cruise, exact sensing and declared affine plant. Failed admission frames
-are retained. Correctness outcomes are recorded separately from timing.
+```bash
+python3 scripts/auditJointPredictiveSafety.py report/new-validation-directory --output report/new-validation-directory/independent-audit.json
+```
 
-Optional arguments include `--output /absolute/new/external/directory`,
-`--sample-count`, `--curvatures`, `--scenarios`, `--warmups`, and `--repetitions`.
-An output directory must not already exist and must be outside the repository.
-By default, a unique directory is created in `~/.cache/collisionAvoidance/`.
+The deterministic fixtures cover lane recovery, circular lane following,
+oncoming avoidance and a turning target. Every issued control is replayed
+with tight `ode45` tolerances at 31 samples per hold. This offline audit
+reports sampled safety and timing; it does not authorize online execution.
 
-The output contains:
+`runNonlinearPredictiveSafetyValidation` also accepts `Scenarios`, `Frames`,
+and `OutputFile` for individual runs. The optimizer
+executes both zero-slack and positive-slack results. The previous trajectory
+only initializes the new solve. See
+[the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
 
-- `manifest.json`: base Git commit, exact worktree source hashes, solver-library
-  hashes, generated C/library/executable/configuration/fixture hashes, commands,
-  toolchain, settings, and final validation status. The worktree hashes identify
-  uncommitted source changes; a commit name alone is not a clean-tree claim.
-- `summary.json`: **only independent executable timings** and verification
-  outcomes, including a breakdown of the slowest native call.
-- `native-replay.jsonl`: individual native timings, statuses, and the first
-  returned decision per prepared frame.
-- `build.log`, `validation.log`, and the original capture/verification artifacts.
+`prepareCollisionAvoidanceController` warms MATLAB and the optimizer using a
+discarded call. `prepareCollisionAvoidancePipeline` additionally probes the
+estimator adapter. Neither helper builds native controller libraries.
 
-The driver checks source/dependency hashes after building and after validation,
-and checks compiled artifacts and fixtures before/after replay and validation.
-Changed source or artifacts, incomplete replay output, build failure, or failed
-independent certification prevent a successful summary. Generated artifacts and
-raw traces remain outside Git; compact experiment reports belong in `report/`.
+## Estimator and perception research
 
-**Current native scope is the prepared active-target numerical kernel.** Input
-parsing, prediction and upstream formulation, reference/terminal synthesis,
-target-free/terminal-optimization modes, and carried-state handling are not a
-standalone C pipeline yet. Fixture loading is excluded from the measured call.
-The summary therefore explicitly sets `fullPipelineMeasured=false`. This
-benchmark must not be reported as complete-frame or Raspberry Pi performance.
+- `nrmmEstimatorControllerAdapter`, `nrmmTargetMeasurement` and
+  `nrmmTargetTruth` provide the estimator scenario interface.
+- `runOnlineNrmmComplexManeuverScenario`, `runOnlineNrmmTrackingErrorBenchmark`
+  and `runNrmmPositionBoundBenchmark` are estimator research drivers.
+- `buildNrmmObserverKernel` and `auditNrmmTruthEnclosure` support the estimator's
+  independent native kernel and bound audits.
+- `fitPerceivedRoadBoundaries`, `evaluatePerceivedRoadBoundarySafety` and
+  `quadraticRoadBoundaryRectangleMargin` support offline curb experiments.
+  Fitted curb segments are not global corridors for the current controller.
 
-Capture timings, the one MATLAB reference call used for correctness, old MATLAB
-runtime replays, and hybrid checked-MEX measurements are diagnostic only. They
-do not substitute for executable performance. Ordinary unit tests can still run
-without a C rebuild; the performance entry always regenerates and recompiles.
-
-The historical 92.155 ms complete hybrid frame is explained in
-[`../report/NATIVE_BENCHMARK_WORKFLOW_20260920.md`](../report/NATIVE_BENCHMARK_WORKFLOW_20260920.md).
+Retired affine MPC, formal controller admission and native controller benchmark
+scripts have been removed. Their dated reports remain historical results;
+use Git history for the source associated with those reports. New reports
+and numerical results belong in `report/`.

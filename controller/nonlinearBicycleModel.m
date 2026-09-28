@@ -13,11 +13,7 @@ classdef nonlinearBicycleModel
             fy=modifiedFialaTire.evaluate(slip,u(2),cfg);
             fx=u(2)*tire.longitudinalForceScale;
             c=cos(u(1));s=sin(u(1));frontX=fx(1)*c-fy(1)*s;frontY=fx(1)*s+fy(1)*c;
-            road=cfg.roadLoad;v=x(4);
-            load=.5*road.airDensity*road.dragCoefficient*road.frontalArea*v^2 ...
-                +cfg.vehicle.m*cfg.vehicle.gravity*(road.rollingCoefficient ...
-                +road.rollingSpeedCoefficient*v+road.rollingQuarticCoefficient*v^4) ...
-                *tanh(v/road.rollingTransitionSpeed);
+            v=x(4);load=nonlinearBicycleModel.roadLoad(v,cfg);
             dx=[v*cos(x(3))-x(5)*sin(x(3));v*sin(x(3))+x(5)*cos(x(3));x(6); ...
                 (frontX+fx(2)-load)/cfg.vehicle.m+x(5)*x(6); ...
                 (frontY+fy(2))/cfg.vehicle.m-v*x(6); ...
@@ -46,13 +42,6 @@ classdef nonlinearBicycleModel
             end
             next=y(1:6);
             if variational,a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);end
-        end
-
-        function states = rollout(x,inputs,cfg)
-            states=zeros(6,size(inputs,2)+1);states(:,1)=x;
-            for index=1:size(inputs,2)
-                states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),cfg);
-            end
         end
 
         function [next,a,b] = jointSample(z,u,targetParameters,cfg)
@@ -96,7 +85,7 @@ classdef nonlinearBicycleModel
             forceY=c*tire.state(1,:);
             inputX=-s*tire.input(1,:)+[-frontY,c*scale(1)];
             inputY=c*tire.input(1,:)+[frontX,s*scale(1)];
-            [~,loadSlope]=ltvBicycleModel.roadLoad(x(4),cfg);
+            [~,loadSlope]=nonlinearBicycleModel.roadLoad(x(4),cfg);
             a=zeros(6);b=zeros(6,2);cp=cos(x(3));sp=sin(x(3));
             a(1,3)=-x(4)*sp-x(5)*cp;a(1,4:5)=[cp,-sp];
             a(2,3)=x(4)*cp-x(5)*sp;a(2,4:5)=[sp,cp];a(3,6)=1;
@@ -114,6 +103,40 @@ classdef nonlinearBicycleModel
                 a(1,:)=a(1,:)/denominator;
                 a(1,2)=a(1,2)+curvature*forward/denominator^2;
                 a(3,:)=a(3,:)-curvature*a(1,:);
+            end
+        end
+
+        function [force, slope, components] = roadLoad(speed, cfg)
+        %nonlinearBicycleModel.roadLoad Signed passive road load and its speed derivative.
+        % Flat road, still air, and a quasi-static equivalent rolling force are
+        % assumed. Positive force opposes forward travel. The smooth rolling sign
+        % preserves rest without applying a constant backward force at zero speed.
+        % Polynomial rolling coefficients have units 1, s/m, and (s/m)^4.
+        % Wheel slip, wheel inertia, camber, and dynamic normal-load effects are
+        % residual dynamics, not reproduced by this reduced road-load model.
+
+            roadLoad = cfg.roadLoad;
+            magnitude = abs(speed);
+            direction = tanh(speed/roadLoad.rollingTransitionSpeed);
+            rollingCoefficient = roadLoad.rollingCoefficient ...
+                + roadLoad.rollingSpeedCoefficient*magnitude ...
+                + roadLoad.rollingQuarticCoefficient*magnitude.^4;
+            aerodynamicFactor = 0.5*roadLoad.airDensity ...
+                * roadLoad.dragCoefficient*roadLoad.frontalArea;
+            aerodynamic = aerodynamicFactor*speed.*magnitude;
+            rollingScale = cfg.vehicle.m*cfg.vehicle.gravity;
+            rolling = rollingScale*rollingCoefficient.*direction;
+            force = aerodynamic+rolling;
+            if nargout > 1
+                slope = 2*aerodynamicFactor*magnitude ...
+                    + rollingScale*((roadLoad.rollingSpeedCoefficient ...
+                        + 4*roadLoad.rollingQuarticCoefficient*magnitude.^3) ...
+                        .*sign(speed).*direction ...
+                        + rollingCoefficient.*(1-direction.^2)/roadLoad.rollingTransitionSpeed);
+            end
+            if nargout > 2
+                components = struct("aerodynamicForce", aerodynamic, ...
+                    "rollingResistanceForce", rolling);
             end
         end
 

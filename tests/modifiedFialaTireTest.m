@@ -84,7 +84,7 @@ classdef modifiedFialaTireTest < matlab.unittest.TestCase
             braking = modifiedFialaTire.evaluate([0; -0.1], -1.0, cfg);
             throttle = modifiedFialaTire.evaluate([0.1; -0.1], 1.0, cfg);
             testCase.verifyEqual([braking, throttle], zeros(2, 2), AbsTol=0.0);
-            testCase.verifyError(@() modifiedFialaTire.linearize(0.02, 15, 1, cfg), ...
+            testCase.verifyError(@() localEndpointTangent(cfg), ...
                 "collisionAvoidanceController:singularTireLinearization");
         end
 
@@ -98,37 +98,6 @@ classdef modifiedFialaTireTest < matlab.unittest.TestCase
                 -0.6*cfg.tire.frictionCoefficient(1)*cfg.vehicle.gravity, AbsTol=1e-12);
         end
 
-        function curvedBicycleMatchesTheNonlinearForceAtItsOperatingPoint(testCase)
-            cfg = collisionAvoidanceControllerConfig();
-            kappa = 0.02;
-            speed = 15.0;
-            brakingRatio = -0.4;
-            steering = atan(cfg.vehicle.wheelbase*kappa);
-            state = [0; 0; 0; speed; 0; kappa*speed];
-            [stateMatrix, inputMatrix, affine] = ...
-                ltvBicycleModel.continuousMatrices(kappa, speed, cfg, brakingRatio);
-            slipAngle = [(cfg.vehicle.lf*state(6))/speed-steering; ...
-                -cfg.vehicle.lr*state(6)/speed];
-            force = modifiedFialaTire.evaluate(slipAngle, ...
-                brakingRatio, cfg);
-            expected = [speed; 0; 0; modifiedFialaTire.accelerationGain(cfg)*brakingRatio ...
-                - ltvBicycleModel.roadLoad(speed, cfg)/cfg.vehicle.m; ...
-                sum(force)/cfg.vehicle.m-speed*state(6); ...
-                [cfg.vehicle.lf, -cfg.vehicle.lr]*force/cfg.vehicle.Iz];
-            actual = stateMatrix*state+inputMatrix*[steering; brakingRatio]+affine;
-            testCase.verifyEqual(actual, expected, AbsTol=1e-11);
-            testCase.verifyGreaterThan(abs(inputMatrix(5, 2)), 0.01);
-            testCase.verifyLessThan(inputMatrix(5, 1), cfg.tire.corneringStiffness(1)/cfg.vehicle.m);
-            testCase.verifyGreaterThan(norm(affine(5:6)-[speed^2*kappa; 0]), 0.1);
-        end
-
-        function curvedRoadRestRemainsInvariantWithFialaTires(testCase)
-            cfg = collisionAvoidanceControllerConfig();
-            state = [10; 0.1; 0.02; 0; 0; 0];
-            [stateMatrix, inputMatrix, affine] = ltvBicycleModel.stageMatrices(0.03, 0, 0.05, cfg);
-            testCase.verifyEqual(stateMatrix*state+inputMatrix*[0; 0]+affine, state, AbsTol=1e-12);
-        end
-
         function scalarTireParametersMatchAnExplicitAxlePair(testCase)
             cfg = collisionAvoidanceControllerConfig();
             paired = modifiedFialaTire.evaluate([0.03; -0.04], -0.3, cfg);
@@ -138,4 +107,8 @@ classdef modifiedFialaTireTest < matlab.unittest.TestCase
             testCase.verifyEqual(scalar, paired, AbsTol=1e-10);
         end
     end
+end
+
+function localEndpointTangent(cfg)
+    [~,~]=modifiedFialaTire.evaluate([0.02;0.02],1,cfg);
 end
