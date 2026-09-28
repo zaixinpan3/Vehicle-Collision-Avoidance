@@ -1,125 +1,101 @@
-function [incumbent,search] = solveNonlinearPredictivePlan(model,previousState)
-%solveNonlinearPredictivePlan Huang safety priority with Li dual SCA steps.
-% Infeasible nominal iterates are search data. Only a full nonlinear witness
-% ending in the invariant joint-state terminal set can authorize an input.
-    cfg=model.cfg;timer=tic;incumbent=[];
-    search=struct('certifiedCandidates',0,'rejectedCandidates',0,'solverCalls',0, ...
-        'source',"",'proposalFailures',strings(0,1),'lastRejection',"",'shiftAttempted',false,'attempts',{{}}, ...
-        'sequentialIterations',{{}},'initialization',"laneFeedbackRollout", ...
-        'safetyObjective',"sumOfStageSafetySlacks",'bestNominalSafetySlack',Inf);
-    if localCanInherit(previousState,model)
-        % The stored policy is available before any new integration or solve.
-        % Its proof is inherited under the explicitly unchanged exact plant.
-        search.shiftAttempted=true;
-        incumbent=localInherit(previousState,model);
-        if ~isempty(incumbent)
-            search.source="inheritedCertifiedPolicy";
-            search.certifiedCandidates=1;
-            if localExpired(timer,cfg),search.elapsedSeconds=toc(timer);return;end
+function [solution,search] = solveNonlinearPredictivePlan(model,previousState)
+%solveNonlinearPredictivePlan Nominal PCBF safety priority and lane CLF SCvx.
+% Rollout residuals and trust-region updates are part of the numerical solve.
+% There is no separate execution verifier or formal certificate pipeline.
+    cfg=model.cfg;timer=tic;solution=[];
+    search=struct('solverCalls',0,'source',"",'lastRejection',"", ...
+        'shiftedPlanAvailable',false,'sequentialIterations',{{}}, ...
+        'initialization',"laneFeedbackRollout",'bestSafetySlack',Inf, ...
+        'converged',false,'failures',strings(0,1));
+    if isstruct(previousState) && isfield(previousState,'version') && previousState.version==49 ...
+            && previousState.sampleTime==cfg.controller.sampleTime ...
+            && size(previousState.plan,2)>=cfg.controller.horizonSteps ...
+            && size(previousState.plan,2)<=cfg.controller.maximumHorizonSteps
+        % Shift controls, append the same lane terminal feedback, and start
+        % this prediction from the current measured joint state.
+        plan=previousState.plan(:,2:end);
+        e=nonlinearBicycleModel.error(previousState.predictedState(:,end),model.lane,model.terminal.reference);
+        u=model.terminal.reference.input+model.terminal.reference.gain*e;
+        if isempty(plan),last=model.previousInput;else,last=plan(:,end);end
+        anchor=[plan,localClip(u,last,cfg)];
+        candidate=localNominalEvaluation(anchor,model);
+        if candidate.hard<=cfg.solver.feasibilityTolerance
+            solution=candidate;search.source="shiftedPlan";search.shiftedPlanAvailable=true;
         end
-        if size(previousState.plan,2)>1
-            tail=previousState.predictedState(:,end);
-            error=nonlinearBicycleModel.error(tail,model.lane,model.backup.reference);
-            u=model.backup.reference.input+model.backup.reference.gain*error;
-            plan=[previousState.plan(:,2:end),u];
-            plan(:,1)=nonlinearSafetyMex('feedbackInput',model.initialState, ...
-                [previousState.certificate.referenceStates(:,2);previousState.plan(:,2)], ...
-                previousState.certificate.feedbackGains(:,:,2));
-            [incumbent,search]=localAdmit(plan,"shiftedCertifiedPlan",incumbent,search,model);
-        end
-    end
-    if ~isempty(cfg.nonlinear.initialPlan)
-        [incumbent,search]=localAdmit(cfg.nonlinear.initialPlan,"suppliedInitialPlan",incumbent,search,model);
-    end
-    % A lane-feedback rollout supplies a numerical center, without a planned
-    % passing maneuver. Safety restoration can start with an intersecting path.
-    try
-        anchor=localSeed(model);
-        [incumbent,search]=localAdmit(anchor,"nominalContinuation",incumbent,search,model);
-    catch exception
-        if ~startsWith(exception.identifier,'collisionAvoidanceController:'),rethrow(exception);end
-        search.lastRejection=string(exception.message);anchor=[];
-    end
-    if ~isempty(incumbent) && incumbent.terminalOnly
-        search.elapsedSeconds=toc(timer);return;
-    end
-    if isempty(incumbent)
-        limit=cfg.nonlinear.maximumAdmissionIterations;
-        if ~isempty(cfg.nonlinear.initialPlan),anchor=cfg.nonlinear.initialPlan;end
-        if ~isempty(model.target)
-            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-            distance=nonlinearSafetyCertificate.rectangle(model.initialState(1:3),shape, ...
-                model.target(1:3),model.target(7:10));
-            if distance<=cfg.collision.safetyMarginMeters
-                search.lastRejection="initialCollisionClearance";search.elapsedSeconds=toc(timer);return;
-            end
-        end
+        search.initialization="shiftedPlan";
     else
-        limit=cfg.nonlinear.maximumImprovementIterations;anchor=incumbent.inputs;
+        anchor=localSeed(model);
     end
-    if ~isempty(anchor) && limit>0
+    if search.initialization=="shiftedPlan",baseline=candidate;
+    else,baseline=localNominalEvaluation(anchor,model);end
+    if isempty(solution) && baseline.hard<=cfg.solver.feasibilityTolerance
+        solution=baseline;search.source="laneFeedbackRollout";
+    end
+    limit=cfg.nonlinear.maximumIterations;
+    if ~isempty(solution) && solution.safety<=cfg.solver.feasibilityTolerance
+        limit=cfg.nonlinear.maximumImprovementIterations;
+    end
+    radius=cfg.nonlinear.trustRadius;
+    for iteration=1:limit
+        if toc(timer)>=min(cfg.solver.timeLimitSeconds,cfg.solver.frameDeadlineSeconds),break;end
+        if ~isempty(solution) && solution.safety<=cfg.solver.feasibilityTolerance ...
+                && solution.cost<=cfg.solver.optimalityTolerance,break;end
         try
-            if isempty(cfg.nonlinear.proposalFunction)
-                [incumbent,search]=localSequentialSearch(anchor,incumbent,search,model,timer,limit);
-            elseif ~isempty(incumbent)
-                search.solverCalls=search.solverCalls+1;
-                plan=cfg.nonlinear.proposalFunction(incumbent,model);
-                [incumbent,search]=localAdmit(plan,"validatedCustomProposal",incumbent,search,model);
+            [plan,step]=localSequentialStep(anchor,model,radius);
+            search.solverCalls=search.solverCalls+step.calls;
+            step.iteration=iteration;step.trustRadius=radius;step.acceptedIterate=false;
+            step.nominalSafetySlack=Inf;step.nominalHardViolation=Inf;
+            if isempty(plan)
+                search.lastRejection=step.status;radius=radius/2;
+                search.sequentialIterations{end+1}=step;
+                if radius<1e-4,break;end
+                continue;
             end
+            candidate=localNominalEvaluation(plan,model);
+            step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;
+            merit=baseline.safety+10*baseline.hard;
+            nextMerit=candidate.safety+10*candidate.hard;
+            improves=nextMerit<merit-1e-8 || ...
+                (nextMerit<=cfg.solver.feasibilityTolerance && candidate.cost<=baseline.cost+1e-10);
+            if improves
+                anchor=plan;baseline=candidate;step.acceptedIterate=true;radius=min(2,1.5*radius);
+            else
+                radius=radius/2;
+            end
+            if candidate.hard<=cfg.solver.feasibilityTolerance && localBetter(candidate,solution,cfg)
+                solution=candidate;search.source="sequentialConvexification";
+            end
+            search.sequentialIterations{end+1}=step;
+            if ~isempty(solution) && solution.safety<=cfg.solver.feasibilityTolerance
+                search.converged=true;
+                % A zero-slack plan attains the global safety lower bound.
+                % Its secondary CLF step has already been solved in the QP.
+                break;
+            end
+            if radius<1e-4,break;end
         catch exception
-            search.proposalFailures(end+1,1)=string(exception.identifier)+": "+string(exception.message);
-            search.lastRejection=string(exception.message);
+            search.failures(end+1,1)=string(exception.identifier)+": "+string(exception.message);
+            search.lastRejection=string(exception.message);break;
         end
+    end
+    if ~isempty(solution)
+        search.lastRejection="";search.bestSafetySlack=solution.safety;
+        search.converged=search.converged || solution.safety<=cfg.solver.feasibilityTolerance;
+    elseif strlength(search.lastRejection)==0
+        search.lastRejection="hardConstraintResidual";
     end
     search.elapsedSeconds=toc(timer);
 end
 
-function [incumbent,search]=localAdmit(plan,source,incumbent,search,model)
-    policy=[];
-    if isstruct(plan),policy=plan.policy;plan=plan.inputs;end
-    if size(plan,2)<model.cfg.controller.horizonSteps || size(plan,2)>model.cfg.controller.maximumHorizonSteps
-        search.rejectedCandidates=search.rejectedCandidates+1;search.lastRejection="horizon";return;
-    end
-    target=model.target;targetStep=0;
-    if isfield(model,'targetAnchor'),target=model.targetAnchor;targetStep=model.targetStep;end
-    candidate=nonlinearSafetyCertificate.plan(model.initialState,plan,model.previousInput, ...
-        target,model.lane,model.frame,model.backup,model.cfg,targetStep,policy);
-    if ~candidate.accepted && candidate.reason=="terminal" && isempty(policy) ...
-            && ~isempty(candidate.terminal) && candidate.terminal.tailMargin>=0 ...
-            && size(plan,2)<model.cfg.controller.maximumHorizonSteps
-        % The nonlinear enclosure can need more settling than the numerical
-        % endpoint. Extend the same lane-feedback continuation and revalidate
-        % its complete prefix; this is still only a candidate until admission.
-        cfg=model.cfg;reference=model.backup.reference;
-        nominal=nonlinearBicycleModel.rollout(model.initialState,plan,cfg);x=nominal(:,end);
-        extra=min(ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime), ...
-            cfg.controller.maximumHorizonSteps-size(plan,2));
-        for index=1:extra
-            error=nonlinearBicycleModel.error(x,model.lane,reference);
-            u=localClip(reference.input+reference.gain*error,plan(:,end),cfg);
-            plan(:,end+1)=u; %#ok<AGROW>
-            x=nonlinearBicycleModel.sample(x,u,cfg);
-        end
-        candidate=nonlinearSafetyCertificate.plan(model.initialState,plan,model.previousInput, ...
-            target,model.lane,model.frame,model.backup,cfg,targetStep);
-    end
-    search.attempts{end+1}=struct('source',source,'accepted',candidate.accepted,'reason',candidate.reason, ...
-        'horizonSteps',size(plan,2),'checkedStage',candidate.checkedStage,'checkedTime',candidate.checkedTime, ...
-        'collisionMargin',candidate.minimumCollisionMargin,'roadMargin',candidate.minimumRoadMargin, ...
-        'checkedBox',candidate.checkedBox,'terminal',candidate.terminal);
-    if ~candidate.accepted
-        search.rejectedCandidates=search.rejectedCandidates+1;search.lastRejection=candidate.reason;return;
-    end
-    search.certifiedCandidates=search.certifiedCandidates+1;
-    candidate.nominalCost=localCost(candidate.states,plan,model);
-    candidate.performanceCost=candidate.nominalCost+model.cfg.clf.relaxationWeight*candidate.clfSlack^2;
-    if isempty(incumbent) || candidate.performanceCost<incumbent.performanceCost
-        incumbent=candidate;search.source=source;
-    end
+function better=localBetter(candidate,current,cfg)
+    if isempty(current),better=true;return;end
+    tolerance=cfg.solver.feasibilityTolerance;
+    better=candidate.safety<current.safety-tolerance || ...
+        (candidate.safety<=max(current.safety,tolerance) && candidate.cost<current.cost);
 end
 
 function plan=localSeed(model)
-    cfg=model.cfg;reference=model.backup.reference;x=model.initialState;previous=model.previousInput;
+    cfg=model.cfg;reference=model.terminal.reference;x=model.initialState;previous=model.previousInput;
     required=cfg.controller.horizonSteps;
     if ~isempty(model.target) && localTailMargin(x,0,model)<0
         projection=laneGeometry.project(x(1:2),model.lane);
@@ -135,8 +111,8 @@ function plan=localSeed(model)
         u=localClip(reference.input+reference.gain*error,previous,cfg);plan(:,index)=u;
         x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;
         error=nonlinearBicycleModel.error(x,model.lane,reference);
-        if index>=required && norm(reference.factor*error)<model.backup.radius*.6 ...
-                && all(abs(u-reference.input)<model.backup.inputRadius*.8)
+        if index>=required && norm(reference.factor*error)<model.terminal.radius*.6 ...
+                && localTailMargin(x,index*cfg.controller.sampleTime,model)>=0
             plan=plan(:,1:index);return;
         end
     end
@@ -145,15 +121,14 @@ end
 function u=localClip(u,previous,cfg)
     lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
     upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
-    reserve=min(cfg.nonlinear.initializationInputReserve,.1*(upper-lower));lower=lower+reserve;upper=upper-reserve;
     rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     u=min(upper,max(lower,min(previous+rate,max(previous-rate,u))));
-    % The validated positive-speed model has no derivative at |b|=1.
+    % The combined-slip force tangent is singular at |b|=1.
     u(2)=min(1-1e-8,max(-1+1e-8,u(2)));
 end
 
 function cost=localCost(states,plan,model)
-    cost=0;reference=model.backup.reference;
+    cost=0;reference=model.terminal.reference;
     for index=1:size(plan,2)
         error=nonlinearBicycleModel.error(states(:,index+1),model.lane,reference);
         cost=cost+error.'*reference.matrix*error+.01*sum((plan(:,index)-reference.input).^2);
@@ -161,72 +136,31 @@ function cost=localCost(states,plan,model)
     cost=cost/size(plan,2);
 end
 
-function [incumbent,search]=localSequentialSearch(anchor,incumbent,search,model,timer,limit)
-    cfg=model.cfg;radius=cfg.nonlinear.trustRadius;admission=isempty(incumbent);
-    baseline=localNominalEvaluation(anchor,model);
-    search.bestNominalSafetySlack=baseline.safety;
-    for iteration=1:limit
-        if toc(timer)>=cfg.solver.frameDeadlineSeconds || (~admission && localExpired(timer,cfg)),break;end
-        [plan,step]=localSequentialStep(anchor,model,radius);
-        search.solverCalls=search.solverCalls+step.calls;
-        step.iteration=iteration;step.trustRadius=radius;step.acceptedIterate=false;
-        step.nominalSafetySlack=Inf;step.nominalHardViolation=Inf;
-        if isempty(plan)
-            radius=radius/2;search.sequentialIterations{end+1}=step;
-            if radius<1e-4,break;end
-            continue;
-        end
-        try
-            candidate=localNominalEvaluation(plan,model);
-        catch exception
-            if ~startsWith(exception.identifier,'collisionAvoidanceController:'),rethrow(exception);end
-            radius=radius/2;search.sequentialIterations{end+1}=step;continue;
-        end
-        step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;
-        merit=baseline.safety+10*baseline.hard;
-        nextMerit=candidate.safety+10*candidate.hard;
-        improves=nextMerit<merit-1e-8 || (nextMerit<=1e-6 && candidate.cost<=baseline.cost+1e-10);
-        if improves
-            anchor=plan;baseline=candidate;step.acceptedIterate=true;
-            search.bestNominalSafetySlack=min(search.bestNominalSafetySlack,candidate.safety);
-            radius=min(2,1.5*radius);
-        else
-            radius=radius/2;
-        end
-        search.sequentialIterations{end+1}=step;
-        if candidate.safety<=.5*cfg.nonlinear.optimizationClearanceMeters && candidate.hard<=1e-5
-            before=search.certifiedCandidates;
-            [incumbent,search]=localAdmit(plan,"sequentialConvexification",incumbent,search,model);
-            if admission && search.certifiedCandidates>before,break;end
-        end
-        if radius<1e-4,break;end
-    end
-end
-
 function [plan,info]=localSequentialStep(anchor,model,radius)
-    cfg=model.cfg;count=size(anchor,2);reference=model.backup.reference;
+    cfg=model.cfg;count=size(anchor,2);reference=model.terminal.reference;
     % Variables: ego state increments, input increments, stage safety slacks,
     % one CLF slack and five terminal absolute-value epigraphs. The target's
     % autonomous joint-state block is eliminated by its exact analytic flow.
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
     is=iu(end)+(1:count);ic=is(end)+1;it=ic+(1:5);nv=it(end);
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
-    rows=cell(1,0);bounds=cell(1,0);hessian=sparse(nv,nv);linear=zeros(nv,1);
+    rows=cell(1,3*count+5);bounds=cell(1,3*count+5);rowCount=0;hessian=sparse(nv,nv);linear=zeros(nv,1);
     lower=-Inf(nv,1);upper=Inf(nv,1);
     stateTrust=radius*[5;5;.5;5;3;1.5];inputTrust=radius*[.15;.25];
     lower(ix(:))=-repmat(stateTrust,count+1,1);upper(ix(:))=-lower(ix(:));
     lower(iu(:))=-repmat(inputTrust,count,1);upper(iu(:))=-lower(iu(:));
     lower([is,ic,it])=0;
-    inputLower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum]+cfg.nonlinear.initializationInputReserve;
-    inputUpper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum]-cfg.nonlinear.initializationInputReserve;
+    inputLower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    inputUpper=[cfg.model.frontWheelSteeringAngleMaximum;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
+    inputLower(2)=max(-1+1e-8,inputLower(2));
     rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     x=model.initialState;initialError=nonlinearBicycleModel.error(x,model.lane,reference);
-    halfCfg=cfg;halfCfg.controller.sampleTime=cfg.controller.sampleTime/2;
+    halfDuration=cfg.controller.sampleTime/2;
     for index=1:count
         % Integrated variational dynamics are tangents to the nonlinear held
         % flow, including the affine defect (zero for this fresh rollout).
-        [middle,am,bm]=nonlinearBicycleModel.sample(x,anchor(:,index),halfCfg);
-        [next,an,bn]=nonlinearBicycleModel.sample(middle,anchor(:,index),halfCfg);
+        [middle,am,bm]=nonlinearBicycleModel.sample(x,anchor(:,index),cfg,[],halfDuration);
+        [next,an,bn]=nonlinearBicycleModel.sample(middle,anchor(:,index),cfg,[],halfDuration);
         a=an*am;b=an*bm+bn;eq=6*index+(1:6);
         equal(eq,ix(:,index+1))=eye(6);equal(eq,ix(:,index))=-a;equal(eq,iu(:,index))=-b;
         lower(iu(:,index))=max(lower(iu(:,index)),inputLower-anchor(:,index));
@@ -234,13 +168,13 @@ function [plan,info]=localSequentialStep(anchor,model,radius)
         r=sparse(2,nv);r(:,iu(:,index))=eye(2);previous=model.previousInput;
         if index>1,r(:,iu(:,index-1))=-eye(2);previous=anchor(:,index-1);end
         finite=isfinite(rate);difference=anchor(:,index)-previous;
-        rows{end+1}=[r(finite,:);-r(finite,:)];bounds{end+1}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
+        rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
         [g,j]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
-        r=-j*map;r(:,is(index))=-1;rows{end+1}=r;bounds{end+1}=g;
+        r=-j*map;r(:,is(index))=-1;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
         [g,j]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
-        r=-j*map;r(:,is(index))=-1;rows{end+1}=r;bounds{end+1}=g;
+        r=-j*map;r(:,is(index))=-1;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         [e,j]=nonlinearBicycleModel.errorLinearization(next,model.lane,reference);
         jx=ix(:,index+1);hessian(jx,jx)=hessian(jx,jx)+2*j.'*reference.matrix*j/count;
         linear(jx)=linear(jx)+2*j.'*reference.matrix*e/count;
@@ -253,27 +187,26 @@ function [plan,info]=localSequentialStep(anchor,model,radius)
         upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-next(4:6));
         if index==1
             r=sparse(1,nv);r(jx)=2*e.'*reference.matrix*j;r(ic)=-1;
-            rows{end+1}=r;bounds{end+1}=(1-cfg.nonlinear.clfDecay)*norm(reference.factor*initialError)^2-norm(reference.factor*e)^2;
+            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=(1-cfg.nonlinear.clfDecay)*norm(reference.factor*initialError)^2-norm(reference.factor*e)^2;
         end
         x=next;
     end
     % A polyhedral subset of the terminal ellipsoid is hard in every step.
-    % Independent full-flow admission checks the actual nonlinear endpoint,
-    % invariant target separation, and previous-input coordinates afterwards.
+    % The SCvx merit uses the corresponding nominal terminal residual.
     r=sparse(5,nv);r(:,ix(:,end))=reference.factor*j;
     epigraph=sparse(5,nv);epigraph(:,it)=eye(5);
-    rows{end+1}=[r-epigraph;-r-epigraph];bounds{end+1}=[-reference.factor*e;reference.factor*e];
-    r=sparse(1,nv);r(it)=1;rows{end+1}=r;bounds{end+1}=.7*model.backup.radius;
-    lower(iu(:,end))=max(lower(iu(:,end)),reference.input-.8*model.backup.inputRadius-anchor(:,end));
-    upper(iu(:,end))=min(upper(iu(:,end)),reference.input+.8*model.backup.inputRadius-anchor(:,end));
+    rowCount=rowCount+1;rows{rowCount}=[r-epigraph;-r-epigraph];bounds{rowCount}=[-reference.factor*e;reference.factor*e];
+    r=sparse(1,nv);r(it)=1;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=model.terminal.radius;
+    lower(iu(:,end))=max(lower(iu(:,end)),reference.input-(rate-model.terminal.inputRadius)-anchor(:,end));
+    upper(iu(:,end))=min(upper(iu(:,end)),reference.input+(rate-model.terminal.inputRadius)-anchor(:,end));
     [tail,gradient]=localTailLinearization(x,count*cfg.controller.sampleTime,model);
-    r=sparse(1,nv);r(ix(:,end))=-gradient;rows{end+1}=r;bounds{end+1}=tail-cfg.nonlinear.clearanceReserve;
+    r=sparse(1,nv);r(ix(:,end))=-gradient;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=tail;
     [g,j]=localSafetyRows(x,count*cfg.controller.sampleTime,model);
-    r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;rows{end+1}=r;bounds{end+1}=g;
+    r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     hessian(ic,ic)=2*cfg.clf.relaxationWeight;
     % A small proximal term resolves unpenalized station/slack directions.
     hessian=hessian+1e-8*speye(nv);hessian=(hessian+hessian.')/2;
-    a=vertcat(rows{:});b=vertcat(bounds{:});objective=zeros(nv,1);objective(is)=1;
+    a=vertcat(rows{1:rowCount});b=vertcat(bounds{1:rowCount});objective=zeros(nv,1);objective(is)=1;
     info=struct('calls',0,'safetyOptimum',Inf,'secondarySafety',Inf,'safetyCap',Inf, ...
         'status',"infeasibleBounds",'safetyExitFlag',NaN,'secondaryExitFlag',NaN);plan=[];
     if any(lower>upper) || any(~isfinite(b)),return;end
@@ -284,8 +217,8 @@ function [plan,info]=localSequentialStep(anchor,model,radius)
     info.safetyExitFlag=flag;
     if flag<=0 || isempty(first),info.status="safetySolveFailed";return;end
     info.safetyOptimum=sum(max(0,first(is)));
-    % This numerical tie tolerance never relaxes executable safety. Only the
-    % original nonlinear zero-slack witness is admitted by localAdmit.
+    % The secondary objective cannot trade away the primary safety optimum
+    % beyond the declared numerical tie tolerance.
     info.safetyCap=info.safetyOptimum+cfg.solver.lexicographicTieTolerance;
     a=[a;objective.'];b=[b;info.safetyCap];
     options=optimoptions('quadprog','Display','off','MaxIterations',cfg.solver.maxIterations, ...
@@ -307,8 +240,8 @@ function [values,jacobian]=localSafetyRows(x,time,model)
     preferred=[-sin(projection.heading);cos(projection.heading)];
     q=localTargetAt(model,time);
     if ~isempty(q)
-        dual=nonlinearSafetyCertificate.dualLinearization(x(1:3),shape,q(1:3),q(7:10),preferred);
-        values=dual.value-cfg.collision.safetyMarginMeters-cfg.nonlinear.optimizationClearanceMeters;
+        dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(7:10),preferred);
+        values=dual.value-cfg.collision.safetyMarginMeters;
         jacobian=[dual.jacobian,zeros(4,3)];
     end
     rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
@@ -323,26 +256,40 @@ end
 
 function evaluation=localNominalEvaluation(plan,model)
     cfg=model.cfg;x=model.initialState;count=size(plan,2);slacks=zeros(1,count);hard=0;
-    halfCfg=cfg;halfCfg.controller.sampleTime=cfg.controller.sampleTime/2;
-    states=zeros(6,count+1);states(:,1)=x;
+    halfDuration=cfg.controller.sampleTime/2;
+    states=zeros(6,count+1);states(:,1)=x;collision=Inf;road=Inf;
     for index=1:count
         values=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
-        middle=nonlinearBicycleModel.sample(x,plan(:,index),halfCfg);
+        middle=nonlinearBicycleModel.sample(x,plan(:,index),cfg,[],halfDuration);
         middleValues=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
         slacks(index)=max([0;-values;-middleValues]);
-        x=nonlinearBicycleModel.sample(middle,plan(:,index),halfCfg);states(:,index+1)=x;
-        hard=hard+max([0;cfg.model.speedMinimum-x(4);x(4)-cfg.model.speedMaximum; ...
-            abs(x(5))-cfg.model.lateralVelocityMaximum;abs(x(6))-cfg.model.yawRateMaximum]);
+        if ~isempty(model.target)
+            collision=min([collision;values(1:4);middleValues(1:4)]);
+            road=min([road;values(5:end);middleValues(5:end)]);
+        else
+            road=min([road;values;middleValues]);
+        end
+        x=nonlinearBicycleModel.sample(middle,plan(:,index),cfg,[],halfDuration);states(:,index+1)=x;
+        hard=max([hard;cfg.model.scheduleSpeedFloor+1e-4-x(4);cfg.model.speedMinimum-x(4); ...
+            x(4)-cfg.model.speedMaximum;abs(x(5))-cfg.model.lateralVelocityMaximum;abs(x(6))-cfg.model.yawRateMaximum]);
     end
-    e=nonlinearBicycleModel.error(x,model.lane,model.backup.reference);
-    tail=localTailMargin(x,count*cfg.controller.sampleTime,model);
-    hard=hard+max(0,norm(model.backup.reference.factor*e)-.8*model.backup.radius) ...
-        +max(0,-tail)+max([0;-localSafetyRows(x,count*cfg.controller.sampleTime,model)]) ...
-        +max([0;abs(plan(:,end)-model.backup.reference.input)-model.backup.inputRadius]);
-    before=nonlinearBicycleModel.error(states(:,1),model.lane,model.backup.reference);
-    after=nonlinearBicycleModel.error(states(:,2),model.lane,model.backup.reference);
-    clf=max(0,norm(model.backup.reference.factor*after)^2-(1-cfg.nonlinear.clfDecay)*norm(model.backup.reference.factor*before)^2);
-    evaluation=struct('safety',sum(slacks),'stageSlacks',slacks,'hard',hard, ...
+    reference=model.terminal.reference;e=nonlinearBicycleModel.error(x,model.lane,reference);
+    rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
+    lo=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
+    hi=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+    hard=max([hard;norm(reference.factor*e)-model.terminal.radius; ...
+        -localTailMargin(x,count*cfg.controller.sampleTime,model); ...
+        -localSafetyRows(x,count*cfg.controller.sampleTime,model); ...
+        reshape(lo-plan,[],1);reshape(plan-hi,[],1); ...
+        reshape(abs(diff([model.previousInput,plan],1,2))-rate,[],1); ...
+        abs(plan(:,end)-reference.input)-(rate-model.terminal.inputRadius)]);
+    before=nonlinearBicycleModel.error(states(:,1),model.lane,reference);
+    after=nonlinearBicycleModel.error(states(:,2),model.lane,reference);
+    v0=norm(reference.factor*before)^2;v1=norm(reference.factor*after)^2;
+    clf=max(0,v1-(1-cfg.nonlinear.clfDecay)*v0);
+    evaluation=struct('inputs',plan,'states',states,'safety',sum(slacks),'stageSlacks',slacks, ...
+        'hard',hard,'clfSlack',clf,'clfInitialValue',v0,'clfNextValue',v1, ...
+        'minimumCollisionMargin',collision,'minimumRoadMargin',road, ...
         'cost',localCost(states,plan,model)+cfg.clf.relaxationWeight*clf^2);
 end
 
@@ -357,76 +304,10 @@ end
 function margin=localTailMargin(x,time,model)
     cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     q=localTargetAt(model,time);
-    margin=nonlinearSafetyMex('tail',[x,x],model.backup.domain,shape,q,model.frame, ...
-        cfg.collision.safetyMarginMeters+cfg.nonlinear.clearanceReserve,0);
+    margin=predictiveSafetyGeometry.terminalMargin(x,q,model.frame,model.terminal,shape, ...
+        cfg.collision.safetyMarginMeters);
 end
 
 function q=localTargetAt(model,time)
-    % The target coordinates of the joint prediction are eliminated exactly.
-    if isfield(model,'targetAnchor')
-        q=nonlinearSafetyCertificate.targetFlow(model.targetAnchor,model.targetStep*model.cfg.controller.sampleTime+time);
-    else
-        q=nonlinearSafetyCertificate.targetFlow(model.target,time);
-    end
-end
-
-function expired=localExpired(timer,cfg)
-    expired=toc(timer)>=min(cfg.solver.certificateSearchTimeLimit,cfg.solver.frameDeadlineSeconds);
-end
-
-function valid=localCanInherit(prior,model)
-    valid=isstruct(prior) && isfield(prior,'version') && prior.version==48 ...
-        && isequaln(prior.identity,model.identity) && ~isempty(prior.plan) ...
-        && isequal(prior.appliedInput,model.previousInput) ...
-        && isfinite(model.stateTime) && isfinite(prior.stateTime) ...
-        && abs(model.stateTime-prior.stateTime-model.cfg.controller.sampleTime) ...
-            <=model.cfg.nonlinear.targetConsistencyTolerance;
-    if ~valid,return;end
-    box=prior.certificate.samples{1}.endpoint(1:6,:);
-    valid=all(model.initialState>=box(:,1) & model.initialState<=box(:,2));
-    % Box containment detects obvious contract violations. It is not evidence
-    % that a disturbed state is an exact successor of the executed policy.
-end
-
-function certificate=localInherit(prior,model)
-    certificate=prior.certificate;cfg=model.cfg;x=model.initialState;
-    if size(prior.plan,2)>1
-        certificate.inputs=prior.plan(:,2:end);
-        certificate.referenceStates=certificate.referenceStates(:,2:end);
-        certificate.feedbackGains=certificate.feedbackGains(:,:,2:end);
-        certificate.inputs(:,1)=nonlinearSafetyMex('feedbackInput',x, ...
-            [certificate.referenceStates(:,1);certificate.inputs(:,1)],certificate.feedbackGains(:,:,1));
-        certificate.feedbackGains(:,:,1)=0;certificate.referenceStates(:,1)=x;
-        certificate.samples=certificate.samples(2:end);
-        certificate.states=[x,certificate.states(:,3:end)];
-    else
-        shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-        [admitted,terminal]=nonlinearSafetyCertificate.terminal([x,x],model.previousInput,model.targetAnchor, ...
-            [model.targetStep;cfg.controller.sampleTime],model.backup,model.frame,shape,cfg);
-        if ~admitted,certificate=[];return;end
-        reference=model.backup.reference;
-        input=nonlinearSafetyMex('backupInput',x,model.frame,[reference.state;reference.input],reference.gain);
-        world=nonlinearSafetyMex('backupWorld',x,model.backup.domain,model.frame);
-        sample=struct('accepted',true,'endpoint',world,'cells',struct('start',0, ...
-            'end',cfg.controller.sampleTime,'swept',world,'domain',world), ...
-            'scope',"invariantFrenetTemplateMappedToWorld");
-        certificate.inputs=input;certificate.samples={sample};certificate.referenceStates=x;
-        certificate.feedbackGains=zeros(2,6);certificate.states=[x,nonlinearBicycleModel.sample(x,input,cfg)];
-        certificate.terminal=terminal;certificate.terminalOnly=true;
-    end
-    certificate.inputRadius=zeros(size(certificate.inputs));certificate.inherited=true;
-    certificate.reason="inheritedUnderExactSuccessorContract";
-    certificate.clfAvailable=false;certificate.clfSlack=0;certificate.clfResidualUpper=0;
-    certificate.clfInitialValue=0;certificate.clfNextValueUpper=0;
-    try
-        before=nonlinearSafetyMex('error',[x,x],model.frame,model.backup.reference.state);
-        after=nonlinearSafetyMex('error',certificate.samples{1}.endpoint(1:6,:),model.frame,model.backup.reference.state);
-        bound=nonlinearSafetyMex('clf',before,after,model.backup.reference.factor,cfg.nonlinear.clfDecay);
-        certificate.clfInitialValue=bound(1);certificate.clfNextValueUpper=bound(2);
-        certificate.clfSlack=bound(3);certificate.clfResidualUpper=bound(4);certificate.clfAvailable=true;
-    catch exception
-        if ~startsWith(exception.identifier,'collisionAvoidanceController:'),rethrow(exception);end
-    end
-    certificate.nominalCost=localCost(certificate.states,certificate.inputs,model);
-    certificate.performanceCost=certificate.nominalCost+cfg.clf.relaxationWeight*certificate.clfSlack^2;
+    q=predictiveSafetyGeometry.targetFlow(model.target,time);
 end

@@ -1,13 +1,13 @@
 function binary = buildFialaIntervalVerifier(outputDirectory)
-%buildFialaIntervalVerifier Build the MPFR-backed nonlinear model verifiers.
+%buildFialaIntervalVerifier Build optional MPFR kernels for independent model studies.
 % Requires system MPFR/GMP development libraries. No dependency is vendored.
     arguments
         outputDirectory (1,1) string
     end
     root=fileparts(fileparts(mfilename('fullpath')));
     if ~isfolder(outputDirectory),mkdir(outputDirectory);end
-    clear fialaIntervalMex fialaFeedbackSampleMex nonlinearSafetyMex
-    for name=["fialaIntervalMex","fialaFeedbackSampleMex","nonlinearSafetyMex"]
+    clear fialaIntervalMex fialaFeedbackSampleMex
+    for name=["fialaIntervalMex","fialaFeedbackSampleMex"]
         target=fullfile(outputDirectory,name+"."+mexext);
         if isfile(target),delete(target);end
         try
@@ -33,6 +33,4 @@ function binary = buildFialaIntervalVerifier(outputDirectory)
     check=fialaFeedbackSampleMex(point(1:6),point(1:6),point,zeros(2,6),zeros(6,1), ...
         ones(17,1),[.1;.005;1e-5;100;128;realmax],[1;1],[-1;-1;1;1;0;0],[]);
     assert(~check.accepted && string(check.reason)=="executionBounds");
-    bounds=nonlinearSafetyMex('target',[0;0;0;2;0;0;2;1;0;0],[1;1]);
-    assert(bounds(1,1)<=2 && bounds(1,2)>=2 && bounds(2,1)==0 && bounds(2,2)==0);
 end

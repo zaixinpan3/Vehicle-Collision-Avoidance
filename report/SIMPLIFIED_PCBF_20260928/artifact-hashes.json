@@ -1,0 +1,106 @@
+[
+  {
+    "path": "config/collisionAvoidanceControllerConfig.m",
+    "sha256": "ad7091019cfd679a69bc9a83f1f8587b388766c8b7090cb5915612c67c209ec0"
+  },
+  {
+    "path": "controller/PCBF_CLF_ARCHITECTURE.md",
+    "sha256": "3d3931044e9717ae2797bb9086575848ba757566e427dea60c4a4a9073e49cd5"
+  },
+  {
+    "path": "controller/collisionAvoidanceController.m",
+    "sha256": "9c73c4ccc9aea7e8039b5195eaaf0d96787527f22a2050777d0a83b5ad104191"
+  },
+  {
+    "path": "controller/laneGeometry.m",
+    "sha256": "457d8e793d9a310361a269f8b21976d9cacf0e0a9c01aa1f9323572cc28fad17"
+  },
+  {
+    "path": "controller/ltvBicycleModel.m",
+    "sha256": "dc43d45720e31a087ba721824de386f5f95defae7e6dd4c18462aa2da245e8b0"
+  },
+  {
+    "path": "controller/modifiedFialaTire.m",
+    "sha256": "84e2b4d92d08ed9a639cd8ea9a7309e14f7296e00d0a33746288e71be877291f"
+  },
+  {
+    "path": "controller/nonlinearBicycleModel.m",
+    "sha256": "652978060851e8927ccce2881c2c6cc3751fd527152f2e6b9ae092daaba4543f"
+  },
+  {
+    "path": "controller/predictiveSafetyGeometry.m",
+    "sha256": "7bc36b93a70f0c8348f64b8e7d26fdcbe5172fa924df6b0b19fa9e1a11c38135"
+  },
+  {
+    "path": "controller/readPlanningInputs.m",
+    "sha256": "672f82f3bff4c98b7c279e9b31f04276b41e5dcf7b65ec6c768c18833c56f400"
+  },
+  {
+    "path": "controller/solveNonlinearPredictivePlan.m",
+    "sha256": "b69196372cc0d39edc3993210faa3a43e6515b93308ae15f2ffd8e9170812ef8"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/code-analysis.json",
+    "sha256": "cfe76398be0ea73f28b6a062cd72f06003aff01d2647f8f56f1b7d1ada5d4c21"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/independent-audit.json",
+    "sha256": "fb642893c0e0d680664d914c913911715216b38bd85ead66b3e92c169222b4ca"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/oncoming.json",
+    "sha256": "b393780bd43936bf3234ecc476adbc8064a8245f3d47c43c8fd5b337f03d7427"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/preparation-check.json",
+    "sha256": "cb9ee0d6b4c4aa5b99b5503f656ceb9079c5b5b17f249f380879fefb192558c4"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/short-replays.json",
+    "sha256": "b48a6b3dbc84c5234d8e76c1521f1b3371466e27d32576c65bec2c45ef0485c5"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/stored-policy.json",
+    "sha256": "8592a86a30a5f78a572792197a0bbdbbf8b432d4c563cee9c47e79e457405a58"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/summary.json",
+    "sha256": "48a533d1c3a1eadcd2264ad220d98050daea003f2c262206127c31d1a2911ce9"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928/tests.json",
+    "sha256": "9c7fb2d4027edcece749200bfd7f2b448f6efcee9786846b4446e69e54594456"
+  },
+  {
+    "path": "report/SIMPLIFIED_PCBF_20260928.md",
+    "sha256": "28c19db7db2d6cef79f0761e3ed7ada97fa16532135b3d407a4db570ad17a160"
+  },
+  {
+    "path": "scripts/auditJointPredictiveSafety.py",
+    "sha256": "7a11c6590794c36b372d0c09d4f34310087ce08905f2b3221d6f68a5fd7841a4"
+  },
+  {
+    "path": "scripts/prepareCollisionAvoidanceController.m",
+    "sha256": "521afd1b362a8c0041a18c2db7966146143cae0e32190b18db78ba3e907d2bd3"
+  },
+  {
+    "path": "scripts/prepareCollisionAvoidancePipeline.m",
+    "sha256": "4d07b00e1eeb5541b36678daaeace7fdc23dd59b0785b21685f8974c2a8c7922"
+  },
+  {
+    "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "sha256": "ac51885de2e2efa25cc5e4816e9242e77727825894ae02e0e9eb53fab9721325"
+  },
+  {
+    "path": "scripts/validateNonlinearPredictiveController.m",
+    "sha256": "ddd4131654b73cc66d68ec3f09166230446d71ce999e32de4fa6a2f6b783c927"
+  },
+  {
+    "path": "tests/collisionAvoidanceControllerConfigTest.m",
+    "sha256": "5cc0a13868ac6c739ecb2bfea6d26a037c94d8875958e6e47f6d9242ee580256"
+  },
+  {
+    "path": "tests/nonlinearPredictiveSafetyTest.m",
+    "sha256": "46d1f08035a745b9b7d762beedd8b80f791d9f4af87faa04a47e5a4265d734d0"
+  }
+]

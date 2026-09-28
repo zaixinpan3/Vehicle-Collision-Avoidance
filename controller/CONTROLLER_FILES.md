@@ -1,11 +1,10 @@
 # Core controller source budget
 
-The core has **24 source files**, including the controller configuration. The
-public entry uses nonlinear inertial Fiala dynamics, full-interval rectangular
-certificates and an invariant cruise backup. See
-[the current contract and proof](NONLINEAR_PREDICTIVE_CBF.md). The remaining affine
-formulation, geometry and prediction modules are shared research utilities;
-they do not define the public controller's safety guarantee.
+The core has **23 source files**, including the controller configuration. The
+public path is the nominal joint-state PCBF/CLF/SCvx controller described in
+[the current architecture](PCBF_CLF_ARCHITECTURE.md). The affine formulation,
+uncertainty and interval kernels are independent research utilities and are
+not called by the public optimizer. The active path requires no native build.
 
 The count includes every MATLAB/C/C++ source or header under `controller/`, plus
 `config/collisionAvoidanceControllerConfig.m`. Tests, scenario drivers, theory
@@ -13,11 +12,10 @@ documents, generated binaries and third-party solvers have separate roles.
 
 | Source | Responsibility and principal interfaces |
 | --- | --- |
-| `collisionAvoidanceController.m` | Public nonlinear controller, immutable target epoch, format-48 joint witness and metadata |
-| `nonlinearBicycleModel.m` | Nonlinear inertial/Frenet derivatives, RK4 proposal and variational flow, realizable trims and transverse errors |
-| `nonlinearSafetyCertificate.m` | Constant-speed/heading-rate target parsing and exact flow, rectangle dual witnesses, swept interval admission, invariant-ball synthesis and infinite target continuation |
-| `solveNonlinearPredictivePlan.m` | Stored-policy execution and terminal handoff, lane-rollout initialization, Huang safety-slack LP and Li dual SCA, secondary CLF QP and nonlinear admission |
-| `nonlinearSafetyMex.cpp` | Directed target/rectangle/road geometry, Frenet norm and tail certificates, interval CLF derivatives and terminal remainder proof |
+| `collisionAvoidanceController.m` | Current joint-state initialization, nominal MPC dispatch, format-49 plan state and metadata |
+| `nonlinearBicycleModel.m` | Nonlinear dynamics, RK4 prediction, analytic variational flow, cruise trims and lane CLF |
+| `predictiveSafetyGeometry.m` | Constant-speed/heading-rate target flow, polygon distance duals, lane terminal set and analytic terminal separation |
+| `solveNonlinearPredictivePlan.m` | Shifted-plan and lane-rollout initialization, safety LP, secondary CLF QP and SCvx trust-region updates |
 | `readPlanningInputs.m` | Shared ego, road and target input normalization |
 | `hardEncounterBarrier.m` | Finite encounter admission/conditioning, same-model invariant cruise certificate (shrunk by the declared lateral clearance), road-refit readmission and carried-witness data |
 | `formulateAvoidanceProblem.m` | Full-plan objective and hard node/terminal rows, affine elimination of the executed prefix, verified fresh-problem inclusion, and soft CLF / hard terminal cones |
@@ -40,20 +38,17 @@ documents, generated binaries and third-party solvers have separate roles.
 
 ## Current interfaces and scope
 
-The public four-output signature is unchanged. Returned controls beyond the first
-are nominal controls of the stored policy; the certificate carries their fixed
-reference states and feedback gains. Use the fourth output as the next call's
-state. The target model, global corridor and exact plant must remain consistent.
-A stored suffix is executable on solver or verification failure, and the invariant
-cruise law is dispatched when that prefix ends. See the main theory document for
-clock, uncertainty, road and positive-speed limits.
+The public four-output signature is unchanged. Controls and predicted states
+are nominal; the fourth output retains the next warm start. The target is
+reinitialized from each observation, with constant-parameter propagation during
+a dropout. See the architecture for positive-speed and global-road limits.
 
-Affine formulation functions remain callable for model studies. Their format-46
-metadata, node-only certificates and affine-plant scenario drivers are not the
-new public interface. Existing tests of those public-controller contracts require
-migration; the nonlinear regression suite is `nonlinearPredictiveSafetyTest`.
+`prepareCollisionAvoidanceController` warms the MATLAB prediction and optimizer
+without building any native libraries. `buildFialaIntervalVerifier` remains an
+explicit offline utility for the two independent Fiala model-study kernels;
+it is not part of controller preparation or execution.
 
-Build the MPFR kernels with `scripts/buildFialaIntervalVerifier.m` outside tracked
-source. `prepareCollisionAvoidanceController` can build missing kernels under
-excluded `solver/nonlinear/`. Clear loaded MATLAB functions/native kernels after
-source changes. `controllerSourceBudgetTest` enforces the 24-source limit.
+The focused current-controller suite is `nonlinearPredictiveSafetyTest`.
+Older public-entry tests and scenario drivers for affine certificate formats
+are not regression coverage of format 49; those interfaces require migration
+before use. The source-budget test retains the existing ceiling of 24 files.

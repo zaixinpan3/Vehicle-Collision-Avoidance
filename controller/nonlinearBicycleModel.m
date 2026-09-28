@@ -1,6 +1,6 @@
 classdef nonlinearBicycleModel
-    %nonlinearBicycleModel Nonlinear ZOH proposals, variational flow and trims.
-    % RK4 evaluates the flow; acceptance uses MPFR interval enclosures separately.
+    %nonlinearBicycleModel Nominal held-input prediction, tangents and lane trims.
+    % RK4 and its variational equations define the numerical prediction model.
     methods (Static)
         function dx = derivative(x,u,cfg,curvature)
             if nargin<4,curvature=[];end
@@ -29,10 +29,13 @@ classdef nonlinearBicycleModel
             end
         end
 
-        function [next,a,b] = sample(x,u,cfg,curvature)
+        function [next,a,b] = sample(x,u,cfg,curvature,duration)
             if nargin<4,curvature=[];end
-            count=max(1,ceil(cfg.controller.sampleTime/cfg.nonlinear.integrationStep));
-            h=cfg.controller.sampleTime/count;variational=nargout>1;
+            if nargin<5,duration=cfg.controller.sampleTime;end
+            % One even integration mesh for full holds and their midpoints.
+            fullCount=2*max(1,ceil(cfg.controller.sampleTime/(2*cfg.nonlinear.integrationStep)));
+            count=max(1,round(fullCount*duration/cfg.controller.sampleTime));
+            h=duration/count;variational=nargout>1;
             if variational,y=[x;reshape(eye(6),[],1);zeros(12,1)];else,y=x;end
             for index=1:count
                 k1=localFlow(y,u,cfg,curvature,variational);
@@ -57,17 +60,20 @@ classdef nonlinearBicycleModel
             % Target parameters are [speed; sideslip; yawRate; half extents;
             % body offset]. Eliminating its unactuated prediction is exact.
             if isempty(targetParameters)
-                [next,a,b]=nonlinearBicycleModel.sample(z,u,cfg);
+                if nargout>1,[next,a,b]=nonlinearBicycleModel.sample(z,u,cfg);
+                else,next=nonlinearBicycleModel.sample(z,u,cfg);end
                 return;
             end
             validateattributes(z,{'double'},{'size',[9,1],'real','finite'});
             validateattributes(targetParameters,{'double'},{'size',[7,1],'real','finite'});
-            [ego,ae,be]=nonlinearBicycleModel.sample(z(1:6),u,cfg);
+            if nargout>1,[ego,ae,be]=nonlinearBicycleModel.sample(z(1:6),u,cfg);
+            else,ego=nonlinearBicycleModel.sample(z(1:6),u,cfg);end
             target=[z(7:9);targetParameters];
-            future=nonlinearSafetyCertificate.targetFlow(target,cfg.controller.sampleTime);
+            future=predictiveSafetyGeometry.targetFlow(target,cfg.controller.sampleTime);
             displacement=future(1:2)-target(1:2);
             at=eye(3);at(1:2,3)=[-displacement(2);displacement(1)];
-            next=[ego;future(1:3)];a=blkdiag(ae,at);b=[be;zeros(3,2)];
+            next=[ego;future(1:3)];
+            if nargout>1,a=blkdiag(ae,at);b=[be;zeros(3,2)];end
         end
 
         function [error,jacobian] = errorLinearization(x,lane,reference)
@@ -80,13 +86,34 @@ classdef nonlinearBicycleModel
         end
 
         function [a,b] = jacobian(x,u,cfg,curvature)
-            a=zeros(6);b=zeros(6,2);step=cfg.nonlinear.finiteDifferenceStep;
-            for index=1:8
-                point=[x;u];d=step*max(1,abs(point(index)));lo=point;hi=point;
-                lo(index)=lo(index)-d;hi(index)=hi(index)+d;
-                column=(nonlinearBicycleModel.derivative(hi(1:6),hi(7:8),cfg,curvature) ...
-                    -nonlinearBicycleModel.derivative(lo(1:6),lo(7:8),cfg,curvature))/(2*d);
-                if index<=6,a(:,index)=column;else,b(:,index-6)=column;end
+            % Analytic combined-slip tire and body-force derivatives.
+            if nargin<4,curvature=[];end
+            tire=modifiedFialaTire.affineModel(x,u,cfg);
+            scale=modifiedFialaTire.parameters(cfg).longitudinalForceScale;
+            fx=u(2)*scale;c=cos(u(1));s=sin(u(1));
+            frontX=fx(1)*c-tire.force(1)*s;frontY=fx(1)*s+tire.force(1)*c;
+            forceX=-s*tire.state(1,:);
+            forceY=c*tire.state(1,:);
+            inputX=-s*tire.input(1,:)+[-frontY,c*scale(1)];
+            inputY=c*tire.input(1,:)+[frontX,s*scale(1)];
+            [~,loadSlope]=ltvBicycleModel.roadLoad(x(4),cfg);
+            a=zeros(6);b=zeros(6,2);cp=cos(x(3));sp=sin(x(3));
+            a(1,3)=-x(4)*sp-x(5)*cp;a(1,4:5)=[cp,-sp];
+            a(2,3)=x(4)*cp-x(5)*sp;a(2,4:5)=[sp,cp];a(3,6)=1;
+            a(4,:)=forceX/cfg.vehicle.m;a(4,4)=a(4,4)-loadSlope/cfg.vehicle.m;
+            a(4,5:6)=a(4,5:6)+[x(6),x(5)];
+            a(5,:)=(forceY+tire.state(2,:))/cfg.vehicle.m;
+            a(5,[4,6])=a(5,[4,6])-[x(6),x(4)];
+            a(6,:)=(cfg.vehicle.lf*forceY-cfg.vehicle.lr*tire.state(2,:))/cfg.vehicle.Iz;
+            b(4,:)=(inputX+[0,scale(2)])/cfg.vehicle.m;
+            b(5,:)=(inputY+tire.input(2,:))/cfg.vehicle.m;
+            b(6,:)=(cfg.vehicle.lf*inputY-cfg.vehicle.lr*tire.input(2,:))/cfg.vehicle.Iz;
+            if ~isempty(curvature)
+                denominator=1-curvature*x(2);
+                forward=x(4)*cp-x(5)*sp;
+                a(1,:)=a(1,:)/denominator;
+                a(1,2)=a(1,2)+curvature*forward/denominator^2;
+                a(3,:)=a(3,:)-curvature*a(1,:);
             end
         end
 

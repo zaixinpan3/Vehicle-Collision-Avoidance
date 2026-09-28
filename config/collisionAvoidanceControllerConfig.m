@@ -26,12 +26,6 @@ function cfg = collisionAvoidanceControllerConfig(userCfg)
     end
     cfg.actuation = localNormalizeActuation(cfg.actuation);
     localValidate(cfg);
-    if isempty(userCfg) || ~isfield(userCfg,'collision') ...
-            || ~isfield(userCfg.collision,'safetyMarginMeters')
-        % Resolve the default for the selected hold duration. An explicit
-        % physical clearance remains authoritative, including an explicit 0.
-        cfg.collision.safetyMarginMeters = .10*max(1,cfg.controller.sampleTime/.05);
-    end
 end
 
 function cfg = localDefaults()
@@ -40,17 +34,10 @@ function cfg = localDefaults()
     % Route-following cruise demand of the CLF.
     cfg.referenceSpeed = 15.0;
 
-    % Numerical rollouts propose controls; directed interval flow certifies them.
-    % The terminal ball is synthesized and checked, never assumed invariant.
-    cfg.nonlinear = struct('integrationStep',0.01,'certificateStep',0.005, ...
-        'terminalRadius',0.25,'minimumTerminalRadius',1e-5, ...
-        'maximumImprovementIterations',2,'maximumAdmissionIterations',24,'trustRadius',0.5, ...
-        'recoveryHorizonSeconds',3,'optimizationClearanceMeters',0.10, ...
-        'finiteDifferenceStep',1e-5,'clfDecay',0.01, ...
-        'initialPlan',zeros(2,0),'proposalFunction',[], ...
-        'maximumCertificateSeconds',Inf,'maximumCertificateCells',20000, ...
-        'targetRearLength',1.65,'clearanceReserve',1e-8,'targetConsistencyTolerance',1e-8, ...
-        'initializationInputReserve',[.005;.005]);
+    % Nominal SCvx prediction and local lane terminal set.
+    cfg.nonlinear = struct('integrationStep',0.01,'terminalRadius',0.25, ...
+        'maximumImprovementIterations',2,'maximumIterations',24,'trustRadius',0.5, ...
+        'recoveryHorizonSeconds',3,'clfDecay',0.01);
 
     % Joint support certificates define collision and encounter-exit constraints.
     % Continuations retain the complete certificate, including its directions.
@@ -89,8 +76,7 @@ function cfg = localDefaults()
     % the cruise CLF matrix that penalizes the final ego deviation.
     cfg.feedbackPrediction.targetReaction = struct("inputWeightScales",[Inf,30,100], ...
         "relevanceMeters",2.0,"exitWeight",1.0,"terminalWeight",0.0);
-    % Physical footprint clearance. The nonlinear controller verifies this
-    % over every complete hold; proposal samples alone are not its proof.
+    % Physical polygon clearance at prediction nodes and hold midpoints.
     cfg.collision = struct("cbfRate",2.0,"safetyMarginMeters",0.10);
     % taylorOrder is the minimum order of the offline whole-hold enclosures
     % (terminal family synthesis, fixedPredict audits). The online certificate
@@ -175,15 +161,15 @@ function cfg = localDefaults()
         "samplePoints", "stageNodes");
     % Sequential convexification minimizes safety slack with linprog, then
     % minimizes the CLF objective with quadprog at the same safety optimum.
-    % Search/deadline budgets limit improvement after admission; an available
-    % stored policy can execute without another solve or numerical rollout.
-    % Initial proof construction can exceed these research timing budgets.
-    % jointFunction and lexicographicTieTolerance serve affine study utilities.
+    % Time budgets stop SCvx iterations; a feasible shifted plan is retained.
+    % certificateSearchTimeLimit remains for independent affine utilities.
     cfg.solver = struct( ...
         "jointFunction", [], ...
         "maxIterations", 400, ...
         "certificateSearchTimeLimit", 5.0, ...
         "frameDeadlineSeconds", inf, ...
+        "timeLimitSeconds", 5.0, ...
+        "feasibilityTolerance", 1.0e-5, ...
         "constraintTolerance", 1.0e-8, ...
         "optimalityTolerance", 1.0e-7, ...
         "lexicographicTieTolerance", 1.0e-6);
@@ -242,25 +228,17 @@ function actuation = localNormalizeActuation(actuation)
 end
 
 function localValidate(cfg)
-    for name=["integrationStep","certificateStep","terminalRadius", ...
-            "minimumTerminalRadius","trustRadius","finiteDifferenceStep", ...
-            "clfDecay","targetRearLength","clearanceReserve","targetConsistencyTolerance", ...
-            "recoveryHorizonSeconds","optimizationClearanceMeters"]
+    for name=["integrationStep","terminalRadius","trustRadius","clfDecay","recoveryHorizonSeconds"]
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    validateattributes(cfg.nonlinear.maximumImprovementIterations,{'double'}, ...
-        {'scalar','real','finite','integer','nonnegative'});
-    validateattributes(cfg.nonlinear.maximumAdmissionIterations,{'double'}, ...
-        {'scalar','real','finite','integer','nonnegative'});
-    validateattributes(cfg.nonlinear.maximumCertificateCells,{'double'}, ...
-        {'scalar','real','finite','integer','positive'});
-    validateattributes(cfg.nonlinear.maximumCertificateSeconds,{'double'},{'scalar','real','positive'});
-    validateattributes(cfg.nonlinear.initialPlan,{'double'},{'nrows',2,'real','finite'});
-    validateattributes(cfg.nonlinear.initializationInputReserve,{'double'},{'size',[2,1],'real','finite','nonnegative'});
+    for name=["maximumImprovementIterations","maximumIterations"]
+        validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','integer','nonnegative'});
+    end
+    validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','positive'});
+    validateattributes(cfg.solver.feasibilityTolerance,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.vehicle.rectangleOffset,{'double'},{'size',[2,1],'real','finite'});
-    if cfg.nonlinear.clfDecay>=1 || cfg.nonlinear.minimumTerminalRadius>cfg.nonlinear.terminalRadius ...
-            || (~isempty(cfg.nonlinear.proposalFunction) && ~isa(cfg.nonlinear.proposalFunction,'function_handle'))
-        error('collisionAvoidanceController:invalidConfiguration','Invalid nonlinear synthesis or proposal configuration.');
+    if cfg.nonlinear.clfDecay>=1
+        error('collisionAvoidanceController:invalidConfiguration','CLF decay must lie in (0,1).');
     end
     for name = ["widthScale","minimumWidthMeters","headingWeight","regularizationWeight"]
         value=cfg.admission.(name);

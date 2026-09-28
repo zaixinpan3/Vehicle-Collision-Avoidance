@@ -1,0 +1,25 @@
+{
+  "preparation": {
+    "performed": true,
+    "elapsedSeconds": 0.61032,
+    "planFeasible": true,
+    "predictiveBarrierValue": 0,
+    "discardedCommandCount": 1,
+    "nativeBuildRequired": false,
+    "scope": "Nominal MATLAB MPC warm-up; no command applied"
+  },
+  "analysis": [
+    {
+      "file": "scripts/prepareCollisionAvoidancePipeline.m",
+      "findings": []
+    },
+    {
+      "file": "scripts/buildFialaIntervalVerifier.m",
+      "findings": []
+    },
+    {
+      "file": "tests/collisionAvoidanceControllerConfigTest.m",
+      "findings": []
+    }
+  ]
+}

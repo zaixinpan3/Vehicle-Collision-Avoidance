@@ -27,7 +27,7 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
     probeCfg.randomSeed = mod(double(estimatorCfg.randomSeed)+104729,2^32);
     context = nrmmEstimatorControllerAdapter("initialize",probeCfg,truth(0),targetMotion);
     probeCount = 24;
-    probeSeconds = zeros(probeCount,1);certified = false(probeCount,1);failures = strings(probeCount,1);
+    probeSeconds = zeros(probeCount,1);feasible = false(probeCount,1);failures = strings(probeCount,1);
     solverCalls = zeros(probeCount,1);
     for sample = 1:probeCount
         sampleTimer = tic;
@@ -35,7 +35,7 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
         [context,estimate,target] = nrmmEstimatorControllerAdapter("sample",context,time,truth(time),targetMotion(time,[]));
         try
             [~,~,problem] = collisionAvoidanceController(estimate,target,road,cfg,[]);
-            certified(sample) = problem.metadata.planCertified;
+            feasible(sample) = problem.metadata.planFeasible;
             solverCalls(sample) = problem.metadata.solverCallCount;
         catch exception
             if ~startsWith(string(exception.identifier),"collisionAvoidanceController:")
@@ -47,7 +47,7 @@ function preparation = prepareCollisionAvoidancePipeline(ego,road,cfg,estimatorC
     end
     preparation.elapsedSeconds = toc(timer);
     preparation.pipelineProbeSeconds = probeSeconds;
-    preparation.pipelineProbeCertified = certified;
+    preparation.pipelineProbeFeasible = feasible;
     preparation.pipelineProbeFailures = failures;
     preparation.pipelineProbeSolverCalls = solverCalls;
     preparation.nativeObserverAvailable = exist("nrmmObserverRk4IntervalMex","file")==3;

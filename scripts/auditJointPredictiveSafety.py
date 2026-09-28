@@ -2,8 +2,7 @@
 
 The named fixtures use 4.8 m by 1.9 m rectangles, an 8 m wide corridor,
 and an oncoming target initially at (24, 0), heading pi, speed 8 m/s.
-This is a sampled replay audit; continuous safety comes from the controller's
-separate directed interval certificate. Only the Python standard library is used.
+This is an offline sampled replay audit; it does not prove continuous safety. Only the Python standard library is used.
 """
 
 import argparse
@@ -46,7 +45,7 @@ def distance(a, b):
 
 def audit(result):
     name = result['scenario']
-    if name not in ('oncoming', 'storedPolicy', 'recovery', 'solverFailure', 'circular'):
+    if name not in ('oncoming', 'storedPolicy', 'recovery', 'solverFailure', 'circular', 'turningTarget'):
         raise ValueError(f'Unsupported fixture: {name}')
     minimum = math.inf
     road_margin = math.inf
@@ -61,20 +60,24 @@ def audit(result):
             else:
                 lateral = [y for _, y in body]
             road_margin = min(road_margin, 4 - max(abs(y) for y in lateral))
-            if name in ('oncoming', 'storedPolicy'):
+            if name in ('oncoming', 'storedPolicy', 'turningTarget'):
                 time = hold['time'] + relative_time
-                target = rectangle(24 - 8 * time, 0, math.pi)
+                if name == 'turningTarget':
+                    yaw = math.pi - .8 * time
+                    target = rectangle(24 - 10 * math.sin(yaw), 10 + 10 * math.cos(yaw), yaw)
+                else:
+                    target = rectangle(24 - 8 * time, 0, math.pi)
                 minimum = min(minimum, distance(body, target))
     complete = result['completed'] and result['executedFrames'] == result['requestedFrames']
     reported = result['minimumReplayClearanceMeters']
     clearance_match = reported is None or abs(minimum - reported) < 1e-9
-    passed = (complete and samples > 0 and clearance_match and road_margin >= -1e-9
-              and minimum >= result['requiredClearanceMeters'] - 1e-9
-              and result['maximumReplayEnclosureViolation'] <= 1e-9)
+    zero_slack = all(hold.get('predictiveBarrierValue', 0) <= 1e-5 for hold in result['trace'])
+    passed = (zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
+              and minimum >= result['requiredClearanceMeters'] - 1e-9)
     return dict(scenario=name, passed=passed, samples=samples,
                 minimumClearanceMeters=minimum if math.isfinite(minimum) else None,
                 minimumRoadMarginMeters=road_margin,
-                agreesWithMatlabGeometry=clearance_match,
+                agreesWithMatlabGeometry=clearance_match, allPlansZeroSlack=zero_slack,
                 finalLateralErrorMeters=result['finalTransverseError'][0])
 
 
