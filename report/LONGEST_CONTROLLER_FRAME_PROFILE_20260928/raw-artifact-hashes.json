@@ -1,0 +1,24 @@
+{
+  "rawDirectory": "/home/zai/.cache/collisionAvoidance/longest-frame-profile-20260928",
+  "rawArtifacts": {
+    "capture.log": "acb0ae54cd91d05bca3f8e75ea35d18cda1d682012b253db3a9eb681f59f860b",
+    "frame-ranking.json": "b94cf0a32b47af5a140b8f29bec0eb83695efa72f1edd996b6c91de82fef7645",
+    "captured-frame.mat": "d168288310ca907768dbaa169c7a13789bc4048d485d495627f889b6d687c28a",
+    "prefix-verification.json": "0eb73b41a1ad441070fca2e51aa7e8102447f07ed4be5995b13723480fa3a119",
+    "selected-frame.json": "e70336c9edad1f3316d74c4caa1771dcd7a59aa75674d250968d141628716e27",
+    "profile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "profile-summary.json": "d50af07dba500f4c2b05677efb5c3da360299da04be2f586afd28272c5ca14dc",
+    "function-profile.json": "4ae857ebbc25eb119ff36ca82c56d592a21c31f88c5caf632b3db60f8ff36198",
+    "function-profile.mat": "4c6a47513dfbbbc09fd0b0874bf9c2345d893252f254a4f2119ac5f16a10b445",
+    "code-analysis.json": "906969a4327d7956c52c3357783354b6626876b092d773e12967f224bb7ca7e0",
+    "timed.m": "b5cddeea235a42eb65b8208c1105cb1d148d806a41fd7336e66c3eb41b1af29a",
+    "timed.log": "49467813d9220b655416b74074d9a2172d1b37b1ef8f734fd0e732b059fdf345",
+    "timed-runs.json": "732d6f31be5496e760d5a6fcdc278ad728301fa42f414abdddb6226605c0b8c0",
+    "instrumented-analysis.json": "d57f64821387a83ff8bd6349b59af665a6c10791049af7a2851d47374fa14d8c",
+    "helper-validation.log": "c457e8e43850218e23fd3ae71e7684c00e13f39c2e23087366b737e48dfaa093",
+    "helper-validation/timed-runs.json": "645e069cc0b48f824685ce2a326216052daf27a56319b9e79f18fed9486dc434",
+    "helper-validation/instrumented-analysis.json": "7d5082b2d14509cf38744193099dbb3297b236bed76c1efbc325d57dba52aa3a",
+    "helper-validation/timing-helper-analysis.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "productionCommit": "b0cc119324b5a8def8af47103970ad00bb8385b0"
+}

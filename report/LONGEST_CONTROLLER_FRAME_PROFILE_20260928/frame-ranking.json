@@ -1,0 +1,145 @@
+{
+  "totalFrames": 1760,
+  "slowest20": [
+    {
+      "cohort": "default",
+      "scenario": "oncoming",
+      "frame": 17,
+      "time": 0.8000000000000002,
+      "seconds": 5.077416
+    },
+    {
+      "cohort": "default",
+      "scenario": "oncoming",
+      "frame": 16,
+      "time": 0.7500000000000001,
+      "seconds": 5.036483
+    },
+    {
+      "cohort": "default",
+      "scenario": "oncoming",
+      "frame": 19,
+      "time": 0.9000000000000002,
+      "seconds": 5.007001
+    },
+    {
+      "cohort": "default",
+      "scenario": "acceleratingTarget",
+      "frame": 18,
+      "time": 0.8500000000000002,
+      "seconds": 4.873706
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "oncoming",
+      "frame": 1,
+      "time": 0,
+      "seconds": 4.849997
+    },
+    {
+      "cohort": "default",
+      "scenario": "oncoming",
+      "frame": 18,
+      "time": 0.8500000000000002,
+      "seconds": 4.761607
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "acceleratingTarget",
+      "frame": 12,
+      "time": 0.5499999999999999,
+      "seconds": 4.489915
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "acceleratingTarget",
+      "frame": 23,
+      "time": 1.1000000000000003,
+      "seconds": 4.235409
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "acceleratingTarget",
+      "frame": 24,
+      "time": 1.1500000000000004,
+      "seconds": 3.883366
+    },
+    {
+      "cohort": "default",
+      "scenario": "acceleratingTarget",
+      "frame": 17,
+      "time": 0.8000000000000002,
+      "seconds": 3.861746
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "oncoming",
+      "frame": 10,
+      "time": 0.44999999999999996,
+      "seconds": 3.795425
+    },
+    {
+      "cohort": "default",
+      "scenario": "acceleratingTarget",
+      "frame": 16,
+      "time": 0.7500000000000001,
+      "seconds": 3.683997
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "oncoming",
+      "frame": 23,
+      "time": 1.1000000000000003,
+      "seconds": 3.53394
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "acceleratingTarget",
+      "frame": 22,
+      "time": 1.0500000000000003,
+      "seconds": 3.524409
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "acceleratingTarget",
+      "frame": 20,
+      "time": 0.9500000000000002,
+      "seconds": 3.340802
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "oncoming",
+      "frame": 16,
+      "time": 0.7500000000000001,
+      "seconds": 2.882526
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "acceleratingTarget",
+      "frame": 17,
+      "time": 0.8000000000000002,
+      "seconds": 2.875054
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "oncoming",
+      "frame": 15,
+      "time": 0.7000000000000001,
+      "seconds": 2.844104
+    },
+    {
+      "cohort": "baseline",
+      "scenario": "oncoming",
+      "frame": 24,
+      "time": 1.1500000000000004,
+      "seconds": 2.60661
+    },
+    {
+      "cohort": "default",
+      "scenario": "acceleratingTarget",
+      "frame": 15,
+      "time": 0.7000000000000001,
+      "seconds": 2.602557
+    }
+  ]
+}

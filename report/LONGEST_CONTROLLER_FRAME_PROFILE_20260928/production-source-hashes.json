@@ -1,0 +1,17 @@
+{
+  "productionCommit": "b0cc119324b5a8def8af47103970ad00bb8385b0",
+  "files": {
+    "config/collisionAvoidanceControllerConfig.m": "bb92a59e8fc9afe5db5c874e63601a06f5926107c7c8b5abadc4e6770fad3d4f",
+    "config/estimatorControllerIntegrationConfig.m": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "config/nrmmTrackingConfig.m": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+    "controller/CONTROLLER_FILES.md": "f3a280b0a991c7e685ae3f5aa6f712ba2e6ea06ecbef0edf95700af9277fc826",
+    "controller/PCBF_CLF_ARCHITECTURE.md": "33db9753ba90eccb174d9cce08005d436b03388a7598cb18b28b1e867d2d93d3",
+    "controller/collisionAvoidanceController.m": "ae31ad730bb2f8513b9d9835d015148fcdeb7e86fedaf3e67bdf2639bf971e7a",
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "1a37fd5340f4210da739b69627627d74e52f66f6e6c434a922e11a05a372a2fe",
+    "controller/readControllerInputs.m": "0f82004d6d799bb9c15396619858747fc16cbcb2efb5af8db89f5c2791df4718",
+    "controller/solvePredictiveControl.m": "f2508a00fefe4f469aa3de6cbc43b1385484318271438432bb03d5abd6bb4d62"
+  }
+}

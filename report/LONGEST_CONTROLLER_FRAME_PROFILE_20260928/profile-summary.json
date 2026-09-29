@@ -1,0 +1,85 @@
+{
+  "frame": 17,
+  "scenario": "oncoming",
+  "originalSeconds": 5.077416,
+  "warmupSeconds": 5.764143,
+  "fixedWorkRuns": [
+    {
+      "seconds": 5.01394,
+      "solverCalls": 32,
+      "iterations": 16,
+      "converged": false,
+      "terminationReason": "iterationLimit",
+      "safetySlack": 1.2352670101245522E-6,
+      "hardResidual": 0,
+      "clfSlack": 23.505483921622272,
+      "firstInput": [
+        -0.10517692677030215,
+        0.078932078712814852
+      ]
+    },
+    {
+      "seconds": 5.063789,
+      "solverCalls": 32,
+      "iterations": 16,
+      "converged": false,
+      "terminationReason": "iterationLimit",
+      "safetySlack": 1.2352670101245522E-6,
+      "hardResidual": 0,
+      "clfSlack": 23.505483921622272,
+      "firstInput": [
+        -0.10517692677030215,
+        0.078932078712814852
+      ]
+    },
+    {
+      "seconds": 5.018255,
+      "solverCalls": 32,
+      "iterations": 16,
+      "converged": false,
+      "terminationReason": "iterationLimit",
+      "safetySlack": 1.2352670101245522E-6,
+      "hardResidual": 0,
+      "clfSlack": 23.505483921622272,
+      "firstInput": [
+        -0.10517692677030215,
+        0.078932078712814852
+      ]
+    }
+  ],
+  "deadlineReplay": {
+    "seconds": 5.084266,
+    "solverCalls": 32,
+    "iterations": 16,
+    "converged": false,
+    "terminationReason": "timeLimit",
+    "safetySlack": 1.2352670101245522E-6,
+    "hardResidual": 0,
+    "clfSlack": 23.505483921622272,
+    "firstInput": [
+      -0.10517692677030215,
+      0.078932078712814852
+    ]
+  },
+  "profiledRun": {
+    "seconds": 6.4083,
+    "solverCalls": 32,
+    "iterations": 16,
+    "converged": false,
+    "terminationReason": "iterationLimit",
+    "safetySlack": 1.2352670101245522E-6,
+    "hardResidual": 0,
+    "clfSlack": 23.505483921622272,
+    "firstInput": [
+      -0.10517692677030215,
+      0.078932078712814852
+    ]
+  },
+  "profilerStatus": {
+    "ProfilerStatus": "on",
+    "DetailLevel": "mmex",
+    "Timer": "performance",
+    "HistoryTracking": "timestamp",
+    "HistorySize": 5.0E+6
+  }
+}

@@ -1,0 +1,823 @@
+{
+  "cohort": "default",
+  "scenario": "oncoming",
+  "frame": 17,
+  "originalSeconds": 5.077416,
+  "ego": {
+    "position": [
+      11.738948343529342,
+      1.5084658683291206
+    ],
+    "yaw": 0.24612904281513504,
+    "speed": 14.835939995928964,
+    "lateralVelocity": -0.3485578895154901,
+    "yawRate": -0.24302950870231513,
+    "stateTime": 0.80000000000000016,
+    "heldActuatorInput": [
+      -0.096575024199889392,
+      0.060117176718183257
+    ]
+  },
+  "target": {
+    "targetPositionInertial": [
+      17.600000000000023,
+      7.83773951454306E-16
+    ],
+    "targetVelocityInertial": [
+      -8,
+      9.7971743931788257E-16
+    ],
+    "targetYawInertial": 3.1415926535897931,
+    "targetYawRate": 0,
+    "targetSideslip": 0,
+    "targetTangentialAcceleration": 0,
+    "targetRearAxleDistance": 1.6,
+    "targetAccelerationInertial": [
+      -0,
+      0
+    ],
+    "targetLength": 4.8,
+    "targetWidth": 1.9,
+    "targetRectangleOffset": [
+      0,
+      0
+    ]
+  },
+  "road": {
+    "centerline": [
+      [
+        -100,
+        0
+      ],
+      [
+        1000,
+        0
+      ]
+    ],
+    "lateralClearance": [
+      4,
+      4
+    ]
+  },
+  "configuration": {
+    "referenceSpeed": 15,
+    "controller": {
+      "sampleTime": 0.05,
+      "horizonSteps": 16,
+      "maximumHorizonSteps": 512
+    },
+    "nonlinear": {
+      "integrationStep": 0.01,
+      "terminalRadius": 0.25,
+      "maximumIterations": 24,
+      "trustRadius": 0.5,
+      "recoveryHorizonSeconds": 3,
+      "clfDecay": 0.01
+    },
+    "collision": {
+      "safetyMarginMeters": 0
+    },
+    "vehicle": {
+      "m": 1650,
+      "Iz": 1700,
+      "lf": 1.4,
+      "lr": 1.65,
+      "wheelbase": 3.05,
+      "length": 4.8,
+      "width": 1.9,
+      "rectangleOffset": [
+        0,
+        0
+      ],
+      "gravity": 9.81
+    },
+    "tire": {
+      "corneringStiffness": [
+        96000,
+        96000
+      ],
+      "frictionCoefficient": [
+        0.85,
+        0.85
+      ]
+    },
+    "actuation": {
+      "brakingRatioMinimum": -1,
+      "brakingRatioMaximum": 1
+    },
+    "roadLoad": {
+      "airDensity": 1.225,
+      "dragCoefficient": 0.3,
+      "frontalArea": 2.2,
+      "rollingCoefficient": 0.01,
+      "rollingSpeedCoefficient": 0,
+      "rollingQuarticCoefficient": 0,
+      "rollingTransitionSpeed": 0.5
+    },
+    "model": {
+      "speedMinimum": 0,
+      "speedMaximum": 18,
+      "scheduleSpeedFloor": 1,
+      "frontWheelSteeringAngleMaximum": 0.69813170079773179,
+      "frontWheelSteeringRateMaximum": null,
+      "brakingRatioRateMaximum": null,
+      "lateralVelocityMaximum": 12,
+      "yawRateMaximum": 5
+    },
+    "clf": {
+      "lateralPositionErrorScale": 0.5,
+      "headingErrorScale": 0.1,
+      "speedErrorScale": 0.25,
+      "lateralVelocityErrorScale": 0.5,
+      "yawRateErrorScale": 0.2,
+      "frontWheelSteeringAngleWeight": 1,
+      "brakingRatioWeight": 1,
+      "relaxationWeight": 100
+    },
+    "solver": {
+      "maxIterations": 400,
+      "timeLimitSeconds": 5,
+      "feasibilityTolerance": 1E-5,
+      "constraintTolerance": 1E-8,
+      "optimalityTolerance": 1E-7,
+      "lexicographicTieTolerance": 1E-6
+    },
+    "target": {
+      "defaultLength": 4.8,
+      "defaultWidth": 1.9,
+      "rearAxleDistance": 1.6
+    }
+  },
+  "fixedWorkConfiguration": {
+    "referenceSpeed": 15,
+    "controller": {
+      "sampleTime": 0.05,
+      "horizonSteps": 16,
+      "maximumHorizonSteps": 512
+    },
+    "nonlinear": {
+      "integrationStep": 0.01,
+      "terminalRadius": 0.25,
+      "maximumIterations": 16,
+      "trustRadius": 0.5,
+      "recoveryHorizonSeconds": 3,
+      "clfDecay": 0.01
+    },
+    "collision": {
+      "safetyMarginMeters": 0
+    },
+    "vehicle": {
+      "m": 1650,
+      "Iz": 1700,
+      "lf": 1.4,
+      "lr": 1.65,
+      "wheelbase": 3.05,
+      "length": 4.8,
+      "width": 1.9,
+      "rectangleOffset": [
+        0,
+        0
+      ],
+      "gravity": 9.81
+    },
+    "tire": {
+      "corneringStiffness": [
+        96000,
+        96000
+      ],
+      "frictionCoefficient": [
+        0.85,
+        0.85
+      ]
+    },
+    "actuation": {
+      "brakingRatioMinimum": -1,
+      "brakingRatioMaximum": 1
+    },
+    "roadLoad": {
+      "airDensity": 1.225,
+      "dragCoefficient": 0.3,
+      "frontalArea": 2.2,
+      "rollingCoefficient": 0.01,
+      "rollingSpeedCoefficient": 0,
+      "rollingQuarticCoefficient": 0,
+      "rollingTransitionSpeed": 0.5
+    },
+    "model": {
+      "speedMinimum": 0,
+      "speedMaximum": 18,
+      "scheduleSpeedFloor": 1,
+      "frontWheelSteeringAngleMaximum": 0.69813170079773179,
+      "frontWheelSteeringRateMaximum": null,
+      "brakingRatioRateMaximum": null,
+      "lateralVelocityMaximum": 12,
+      "yawRateMaximum": 5
+    },
+    "clf": {
+      "lateralPositionErrorScale": 0.5,
+      "headingErrorScale": 0.1,
+      "speedErrorScale": 0.25,
+      "lateralVelocityErrorScale": 0.5,
+      "yawRateErrorScale": 0.2,
+      "frontWheelSteeringAngleWeight": 1,
+      "brakingRatioWeight": 1,
+      "relaxationWeight": 100
+    },
+    "solver": {
+      "maxIterations": 400,
+      "timeLimitSeconds": null,
+      "feasibilityTolerance": 1E-5,
+      "constraintTolerance": 1E-8,
+      "optimalityTolerance": 1E-7,
+      "lexicographicTieTolerance": 1E-6
+    },
+    "target": {
+      "defaultLength": 4.8,
+      "defaultWidth": 1.9,
+      "rearAxleDistance": 1.6
+    }
+  },
+  "originalTrace": {
+    "time": 0.80000000000000016,
+    "controllerSeconds": 5.077416,
+    "horizonSteps": 81,
+    "source": "sequentialConvexification",
+    "solverCalls": 32,
+    "initialization": "shiftedWarmStart",
+    "scvxConverged": false,
+    "terminationReason": "timeLimit",
+    "sequentialIterations": [
+      {
+        "calls": 2,
+        "safetyOptimum": 1.7667223110395968E-6,
+        "secondarySafety": 2.7667017470615372E-6,
+        "safetyCap": 2.7667223110395965E-6,
+        "clfSlack": 19.976251788350382,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.839743685617002E-7,
+        "iteration": 1,
+        "trustRadius": 0.5,
+        "acceptedIterate": false,
+        "nominalSafetySlack": 35.463625309101687,
+        "nominalHardViolation": 41.855303666211128
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 1.5477380829805358E-8,
+        "secondarySafety": 1.0152985037865156E-6,
+        "safetyCap": 1.0154773808298053E-6,
+        "clfSlack": 22.053805465787235,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.968932621294623E-8,
+        "iteration": 2,
+        "trustRadius": 0.25,
+        "acceptedIterate": false,
+        "nominalSafetySlack": 0.0013437822668882493,
+        "nominalHardViolation": 14.505512961413423
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 4.893450872915158E-10,
+        "secondarySafety": 1.0004871717708274E-6,
+        "safetyCap": 1.0004893450872914E-6,
+        "clfSlack": 23.091959220383306,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 4.0368524023776456E-10,
+        "iteration": 3,
+        "trustRadius": 0.125,
+        "acceptedIterate": false,
+        "nominalSafetySlack": 0.00033962543973398152,
+        "nominalHardViolation": 3.2615586123252327
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 2.6326399722666546E-11,
+        "secondarySafety": 9.95041442082122E-7,
+        "safetyCap": 1.0000263263997226E-6,
+        "clfSlack": 23.6110382674059,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.0604829729209814E-9,
+        "iteration": 4,
+        "trustRadius": 0.0625,
+        "acceptedIterate": false,
+        "nominalSafetySlack": 8.57110185310539E-5,
+        "nominalHardViolation": 0.60150148638489009
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 8.4372206339358842E-10,
+        "secondarySafety": 1.0006449091875233E-6,
+        "safetyCap": 1.0008437220633934E-6,
+        "clfSlack": 23.870570613122272,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 5.1561275378703229E-10,
+        "iteration": 5,
+        "trustRadius": 0.03125,
+        "acceptedIterate": false,
+        "nominalSafetySlack": 2.2168512771481019E-5,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 2.4910912553977496E-10,
+        "secondarySafety": 1.0002472104810121E-6,
+        "safetyCap": 1.0002491091255397E-6,
+        "clfSlack": 24.000339781423413,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 6.46455545344482E-18,
+        "iteration": 6,
+        "trustRadius": 0.015625,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 6.2888140499595124E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 1.9740506140954302E-10,
+        "secondarySafety": 1.0001973251915871E-6,
+        "safetyCap": 1.0001974050614094E-6,
+        "clfSlack": 23.939483899472304,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.1899118843028411E-17,
+        "iteration": 7,
+        "trustRadius": 0.0078125,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 2.1648305907895349E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 2.7204825270711371E-9,
+        "secondarySafety": 1.0021623702735207E-6,
+        "safetyCap": 1.002720482527071E-6,
+        "clfSlack": 23.84195208353885,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.8294932442155577E-10,
+        "iteration": 8,
+        "trustRadius": 0.01171875,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 3.679058296457427E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 4.6888478114746074E-11,
+        "secondarySafety": 1.0000366445724157E-6,
+        "safetyCap": 1.0000468884781147E-6,
+        "clfSlack": 23.794713844391545,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 6.2159331901243033E-11,
+        "iteration": 9,
+        "trustRadius": 0.005859375,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 1.6259819937136655E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 3.13484164918949E-10,
+        "secondarySafety": 1.0003051919305854E-6,
+        "safetyCap": 1.000313484164919E-6,
+        "clfSlack": 23.7206380490227,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.3580479243328197E-17,
+        "iteration": 10,
+        "trustRadius": 0.0087890625,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 2.4234294652147881E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 6.3367075045700175E-10,
+        "secondarySafety": 1.0006262217752994E-6,
+        "safetyCap": 1.000633670750457E-6,
+        "clfSlack": 23.684404017588257,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.9741128364978138E-10,
+        "iteration": 11,
+        "trustRadius": 0.00439453125,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 1.3418184998670313E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 1.0138892989927578E-8,
+        "secondarySafety": 1.010138641534496E-6,
+        "safetyCap": 1.0101388929899275E-6,
+        "clfSlack": 23.628307718134852,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 2.3310346708438345E-17,
+        "iteration": 12,
+        "trustRadius": 0.006591796875,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 1.7831554038894026E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 7.860517607349578E-13,
+        "secondarySafety": 9.9999992614838948E-7,
+        "safetyCap": 1.0000007860517608E-6,
+        "clfSlack": 23.600706852122045,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 3.1542968300393931E-11,
+        "iteration": 13,
+        "trustRadius": 0.0032958984375,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 1.1872377734256645E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 2.6001536282511224E-10,
+        "secondarySafety": 1.0002596964156771E-6,
+        "safetyCap": 1.0002600153628252E-6,
+        "clfSlack": 23.558336527646745,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 3.3906728878589643E-18,
+        "iteration": 14,
+        "trustRadius": 0.00494384765625,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 1.4249550392975152E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 4.8102162460865606E-11,
+        "secondarySafety": 9.6448621373118012E-7,
+        "safetyCap": 1.0000481021624609E-6,
+        "clfSlack": 23.53741774674166,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 1.2107308332676527E-11,
+        "iteration": 15,
+        "trustRadius": 0.002471923828125,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 1.0678211666004245E-6,
+        "nominalHardViolation": 0
+      },
+      {
+        "calls": 2,
+        "safetyOptimum": 9.6536870357026946E-13,
+        "secondarySafety": 1.0000007466006291E-6,
+        "safetyCap": 1.0000009653687035E-6,
+        "clfSlack": 23.505441984193428,
+        "status": "solved",
+        "safetyExitFlag": 1,
+        "secondaryExitFlag": 1,
+        "solverResidual": 3.3198397576448234E-18,
+        "iteration": 16,
+        "trustRadius": 0.0037078857421875,
+        "acceptedIterate": true,
+        "nominalSafetySlack": 1.2352670101245522E-6,
+        "nominalHardViolation": 0
+      }
+    ],
+    "solverFailures": [],
+    "predictiveBarrierValue": 1.2352670101245522E-6,
+    "hardResidual": 0,
+    "clfSlack": 23.505483921622272,
+    "state": [
+      11.738948343529342,
+      1.5084658683291206,
+      0.24612904281513504,
+      14.835939995928964,
+      -0.3485578895154901,
+      -0.24302950870231513
+    ],
+    "nextState": [
+      12.463849204486824,
+      1.6686230542289437,
+      0.23072878017650525,
+      14.852938044671728,
+      -0.28017436212567576,
+      -0.3588104488472319
+    ],
+    "input": [
+      -0.10517692677030215,
+      0.078932078712814852
+    ],
+    "transverseError": [
+      1.6686230542289437,
+      0.23072878017650525,
+      -0.14706195532827238,
+      -0.28017436212567576,
+      -0.3588104488472319
+    ],
+    "auditTimes": [
+      0,
+      0.0016666666666666668,
+      0.0033333333333333335,
+      0.005000000000000001,
+      0.0066666666666666671,
+      0.0083333333333333332,
+      0.010000000000000002,
+      0.011666666666666667,
+      0.013333333333333334,
+      0.015000000000000001,
+      0.016666666666666666,
+      0.018333333333333333,
+      0.020000000000000004,
+      0.021666666666666667,
+      0.023333333333333334,
+      0.025,
+      0.026666666666666668,
+      0.028333333333333335,
+      0.030000000000000002,
+      0.031666666666666669,
+      0.033333333333333333,
+      0.035,
+      0.036666666666666667,
+      0.038333333333333337,
+      0.040000000000000008,
+      0.041666666666666664,
+      0.043333333333333335,
+      0.045000000000000005,
+      0.046666666666666669,
+      0.048333333333333339,
+      0.05
+    ],
+    "auditStates": [
+      [
+        11.738948343529342,
+        1.5084658683291206,
+        0.24612904281513504,
+        14.835939995928964,
+        -0.3485578895154901,
+        -0.24302950870231513
+      ],
+      [
+        11.763072542335225,
+        1.5139233335378417,
+        0.245719476389713,
+        14.836464077685966,
+        -0.34725781294024516,
+        -0.2484279651937277
+      ],
+      [
+        11.787199304728381,
+        1.5193731990689698,
+        0.24530102282032878,
+        14.83699302451911,
+        -0.34586694575233357,
+        -0.25369461877143218
+      ],
+      [
+        11.811328647868722,
+        1.5248153983094994,
+        0.24487389911183954,
+        14.83752660492352,
+        -0.3443881595012675,
+        -0.25883265751797491
+      ],
+      [
+        11.835460588509942,
+        1.5302498650994707,
+        0.24443831701494009,
+        14.838064590504098,
+        -0.34282426697296953,
+        -0.26384519852559019
+      ],
+      [
+        11.859595143009756,
+        1.5356765337037863,
+        0.24399448314353397,
+        14.838606756129639,
+        -0.34117802244221412,
+        -0.26873528904608052
+      ],
+      [
+        11.88373232733962,
+        1.5410953387863775,
+        0.24354259909016904,
+        14.839152880070724,
+        -0.33945212198644,
+        -0.27350590764214533
+      ],
+      [
+        11.907872157093978,
+        1.5465062153865758,
+        0.24308286153956271,
+        14.839702744122294,
+        -0.33764920385694897,
+        -0.2781599653398325
+      ],
+      [
+        11.932014647498988,
+        1.5519090988975575,
+        0.24261546238020298,
+        14.840256133711716,
+        -0.33577184890318129,
+        -0.28270030678135633
+      ],
+      [
+        11.956159813420861,
+        1.5573039250467233,
+        0.2421405888140275,
+        14.840812837993244,
+        -0.33382258104603341,
+        -0.28712971137759097
+      ],
+      [
+        11.98030766937374,
+        1.5626906298778951,
+        0.24165842346418248,
+        14.841372649929628,
+        -0.33180386779633303,
+        -0.29145089445950012
+      ],
+      [
+        12.004458229527204,
+        1.5680691497352037,
+        0.24116914448086402,
+        14.841935366361691,
+        -0.32971812081474905,
+        -0.2956665084277198
+      ],
+      [
+        12.028611507713387,
+        1.5734394212485614,
+        0.24067292564524595,
+        14.842500788066584,
+        -0.32756769650958045,
+        -0.29977914389948779
+      ],
+      [
+        12.052767517433759,
+        1.5788013813206083,
+        0.24016993647149845,
+        14.843068719805471,
+        -0.32535489666903089,
+        -0.30379133085210469
+      ],
+      [
+        12.076926271865567,
+        1.5841549671150337,
+        0.23966034230690475,
+        14.843638970361296,
+        -0.32308196912473786,
+        -0.30770553976210741
+      ],
+      [
+        12.101087783867964,
+        1.5895001160461757,
+        0.23914430443008314,
+        14.844211352567307,
+        -0.32075110844348231,
+        -0.31152418273934085
+      ],
+      [
+        12.125252065987858,
+        1.5948367657698104,
+        0.23862198014732386,
+        14.844785683326968,
+        -0.31836445664415913,
+        -0.31524961465512796
+      ],
+      [
+        12.149419130465477,
+        1.600164854175042,
+        0.23809352288705105,
+        14.845361783625828,
+        -0.31592410393723874,
+        -0.31888413426375184
+      ],
+      [
+        12.173588989239668,
+        1.6054843193772177,
+        0.2375590822924217,
+        14.845939478535954,
+        -0.31343208948409779,
+        -0.32242998531648948
+      ],
+      [
+        12.197761653952973,
+        1.6107950997117859,
+        0.23701880431207456,
+        14.846518597213443,
+        -0.31089040217373842,
+        -0.32588935766746141
+      ],
+      [
+        12.221937135956459,
+        1.6160971337290322,
+        0.23647283128904345,
+        14.847098972889533,
+        -0.30830098141455442,
+        -0.32926438837059036
+      ],
+      [
+        12.246115446314352,
+        1.6213903601896187,
+        0.23592130204784986,
+        14.847680442855827,
+        -0.30566571793893571,
+        -0.33255716276699515
+      ],
+      [
+        12.270296595808455,
+        1.6266747180608689,
+        0.23536435197979205,
+        14.848262848444055,
+        -0.30298645461863327,
+        -0.3357697155621801
+      ],
+      [
+        12.294480594942396,
+        1.6319501465137356,
+        0.23480211312644741,
+        14.848846035000834,
+        -0.30026498728892953,
+        -0.33890403189241486
+      ],
+      [
+        12.318667453945682,
+        1.6372165849203937,
+        0.23423471426140705,
+        14.84942985185787,
+        -0.29750306557978179,
+        -0.34196204837973837
+      ],
+      [
+        12.3428571827776,
+        1.6424739728524098,
+        0.23366228097026207,
+        14.850014152297943,
+        -0.29470239375222018,
+        -0.34494565417505535
+      ],
+      [
+        12.367049791130968,
+        1.6477222500794346,
+        0.23308493572886124,
+        14.850598793517083,
+        -0.29186463153839332,
+        -0.34785669198883462
+      ],
+      [
+        12.391245288435734,
+        1.652961356568373,
+        0.2325027979798619,
+        14.851183636583299,
+        -0.28899139498376236,
+        -0.35069695910895377
+      ],
+      [
+        12.415443683862446,
+        1.6581912324829891,
+        0.23191598420759513,
+        14.851768546392139,
+        -0.28608425729004489,
+        -0.35346820840527465
+      ],
+      [
+        12.439644986325588,
+        1.6634118181839046,
+        0.23132460801126811,
+        14.852353391619468,
+        -0.28314474965760866,
+        -0.35617214932056984
+      ],
+      [
+        12.463849204486824,
+        1.6686230542289437,
+        0.23072878017650525,
+        14.852938044671728,
+        -0.28017436212567576,
+        -0.3588104488472319
+      ]
+    ],
+    "predictionCollisionMargin": -1.2352670101245522E-6
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "runs": [
+    {
+      "run": 1,
+      "seconds": 5.851232,
+      "fullTrajectoryMaximumError": 0,
+      "solverCalls": 32,
+      "iterations": 16,
+      "terminationReason": "iterationLimit"
+    },
+    {
+      "run": 2,
+      "seconds": 4.963304,
+      "fullTrajectoryMaximumError": 0,
+      "solverCalls": 32,
+      "iterations": 16,
+      "terminationReason": "iterationLimit"
+    },
+    {
+      "run": 3,
+      "seconds": 4.955006,
+      "fullTrajectoryMaximumError": 0,
+      "solverCalls": 32,
+      "iterations": 16,
+      "terminationReason": "iterationLimit"
+    },
+    {
+      "run": 4,
+      "seconds": 4.949617,
+      "fullTrajectoryMaximumError": 0,
+      "solverCalls": 32,
+      "iterations": 16,
+      "terminationReason": "iterationLimit"
+    },
+    {
+      "run": 5,
+      "seconds": 5.837679,
+      "fullTrajectoryMaximumError": null,
+      "solverCalls": 38,
+      "iterations": 19,
+      "terminationReason": "zeroSlack"
+    }
+  ],
+  "codeAnalyzer": []
+}

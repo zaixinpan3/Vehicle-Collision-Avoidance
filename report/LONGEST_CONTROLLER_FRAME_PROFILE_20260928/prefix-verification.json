@@ -1,0 +1,138 @@
+[
+  {
+    "frame": 1,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 20,
+    "seconds": 3.207222
+  },
+  {
+    "frame": 2,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 8,
+    "seconds": 0.849165
+  },
+  {
+    "frame": 3,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 8,
+    "seconds": 0.83902
+  },
+  {
+    "frame": 4,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 8,
+    "seconds": 0.822403
+  },
+  {
+    "frame": 5,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 8,
+    "seconds": 0.857272
+  },
+  {
+    "frame": 6,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 10,
+    "seconds": 1.055891
+  },
+  {
+    "frame": 7,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 14,
+    "seconds": 1.480973
+  },
+  {
+    "frame": 8,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 14,
+    "seconds": 1.466943
+  },
+  {
+    "frame": 9,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 16,
+    "seconds": 1.655201
+  },
+  {
+    "frame": 10,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 14,
+    "seconds": 1.484097
+  },
+  {
+    "frame": 11,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 16,
+    "seconds": 1.655265
+  },
+  {
+    "frame": 12,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 14,
+    "seconds": 1.575819
+  },
+  {
+    "frame": 13,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 8,
+    "seconds": 0.942812
+  },
+  {
+    "frame": 14,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 10,
+    "seconds": 1.130172
+  },
+  {
+    "frame": 15,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 22,
+    "seconds": 2.419136
+  },
+  {
+    "frame": 16,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 40,
+    "seconds": 4.996157
+  },
+  {
+    "frame": 17,
+    "inputMaximumError": 0,
+    "safetySlackError": 0,
+    "clfSlackError": 0,
+    "solverCalls": 32,
+    "seconds": 5.062032
+  }
+]

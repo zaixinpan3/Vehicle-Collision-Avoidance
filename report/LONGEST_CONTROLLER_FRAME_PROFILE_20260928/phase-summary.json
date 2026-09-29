@@ -1,0 +1,47 @@
+{
+  "runs": [
+    {
+      "run": 2,
+      "totalSeconds": 4.984995,
+      "assemblySeconds": 1.59088,
+      "lpSeconds": 0.09933600000000001,
+      "qpSeconds": 2.67827,
+      "evaluationSeconds": 0.593707,
+      "otherSeconds": 0.022801999999999545
+    },
+    {
+      "run": 3,
+      "totalSeconds": 5.021457,
+      "assemblySeconds": 1.615939,
+      "lpSeconds": 0.098884,
+      "qpSeconds": 2.695819,
+      "evaluationSeconds": 0.59406,
+      "otherSeconds": 0.016754999999999853
+    },
+    {
+      "run": 4,
+      "totalSeconds": 5.013216,
+      "assemblySeconds": 1.595568,
+      "lpSeconds": 0.098331,
+      "qpSeconds": 2.707155,
+      "evaluationSeconds": 0.5965619999999999,
+      "otherSeconds": 0.015600000000000058
+    }
+  ],
+  "meanSeconds": {
+    "totalSeconds": 5.006556,
+    "assemblySeconds": 1.6007956666666667,
+    "lpSeconds": 0.09885033333333333,
+    "qpSeconds": 2.6937480000000003,
+    "evaluationSeconds": 0.5947763333333334,
+    "otherSeconds": 0.018385666666666484
+  },
+  "meanPercent": {
+    "assemblySeconds": 31.973989038905522,
+    "lpSeconds": 1.9744178100341498,
+    "qpSeconds": 53.804411655437406,
+    "evaluationSeconds": 11.879949676650643,
+    "otherSeconds": 0.36723181897229323
+  },
+  "rejectedFirstFiveMeanSeconds": 1.7743846666666667
+}
