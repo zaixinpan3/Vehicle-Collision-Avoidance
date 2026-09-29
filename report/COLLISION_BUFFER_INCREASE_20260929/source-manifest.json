@@ -1,0 +1,334 @@
+[
+  {
+    "path": "config/collisionAvoidanceControllerConfig.m",
+    "sha256": "e3529546f96890c49a04f3838d3a3d38286efbc14c976323d781eff0965c8ee5"
+  },
+  {
+    "path": "config/estimatorControllerIntegrationConfig.m",
+    "sha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b"
+  },
+  {
+    "path": "config/nrmmTrackingConfig.m",
+    "sha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47"
+  },
+  {
+    "path": "controller/CONTROLLER_FILES.md",
+    "sha256": "b4259bd312d4edce30327d361210c9f5ad28c5bcb94ab65eaa8754cf8dfd658a"
+  },
+  {
+    "path": "controller/PCBF_CLF_ARCHITECTURE.md",
+    "sha256": "457f808888dd1b1f7a10b74db4c6e62c081e6b399152b319b243f9c0d0fce759"
+  },
+  {
+    "path": "controller/collisionAvoidanceController.m",
+    "sha256": "f227b5af54b941f81a5d6245e1514f53167bed7facae91048d4d792e0fceeb88"
+  },
+  {
+    "path": "controller/laneGeometry.m",
+    "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc"
+  },
+  {
+    "path": "controller/modifiedFialaTire.m",
+    "sha256": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd"
+  },
+  {
+    "path": "controller/nonlinearBicycleModel.m",
+    "sha256": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1"
+  },
+  {
+    "path": "controller/predictiveSafetyGeometry.m",
+    "sha256": "db23d19a88297cec88799506619e794c0a6e180b0d303a4233aa8bde10b67436"
+  },
+  {
+    "path": "controller/readControllerInputs.m",
+    "sha256": "0f82004d6d799bb9c15396619858747fc16cbcb2efb5af8db89f5c2791df4718"
+  },
+  {
+    "path": "controller/solvePredictiveControl.m",
+    "sha256": "793a3f56ca2205e1319e8769602bd38d06a21cc4975c2ce4dba8e0c1be18146e"
+  },
+  {
+    "path": "controller/terminalContinuation.m",
+    "sha256": "6164ff5b7f2b13c91a71fcba024de0e8e8584f43929b13d2e51797de2c88618c"
+  },
+  {
+    "path": "estimator/OBSERVER_ISS_THEORY.md",
+    "sha256": "51e1b8a58e98f75fe1974af470aa301b1ee2eddc64c79806814d2a8286e39d56"
+  },
+  {
+    "path": "estimator/certifiedKinematicCourseCorrespondence.m",
+    "sha256": "e969fc6c2aee79fd4eb9976d6a7342609499c7a6e40b2ad1f8516fb1a3288e5b"
+  },
+  {
+    "path": "estimator/certifiedRotationCorrespondence.m",
+    "sha256": "fe3848a3e72ba4da39b800f2f374e85d37c457aad7df8e24c5f5dc250309b37e"
+  },
+  {
+    "path": "estimator/nrmmControllerErrorBounds.m",
+    "sha256": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc"
+  },
+  {
+    "path": "estimator/nrmmKinematicVelocityMeasurement.m",
+    "sha256": "0f075c3dafeb4b11a8cda324f39c88e370c29c35ba9755a4412f20a83f5edfae"
+  },
+  {
+    "path": "estimator/nrmmObserverCertificate.m",
+    "sha256": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308"
+  },
+  {
+    "path": "estimator/nrmmObserverRk4Interval.m",
+    "sha256": "33c395fb3f5905853a19dfd1e6502b80d1a50ffcb281934e98a00b459f6dd795"
+  },
+  {
+    "path": "estimator/nrmmObserverVectorField.m",
+    "sha256": "df803b56eb8c3584f9903d271b15f0168d1881ba0bdcf4cba2688c6d48ee5686"
+  },
+  {
+    "path": "estimator/nrmmPositionErrorBound.m",
+    "sha256": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5"
+  },
+  {
+    "path": "estimator/nrmmTargetHistory.m",
+    "sha256": "7d42d50c49d6217738a9b0247d2ad1faa8563b8066d03e9556e0185e4984522e"
+  },
+  {
+    "path": "estimator/nrmmTargetLipschitzCertificate.m",
+    "sha256": "d1f561ad3c3de0868d73b5f45589b30af2b574136316faaca80bfa8100f9c8ba"
+  },
+  {
+    "path": "estimator/nrmmTargetParameterErrorBounds.m",
+    "sha256": "6d1104488dc5b9b2d8dda8c3274a6f24294fef0e5d767df6008cb8a473d8d850"
+  },
+  {
+    "path": "estimator/nrmmTargetTrackerDerivative.m",
+    "sha256": "6e38b0cbb14d316af51f841d6d0c9a5faf2047a898868d9171df912094a5f088"
+  },
+  {
+    "path": "estimator/nrmmVelocityDisturbanceBound.m",
+    "sha256": "84c4c6e9e4c1b47c395df29f5c71043854522d563c7222922aeeb2be9160951a"
+  },
+  {
+    "path": "estimator/nrmmYawObserverDerivative.m",
+    "sha256": "732496acba9d6c793d443d53c5fd424912016755cdc3178fe8160e23e46dc70d"
+  },
+  {
+    "path": "estimator/nrmmYawSet.m",
+    "sha256": "cc30d09659426872322c8c28d373144680a1dcf23a1ec5354f35f30b1079c295"
+  },
+  {
+    "path": "estimator/onlineNrmmTrackingRuntime.m",
+    "sha256": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05"
+  },
+  {
+    "path": "estimator/synthesizeNrmmObserverGains.m",
+    "sha256": "8697b7b460b7ea2c9c434ae3542d5cbaf3ac11cd2fe7d4669012f93ab20b103a"
+  },
+  {
+    "path": "estimator/synthesizeTargetTrackerCertificate.m",
+    "sha256": "74a00654062d3f17fedf497b296c67b9cde02fb8db4cf3a8b63e0f41220eefbe"
+  },
+  {
+    "path": "scripts/README.md",
+    "sha256": "5d794c65703ff69191c3e3459e1581d51edceea9ea2ff72dec3d279ed841e794"
+  },
+  {
+    "path": "scripts/auditJointPredictiveSafety.py",
+    "sha256": "8efb75398ae102874d19ebedf7135c6131326b4f0c1f8932375e7720bd258bf8"
+  },
+  {
+    "path": "scripts/auditNrmmTruthEnclosure.m",
+    "sha256": "1a90f9b548f53852d60e33128baa1f3a524c6d99bb99a6798f97d9f19fb2cbf2"
+  },
+  {
+    "path": "scripts/buildNrmmObserverKernel.m",
+    "sha256": "bbeda1cc880491cbf0012681f7468facb6ed4e0bd54d52ab832c9657a9cf8dd5"
+  },
+  {
+    "path": "scripts/evaluatePerceivedRoadBoundarySafety.m",
+    "sha256": "e1c7e52989870e7b8bcdc09bdcddc26e9833b50760e5346eddde767c5f07c0c0"
+  },
+  {
+    "path": "scripts/fitPerceivedRoadBoundaries.m",
+    "sha256": "81d0648d69f58a313ae21159f0aa215356d611f0f6bdcc849d7056c451316626"
+  },
+  {
+    "path": "scripts/nrmmEstimatorControllerAdapter.m",
+    "sha256": "fa1555c793dcab141965f9ad06b0c9a0406b3c310768ba1ccb275ec38ac7ccf9"
+  },
+  {
+    "path": "scripts/nrmmTargetMeasurement.m",
+    "sha256": "e1cfb385ae5af1d8597f0bfb40ce7c1e8f169200c6ae2593e49c03af17eb606e"
+  },
+  {
+    "path": "scripts/nrmmTargetTruth.m",
+    "sha256": "eadd6a43cc14e18914d24832f15298111dae74ea3596bdd76c91cd41e5dceee3"
+  },
+  {
+    "path": "scripts/prepareCollisionAvoidanceController.m",
+    "sha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9"
+  },
+  {
+    "path": "scripts/prepareCollisionAvoidancePipeline.m",
+    "sha256": "4db704c9ce97330bfe1d12dc283a1407da000a4a39dd4cc3cfec6a0b9a659c47"
+  },
+  {
+    "path": "scripts/quadraticRoadBoundaryRectangleMargin.m",
+    "sha256": "cd584ea383cca6d86f219490699fb62b24aabf54bbe8cf1795e2c5cfa0aa2a37"
+  },
+  {
+    "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "sha256": "5041ca273f57ee35bdf39cbd656dfa510a4ace2cc270cc3a80724f9242954a1c"
+  },
+  {
+    "path": "scripts/runNrmmPositionBoundBenchmark.m",
+    "sha256": "4cc13ceb718af5590e195f57061c68a990d271c061cc73a0308e4380726fbe7c"
+  },
+  {
+    "path": "scripts/runOnlineNrmmComplexManeuverScenario.m",
+    "sha256": "2502c66c89027aadb8a991e2720c92fa85844a2bffd280b42fe4e32f62f7cae5"
+  },
+  {
+    "path": "scripts/runOnlineNrmmTrackingErrorBenchmark.m",
+    "sha256": "d969f1fefa3bef8da2c5f23ec4847032a61d6f7fa4d4f98555b4333157e5a294"
+  },
+  {
+    "path": "scripts/validateNonlinearPredictiveController.m",
+    "sha256": "376a3e54b4a31f69cbb9f1c5f8196658e476562901277899d4414595b1a5a0eb"
+  },
+  {
+    "path": "tests/auditJointPredictiveSafetyTest.py",
+    "sha256": "0c089982ba28b5992ff4ef2bf1f022c0dd2b5be166e96bfe6862cb797469ae72"
+  },
+  {
+    "path": "tests/certifiedKinematicCourseCorrespondenceTest.m",
+    "sha256": "b27af26417534778bf87b0c66b7497974bc5dca5add62969df0b6154ef125f03"
+  },
+  {
+    "path": "tests/collisionAvoidanceControllerConfigTest.m",
+    "sha256": "3ee7e3bfbd85c12e38d3a6855e922886d8f8fc750741c8fb63417a24b8b46c97"
+  },
+  {
+    "path": "tests/computeLidarRingCurbFeaturesTest.m",
+    "sha256": "ffa0d9ac6de0c39b9001e491525cfb2086f75c01d9aa6a1abb2ffbbc2b94f460"
+  },
+  {
+    "path": "tests/controllerInputGeometryTest.m",
+    "sha256": "4abf8d0aa19e3c9c6c04efe8289b3b44588681553f670a8c9c80e250690376eb"
+  },
+  {
+    "path": "tests/controllerSourceBudgetTest.m",
+    "sha256": "50484401ae89480681b5f47006b76e77f8680766b2e72f1209afcf2ae1ad3082"
+  },
+  {
+    "path": "tests/estimateRoadHeadingFromFeatureSeedsTest.m",
+    "sha256": "7d2be602883261d4082b0cbf6fe01aeb39ae7316435ab727994dc6c582466424"
+  },
+  {
+    "path": "tests/evaluateCurbDetectorDevelopmentRegressionTest.m",
+    "sha256": "0211c85eced5349a032d2a691353fa14266de89836ff361104d4de665429fca4"
+  },
+  {
+    "path": "tests/evaluateCurbRingFeatureBackgroundCalibrationTest.m",
+    "sha256": "437b9f1e8e89f46fc7cb6874adf0be144ffc22b2c3177f1728ce9e0d0c7bdb53"
+  },
+  {
+    "path": "tests/evaluateExportedCurbMasksAgainstDevelopmentLabelsTest.m",
+    "sha256": "a7ab1fba8514bbb7b5bb59c9f3b31d435f80e1470cb4fa4133e70a09c54a8fce"
+  },
+  {
+    "path": "tests/fitPerceivedRoadBoundariesTest.m",
+    "sha256": "2cedbbcba174e972e5d971230df53fb018f77211f6070729c57200173236ec0a"
+  },
+  {
+    "path": "tests/fuseLidarRingCurbFeaturesTest.m",
+    "sha256": "1911d67292cde8cc2f57166b12735806fc9839538ecd72903912ac26cf1d48e1"
+  },
+  {
+    "path": "tests/groundPointsProcessingTest.m",
+    "sha256": "239feecc7b4df94d34d861e934df87beb517b663a13879446b96227a8b570bf7"
+  },
+  {
+    "path": "tests/longitudinalRoadLoadTest.m",
+    "sha256": "5425e5d182a050c91d825090a2a937dd87c258d9ab500d59673163eb56eb8d24"
+  },
+  {
+    "path": "tests/modifiedFialaTireTest.m",
+    "sha256": "906e74544157f8f0e05eb0e26ae710d16276a693c7da583bf97c061fddafdcad"
+  },
+  {
+    "path": "tests/nonlinearPredictiveSafetyTest.m",
+    "sha256": "68183374996abbd631bd73305c99c9d9e03d8ebdacbc13f3916e6488ac56d43b"
+  },
+  {
+    "path": "tests/nrmmCascadeCertificateTest.m",
+    "sha256": "335f62fea291b0a4a20ce2ac5c9e9d09e4f1b682665661d834bf10568e57e8ae"
+  },
+  {
+    "path": "tests/nrmmControllerErrorBoundsTest.m",
+    "sha256": "f8df17bdd9fefd2873ec3c264b7084618582e0416566957d4f2a8a1ae70631d9"
+  },
+  {
+    "path": "tests/nrmmDirectVelocityTest.m",
+    "sha256": "c380d86716e143764273b085365cb7def37a7e4c59108dd3457a8fd0a8af17f0"
+  },
+  {
+    "path": "tests/nrmmModelFormulationTest.m",
+    "sha256": "8c43897569301436ae3ab5c506d8c104e6574fe284edcfe460711f3e55d538df"
+  },
+  {
+    "path": "tests/nrmmNativeKernelTest.m",
+    "sha256": "59374d58c3ed6bafa1c71d3f6e85bdca158ed067719fab8886190d893688af7f"
+  },
+  {
+    "path": "tests/nrmmObserverVectorFieldTest.m",
+    "sha256": "ed6cad2efa2a832c96fa73d737aacd26a63abf1dcce61785436a0f08efeffbe3"
+  },
+  {
+    "path": "tests/nrmmPositionErrorBoundTest.m",
+    "sha256": "62bf4ca5f661b70e238164bc98a1e52f6e259ea854293b6c690dc7d29f8c14d2"
+  },
+  {
+    "path": "tests/nrmmStructuredHighGainTest.m",
+    "sha256": "04e1a980d5eb156bba785e8ac1be5447dbe40618c2ebc0fc05a5be8171c8a9dd"
+  },
+  {
+    "path": "tests/nrmmTargetHistoryTest.m",
+    "sha256": "ece4799ae70cb7f69c7ad77750965ba2bcc4565da2f41806ada609496b8154a2"
+  },
+  {
+    "path": "tests/nrmmTargetParameterErrorBoundsTest.m",
+    "sha256": "d0d130f9f0440a05bfe2fb9ca5b8a78377b115d74fad1897f194c9faa076bf03"
+  },
+  {
+    "path": "tests/nrmmTruthEnclosureAuditTest.m",
+    "sha256": "a49a8ba7d8427f1ba67bc69de335cc64a9de047da4f150320f2a4f2349e62fcd"
+  },
+  {
+    "path": "tests/nrmmYawObserverTest.m",
+    "sha256": "4482b2b8f4fab3ce5ff252a8db557bd6467d5ecc3c344c6a44e923c55e528889"
+  },
+  {
+    "path": "tests/nrmmYawSetTest.m",
+    "sha256": "5a3ef6d6d19eaf6e6ba0f2bc3a638f4ddfd107705dee94a3dff111f7bf9d1c10"
+  },
+  {
+    "path": "tests/observerGainSynthesisTest.m",
+    "sha256": "1921560501708c581233646d9dee62f50284ffa4c77170ed03dcc6da91f7eb59"
+  },
+  {
+    "path": "tests/onlineNrmmTrackingRuntimeTest.m",
+    "sha256": "347bef813aa384373e6d69c252468a5c4af38b1e9d1151e2a3b4e05e0a810c8c"
+  },
+  {
+    "path": "tests/temporalGroundPointsProcessingTest.m",
+    "sha256": "fbb310ba825a54d864f19326237ccc7f7a23c20c63898f0f96dddb7e04d87c0d"
+  },
+  {
+    "path": "tests/terminalContinuationTest.m",
+    "sha256": "90302fcf5a686b62e179767ec0f29cb13d78624a9bc5d98b6e31e035192bc308"
+  },
+  {
+    "path": "tests/trackCurbQuadraticModelsTest.m",
+    "sha256": "836da9f1921e63f19bb21c786f0760d8b2bff2e4e55ae8818c907639b3dd71f7"
+  }
+]

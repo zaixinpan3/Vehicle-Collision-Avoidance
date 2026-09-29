@@ -1,0 +1,222 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/analysis.log",
+    "bytes": 966,
+    "sha256": "b3d0e2be4a94107b0470e5a2d603648c8b2baaa01dba0de8ec587428452bf3cb"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/analyze.py",
+    "bytes": 6637,
+    "sha256": "ffbda6bd3e01aa2ebd231c7f767e4958a9dc390916e258992af9cba1e05ace10"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/base-commit.txt",
+    "bytes": 41,
+    "sha256": "e5270b1ba4e488c4b0a484e6186d9a858631c19dee376b8a117899c68b32ea31"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/campaign.log",
+    "bytes": 33784,
+    "sha256": "8d1e7c903c0f797b274ba220af467ef6308132eb6d80c229cd5d897b8d3bfa38"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/campaign.m",
+    "bytes": 1306,
+    "sha256": "8b1da32d2cfb77ceca96ea1bce169b2b1d9f69a43e6139a0b225befd0efcd18f"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/collect.py",
+    "bytes": 4640,
+    "sha256": "7ecc226765dbeb1c40ca58578ddcd314e68105502cde23cb77a1935f900f257e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/probe.log",
+    "bytes": 3192,
+    "sha256": "f86a37fd3388516a2c9cb3a19e4e1a8cde943d73ac21ca67dd0a26823afc40ef"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/probe.m",
+    "bytes": 544,
+    "sha256": "3e9272edd8e61926f05a1962a01b8415ae3c4ce735b363786f7dc3ea46e87dbe"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/probe6mm.json",
+    "bytes": 876788,
+    "sha256": "c516c690dbe3adb5a358573737cfe76867ca7689b00ae41b7ef77e5c4ba333ab"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/python-tests.txt",
+    "bytes": 107,
+    "sha256": "42f237d7abc9eb371abada54db94861f647b2fd2e4008b692ec18dfdcc2e00d5"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/source-manifest.json",
+    "bytes": 11890,
+    "sha256": "6e6b5af55a3502ae5d7ef0b0265a1b4b6116d0c16efec19ab520df913099fe99"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/acceleratingTarget-timing.csv",
+    "bytes": 12821,
+    "sha256": "f98b47ec9583ec3635ce2584c4ba22531a0788f86a65dda2dd16ca0088bf3ad0"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/acceleratingTarget.json",
+    "bytes": 876740,
+    "sha256": "d51df85a12c3a41c161f827603e9959fa669c40244ea680bb37cf2661abfcb33"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/acceleratingTurn-timing.csv",
+    "bytes": 12806,
+    "sha256": "62c66bb3759f9d4ac63344fe8a6692c3d2096e1ff07d584f476235003ea83497"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/acceleratingTurn.json",
+    "bytes": 655092,
+    "sha256": "389ebca41c5553773e76d3f5e963d79e60489f070e7d02af8f9ecfc937bd176d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/audit.json",
+    "bytes": 3752,
+    "sha256": "8ef5bd40ce1b1b68e466d3d1fac5d970b7d26114d56c4a12fff13e9dcd4e6b6d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/brakingTarget-timing.csv",
+    "bytes": 12810,
+    "sha256": "9e6f63c056fb9782d592feeac5ed334de330ec50f4f7cd93db325ad6514a7191"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/brakingTarget.json",
+    "bytes": 655065,
+    "sha256": "8b148a4bc49546f6d27dc632a31d83023d771029f103b47fff3040678160816b"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/circular-timing.csv",
+    "bytes": 3240,
+    "sha256": "ec26bf08178dbd30ad1e1904dbe5fa7d4d77210446d1d3b0c9ed604ac665e501"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/circular.json",
+    "bytes": 215418,
+    "sha256": "fd8049dd5dbd42bafd7a3702157d9171eada44091261395d9b5d7cb573c1b868"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/oncoming-timing.csv",
+    "bytes": 12816,
+    "sha256": "5042c2083f2a3aa045eae0274cb497711ee69b2d333e764e9e8c0ba6c2cf5bd6"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/oncoming.json",
+    "bytes": 877675,
+    "sha256": "d2c0d0c3a88f98894a77c6fa85949489adf322998b6e75880d7194a992e6b74d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/recovery-timing.csv",
+    "bytes": 3244,
+    "sha256": "10134731f47e6810a08765f5d9045d477ab4c8a34789929366a845b8b008d804"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/recovery.json",
+    "bytes": 227610,
+    "sha256": "7005d89c8003a712292ddc05f906ac4aba57b5275d8037b341ec66ad1562c6bd"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/summary.json",
+    "bytes": 41496,
+    "sha256": "1869e98efedeeadcd799d569aaa76120d2ba677b838195181b1fc83b9f993bd4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/turningTarget-timing.csv",
+    "bytes": 12808,
+    "sha256": "d2b822ac9432e8a24762f572c31101fc307832f67f625419328d444f4c6ecda9"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed15/turningTarget.json",
+    "bytes": 655087,
+    "sha256": "36f8a2a44b8a36afc01a7635e072b1626bcbaf70ec237440b0c69c3bb45005af"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/acceleratingTarget-timing.csv",
+    "bytes": 12714,
+    "sha256": "8a84c576923db6b2beebc6ccc3b7104d8015fe2f29bff16b0aff2e59c6bac8bc"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/acceleratingTarget.json",
+    "bytes": 876783,
+    "sha256": "0a935fd1716bc4c060d957bcb6363f6e7e5e2b460eb938b59c02e1008a63ca3f"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/acceleratingTurn-timing.csv",
+    "bytes": 12739,
+    "sha256": "3e9e619699b9955939076df3eb7356bf0dcf30273699e3b09331e81461863b99"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/acceleratingTurn.json",
+    "bytes": 564257,
+    "sha256": "d31d8f629ae5995775ce08e2892284cac9161bd45a0e21446e18ba12fdc12435"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/audit.json",
+    "bytes": 3733,
+    "sha256": "cb7a0654c5c2031f62db1177c0a514a51852bc6f55a10fb8eeae7bf667839d8b"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/brakingTarget-timing.csv",
+    "bytes": 12698,
+    "sha256": "f9a0343ac753c2e36f861c385ef7383316f472cc7b2a2f5379713a3ede889ebc"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/brakingTarget.json",
+    "bytes": 669145,
+    "sha256": "b3143d65d1006064d6da24ad3c93d744627031eba680b7a825cefd7561d3c904"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/circular-timing.csv",
+    "bytes": 3245,
+    "sha256": "ad06fe8efe447537c02c34d7215617e0e14c0ca7fd541db900d581be446325e5"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/circular.json",
+    "bytes": 215615,
+    "sha256": "b493d04a1d46ec2d39d9f16a124c64e8b8c9d14c3e29f684d79dec92d8541527"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/oncoming-timing.csv",
+    "bytes": 12715,
+    "sha256": "84d64f8f255f9b6f518420ad3b88bc1f252c372bff9ec6e85b22dc6f49d7c7c2"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/oncoming.json",
+    "bytes": 877410,
+    "sha256": "90d97a20753e532de8d37d7e20100365283e55a110c83a6a0f1d707e10483e21"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/recovery-timing.csv",
+    "bytes": 3242,
+    "sha256": "2462786da0b571096ffe118c8770fc048bdfc7bfe96710ea6b03bfa967ade522"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/recovery.json",
+    "bytes": 227008,
+    "sha256": "25aec3829426a38d838e8bafd07eeec2ed3868cfa4429a7abac562c7a1bb02ec"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/summary.json",
+    "bytes": 42060,
+    "sha256": "b361fa804e97733f063ea32932deb62880f8c3005fbf622cbf5532c86d370444"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/turningTarget-timing.csv",
+    "bytes": 12733,
+    "sha256": "84a029ed7e0ddabef5f50202b2755ad3562f926410316fbf6a077c3e7e554ecb"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/speed8/turningTarget.json",
+    "bytes": 564226,
+    "sha256": "27858be0f3286d25174679ea89678fc040bb6a91474c9c3328d8957448943caf"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-buffer-20260929-145415/tests.json",
+    "bytes": 34913,
+    "sha256": "529a22fb414744dcc0f4b30b133a26943c3281b69b17ab5426a166adf8aaf1fc"
+  }
+]

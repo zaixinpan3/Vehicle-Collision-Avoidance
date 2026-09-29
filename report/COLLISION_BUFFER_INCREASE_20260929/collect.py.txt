@@ -1,0 +1,36 @@
+from pathlib import Path
+import json,csv,hashlib,shutil,subprocess
+root=Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance');raw=Path(__file__).parent;out=root/'report/COLLISION_BUFFER_INCREASE_20260929';out.mkdir(exist_ok=True)
+def save(name,value):(out/name).write_text(json.dumps(value,indent=2)+'\n')
+def many(value):return value if isinstance(value,list) else [value]
+rows=[];audits=[];later=[];initial=[]
+for speed in [8,15]:
+ folder=raw/f'speed{speed}';data=json.loads((folder/'summary.json').read_text())['results'];checks=json.loads((folder/'audit.json').read_text());audits += [dict(speed=speed,**e) for e in checks]
+ for r in data:
+  item=dict(speed=speed,**r);rows.append(item);trace=json.loads((folder/(r['scenario']+'.json')).read_text())['results']['trace'];later+=trace[1:]
+  if trace:initial.append(dict(speed=speed,scenario=r['scenario'],seconds=trace[0]['controllerSeconds']))
+  assert r['configuration']['collision']['safetyMarginMeters']==.006
+  for frame in trace:
+   assert frame['hardResidual']==0 and frame['predictiveBarrierValue']==0 and frame['terminationReason']=='feasibleWitness'
+   steps=[s for s in many(frame['sequentialIterations']) if s]
+   if steps:
+    assert steps[-1]['retainedAsWitness'] and sum(s['retainedAsWitness'] for s in steps)==1
+    if steps[-1]['status']=='primaryFeasible':assert steps[-1]['calls']==1 and not steps[-1]['secondaryReturned']
+  item['meetsOriginal5mmReplayFloor']=r['completed'] and r['strictOverlapSamples']==0 and (r['minimumReplayClearanceMeters'] is None or r['minimumReplayClearanceMeters']>=.005-1e-9) and r['minimumWholeBodyRoadMarginMeters']>=-1e-9
+  shutil.copy(folder/(r['scenario']+'-timing.csv'),out/(f'speed{speed}-'+r['scenario']+'-timing.csv'))
+tests=json.loads((raw/'tests.json').read_text());assert len(tests['tests'])==204 and all(t['Passed'] and not t['Incomplete'] for t in tests['tests'])
+manifest=json.loads((raw/'source-manifest.json').read_text())
+for e in manifest:
+ assert hashlib.sha256((raw/'source'/e['path']).read_bytes()).hexdigest()==e['sha256']
+ if e['path'].startswith(('controller/','config/','scripts/','tests/')):assert hashlib.sha256((root/e['path']).read_bytes()).hexdigest()==e['sha256'],e['path']
+summary=dict(baseCommit=(raw/'base-commit.txt').read_text().strip(),planningBufferMeters=.006,originalReplayFloorMeters=.005,matlabControllerTestsPassed=204,pythonTestsPassed=9,scenarios=len(rows),completed=sum(r['completed'] for r in rows),completedCollisionFree=sum(r['completedSampledCollisionFree'] for r in rows),full6mmAndRoadAuditsPassed=sum(a['passed'] for a in audits),original5mmAndRoadAuditsPassed=sum(r['meetsOriginal5mmReplayFloor'] for r in rows),executedHolds=sum(r['executedFrames'] for r in rows),auditedSamples=sum(r['auditedSamples'] for r in rows),strictOverlapSamples=sum(r['strictOverlapSamples'] for r in rows),full6mmShortfallSamples=sum(r['denseClearanceShortfallSamples'] for r in rows),minimumReplayDistanceMeters=min(r['minimumReplayClearanceMeters'] for r in rows if r['minimumReplayClearanceMeters'] is not None),laterHolds=len(later),laterMaximumSeconds=max(t['controllerSeconds'] for t in later),laterDeadlineMisses=sum(t['controllerSeconds']>.05 for t in later),initializationMaximumSeconds=max(t['seconds'] for t in initial),maximumSafetySlack=max(r['maximumSafetySlack'] or 0 for r in rows),maximumHardResidual=max(r['maximumHardResidual'] or 0 for r in rows),failures=[dict(speed=r['speed'],scenario=r['scenario'],failure=r['failure'],seconds=r['failedFrameSeconds']) for r in rows if not r['completed']],originalShortfallCase=next(r for r in rows if r['speed']==8 and r['scenario']=='acceleratingTarget'))
+assert summary['completed']==14 and summary['strictOverlapSamples']==0 and summary['original5mmAndRoadAuditsPassed']==14
+save('outcomes.json',summary);save('scenario-summary.json',rows);save('configured6mm-audit.json',audits)
+for name in ['tests.json','source-manifest.json','python-tests.txt','probe6mm.json']:
+ if name=='probe6mm.json':
+  p=json.loads((raw/name).read_text())['results'];save('probe6mm-summary.json',{k:v for k,v in p.items() if k!='trace'})
+ else:shutil.copy(raw/name,out/name)
+for name in ['campaign.m','probe.m','analyze.py','collect.py']:shutil.copy(raw/name,out/(name+'.txt'))
+files=[p for p in raw.rglob('*') if p.is_file() and 'source' not in p.relative_to(raw).parts and p.name not in ['archive.py','collect.log']]
+save('raw-artifact-hashes.json',[dict(path=str(p),bytes=p.stat().st_size,sha256=hashlib.sha256(p.read_bytes()).hexdigest()) for p in sorted(files)])
+print(json.dumps({k:v for k,v in summary.items() if k!='originalShortfallCase'},indent=2))

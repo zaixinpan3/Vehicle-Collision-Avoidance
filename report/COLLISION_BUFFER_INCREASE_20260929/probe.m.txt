@@ -1,0 +1,4 @@
+out=fileparts(mfilename('fullpath'));cd(fullfile(out,'source'));addpath('scripts','controller','config');
+cfg=struct('referenceSpeed',8,'controller',struct('horizonSteps',8),'collision',struct('safetyMarginMeters',.006));
+report=runNonlinearPredictiveSafetyValidation(Scenarios="acceleratingTarget",Frames=160,ControllerConfiguration=cfg,OutputFile=fullfile(out,'probe6mm.json'));
+assert(report.results.completed && report.results.minimumReplayClearanceMeters>=.005,'The increased buffer did not preserve the original 5 mm replay clearance.');
