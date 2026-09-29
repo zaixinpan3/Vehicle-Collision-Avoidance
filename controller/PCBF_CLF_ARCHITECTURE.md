@@ -188,8 +188,11 @@ secondary cost may be large. Neither objective optimality nor agreement
 between affine and nonlinear CLF slack is required for execution.
 
 When no witness exists, every finite primary conic result is checked against
-the original nonlinear constraints while time remains. A feasible primary
-result is returned before constructing or solving the secondary problem.
+the original nonlinear constraints while time remains. If endpoint membership
+fails, the existing endpoint correction runs on that primary candidate before
+it can be replaced by a secondary cost solution. The corrected inputs are
+reevaluated against every original hard constraint and the PCBF slack budget.
+A feasible primary result is returned before constructing or solving the secondary problem.
 Otherwise restoration or the secondary objective continues to guide search.
 The first admitted nonlinear candidate ends the outer iteration immediately;
 there is no subsequent search for a lower-cost witness. `search.converged`

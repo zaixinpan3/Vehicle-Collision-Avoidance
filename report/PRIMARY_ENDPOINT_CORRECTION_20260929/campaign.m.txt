@@ -1,0 +1,16 @@
+out=fileparts(mfilename('fullpath'));cd(fullfile(out,'source'));addpath('scripts','controller','config');
+suites={'tests/terminalContinuationTest.m','tests/nonlinearPredictiveSafetyTest.m','tests/modifiedFialaTireTest.m','tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m','tests/longitudinalRoadLoadTest.m','tests/controllerInputGeometryTest.m','tests/nrmmModelFormulationTest.m','tests/onlineNrmmTrackingRuntimeTest.m'};
+results=runtests(suites);entries=table(results);entries=entries(:,{'Name','Passed','Failed','Incomplete','Duration'});
+localSave(fullfile(out,'tests.json'),struct('matlabVersion',version,'tests',table2struct(entries)));assertSuccess(results);
+for speed=[8,15]
+ folder=fullfile(out,"speed"+speed);if ~isfolder(folder),mkdir(folder);end
+ cfg=struct('referenceSpeed',speed,'controller',struct('horizonSteps',speed+mod(speed,2)));
+ for name=["recovery","circular","brakingTarget","turningTarget","acceleratingTurn","oncoming","acceleratingTarget"]
+  frames=160;if name=="recovery" || name=="circular",frames=40;end
+  runNonlinearPredictiveSafetyValidation(Scenarios=name,Frames=frames,ControllerConfiguration=cfg,OutputFile=fullfile(folder,name+".json"));
+ end
+end
+fprintf('PRIMARY-ENDPOINT FIX CAMPAIGN COMPLETE\n');
+function localSave(path,value)
+ f=fopen(path,'w');assert(f>=0);fprintf(f,'%s\n',jsonencode(value));fclose(f);
+end

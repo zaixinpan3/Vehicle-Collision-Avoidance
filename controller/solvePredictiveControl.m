@@ -275,6 +275,9 @@ function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
         primaryInputs=anchor+reshape(first(iu(:)),2,[]);
         try
             primaryCandidate=localNominalEvaluation(primaryInputs,model);
+            % Repair terminal defects before replacing a usable primary plan.
+            primaryCandidate=localPolishEndpoint(primaryCandidate,model,timer);
+            primaryInputs=primaryCandidate.inputs;
             if localFeasible(primaryCandidate,model)
                 inputs=primaryInputs;candidate=primaryCandidate;info.status="primaryFeasible";
                 info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;return;

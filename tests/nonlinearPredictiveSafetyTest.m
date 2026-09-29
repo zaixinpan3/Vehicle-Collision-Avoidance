@@ -303,6 +303,28 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
                 end
             end
         end
+        function correctedPrimaryAvoidanceReturnsBeforeCostRefinement(testCase)
+            [ego,road,cfg]=localFixture();ego.speed=15;
+            cfg.referenceSpeed=15;cfg.controller.horizonSteps=16;
+            cfg.solver.timeLimitSeconds=30;
+            target=localTarget([24;0;pi;8;0;0;1.6;2.4;.95;0;0]);
+            [command,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(command.actuatorInput,plan(:,1));
+            testCase.verifyEqual(problem.solution.hard,0);
+            testCase.verifyEqual(problem.solution.safety,0);
+            testCase.verifyGreaterThan(problem.metadata.minimumCollisionMargin,0);
+            testCase.verifyGreaterThan(problem.metadata.minimumRoadMargin,0);
+            endpoint=[problem.solution.states(:,end);plan(:,end)];
+            value=terminalContinuation.membership(endpoint, ...
+                problem.model.sampleIndex+size(plan,2),problem.model.terminal);
+            testCase.verifyLessThanOrEqual(value,0);
+            steps=problem.metadata.search.sequentialIterations;
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyEqual(steps{end}.status,"primaryFeasible");
+            testCase.verifyEqual(steps{end}.calls,1);
+            testCase.verifyFalse(steps{end}.secondaryReturned);
+            testCase.verifyTrue(steps{end}.retainedAsWitness);
+        end
         function terminalLaneFeedbackWorksOnBothCurvatureSigns(testCase,curvature)
             [ego,~,cfg]=localFixture();trim=nonlinearBicycleModel.cruise(cfg,curvature);
             ego.yaw=trim.state(3);ego.speed=trim.state(4);ego.lateralVelocity=trim.state(5);ego.yawRate=trim.state(6);

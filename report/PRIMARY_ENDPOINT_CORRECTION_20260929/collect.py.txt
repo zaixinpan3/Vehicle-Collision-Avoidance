@@ -1,0 +1,35 @@
+from pathlib import Path
+import json,csv,hashlib,shutil,subprocess
+root=Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance');raw=Path(__file__).parent;out=root/'report/PRIMARY_ENDPOINT_CORRECTION_20260929';out.mkdir(exist_ok=True)
+def save(name,value):
+ (out/name).write_text(json.dumps(value,indent=2)+'\n')
+def many(value):return value if isinstance(value,list) else [value]
+rows=[];audits=[];holds=[];initial=[]
+for speed in [8,15]:
+ folder=raw/f'speed{speed}';data=json.loads((folder/'summary.json').read_text())['results'];checked=json.loads((folder/'audit.json').read_text());audits+= [dict(speed=speed,**item) for item in checked]
+ for r in data:
+  item=dict(speed=speed,**r);rows.append(item)
+  original=json.loads((folder/(r['scenario']+'.json')).read_text())['results'];trace=many(original['trace']) if original['trace'] else [];holds+=trace[1:]
+  if trace:initial.append(dict(speed=speed,scenario=r['scenario'],seconds=trace[0]['controllerSeconds'],search=trace[0]['sequentialIterations']))
+  for frame in trace:
+   assert frame['hardResidual']==0 and frame['predictiveBarrierValue']==0
+   assert frame['terminationReason']=='feasibleWitness'
+   steps=[s for s in many(frame['sequentialIterations']) if s]
+   if steps:
+    assert steps[-1]['retainedAsWitness'] and sum(s['retainedAsWitness'] for s in steps)==1
+    if steps[-1]['status']=='primaryFeasible':assert steps[-1]['calls']==1 and not steps[-1]['secondaryReturned']
+  shutil.copy(folder/(r['scenario']+'-timing.csv'),out/(f'speed{speed}-'+r['scenario']+'-timing.csv'))
+tests=json.loads((raw/'tests.json').read_text());passed=sum(e['Passed'] for e in tests['tests']);assert passed==247 and all(e['Passed'] and not e['Incomplete'] for e in tests['tests'])
+manifest=json.loads((raw/'source-manifest.json').read_text())
+for e in manifest:
+ p=raw/'source'/e['path'];assert hashlib.sha256(p.read_bytes()).hexdigest()==e['sha256']
+ if e['path'].startswith(('controller/','config/','scripts/','tests/')):assert hashlib.sha256((root/e['path']).read_bytes()).hexdigest()==e['sha256'],e['path']
+summary=dict(baseCommit=(raw/'base-commit.txt').read_text().strip(),matlabTestsPassed=passed,pythonTestsPassed=9,scenarios=len(rows),completed=sum(r['completed'] for r in rows),completedCollisionFree=sum(r['completedSampledCollisionFree'] for r in rows),scenarioAuditsPassed=sum(a['passed'] for a in audits),executedHolds=sum(r['executedFrames'] for r in rows),auditedSamples=sum(r['auditedSamples'] for r in rows),strictOverlapSamples=sum(r['strictOverlapSamples'] for r in rows),bufferShortfallSamples=sum(r['denseClearanceShortfallSamples'] for r in rows),laterHolds=len(holds),laterMaximumSeconds=max(h['controllerSeconds'] for h in holds),laterDeadlineMisses=sum(h['controllerSeconds']>.05 for h in holds),initializationMaximumSeconds=max(e['seconds'] for e in initial),maximumSafetySlack=max(r['maximumSafetySlack'] or 0 for r in rows),maximumHardResidual=max(r['maximumHardResidual'] or 0 for r in rows),failures=[dict(speed=r['speed'],scenario=r['scenario'],failure=r['failure'],seconds=r['failedFrameSeconds']) for r in rows if not r['completed']],targetCase=next(r for r in rows if r['speed']==15 and r['scenario']=='oncoming'))
+save('outcomes.json',summary);save('scenario-summary.json',rows);save('scenario-audit.json',audits);save('initialization-searches.json',initial)
+for name in ['tests.json','initial-tests.json','dependency-retry-tests.json','source-manifest.json','python-tests.txt']:shutil.copy(raw/name,out/name)
+for name in ['campaign.m','resume_campaign.m','analyze.py','collect.py']:shutil.copy(raw/name,out/(name+'.txt'))
+files=[p for p in raw.rglob('*') if p.is_file() and 'source' not in p.relative_to(raw).parts and p.name not in ['archive.py','collect.log']]
+save('raw-artifact-hashes.json',[dict(path=str(p),bytes=p.stat().st_size,sha256=hashlib.sha256(p.read_bytes()).hexdigest()) for p in sorted(files)])
+with (out/'scenario-summary.csv').open('w') as f:
+ columns=['speed','scenario','executedFrames','completed','minimumReplayClearanceMeters','firstFrameSeconds','subsequentMedianSeconds','subsequentP95Seconds','deadlineMisses','strictOverlapSamples','denseClearanceShortfallSamples','failure'];writer=csv.DictWriter(f,fieldnames=columns,lineterminator='\n');writer.writeheader();writer.writerows({k:r[k] for k in columns} for r in rows)
+print(json.dumps(summary,indent=2))

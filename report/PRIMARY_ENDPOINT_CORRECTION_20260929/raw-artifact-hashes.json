@@ -1,0 +1,232 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/analysis.log",
+    "bytes": 965,
+    "sha256": "bf9407e74ddb2ef4c784d51e6e3e721eb6e59d92992877fd2faa807d77ec9042"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/analyze.py",
+    "bytes": 6637,
+    "sha256": "ffbda6bd3e01aa2ebd231c7f767e4958a9dc390916e258992af9cba1e05ace10"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/base-commit.txt",
+    "bytes": 41,
+    "sha256": "a648cf7b08c0de36935a2fbcfb0783ee1ea0b28eb6624e096738259cc9b53f5a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/campaign.log",
+    "bytes": 33202,
+    "sha256": "ac81972e6096427f1b1d8f706a436f7056488ed868ff3e6361457ce899343981"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/campaign.m",
+    "bytes": 1385,
+    "sha256": "1c123babd176020c8f67d91b261fca2a20b3de157d3705699c52d1ceb4030646"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/collect.py",
+    "bytes": 4374,
+    "sha256": "f6998961a479101cbd6a74574fb601a17b0a608618dd196bec14b7ef4602d0b5"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/dependency-retry-tests.json",
+    "bytes": 6718,
+    "sha256": "e19ef8c152b4a96dbcbf7eacb58c7b89268a40d00d8f099fbc102fb488869a65"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/initial-campaign.log",
+    "bytes": 65700,
+    "sha256": "64e66e2600168f9c2220220e4d31ca93216ec19eaf6f4d347dcb8e7ecb161495"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/initial-tests.json",
+    "bytes": 41453,
+    "sha256": "8a6d898431f46b2c94b0d1eceffc73a8753e332f882237e9c0d22e2df9611fd9"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/python-tests.txt",
+    "bytes": 107,
+    "sha256": "42f237d7abc9eb371abada54db94861f647b2fd2e4008b692ec18dfdcc2e00d5"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/resume_campaign.m",
+    "bytes": 1679,
+    "sha256": "1fac047e3b19115b03dce58de5d8fe00e274d100c3a885e6ac8f1f05b965616c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/source-manifest.json",
+    "bytes": 11890,
+    "sha256": "dd705ecf921298ab22b70a1818718fc50e7e67c61f4c30e19133cad00a89fc13"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/acceleratingTarget-timing.csv",
+    "bytes": 12816,
+    "sha256": "dc907b29147646db21818362b9b7aede3fbbdae0ffbab7a6625aed8ff76e0b16"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/acceleratingTarget.json",
+    "bytes": 876946,
+    "sha256": "e70ab8adf881e6139683a36fd1044b00193e2928c8d8f0f4192df43f17d9c1f1"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/acceleratingTurn-timing.csv",
+    "bytes": 12798,
+    "sha256": "4602c77af851148494fe658289dfb411c8c2c1be1ea9ab94a5cd4b4c184d6f52"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/acceleratingTurn.json",
+    "bytes": 655083,
+    "sha256": "6c22db8f79e9b8ae83095001d9a30e19bcaa809f3e89892415c1437c84525cc4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/audit.json",
+    "bytes": 3752,
+    "sha256": "d92ea3402d18116348de983268e1ad556be18d303938e272a9f5f9438fdc21cd"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/brakingTarget-timing.csv",
+    "bytes": 12799,
+    "sha256": "4dbeb33ae23d87049966a5b62e55da643f9b915b706fb1695a32f8c74aadd0f2"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/brakingTarget.json",
+    "bytes": 654590,
+    "sha256": "b5d8ca8551ab16e7f6858f11b631d3370e0eede021577b5d6f62547a6a8e33d0"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/circular-timing.csv",
+    "bytes": 3242,
+    "sha256": "af802cc18b04eefb8ae344ab0343f892bb87c3eda5160fa83d8da37b8addbbd6"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/circular.json",
+    "bytes": 215431,
+    "sha256": "716e5577e7144daecacd3860d2a7fbfd0dd9cb412b858e6551519414da8b4075"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/oncoming-timing.csv",
+    "bytes": 12812,
+    "sha256": "e5f5c2d9e8e19b16912c219fc83b892fff6a3269292bda488a5ca825efa67a33"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/oncoming.json",
+    "bytes": 878488,
+    "sha256": "a0ed9e6938e9d5410303b2977b32127071a7921d98318dd774988b6556a1d67a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/recovery-timing.csv",
+    "bytes": 3242,
+    "sha256": "49a01efe92bad9b5bc8c87ab77673f679eaf6edfebf1a7e20db02e510cd2eb34"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/recovery.json",
+    "bytes": 227619,
+    "sha256": "2419b9d1ef1ea5d3b720f26a8dc20e2e4f234f87fa24187c3f7fdb063bd3ed90"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/summary.json",
+    "bytes": 41528,
+    "sha256": "e6b0e4ba4d023a00444ff9028e273a0470428e368b684ddc5056f72f7be451ec"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/turningTarget-timing.csv",
+    "bytes": 12804,
+    "sha256": "c1f6ea61d8c026bc16f175890853a1bba84c8f2e0b4296176b5f8f581ec79b4e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed15/turningTarget.json",
+    "bytes": 655093,
+    "sha256": "d356be782b8119e7a187c54df9e9a6887abe16c048d73eb6ffcd8326a8a1eca5"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/acceleratingTarget-timing.csv",
+    "bytes": 12712,
+    "sha256": "fd67790158a35a582b87534c081a95e53bdf559f11cf324b535d423b74f6e743"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/acceleratingTarget.json",
+    "bytes": 877564,
+    "sha256": "ec2ce8329c5a9e0c5cc045f643d8f300b9023bf0a17337022f6100541ba380a5"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/acceleratingTurn-timing.csv",
+    "bytes": 12730,
+    "sha256": "ff4c75cfaba3b7e0b984aaa18b26b988611ce507c216c829ba7829ab3609dc83"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/acceleratingTurn.json",
+    "bytes": 564254,
+    "sha256": "be530fb295603be9b1d3e42c6c986f40ff29b5b09a76ca284535ce466df53f96"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/audit.json",
+    "bytes": 3734,
+    "sha256": "756db327b67266719d725a3243adc88724a79902126bcd7725e658c354f8567a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/brakingTarget-timing.csv",
+    "bytes": 12700,
+    "sha256": "12553d9934a4d33bf4057e9bdeac6e94c3150d30f50f49879893169fadabc1e1"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/brakingTarget.json",
+    "bytes": 668248,
+    "sha256": "94591fd0b3483fa093f2b9c835a2fb290eb2679d57c6b0dab44e6afee2065a3a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/circular-timing.csv",
+    "bytes": 3236,
+    "sha256": "142853c3e138b2932ef0a265e4f84d03ec43cf98c494599414534aeb78e27697"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/circular.json",
+    "bytes": 215605,
+    "sha256": "4207d34076bb51053eaa7762fd68fe4c33c6c389a4e1ebca2a1406909b20e7fa"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/oncoming-timing.csv",
+    "bytes": 12715,
+    "sha256": "3bc8ee8800e4cc3dcd00b0a5c4bd8397995ada4a171473491bcf634c8ea8bca0"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/oncoming.json",
+    "bytes": 877193,
+    "sha256": "734c79097b29649b565018d609c8df2a5998a4f3cb2a814b75c02700230505b6"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/recovery-timing.csv",
+    "bytes": 3244,
+    "sha256": "ae9f9154d7175fa8dd99b882c8d46e2e500c1035eac6bd3cd611ee7b439b8374"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/recovery.json",
+    "bytes": 227010,
+    "sha256": "b5c6f16ffe23b628cb6b080b2872c8661713dd15f58f2564e199ad1af96bffc3"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/summary.json",
+    "bytes": 42036,
+    "sha256": "4aa6e73379aa99c52965289603899e65c7b46fb203a26b909f40688dd05a93a9"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/turningTarget-timing.csv",
+    "bytes": 12737,
+    "sha256": "244695cff9c828ca1fa988e01a99a3fd0493a3d30786fc0169b69d694dc1a715"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/speed8/turningTarget.json",
+    "bytes": 564239,
+    "sha256": "1e3bfcf321af406e2891f3238bd7a8551b26e8fe2cef987a54a2fb669183ca8f"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/tests.json",
+    "bytes": 41789,
+    "sha256": "895b4af2ae6bb10752854a6c02cafa2d6a9a3071754ca92ea65be2040890418b"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/primary-endpoint-fix-20260929-133506/write_report.py",
+    "bytes": 9393,
+    "sha256": "41bf0701edd098fe47d961b4bb2fd48f08fe332aa2745f9a7c71965b5a28b108"
+  }
+]
