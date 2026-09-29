@@ -1,0 +1,14 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');global failureDiagnostic
+rows=struct([]);
+for speed=[8,15]
+ c=load(fullfile(raw,"speed"+speed+"-turningCrossing-budget30.mat"));model=c.diagnostic.initialModel;
+ entries=[c.diagnostic.evaluations{:}];[~,which]=min([entries.hard]);best=entries(which);
+ wall=tic;[solution,search,model]=solveFromDiagnosticAnchor(model,best.inputs,best.terminalPhaseMeters);seconds=toc(wall);
+ diagnostic=failureDiagnostic;save(fullfile(raw,"restart-"+speed+"-turningCrossing.mat"),'solution','search','model','diagnostic','seconds','which');
+ row=struct('speed',speed,'scenario','turningCrossing','startingEvaluationIndex',which,'startingHard',best.hard,'startingPhase',best.terminalPhaseMeters, ...
+  'seconds',seconds,'accepted',~isempty(solution),'search',search);
+ if ~isempty(solution),row.hard=solution.hard;row.phase=solution.terminalPhaseMeters;else,row.hard=NaN;row.phase=NaN;end
+ if isempty(rows),rows=row;else,rows(end+1)=row;end
+ fprintf('RESTART %g accepted %d %.3f seconds %d solves\n',speed,row.accepted,seconds,search.solverCalls);
+end
+f=fopen(fullfile(raw,'restart-controls.json'),'w');fprintf(f,'%s\n',jsonencode(rows));fclose(f);

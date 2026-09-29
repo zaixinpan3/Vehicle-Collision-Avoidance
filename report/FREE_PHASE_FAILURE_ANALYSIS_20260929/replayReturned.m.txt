@@ -1,0 +1,27 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');
+files=[dir(fullfile(raw,'speed*-budget30.mat'));dir(fullfile(raw,'restart-*.mat'))];rows=struct([]);
+for f=files.'
+ c=load(fullfile(f.folder,f.name));
+ if isfield(c,'solution'),solution=c.solution;model=c.model;
+ elseif strlength(c.failure)==0,solution=c.problem.solution;model=c.problem.model;
+ else,continue;end
+ if isempty(solution),continue;end
+ cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];x=model.initialState;times=[];states=[];minimum=Inf;sampled=Inf;count=size(solution.inputs,2);
+ for k=1:count
+  [t,y]=ode45(@(~,z)nonlinearBicycleModel.derivative(z,solution.inputs(:,k),cfg),linspace(0,.05,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
+  for j=1:numel(t)
+   q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,(k-1)*.05+t(j));d=predictiveSafetyGeometry.rectangle(y(j,1:3).',shape,q(1:3),q(8:11));
+   minimum=min(minimum,d);if mod(j-1,15)==0,sampled=min(sampled,d);end
+  end
+  x=y(end,:).';times=[times;(k-1)*.05+t];states=[states;y]; %#ok<AGROW>
+ end
+ value=terminalContinuation.membership([x;solution.inputs(:,end)],count,model.terminal);
+ e=struct('source',f.name,'horizonSeconds',count*.05,'nominalHard',solution.hard,'nominalSafety',solution.safety, ...
+   'nominalCollisionMargin',solution.minimumCollisionMargin,'terminalPhaseMeters',solution.terminalPhaseMeters, ...
+   'ode45MinimumDistance',minimum,'ode45NodeMidpointMinimumDistance',sampled,'ode45EndpointMembership',value);
+ if isempty(rows),rows=e;else,rows(end+1)=e;end
+ replay=struct('metrics',e,'times',times,'states',states,'targetInitialState',model.targetEpoch,'configuration',cfg);
+ out=fullfile(raw,"replay-"+erase(f.name,'.mat')+".json");h=fopen(out,'w');fprintf(h,'%s\n',jsonencode(replay));fclose(h);
+ fprintf('REPLAY %s min %.9g node %.9g terminal %.9g\n',f.name,minimum,sampled,value);
+end
+f=fopen(fullfile(raw,'replay-summary.json'),'w');fprintf(f,'%s\n',jsonencode(rows));fclose(f);

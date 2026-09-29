@@ -1,0 +1,28 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config','scripts');
+global failureModel failureDiagnostic
+for speed=[8,15]
+ for name=["brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"]
+  if speed==8 && name=="crossing",continue;end
+  [x,q,road,cfg]=collisionThreatScenario(name,struct('referenceSpeed',speed,'controller',struct('horizonSteps',speed+mod(speed,2))));
+  ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6),'stateTime',0,'heldActuatorInput',[0;0]);
+  direction=[cos(q(3)+q(6));sin(q(3)+q(6))];velocity=q(4)*direction;yawRate=q(4)*sin(q(6))/q(7);
+  target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',velocity,'targetYawInertial',q(3), ...
+    'targetYawRate',yawRate,'targetSideslip',q(6),'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7), ...
+    'targetAccelerationInertial',q(5)*direction+yawRate*[-velocity(2);velocity(1)], ...
+    'targetLength',2*q(8),'targetWidth',2*q(9),'targetRectangleOffset',q(10:11));
+  budgets=5;if ~startsWith(name,"curved"),budgets=[5,30];end
+  for budget=budgets
+   cfg.solver.timeLimitSeconds=budget;failure="";wall=tic;command=[];problem=[];
+   try,[command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);catch ex,failure=string(ex.identifier)+": "+string(ex.message);end
+   seconds=toc(wall);diagnostic=failureDiagnostic;model=failureModel;
+   save(fullfile(raw,"speed"+speed+"-"+name+"-budget"+budget+".mat"),'diagnostic','model','seconds','failure','ego','target','road','cfg','command','problem');
+   compact=diagnostic;
+   for j=1:numel(compact.evaluations),compact.evaluations{j}=rmfield(compact.evaluations{j},{'inputs','states','stageSafety','stageHard','stageCost','stageCollision','stageSlacks'});end
+   if isfield(compact,'initialModel'),compact=rmfield(compact,{'initialModel','initialAnchor'});end
+   if isfield(compact,'model'),compact=rmfield(compact,{'model','solution'});end
+   out=struct('scenario',name,'speed',speed,'budget',budget,'seconds',seconds,'failure',failure,'diagnostic',compact);
+   f=fopen(fullfile(raw,"speed"+speed+"-"+name+"-budget"+budget+".json"),'w');fprintf(f,'%s\n',jsonencode(out));fclose(f);
+   fprintf('%g %s budget %g: %.3f s, %d solves, %d evaluations; %s\n',speed,name,budget,seconds,numel(diagnostic.solves),numel(diagnostic.evaluations),failure);
+  end
+ end
+end

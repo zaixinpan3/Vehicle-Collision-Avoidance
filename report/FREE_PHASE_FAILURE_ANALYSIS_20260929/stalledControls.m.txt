@@ -1,0 +1,25 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');
+rows=struct([]);
+for speed=[8,15]
+ c=load(fullfile(raw,"speed"+speed+"-turningCrossing-budget30.mat"));model=c.diagnostic.model;
+ stages=c.diagnostic.search.sequentialIterations;accepted=find(cellfun(@(x)x.acceptedIterate,stages),1,'last');last=stages{accepted};
+ evaluations=[c.diagnostic.evaluations{:}];idx=find([evaluations.hard]==last.nominalHardViolation & [evaluations.terminalPhaseMeters]==model.terminal.phaseMeters,1,'last');
+ assert(~isempty(idx));anchor=evaluations(idx).inputs;
+ failed=find((1:numel(stages))>accepted & cellfun(@(x)x.status=="safetySolveFailed",stages),1);radius=stages{failed}.trustRadius;
+ for condition=["fullRestoration","noFutureSeparation","noEndpoint","wideTrustRestoration"]
+  useRadius=radius;if condition=="wideTrustRestoration",useRadius=1;end
+  p=captureFirstAffine(anchor,model,useRadius);a=p.a;b=p.b;endpoint=p.endpoint;upper=p.upper;upper(p.is)=Inf;
+  objective=zeros(size(p.objective));objective(p.is)=1;
+  if condition=="noFutureSeparation",selected=find(a(:,p.ip));a(selected,:)=[];b(selected)=[];end
+  if condition=="noEndpoint",endpoint=[];end
+  [z,~,flag,output]=coneprog(objective,endpoint,a,b,p.equal,p.rhs,p.lower,upper, ...
+    optimoptions('coneprog','Display','none','MaxTime',5,'MaxIterations',400,'ConstraintTolerance',1e-8,'OptimalityTolerance',1e-7));
+  residual=NaN;if ~isempty(z),residual=max([0;a*z-b;abs(p.equal*z-p.rhs);p.lower-z;z-upper]);end
+  e=struct('speed',speed,'scenario','turningCrossing','condition',condition,'flag',flag,'linearResidual',residual, ...
+    'anchorEvaluation',idx,'anchorHard',evaluations(idx).hard,'anchorPhase',model.terminal.phaseMeters, ...
+    'anchorSeparation',evaluations(idx).terminalSeparationMargin,'radius',useRadius,'positionTrustMeters',5*useRadius,'solverOutput',output);
+  if isempty(rows),rows=e;else,rows(end+1)=e;end
+  fprintf('STALLED %g %s flag %g radius %.6g phase %.6g margin %.6g\n',speed,condition,flag,useRadius,e.anchorPhase,e.anchorSeparation);
+ end
+end
+f=fopen(fullfile(raw,'stalled-controls.json'),'w');fprintf(f,'%s\n',jsonencode(rows));fclose(f);

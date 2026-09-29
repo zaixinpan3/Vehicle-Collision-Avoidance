@@ -1,0 +1,42 @@
+--- controller/solvePredictiveControl.m
++++ diagnostic-copy/controller/solvePredictiveControl.m
+@@ -5,0 +6,2 @@
++    global failureDiagnostic
++    failureDiagnostic=struct('evaluations',{{}},'solves',{{}},'seedAttempts',{{}},'seedSeconds',NaN);
+@@ -43 +45,2 @@
+-        [anchor,model.terminal]=localSeed(model);
++        seedTimer=tic;[anchor,model.terminal]=localSeed(model);
++        failureDiagnostic.seedSeconds=toc(seedTimer);failureDiagnostic.initialAnchor=anchor;failureDiagnostic.initialModel=model;
+@@ -171,0 +175 @@
++    global failureDiagnostic
+@@ -183 +187,3 @@
+-        if value<0 && terminalContinuation.separation(seed,q,model.frame,cfg)>0
++        separation=terminalContinuation.separation(seed,q,model.frame,cfg);
++        failureDiagnostic.seedAttempts{end+1}=struct('index',index,'membership',value,'separation',separation,'state',x,'target',q);
++        if value<0 && separation>0
+@@ -200,0 +207 @@
++    global failureDiagnostic
+@@ -287 +294,2 @@
+-    [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
++    solveTimer=tic;[first,~,flag,solverOutput]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);
++    failureDiagnostic.solves{end+1}=struct('stage','primary','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel(objective),'rows',size(a,1),'radius',radius,'hasPoint',~isempty(first));info.calls=1;
+@@ -294,0 +303 @@
++            info.primaryCandidateHard=primaryCandidate.hard;info.primaryCandidatePhaseMeters=primaryCandidate.terminalPhaseMeters;
+@@ -312 +321,2 @@
+-        [first,~,flag]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
++        solveTimer=tic;[first,~,flag,solverOutput]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);
++    failureDiagnostic.solves{end+1}=struct('stage','restoration','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel(restoration),'rows',size(a,1),'radius',radius,'hasPoint',~isempty(first));info.calls=info.calls+1;
+@@ -344 +354,2 @@
+-    [second,~,flag]=coneprog(objective,cones,a,b,equal,rhs,lower,upper,options);
++    solveTimer=tic;[second,~,flag,solverOutput]=coneprog(objective,cones,a,b,equal,rhs,lower,upper,options);
++    failureDiagnostic.solves{end+1}=struct('stage','secondary','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel(objective),'rows',size(a,1),'radius',radius,'hasPoint',~isempty(second));
+@@ -373,0 +385 @@
++    global failureDiagnostic
+@@ -428,0 +441,7 @@
++    entry=evaluation;entry.terminalResidual=norm(seed.factor*deviation)-seed.radius;
++    entry.terminalError=deviation;entry.terminalRadius=seed.radius;
++    [entry.completionSafety,entry.worstCompletionOffset]=max([0,stageSafety(prefix+1:end)]);
++    entry.stateViolation=max(stageHard);entry.endpointSafety=max([0;-localSafetyRows(x,count*cfg.controller.sampleTime,model)]);
++    entry.inputViolation=max([0;reshape(lo-inputs,[],1);reshape(inputs-hi,[],1)]);
++    entry.slewViolation=max([0;reshape(abs(diff([model.previousInput,inputs],1,2))-rate,[],1)]);
++    failureDiagnostic.evaluations{end+1}=entry;
