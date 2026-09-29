@@ -1,0 +1,30 @@
+out=fileparts(mfilename('fullpath'));entries=struct([]);
+for name=["braking346","oncoming8","oncoming15"]
+    p=load(fullfile(out,"cone-"+name+".mat"));
+    nv=numel(p.objective);cost=p.cones(2);rows=size(cost.A,1)-1;groups=ceil(rows/7);total=nv+groups;
+    endpoint=p.cones(1);
+    cones=secondordercone([endpoint.A,sparse(size(endpoint.A,1),groups)],endpoint.b,[endpoint.d;zeros(groups,1)],endpoint.gamma);
+    for group=1:groups
+        selected=7*(group-1)+(1:min(7,rows-7*(group-1)));
+        r=sparse(1,total);r(nv+group)=1;
+        cones(end+1)=secondordercone([[cost.A(selected,:),sparse(numel(selected),groups)];r], ...
+            [cost.b(selected);1],r.',-1);
+    end
+    a=[p.a,sparse(size(p.a,1),groups);-cost.d.',ones(1,groups)];b=[p.b;0];
+    equal=[p.equal,sparse(size(p.equal,1),groups)];objective=[p.objective;zeros(groups,1)];
+    lower=[p.lower;zeros(groups,1)];upper=[p.upper;Inf(groups,1)];
+    for repetition=1:2
+        options=p.options;options.MaxTime=3;
+        wall=tic;[x,value,flag,output]=coneprog(objective,cones,a,b,equal,p.rhs,lower,upper,options);seconds=toc(wall);
+        linear=Inf;cone=Inf;
+        if ~isempty(x)
+            linear=max([0;a*x-b;abs(equal*x-p.rhs);lower-x;x-upper]);cone=0;
+            for j=1:numel(cones),c=cones(j);cone=max(cone,norm(c.A*x-c.b)-c.d.'*x+c.gamma);end
+        end
+        entry=struct('problem',name,'repetition',repetition,'seconds',seconds,'objective',value,'exitFlag',flag, ...
+            'output',output,'linearResidual',linear,'coneResidual',cone,'variables',total,'cones',numel(cones));
+        if isempty(entries),entries=entry;else,entries(end+1)=entry;end
+        fprintf('%s split: %.4f s, flag %d, linear %.3g cone %.3g\n',name,seconds,flag,linear,cone);
+        f=fopen(fullfile(out,'split-cone-benchmark.json'),'w');fprintf(f,'%s\n',jsonencode(entries));fclose(f);
+    end
+end

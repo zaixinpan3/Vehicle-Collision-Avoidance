@@ -1,0 +1,13 @@
+--- before/controller/solvePredictiveControl.m
++++ capture-source/controller/solvePredictiveControl.m
+@@ -249,6 +249,10 @@
+     r=sparse(1,nv);r(it)=1;
+     costCone=secondordercone([2*costMatrix;r],[-2*costOffset;1],r.',-1);
+     objective=zeros(nv,1);objective(it)=1;
++    global captureFile;
++    cones=[endpoint,costCone];
++    save(captureFile,'objective','cones','a','b','equal','rhs','lower','upper','options');
++    error('diagnostic:captureComplete','Conic problem captured before secondary solve.');
+     [second,~,flag]=coneprog(objective,[endpoint,costCone],a,b,equal,rhs,lower,upper,options);
+     info.calls=2;info.secondaryExitFlag=flag;
+     % A finite suboptimal conic point can still improve the nonlinear MPC.

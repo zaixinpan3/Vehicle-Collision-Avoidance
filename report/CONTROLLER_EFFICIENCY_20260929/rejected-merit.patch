@@ -1,0 +1,13 @@
+--- headroom-source/controller/solvePredictiveControl.m
++++ merit-source/controller/solvePredictiveControl.m
+@@ -73,7 +73,9 @@
+             candidate=localPolishEndpoint(candidate,model,timer);
+             inputs=candidate.inputs;
+             step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;
+-            merit=baseline.safety+100*baseline.hard;nextMerit=candidate.safety+100*candidate.hard;
++            scale=max(1,baseline.cost);
++            merit=baseline.safety+100*baseline.hard+baseline.cost/scale;
++            nextMerit=candidate.safety+100*candidate.hard+candidate.cost/scale;
+             improves=nextMerit<merit || (candidate.hard==0 && candidate.safety<=baseline.safety && candidate.cost<baseline.cost);
+             if improves
+                 anchor=inputs;baseline=candidate;step.acceptedIterate=true;

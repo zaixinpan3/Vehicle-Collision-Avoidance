@@ -25,7 +25,7 @@ classdef predictiveSafetyGeometry
                 beta=raw.targetSideslip;
             end
             validateattributes(beta,{'double'},{'scalar','real','finite','>',-pi/2,'<',pi/2});
-            tangent=[cos(observation.yaw+beta);sin(observation.yaw+beta)];
+            tangent=predictiveSafetyGeometry.direction(observation.yaw+beta);
             speed=tangent.'*observation.velocity;
             if norm(observation.velocity-speed*tangent)>1e-10*max(1,abs(speed))
                 error('collisionAvoidanceController:inconsistentTargetMotion','Velocity direction and supplied sideslip disagree.');
@@ -41,8 +41,14 @@ classdef predictiveSafetyGeometry
             arc=q(4)*time+.5*q(5)*time^2;
             curvature=sin(q(6))/q(7);a=curvature*arc/2;scale=1;
             if a~=0,scale=sin(a)/a;end
-            next=q;next(1:2)=q(1:2)+arc*scale*[cos(q(3)+q(6)+a);sin(q(3)+q(6)+a)];
+            next=q;next(1:2)=q(1:2)+arc*scale*predictiveSafetyGeometry.direction(q(3)+q(6)+a);
             next(3)=q(3)+curvature*arc;next(4)=q(4)+q(5)*time;
+        end
+
+        function tangent = direction(angle)
+            % Exact cardinal directions avoid a fictitious transverse drift
+            % over an infinite horizon. Nearby physical angles remain nonzero.
+            tangent=[cospi(angle/pi);sinpi(angle/pi)];
         end
 
         function [distance,certificate] = rectangle(poseE,shapeE,poseT,shapeT)

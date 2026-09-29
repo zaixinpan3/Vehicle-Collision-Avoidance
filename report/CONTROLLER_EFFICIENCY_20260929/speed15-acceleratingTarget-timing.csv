@@ -1,0 +1,161 @@
+time,controllerSeconds,horizonSteps,solverCalls,source,terminationReason,scvxConverged,hardResidual,predictiveBarrierValue
+0,3.111354,76,10,sequentialConvexification,zeroSlack,True,0,0
+0.05,2.542839,75,4,sequentialConvexification,zeroSlack,True,0,0
+0.10000000000000002,2.526906,74,4,sequentialConvexification,zeroSlack,True,0,0
+0.15000000000000002,2.607211,73,4,sequentialConvexification,zeroSlack,True,0,0
+0.2,2.950567,72,5,sequentialConvexification,zeroSlack,True,0,0
+0.25,4.568133,71,7,sequentialConvexification,zeroSlack,True,0,0
+0.3,5.006258,70,9,feasibleInitialization,timeLimit,False,0,0
+0.35,5.015288,69,9,feasibleInitialization,timeLimit,False,0,0
+0.39999999999999997,4.74554,68,8,sequentialConvexification,zeroSlack,True,0,0
+0.44999999999999996,5.007984,67,8,feasibleInitialization,timeLimit,False,0,0
+0.49999999999999994,5.008988,66,9,feasibleInitialization,timeLimit,False,0,0
+0.5499999999999999,3.162671,65,5,sequentialConvexification,zeroSlack,True,0,0
+0.6,2.983049,64,5,sequentialConvexification,zeroSlack,True,0,0
+0.65,3.508182,63,6,sequentialConvexification,zeroSlack,True,0,0
+0.7000000000000001,5.01955,62,9,sequentialConvexification,timeLimit,False,0,0
+0.7500000000000001,5.013239,61,10,feasibleInitialization,timeLimit,False,0,0
+0.8000000000000002,5.008895,60,9,feasibleInitialization,timeLimit,False,0,0
+0.8500000000000002,5.008847,59,9,feasibleInitialization,timeLimit,False,0,0
+0.9000000000000002,3.156612,58,11,sequentialConvexification,zeroSlack,True,0,0
+0.9500000000000002,4.322836,57,15,sequentialConvexification,zeroSlack,True,0,0
+1.0000000000000002,5.014359,56,16,feasibleInitialization,timeLimit,False,0,0
+1.0500000000000003,5.002152,55,15,feasibleInitialization,timeLimit,False,0,0
+1.1000000000000003,5.008269,54,17,feasibleInitialization,timeLimit,False,0,0
+1.1500000000000004,5.011364,53,17,feasibleInitialization,timeLimit,False,0,0
+1.2000000000000004,5.003529,52,18,feasibleInitialization,timeLimit,False,0,0
+1.2500000000000004,5.007548,51,18,feasibleInitialization,timeLimit,False,0,0
+1.3000000000000005,5.011116,50,20,feasibleInitialization,timeLimit,False,0,0
+1.3500000000000005,5.006057,49,20,feasibleInitialization,timeLimit,False,0,0
+1.4000000000000006,5.006884,48,20,feasibleInitialization,timeLimit,False,0,0
+1.4500000000000006,5.007711,47,21,feasibleInitialization,timeLimit,False,0,0
+1.5000000000000007,5.006769,46,22,feasibleInitialization,timeLimit,False,0,0
+1.5500000000000007,4.997486,45,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+1.6000000000000008,5.013118,44,23,feasibleInitialization,timeLimit,False,0,0
+1.6500000000000008,4.933659,43,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+1.7000000000000008,4.808386,42,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+1.7500000000000009,4.646634,41,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+1.800000000000001,4.410047,40,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+1.850000000000001,4.550757,39,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+1.900000000000001,4.053898,38,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+1.9500000000000008,4.11064,37,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.000000000000001,3.971536,36,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.0500000000000007,3.678535,35,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.1000000000000005,3.542492,34,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.1500000000000004,3.454436,33,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.2,3.421761,32,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.25,3.24354,31,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.3,3.234769,30,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.3499999999999996,2.986741,29,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.3999999999999995,2.872567,28,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.4499999999999993,3.016385,27,23,feasibleInitialization,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.499999999999999,3.017174,26,24,sequentialConvexification,Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.,False,0,0
+2.549999999999999,2.015778,25,14,sequentialConvexification,zeroSlack,True,0,0
+2.5999999999999988,3.959888,24,24,sequentialConvexification,iterationLimit,False,0,0
+2.6499999999999986,3.41345,23,24,sequentialConvexification,zeroSlack,True,0,0
+2.6999999999999984,1.939564,22,13,sequentialConvexification,zeroSlack,True,0,0
+2.7499999999999982,1.148277,21,10,sequentialConvexification,zeroSlack,True,0,0
+2.799999999999998,0.660526,20,7,sequentialConvexification,zeroSlack,True,0,0
+2.849999999999998,1.212296,19,10,sequentialConvexification,zeroSlack,True,0,0
+2.8999999999999977,3.874167,18,24,sequentialConvexification,iterationLimit,False,0,0
+2.9499999999999975,3.817443,17,24,sequentialConvexification,iterationLimit,False,0,0
+2.9999999999999973,3.627502,16,24,sequentialConvexification,iterationLimit,False,0,0
+3.049999999999997,1.57571,16,10,sequentialConvexification,zeroSlack,True,0,0
+3.099999999999997,1.736368,16,13,sequentialConvexification,zeroSlack,True,0,0
+3.149999999999997,1.251087,16,10,sequentialConvexification,zeroSlack,True,0,0
+3.1999999999999966,1.615088,16,15,sequentialConvexification,zeroSlack,True,0,0
+3.2499999999999964,0.890954,16,10,sequentialConvexification,zeroSlack,True,0,0
+3.2999999999999963,0.756039,16,9,sequentialConvexification,zeroSlack,True,0,0
+3.349999999999996,0.089972,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.399999999999996,0.103298,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.4499999999999957,0.096368,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.4999999999999956,0.112207,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.5499999999999954,0.097305,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.599999999999995,0.105817,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.649999999999995,0.110967,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.699999999999995,0.090883,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.7499999999999947,0.083598,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.7999999999999945,0.082663,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.8499999999999943,0.085679,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.899999999999994,0.086363,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.949999999999994,0.094204,16,1,sequentialConvexification,zeroSlack,True,0,0
+3.999999999999994,0.087998,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.049999999999994,0.087617,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.099999999999993,0.088925,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.149999999999993,0.089332,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.199999999999993,0.089938,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.249999999999993,0.093632,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.299999999999993,0.090299,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.3499999999999925,0.088311,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.399999999999992,0.089304,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.449999999999992,0.09333,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.499999999999992,0.086705,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.549999999999992,0.088481,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.599999999999992,0.088539,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.6499999999999915,0.094699,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.699999999999991,0.092624,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.749999999999991,0.09137,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.799999999999991,0.090956,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.849999999999991,0.090601,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.899999999999991,0.090696,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.94999999999999,0.089712,16,1,sequentialConvexification,zeroSlack,True,0,0
+4.99999999999999,0.091833,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.04999999999999,0.092223,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.09999999999999,0.089442,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.14999999999999,0.087846,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.1999999999999895,0.090608,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.249999999999989,0.091155,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.299999999999989,0.089383,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.349999999999989,0.092178,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.399999999999989,0.088804,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.449999999999989,0.093289,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.4999999999999885,0.100506,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.549999999999988,0.093362,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.599999999999988,0.097097,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.649999999999988,0.097392,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.699999999999988,0.096714,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.749999999999988,0.096178,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.799999999999987,0.09551,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.849999999999987,0.097747,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.899999999999987,0.099847,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.949999999999987,0.100086,16,1,sequentialConvexification,zeroSlack,True,0,0
+5.999999999999987,0.095197,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.0499999999999865,0.096834,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.099999999999986,0.094641,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.149999999999986,0.098042,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.199999999999986,0.093473,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.249999999999986,0.097235,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.299999999999986,0.094907,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.349999999999985,0.09242,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.399999999999985,0.093727,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.449999999999985,0.092804,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.499999999999985,0.09139,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.549999999999985,0.091056,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.5999999999999845,0.091836,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.649999999999984,0.091172,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.699999999999984,0.090988,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.749999999999984,0.090332,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.799999999999984,0.090754,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.849999999999984,0.091779,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.8999999999999835,0.092284,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.949999999999983,0.090972,16,1,sequentialConvexification,zeroSlack,True,0,0
+6.999999999999983,0.094453,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.049999999999983,0.090754,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.099999999999983,0.090662,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.149999999999983,0.091411,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.199999999999982,0.091032,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.249999999999982,0.093413,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.299999999999982,0.094029,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.349999999999982,0.095052,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.399999999999982,0.094825,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.4499999999999815,0.098259,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.499999999999981,0.095094,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.549999999999981,0.093831,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.599999999999981,0.096935,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.649999999999981,0.094562,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.699999999999981,0.097348,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.7499999999999805,0.09271,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.79999999999998,0.096589,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.84999999999998,0.097253,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.89999999999998,0.097404,16,1,sequentialConvexification,zeroSlack,True,0,0
+7.94999999999998,0.097403,16,1,sequentialConvexification,zeroSlack,True,0,0

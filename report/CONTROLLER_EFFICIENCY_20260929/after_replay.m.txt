@@ -1,0 +1,12 @@
+out=fileparts(mfilename('fullpath'));
+cd(fullfile(out,'after'));addpath('scripts','controller','config');
+capture=load('/home/zai/.cache/collisionAvoidance/margin-profile-20260929-043632/captured-frame.mat');entries=struct([]);
+for index=1:8
+ wall=tic;[command,~,problem]=collisionAvoidanceController(capture.ego,capture.target,capture.road,capture.cfg,capture.previousState);seconds=toc(wall);
+ entry=struct('index',index,'warmup',index==1,'seconds',seconds,'input',command.actuatorInput, ...
+  'inputError',max(abs(command.actuatorInput-capture.saved.input)),'cost',problem.solution.cost, ...
+  'hard',problem.solution.hard,'safety',problem.solution.safety,'horizon',problem.metadata.horizonSteps,'search',problem.metadata.search);
+ if isempty(entries),entries=entry;else,entries(index)=entry;end
+ fprintf('after replay %d: %.6f seconds, calls %d, %s\n',index,seconds,problem.metadata.solverCallCount,problem.metadata.search.terminationReason);
+end
+f=fopen(fullfile(out,'after-replays.json'),'w');fprintf(f,'%s\n',jsonencode(entries));fclose(f);

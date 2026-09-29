@@ -37,7 +37,12 @@ function [command,predictedInput,prediction,controllerState] = ...
         end
     end
     q=predictiveSafetyGeometry.targetFlow(targetEpoch,index*cfg.controller.sampleTime);
-    if ~isempty(observed) && (isempty(q) || norm(observed-q,inf)>1e-8*max(1,norm(q,inf)))
+    difference=Inf;
+    if ~isempty(observed) && ~isempty(q)
+        difference=observed-q;
+        difference(3)=atan2(sin(difference(3)),cos(difference(3)));
+    end
+    if ~isempty(observed) && norm(difference,inf)>1e-8*max(1,norm(q,inf))
         error('collisionAvoidanceController:changedTargetTrajectory', ...
             'The observation changes the fixed target trajectory. Initialize a new problem explicitly.');
     end
@@ -56,7 +61,7 @@ function [command,predictedInput,prediction,controllerState] = ...
         'targetParameters',targetParameters,'previousInput',previous,'target',q,'targetEpoch',targetEpoch, ...
         'sampleIndex',index,'epochTime',epochTime,'lane',lane,'road',road,'frame',frame, ...
         'terminal',terminal,'stateTime',ego.stateTime);
-    [solution,search,model]=solvePredictiveControl(model,previousState);
+    [solution,search,model]=solvePredictiveControl(model,previousState,timer);
     if isempty(solution)
         error('collisionAvoidanceController:noFeasibleContinuation', ...
             'No feasible nonlinear prefix and indefinite continuation were obtained (%s).',search.terminationReason);

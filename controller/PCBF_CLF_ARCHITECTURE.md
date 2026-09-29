@@ -52,11 +52,19 @@ and retraces its path. No stopping rule or constant independent yaw rate is
 introduced. Eliminating the autonomous target trajectory from the numerical
 variables preserves the joint ego/target model.
 
+Target directions use `sinpi(angle/pi)` and `cospi(angle/pi)` so that cardinal
+headings have exact zero transverse components. The straight endpoint test
+projects motion using relative headings in the road frame, avoiding cancellation
+of world-coordinate dot products. No small physical acceleration is thresholded
+to zero; nearby non-cardinal headings retain their transverse motion.
+
 Every target prediction uses the original epoch and an **absolute integer
 half-sample index**. This preserves retained node and midpoint evaluations
 under a shift. Later observations cannot reinitialize the forecast. A changed
 target trajectory, road, physical constraint set or prediction model requires
 an explicit new problem (`previousState=[]`). A timestamp gap is rejected.
+Equivalent headings across the +/-pi representation boundary are compared
+modulo one turn and do not invalidate or restart the fixed target epoch.
 A changed measured ego state or input memory invokes fresh feasibility
 restoration and disables the shifted slack guarantee for that transition.
 
@@ -166,7 +174,20 @@ step uses variational RK4 dynamics and linearized support-dual geometry.
 The endpoint is represented by its actual **2-norm cone**, with ego state
 and final input in the cone. The previous inscribed 1-norm polytope has been
 removed. `coneprog` solves the primary slack problem and the secondary
-quadratic lane/CLF objective represented by a cone epigraph.
+quadratic lane/CLF objective. Each stage and the CLF penalty has its own
+small squared-norm cone epigraph; their epigraph values sum to the total
+objective. This is algebraically equivalent to one horizon-wide norm cone,
+while avoiding its global factorization coupling. The default internal
+linear solver remains unchanged.
+
+Both objectives have a known lower bound of zero. A nonlinear feasible witness
+with exactly zero safety slack and secondary cost no greater than
+`solver.optimalityTolerance` terminates with `objectiveLowerBound` without a
+conic solve. The tolerance is used as an absolute secondary objective gap here;
+it never relaxes safety slack or hard constraints. A zero-slack feasible anchor
+also establishes the primary optimum of its affine subproblem, so only the
+secondary solve is needed when its cost still warrants improvement. These are
+termination rules within the same controller, not separate controller modes.
 
 The soft first-step CLF is
 
@@ -186,6 +207,24 @@ satisfies the original **hard, zero-slack** completion. A short shooting
 correction of the final controls removes terminal linearization defects.
 All corrected inputs, slew limits, safety samples and endpoint membership
 are reevaluated; selected controls are not clipped.
+
+Evaluation stores per-stage safety, physical residuals and costs. During an
+endpoint correction the unchanged prefix is reused and only the modified suffix
+is integrated again. Input magnitude/slew violations reject a correction before
+integration. The original half-radius polishing target retains interior
+headroom in the small terminal set.
+Under exact successor and input-memory equality, a shifted witness reuses its
+unchanged absolute-time stages; an appended terminal input alone needs a new
+rollout. Changed measured states require a fresh full evaluation. Endpoint,
+initial-state, input and slew checks are still performed for every returned plan.
+
+All improvement steps share the time remaining since controller-call entry.
+Each conic call receives the remaining budget, and no new candidate processing
+or polishing trial is started after expiration. Initial witness construction or
+revalidation must still finish before returning any input. An in-flight conic
+factorization or rollout is not preemptible, so the budget remains a soft limit,
+not a real-time deadline guarantee. Expiration retains an available feasible
+witness; without one, initialization reports failure.
 
 Finite suboptimal secondary conic iterates remain eligible even when the
 solver stops without an optimal exit flag. Their reported exit flags are

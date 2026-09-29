@@ -126,14 +126,20 @@ classdef terminalContinuation
                     collision=max([egoSide(1)-side(2),side(1)-egoSide(2),forward]);
                 else
                     targetVertices=q(1:2)+localRotation(q(3))*(q(10:11)+q(8:9).*[-1,1,1,-1;-1,-1,1,1]);
-                    direction=[cos(q(3)+q(6));sin(q(3)+q(6))];
+                    direction=predictiveSafetyGeometry.direction(q(3)+q(6)-frame(3));
+                    egoDirection=predictiveSafetyGeometry.direction(x(3)-frame(3));
+                    projectedVelocity=[egoDirection(1),-egoDirection(2);egoDirection(2),egoDirection(1)] ...
+                        *seed.increment(1:2)/cfg.controller.sampleTime;
+                    relative=projectedVelocity-q(4)*direction;
+                    speeds=[relative(1),-relative(1),relative(2),-relative(2)];
+                    accelerations=-q(5)*[direction(1),-direction(1),direction(2),-direction(2)];
                     % Relative quadratic progress accounts for both ahead and
                     % behind separation, acceleration, and signed reversal.
                     collision=-Inf;
-                    for normal=[t,-t,n,-n]
-                        speed=normal.'*(velocity-q(4)*direction);
-                        acceleration=-q(5)*(normal.'*direction);
-                        lower=localProgressMinimum(speed,acceleration);
+                    normals=[t,-t,n,-n];
+                    for axis=1:4
+                        normal=normals(:,axis);
+                        lower=localProgressMinimum(speeds(axis),accelerations(axis));
                         gap=min(normal.'*(x(1:2)+corners))-max(normal.'*targetVertices)-padding+lower;
                         collision=max(collision,gap);
                     end
@@ -149,7 +155,7 @@ classdef terminalContinuation
                     [targetCenter,inner,outer]=localOrbit(q);d=norm(center-targetCenter);
                     nearest=max([0,d-outer,inner-d]);farthest=d+outer;
                 else
-                    direction=[cos(q(3)+q(6));sin(q(3)+q(6))];d=q(1:2)-center;
+                    direction=predictiveSafetyGeometry.direction(q(3)+q(6));d=q(1:2)-center;
                     lower=localProgressMinimum(q(4),q(5));upper=-localProgressMinimum(-q(4),-q(5));
                     arc=min(upper,max(lower,-d.'*direction));targetReach=norm(q(8:9)+abs(q(10:11)));
                     nearest=norm(d+arc*direction)-targetReach;

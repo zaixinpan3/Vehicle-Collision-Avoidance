@@ -1,0 +1,3 @@
+cd('/home/zai/.cache/collisionAvoidance/controller-efficiency-20260929-050658/merit-source');addpath('scripts','controller','config');
+runCapturedValidation(Scenarios="oncoming",Frames=60,OutputFile="/home/zai/.cache/collisionAvoidance/controller-efficiency-20260929-050658/merit-oncoming.json");
+runCapturedValidation(Scenarios="acceleratingTarget",Frames=60,OutputFile="/home/zai/.cache/collisionAvoidance/controller-efficiency-20260929-050658/merit-acceleratingTarget.json");

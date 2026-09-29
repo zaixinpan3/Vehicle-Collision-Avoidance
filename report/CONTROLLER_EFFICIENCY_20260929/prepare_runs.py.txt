@@ -1,0 +1,44 @@
+from pathlib import Path
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import subprocess,shutil,json,hashlib
+raw=Path(__file__).parent;root=Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance')
+hashes={}
+for name in subprocess.check_output(['git','ls-files','controller','config','scripts','tests','estimator'],cwd=root,text=True).splitlines():
+ p=root/name
+ if p.is_file():
+  dest=raw/'after'/name;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,dest);hashes[name]=hashlib.sha256(p.read_bytes()).hexdigest()
+if not (raw/'after/solver').exists():(raw/'after/solver').symlink_to(root/'solver',target_is_directory=True)
+(raw/'after-manifest.json').write_text(json.dumps(dict(baseCommit='fc777d841d761c0803e078ae98ec854614f123f8',capturedAt=datetime.now(ZoneInfo('America/Chicago')).isoformat(),files=hashes),indent=2)+'\n')
+(raw/'working-changes.patch').write_bytes(subprocess.check_output(['git','diff','--','controller','config','scripts/auditJointPredictiveSafety.py','tests/nonlinearPredictiveSafetyTest.m','tests/auditJointPredictiveSafetyTest.py'],cwd=root))
+script=r'''out=fileparts(mfilename('fullpath'));
+cd(fullfile(out,'SOURCE'));addpath('scripts','controller','config');
+capture=load('/home/zai/.cache/collisionAvoidance/margin-profile-20260929-043632/captured-frame.mat');entries=struct([]);
+for index=1:COUNT
+ wall=tic;[command,~,problem]=collisionAvoidanceController(capture.ego,capture.target,capture.road,capture.cfg,capture.previousState);seconds=toc(wall);
+ entry=struct('index',index,'warmup',index==1,'seconds',seconds,'input',command.actuatorInput, ...
+  'inputError',max(abs(command.actuatorInput-capture.saved.input)),'cost',problem.solution.cost, ...
+  'hard',problem.solution.hard,'safety',problem.solution.safety,'horizon',problem.metadata.horizonSteps,'search',problem.metadata.search);
+ if isempty(entries),entries=entry;else,entries(index)=entry;end
+ fprintf('SOURCE replay %d: %.6f seconds, calls %d, %s\n',index,seconds,problem.metadata.solverCallCount,problem.metadata.search.terminationReason);
+end
+f=fopen(fullfile(out,'SOURCE-replays.json'),'w');fprintf(f,'%s\n',jsonencode(entries));fclose(f);
+'''
+for src,n in [('before',4),('after',8)]:
+ (raw/(src+'_replay.m')).write_text(script.replace('SOURCE',src).replace('COUNT',str(n)))
+checks=r'''out=fileparts(mfilename('fullpath'));cd(fullfile(out,'after'));addpath('scripts','controller','config');
+suites={'tests/terminalContinuationTest.m','tests/nonlinearPredictiveSafetyTest.m','tests/modifiedFialaTireTest.m','tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m','tests/longitudinalRoadLoadTest.m','tests/controllerInputGeometryTest.m','tests/nrmmModelFormulationTest.m','tests/onlineNrmmTrackingRuntimeTest.m'};
+results=runtests(suites);entries=table(results);entries=entries(:,{'Name','Passed','Failed','Incomplete','Duration'});
+f=fopen(fullfile(out,'tests.json'),'w');fprintf(f,'%s\n',jsonencode(struct('matlabVersion',version,'tests',table2struct(entries))));fclose(f);assertSuccess(results);
+run(fullfile(out,'after_replay.m'));
+for speed=[8,15]
+ folder=fullfile(out,"speed"+speed);if ~isfolder(folder),mkdir(folder);end
+ cfg=struct('referenceSpeed',speed,'controller',struct('horizonSteps',speed+mod(speed,2)));
+ for name=["recovery","circular","brakingTarget","turningTarget","acceleratingTurn","oncoming","acceleratingTarget"]
+  frames=160;if name=="recovery" || name=="circular",frames=40;end
+  runNonlinearPredictiveSafetyValidation(Scenarios=name,Frames=frames,ControllerConfiguration=cfg,OutputFile=fullfile(folder,name+".json"));
+ end
+end
+fprintf('EFFICIENCY CAMPAIGN COMPLETE\n');
+'''
+(raw/'campaign.m').write_text(checks)

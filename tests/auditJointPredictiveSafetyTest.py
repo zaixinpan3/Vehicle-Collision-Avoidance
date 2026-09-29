@@ -26,6 +26,19 @@ class CollisionAuditTest(unittest.TestCase):
     def test_retained_witness_does_not_require_a_new_solve(self):
         self.assertTrue(feasible_hold(dict(hardResidual=0, source='retainedContinuation', solverCalls=0)))
 
+    def test_objective_bound_can_converge_without_invoking_an_optimizer(self):
+        hold = dict(time=0, auditTimes=[0], auditStates=[[0, 0, 0, 8, 0, 0]],
+                    predictiveBarrierValue=0, hardResidual=0, source='feasibleInitialization',
+                    solverCalls=0, scvxConverged=True)
+        result = dict(scenario='recovery', targetInitialState=[], trace=[hold], completed=True,
+                      executedFrames=1, requestedFrames=1, minimumReplayClearanceMeters=None,
+                      requiredClearanceMeters=.005, finalTransverseError=[0],
+                      configuration=dict(vehicle=dict(length=4.8, width=1.9, rectangleOffset=[0, 0])))
+        checked = audit(result)
+        self.assertTrue(checked['passed'])
+        self.assertTrue(checked['everyHoldConverged'])
+        self.assertFalse(checked['everyHoldInvokedOptimizer'])
+
     def test_small_positive_hard_residual_is_not_feasible(self):
         self.assertFalse(feasible_hold(dict(hardResidual=1e-12, source='sequentialConvexification', solverCalls=2)))
 

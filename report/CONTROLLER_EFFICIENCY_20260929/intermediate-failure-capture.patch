@@ -1,0 +1,27 @@
+--- after/scripts/runNonlinearPredictiveSafetyValidation.m
++++ headroom-source/scripts/runCapturedValidation.m
+@@ -1,4 +1,4 @@
+-function report = runNonlinearPredictiveSafetyValidation(options)
++function report = runCapturedValidation(options)
+ %runNonlinearPredictiveSafetyValidation Deterministic nonlinear closed-loop audit.
+ % A tight ode45 replay checks each issued hold independently of the RK4 proposal.
+ % The audit is offline evidence; it is not an execution admission layer.
+@@ -20,7 +20,7 @@
+         firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;warmStartedFrames=0;finalError=[];
+         trace=struct([]);failedFrameSeconds=NaN;failureTime=NaN;passedTarget=false;
+         for frame=1:options.Frames
+-            frameTimer=tic;
++            previousControllerState=prior;frameTimer=tic;
+             try
+                 solveCfg=cfg;
+                 if frame>1 && ~options.ImproveAfterInitialization,solveCfg.solver.timeLimitSeconds=1e-12;end
+@@ -76,6 +76,9 @@
+                 if mod(frame,4)==0,fprintf('%s: %d/%d holds, last %.3f s, source %s\n', ...
+                     name,frame,options.Frames,frameSeconds,search.source);end
+             catch exception
++                if strlength(options.OutputFile)>0
++                    save(replace(options.OutputFile,'.json','-failure.mat'),'ego','target','road','cfg','previousControllerState','frame','exception');
++                end
+                 failedFrameSeconds=toc(frameTimer);failureTime=(frame-1)*cfg.controller.sampleTime;
+                 failure=string(exception.identifier)+": "+string(exception.message);break;
+             end

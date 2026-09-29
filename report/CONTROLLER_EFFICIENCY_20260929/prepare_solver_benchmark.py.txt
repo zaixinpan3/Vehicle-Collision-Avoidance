@@ -1,0 +1,48 @@
+from pathlib import Path
+import shutil
+raw=Path(__file__).parent
+shutil.copytree(raw/'before',raw/'capture-source',symlinks=True,dirs_exist_ok=True)
+p=raw/'capture-source/controller/solvePredictiveControl.m';s=p.read_text();needle='    [second,~,flag]=coneprog(objective,[endpoint,costCone],a,b,equal,rhs,lower,upper,options);'
+s=s.replace(needle,'''    global captureFile;
+    cones=[endpoint,costCone];
+    save(captureFile,'objective','cones','a','b','equal','rhs','lower','upper','options');
+    error('diagnostic:captureComplete','Conic problem captured before secondary solve.');
+'''+needle)
+p.write_text(s)
+h=(raw/'before/scripts/runNonlinearPredictiveSafetyValidation.m').read_text();helpers=h[h.index('function ego=localEgo'):]
+script=r'''out=fileparts(mfilename('fullpath'));cd(fullfile(out,'capture-source'));addpath('controller','config','scripts');
+global captureFile;capture=load('/home/zai/.cache/collisionAvoidance/margin-profile-20260929-043632/captured-frame.mat');
+captureFile=fullfile(out,'cone-braking346.mat');
+collisionAvoidanceController(capture.ego,capture.target,capture.road,capture.cfg,capture.previousState);
+for speed=[8,15]
+ cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed,'controller',struct('horizonSteps',speed+mod(speed,2))));
+ cfg.solver.timeLimitSeconds=60;cfg.nonlinear.maximumIterations=1;
+ ego=localEgo([0;0;0;speed;0;0],0,[0;0]);target=localTarget([24;0;pi;8;0;0;1.6;2.4;.95;0;0]);
+ road=struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);
+ captureFile=fullfile(out,"cone-oncoming"+speed+".mat");
+ try,collisionAvoidanceController(ego,target,road,cfg,[]);catch e,fprintf('Capture driver: %s\n',e.identifier);end
+ assert(isfile(captureFile),'Secondary problem was not captured.');
+end
+clear global captureFile;
+entries=struct([]);
+for name=["braking346","oncoming8","oncoming15"]
+ p=load(fullfile(out,"cone-"+name+".mat"));
+ for repetition=1:2
+  for method=["auto","normal","schur","augmented"]
+   options=p.options;options.LinearSolver=method;options.MaxTime=3;
+   wall=tic;[x,value,flag,output]=coneprog(p.objective,p.cones,p.a,p.b,p.equal,p.rhs,p.lower,p.upper,options);seconds=toc(wall);
+   linear=Inf;cone=Inf;
+   if ~isempty(x)
+    linear=max([0;p.a*x-p.b;abs(p.equal*x-p.rhs);p.lower-x;x-p.upper]);cone=0;
+    for j=1:numel(p.cones),c=p.cones(j);cone=max(cone,norm(c.A*x-c.b)-c.d.'*x+c.gamma);end
+   end
+   entry=struct('problem',name,'repetition',repetition,'method',method,'seconds',seconds,'objective',value, ...
+    'exitFlag',flag,'output',output,'linearResidual',linear,'coneResidual',cone);
+   if isempty(entries),entries=entry;else,entries(end+1)=entry;end
+   fprintf('%s %s: %.4f s, flag %d, linear %.3g cone %.3g\n',name,method,seconds,flag,linear,cone);
+   f=fopen(fullfile(out,'linear-solver-benchmark.json'),'w');fprintf(f,'%s\n',jsonencode(entries));fclose(f);
+  end
+ end
+end
+'''
+(raw/'solver_benchmark.m').write_text(script+'\n'+helpers)
