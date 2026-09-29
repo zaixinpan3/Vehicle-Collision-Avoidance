@@ -1,0 +1,40 @@
+from pathlib import Path
+import json,csv,hashlib,shutil,subprocess,difflib
+root=Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance');raw=Path(__file__).parent;out=root/'report/ONCOMING_INITIALIZATION_FAILURE_20260929';out.mkdir(exist_ok=True)
+def load(name):return json.loads((raw/name).read_text())
+def save(name,value):(out/name).write_text(json.dumps(value,indent=2)+'\n')
+def csvwrite(name,rows):
+ with (out/name).open('w') as f:
+  w=csv.DictWriter(f,fieldnames=list(rows[0]),lineterminator="\n");w.writeheader();w.writerows(rows)
+base={}
+for budget in [5,30]:
+ d=load(f'budget{budget}.json');g=d['diagnostic'];s=g['search'];m=g['initialModel'];
+ base[str(budget)]={'seconds':d['seconds'],'failure':d['failure'],'search':s,'seedSeconds':g['seedSeconds'],'horizonSteps':len(g['initialAnchor'][0]),'terminalRadius':m['terminal']['radius'],'terminalEpochState':m['terminal']['epochState'],'solves':g['solves'],'evaluationCount':len(g['evaluations'])}
+ csvwrite(f'evaluations-budget{budget}.csv',[dict(index=i,hard=e['hard'],prefixSlack=e['safety'],collisionMargin=e['minimumCollisionMargin'],roadMargin=e['minimumRoadMargin'],terminalResidual=e['terminalResidual'],cost=e['cost'],clfSlack=e['clfSlack']) for i,e in enumerate(g['evaluations'],1)])
+ assert not g['solution'] and d['failure']
+ assert all(e['hard']>0 for e in g['evaluations'])
+c=load('counterfactual.json');polished=c['polished'][4];assert polished['index']==39 and polished['afterHard']==0 and polished['safety']==0
+p=load('budget30.json')['diagnostic']['evaluations'][38];secondary=load('budget30.json')['diagnostic']['evaluations'][39]
+comparison=dict(originalPrimary=dict(hard=p['hard'],safety=p['safety'],terminalResidual=p['terminalResidual'],collisionMargin=p['minimumCollisionMargin'],roadMargin=p['minimumRoadMargin']),originalSecondary=dict(hard=secondary['hard'],terminalResidual=secondary['terminalResidual'],collisionMargin=secondary['minimumCollisionMargin']),polishedPrimary={k:v for k,v in polished.items() if k!='evaluation'})
+loop=load('counterfactual-closed-loop.json')['results'];summary={k:v for k,v in loop.items() if k not in ['trace','configuration']};later=[e['controllerSeconds'] for e in loop['trace'][1:]];summary['subsequentMaximumSeconds']=max(later);summary['subsequentDeadlineMisses']=sum(x>.05 for x in later);summary['initialSearch']=loop['trace'][0]['sequentialIterations']
+audit=load('independent-audit.json');assert audit['results'][0]['passed'] and loop['completed'] and loop['executedFrames']==160 and loop['passedTarget']
+assert all(e['hardResidual']==0 and e['predictiveBarrierValue']==0 for e in loop['trace'])
+csvwrite('counterfactual-timing.csv',[dict(frame=i,seconds=e['controllerSeconds'],solverCalls=e['solverCalls'],hard=e['hardResidual'],safety=e['predictiveBarrierValue'],source=e['source']) for i,e in enumerate(loop['trace'],1)])
+probes={}
+for budget in [30,5]:
+ d=load(f'primaryPolishBudget{budget}.json');s=d['diagnostic']['search'];assert d['failure']=='' and s['terminationReason']=='feasibleWitness';probes[str(budget)]=dict(seconds=d['seconds'],search=s)
+save('summary.json',dict(baseCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),scenario=dict(egoSpeed=15,targetSpeed=8,centerDistance=24,bodyGap=19.2,straightContactTime=19.2/23,safetyMargin=.005,sampleTime=.05,prefixSteps=16,completionSteps=60,horizonSteps=76),baseline=base,primaryComparison=comparison,borrowedCandidate={k:v for k,v in c['borrowed'].items() if k in ['hard','safety','minimumCollisionMargin','minimumRoadMargin','cost']},endpointPolishProbes=[{k:v for k,v in e.items() if k!='evaluation'} for e in c['polished']],counterfactualBudgetProbes=probes,counterfactualClosedLoop=summary))
+shutil.copy(raw/'independent-audit.json',out/'independent-audit.json');shutil.copy(raw/'audit.json',out/'candidate-replays.json')
+for name in ['diagnose.m','counterfactual.m','audit.m','primary_polish.m','closed_loop.m','prepare.py','analyze.py']:
+ shutil.copy(raw/name,out/(name+'.txt'))
+original=(root/'controller/solvePredictiveControl.m').read_text();changed=(raw/'counterfactual-source/controller/solvePredictiveControl.m').read_text();patch=''.join(difflib.unified_diff(original.splitlines(True),changed.splitlines(True),fromfile='a/controller/solvePredictiveControl.m',tofile='b/controller/solvePredictiveControl.m'));(out/'counterfactual-controller.patch').write_text(patch)
+manifest=[]
+for folder in ['controller','config','scripts']:
+ for file in sorted((root/folder).glob('*.m')):
+  record=dict(path=str(file.relative_to(root)),productionSha256=hashlib.sha256(file.read_bytes()).hexdigest())
+  copy=raw/'counterfactual-source'/file.relative_to(root);record['counterfactualSha256']=hashlib.sha256(copy.read_bytes()).hexdigest();manifest.append(record)
+assert [e['path'] for e in manifest if e['productionSha256']!=e['counterfactualSha256']]==['controller/solvePredictiveControl.m']
+save('source-manifest.json',manifest)
+files=[p for p in raw.iterdir() if p.is_file() and p.suffix in ['.json','.mat','.log','.m','.py']]
+save('raw-artifact-hashes.json',[dict(path=str(p),sha256=hashlib.sha256(p.read_bytes()).hexdigest(),bytes=p.stat().st_size) for p in sorted(files) if p.name!='archive.py'])
+print(json.dumps(dict(base5Seconds=base['5']['seconds'],base30Seconds=base['30']['seconds'],counterfactual=summary,assertions='passed'),indent=2))

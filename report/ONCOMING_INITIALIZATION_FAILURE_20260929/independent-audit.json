@@ -1,0 +1,20 @@
+{
+  "scope": "independent sampled geometry",
+  "results": [
+    {
+      "scenario": "oncoming",
+      "passed": true,
+      "samples": 4960,
+      "minimumClearanceMeters": 0.015029231541279732,
+      "minimumRoadMarginMeters": 0.39136844520177805,
+      "agreesWithMatlabGeometry": true,
+      "allPredictionsZeroSlack": true,
+      "everyHoldFeasible": true,
+      "everyHoldInvokedOptimizer": false,
+      "everyHoldConverged": true,
+      "strictlyCollisionFree": true,
+      "configuredClearanceSatisfied": true,
+      "finalLateralErrorMeters": -1.0247567884444158e-09
+    }
+  ]
+}

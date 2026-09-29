@@ -1,0 +1,19 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');
+c=load(fullfile(raw,'counterfactual.mat'));model=c.model;cfg=model.cfg;audits=struct([]);
+for number=1:2
+ if number==1,candidate=c.borrowed;name="borrowed";else,candidate=c.polished(5).evaluation;name="polishedPrimaryIteration6";end
+ x=model.initialState;distance=Inf;road=Inf;overlap=0;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+ for k=1:size(candidate.inputs,2)
+  [time,states]=ode45(@(~,s)nonlinearBicycleModel.derivative(s,candidate.inputs(:,k),cfg),linspace(0,cfg.controller.sampleTime,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
+  for j=1:numel(time)
+   q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,(k-1)*cfg.controller.sampleTime+time(j));
+   d=predictiveSafetyGeometry.rectangle(states(j,1:3).',shape,q(1:3),q(8:11));distance=min(distance,d);overlap=overlap+(d==0);
+   yaw=states(j,3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];vertices=states(j,1:2).'+rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);road=min([road;vertices(2,:).'+4;4-vertices(2,:).']);
+  end
+  x=states(end,:).';
+ end
+ entry=struct('name',name,'holds',size(candidate.inputs,2),'samples',31*size(candidate.inputs,2),'minimumDistance',distance,'minimumRoad',road,'zeroDistanceSamples',overlap,'maximumRk4OdeEndDifference',max(abs(x-candidate.states(:,end))));
+ if isempty(audits),audits=entry;else,audits(end+1)=entry;end
+ fprintf('%s: min distance %.12g road %.12g overlap %d\n',name,distance,road,overlap);
+end
+f=fopen(fullfile(raw,'audit.json'),'w');fprintf(f,'%s\n',jsonencode(audits));fclose(f);

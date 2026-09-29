@@ -1,0 +1,152 @@
+[
+  {
+    "path": "controller/collisionAvoidanceController.m",
+    "productionSha256": "f227b5af54b941f81a5d6245e1514f53167bed7facae91048d4d792e0fceeb88",
+    "counterfactualSha256": "f227b5af54b941f81a5d6245e1514f53167bed7facae91048d4d792e0fceeb88"
+  },
+  {
+    "path": "controller/laneGeometry.m",
+    "productionSha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "counterfactualSha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc"
+  },
+  {
+    "path": "controller/modifiedFialaTire.m",
+    "productionSha256": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "counterfactualSha256": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd"
+  },
+  {
+    "path": "controller/nonlinearBicycleModel.m",
+    "productionSha256": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "counterfactualSha256": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1"
+  },
+  {
+    "path": "controller/predictiveSafetyGeometry.m",
+    "productionSha256": "db23d19a88297cec88799506619e794c0a6e180b0d303a4233aa8bde10b67436",
+    "counterfactualSha256": "db23d19a88297cec88799506619e794c0a6e180b0d303a4233aa8bde10b67436"
+  },
+  {
+    "path": "controller/readControllerInputs.m",
+    "productionSha256": "0f82004d6d799bb9c15396619858747fc16cbcb2efb5af8db89f5c2791df4718",
+    "counterfactualSha256": "0f82004d6d799bb9c15396619858747fc16cbcb2efb5af8db89f5c2791df4718"
+  },
+  {
+    "path": "controller/solvePredictiveControl.m",
+    "productionSha256": "7c83001a4ff847cc98d61b957e5c75c5ecded687bbda6858a03693a4e6bf2614",
+    "counterfactualSha256": "d194593028e9f36dbb9938e01cac5a6c701e5c527493958a51ca8de36ba35af9"
+  },
+  {
+    "path": "controller/terminalContinuation.m",
+    "productionSha256": "6164ff5b7f2b13c91a71fcba024de0e8e8584f43929b13d2e51797de2c88618c",
+    "counterfactualSha256": "6164ff5b7f2b13c91a71fcba024de0e8e8584f43929b13d2e51797de2c88618c"
+  },
+  {
+    "path": "config/collisionAvoidanceControllerConfig.m",
+    "productionSha256": "7c5612be61b5a572122ab535bf5246af35799832d72dbb6b78ca437bf1d4c5fa",
+    "counterfactualSha256": "7c5612be61b5a572122ab535bf5246af35799832d72dbb6b78ca437bf1d4c5fa"
+  },
+  {
+    "path": "config/estimatorControllerIntegrationConfig.m",
+    "productionSha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "counterfactualSha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b"
+  },
+  {
+    "path": "config/nrmmTrackingConfig.m",
+    "productionSha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+    "counterfactualSha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47"
+  },
+  {
+    "path": "scripts/auditNrmmTruthEnclosure.m",
+    "productionSha256": "1a90f9b548f53852d60e33128baa1f3a524c6d99bb99a6798f97d9f19fb2cbf2",
+    "counterfactualSha256": "1a90f9b548f53852d60e33128baa1f3a524c6d99bb99a6798f97d9f19fb2cbf2"
+  },
+  {
+    "path": "scripts/buildNrmmObserverKernel.m",
+    "productionSha256": "bbeda1cc880491cbf0012681f7468facb6ed4e0bd54d52ab832c9657a9cf8dd5",
+    "counterfactualSha256": "bbeda1cc880491cbf0012681f7468facb6ed4e0bd54d52ab832c9657a9cf8dd5"
+  },
+  {
+    "path": "scripts/evaluatePerceivedRoadBoundarySafety.m",
+    "productionSha256": "e1c7e52989870e7b8bcdc09bdcddc26e9833b50760e5346eddde767c5f07c0c0",
+    "counterfactualSha256": "e1c7e52989870e7b8bcdc09bdcddc26e9833b50760e5346eddde767c5f07c0c0"
+  },
+  {
+    "path": "scripts/fitPerceivedRoadBoundaries.m",
+    "productionSha256": "81d0648d69f58a313ae21159f0aa215356d611f0f6bdcc849d7056c451316626",
+    "counterfactualSha256": "81d0648d69f58a313ae21159f0aa215356d611f0f6bdcc849d7056c451316626"
+  },
+  {
+    "path": "scripts/nrmmEstimatorControllerAdapter.m",
+    "productionSha256": "fa1555c793dcab141965f9ad06b0c9a0406b3c310768ba1ccb275ec38ac7ccf9",
+    "counterfactualSha256": "fa1555c793dcab141965f9ad06b0c9a0406b3c310768ba1ccb275ec38ac7ccf9"
+  },
+  {
+    "path": "scripts/nrmmTargetMeasurement.m",
+    "productionSha256": "e1cfb385ae5af1d8597f0bfb40ce7c1e8f169200c6ae2593e49c03af17eb606e",
+    "counterfactualSha256": "e1cfb385ae5af1d8597f0bfb40ce7c1e8f169200c6ae2593e49c03af17eb606e"
+  },
+  {
+    "path": "scripts/nrmmTargetTruth.m",
+    "productionSha256": "eadd6a43cc14e18914d24832f15298111dae74ea3596bdd76c91cd41e5dceee3",
+    "counterfactualSha256": "eadd6a43cc14e18914d24832f15298111dae74ea3596bdd76c91cd41e5dceee3"
+  },
+  {
+    "path": "scripts/plotObserverComparison.m",
+    "productionSha256": "d11fd9336cfbd21abaaecbda79c1998814c38b0c917363f46b2c134ce2155b18",
+    "counterfactualSha256": "d11fd9336cfbd21abaaecbda79c1998814c38b0c917363f46b2c134ce2155b18"
+  },
+  {
+    "path": "scripts/prepareCollisionAvoidanceController.m",
+    "productionSha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9",
+    "counterfactualSha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9"
+  },
+  {
+    "path": "scripts/prepareCollisionAvoidancePipeline.m",
+    "productionSha256": "4db704c9ce97330bfe1d12dc283a1407da000a4a39dd4cc3cfec6a0b9a659c47",
+    "counterfactualSha256": "4db704c9ce97330bfe1d12dc283a1407da000a4a39dd4cc3cfec6a0b9a659c47"
+  },
+  {
+    "path": "scripts/prepareObserverComparisonEstimators.m",
+    "productionSha256": "c781f637d558d70ca5be87212e7ac37f047258baaff428c997ec5a038bf56646",
+    "counterfactualSha256": "c781f637d558d70ca5be87212e7ac37f047258baaff428c997ec5a038bf56646"
+  },
+  {
+    "path": "scripts/quadraticRoadBoundaryRectangleMargin.m",
+    "productionSha256": "cd584ea383cca6d86f219490699fb62b24aabf54bbe8cf1795e2c5cfa0aa2a37",
+    "counterfactualSha256": "cd584ea383cca6d86f219490699fb62b24aabf54bbe8cf1795e2c5cfa0aa2a37"
+  },
+  {
+    "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "productionSha256": "5041ca273f57ee35bdf39cbd656dfa510a4ace2cc270cc3a80724f9242954a1c",
+    "counterfactualSha256": "5041ca273f57ee35bdf39cbd656dfa510a4ace2cc270cc3a80724f9242954a1c"
+  },
+  {
+    "path": "scripts/runNrmmPositionBoundBenchmark.m",
+    "productionSha256": "4cc13ceb718af5590e195f57061c68a990d271c061cc73a0308e4380726fbe7c",
+    "counterfactualSha256": "4cc13ceb718af5590e195f57061c68a990d271c061cc73a0308e4380726fbe7c"
+  },
+  {
+    "path": "scripts/runObserverComparisonCampaign.m",
+    "productionSha256": "5aa2e47ea9c090714fd5e67b47754abfd5839e27ec02ba50e306d8efb92deff6",
+    "counterfactualSha256": "5aa2e47ea9c090714fd5e67b47754abfd5839e27ec02ba50e306d8efb92deff6"
+  },
+  {
+    "path": "scripts/runObserverComparisonScenario.m",
+    "productionSha256": "6d8741849dac9ade543029fa2c6ec80f0ebddf60a53eee795619e9b8d232cf48",
+    "counterfactualSha256": "6d8741849dac9ade543029fa2c6ec80f0ebddf60a53eee795619e9b8d232cf48"
+  },
+  {
+    "path": "scripts/runOnlineNrmmComplexManeuverScenario.m",
+    "productionSha256": "2502c66c89027aadb8a991e2720c92fa85844a2bffd280b42fe4e32f62f7cae5",
+    "counterfactualSha256": "2502c66c89027aadb8a991e2720c92fa85844a2bffd280b42fe4e32f62f7cae5"
+  },
+  {
+    "path": "scripts/runOnlineNrmmTrackingErrorBenchmark.m",
+    "productionSha256": "d969f1fefa3bef8da2c5f23ec4847032a61d6f7fa4d4f98555b4333157e5a294",
+    "counterfactualSha256": "d969f1fefa3bef8da2c5f23ec4847032a61d6f7fa4d4f98555b4333157e5a294"
+  },
+  {
+    "path": "scripts/validateNonlinearPredictiveController.m",
+    "productionSha256": "376a3e54b4a31f69cbb9f1c5f8196658e476562901277899d4414595b1a5a0eb",
+    "counterfactualSha256": "376a3e54b4a31f69cbb9f1c5f8196658e476562901277899d4414595b1a5a0eb"
+  }
+]

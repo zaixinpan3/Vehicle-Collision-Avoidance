@@ -1,0 +1,20 @@
+from pathlib import Path
+import shutil
+root=Path.cwd();raw=Path('/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929');source=raw/'source'
+for folder in ['controller','config']:
+ shutil.copytree(root/folder,source/folder,dirs_exist_ok=True)
+p=source/'controller/collisionAvoidanceController.m';s=p.read_text();s=s.replace('    [solution,search,model]=solvePredictiveControl(model,previousState,timer);','    global failureModel failureDiagnostic\n    failureModel=model;\n    [solution,search,model]=solvePredictiveControl(model,previousState,timer);\n    failureDiagnostic.search=search;failureDiagnostic.model=model;failureDiagnostic.solution=solution;');p.write_text(s)
+p=source/'controller/solvePredictiveControl.m';s=p.read_text();s=s.replace('    cfg=model.cfg;solution=[];model.slackCap=Inf;','    global failureDiagnostic\n    failureDiagnostic=struct(\'evaluations\',{{}},\'solves\',{{}},\'seedSeconds\',NaN);\n    cfg=model.cfg;solution=[];model.slackCap=Inf;')
+s=s.replace('        [anchor,model.terminal]=localSeed(model);','        seedTimer=tic;[anchor,model.terminal]=localSeed(model);\n        failureDiagnostic.seedSeconds=toc(seedTimer);failureDiagnostic.initialAnchor=anchor;failureDiagnostic.initialModel=model;')
+for key,obj,cones,out in [('primary','objective','endpoint','first'),('restoration','restoration','endpoint','first'),('secondary','objective','cones','second')]:
+ old=f'[{out},~,flag]=coneprog({obj},{cones},a,b,equal,rhs,lower,upper,options);'
+ new=f"solveTimer=tic;[{out},~,flag,solverOutput]=coneprog({obj},{cones},a,b,equal,rhs,lower,upper,options);\n    failureDiagnostic.solves{{end+1}}=struct('stage','{key}','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel({obj}),'rows',size(a,1),'radius',radius,'hasPoint',~isempty({out}));"
+ assert old in s;s=s.replace(old,new)
+s=s.replace('    cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;','    global failureDiagnostic\n    cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;')
+old="        'stageCollision',stageCollision,'stageRoad',stageRoad);"
+new=old+"\n    [~,~,terminalError]=terminalContinuation.membership([x;inputs(:,end)],model.sampleIndex+count,model.terminal);\n    entry=evaluation;entry.terminalResidual=norm(model.terminal.factor*terminalError)-model.terminal.radius;\n    entry.time=(0:count)*cfg.controller.sampleTime;\n    failureDiagnostic.evaluations{end+1}=entry;"
+assert old in s;s=s.replace(old,new);p.write_text(s)
+# An offline helper exposes the unchanged local seed/evaluation routines.
+start=s.index('\nfunction feasible=localFeasible')
+helper="function [evaluation,model]=evaluateFailureInputs(model,inputs)\n    if nargin<2,[inputs,model.terminal]=localSeed(model);end\n    model.slackCap=Inf;evaluation=localNominalEvaluation(inputs,model);\nend\n"+s[start:]
+(source/'controller/evaluateFailureInputs.m').write_text(helper)

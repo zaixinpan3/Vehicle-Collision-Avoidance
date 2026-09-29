@@ -1,0 +1,11 @@
+--- a/controller/solvePredictiveControl.m
++++ b/controller/solvePredictiveControl.m
+@@ -275,6 +275,8 @@
+         primaryInputs=anchor+reshape(first(iu(:)),2,[]);
+         try
+             primaryCandidate=localNominalEvaluation(primaryInputs,model);
++            primaryCandidate=localPolishEndpoint(primaryCandidate,model,timer);
++            primaryInputs=primaryCandidate.inputs;
+             if localFeasible(primaryCandidate,model)
+                 inputs=primaryInputs;candidate=primaryCandidate;info.status="primaryFeasible";
+                 info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;return;

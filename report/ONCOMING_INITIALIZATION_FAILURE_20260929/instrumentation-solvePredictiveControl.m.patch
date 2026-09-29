@@ -1,0 +1,30 @@
+--- a/controller/solvePredictiveControl.m
++++ b/controller/solvePredictiveControl.m
+@@ -5,0 +6,2 @@
++    global failureDiagnostic
++    failureDiagnostic=struct('evaluations',{{}},'solves',{{}},'seedSeconds',NaN);
+@@ -43 +45,2 @@
+-        [anchor,model.terminal]=localSeed(model);
++        seedTimer=tic;[anchor,model.terminal]=localSeed(model);
++        failureDiagnostic.seedSeconds=toc(seedTimer);failureDiagnostic.initialAnchor=anchor;failureDiagnostic.initialModel=model;
+@@ -193,0 +197 @@
++    global failureDiagnostic
+@@ -272 +276,2 @@
+-    [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
++    solveTimer=tic;[first,~,flag,solverOutput]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);
++    failureDiagnostic.solves{end+1}=struct('stage','primary','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel(objective),'rows',size(a,1),'radius',radius,'hasPoint',~isempty(first));info.calls=1;
+@@ -293 +298,2 @@
+-        [first,~,flag]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
++        solveTimer=tic;[first,~,flag,solverOutput]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);
++    failureDiagnostic.solves{end+1}=struct('stage','restoration','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel(restoration),'rows',size(a,1),'radius',radius,'hasPoint',~isempty(first));info.calls=info.calls+1;
+@@ -325 +331,2 @@
+-    [second,~,flag]=coneprog(objective,cones,a,b,equal,rhs,lower,upper,options);
++    solveTimer=tic;[second,~,flag,solverOutput]=coneprog(objective,cones,a,b,equal,rhs,lower,upper,options);
++    failureDiagnostic.solves{end+1}=struct('stage','secondary','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel(objective),'rows',size(a,1),'radius',radius,'hasPoint',~isempty(second));
+@@ -364,0 +372 @@
++    global failureDiagnostic
+@@ -418,0 +427,4 @@
++    [~,~,terminalError]=terminalContinuation.membership([x;inputs(:,end)],model.sampleIndex+count,model.terminal);
++    entry=evaluation;entry.terminalResidual=norm(model.terminal.factor*terminalError)-model.terminal.radius;
++    entry.time=(0:count)*cfg.controller.sampleTime;
++    failureDiagnostic.evaluations{end+1}=entry;

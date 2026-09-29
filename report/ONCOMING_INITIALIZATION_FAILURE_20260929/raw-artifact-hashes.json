@@ -1,0 +1,132 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/analysis.log",
+    "sha256": "aa98ac7e2f04eda2a8818f1e640398095433a7b63c68d5b18b18f3d3f3bf8258",
+    "bytes": 5044
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/analyze.py",
+    "sha256": "63ad5fd2d122d895686c338237a7652bf213997364a4bb96b355ab6aaa3e3aee",
+    "bytes": 5375
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/audit.json",
+    "sha256": "5a7ea793d8acf641a1d0f5d5dbf52cf43adc3874c90b79f555800f04c88f1118",
+    "bytes": 405
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/audit.m",
+    "sha256": "31cfc3a120b2e1d1d0724c2b3d2955fe003f4af998cc71e285e611e64a60149c",
+    "bytes": 1633
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/borrowed.mat",
+    "sha256": "e388f0a602afd3ceff0d341ed47d5d73f21432d1686af18db75c2b878aa01bee",
+    "bytes": 10303
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/budget30.json",
+    "sha256": "754d516469fa3e9e74e52963aae3e0d9e75c253b1da89982e657993eb8fe402b",
+    "bytes": 865128
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/budget30.mat",
+    "sha256": "5b9d57cb6353cb4f9ddfebe29c5e229e5f3a00645164d02738da27541649c421",
+    "bytes": 342703
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/budget5.json",
+    "sha256": "97f00fd67c58d21bb147e52391644db6ba52c7544e1ae886152e2c99e71352ae",
+    "bytes": 848305
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/budget5.mat",
+    "sha256": "6d5b4c2e4c546546efc404ab255489268498c18131d4006f11a87164995715cf",
+    "bytes": 338519
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/closed_loop.log",
+    "sha256": "4f7d6652bfb19000b66df050203b0fafd6cbfa510950a046cfa3676ae9e6f36b",
+    "bytes": 2782
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/closed_loop.m",
+    "sha256": "0f16f9e4d94c369ca017ca80e7a7d7d2dcab34890d82daf9e94e60385dda9a62",
+    "bytes": 606
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/counterfactual-closed-loop.json",
+    "sha256": "ddad998cadf29a7a31e7f2d1706c61d5c178129fb4d4254b2e1ada1f72fcfce4",
+    "bytes": 878493
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/counterfactual.json",
+    "sha256": "fea4807bb7eadf8c9d3210e36f094d158b07b4919783952881d8c98c8d1b6312",
+    "bytes": 122256
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/counterfactual.log",
+    "sha256": "f3496d5e879166ef1de56d0749bdf117e0bf86a5745f394dd1f7464ffaba107a",
+    "bytes": 656
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/counterfactual.m",
+    "sha256": "dcb6a9730e502669379d7e79734dde2a9a149b77025b0a9af921b89447145085",
+    "bytes": 1618
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/counterfactual.mat",
+    "sha256": "f42120ac8808f5b4fceb6be3703108263b82a7de4a6fe43d9e067d75a643aa4f",
+    "bytes": 51949
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/diagnose.log",
+    "sha256": "5610ff74d228e896ec2f344cbd91376631e79de195acfae6f775fd0f8a7494b3",
+    "bytes": 12837
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/diagnose.m",
+    "sha256": "c2e3e94a968763366a920eeae0a89c0d73ad3be463d05b91f5ccb9cb138395ea",
+    "bytes": 2059
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/independent-audit.json",
+    "sha256": "0cd8a851074a7842ea18481493d224d8ce34acd9707fad179a620dbed8b6db6e",
+    "bytes": 587
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/prepare.py",
+    "sha256": "63d297120a1581ad7d298438b118ada09281e392584583098e59fbdb8e93955b",
+    "bytes": 2920
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/primaryPolishBudget30.json",
+    "sha256": "d4b21960044649b63ce90ba51ee7f05f6705cab32b0ff33169d7d33daaf67be7",
+    "bytes": 1117769
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/primaryPolishBudget30.mat",
+    "sha256": "009205fa2cf992a49dc1c76aab88557b151921ce9fd7df7332f779dac6b95424",
+    "bytes": 444838
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/primaryPolishBudget5.json",
+    "sha256": "d93ed0e8963666dfb3c7e565a55a923ccaf483194968a09636f9aa9ede79a37c",
+    "bytes": 1117767
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/primaryPolishBudget5.mat",
+    "sha256": "82e6471b4b5ca264468884e8687ea3210d1424f9f0de1d83a75fb405df7a0cb4",
+    "bytes": 444834
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/primary_polish.log",
+    "sha256": "8aa0b1b851d38dfee5dffb33571aa600e00e35679871157e630f7ed925b34b8a",
+    "bytes": 13425
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/oncoming-failure-20260929/primary_polish.m",
+    "sha256": "a5304836b1a52eebe67ef2335f8cff09d3dd78396c0e7821f98de11b81a390d7",
+    "bytes": 2085
+  }
+]

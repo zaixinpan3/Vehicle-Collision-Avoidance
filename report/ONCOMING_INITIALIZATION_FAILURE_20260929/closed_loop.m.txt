@@ -1,0 +1,6 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'counterfactual-source'));addpath('scripts','controller','config');
+cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',15,'controller',struct('horizonSteps',16)));
+terminalContinuation.build(cfg,0);
+report=runNonlinearPredictiveSafetyValidation(Scenarios="oncoming",Frames=160,ControllerConfiguration=cfg,OutputFile=fullfile(raw,'counterfactual-closed-loop.json'));
+assert(report.results.completed,'Counterfactual failed to finish.');
+assert(report.results.minimumReplayClearanceMeters>0 && report.results.minimumReplayRoadMarginMeters>=0);

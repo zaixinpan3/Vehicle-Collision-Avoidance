@@ -1,0 +1,18 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');
+global failureModel failureDiagnostic
+record=jsondecode(fileread('/home/zai/.cache/collisionAvoidance/first-feasible-20260929-110622/speed15/oncoming.json'));
+cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',15,'controller',struct('horizonSteps',16)));q=record.results.targetInitialState;
+ego=struct('position',[0;0],'yaw',0,'speed',15,'lateralVelocity',0,'yawRate',0,'stateTime',0,'heldActuatorInput',[0;0]);
+target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',[-8;0],'targetYawInertial',pi,'targetYawRate',0,'targetSideslip',0,'targetTangentialAcceleration',0,'targetRearAxleDistance',q(7),'targetAccelerationInertial',[0;0],'targetLength',4.8,'targetWidth',1.9,'targetRectangleOffset',[0;0]);
+road=struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);
+for budget=[5,30]
+ cfg.solver.timeLimitSeconds=budget;clear terminalContinuation
+ wall=tic;failure="";
+ try,[command,~,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);catch exception,failure=string(exception.identifier)+": "+string(exception.message);end
+ seconds=toc(wall);diagnostic=failureDiagnostic;model=failureModel;
+ save(fullfile(raw,"budget"+budget+".mat"),'diagnostic','model','seconds','failure','ego','target','road','cfg');
+ fprintf('Budget %.0f: %.6f s, failure %s, %d solves, %d evaluations\n',budget,seconds,failure,numel(diagnostic.solves),numel(diagnostic.evaluations));
+ for i=1:numel(diagnostic.solves),e=diagnostic.solves{i};fprintf(' solve %d %s flag %d %.4f s radius %.6f\n',i,e.stage,e.flag,e.seconds,e.radius);end
+ for i=1:numel(diagnostic.evaluations),e=diagnostic.evaluations{i};fprintf(' evaluation %d hard %.9g safety %.9g collision %.9g road %.9g terminal %.9g\n',i,e.hard,e.safety,e.minimumCollisionMargin,e.minimumRoadMargin,e.terminalResidual);end
+ f=fopen(fullfile(raw,"budget"+budget+".json"),'w');fprintf(f,'%s\n',jsonencode(struct('seconds',seconds,'failure',failure,'diagnostic',diagnostic)));fclose(f);
+end

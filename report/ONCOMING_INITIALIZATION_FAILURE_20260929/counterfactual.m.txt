@@ -1,0 +1,15 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');global failureDiagnostic
+failureDiagnostic=struct('evaluations',{{}});
+capture=load(fullfile(raw,'budget30.mat'));model=capture.diagnostic.initialModel;cfg=model.cfg;
+record=jsondecode(fileread('/home/zai/.cache/collisionAvoidance/first-feasible-20260929-110622/speed15/acceleratingTarget.json'));trace=record.results.trace;count=size(capture.diagnostic.initialAnchor,2);
+inputs=reshape([trace(1:count).input],2,[]);[evaluation,~]=evaluateFailureInputs(model,inputs);
+borrowed=evaluation;save(fullfile(raw,'borrowed.mat'),'borrowed','model');
+fprintf('Borrowed accelerating trajectory: hard %.12g safety %.12g collision %.12g road %.12g\n',evaluation.hard,evaluation.safety,evaluation.minimumCollisionMargin,evaluation.minimumRoadMargin);
+polished=struct([]);
+for index=[7,14,21,29,39,46]
+ candidate=capture.diagnostic.evaluations{index};wall=tic;e=polishFailureInputs(candidate,model);seconds=toc(wall);
+ entry=struct('index',index,'seconds',seconds,'beforeHard',candidate.hard,'afterHard',e.hard,'collision',e.minimumCollisionMargin,'road',e.minimumRoadMargin,'safety',e.safety,'evaluation',e);
+ if isempty(polished),polished=entry;else,polished(end+1)=entry;end
+ fprintf('Polish primary %d: %.6f s hard %.12g collision %.12g road %.12g\n',index,seconds,e.hard,e.minimumCollisionMargin,e.minimumRoadMargin);
+end
+save(fullfile(raw,'counterfactual.mat'),'borrowed','polished','model');f=fopen(fullfile(raw,'counterfactual.json'),'w');fprintf(f,'%s\n',jsonencode(struct('borrowed',borrowed,'polished',polished)));fclose(f);
