@@ -78,7 +78,9 @@ The signed collision predicate uses nonnegative support dual variables for
 both oriented rectangles and a unit separating normal. During overlap, a
 signed support gap supplies a restoration direction. An unsigned rectangle
 distance of zero is never used as evidence of separation. The configured
-additional physical collision buffer remains zero by default.
+additional physical collision buffer defaults to 0.005 m and can be explicitly
+set to zero. It applies at the prediction constraint samples and in the
+terminal separation certificate; it is not a continuous-time clearance guarantee.
 
 With the endpoint family `B_j` defined below, the terminal tube is represented
 implicitly by

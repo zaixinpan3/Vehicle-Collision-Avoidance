@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-09-29T04:50:09.258634-05:00",
+  "processes": [
+    {
+      "pid": 2074560,
+      "elapsed": "00:46",
+      "cpuPercent": 429.0
+    },
+    {
+      "pid": 2074685,
+      "elapsed": "00:45",
+      "cpuPercent": 411.0
+    },
+    {
+      "pid": 2075721,
+      "elapsed": "00:20",
+      "cpuPercent": 269.0
+    }
+  ],
+  "note": "Other project MATLAB tasks active during frame replays; no unrelated process stopped."
+}

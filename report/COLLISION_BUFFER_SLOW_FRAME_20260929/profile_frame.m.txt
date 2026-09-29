@@ -1,0 +1,63 @@
+out=fileparts(mfilename('fullpath'));
+cd(fullfile(out,'profile-source'));addpath('controller','config','scripts');
+original=jsondecode(fileread(fullfile(out,'..','current-controller-rerun-20260929-011231','baseline','brakingTarget.json')));
+r=original.results;cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8,'controller',struct('horizonSteps',8)));
+assert(cfg.collision.safetyMarginMeters==0);
+road=struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);
+target=localTarget(r.targetInitialState);previousState=[];reconstruction=struct([]);
+for index=1:11
+    saved=r.trace(index);previousInput=[0;0];if index>1,previousInput=r.trace(index-1).input;end
+    ego=localEgo(saved.state,saved.time,previousInput);
+    captureCfg=cfg;captureCfg.solver.timeLimitSeconds=1e-12;
+    [command,~,problem,previousState]=collisionAvoidanceController(ego,target,road,captureCfg,previousState);
+    error=max(abs(command.actuatorInput-saved.input));
+    assert(error==0 && size(previousState.inputTrajectory,2)==saved.horizonSteps);
+    assert(problem.model.sampleIndex==saved.absoluteSampleIndex && problem.model.terminal.epochIndex==saved.endpointIndex);
+    entry=struct('frame',index,'inputMaxError',error,'horizonSteps',saved.horizonSteps, ...
+        'source',problem.metadata.search.source,'originalSource',saved.source);
+    if isempty(reconstruction),reconstruction=entry;else,reconstruction(index)=entry;end
+    q=predictiveSafetyGeometry.targetFlow(problem.model.targetEpoch,(problem.model.sampleIndex+1)*cfg.controller.sampleTime);
+    target=localTarget(q);
+end
+saved=r.trace(12);ego=localEgo(saved.state,saved.time,r.trace(11).input);
+save(fullfile(out,'captured-frame.mat'),'ego','target','road','cfg','previousState','reconstruction','saved');
+fprintf('Captured frame 12 after exact command and horizon reconstruction.\n');
+global frameTiming;replays=struct([]);
+for index=1:4
+    clear collisionAvoidanceController;
+    wall=tic;[command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,previousState);elapsed=toc(wall);
+    entry=struct('index',index,'warmup',index==1,'seconds',elapsed,'timing',frameTiming, ...
+        'inputError',max(abs(command.actuatorInput-saved.input)),'horizonSteps',problem.metadata.horizonSteps, ...
+        'search',problem.metadata.search,'hardResidual',problem.solution.hard);
+    if isempty(replays),replays=entry;else,replays(index)=entry;end
+    fprintf('Replay %d: %.6f seconds, %s\n',index,elapsed,problem.metadata.search.terminationReason);
+end
+file=fopen(fullfile(out,'frame-replays.json'),'w');fprintf(file,'%s\n',jsonencode(struct('reconstruction',reconstruction,'replays',replays)));fclose(file);
+profile clear;profile on;
+wall=tic;[command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,previousState);profileElapsed=toc(wall);
+profile off;data=profile('info');save(fullfile(out,'profile.mat'),'data','problem','frameTiming','profileElapsed');
+hot=struct([]);
+for index=1:numel(data.FunctionTable)
+    f=data.FunctionTable(index);
+    childTime=0;if ~isempty(f.Children),childTime=sum([f.Children.TotalTime]);end
+    entry=struct('name',f.FunctionName,'file',f.FileName,'calls',f.NumCalls,'inclusiveSeconds',f.TotalTime, ...
+        'selfSeconds',max(0,f.TotalTime-childTime),'executedLines',f.ExecutedLines);
+    if isempty(hot),hot=entry;else,hot(index)=entry;end
+end
+file=fopen(fullfile(out,'frame-profile.json'),'w');fprintf(file,'%s\n',jsonencode(struct('seconds',profileElapsed, ...
+    'timing',frameTiming,'search',problem.metadata.search,'functions',hot)));fclose(file);
+fprintf('FRAME PROFILE COMPLETE\n');
+
+function ego=localEgo(x,time,input)
+    ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
+        'stateTime',time,'heldActuatorInput',input);
+end
+function target=localTarget(q)
+    direction=[cos(q(3)+q(6));sin(q(3)+q(6))];velocity=q(4)*direction;
+    yawRate=q(4)*sin(q(6))/q(7);
+    target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',velocity, ...
+        'targetYawInertial',q(3),'targetYawRate',yawRate,'targetSideslip',q(6), ...
+        'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7), ...
+        'targetAccelerationInertial',q(5)*direction+yawRate*[-velocity(2);velocity(1)], ...
+        'targetLength',2*q(8),'targetWidth',2*q(9),'targetRectangleOffset',q(10:11));
+end

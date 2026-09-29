@@ -1,0 +1,5 @@
+replay,warmup,totalSeconds,initialEvaluationSeconds,assemblySeconds,primarySeconds,secondarySetupSeconds,secondarySeconds,candidateEvaluationSeconds,endpointPolishSeconds
+1,True,9.004789,0.190772,0.794404,0.471292,0.002563,6.114698,0.232553,1.183937
+2,False,9.298113,0.19283,0.625372,0.383354,0.001535,6.699505,0.227598,1.157444
+3,False,7.742739,0.201766,0.740979,0.48121,0.003697,6.271649,,
+4,False,11.993648,0.289297,0.76443,0.46687,0.001297,8.84429,0.245919,

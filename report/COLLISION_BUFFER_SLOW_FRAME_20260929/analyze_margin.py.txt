@@ -1,0 +1,89 @@
+from pathlib import Path
+import csv, json, math, sys, collections, statistics
+root=Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance')
+raw=Path(__file__).parent
+sys.path.insert(0,str(raw/'source/scripts'))
+from auditJointPredictiveSafety import audit, rectangle, distance, edge_distance, clearance_passes, target_state
+
+def many(x): return x if isinstance(x,list) else [x]
+
+def signed_sat_gap(a,b):
+    gaps=[]
+    for polygon in (a,b):
+        for i,p in enumerate(polygon):
+            q=polygon[(i+1)%4];nx,ny=p[1]-q[1],q[0]-p[0];norm=math.hypot(nx,ny)
+            aa=[(nx*x+ny*y)/norm for x,y in a];bb=[(nx*x+ny*y)/norm for x,y in b]
+            gaps.append(max(min(aa)-max(bb),min(bb)-max(aa)))
+    return max(gaps)
+
+def summarize(r):
+    initial=r['targetInitialState']
+    t=r['trace']; t=many(t) if t else []
+    out={k:v for k,v in r.items() if k not in ('trace','configuration')}
+    out['configuration']=r['configuration']
+    early=[h['controllerSeconds']for h in t if h['time']<2-1e-9]
+    out['firstTwoSecondsMedianSeconds']=statistics.median(early) if early else None
+    out['firstTwoSecondsMaximumSeconds']=max(early,default=None)
+    out['convergedFrames']=sum(h['scvxConverged'] for h in t)
+    out['terminationCounts']=dict(collections.Counter(h['terminationReason'] or 'missingDiagnostic' for h in t))
+    out['maximumSafetySlack']=max((h['predictiveBarrierValue'] for h in t),default=None)
+    out['maximumHardResidual']=max((h['hardResidual'] for h in t),default=None)
+    out['horizonSteps']=sorted(set(h['horizonSteps'] for h in t))
+    out['controlSourceCounts']=dict(collections.Counter(h['source'] for h in t))
+    out['initializationCounts']=dict(collections.Counter(h['initialization'] for h in t))
+    out['shiftAvailableFrames']=sum(h['shiftAvailable'] for h in t)
+    out['maximumCompletionSteps']=max((h['completionSteps'] for h in t),default=None)
+    out['completedSampledCollisionFree']=bool(t) and r['completed'] and (not initial or r['minimumReplayClearanceMeters']>0)
+    steps=[s for h in t for s in many(h['sequentialIterations']) if s]
+    out['primaryExitFlags']=dict(collections.Counter(str(s['safetyExitFlag']) for s in steps))
+    out['secondaryExitFlags']=dict(collections.Counter(str(s['secondaryExitFlag']) for s in steps))
+    out['maximumSubproblemResidual']=max((s['solverResidual'] for s in steps if isinstance(s.get('solverResidual'),(int,float))),default=None)
+    out['solverExceptions']=[e for h in t for e in many(h['solverFailures']) if e]
+    closest=None; samples=[]
+    for h in t:
+        for dt,x in zip(h['auditTimes'],h['auditStates']):
+            time=h['time']+dt
+            body=rectangle(*x[:3]); gap=None; signed=None
+            if r['scenario']=='circular':
+                # The inner radial extremum may lie on a body edge.
+                minradius=min(edge_distance((0,200),body[i],body[(i+1)%4]) for i in range(4))
+                maxradius=max(math.hypot(a,b-200) for a,b in body)
+                margin=min(minradius-196,204-maxradius)
+            else:
+                margin=4-max(abs(b) for a,b in body)
+            if initial:
+                q=target_state(initial,time)
+                target=rectangle(*q[:3],shape=initial[7:11])
+                gap=distance(body,target); signed=signed_sat_gap(body,target)
+                if closest is None or gap<closest['clearanceMeters']:
+                    closest=dict(timeSeconds=time,clearanceMeters=gap,holdStartSeconds=h['time'],relativeHoldSeconds=dt)
+            samples.append(dict(time=time,constraintSample=abs(dt/(r['sampleTimeSeconds']/2)-round(dt/(r['sampleTimeSeconds']/2)))<1e-9,clearance=gap,signedGap=signed,roadMargin=margin,vx=x[3],vy=x[4],yawRate=x[5]))
+    out['closestEncounter']=closest
+    out['auditedSamples']=len(samples)
+    out['zeroDistanceSamples']=sum(s['clearance'] is not None and s['clearance']<=0 for s in samples)
+    out['denseClearanceShortfallSamples']=sum(s['clearance'] is not None and not clearance_passes(s['clearance'],r['requiredClearanceMeters']) for s in samples)
+    out['strictOverlapSamples']=sum(s['signedGap'] is not None and s['signedGap'] < -1e-10 for s in samples)
+    out['minimumNodeMidpointDistanceMeters']=min((s['clearance'] for s in samples if s['constraintSample'] and s['clearance'] is not None),default=None)
+    out['minimumNodeMidpointSignedSatGapMeters']=min((s['signedGap'] for s in samples if s['constraintSample'] and s['signedGap'] is not None),default=None)
+    out['zeroDistanceSamplesDetail']=[{k:s[k] for k in ('time','constraintSample','clearance','signedGap')} for s in samples if s['clearance']==0]
+    out['minimumSignedSatGapMeters']=min((s['signedGap'] for s in samples if s['signedGap'] is not None),default=None)
+    out['minimumWholeBodyRoadMarginMeters']=min((s['roadMargin'] for s in samples),default=None)
+    out['longitudinalSpeedRangeMetersPerSecond']=[min((s['vx'] for s in samples),default=None),max((s['vx'] for s in samples),default=None)]
+    out['peakAbsoluteSteeringDegrees']=max((abs(h['input'][0])*180/math.pi for h in t),default=None)
+    out['peakAbsoluteBrakingRatio']=max((abs(h['input'][1]) for h in t),default=None)
+    return out,samples
+
+
+rows=[]
+for name in ['oncoming','acceleratingTarget']:
+    current=json.loads((raw/(name+'.json')).read_text())
+    original=json.loads((raw.parent/'current-controller-rerun-20260929-011231'/'baseline'/(name+'.json')).read_text())
+    old=original['results'];old['trace']=old['trace'][:60];old['requestedFrames']=60;old['executedFrames']=len(old['trace']);old['completed']=True
+    # Derive dense minima from the matched prefix, rather than keep the old full-run summary.
+    a,oldSamples=summarize(old);a['minimumReplayClearanceMeters']=min(s['clearance'] for s in oldSamples)
+    a={k:a[k] for k in ['minimumReplayClearanceMeters','minimumSignedSatGapMeters','strictOverlapSamples','auditedSamples','minimumNodeMidpointDistanceMeters','minimumWholeBodyRoadMarginMeters','closestEncounter']}
+    a['comparisonWindowSeconds']=3
+    b,samples=summarize(current['results']);check=audit(current['results'])
+    rows.append(dict(scenario=name,zeroMargin=a,fiveMillimeterMargin=b,audit=check))
+    print(name,b['executedFrames'],b['minimumReplayClearanceMeters'],b['strictOverlapSamples'],b['denseClearanceShortfallSamples'],b['minimumNodeMidpointDistanceMeters'],check)
+(raw/'margin-comparison.json').write_text(json.dumps(rows,indent=2)+'\n')

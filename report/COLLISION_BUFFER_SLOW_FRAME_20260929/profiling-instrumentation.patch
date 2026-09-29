@@ -1,0 +1,55 @@
+--- a/controller/solvePredictiveControl.m
++++ b/controller/solvePredictiveControl.m
+@@ -4,0 +5 @@
++    global frameTiming; frameTiming=struct('roadRowsSeconds',0,'collisionRowsSeconds',0,'safetyRowsCalls',0);
+@@ -41,0 +43,2 @@
++    frameTiming.initialEvaluationSeconds=toc(timer);
++    frameTiming.baselineCost=baseline.cost;frameTiming.baselineHard=baseline.hard;frameTiming.baselineSafety=baseline.safety;frameTiming.baselineClfSlack=baseline.clfSlack;
+@@ -56,2 +59,12 @@
+-            candidate=localNominalEvaluation(inputs,model);
+-            candidate=localPolishEndpoint(candidate,model);
++            phaseTimer=tic;candidate=localNominalEvaluation(inputs,model);
++            frameTiming.candidateEvaluationSeconds=toc(phaseTimer);
++            frameTiming.candidateHardBeforePolish=candidate.hard;
++            [~,~,diagnosticDeviation]=terminalContinuation.membership([candidate.states(:,end);candidate.inputs(:,end)], ...
++                model.sampleIndex+size(candidate.inputs,2),model.terminal);
++            frameTiming.candidateTerminalViolationBeforePolish=norm(model.terminal.factor*diagnosticDeviation)-model.terminal.radius;
++            phaseTimer=tic;candidate=localPolishEndpoint(candidate,model);
++            frameTiming.endpointPolishSeconds=toc(phaseTimer);
++            frameTiming.candidateHardAfterPolish=candidate.hard;
++            [~,~,diagnosticDeviation]=terminalContinuation.membership([candidate.states(:,end);candidate.inputs(:,end)], ...
++                model.sampleIndex+size(candidate.inputs,2),model.terminal);
++            frameTiming.candidateTerminalViolationAfterPolish=norm(model.terminal.factor*diagnosticDeviation)-model.terminal.radius;
+@@ -90 +103 @@
+-    search.elapsedSeconds=toc(timer);
++    search.elapsedSeconds=toc(timer);frameTiming.totalSolveSeconds=search.elapsedSeconds;
+@@ -93,0 +107 @@
++    global frameTiming;frameTiming.polishTrials=0;frameTiming.polishIterations=0;
+@@ -102,0 +117 @@
++        frameTiming.polishIterations=iteration;
+@@ -116,0 +132 @@
++                frameTiming.polishTrials=frameTiming.polishTrials+1;
+@@ -160,0 +177 @@
++    global frameTiming; assemblyTimer=tic;
+@@ -234 +251,9 @@
+-    [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;info.safetyExitFlag=flag;
++    frameTiming.assemblySeconds=toc(assemblyTimer);
++    frameTiming.terminalRadius=seed.radius;frameTiming.terminalFactorNorm=norm(seed.factor);
++    frameTiming.variables=nv;frameTiming.equalities=size(equal,1);frameTiming.inequalities=size(a,1);
++    frameTiming.equalityNonzeros=nnz(equal);frameTiming.inequalityNonzeros=nnz(a);
++    frameTiming.endpointConeDimension=size(map,1);frameTiming.costConeDimension=size(costMatrix,1)+1;
++    phaseTimer=tic;
++    [first,~,flag,output]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;info.safetyExitFlag=flag;
++    frameTiming.primarySeconds=toc(phaseTimer);frameTiming.primaryOutput=output;
++    secondarySetupTimer=tic;
+@@ -252 +277,3 @@
+-    [second,~,flag]=coneprog(objective,[endpoint,costCone],a,b,equal,rhs,lower,upper,options);
++    frameTiming.secondarySetupSeconds=toc(secondarySetupTimer);phaseTimer=tic;
++    [second,~,flag,output]=coneprog(objective,[endpoint,costCone],a,b,equal,rhs,lower,upper,options);
++    frameTiming.secondarySeconds=toc(phaseTimer);frameTiming.secondaryOutput=output;
+@@ -264,0 +292 @@
++    global frameTiming;frameTiming.safetyRowsCalls=frameTiming.safetyRowsCalls+1;collisionTimer=tic;
+@@ -274,0 +303 @@
++    frameTiming.collisionRowsSeconds=frameTiming.collisionRowsSeconds+toc(collisionTimer);roadTimer=tic;
+@@ -282,0 +312 @@
++    frameTiming.roadRowsSeconds=frameTiming.roadRowsSeconds+toc(roadTimer);

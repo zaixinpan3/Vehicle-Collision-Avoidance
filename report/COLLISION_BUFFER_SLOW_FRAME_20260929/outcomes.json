@@ -1,0 +1,43 @@
+{
+  "testsPassed": 234,
+  "marginResults": [
+    {
+      "scenario": "oncoming",
+      "frames": 60,
+      "minimumDistance": 0.004607376734450989,
+      "overlaps": 0,
+      "bufferShortfalls": 8,
+      "auditPassed": false
+    },
+    {
+      "scenario": "acceleratingTarget",
+      "frames": 60,
+      "minimumDistance": 0.004062624945708349,
+      "overlaps": 0,
+      "bufferShortfalls": 9,
+      "auditPassed": false
+    }
+  ],
+  "originalSeconds": 9.113704,
+  "medianReplaySeconds": 9.298113,
+  "observedPhaseMedians": {
+    "initialEvaluationSeconds": 0.201766,
+    "assemblySeconds": 0.740979,
+    "primarySeconds": 0.46687,
+    "secondarySetupSeconds": 0.001535,
+    "secondarySeconds": 6.699505,
+    "candidateEvaluationSeconds": 0.23675849999999998,
+    "endpointPolishSeconds": 1.157444
+  },
+  "representativeReplay": 2,
+  "representativeSeconds": 9.298113,
+  "representativePhases": {
+    "initialEvaluationSeconds": 0.19283,
+    "assemblySeconds": 0.625372,
+    "primarySeconds": 0.383354,
+    "secondarySetupSeconds": 0.001535,
+    "secondarySeconds": 6.699505,
+    "candidateEvaluationSeconds": 0.227598,
+    "endpointPolishSeconds": 1.157444
+  }
+}
