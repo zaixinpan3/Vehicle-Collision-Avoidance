@@ -1,0 +1,161 @@
+time,controllerSeconds,solverCalls,horizonSteps,scvxConverged,terminationReason,predictiveBarrierValue,hardResidual,clfSlack
+0,8.163962,2,357,False,timeLimit,0,0,0
+0.05,8.207675,2,356,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+0.10000000000000002,8.696363,2,355,False,timeLimit,0,0,0
+0.15000000000000002,8.792762,2,354,False,timeLimit,0,0,0
+0.2,8.401722,2,353,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+0.25,8.77868,2,352,False,timeLimit,0,0,0
+0.3,7.956081,2,351,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+0.35,8.452244,2,350,False,timeLimit,0,0,0
+0.39999999999999997,8.6592,2,349,False,timeLimit,0,0,0
+0.44999999999999996,8.547576,2,348,False,timeLimit,0,0,0
+0.49999999999999994,8.619018,2,347,False,timeLimit,0,0,0
+0.5499999999999999,9.113704,2,346,False,timeLimit,0,0,0
+0.6,8.451133,2,345,False,timeLimit,0,0,0
+0.65,9.098171,2,344,False,timeLimit,0,0,0
+0.7000000000000001,8.281801,2,343,False,timeLimit,0,0,0
+0.7500000000000001,8.941626,2,342,False,timeLimit,0,0,0
+0.8000000000000002,8.422252,2,341,False,timeLimit,0,0,0
+0.8500000000000002,8.87191,2,340,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+0.9000000000000002,8.882134,2,339,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+0.9500000000000002,8.695726,2,338,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.0000000000000002,8.247552,2,337,False,timeLimit,0,0,0
+1.0500000000000003,8.708787,2,336,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.1000000000000003,8.723547,2,335,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.1500000000000004,8.484782,2,334,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.2000000000000004,8.516358,2,333,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.2500000000000004,8.251089,2,332,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.3000000000000005,8.50844,2,331,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.3500000000000005,8.289041,2,330,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.4000000000000006,8.351746,2,329,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.4500000000000006,8.03619,2,328,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.5000000000000007,8.088015,2,327,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.5500000000000007,7.956157,2,326,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.6000000000000008,7.958695,2,325,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.6500000000000008,8.009593,2,324,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.7000000000000008,7.913408,2,323,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.7500000000000009,8.021545,2,322,False,timeLimit,0,0,0
+1.800000000000001,8.099362,2,321,False,timeLimit,0,0,0
+1.850000000000001,8.032952,2,320,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.900000000000001,7.957093,2,319,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+1.9500000000000008,7.966204,2,318,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.000000000000001,8.023796,2,317,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.0500000000000007,7.924546,2,316,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.1000000000000005,7.428603,2,315,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.1500000000000004,7.704952,2,314,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.2,7.868152,2,313,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.25,7.707104,2,312,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.3,7.905121,2,311,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.3499999999999996,7.654802,2,310,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.3999999999999995,7.770182,2,309,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.4499999999999993,7.687932,2,308,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.499999999999999,7.651904,2,307,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.549999999999999,7.495993,2,306,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.5999999999999988,7.64831,2,305,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.6499999999999986,7.432694,2,304,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.6999999999999984,7.609385,2,303,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.7499999999999982,7.47504,2,302,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.799999999999998,7.79497,2,301,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.849999999999998,7.304318,2,300,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.8999999999999977,7.740136,2,299,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.9499999999999975,7.520628,2,298,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+2.9999999999999973,7.545737,2,297,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.049999999999997,7.985088,2,296,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.099999999999997,7.43852,2,295,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.149999999999997,7.92074,2,294,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.1999999999999966,7.533784,2,293,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.2499999999999964,7.89999,2,292,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.2999999999999963,7.343941,2,291,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.349999999999996,7.832901,2,290,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.399999999999996,7.081411,2,289,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.4499999999999957,7.8916,2,288,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.4999999999999956,7.898714,2,287,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.5499999999999954,7.781747,2,286,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.599999999999995,7.81367,2,285,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.649999999999995,7.698319,2,284,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.699999999999995,7.459293,2,283,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.7499999999999947,7.40658,2,282,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.7999999999999945,7.347085,2,281,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.8499999999999943,7.011703,2,280,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.899999999999994,7.051332,2,279,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.949999999999994,6.874744,2,278,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+3.999999999999994,7.115555,2,277,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.049999999999994,6.928677,2,276,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.099999999999993,6.991277,2,275,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.149999999999993,6.900178,2,274,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.199999999999993,6.946095,2,273,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.249999999999993,7.281635,2,272,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.299999999999993,6.835873,2,271,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.3499999999999925,7.291933,2,270,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.399999999999992,7.054792,2,269,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.449999999999992,7.269866,2,268,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.499999999999992,6.795759,2,267,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.549999999999992,7.133435,2,266,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.599999999999992,7.243362,2,265,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.6499999999999915,7.017322,2,264,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.699999999999991,7.155709,2,263,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.749999999999991,6.837283,2,262,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.799999999999991,7.015754,2,261,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.849999999999991,6.835247,2,260,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.899999999999991,6.939839,2,259,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.94999999999999,6.75128,2,258,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+4.99999999999999,6.915176,2,257,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.04999999999999,6.724377,2,256,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.09999999999999,6.818232,2,255,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.14999999999999,8.062874,2,254,False,timeLimit,0,0,0
+5.1999999999999895,6.829262,2,253,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.249999999999989,6.981303,2,252,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.299999999999989,6.817085,2,251,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.349999999999989,6.62197,2,250,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.399999999999989,6.722211,2,249,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.449999999999989,6.717726,2,248,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.4999999999999885,6.824057,2,247,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.549999999999988,6.608078,2,246,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.599999999999988,6.546483,2,245,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.649999999999988,6.759815,2,244,True,zeroSlack,0,0,0
+5.699999999999988,7.003544,2,243,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.749999999999988,6.917293,2,242,True,zeroSlack,0,0,0
+5.799999999999987,6.803174,2,241,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.849999999999987,6.524616,2,240,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+5.899999999999987,6.416805,2,239,True,zeroSlack,0,0,0
+5.949999999999987,6.721762,2,238,True,zeroSlack,0,0,0
+5.999999999999987,6.688105,2,237,True,zeroSlack,0,0,0
+6.0499999999999865,6.612395,2,236,True,zeroSlack,0,0,0
+6.099999999999986,6.541658,2,235,True,zeroSlack,0,0,0
+6.149999999999986,6.861532,2,234,True,zeroSlack,0,0,0
+6.199999999999986,6.766003,2,233,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.249999999999986,6.546036,2,232,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.299999999999986,6.900694,2,231,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.349999999999985,6.659187,2,230,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.399999999999985,6.526217,2,229,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.449999999999985,6.371668,2,228,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.499999999999985,6.609011,2,227,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.549999999999985,6.490705,2,226,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.5999999999999845,6.655036,2,225,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.649999999999984,6.419841,2,224,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.699999999999984,6.505837,2,223,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.749999999999984,6.902857,2,222,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.799999999999984,6.905302,2,221,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.849999999999984,6.696908,2,220,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.8999999999999835,6.822882,2,219,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.949999999999983,7.199247,2,218,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+6.999999999999983,6.799382,2,217,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.049999999999983,6.511457,2,216,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.099999999999983,6.857653,2,215,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.149999999999983,6.898114,2,214,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.199999999999982,6.468826,2,213,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.249999999999982,6.208812,2,212,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.299999999999982,6.473186,2,211,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.349999999999982,6.444845,2,210,True,zeroSlack,0,0,0
+7.399999999999982,6.892933,2,209,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.4499999999999815,6.686171,2,208,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.499999999999981,6.229723,2,207,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.549999999999981,6.617503,2,206,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.599999999999981,6.460305,2,205,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.649999999999981,6.298225,2,204,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.699999999999981,6.499701,2,203,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.7499999999999805,6.549692,2,202,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.79999999999998,6.436109,2,201,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.84999999999998,6.489545,2,200,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.89999999999998,6.277287,2,199,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0
+7.94999999999998,6.390728,2,198,False,Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0,0,0

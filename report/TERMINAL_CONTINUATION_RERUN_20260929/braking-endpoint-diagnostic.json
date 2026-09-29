@@ -1,0 +1,62 @@
+[
+  {
+    "referenceSpeed": 8,
+    "stage": 68,
+    "time": 3.4000000000000004,
+    "originalMargin": -7.90006987409491,
+    "equivalentRepresentationMargin": 3.0499301259050906,
+    "targetLateralAcceleration": -1.2246467991473532E-16,
+    "velocityRepresentationDifference": 1.7145055188062949E-16,
+    "endpointMembership": -1.4901161193847656E-8
+  },
+  {
+    "referenceSpeed": 8,
+    "stage": 357,
+    "time": 17.85,
+    "originalMargin": 0.011180125905108942,
+    "equivalentRepresentationMargin": 3.0499301259050906,
+    "targetLateralAcceleration": -1.2246467991473532E-16,
+    "velocityRepresentationDifference": 1.9410651766485551E-15,
+    "endpointMembership": -1.4901161193847656E-8
+  },
+  {
+    "referenceSpeed": 8,
+    "stage": 512,
+    "time": 25.6,
+    "originalMargin": 3.0499301259050906,
+    "equivalentRepresentationMargin": 3.0499301259050906,
+    "targetLateralAcceleration": -1.2246467991473532E-16,
+    "velocityRepresentationDifference": 2.8901664459877537E-15,
+    "endpointMembership": -1.4901161193847656E-8
+  },
+  {
+    "referenceSpeed": 15,
+    "stage": 76,
+    "time": 3.8000000000000003,
+    "originalMargin": -7.9004468213091972,
+    "equivalentRepresentationMargin": 3.049553178690803,
+    "targetLateralAcceleration": -1.2246467991473532E-16,
+    "velocityRepresentationDifference": 2.2043642384652361E-16,
+    "endpointMembership": -9.5367431640625E-7
+  },
+  {
+    "referenceSpeed": 15,
+    "stage": 357,
+    "time": 17.85,
+    "originalMargin": -7.9004468213091821,
+    "equivalentRepresentationMargin": 3.049553178690803,
+    "targetLateralAcceleration": -1.2246467991473532E-16,
+    "velocityRepresentationDifference": 1.9410651766485551E-15,
+    "endpointMembership": -9.5367431640625E-7
+  },
+  {
+    "referenceSpeed": 15,
+    "stage": 512,
+    "time": 25.6,
+    "originalMargin": -7.9004468213091634,
+    "equivalentRepresentationMargin": 3.049553178690803,
+    "targetLateralAcceleration": -1.2246467991473532E-16,
+    "velocityRepresentationDifference": 2.8901664459877537E-15,
+    "endpointMembership": -9.5367431640625E-7
+  }
+]

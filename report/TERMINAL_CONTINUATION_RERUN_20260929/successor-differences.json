@@ -1,0 +1,401 @@
+[
+  {
+    "cohort": "baseline",
+    "scenario": "recovery",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 40,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [
+      4.2756909124364029E-12,
+      6.3650479331656129E-10,
+      4.1220632162599843E-9,
+      3.6403324799039183E-10,
+      5.2350720725416466E-8,
+      1.3337095718275738E-7
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      4.4408920985006262E-15,
+      7.2369983269982008E-12,
+      3.0582082141206515E-11,
+      1.4743761767022079E-13,
+      3.9408106969731141E-10,
+      9.8423637837942446E-10
+    ]
+  },
+  {
+    "cohort": "baseline",
+    "scenario": "circular",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 40,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [
+      3.5527136788005009E-15,
+      3.3306690738754696E-16,
+      2.7755575615628914E-17,
+      0,
+      1.3877787807814457E-17,
+      1.3877787807814457E-17
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      8.8817841970012523E-16,
+      1.0408340855860843E-17,
+      2.6020852139652106E-18,
+      0,
+      6.9388939039072284E-18,
+      0
+    ]
+  },
+  {
+    "cohort": "baseline",
+    "scenario": "oncoming",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 160,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [
+      4.6067301084917744E-8,
+      1.0129632732613914E-7,
+      1.3580587654438148E-7,
+      1.1038898151127796E-7,
+      1.2759050558863727E-6,
+      2.358906239997155E-6
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      1.4210854715202004E-14,
+      1.1214843868982692E-12,
+      6.1373860997734084E-12,
+      6.2172489379008766E-15,
+      3.1574267724416542E-11,
+      1.4978886329575148E-10
+    ]
+  },
+  {
+    "cohort": "baseline",
+    "scenario": "turningTarget",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 160,
+    "exactlyMatchingSuccessors": 4,
+    "maximumAbsoluteSuccessorDifference": [
+      2.8421709430404007E-14,
+      2.9239326702767026E-34,
+      1.5994371632186612E-33,
+      1.0658141036401503E-14,
+      1.9934836219073602E-32,
+      5.164711565512569E-32
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      1.4210854715202004E-14,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "cohort": "baseline",
+    "scenario": "acceleratingTarget",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 160,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [
+      2.0661653721276707E-8,
+      6.7152482796650759E-8,
+      9.0434863458943582E-8,
+      1.59425542989311E-7,
+      1.6238832077908327E-6,
+      2.5146640829643019E-6
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      1.4210854715202004E-14,
+      1.297875482633139E-12,
+      1.3220542289298454E-12,
+      4.4408920985006262E-15,
+      1.4608177864370177E-11,
+      4.2572948201032196E-11
+    ]
+  },
+  {
+    "cohort": "baseline",
+    "scenario": "acceleratingTurn",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 117,
+    "exactlyMatchingSuccessors": 4,
+    "maximumAbsoluteSuccessorDifference": [
+      2.8421709430404007E-14,
+      2.9239326702767026E-34,
+      1.5994371632186612E-33,
+      1.0658141036401503E-14,
+      1.9934836219073602E-32,
+      5.164711565512569E-32
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      7.1054273576010019E-15,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "cohort": "baseline",
+    "scenario": "brakingTarget",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 160,
+    "exactlyMatchingSuccessors": 4,
+    "maximumAbsoluteSuccessorDifference": [
+      2.8421709430404007E-14,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      1.7763568394002505E-14,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "cohort": "default",
+    "scenario": "recovery",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 40,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [
+      1.1608491945480637E-12,
+      2.8011760966339949E-10,
+      5.4140527195982446E-10,
+      3.33244543071487E-11,
+      1.368873484659458E-8,
+      8.79843180343759E-9
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      1.7763568394002505E-15,
+      4.2423914858522038E-12,
+      8.60540866267235E-12,
+      1.4210854715202004E-14,
+      2.087027581461863E-10,
+      1.4088412413678503E-10
+    ]
+  },
+  {
+    "cohort": "default",
+    "scenario": "circular",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 40,
+    "exactlyMatchingSuccessors": 1,
+    "maximumAbsoluteSuccessorDifference": [
+      7.1054273576010019E-15,
+      4.4408920985006262E-16,
+      5.5511151231257827E-17,
+      0,
+      1.3877787807814457E-17,
+      2.7755575615628914E-17
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      1.7763568394002505E-15,
+      4.163336342344337E-17,
+      5.2041704279304213E-18,
+      0,
+      3.4694469519536142E-18,
+      1.3877787807814457E-17
+    ]
+  },
+  {
+    "cohort": "default",
+    "scenario": "oncoming",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 0,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [],
+    "medianAbsoluteSuccessorDifference": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "cohort": "default",
+    "scenario": "turningTarget",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 160,
+    "exactlyMatchingSuccessors": 4,
+    "maximumAbsoluteSuccessorDifference": [
+      2.8421709430404007E-14,
+      1.1031314018206403E-35,
+      2.0034350570073686E-35,
+      1.0658141036401503E-14,
+      5.0869296366596134E-34,
+      3.2555640947722075E-34
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      2.1316282072803006E-14,
+      1.6171410273041544E-38,
+      3.0639228371840264E-38,
+      0,
+      7.1594621342944914E-37,
+      5.16240380534842E-37
+    ]
+  },
+  {
+    "cohort": "default",
+    "scenario": "acceleratingTarget",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 0,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [],
+    "medianAbsoluteSuccessorDifference": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "cohort": "default",
+    "scenario": "acceleratingTurn",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 117,
+    "exactlyMatchingSuccessors": 4,
+    "maximumAbsoluteSuccessorDifference": [
+      2.8421709430404007E-14,
+      1.1031314018206403E-35,
+      2.0034350570073686E-35,
+      1.0658141036401503E-14,
+      5.0869296366596134E-34,
+      3.2555640947722075E-34
+    ],
+    "medianAbsoluteSuccessorDifference": [
+      2.1316282072803006E-14,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "cohort": "default",
+    "scenario": "brakingTarget",
+    "stateOrder": [
+      "X",
+      "Y",
+      "psi",
+      "vx",
+      "vy",
+      "r"
+    ],
+    "holds": 0,
+    "exactlyMatchingSuccessors": 0,
+    "maximumAbsoluteSuccessorDifference": [],
+    "medianAbsoluteSuccessorDifference": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  }
+]

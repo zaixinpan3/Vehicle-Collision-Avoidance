@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-09-29T01:13:46.916906-05:00",
+  "processSnapshot": [
+    "    PID     ELAPSED %CPU COMMAND",
+    "1883520       02:39  468 MATLAB",
+    "1887317       01:06  247 MATLAB",
+    "1889707       00:14  160 MATLAB",
+    "1890390       00:00  100 ps",
+    "1890389       00:00 33.3 python",
+    "1845716       38:07  9.3 chromium",
+    "1888466       00:43  8.5 chromium",
+    "1868223       20:51  8.4 chromium",
+    "1888443       00:43  7.1 chromium",
+    "1734566    03:52:20  5.7 chromium",
+    "  48762  2-07:15:41  5.4 ghostty"
+  ],
+  "note": "Other MATLAB activity observed during selected regression tests; no unrelated process was stopped. Timing is under uncontrolled host load.",
+  "laterObservations": [
+    {
+      "observedAt": "2026-09-29T01:24:58.149758-05:00",
+      "matlabProcessSnapshot": [
+        "    PID     ELAPSED %CPU COMMAND",
+        "1484003    11:21:35  0.1 MATLAB",
+        "1484145    11:21:34  0.2 MATLAB",
+        "1673974    05:32:06  0.1 MATLAB",
+        "1674115    05:32:05  0.4 MATLAB",
+        "1887317       12:17  253 MATLAB"
+      ],
+      "stage": "baseline turningTarget; other active MATLAB batches previously observed have ended; idle GUI processes remain"
+    }
+  ]
+}
