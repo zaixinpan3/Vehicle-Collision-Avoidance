@@ -1,0 +1,81 @@
+[
+  {
+    "scenario": "oncoming",
+    "minimumNodeMidpointDistanceMeters": 0.0,
+    "minimumNodeMidpointSignedSatGapMeters": -9.993068261771043e-07,
+    "overlaps": [
+      {
+        "time": 1.011666666666667,
+        "holdSample": 7,
+        "signedSatGapMeters": -0.00016794245744933267
+      },
+      {
+        "time": 1.0133333333333336,
+        "holdSample": 8,
+        "signedSatGapMeters": -0.0003841689476188348
+      },
+      {
+        "time": 1.0150000000000001,
+        "holdSample": 9,
+        "signedSatGapMeters": -0.0005331812259015134
+      },
+      {
+        "time": 1.0166666666666668,
+        "holdSample": 10,
+        "signedSatGapMeters": -0.0006147091121859738
+      },
+      {
+        "time": 1.0183333333333335,
+        "holdSample": 11,
+        "signedSatGapMeters": -0.0006284878321932696
+      },
+      {
+        "time": 1.0200000000000002,
+        "holdSample": 12,
+        "signedSatGapMeters": -0.0005742579203071863
+      },
+      {
+        "time": 1.021666666666667,
+        "holdSample": 13,
+        "signedSatGapMeters": -0.0004517651197580852
+      },
+      {
+        "time": 1.0233333333333337,
+        "holdSample": 14,
+        "signedSatGapMeters": -0.0002607602893561767
+      },
+      {
+        "time": 1.0250000000000001,
+        "holdSample": 15,
+        "signedSatGapMeters": -9.993068261771043e-07
+      }
+    ]
+  },
+  {
+    "scenario": "turningTarget",
+    "minimumNodeMidpointDistanceMeters": 0.0009930594564646063,
+    "minimumNodeMidpointSignedSatGapMeters": 0.0009930594564646622,
+    "overlaps": [
+      {
+        "time": 1.0183333333333335,
+        "holdSample": 11,
+        "signedSatGapMeters": -0.018480697462132767
+      },
+      {
+        "time": 1.0200000000000002,
+        "holdSample": 12,
+        "signedSatGapMeters": -0.021885931383671453
+      },
+      {
+        "time": 1.021666666666667,
+        "holdSample": 13,
+        "signedSatGapMeters": -0.014282954910951884
+      },
+      {
+        "time": 1.0233333333333337,
+        "holdSample": 14,
+        "signedSatGapMeters": -0.006656801933123679
+      }
+    ]
+  }
+]

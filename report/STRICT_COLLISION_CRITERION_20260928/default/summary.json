@@ -1,0 +1,626 @@
+{
+  "cohort": "default",
+  "results": [
+    {
+      "scenario": "recovery",
+      "requestedFrames": 40,
+      "executedFrames": 40,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": null,
+      "minimumReplayRoadMarginMeters": 3.0391851936088212,
+      "maximumFrameSeconds": 0.89796,
+      "maximumHorizonSteps": 16,
+      "initialClfValue": 0.005729290220041133,
+      "finalClfValue": 1.8712919884888788e-07,
+      "maximumClfSlack": 0.0003114016105276885,
+      "sampleTimeSeconds": 0.05,
+      "randomSeed": [],
+      "finalTransverseError": [
+        5.2851029618259376e-05,
+        -1.054090158095329e-05,
+        8.79065709114002e-11,
+        -2.149798009503208e-05,
+        3.537019048019425e-05
+      ],
+      "warmStartedFrames": 39,
+      "requiredClearanceMeters": 0,
+      "firstFrameSeconds": 0.89796,
+      "subsequentMedianSeconds": 0.04031,
+      "subsequentP95Seconds": 0.07489249999999996,
+      "deadlineMisses": 5,
+      "failedFrameSeconds": null,
+      "failureTime": null,
+      "passedTarget": false,
+      "totalSolverCalls": 85,
+      "configuration": {
+        "referenceSpeed": 15,
+        "controller": {
+          "sampleTime": 0.05,
+          "horizonSteps": 16,
+          "maximumHorizonSteps": 512
+        },
+        "nonlinear": {
+          "integrationStep": 0.01,
+          "terminalRadius": 0.25,
+          "maximumIterations": 24,
+          "trustRadius": 0.5,
+          "recoveryHorizonSeconds": 3,
+          "clfDecay": 0.01
+        },
+        "collision": {
+          "safetyMarginMeters": 0
+        },
+        "vehicle": {
+          "m": 1650,
+          "Iz": 1700,
+          "lf": 1.4,
+          "lr": 1.65,
+          "wheelbase": 3.05,
+          "length": 4.8,
+          "width": 1.9,
+          "rectangleOffset": [
+            0,
+            0
+          ],
+          "gravity": 9.81
+        },
+        "tire": {
+          "corneringStiffness": [
+            96000,
+            96000
+          ],
+          "frictionCoefficient": [
+            0.85,
+            0.85
+          ]
+        },
+        "actuation": {
+          "brakingRatioMinimum": -1,
+          "brakingRatioMaximum": 1
+        },
+        "roadLoad": {
+          "airDensity": 1.225,
+          "dragCoefficient": 0.3,
+          "frontalArea": 2.2,
+          "rollingCoefficient": 0.01,
+          "rollingSpeedCoefficient": 0,
+          "rollingQuarticCoefficient": 0,
+          "rollingTransitionSpeed": 0.5
+        },
+        "model": {
+          "speedMinimum": 0,
+          "speedMaximum": 18,
+          "scheduleSpeedFloor": 1,
+          "frontWheelSteeringAngleMaximum": 0.6981317007977318,
+          "frontWheelSteeringRateMaximum": null,
+          "brakingRatioRateMaximum": null,
+          "lateralVelocityMaximum": 12,
+          "yawRateMaximum": 5
+        },
+        "clf": {
+          "lateralPositionErrorScale": 0.5,
+          "headingErrorScale": 0.1,
+          "speedErrorScale": 0.25,
+          "lateralVelocityErrorScale": 0.5,
+          "yawRateErrorScale": 0.2,
+          "frontWheelSteeringAngleWeight": 1,
+          "brakingRatioWeight": 1,
+          "relaxationWeight": 100
+        },
+        "solver": {
+          "maxIterations": 400,
+          "timeLimitSeconds": 5,
+          "feasibilityTolerance": 1e-05,
+          "constraintTolerance": 1e-08,
+          "optimalityTolerance": 1e-07,
+          "lexicographicTieTolerance": 1e-06
+        },
+        "target": {
+          "defaultLength": 4.8,
+          "defaultWidth": 1.9
+        }
+      },
+      "convergedFrames": 40,
+      "terminationCounts": {
+        "zeroSlack": 40
+      },
+      "maximumSafetySlack": 0,
+      "maximumHardResidual": 0,
+      "horizonSteps": [
+        16
+      ],
+      "primaryExitFlags": {
+        "1": 42,
+        "-3": 1
+      },
+      "secondaryExitFlags": {
+        "1": 42,
+        "None": 1
+      },
+      "maximumSubproblemResidual": 8.466598227576594e-11,
+      "solverExceptions": [],
+      "closestEncounter": null,
+      "auditedSamples": 1240,
+      "zeroDistanceSamples": 0,
+      "denseClearanceShortfallSamples": 0,
+      "strictOverlapSamples": 0,
+      "minimumSignedSatGapMeters": null,
+      "minimumWholeBodyRoadMarginMeters": 3.0391851936088212,
+      "longitudinalSpeedRangeMetersPerSecond": [
+        14.999993696531616,
+        15.000001918714409
+      ],
+      "peakAbsoluteSteeringDegrees": 0.173716633178404,
+      "peakAbsoluteBrakingRatio": 0.018409234115342968
+    },
+    {
+      "scenario": "circular",
+      "requestedFrames": 40,
+      "executedFrames": 40,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": null,
+      "minimumReplayRoadMarginMeters": 3.0331429530750453,
+      "maximumFrameSeconds": 0.067027,
+      "maximumHorizonSteps": 16,
+      "initialClfValue": 0,
+      "finalClfValue": 8.989761707551787e-18,
+      "maximumClfSlack": 1.1019395694394901e-16,
+      "sampleTimeSeconds": 0.05,
+      "randomSeed": [],
+      "finalTransverseError": [
+        3.7914083159908495e-10,
+        -6.112644244937737e-12,
+        -2.709565904979172e-10,
+        1.6283457221488717e-11,
+        -2.9565766501704616e-11
+      ],
+      "warmStartedFrames": 39,
+      "requiredClearanceMeters": 0,
+      "firstFrameSeconds": 0.067027,
+      "subsequentMedianSeconds": 0.040794,
+      "subsequentP95Seconds": 0.04332485,
+      "deadlineMisses": 1,
+      "failedFrameSeconds": null,
+      "failureTime": null,
+      "passedTarget": false,
+      "totalSolverCalls": 80,
+      "configuration": {
+        "referenceSpeed": 15,
+        "controller": {
+          "sampleTime": 0.05,
+          "horizonSteps": 16,
+          "maximumHorizonSteps": 512
+        },
+        "nonlinear": {
+          "integrationStep": 0.01,
+          "terminalRadius": 0.25,
+          "maximumIterations": 24,
+          "trustRadius": 0.5,
+          "recoveryHorizonSeconds": 3,
+          "clfDecay": 0.01
+        },
+        "collision": {
+          "safetyMarginMeters": 0
+        },
+        "vehicle": {
+          "m": 1650,
+          "Iz": 1700,
+          "lf": 1.4,
+          "lr": 1.65,
+          "wheelbase": 3.05,
+          "length": 4.8,
+          "width": 1.9,
+          "rectangleOffset": [
+            0,
+            0
+          ],
+          "gravity": 9.81
+        },
+        "tire": {
+          "corneringStiffness": [
+            96000,
+            96000
+          ],
+          "frictionCoefficient": [
+            0.85,
+            0.85
+          ]
+        },
+        "actuation": {
+          "brakingRatioMinimum": -1,
+          "brakingRatioMaximum": 1
+        },
+        "roadLoad": {
+          "airDensity": 1.225,
+          "dragCoefficient": 0.3,
+          "frontalArea": 2.2,
+          "rollingCoefficient": 0.01,
+          "rollingSpeedCoefficient": 0,
+          "rollingQuarticCoefficient": 0,
+          "rollingTransitionSpeed": 0.5
+        },
+        "model": {
+          "speedMinimum": 0,
+          "speedMaximum": 18,
+          "scheduleSpeedFloor": 1,
+          "frontWheelSteeringAngleMaximum": 0.6981317007977318,
+          "frontWheelSteeringRateMaximum": null,
+          "brakingRatioRateMaximum": null,
+          "lateralVelocityMaximum": 12,
+          "yawRateMaximum": 5
+        },
+        "clf": {
+          "lateralPositionErrorScale": 0.5,
+          "headingErrorScale": 0.1,
+          "speedErrorScale": 0.25,
+          "lateralVelocityErrorScale": 0.5,
+          "yawRateErrorScale": 0.2,
+          "frontWheelSteeringAngleWeight": 1,
+          "brakingRatioWeight": 1,
+          "relaxationWeight": 100
+        },
+        "solver": {
+          "maxIterations": 400,
+          "timeLimitSeconds": 5,
+          "feasibilityTolerance": 1e-05,
+          "constraintTolerance": 1e-08,
+          "optimalityTolerance": 1e-07,
+          "lexicographicTieTolerance": 1e-06
+        },
+        "target": {
+          "defaultLength": 4.8,
+          "defaultWidth": 1.9
+        }
+      },
+      "convergedFrames": 40,
+      "terminationCounts": {
+        "zeroSlack": 40
+      },
+      "maximumSafetySlack": 0,
+      "maximumHardResidual": 0,
+      "horizonSteps": [
+        16
+      ],
+      "primaryExitFlags": {
+        "1": 40
+      },
+      "secondaryExitFlags": {
+        "1": 40
+      },
+      "maximumSubproblemResidual": 6.849593517357282e-13,
+      "solverExceptions": [],
+      "closestEncounter": null,
+      "auditedSamples": 1240,
+      "zeroDistanceSamples": 0,
+      "denseClearanceShortfallSamples": 0,
+      "strictOverlapSamples": 0,
+      "minimumSignedSatGapMeters": null,
+      "minimumWholeBodyRoadMarginMeters": 3.0331429530750427,
+      "longitudinalSpeedRangeMetersPerSecond": [
+        14.999991608004905,
+        14.999991610629177
+      ],
+      "peakAbsoluteSteeringDegrees": 0.96742485513681,
+      "peakAbsoluteBrakingRatio": 0.019749267546771893
+    },
+    {
+      "scenario": "oncoming",
+      "requestedFrames": 160,
+      "executedFrames": 160,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": 0,
+      "minimumReplayRoadMarginMeters": 0.3555767504664482,
+      "maximumFrameSeconds": 5.219364,
+      "maximumHorizonSteps": 81,
+      "initialClfValue": 0,
+      "finalClfValue": 0.000796715713510133,
+      "maximumClfSlack": 62.621740601361694,
+      "sampleTimeSeconds": 0.05,
+      "randomSeed": [],
+      "finalTransverseError": [
+        -0.0029600299553759956,
+        -1.472947120023612e-05,
+        -4.134915966957919e-06,
+        -0.0018119857000191445,
+        -0.002696089577153749
+      ],
+      "warmStartedFrames": 159,
+      "requiredClearanceMeters": 0,
+      "firstFrameSeconds": 2.415995,
+      "subsequentMedianSeconds": 0.211935,
+      "subsequentP95Seconds": 1.5182685499999993,
+      "deadlineMisses": 160,
+      "failedFrameSeconds": null,
+      "failureTime": null,
+      "passedTarget": true,
+      "totalSolverCalls": 680,
+      "configuration": {
+        "referenceSpeed": 15,
+        "controller": {
+          "sampleTime": 0.05,
+          "horizonSteps": 16,
+          "maximumHorizonSteps": 512
+        },
+        "nonlinear": {
+          "integrationStep": 0.01,
+          "terminalRadius": 0.25,
+          "maximumIterations": 24,
+          "trustRadius": 0.5,
+          "recoveryHorizonSeconds": 3,
+          "clfDecay": 0.01
+        },
+        "collision": {
+          "safetyMarginMeters": 0
+        },
+        "vehicle": {
+          "m": 1650,
+          "Iz": 1700,
+          "lf": 1.4,
+          "lr": 1.65,
+          "wheelbase": 3.05,
+          "length": 4.8,
+          "width": 1.9,
+          "rectangleOffset": [
+            0,
+            0
+          ],
+          "gravity": 9.81
+        },
+        "tire": {
+          "corneringStiffness": [
+            96000,
+            96000
+          ],
+          "frictionCoefficient": [
+            0.85,
+            0.85
+          ]
+        },
+        "actuation": {
+          "brakingRatioMinimum": -1,
+          "brakingRatioMaximum": 1
+        },
+        "roadLoad": {
+          "airDensity": 1.225,
+          "dragCoefficient": 0.3,
+          "frontalArea": 2.2,
+          "rollingCoefficient": 0.01,
+          "rollingSpeedCoefficient": 0,
+          "rollingQuarticCoefficient": 0,
+          "rollingTransitionSpeed": 0.5
+        },
+        "model": {
+          "speedMinimum": 0,
+          "speedMaximum": 18,
+          "scheduleSpeedFloor": 1,
+          "frontWheelSteeringAngleMaximum": 0.6981317007977318,
+          "frontWheelSteeringRateMaximum": null,
+          "brakingRatioRateMaximum": null,
+          "lateralVelocityMaximum": 12,
+          "yawRateMaximum": 5
+        },
+        "clf": {
+          "lateralPositionErrorScale": 0.5,
+          "headingErrorScale": 0.1,
+          "speedErrorScale": 0.25,
+          "lateralVelocityErrorScale": 0.5,
+          "yawRateErrorScale": 0.2,
+          "frontWheelSteeringAngleWeight": 1,
+          "brakingRatioWeight": 1,
+          "relaxationWeight": 100
+        },
+        "solver": {
+          "maxIterations": 400,
+          "timeLimitSeconds": 5,
+          "feasibilityTolerance": 1e-05,
+          "constraintTolerance": 1e-08,
+          "optimalityTolerance": 1e-07,
+          "lexicographicTieTolerance": 1e-06
+        },
+        "target": {
+          "defaultLength": 4.8,
+          "defaultWidth": 1.9
+        }
+      },
+      "convergedFrames": 159,
+      "terminationCounts": {
+        "zeroSlack": 159,
+        "timeLimit": 1
+      },
+      "maximumSafetySlack": 6.376322603918183e-06,
+      "maximumHardResidual": 0,
+      "horizonSteps": [
+        81
+      ],
+      "primaryExitFlags": {
+        "1": 338,
+        "-3": 4
+      },
+      "secondaryExitFlags": {
+        "1": 338,
+        "None": 4
+      },
+      "maximumSubproblemResidual": 2.684080226975186e-06,
+      "solverExceptions": [],
+      "closestEncounter": {
+        "timeSeconds": 1.011666666666667,
+        "clearanceMeters": 0.0,
+        "holdStartSeconds": 1.0000000000000002,
+        "relativeHoldSeconds": 0.011666666666666667
+      },
+      "auditedSamples": 4960,
+      "zeroDistanceSamples": 9,
+      "denseClearanceShortfallSamples": 9,
+      "strictOverlapSamples": 9,
+      "minimumSignedSatGapMeters": -0.0006284878321932696,
+      "minimumWholeBodyRoadMarginMeters": 0.35557675046644777,
+      "longitudinalSpeedRangeMetersPerSecond": [
+        14.675168312610953,
+        15.1544897710237
+      ],
+      "peakAbsoluteSteeringDegrees": 14.738293160351844,
+      "peakAbsoluteBrakingRatio": 0.3357319254378778
+    },
+    {
+      "scenario": "turningTarget",
+      "requestedFrames": 160,
+      "executedFrames": 160,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": 0,
+      "minimumReplayRoadMarginMeters": 2.8560968275734773,
+      "maximumFrameSeconds": 4.027032,
+      "maximumHorizonSteps": 81,
+      "initialClfValue": 0,
+      "finalClfValue": 7.600138116040011e-05,
+      "maximumClfSlack": 0.3729964407792603,
+      "sampleTimeSeconds": 0.05,
+      "randomSeed": [],
+      "finalTransverseError": [
+        0.0011516948382666347,
+        1.555938413455246e-08,
+        1.6438606440516423e-06,
+        1.9156051341134515e-08,
+        -5.7619104295169986e-08
+      ],
+      "warmStartedFrames": 159,
+      "requiredClearanceMeters": 0,
+      "firstFrameSeconds": 2.874082,
+      "subsequentMedianSeconds": 0.211923,
+      "subsequentP95Seconds": 1.9155303,
+      "deadlineMisses": 160,
+      "failedFrameSeconds": null,
+      "failureTime": null,
+      "passedTarget": true,
+      "totalSolverCalls": 720,
+      "configuration": {
+        "referenceSpeed": 15,
+        "controller": {
+          "sampleTime": 0.05,
+          "horizonSteps": 16,
+          "maximumHorizonSteps": 512
+        },
+        "nonlinear": {
+          "integrationStep": 0.01,
+          "terminalRadius": 0.25,
+          "maximumIterations": 24,
+          "trustRadius": 0.5,
+          "recoveryHorizonSeconds": 3,
+          "clfDecay": 0.01
+        },
+        "collision": {
+          "safetyMarginMeters": 0
+        },
+        "vehicle": {
+          "m": 1650,
+          "Iz": 1700,
+          "lf": 1.4,
+          "lr": 1.65,
+          "wheelbase": 3.05,
+          "length": 4.8,
+          "width": 1.9,
+          "rectangleOffset": [
+            0,
+            0
+          ],
+          "gravity": 9.81
+        },
+        "tire": {
+          "corneringStiffness": [
+            96000,
+            96000
+          ],
+          "frictionCoefficient": [
+            0.85,
+            0.85
+          ]
+        },
+        "actuation": {
+          "brakingRatioMinimum": -1,
+          "brakingRatioMaximum": 1
+        },
+        "roadLoad": {
+          "airDensity": 1.225,
+          "dragCoefficient": 0.3,
+          "frontalArea": 2.2,
+          "rollingCoefficient": 0.01,
+          "rollingSpeedCoefficient": 0,
+          "rollingQuarticCoefficient": 0,
+          "rollingTransitionSpeed": 0.5
+        },
+        "model": {
+          "speedMinimum": 0,
+          "speedMaximum": 18,
+          "scheduleSpeedFloor": 1,
+          "frontWheelSteeringAngleMaximum": 0.6981317007977318,
+          "frontWheelSteeringRateMaximum": null,
+          "brakingRatioRateMaximum": null,
+          "lateralVelocityMaximum": 12,
+          "yawRateMaximum": 5
+        },
+        "clf": {
+          "lateralPositionErrorScale": 0.5,
+          "headingErrorScale": 0.1,
+          "speedErrorScale": 0.25,
+          "lateralVelocityErrorScale": 0.5,
+          "yawRateErrorScale": 0.2,
+          "frontWheelSteeringAngleWeight": 1,
+          "brakingRatioWeight": 1,
+          "relaxationWeight": 100
+        },
+        "solver": {
+          "maxIterations": 400,
+          "timeLimitSeconds": 5,
+          "feasibilityTolerance": 1e-05,
+          "constraintTolerance": 1e-08,
+          "optimalityTolerance": 1e-07,
+          "lexicographicTieTolerance": 1e-06
+        },
+        "target": {
+          "defaultLength": 4.8,
+          "defaultWidth": 1.9
+        }
+      },
+      "convergedFrames": 160,
+      "terminationCounts": {
+        "zeroSlack": 160
+      },
+      "maximumSafetySlack": 2.0034744102614965e-06,
+      "maximumHardResidual": 0,
+      "horizonSteps": [
+        81
+      ],
+      "primaryExitFlags": {
+        "1": 359,
+        "-3": 2
+      },
+      "secondaryExitFlags": {
+        "1": 359,
+        "None": 2
+      },
+      "maximumSubproblemResidual": 1.2937904599743757e-06,
+      "solverExceptions": [],
+      "closestEncounter": {
+        "timeSeconds": 1.0183333333333335,
+        "clearanceMeters": 0.0,
+        "holdStartSeconds": 1.0000000000000002,
+        "relativeHoldSeconds": 0.018333333333333333
+      },
+      "auditedSamples": 4960,
+      "zeroDistanceSamples": 4,
+      "denseClearanceShortfallSamples": 4,
+      "strictOverlapSamples": 4,
+      "minimumSignedSatGapMeters": -0.021885931383671453,
+      "minimumWholeBodyRoadMarginMeters": 2.8560968275734773,
+      "longitudinalSpeedRangeMetersPerSecond": [
+        14.978946700652768,
+        15.032355306672708
+      ],
+      "peakAbsoluteSteeringDegrees": 3.5064252019843742,
+      "peakAbsoluteBrakingRatio": 0.1337963314035476
+    }
+  ]
+}

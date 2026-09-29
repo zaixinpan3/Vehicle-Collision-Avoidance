@@ -119,6 +119,16 @@ and returned with their achieved slack sum.
 
 ## Polygon duals and SCvx
 
+The physical collision criterion is strictly positive rectangle distance.
+`collision.safetyMarginMeters` defaults to zero: there is no required additional
+0.10 m buffer. A nonnegative optional buffer can be configured explicitly.
+The optimizer imposes nonnegative signed separation at its constraint samples;
+these closed inequalities and their numerical tolerances cannot certify a
+strict inequality or exclude contact between samples. Offline collision checks
+therefore require distance strictly greater than zero, with no tolerance that
+would admit touching or overlapping rectangles. A reported zero safety slack
+alone is not a strict collision-free certificate.
+
 Both vehicles are oriented rectangles, including optional offsets from their
 state reference points. For body-frame halfspaces \(A b\le d\), rotations
 \(R_e,R_t\), and a target-to-ego unit normal \(n\), the distance dual uses

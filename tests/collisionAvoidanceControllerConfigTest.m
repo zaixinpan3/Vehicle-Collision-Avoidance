@@ -49,6 +49,22 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function noAdditionalCollisionBufferIsRequiredByDefault(testCase)
+            cfg = collisionAvoidanceControllerConfig();
+            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0);
+            cfg = collisionAvoidanceControllerConfig( ...
+                struct('collision', struct('safetyMarginMeters', 0)));
+            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0);
+        end
+
+        function collisionBufferCannotBeNegativeOrNonfinite(testCase)
+            for margin = [-0.1, NaN, Inf]
+                testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
+                    struct('collision', struct('safetyMarginMeters', margin))), ...
+                    'collisionAvoidanceController:invalidConfiguration');
+            end
+        end
+
         function solverPrecisionAndIterationLimitsAreValidated(testCase)
             invalid = {struct("constraintTolerance", 0.0), ...
                 struct("optimalityTolerance", -1.0), ...

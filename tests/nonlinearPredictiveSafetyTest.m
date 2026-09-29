@@ -82,6 +82,15 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(isfield(problem,'certificate'));
             testCase.verifyEqual(problem.metadata.safetyScope,"nominalSampledPrediction");
         end
+        function zeroAdditionalBufferAllowsSeparatedTargetControl(testCase)
+            [ego,road,cfg]=localFixture();cfg.collision.safetyMarginMeters=0;
+            target=localTarget([30;5;0;6;0;0;2.4;.95;0;0]);
+            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(problem.metadata.optimizationReturned);
+            testCase.verifyTrue(problem.metadata.zeroSlack);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1));
+            testCase.verifyGreaterThan(problem.metadata.minimumCollisionMargin,0);
+        end
         function targetMeasurementsInitializeEachNewJointState(testCase)
             [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;0;0;2.4;.95;0;0]);
             [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);

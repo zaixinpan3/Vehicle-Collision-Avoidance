@@ -43,6 +43,11 @@ def distance(a, b):
                for p in vertices for i in range(4))
 
 
+def clearance_passes(minimum, margin):
+    """Require strict separation, plus any explicitly configured buffer."""
+    return minimum > 0 and minimum >= margin - 1e-9
+
+
 def audit(result):
     name = result['scenario']
     if name not in ('oncoming', 'recovery', 'circular', 'turningTarget'):
@@ -73,12 +78,15 @@ def audit(result):
     clearance_match = reported is None or abs(minimum - reported) < 1e-9
     zero_slack = all(hold.get('predictiveBarrierValue', 0) <= 1e-5 for hold in result['trace'])
     solved = all(hold['solverCalls'] >= 2 for hold in result['trace'])
+    collision_free = minimum > 0
+    clearance_satisfied = clearance_passes(minimum, result['requiredClearanceMeters'])
     passed = (solved and zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
-              and minimum >= result['requiredClearanceMeters'] - 1e-9)
+              and clearance_satisfied)
     return dict(scenario=name, passed=passed, samples=samples,
                 minimumClearanceMeters=minimum if math.isfinite(minimum) else None,
                 minimumRoadMarginMeters=road_margin,
                 agreesWithMatlabGeometry=clearance_match, allPredictionsZeroSlack=zero_slack, everyHoldSolved=solved,
+                strictlyCollisionFree=collision_free, configuredClearanceSatisfied=clearance_satisfied,
                 finalLateralErrorMeters=result['finalTransverseError'][0])
 
 

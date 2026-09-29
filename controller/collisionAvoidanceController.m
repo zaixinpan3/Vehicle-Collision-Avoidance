@@ -16,9 +16,6 @@ function [command,predictedInput,prediction,controllerState] = ...
     if nargin<3,laneCenterline=[];end
     if nargin<2,targetEstimate=[];end
     timer=tic;cfg=collisionAvoidanceControllerConfig(cfg);
-    if cfg.collision.safetyMarginMeters<=0
-        error('collisionAvoidanceController:positiveClearanceRequired','Rectangular separation requires positive clearance.');
-    end
     [ego,lane,road,observation]=readControllerInputs(egoState,targetEstimate,laneCenterline,cfg);
     if isempty(targetEstimate) && isfield(egoState,'targetEstimate'),targetEstimate=egoState.targetEstimate;end
     q=predictiveSafetyGeometry.target(observation,targetEstimate,cfg);
