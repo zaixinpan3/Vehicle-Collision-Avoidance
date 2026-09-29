@@ -44,7 +44,7 @@ function cfg=localDefaults()
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
         'feasibilityTolerance',1e-5,'constraintTolerance',1e-8, ...
         'optimalityTolerance',1e-7,'lexicographicTieTolerance',1e-6);
-    cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9);
+    cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
 end
 
 function base=localMerge(base,overrides)
@@ -116,7 +116,7 @@ function localValidate(cfg)
         validateattributes(cfg.solver.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.solver.lexicographicTieTolerance,{'double'},{'scalar','real','finite','nonnegative'});
-    for name=["defaultLength","defaultWidth"]
+    for name=["defaultLength","defaultWidth","rearAxleDistance"]
         validateattributes(cfg.target.(name),{'double'},{'scalar','real','finite','positive'});
     end
 end

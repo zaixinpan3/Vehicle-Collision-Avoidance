@@ -1,0 +1,41 @@
+{
+  "scenario": "acceleratingTarget",
+  "method": "Independent polygon SAT on exported ode45 states and analytic target motion; penetration is the minimum separating translation along a polygon edge normal",
+  "contacts": [
+    {
+      "holdIndex": 29,
+      "sampleIndex": 16,
+      "timeSeconds": 1.4250000000000005,
+      "penetrationMeters": 6.338043427089879e-06,
+      "nominalSafetySlack": 6.3370287537445336e-06,
+      "hardResidual": 0,
+      "scvxConverged": true
+    }
+  ],
+  "affectedHolds": [
+    {
+      "holdIndex": 29,
+      "holdTimeSeconds": 1.4000000000000006,
+      "samplesAtStartMidpointEnd": [
+        {
+          "relativeTimeSeconds": 0,
+          "distanceMeters": 0.006285135032989491,
+          "signedSatGapMeters": 0.006285135032989331
+        },
+        {
+          "relativeTimeSeconds": 0.025,
+          "distanceMeters": 0.0,
+          "signedSatGapMeters": -6.338043427089879e-06
+        },
+        {
+          "relativeTimeSeconds": 0.05,
+          "distanceMeters": 0.04788942524681311,
+          "signedSatGapMeters": 0.047889425246813166
+        }
+      ],
+      "predictionCollisionMargin": -6.3370287537445336e-06
+    }
+  ],
+  "contactSamples": 1,
+  "maximumPenetrationMeters": 6.338043427089879e-06
+}

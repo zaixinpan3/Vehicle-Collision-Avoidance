@@ -45,24 +45,26 @@ classdef nonlinearBicycleModel
         end
 
         function [next,a,b] = jointSample(z,u,targetParameters,cfg)
-            % Joint autonomous state [ego(6); target position(2); target yaw].
-            % Target parameters are [speed; sideslip; yawRate; half extents;
-            % body offset]. Eliminating its unactuated prediction is exact.
+            % Joint state [ego(6); target position(2); target yaw; target V].
+            % Constant target parameters: [A; beta; lr; half extents; offset].
+            % Eliminating the autonomous target prediction is exact.
             if isempty(targetParameters)
                 if nargout>1,[next,a,b]=nonlinearBicycleModel.sample(z,u,cfg);
                 else,next=nonlinearBicycleModel.sample(z,u,cfg);end
                 return;
             end
-            validateattributes(z,{'double'},{'size',[9,1],'real','finite'});
+            validateattributes(z,{'double'},{'size',[10,1],'real','finite'});
             validateattributes(targetParameters,{'double'},{'size',[7,1],'real','finite'});
             if nargout>1,[ego,ae,be]=nonlinearBicycleModel.sample(z(1:6),u,cfg);
             else,ego=nonlinearBicycleModel.sample(z(1:6),u,cfg);end
-            target=[z(7:9);targetParameters];
+            target=[z(7:10);targetParameters];
             future=predictiveSafetyGeometry.targetFlow(target,cfg.controller.sampleTime);
             displacement=future(1:2)-target(1:2);
-            at=eye(3);at(1:2,3)=[-displacement(2);displacement(1)];
-            next=[ego;future(1:3)];
-            if nargout>1,a=blkdiag(ae,at);b=[be;zeros(3,2)];end
+            at=eye(4);at(1:2,3)=[-displacement(2);displacement(1)];
+            at(1:2,4)=cfg.controller.sampleTime*[cos(future(3)+target(6));sin(future(3)+target(6))];
+            at(3,4)=cfg.controller.sampleTime*sin(target(6))/target(7);
+            next=[ego;future(1:4)];
+            if nargout>1,a=blkdiag(ae,at);b=[be;zeros(4,2)];end
         end
 
         function [error,jacobian] = errorLinearization(x,lane,reference)

@@ -1,0 +1,58 @@
+MATLAB initial test log export. Backspace controls and trailing whitespace
+were removed for readability; the test output and error text are preserved.
+
+Running nonlinearPredictiveSafetyTest
+.......... .......... .......... .......... ..........
+......
+Done nonlinearPredictiveSafetyTest
+__________
+
+Running controllerInputGeometryTest
+.......
+================================================================================
+Error occurred in controllerInputGeometryTest/estimatorPublishesItsRearAxleDistance and it did not run to completion.
+    ---------
+    Error ID:
+    ---------
+    'nrmmTargetTrackerDerivative:invalidDomain'
+    --------------
+    Error Details:
+    --------------
+    Error using nrmmTargetTrackerDerivative>localTargetDomain (line 147)
+    domain.yawRateMaximum must be a finite scalar.
+
+    Error in nrmmTargetTrackerDerivative (line 50)
+            sideslipMaximum] = localTargetDomain(domain);
+
+    Error in controllerInputGeometryTest/estimatorPublishesItsRearAxleDistance
+    (line 53)
+                [~,estimate]=nrmmTargetTrackerDerivative([20;1;v;acceleration],
+                ...
+================================================================================
+... .....
+Done controllerInputGeometryTest
+__________
+
+Running collisionAvoidanceControllerConfigTest
+.......... .......... .......... .......... ..........
+.......
+Done collisionAvoidanceControllerConfigTest
+__________
+
+Running controllerSourceBudgetTest
+.
+Done controllerSourceBudgetTest
+__________
+
+Failure Summary:
+
+     Name                                                               Failed  Incomplete  Reason(s)
+    ==================================================================================================
+     controllerInputGeometryTest/estimatorPublishesItsRearAxleDistance    X         X       Errored.
+{Error using assert
+At least one test failed in the test session.
+
+Error in matlab.unittest.internal.BaseTestResult/assertSuccess (line 126)
+             assert(~any([resultArray.Failed]),message('MATLAB:unittest:TestResult:UnsuccessfulRun'));
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+}

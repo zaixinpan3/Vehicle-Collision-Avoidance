@@ -1,7 +1,7 @@
 """Independently audit geometry in runNonlinearPredictiveSafetyValidation exports.
 
-The named fixtures use 4.8 m by 1.9 m rectangles, an 8 m wide corridor,
-and an oncoming target initially at (24, 0), heading pi, speed 8 m/s.
+The target follows constant tangential acceleration and constant sideslip.
+Its independent initial state and parameters are read from each export.
 This is an offline sampled replay audit; it does not prove continuous safety. Only the Python standard library is used.
 """
 
@@ -11,10 +11,24 @@ import math
 from pathlib import Path
 
 
-def rectangle(x, y, heading):
+def rectangle(x, y, heading, shape=(2.4, .95, 0, 0)):
     c, s = math.cos(heading), math.sin(heading)
+    length, width, offset_x, offset_y = shape
+    x, y = x + c * offset_x - s * offset_y, y + s * offset_x + c * offset_y
     return [(x + c * a - s * b, y + s * a + c * b)
-            for a, b in ((-2.4, -.95), (2.4, -.95), (2.4, .95), (-2.4, .95))]
+            for a, b in ((-length, -width), (length, -width), (length, width), (-length, width))]
+
+
+def target_state(initial, time):
+    """Closed-form single-track motion, including signed velocity after braking."""
+    x, y, heading, velocity, acceleration, beta, rear_axle = initial[:7]
+    arc = velocity * time + .5 * acceleration * time * time
+    curvature = math.sin(beta) / rear_axle
+    angle = curvature * arc / 2
+    travel = arc * (math.sin(angle) / angle if angle else 1)
+    course = heading + beta + angle
+    return (x + travel * math.cos(course), y + travel * math.sin(course),
+            heading + curvature * arc, velocity + acceleration * time)
 
 
 def dot(a, b):
@@ -50,28 +64,28 @@ def clearance_passes(minimum, margin):
 
 def audit(result):
     name = result['scenario']
-    if name not in ('oncoming', 'recovery', 'circular', 'turningTarget'):
+    if name not in ('oncoming', 'recovery', 'circular', 'turningTarget',
+                    'acceleratingTarget', 'acceleratingTurn', 'brakingTarget'):
         raise ValueError(f'Unsupported fixture: {name}')
+    initial = result['targetInitialState']
+    vehicle = result['configuration']['vehicle']
+    ego_shape = (vehicle['length'] / 2, vehicle['width'] / 2, *vehicle['rectangleOffset'])
     minimum = math.inf
     road_margin = math.inf
     samples = 0
     for hold in result['trace']:
         for relative_time, state in zip(hold['auditTimes'], hold['auditStates']):
             samples += 1
-            body = rectangle(*state[:3])
+            body = rectangle(*state[:3], shape=ego_shape)
             if name == 'circular':
                 # Positive 0.005 1/m curvature: center (0, 200), radius 200.
                 lateral = [200 - math.hypot(x, y - 200) for x, y in body]
             else:
                 lateral = [y for _, y in body]
             road_margin = min(road_margin, 4 - max(abs(y) for y in lateral))
-            if name in ('oncoming', 'turningTarget'):
+            if initial:
                 time = hold['time'] + relative_time
-                if name == 'turningTarget':
-                    yaw = math.pi - .8 * time
-                    target = rectangle(24 - 10 * math.sin(yaw), 10 + 10 * math.cos(yaw), yaw)
-                else:
-                    target = rectangle(24 - 8 * time, 0, math.pi)
+                target = rectangle(*target_state(initial, time)[:3], shape=initial[7:11])
                 minimum = min(minimum, distance(body, target))
     complete = result['completed'] and result['executedFrames'] == result['requestedFrames']
     reported = result['minimumReplayClearanceMeters']
@@ -94,9 +108,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--files', nargs='+', default=['short-replays.json', 'oncoming.json'])
     args = parser.parse_args()
     entries = []
-    for name in ('short-replays.json', 'oncoming.json'):
+    for name in args.files:
         data = json.loads((args.directory / name).read_text())['results']
         entries.extend(audit(result) for result in (data if isinstance(data, list) else [data]))
     args.output.write_text(json.dumps(dict(scope='independent sampled geometry', results=entries), indent=2) + '\n')

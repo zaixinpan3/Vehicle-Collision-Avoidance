@@ -28,7 +28,7 @@ The public four-output call remains:
 Use `state` as the next call's `previousState`. The optional persistent state
 can still be reset with `collisionAvoidanceController("resetNominalTrajectory")`.
 `problem.solution` contains nominal states, inputs, stage slacks, CLF values
-and optimization residuals. State format 50 stores `inputTrajectory` and
+and optimization residuals. State format 51 stores `inputTrajectory` and
 `stateTrajectory` solely for the next numerical warm start. An older state
 starts a fresh solve. Each call runs the optimizer and directly applies its
 first returned control, for both zero and positive safety slack. If no
@@ -54,29 +54,63 @@ prediction under a held input. Its analytic force and kinematic derivatives
 are integrated with the RK4 variational equations. This tire model requires
 longitudinal velocity above `model.scheduleSpeedFloor` (1 m/s by default).
 
-For constant tangential speed \(v_t\), heading rate \(\omega_t\), and an optional
-known constant course/body-heading offset \(b_t\),
+The target has constant tangential acceleration \(A_C\) and constant
+sideslip \(\beta_C\). Its rear-axle distance \(l_{r,C}>0\) is fixed. The
+single-track kinematics agree with the existing NRMM target model on its
+positive-speed domain:
 
 \[
-\dot p_t=v_t[\cos(\psi_t+b_t),\sin(\psi_t+b_t)]^T,
-\qquad \dot\psi_t=\omega_t.
+\dot p_C=V_C[\cos(\psi_C+\beta_C),\sin(\psi_C+\beta_C)]^T,\qquad
+\dot V_C=A_C,\qquad \dot\psi_C=\kappa_C V_C,
+\]
+\[
+\kappa_C=\frac{\sin\beta_C}{l_{r,C}},\qquad
+\dot A_C=\dot\beta_C=0.
 \]
 
-The offset is zero when velocity follows body heading. Speed and heading rate
-are independent parameters. The exact discrete target flow is
+Thus curvature is constant and heading rate changes with speed. With signed
+arc length \(s(h)=V_C h+A_C h^2/2\), the exact flow is
 
 \[
-p_t^+=p_t+h v_t\operatorname{sinc}(\omega_t h/2)
- \begin{bmatrix}\cos(\psi_t+b_t+\omega_t h/2)\\
- \sin(\psi_t+b_t+\omega_t h/2)\end{bmatrix},\quad
-\psi_t^+=\psi_t+h\omega_t,
+p_C^+=p_C+s(h)\operatorname{sinc}(\kappa_C s(h)/2)
+ \begin{bmatrix}\cos(\psi_C+\beta_C+\kappa_C s(h)/2)\\
+ \sin(\psi_C+\beta_C+\kappa_C s(h)/2)\end{bmatrix},
+\]
+\[
+\psi_C^+=\psi_C+\kappa_C s(h),\qquad V_C^+=V_C+A_C h,
 \]
 
 where \(\operatorname{sinc}(a)=\sin(a)/a\), including its limit at zero.
-The joint state is \(z=(x_e,p_t,\psi_t)\in\mathbb R^9\). The target's autonomous
+The joint state is \(z=(x_e,p_C,\psi_C,V_C)\in\mathbb R^{10}\). The target's autonomous
 coordinates are eliminated analytically from the optimization; they remain
 in `model.jointState` and `predictedJointState`. With finite slew limits, the
 previous applied input is an additional memory coordinate for MPC reasoning.
+
+`model.target` stores `[X; Y; psi; V; A; beta; lr; halfLength; halfWidth;
+offsetX; offsetY]`. Its last seven entries are `model.targetParameters`.
+The target block of the exact joint-state Jacobian includes
+\(\partial p_C^+/\partial V_C=h[\cos(\psi_C^++\beta_C),
+\sin(\psi_C^++\beta_C)]^T\) and
+\(\partial\psi_C^+/\partial V_C=h\kappa_C\).
+
+The input accepts `targetTangentialAcceleration` or the NRMM field
+`targetScalarAcceleration`. If neither is supplied, acceleration is the
+projection of `targetAccelerationInertial` (or its framed equivalent) along
+\([\cos(\psi_C+\beta_C),\sin(\psi_C+\beta_C)]^T\); missing acceleration defaults
+to zero. `targetSideslip` may be supplied, or is inferred from velocity and
+explicit body heading on the branch \(|\beta_C|<\pi/2\). At zero velocity it
+defaults to zero unless supplied. A supplied `targetRearAxleDistance` overrides
+`cfg.target.rearAxleDistance` (1.6 m by default). The NRMM estimate publishes its
+own rear-axle distance. `targetYawRate` is no longer a prediction parameter;
+heading rate is always calculated from \(V_C\sin\beta_C/l_{r,C}\).
+
+The prediction retains constant acceleration through zero using **signed
+tangential velocity**. A braking target can stop instantaneously and then
+reverse along the same path; no stop-and-hold clamp changes \(A_C\). In reverse,
+\(\beta_C\) defines the body's forward tangent and the velocity course differs
+by \(\pi\). The NRMM observer's positive-speed operating domain is unchanged.
+This continuation is a mathematical modeling assumption, not a prediction
+that a physical braking driver must reverse.
 
 Each new target observation initializes the target part of the current state.
 During a missing observation, the previous target is propagated by this flow;
@@ -204,10 +238,17 @@ ellipsoid. Terminal input memory leaves room for the next lane-feedback input.
 
 Straight and constant-curvature global lane corridors are supported. A
 closed-form terminal geometry constraint separates the whole terminal lane
-tube from the target's remaining straight ray or circular orbit. On a straight
-road this can be a lateral separation or an ego-forward halfspace with
-nondecreasing relative progress. On a circular road it uses separated radial
-ranges. This is a sufficient terminal set, so it can exclude some feasible
+tube from the target's remaining straight path or circular orbit. For
+\(\kappa_C\ne0\), the fixed orbit radius is \(1/|\kappa_C|\), independent of
+acceleration. A target with both \(V_C=A_C=0\) remains a fixed rectangle.
+For a straight target path, analytic quadratic extrema bound all future
+displacement \(V_C t+A_Ct^2/2\), including any reversal. On a straight road,
+separation can be lateral, or the ego rear can remain ahead of the target's
+maximum relative forward excursion. This accounts for the ego terminal
+progress lower bound and the target's acceleration. An accelerating target
+behind the ego cannot qualify merely because its current speed is lower.
+On a circular road the target path gives separated radial ranges.
+This is a sufficient terminal set, so it can exclude some feasible
 maneuvers; it avoids infinite-horizon numerical search and interval arithmetic.
 
 **Nominal recursive-feasibility statement.** Assume that the selected terminal
@@ -252,6 +293,8 @@ validateNonlinearPredictiveController(outputDirectory);
 The MATLAB entry requires Optimization Toolbox and Control System Toolbox.
 No MEX build or MPFR installation is needed. See
 `report/DIRECT_PCBF_CLEANUP_20260928.md` for the executed scope and measured timing.
+The revised target model and its checks are recorded in
+`report/TARGET_ACCELERATION_SIDESLIP_20260928.md`.
 Offline replay and Python geometry audits produce research evidence, and are
 not called when the controller issues an input.
 

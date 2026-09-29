@@ -1,0 +1,267 @@
+{
+  "scope": "Constant tangential acceleration and constant sideslip target model; exact observations in offline replays",
+  "baseCommit": "ecfbf48a6f6f66864ab247a3b030f7e86ece52f1",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "tests": {
+    "count": 220,
+    "passed": 220,
+    "failed": 0,
+    "incomplete": 0,
+    "pythonTests": 5
+  },
+  "codeAnalysis": {
+    "files": 15,
+    "findings": {
+      "SPRIX": 12
+    }
+  },
+  "replays": [
+    {
+      "scenario": "recovery",
+      "requestedFrames": 40,
+      "executedFrames": 40,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": null,
+      "minimumReplayRoadMarginMeters": 3.03923335161947,
+      "firstFrameSeconds": 0.197826,
+      "subsequentMedianSeconds": 0.022404,
+      "subsequentP95Seconds": 0.023685199999999997,
+      "maximumFrameSeconds": 0.197826,
+      "deadlineMisses": 1,
+      "maximumHorizonSteps": 8,
+      "targetInitialState": [],
+      "auditPassed": true,
+      "largestSafetySlack": 0,
+      "largestHardResidual": 0,
+      "nominalConvergedHolds": 40
+    },
+    {
+      "scenario": "circular",
+      "requestedFrames": 40,
+      "executedFrames": 40,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": null,
+      "minimumReplayRoadMarginMeters": 3.022087949329766,
+      "firstFrameSeconds": 0.032975,
+      "subsequentMedianSeconds": 0.02226,
+      "subsequentP95Seconds": 0.024944449999999993,
+      "maximumFrameSeconds": 0.032975,
+      "deadlineMisses": 0,
+      "maximumHorizonSteps": 8,
+      "targetInitialState": [],
+      "auditPassed": true,
+      "largestSafetySlack": 0,
+      "largestHardResidual": 0,
+      "nominalConvergedHolds": 40
+    },
+    {
+      "scenario": "oncoming",
+      "requestedFrames": 160,
+      "executedFrames": 160,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.008360304727503568,
+      "minimumReplayRoadMarginMeters": 0.43709048388126037,
+      "firstFrameSeconds": 4.875669,
+      "subsequentMedianSeconds": 0.241804,
+      "subsequentP95Seconds": 2.276481699999997,
+      "maximumFrameSeconds": 4.875669,
+      "deadlineMisses": 160,
+      "maximumHorizonSteps": 90,
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        0,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "auditPassed": true,
+      "largestSafetySlack": 8.769963267596381e-06,
+      "largestHardResidual": 0,
+      "nominalConvergedHolds": 159
+    },
+    {
+      "scenario": "turningTarget",
+      "requestedFrames": 160,
+      "executedFrames": 160,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": 4.264841713754139,
+      "minimumReplayRoadMarginMeters": 3.0468387146898643,
+      "firstFrameSeconds": 0.293223,
+      "subsequentMedianSeconds": 0.272384,
+      "subsequentP95Seconds": 0.29880589999999996,
+      "maximumFrameSeconds": 0.518757,
+      "deadlineMisses": 160,
+      "maximumHorizonSteps": 100,
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        0,
+        -0.15865526218640144,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "auditPassed": true,
+      "largestSafetySlack": 0,
+      "largestHardResidual": 0,
+      "nominalConvergedHolds": 160
+    },
+    {
+      "scenario": "acceleratingTarget",
+      "requestedFrames": 160,
+      "executedFrames": 160,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": 0,
+      "minimumReplayRoadMarginMeters": 0.5150366795351813,
+      "firstFrameSeconds": 2.179093,
+      "subsequentMedianSeconds": 0.240865,
+      "subsequentP95Seconds": 1.9854841499999993,
+      "maximumFrameSeconds": 4.51464,
+      "deadlineMisses": 160,
+      "maximumHorizonSteps": 90,
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        1,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "auditPassed": false,
+      "largestSafetySlack": 7.6265779437312275e-06,
+      "largestHardResidual": 0,
+      "nominalConvergedHolds": 160
+    },
+    {
+      "scenario": "acceleratingTurn",
+      "requestedFrames": 160,
+      "executedFrames": 160,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": 2.5790494583983965,
+      "minimumReplayRoadMarginMeters": 3.0464389137570804,
+      "firstFrameSeconds": 0.29705,
+      "subsequentMedianSeconds": 0.271071,
+      "subsequentP95Seconds": 0.2867548,
+      "maximumFrameSeconds": 0.384446,
+      "deadlineMisses": 160,
+      "maximumHorizonSteps": 100,
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        1,
+        -0.15865526218640144,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "auditPassed": true,
+      "largestSafetySlack": 0,
+      "largestHardResidual": 0,
+      "nominalConvergedHolds": 160
+    },
+    {
+      "scenario": "brakingTarget",
+      "requestedFrames": 160,
+      "executedFrames": 160,
+      "completed": true,
+      "failure": "",
+      "minimumReplayClearanceMeters": 4.0999999954809585,
+      "minimumReplayRoadMarginMeters": 3.049999995425762,
+      "firstFrameSeconds": 0.026101,
+      "subsequentMedianSeconds": 0.02359,
+      "subsequentP95Seconds": 0.026063449999999995,
+      "maximumFrameSeconds": 0.040553,
+      "deadlineMisses": 0,
+      "maximumHorizonSteps": 8,
+      "targetInitialState": [
+        24,
+        6,
+        3.141592653589793,
+        2,
+        -1,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ],
+      "auditPassed": true,
+      "largestSafetySlack": 0,
+      "largestHardResidual": 0,
+      "nominalConvergedHolds": 160
+    }
+  ],
+  "replayHolds": 880,
+  "independentSamples": 27280,
+  "auditPassCount": 6,
+  "auditScenarioCount": 7,
+  "acceleratingContact": {
+    "scenario": "acceleratingTarget",
+    "method": "Independent polygon SAT on exported ode45 states and analytic target motion; penetration is the minimum separating translation along a polygon edge normal",
+    "contacts": [
+      {
+        "holdIndex": 29,
+        "sampleIndex": 16,
+        "timeSeconds": 1.4250000000000005,
+        "penetrationMeters": 6.338043427089879e-06,
+        "nominalSafetySlack": 6.3370287537445336e-06,
+        "hardResidual": 0,
+        "scvxConverged": true
+      }
+    ],
+    "affectedHolds": [
+      {
+        "holdIndex": 29,
+        "holdTimeSeconds": 1.4000000000000006,
+        "samplesAtStartMidpointEnd": [
+          {
+            "relativeTimeSeconds": 0,
+            "distanceMeters": 0.006285135032989491,
+            "signedSatGapMeters": 0.006285135032989331
+          },
+          {
+            "relativeTimeSeconds": 0.025,
+            "distanceMeters": 0.0,
+            "signedSatGapMeters": -6.338043427089879e-06
+          },
+          {
+            "relativeTimeSeconds": 0.05,
+            "distanceMeters": 0.04788942524681311,
+            "signedSatGapMeters": 0.047889425246813166
+          }
+        ],
+        "predictionCollisionMargin": -6.3370287537445336e-06
+      }
+    ],
+    "contactSamples": 1,
+    "maximumPenetrationMeters": 6.338043427089879e-06
+  },
+  "signedVelocityContinuation": "V(t)=V(0)+A*t continues through zero and may become negative; no stop clamp",
+  "initialTestAttempt": "128/129 passed; one new interface test omitted derived domain bounds. The fixture was corrected; final tests all pass."
+}

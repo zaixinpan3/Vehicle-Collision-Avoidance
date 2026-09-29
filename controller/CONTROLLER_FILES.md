@@ -10,7 +10,7 @@ The current algorithm is described in [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHIT
 | `solvePredictiveControl.m` | SCvx, primary safety LP, secondary lane CLF QP and numerical trust region |
 | `nonlinearBicycleModel.m` | Nonlinear Fiala dynamics, RK4, analytic tangents, road load, cruise trim and lane CLF |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-speed/heading-rate target flow, rectangle distance duals and MPC terminal geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/constant-sideslip target flow, rectangle distance duals and MPC terminal geometry |
 | `laneGeometry.m` | Straight and circular lane coordinates and projection |
 | `../config/collisionAvoidanceControllerConfig.m` | Active defaults, strict merging and validation |
 

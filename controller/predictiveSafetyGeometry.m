@@ -2,7 +2,9 @@ classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target flow, polygon duals and nominal MPC terminal geometry.
     methods (Static)
         function q = target(observation,raw,~)
-            q=zeros(10,0);if isempty(observation),return;end
+            % q = [X;Y;psi;V;A;beta;lr;halfLength;halfWidth;offsetX;offsetY].
+            % V is signed tangential velocity; A and beta remain constant.
+            q=zeros(11,0);if isempty(observation),return;end
             headingKnown=false;
             for name=["targetYawInertial","targetHeadingInertial","targetYawRelative", ...
                     "targetYawAngle","targetYaw","yawAngle","yaw","heading","relativeYaw","relativeHeading"]
@@ -15,28 +17,32 @@ classdef predictiveSafetyGeometry
             speed=norm(observation.velocity);beta=0;
             if speed>0,beta=atan2(sin(atan2(observation.velocity(2),observation.velocity(1))-observation.yaw), ...
                     cos(atan2(observation.velocity(2),observation.velocity(1))-observation.yaw));end
+            if abs(beta)>pi/2,beta=beta-sign(beta)*pi;end
             offset=zeros(2,1);
             if isfield(raw,'targetRectangleOffset'),offset=raw.targetRectangleOffset;end
             validateattributes(offset,{'double'},{'size',[2,1],'real','finite'});
-            if isfield(raw,'targetSideslip')
-                validateattributes(raw.targetSideslip,{'double'},{'scalar','real','finite'});
-                if speed>0 && abs(atan2(sin(beta-raw.targetSideslip),cos(beta-raw.targetSideslip)))>1e-10
-                    error('collisionAvoidanceController:inconsistentTargetMotion','Velocity course and supplied sideslip disagree.');
-                end
+            if isfield(raw,'targetSideslip') && ~isempty(raw.targetSideslip)
                 beta=raw.targetSideslip;
             end
-            % Tangential speed and body heading rate are independent constants.
-            % A known constant course/body offset is retained when supplied.
-            omega=observation.yawRate;
-            q=[observation.position;observation.yaw;speed;beta;omega;observation.length/2;observation.width/2;offset];
+            validateattributes(beta,{'double'},{'scalar','real','finite','>',-pi/2,'<',pi/2});
+            tangent=[cos(observation.yaw+beta);sin(observation.yaw+beta)];
+            speed=tangent.'*observation.velocity;
+            if norm(observation.velocity-speed*tangent)>1e-10*max(1,abs(speed))
+                error('collisionAvoidanceController:inconsistentTargetMotion','Velocity direction and supplied sideslip disagree.');
+            end
+            acceleration=observation.tangentialAcceleration;
+            if isempty(acceleration),acceleration=tangent.'*observation.acceleration;end
+            q=[observation.position;observation.yaw;speed;acceleration;beta;observation.rearAxleDistance; ...
+                observation.length/2;observation.width/2;offset];
         end
 
         function next = targetFlow(q,time)
             if isempty(q),next=q;return;end
-            a=q(6)*time/2;scale=1;
+            arc=q(4)*time+.5*q(5)*time^2;
+            curvature=sin(q(6))/q(7);a=curvature*arc/2;scale=1;
             if a~=0,scale=sin(a)/a;end
-            next=q;next(1:2)=q(1:2)+q(4)*time*scale*[cos(q(3)+q(5)+a);sin(q(3)+q(5)+a)];
-            next(3)=q(3)+q(6)*time;
+            next=q;next(1:2)=q(1:2)+arc*scale*[cos(q(3)+q(6)+a);sin(q(3)+q(6)+a)];
+            next(3)=q(3)+curvature*arc;next(4)=q(4)+q(5)*time;
         end
 
         function [distance,certificate] = rectangle(poseE,shapeE,poseT,shapeT)
@@ -150,51 +156,66 @@ classdef predictiveSafetyGeometry
                 radius=abs(1/frame(4));center=origin+n/frame(4);width=bound(1)+reach;
                 road=min(frame(5:6))-width;
                 if isempty(q),margin=road;return;end
-                if q(6)~=0
+                if q(6)~=0 && any(q(4:5)~=0)
                     [targetCenter,inner,outer]=localOrbit(q);d=norm(targetCenter-center);
                     minimum=max([0,d-outer,inner-d]);maximum=d+outer;
                 else
-                    d=q(1:2)-center;v=q(4)*[cos(q(3)+q(5));sin(q(3)+q(5))];
-                    tau=max(0,-d.'*v/max(q(4)^2,eps));targetReach=norm(q(7:8)+abs(q(9:10)));
-                    minimum=norm(d+tau*v)-targetReach;maximum=norm(d)+targetReach;
-                    if q(4)>0,maximum=Inf;end
+                    d=q(1:2)-center;direction=[cos(q(3)+q(6));sin(q(3)+q(6))];
+                    [first,last]=localProgressRange(q(4),q(5));
+                    arc=min(last,max(first,-d.'*direction));targetReach=norm(q(8:9)+abs(q(10:11)));
+                    minimum=norm(d+arc*direction)-targetReach;maximum=norm(d)+targetReach;
+                    if isinf(first) || isinf(last),maximum=Inf;end
                 end
                 collision=max(minimum-radius-width,radius-width-maximum)-clearance;
                 margin=min(road,collision);return;
             end
             if isempty(q),margin=road;return;end
-            velocity=q(4)*[cos(q(3)+q(5));sin(q(3)+q(5))];
-            if q(6)~=0
+            angle=abs(ref.state(3))+bound(2);
+            progress=(ref.state(4)-bound(3))*cos(angle)-(abs(ref.state(5))+bound(4))*sin(angle);
+            if q(6)~=0 && any(q(4:5)~=0)
                 [center,~,outer]=localOrbit(q);
                 targetLateral=n.'*(center-origin)+[-outer;outer];
                 targetForward=t.'*center+outer;
-                targetProgress=0;
+                advance=0;if progress<0,advance=Inf;end
             else
                 r=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
-                vertices=q(1:2)+r*(q(9:10)+q(7:8).*[-1,1,1,-1;-1,-1,1,1]);
-                side=n.'*(vertices-origin);targetLateral=[min(side);max(side)];
-                sideSpeed=n.'*velocity;
-                if sideSpeed < -1e-12,targetLateral(1)=-Inf;end
-                if sideSpeed > 1e-12,targetLateral(2)=Inf;end
-                targetForward=max(t.'*vertices);targetProgress=t.'*velocity;
+                vertices=q(1:2)+r*(q(10:11)+q(8:9).*[-1,1,1,-1;-1,-1,1,1]);
+                direction=[cos(q(3)+q(6));sin(q(3)+q(6))];
+                lateralDirection=n.'*direction;forwardDirection=t.'*direction;
+                if abs(lateralDirection)<1e-12,lateralDirection=0;end
+                if abs(forwardDirection)<1e-12,forwardDirection=0;end
+                [lower,upper]=localProgressRange(q(4)*lateralDirection,q(5)*lateralDirection);
+                side=n.'*(vertices-origin);targetLateral=[min(side)+lower;max(side)+upper];
+                targetForward=max(t.'*vertices);
+                [~,advance]=localProgressRange(q(4)*forwardDirection-progress,q(5)*forwardDirection);
             end
             collision=max(lateral(1)-targetLateral(2),targetLateral(1)-lateral(2))-clearance;
-            angle=abs(ref.state(3))+bound(2);
-            progress=(ref.state(4)-bound(3))*cos(angle)-(abs(ref.state(5))+bound(4))*sin(angle);
-            if progress>=targetProgress
-                rear=min(corners(1,:))-reach*bound(2);
-                collision=max(collision,t.'*x(1:2)+rear-targetForward-clearance);
-            end
+            rear=min(corners(1,:))-reach*bound(2);
+            collision=max(collision,t.'*x(1:2)+rear-targetForward-advance-clearance);
             margin=min(road,collision);
         end
     end
 end
 
 function [center,inner,outer]=localOrbit(q)
-    radius=q(4)/q(6);angle=q(3)+q(5);
+    radius=q(7)/sin(q(6));angle=q(3)+q(6);
     center=q(1:2)+radius*[-sin(angle);cos(angle)];
-    offset=[-radius*sin(q(5));radius*cos(q(5))]-q(9:10);
-    inner=norm(max(0,abs(offset)-q(7:8)));outer=norm(abs(offset)+q(7:8));
+    offset=[-radius*sin(q(6));radius*cos(q(6))]-q(10:11);
+    inner=norm(max(0,abs(offset)-q(8:9)));outer=norm(abs(offset)+q(8:9));
+end
+
+function [lower,upper]=localProgressRange(velocity,acceleration)
+    % Range of velocity*t + acceleration*t^2/2 for every t >= 0.
+    lower=0;upper=0;
+    if acceleration>0
+        lower=-min(velocity,0)^2/(2*acceleration);upper=Inf;
+    elseif acceleration<0
+        lower=-Inf;upper=-max(velocity,0)^2/(2*acceleration);
+    elseif velocity>0
+        upper=Inf;
+    elseif velocity<0
+        lower=-Inf;
+    end
 end
 
 function [distance,point]=localPointSegment(vertex,first,last)

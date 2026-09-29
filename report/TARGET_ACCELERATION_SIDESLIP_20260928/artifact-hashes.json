@@ -1,0 +1,32 @@
+{
+  "scope": "Technical source and result files only; no weekly/monthly archive documents",
+  "sha256": {
+    "config/collisionAvoidanceControllerConfig.m": "bb92a59e8fc9afe5db5c874e63601a06f5926107c7c8b5abadc4e6770fad3d4f",
+    "controller/CONTROLLER_FILES.md": "f3a280b0a991c7e685ae3f5aa6f712ba2e6ea06ecbef0edf95700af9277fc826",
+    "controller/PCBF_CLF_ARCHITECTURE.md": "33db9753ba90eccb174d9cce08005d436b03388a7598cb18b28b1e867d2d93d3",
+    "controller/collisionAvoidanceController.m": "ae31ad730bb2f8513b9d9835d015148fcdeb7e86fedaf3e67bdf2639bf971e7a",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "1a37fd5340f4210da739b69627627d74e52f66f6e6c434a922e11a05a372a2fe",
+    "controller/readControllerInputs.m": "0f82004d6d799bb9c15396619858747fc16cbcb2efb5af8db89f5c2791df4718",
+    "controller/solvePredictiveControl.m": "f2508a00fefe4f469aa3de6cbc43b1385484318271438432bb03d5abd6bb4d62",
+    "estimator/nrmmTargetTrackerDerivative.m": "6e38b0cbb14d316af51f841d6d0c9a5faf2047a898868d9171df912094a5f088",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928.md": "6d33c9df5ac5992be1a34bbc62931c16c47931c432c4c3a548ba55f15c899188",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/accelerating-contact.json": "857beeef7a1152362bce63a226d2cd2c43780f3ac724c68cd787d1d94bed52ef",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/code-analysis.json": "bfc2e8e3a84574fd14a7a4e41a98fa212b37ec5a5d23e9322797a29a83123c1b",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/independent-audit.json": "5fbfcb311b2903c6bbb93c856cb2812c41f43f691a1e01718c8c1fd6169ccce1",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/initial-test-log.txt": "25aaf96420ff5d227923e941860a64999a98a4b8378b2ceb977e2df21e9be772",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/initial-tests.json": "7ed1ff23b848b93d6b9cc8b282f52897f23fba2fcd68e6373a680e1f47e2c85f",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/oncoming.json": "e88bf619f8f42b26c96e592e260c16aa8b12b59633896375b440ab6745a8f97b",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/short-replays.json": "16e83f452dae62bbfbf3042912b30bd00b66ed694b86dd84d9344bf2e59e06a0",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/summary.json": "b9f66def631f761d8f9d046b3d9580fdbb31dffe04d2c6c4dc94066c88f0378a",
+    "report/TARGET_ACCELERATION_SIDESLIP_20260928/tests.json": "c7d68867163d48e55e62b58d6d5146a168ce3d993a8d1631b761f8f1b9352448",
+    "scripts/README.md": "5d794c65703ff69191c3e3459e1581d51edceea9ea2ff72dec3d279ed841e794",
+    "scripts/auditJointPredictiveSafety.py": "a1df0ce9f585a0aeac8af51695d44f71941a9ed1dc04a16e16a4dbe1001365b7",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "d1d9ac37bb3ff02edd954ae485d6ad85aee276a02b7f2ea46fcd73568c2417d1",
+    "scripts/validateNonlinearPredictiveController.m": "06c23063252dcd0c1495a4a60092a071923e8024b4752eb532b5147ebb1a238a",
+    "tests/auditJointPredictiveSafetyTest.py": "2cf8a96459a39ca1cbe27894a5b65814975661aecc19a5485f62d43ec0a70572",
+    "tests/collisionAvoidanceControllerConfigTest.m": "a7e598c9a27c904fbefd209bd5a1d5c39eea5dcf5c99d301aff5a36978a6136f",
+    "tests/controllerInputGeometryTest.m": "4abf8d0aa19e3c9c6c04efe8289b3b44588681553f670a8c9c80e250690376eb",
+    "tests/nonlinearPredictiveSafetyTest.m": "2cb2ddb6112433069d608a19b5e24c4e719e452ac67babd567b725107111f00a"
+  }
+}

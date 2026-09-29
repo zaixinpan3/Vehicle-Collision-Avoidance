@@ -13,7 +13,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     results=cell(1,numel(options.Scenarios));
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);
-        [ego,target,road,cfg]=localFixture(name,options.ControllerConfiguration);prior=[];
+        [ego,target,road,cfg,initialTarget]=localFixture(name,options.ControllerConfiguration);prior=[];
         frames=0;minimumClearance=Inf;minimumRoadMargin=Inf;maximumSeconds=0;failure="";
         firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;warmStartedFrames=0;finalError=[];
         trace=struct([]);failedFrameSeconds=NaN;failureTime=NaN;passedTarget=false;
@@ -31,7 +31,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 for j=1:numel(times)
                     q=predictiveSafetyGeometry.targetFlow(problem.model.target,times(j));
                     if ~isempty(q)
-                        distance=predictiveSafetyGeometry.rectangle(states(j,1:3).',shape,q(1:3),q(7:10));
+                        distance=predictiveSafetyGeometry.rectangle(states(j,1:3).',shape,q(1:3),q(8:11));
                         minimumClearance=min(minimumClearance,distance);
                     end
                     rotation=[cos(states(j,3)),-sin(states(j,3));sin(states(j,3)),cos(states(j,3))];
@@ -61,7 +61,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 if ~isempty(target)
                     q=predictiveSafetyGeometry.targetFlow(problem.model.target,h);
                     target=localTarget(q);
-                    passedTarget=passedTarget || next(1)-q(1)>cfg.vehicle.length/2+q(7);
+                    passedTarget=passedTarget || next(1)-q(1)>cfg.vehicle.length/2+q(8);
                 end
                 frames=frames+1;
                 if mod(frame,4)==0,fprintf('%s: %d/%d holds, last %.3f s, source %s\n', ...
@@ -87,10 +87,11 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'firstFrameSeconds',firstSeconds,'subsequentMedianSeconds',medianLater, ...
             'subsequentP95Seconds',p95Later,'deadlineMisses',nnz(seconds>cfg.controller.sampleTime), ...
             'failedFrameSeconds',failedFrameSeconds,'failureTime',failureTime,'passedTarget',passedTarget, ...
-            'totalSolverCalls',solverCalls,'configuration',cfg,'trace',trace);
+            'totalSolverCalls',solverCalls,'targetInitialState',initialTarget,'configuration',cfg,'trace',trace);
         fprintf('%s: %d/%d frames, max %.3f s, failure %s\n',name,frames,options.Frames,maximumSeconds,failure);
     end
-    report=struct('model',"nonlinear combined-slip Fiala; one constant-speed/heading-rate target", ...
+    report=struct('model',"nonlinear combined-slip Fiala; one constant-acceleration/constant-sideslip target", ...
+        'targetStateOrder',["X","Y","psi","V","A","beta","lr","halfLength","halfWidth","offsetX","offsetY"], ...
         'scope',"nominal PCBF/CLF/SCvx with independent offline replay", ...
         'stateObservation',"exact ego and target states; no observer, noise or delay", ...
         'replay',struct('integrator',"ode45",'relativeTolerance',1e-11, ...
@@ -101,22 +102,29 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     end
 end
 
-function [ego,target,road,cfg]=localFixture(name,controllerConfiguration)
+function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
     cfg=collisionAvoidanceControllerConfig(controllerConfiguration);
     road=struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);
-    x=[0;0;0;cfg.referenceSpeed;0;0];target=[];
+    x=[0;0;0;cfg.referenceSpeed;0;0];target=[];q=[];lr=cfg.target.rearAxleDistance;
     switch name
         case "recovery",x(2)=.01;
         case "oncoming"
-            target=localTarget([24;0;pi;8;0;0;2.4;.95;0;0]);
+            q=[24;0;pi;8;0;0;lr;2.4;.95;0;0];
         case "circular"
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',.005,'length',200), ...
                 'lateralClearance',[4;4]);
             trim=nonlinearBicycleModel.cruise(cfg,.005);x=trim.state;x(1:2)=0;
         case "turningTarget"
-            target=localTarget([24;0;pi;8;0;-.8;2.4;.95;0;0]);
+            q=[24;0;pi;8;0;atan(-.1*lr);lr;2.4;.95;0;0];
+        case "acceleratingTarget"
+            q=[24;0;pi;8;1;0;lr;2.4;.95;0;0];
+        case "acceleratingTurn"
+            q=[24;0;pi;8;1;atan(-.1*lr);lr;2.4;.95;0;0];
+        case "brakingTarget"
+            q=[24;6;pi;2;-1;0;lr;2.4;.95;0;0];
         otherwise,error('runNonlinearPredictiveSafetyValidation:unknownScenario','Unknown scenario %s.',name);
     end
+    if ~isempty(q),target=localTarget(q);end
     ego=localEgo(x,0,[0;0]);
 end
 function ego=localEgo(x,time,input)
@@ -124,9 +132,11 @@ function ego=localEgo(x,time,input)
         'stateTime',time,'heldActuatorInput',input);
 end
 function target=localTarget(q)
-    velocity=q(4)*[cos(q(3)+q(5));sin(q(3)+q(5))];
+    direction=[cos(q(3)+q(6));sin(q(3)+q(6))];velocity=q(4)*direction;
+    yawRate=q(4)*sin(q(6))/q(7);
     target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',velocity, ...
-        'targetYawInertial',q(3),'targetYawRate',q(6),'targetSideslip',q(5), ...
-        'targetAccelerationInertial',q(6)*[-velocity(2);velocity(1)],'targetLength',2*q(7), ...
-        'targetWidth',2*q(8),'targetRectangleOffset',q(9:10));
+        'targetYawInertial',q(3),'targetYawRate',yawRate,'targetSideslip',q(6), ...
+        'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7), ...
+        'targetAccelerationInertial',q(5)*direction+yawRate*[-velocity(2);velocity(1)], ...
+        'targetLength',2*q(8),'targetWidth',2*q(9),'targetRectangleOffset',q(10:11));
 end

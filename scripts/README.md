@@ -22,7 +22,14 @@ with tight `ode45` tolerances at 31 samples per hold. This offline audit
 reports sampled safety and timing; it does not authorize online execution.
 
 `runNonlinearPredictiveSafetyValidation` also accepts `Scenarios`, `Frames`,
-and `OutputFile` for individual runs. The optimizer
+`ControllerConfiguration`, and `OutputFile` for individual runs. Additional
+fixtures `acceleratingTarget`, `acceleratingTurn`, and `brakingTarget` exercise
+constant tangential acceleration with constant sideslip. The braking fixture
+passes through zero signed velocity at 2 s. Each export records the initial
+target state and parameters for independent reconstruction; the audit's
+`--files` option selects individual JSON exports. Historical exports without
+the revised target state require the audit source from their recorded commit.
+The optimizer
 executes both zero-slack and positive-slack results. The previous trajectory
 only initializes the new solve. See
 [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).

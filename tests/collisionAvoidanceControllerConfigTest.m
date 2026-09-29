@@ -49,6 +49,13 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function targetRearAxleDistanceIsPositiveAndIndependentOfEgoGeometry(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',1.8)));
+            testCase.verifyEqual(cfg.target.rearAxleDistance,1.8);
+            testCase.verifyEqual(cfg.vehicle.lr,1.65);
+            testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',0))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
         function noAdditionalCollisionBufferIsRequiredByDefault(testCase)
             cfg = collisionAvoidanceControllerConfig();
             testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0);

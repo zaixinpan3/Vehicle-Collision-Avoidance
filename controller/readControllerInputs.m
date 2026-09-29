@@ -13,13 +13,17 @@ function [ego,lane,road,target] = readControllerInputs(egoState,targetEstimate,l
     [position,available]=localTargetPosition(targetEstimate,ego);
     if ~available,return;end
     velocity=localTargetVelocity(targetEstimate,ego);
-    acceleration=zeros(2,1);
-    if any(isfield(targetEstimate,["targetAccelerationInertial","targetAccelerationX","targetAcceleration"]))
-        acceleration=localTargetAcceleration(targetEstimate,ego);
+    acceleration=localTargetAcceleration(targetEstimate,ego);
+    tangentialAcceleration=[];
+    for field=["targetTangentialAcceleration","targetScalarAcceleration"]
+        if isfield(targetEstimate,field) && ~isempty(targetEstimate.(field))
+            tangentialAcceleration=localFiniteTargetScalar(targetEstimate.(field),field);break;
+        end
     end
-    target=struct('position',position,'velocity',velocity, ...
+    target=struct('position',position,'velocity',velocity,'acceleration',acceleration, ...
+        'tangentialAcceleration',tangentialAcceleration, ...
         'yaw',localTargetYaw(targetEstimate,ego,velocity), ...
-        'yawRate',localTargetYawRate(targetEstimate,velocity,acceleration), ...
+        'rearAxleDistance',localTargetDimension(targetEstimate,"targetRearAxleDistance",cfg.target.rearAxleDistance), ...
         'length',localTargetDimension(targetEstimate,"targetLength",cfg.target.defaultLength), ...
         'width',localTargetDimension(targetEstimate,"targetWidth",cfg.target.defaultWidth));
 end
@@ -290,24 +294,6 @@ function yaw = localTargetYaw(data, ego, velocity)
         + "or targetYawRelative for the oriented rectangle geometry.");
 end
 
-function yawRate = localTargetYawRate( ...
-        data, velocity, acceleration)
-    for fieldName = ["targetYawRate", "yawRate", "courseRate"]
-        if isfield(data, fieldName) && ~isempty(data.(fieldName))
-            yawRate = localFiniteTargetScalar( ...
-                data.(fieldName), fieldName);
-            return;
-        end
-    end
-    speedSquared = velocity.' * velocity;
-    if speedSquared > 100.0 * eps(max(1.0, speedSquared))
-        yawRate = localPlanarCross(velocity, acceleration) ...
-            / speedSquared;
-        return;
-    end
-    yawRate = 0.0;
-end
-
 function value = localFiniteTargetScalar(value, fieldName)
     if ~isnumeric(value) || ~isreal(value) || ~isscalar(value) ...
             || ~isfinite(value)
@@ -434,20 +420,7 @@ function acceleration = localTargetAcceleration(data, ego)
             acceleration, frame, ego.yaw);
         return;
     end
-    % A single constant-speed, constant-heading-rate target needs no
-    % separately measured acceleration when its heading rate is explicit.
-    for fieldName = ["targetYawRate", "yawRate", "courseRate"]
-        if isfield(data,fieldName) && ~isempty(data.(fieldName))
-            omega = localFiniteTargetScalar(data.(fieldName),fieldName);
-            velocity = localTargetVelocity(data,ego);
-            acceleration = omega*[-velocity(2);velocity(1)];
-            return;
-        end
-    end
-    error("collisionAvoidanceController:invalidInput", ...
-        "Every active target requires targetAccelerationInertial " ...
-        + "from the motion estimator, or an equivalent target " ...
-        + "acceleration with an explicit frame contract.");
+    acceleration=zeros(2,1);
 end
 
 function frame = localFrame(data, fieldName, defaultFrame)
@@ -497,9 +470,4 @@ end
 
 function angle = localWrapToPi(angle)
     angle = atan2(sin(angle), cos(angle));
-end
-
-function value = localPlanarCross(firstVector, secondVector)
-    value = firstVector(1) * secondVector(2) ...
-        - firstVector(2) * secondVector(1);
 end

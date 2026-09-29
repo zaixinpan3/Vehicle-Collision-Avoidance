@@ -7,7 +7,7 @@ function [solution,search] = solvePredictiveControl(model,previousState)
         'terminationReason',"iterationLimit",'sequentialIterations',{{}}, ...
         'initialization',"laneFeedbackRollout",'safetySlack',Inf, ...
         'converged',false,'failures',strings(0,1));
-    warm=isstruct(previousState) && isfield(previousState,'version') && previousState.version==50 ...
+    warm=isstruct(previousState) && isfield(previousState,'version') && previousState.version==51 ...
         && previousState.sampleTime==cfg.controller.sampleTime ...
         && size(previousState.inputTrajectory,2)>=cfg.controller.horizonSteps ...
         && size(previousState.inputTrajectory,2)<=cfg.controller.maximumHorizonSteps;
@@ -87,7 +87,7 @@ function inputs=localSeed(model)
     if ~isempty(model.target) && localTailMargin(x,0,model)<0
         projection=laneGeometry.project(x(1:2),model.lane);
         tangent=[cos(projection.heading);sin(projection.heading)];q=model.target;
-        relativeSpeed=cfg.referenceSpeed-q(4)*cos(q(3)+q(5)-projection.heading);
+        relativeSpeed=cfg.referenceSpeed-q(4)*cos(q(3)+q(6)-projection.heading);
         encounterTime=max(0,tangent.'*(q(1:2)-x(1:2))/max(1,relativeSpeed));
         required=max(required,ceil((encounterTime+cfg.nonlinear.recoveryHorizonSeconds)/cfg.controller.sampleTime));
         required=min(required,cfg.controller.maximumHorizonSteps);
@@ -225,7 +225,7 @@ function [values,jacobian]=localSafetyRows(x,time,model)
     preferred=[-sin(projection.heading);cos(projection.heading)];
     q=localTargetAt(model,time);
     if ~isempty(q)
-        dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(7:10),preferred);
+        dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(8:11),preferred);
         values=dual.value-cfg.collision.safetyMarginMeters;
         jacobian=[dual.jacobian,zeros(4,3)];
     end
