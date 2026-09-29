@@ -1,0 +1,35 @@
+out=fileparts(mfilename('fullpath'));cd(fullfile(out,'source'));addpath('scripts','controller','config');
+previous=jsondecode(fileread(fullfile(out,'initial-tests.json')));
+results=runtests('tests/nonlinearPredictiveSafetyTest.m');entries=table(results);entries=entries(:,{'Name','Passed','Failed','Incomplete','Duration'});fresh=table2struct(entries);
+localSave(fullfile(out,'targeted-tests.json'),struct('matlabVersion',version,'tests',fresh));assertSuccess(results);
+for index=1:numel(fresh)
+    match=find(strcmp({previous.tests.Name},fresh(index).Name));assert(isscalar(match));previous.tests(match)=fresh(index);
+end
+assert(all([previous.tests.Passed]) && ~any([previous.tests.Incomplete]));previous.validation='Full nine-suite attempt plus targeted retry after updating one stale optimizer-call expectation; production code unchanged between runs.';
+localSave(fullfile(out,'tests.json'),previous);
+capture=load('/home/zai/.cache/collisionAvoidance/current-slow-frame-20260929-105333/captured-frame.mat');replays=struct([]);
+for index=1:6
+    wall=tic;[command,~,problem]=collisionAvoidanceController(capture.ego,capture.target,capture.road,capture.cfg,capture.previousState);seconds=toc(wall);
+    entry=struct('index',index,'warmup',index==1,'seconds',seconds,'input',command.actuatorInput, ...
+        'shiftedInputDifference',max(abs(command.actuatorInput-capture.previousState.inputTrajectory(:,2))), ...
+        'previousOptimizedInputDifference',max(abs(command.actuatorInput-capture.saved.input)), ...
+        'cost',problem.solution.cost,'clfSlack',problem.solution.clfSlack,'hard',problem.solution.hard,'safety',problem.solution.safety, ...
+        'horizon',problem.metadata.horizonSteps,'search',problem.metadata.search);
+    assert(entry.shiftedInputDifference==0 && entry.hard==0 && entry.safety==0);
+    assert(problem.metadata.solverCallCount==0 && problem.metadata.search.terminationReason=="feasibleWitness");
+    if isempty(replays),replays=entry;else,replays(index)=entry;end
+    fprintf('Captured-frame replay %d: %.6f s, no solver calls, cost %.6f\n',index,seconds,entry.cost);
+end
+localSave(fullfile(out,'captured-frame-replays.json'),replays);
+for speed=[8,15]
+ folder=fullfile(out,"speed"+speed);if ~isfolder(folder),mkdir(folder);end
+ cfg=struct('referenceSpeed',speed,'controller',struct('horizonSteps',speed+mod(speed,2)));
+ for name=["recovery","circular","brakingTarget","turningTarget","acceleratingTurn","oncoming","acceleratingTarget"]
+  frames=160;if name=="recovery" || name=="circular",frames=40;end
+  runNonlinearPredictiveSafetyValidation(Scenarios=name,Frames=frames,ControllerConfiguration=cfg,OutputFile=fullfile(folder,name+".json"));
+ end
+end
+fprintf('FIRST-FEASIBLE CAMPAIGN COMPLETE\n');
+function localSave(path,value)
+ f=fopen(path,'w');assert(f>=0);fprintf(f,'%s\n',jsonencode(value));fclose(f);
+end

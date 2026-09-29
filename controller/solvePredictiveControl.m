@@ -1,7 +1,7 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl Lexicographic PCBF/CLF with a retained hard completion.
-% Only nonlinear feasible iterates within the shifted slack budget replace
-% the retained witness. The endpoint family supplies every newly appended input.
+%solvePredictiveControl Return the first admissible nonlinear continuation.
+% Safety and lane/CLF costs guide restoration only while no witness exists.
+% The endpoint family supplies every newly appended input.
     if nargin<3,timer=tic;end
     cfg=model.cfg;solution=[];model.slackCap=Inf;
     search=struct('solverCalls',0,'source',"sequentialConvexification", ...
@@ -46,21 +46,22 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     if isempty(solution),baseline=localNominalEvaluation(anchor,model);
     else,baseline=solution;
     end
-    if isempty(solution) && baseline.hard==0 && baseline.safety<=model.slackCap
+    if isempty(solution) && localFeasible(baseline,model)
         solution=baseline;search.source="feasibleInitialization";
+    end
+    if ~isempty(solution)
+        search.converged=true;search.terminationReason="feasibleWitness";
+        search.safetySlack=solution.safety;search.elapsedSeconds=toc(timer);return;
     end
     radius=cfg.nonlinear.trustRadius;
     for iteration=1:cfg.nonlinear.maximumIterations
-        if localObjectiveSatisfied(solution,cfg)
-            search.converged=true;search.terminationReason="objectiveLowerBound";break;
-        end
         if toc(timer)>=cfg.solver.timeLimitSeconds,search.terminationReason="timeLimit";break;end
         try
-            [inputs,step]=localSequentialStep(anchor,model,radius,baseline,timer);
+            [inputs,step,candidate]=localSequentialStep(anchor,model,radius,timer);
             search.solverCalls=search.solverCalls+step.calls;
             step.iteration=iteration;step.trustRadius=radius;step.acceptedIterate=false;
             step.retainedAsWitness=false;step.nominalSafetySlack=Inf;step.nominalHardViolation=Inf;
-            if toc(timer)>=cfg.solver.timeLimitSeconds
+            if isempty(candidate) && toc(timer)>=cfg.solver.timeLimitSeconds
                 search.terminationReason="timeLimit";search.sequentialIterations{end+1}=step;break;
             end
             if isempty(inputs)
@@ -69,10 +70,16 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 if radius<1e-7,break;end
                 continue;
             end
-            candidate=localNominalEvaluation(inputs,model);
-            candidate=localPolishEndpoint(candidate,model,timer);
+            if isempty(candidate),candidate=localNominalEvaluation(inputs,model);end
+            if ~localFeasible(candidate,model),candidate=localPolishEndpoint(candidate,model,timer);end
             inputs=candidate.inputs;
             step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;
+            if localFeasible(candidate,model)
+                solution=candidate;search.source="sequentialConvexification";
+                step.acceptedIterate=true;step.retainedAsWitness=true;
+                search.sequentialIterations{end+1}=step;
+                search.converged=true;search.terminationReason="feasibleWitness";break;
+            end
             merit=baseline.safety+100*baseline.hard;nextMerit=candidate.safety+100*candidate.hard;
             improves=nextMerit<merit || (candidate.hard==0 && candidate.safety<=baseline.safety && candidate.cost<baseline.cost);
             if improves
@@ -81,17 +88,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             else
                 radius=radius/2;
             end
-            feasible=candidate.hard==0 && candidate.safety<=model.slackCap;
-            better=isempty(solution) || candidate.safety<solution.safety ...
-                || (candidate.safety==solution.safety && candidate.cost<solution.cost);
-            if feasible && better
-                solution=candidate;search.source="sequentialConvexification";step.retainedAsWitness=true;
-            end
             search.sequentialIterations{end+1}=step;
-            search.converged=feasible && candidate.safety==0 && ~step.completionRestoration ...
-                && step.secondaryReturned ...
-                && candidate.clfSlack<=step.clfSlack+cfg.solver.feasibilityTolerance;
-            if search.converged,search.terminationReason="zeroSlack";break;end
             if radius<1e-7,search.terminationReason="smallTrustRegion";break;end
         catch exception
             search.failures(end+1,1)=string(exception.identifier)+": "+string(exception.message);
@@ -106,11 +103,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.elapsedSeconds=toc(timer);
 end
 
-function satisfied=localObjectiveSatisfied(solution,cfg)
-    % Both objectives are nonnegative. A feasible zero-slack witness within
-    % this absolute cost gap cannot benefit materially from another solve.
-    satisfied=~isempty(solution) && solution.hard==0 && solution.safety==0 ...
-        && solution.cost<=cfg.solver.optimalityTolerance;
+function feasible=localFeasible(candidate,model)
+    % Preserve the original hard constraints and shifted PCBF slack budget.
+    % Positive prefix slack remains recovery, not a collision-free claim.
+    feasible=~isempty(candidate) && candidate.hard==0 && candidate.safety<=model.slackCap;
 end
 
 function yes=localDomainFailure(exception)
@@ -128,9 +124,10 @@ function candidate=localPolishEndpoint(candidate,model,timer)
     ref=terminalContinuation.referenceAt(seed,endIndex);
     transform=blkdiag([cos(ref(3)),sin(ref(3));-sin(ref(3)),cos(ref(3))],eye(6));
     for iteration=1:5
+        if localFeasible(candidate,model),return;end
         if toc(timer)>=cfg.solver.timeLimitSeconds,return;end
         [~,~,deviation]=terminalContinuation.membership([candidate.states(:,end);candidate.inputs(:,end)],endIndex,seed);
-        if norm(seed.factor*deviation)<.5*seed.radius,return;end
+        if norm(seed.factor*deviation)<=seed.radius,return;end
         sensitivity=zeros(6,2*length);x=candidate.states(:,first);
         for index=first:count
             [x,a,b]=nonlinearBicycleModel.sample(x,candidate.inputs(:,index),cfg);
@@ -193,10 +190,10 @@ function u=localClip(u,previous,cfg)
     u=min(upper,max(lower,min(previous+rate,max(previous-rate,u))));
 end
 
-function [inputs,info]=localSequentialStep(anchor,model,radius,baseline,timer)
+function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
     info=struct('calls',0,'safetyOptimum',Inf,'secondarySafety',Inf,'safetyCap',Inf, ...
         'clfSlack',Inf,'status',"infeasibleBounds",'safetyExitFlag',NaN,'secondaryExitFlag',NaN, ...
-        'completionRestoration',false,'secondaryReturned',false,'safetyBoundAttained',false);inputs=[];
+        'completionRestoration',false,'secondaryReturned',false);inputs=[];candidate=[];
     cfg=model.cfg;count=size(anchor,2);prefix=cfg.controller.horizonSteps;reference=model.terminal.reference;
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
     is=iu(end)+(1:count);ic=is(end)+1;it=ic+1;nv=it;
@@ -272,12 +269,19 @@ function [inputs,info]=localSequentialStep(anchor,model,radius,baseline,timer)
     options=optimoptions('coneprog','Display','none','MaxIterations',cfg.solver.maxIterations, ...
         'ConstraintTolerance',cfg.solver.constraintTolerance,'OptimalityTolerance',cfg.solver.optimalityTolerance, ...
         'MaxTime',remaining);
-    if baseline.hard==0 && baseline.safety==0
-        % The zero increment is feasible and attains the primary lower bound.
-        first=zeros(nv,1);first(ic)=baseline.clfSlack;flag=1;info.safetyBoundAttained=true;
-    else
-        [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
-        info.safetyExitFlag=flag;
+    [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
+    info.safetyExitFlag=flag;
+    if ~isempty(first) && all(isfinite(first)) && toc(timer)<cfg.solver.timeLimitSeconds
+        primaryInputs=anchor+reshape(first(iu(:)),2,[]);
+        try
+            primaryCandidate=localNominalEvaluation(primaryInputs,model);
+            if localFeasible(primaryCandidate,model)
+                inputs=primaryInputs;candidate=primaryCandidate;info.status="primaryFeasible";
+                info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;return;
+            end
+        catch exception
+            if ~localDomainFailure(exception),rethrow(exception);end
+        end
     end
     if flag<=0 || isempty(first)
         % Elastic rows are a numerical restoration step only. The completion

@@ -3,10 +3,11 @@
 ## Scope
 
 The controller uses one nonlinear ego bicycle model and one known target
-trajectory. A Huang-style primary objective minimizes the sum of safety
-slacks over a fixed MPC prefix. A soft lane CLF supplies the secondary
-objective. Li-style polygon support duals and sequential convexification
-supply numerical search directions. Both zero-slack and positive-slack
+trajectory. It returns the first admissible nonlinear continuation. While
+restoration is needed, a Huang-style primary objective minimizes the sum of
+safety slacks over a fixed MPC prefix, and a soft lane CLF guides the secondary
+search. Li-style polygon support duals and sequential convexification supply
+numerical search directions. Both zero-slack and positive-slack
 **feasible** prefixes can be executed. Positive slack describes recovery;
 it does not imply collision-free motion.
 
@@ -14,7 +15,7 @@ The terminal condition is an implicit backward-reachable tube, represented
 by a hard completion trajectory and an indefinitely admissible endpoint
 family. Its construction and numerical scope are described below. The
 controller retains the feasible continuation, including its slack budget,
-so an unsuccessful improvement solve does not discard an available control.
+and executes it immediately whenever revalidation succeeds.
 
 ## Model, clock and input memory
 
@@ -180,14 +181,21 @@ objective. This is algebraically equivalent to one horizon-wide norm cone,
 while avoiding its global factorization coupling. The default internal
 linear solver remains unchanged.
 
-Both objectives have a known lower bound of zero. A nonlinear feasible witness
-with exactly zero safety slack and secondary cost no greater than
-`solver.optimalityTolerance` terminates with `objectiveLowerBound` without a
-conic solve. The tolerance is used as an absolute secondary objective gap here;
-it never relaxes safety slack or hard constraints. A zero-slack feasible anchor
-also establishes the primary optimum of its affine subproblem, so only the
-secondary solve is needed when its cost still warrants improvement. These are
-termination rules within the same controller, not separate controller modes.
+A revalidated initial or shifted witness terminates with `feasibleWitness`
+without a conic solve. Its nonlinear hard residual must be exactly zero and
+its prefix safety-slack sum must satisfy the existing shifted budget. The
+secondary cost may be large. Neither objective optimality nor agreement
+between affine and nonlinear CLF slack is required for execution.
+
+When no witness exists, every finite primary conic result is checked against
+the original nonlinear constraints while time remains. A feasible primary
+result is returned before constructing or solving the secondary problem.
+Otherwise restoration or the secondary objective continues to guide search.
+The first admitted nonlinear candidate ends the outer iteration immediately;
+there is no subsequent search for a lower-cost witness. `search.converged`
+and its legacy `scvxConverged` metadata field denote satisfaction of this
+feasibility stopping target, not numerical optimality. Positive prefix slack
+still describes recovery and is not labeled zero-slack or collision-free.
 
 The soft first-step CLF is
 
@@ -204,27 +212,30 @@ If hard completion rows make a convex subproblem infeasible, a numerical
 restoration step temporarily uses elastic completion rows. This is only a
 search direction. It cannot be retained unless a fresh nonlinear rollout
 satisfies the original **hard, zero-slack** completion. A short shooting
-correction of the final controls removes terminal linearization defects.
-All corrected inputs, slew limits, safety samples and endpoint membership
-are reevaluated; selected controls are not clipped.
+correction of the final controls removes terminal linearization defects only
+when endpoint membership fails. A feasible candidate bypasses correction;
+correction ends as soon as feasibility is reached. All corrected inputs,
+slew limits, safety samples and endpoint membership are reevaluated;
+selected controls are not clipped.
 
 Evaluation stores per-stage safety, physical residuals and costs. During an
 endpoint correction the unchanged prefix is reused and only the modified suffix
 is integrated again. Input magnitude/slew violations reject a correction before
-integration. The original half-radius polishing target retains interior
-headroom in the small terminal set.
+integration. The actual terminal-set membership bound is used; an already
+admissible candidate is not polished further to obtain half-radius headroom.
 Under exact successor and input-memory equality, a shifted witness reuses its
 unchanged absolute-time stages; an appended terminal input alone needs a new
 rollout. Changed measured states require a fresh full evaluation. Endpoint,
 initial-state, input and slew checks are still performed for every returned plan.
 
-All improvement steps share the time remaining since controller-call entry.
+All restoration steps share the time remaining since controller-call entry.
 Each conic call receives the remaining budget, and no new candidate processing
 or polishing trial is started after expiration. Initial witness construction or
 revalidation must still finish before returning any input. An in-flight conic
 factorization or rollout is not preemptible, so the budget remains a soft limit,
-not a real-time deadline guarantee. Expiration retains an available feasible
-witness; without one, initialization reports failure.
+not a real-time deadline guarantee. A verified feasible witness is returned
+even if its final validation crosses the budget. Without one, expired search
+reports failure.
 
 Finite suboptimal secondary conic iterates remain eligible even when the
 solver stops without an optimal exit flag. Their reported exit flags are

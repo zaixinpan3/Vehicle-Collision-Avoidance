@@ -106,7 +106,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         function laneFollowingRunsWithNoNativeVerifier(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            testCase.verifyTrue(problem.metadata.optimizationReturned);
+            testCase.verifyFalse(problem.metadata.optimizationReturned);
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
             testCase.verifySize(command.actuatorInput,[2,1]);
@@ -118,7 +118,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             target=localTarget([30;5;0;6;0;0;1.6;2.4;.95;0;0]);
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyFalse(problem.metadata.optimizationReturned);
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"objectiveLowerBound");
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1));
             testCase.verifyGreaterThan(problem.metadata.minimumCollisionMargin,0);
@@ -181,23 +181,36 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.search.shiftAvailable);
             testCase.verifyTrue(problem.metadata.zeroSlack);
         end
-        function negligibleFeasibleCostStopsAtTheKnownObjectiveBound(testCase)
+        function feasibleInitializationReturnsWithoutOptimization(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=1e-9;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyEqual(problem.solution.hard,0);
             testCase.verifyEqual(problem.solution.safety,0);
             testCase.verifyLessThanOrEqual(problem.solution.cost,cfg.solver.optimalityTolerance);
             testCase.verifyEqual(problem.metadata.solverCallCount,0);
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"objectiveLowerBound");
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
         end
-        function nontrivialFeasibleCostOnlyNeedsThePerformanceSolve(testCase)
+        function nontrivialFeasibleCostDoesNotTriggerAnImprovementSolve(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             cfg.nonlinear.maximumIterations=1;cfg.solver.timeLimitSeconds=60;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            testCase.verifyEqual(problem.metadata.solverCallCount,1);
-            testCase.verifyTrue(problem.metadata.search.sequentialIterations{1}.safetyBoundAttained);
+            testCase.verifyGreaterThan(problem.solution.cost,cfg.solver.optimalityTolerance);
+            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyEmpty(problem.metadata.search.sequentialIterations);
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
             testCase.verifyEqual(problem.solution.hard,0);
+        end
+        function shiftedFeasiblePlanIsExecutedDespiteItsNonzeroCost(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=.1;
+            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,prior);
+            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyGreaterThan(problem.solution.cost,cfg.solver.optimalityTolerance);
+            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyEqual(command.actuatorInput,prior.inputTrajectory(:,2));
+            testCase.verifyEqual(problem.metadata.controlSource,"retainedContinuation");
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
         end
         function cachedContinuationMatchesAFreshNonlinearEvaluation(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.01;cfg.solver.timeLimitSeconds=60;
@@ -267,7 +280,8 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1));
             testCase.verifyGreaterThan(problem.metadata.predictiveBarrierValue,0);
             testCase.verifyFalse(problem.metadata.zeroSlack);
-            testCase.verifyTrue(problem.metadata.optimizationReturned);
+            testCase.verifyFalse(problem.metadata.optimizationReturned);
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
         end
         function oncomingAvoidanceStartsFromALaneRollout(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=60;
@@ -279,6 +293,9 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(problem.metadata.drivingModeSwitching);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
             steps=problem.metadata.search.sequentialIterations;
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyTrue(steps{end}.retainedAsWitness);
+            testCase.verifyEqual(sum(cellfun(@(step)step.retainedAsWitness,steps)),1);
             for j=1:numel(steps)
                 step=steps{j};
                 if step.status=="solved"

@@ -1,0 +1,44 @@
+{
+  "baseCommit": "3f3e4959478ff62ea8a4e2160e1e011dcb523a86",
+  "testsPassed": 246,
+  "pythonTestsPassed": 9,
+  "initialStaleExpectationFailures": 1,
+  "scenariosCompleted": 13,
+  "scenariosCompletedCollisionFree": 13,
+  "scenarioAuditsPassed": 12,
+  "executedHolds": 1600,
+  "auditedSamples": 49600,
+  "strictOverlapSamples": 0,
+  "denseBufferShortfallSamples": 6,
+  "noSolverHolds": 1597,
+  "totalSolverCalls": 18,
+  "laterHolds": 1587,
+  "laterDeadlineMisses": 0,
+  "laterMaximumSeconds": 0.036562,
+  "deadlineMisses": 11,
+  "firstFeasibleStopChecks": 1600,
+  "maximumSafetySlack": 0,
+  "maximumHardResidual": 0,
+  "capturedFrame": {
+    "originalSeconds": 5.01955,
+    "beforeWarmedMedianSeconds": 5.010805,
+    "afterWarmedMedianSeconds": 0.025604,
+    "speedup": 195.7039915638182,
+    "horizon": 62,
+    "cost": 191168.73622489185,
+    "clfSlack": 43.708026325353785,
+    "shiftedInputDifference": 0,
+    "previousOptimizedInputDifference": 0.0019531510928327556,
+    "solverCalls": 0
+  },
+  "failures": [
+    {
+      "speed": 15,
+      "scenario": "oncoming",
+      "executedFrames": 0,
+      "failureTime": 0,
+      "failedFrameSeconds": 5.014182,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit)."
+    }
+  ]
+}
