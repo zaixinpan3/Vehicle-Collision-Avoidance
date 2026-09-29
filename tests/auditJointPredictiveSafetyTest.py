@@ -6,10 +6,23 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state, feasible_hold
+from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state, feasible_hold, audit
 
 
 class CollisionAuditTest(unittest.TestCase):
+    def test_initialization_failure_is_a_failed_audit_without_geometry_claims(self):
+        result = dict(scenario='oncoming', targetInitialState=[], trace=[], completed=False,
+                      executedFrames=0, requestedFrames=2, minimumReplayClearanceMeters=None,
+                      requiredClearanceMeters=0, finalTransverseError=[],
+                      configuration=dict(vehicle=dict(length=4.8, width=1.9, rectangleOffset=[0, 0])))
+        checked = audit(result)
+        self.assertFalse(checked['passed'])
+        self.assertFalse(checked['strictlyCollisionFree'])
+        self.assertFalse(checked['everyHoldFeasible'])
+        self.assertIsNone(checked['minimumClearanceMeters'])
+        self.assertIsNone(checked['minimumRoadMarginMeters'])
+        self.assertIsNone(checked['finalLateralErrorMeters'])
+
     def test_retained_witness_does_not_require_a_new_solve(self):
         self.assertTrue(feasible_hold(dict(hardResidual=0, source='retainedContinuation', solverCalls=0)))
 

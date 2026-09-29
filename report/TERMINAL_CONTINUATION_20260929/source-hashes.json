@@ -9,5 +9,5 @@
   "controller/terminalContinuation.m": "b3be38e5d6d9085044da51e91a61f3e1e2079f40b274c94f7283b45dbe8bb1a5",
   "config/collisionAvoidanceControllerConfig.m": "2be9e96e640a17400493be734ab5e3cb5ddb19b9233de9013a3048892fceab30",
   "scripts/runNonlinearPredictiveSafetyValidation.m": "5041ca273f57ee35bdf39cbd656dfa510a4ace2cc270cc3a80724f9242954a1c",
-  "scripts/auditJointPredictiveSafety.py": "8804dcf5eed587d75de3540c7e966576c74834704cf1953be4a414fe0ad1f0e8"
+  "scripts/auditJointPredictiveSafety.py": "53d974ad87a30afdf07fdfdc19781f0767ce70907c8dba1f0dd5bb75ea210368"
 }

@@ -30,7 +30,7 @@ The seed is deliberately sufficient and can be small. The MPC terminal region is
 ## Checks
 
 - Selected regression suites: **234/234 passed**. The 75 terminal/controller checks were repeated after the final candidate-selection change: **75/75 passed**.
-- Python collision/target/audit behavior checks: **7 passed**. The audit requires exact reported zero safety slack and zero hard residual, and recognizes retained witnesses without requiring a new solve.
+- Python collision/target/audit behavior checks: **8 passed**. The audit requires exact reported zero safety slack and zero hard residual, and recognizes retained witnesses without requiring a new solve.
 - Factory MATLAB Code Analyzer: ten changed MATLAB sources/scripts/tests examined; only twelve sparse-indexing performance notices in the SCvx assembler remain.
 - Endpoint closure checks cover both curvature signs, actuator memory and finite slew. Continuation checks cross the original endpoint with optimization disabled and exercise positive-slack shifts, fixed target epochs, time gaps, changed input memory and infeasible completions.
 
@@ -60,7 +60,7 @@ Fresh four-hold runs use ODE45 successors, the default five-second soft solve bu
 | acceleratingTurn | 4/4 | 5.445 | Completed |
 | brakingTarget | 4/4 | 9.919 | Completed |
 
-A separate two-hold 15 m/s default-budget smoke run completed recovery and circular-road cases but **failed to initialize the oncoming case within five seconds**; no command was returned for that case. A diagnostic 60-second oncoming solve before the final suboptimal-iterate eligibility change found a feasible zero-slack witness at outer iteration 4 and retained it through the time limit (63.1454 s total, 26 conic calls). Its secondary conic solves repeatedly reported exit flag -7; this motivated evaluating finite suboptimal secondary points rather than automatically discarding them. The final five-second smoke run still timed out during oncoming initialization. This remains a solver-performance limitation.
+A separate two-hold 15 m/s default-budget smoke run completed recovery and circular-road cases but **failed to initialize the oncoming case within five seconds**; no command was returned for that case. A diagnostic 60-second oncoming solve before the final suboptimal-iterate eligibility change found a feasible zero-slack witness at outer iteration 4 and retained it through the time limit (63.1454 s total, 26 conic calls). Its secondary conic solves repeatedly reported exit flag -7; this motivated evaluating finite suboptimal secondary points rather than automatically discarding them. The final five-second smoke run still timed out during oncoming initialization. The default-budget audit records 2/3 passed and an explicit zero-hold failure without making geometry claims. This remains a solver-performance limitation.
 
 An earlier braking-target stress solve outlasted the outer iteration deadline and was interrupted. The configured soft time budget is now also passed to coneprog through MaxTime; all seven final short ODE runs complete. This is still a soft limit: active factorization and terminal correction can overrun it. The present conic implementation does **not** establish real-time 50 ms initialization or reoptimization. Host load was uncontrolled and some diagnostic MATLAB runs overlapped; these timings are not an isolated performance benchmark.
 

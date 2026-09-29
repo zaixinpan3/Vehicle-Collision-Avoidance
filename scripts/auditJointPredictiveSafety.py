@@ -96,21 +96,21 @@ def audit(result):
                 minimum = min(minimum, distance(body, target))
     complete = result['completed'] and result['executedFrames'] == result['requestedFrames']
     reported = result['minimumReplayClearanceMeters']
-    clearance_match = reported is None or abs(minimum - reported) < 1e-9
-    zero_slack = all(hold.get('predictiveBarrierValue') == 0 for hold in result['trace'])
-    solved = all(hold['solverCalls'] >= 2 for hold in result['trace'])
-    feasible = all(feasible_hold(hold) for hold in result['trace'])
-    collision_free = minimum > 0
-    clearance_satisfied = clearance_passes(minimum, result['requiredClearanceMeters'])
+    clearance_match = samples > 0 and (reported is None or abs(minimum - reported) < 1e-9)
+    zero_slack = bool(result['trace']) and all(hold.get('predictiveBarrierValue') == 0 for hold in result['trace'])
+    solved = bool(result['trace']) and all(hold['solverCalls'] >= 2 for hold in result['trace'])
+    feasible = bool(result['trace']) and all(feasible_hold(hold) for hold in result['trace'])
+    collision_free = samples > 0 and minimum > 0
+    clearance_satisfied = samples > 0 and clearance_passes(minimum, result['requiredClearanceMeters'])
     passed = (feasible and zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
               and clearance_satisfied)
     return dict(scenario=name, passed=passed, samples=samples,
                 minimumClearanceMeters=minimum if math.isfinite(minimum) else None,
-                minimumRoadMarginMeters=road_margin,
+                minimumRoadMarginMeters=road_margin if math.isfinite(road_margin) else None,
                 agreesWithMatlabGeometry=clearance_match, allPredictionsZeroSlack=zero_slack,
                 everyHoldFeasible=feasible, everyHoldSolved=solved,
                 strictlyCollisionFree=collision_free, configuredClearanceSatisfied=clearance_satisfied,
-                finalLateralErrorMeters=result['finalTransverseError'][0])
+                finalLateralErrorMeters=(result['finalTransverseError'][0] if result['finalTransverseError'] else None))
 
 
 def main():
