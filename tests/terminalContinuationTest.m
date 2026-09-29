@@ -71,6 +71,32 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,first), ...
                 'collisionAvoidanceController:changedContinuationProblem');
         end
+        function changingRoadWidthPreservesTheRetainedWitness(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=1e-12;
+            [~,~,~,first]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,first);road.lateralClearance=[.01;.02];
+            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,first);
+            testCase.verifyEqual(command.actuatorInput,first.inputTrajectory(:,2),AbsTol=1e-14);
+            testCase.verifyTrue(problem.metadata.search.shiftAvailable);
+            testCase.verifyEqual(problem.metadata.controlSource,"retainedContinuation");
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+            testCase.verifyFalse(problem.metadata.roadConstraintsEnforced);
+        end
+        function changingTheGivenPathStillRequiresReinitialization(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=1e-12;
+            [~,~,~,first]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,first);road.centerline(:,2)=1;
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,first), ...
+                'collisionAvoidanceController:changedContinuationProblem');
+        end
+        function targetSeparationDoesNotDependOnRoadWidth(testCase,curvature)
+            [seed,cfg]=localSeed(curvature);
+            q=[1000;1000;0;0;0;0;1.6;2.4;.95;0;0];
+            wide=terminalContinuation.separation(seed,q,[0;0;.2;curvature;4;4],cfg);
+            narrow=terminalContinuation.separation(seed,q,[0;0;.2;curvature;.01;.02],cfg);
+            testCase.verifyGreaterThan(narrow,0);
+            testCase.verifyEqual(narrow,wide,AbsTol=1e-12);
+        end
         function noResultIsIssuedForAnInfeasibleHardCompletion(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=1e-12;
             target=struct('targetPositionInertial',[12;0],'targetVelocityInertial',[-8;0],'targetYawInertial',pi);

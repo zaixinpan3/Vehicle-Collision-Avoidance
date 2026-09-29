@@ -24,6 +24,12 @@ positive slack does not imply collision-free motion. The last applied input
 belongs to the terminal state. The fixed lane ellipsoid, terminal input band,
 1-norm polytope and clipped lane-feedback append have been removed.
 
+Road boundaries are excluded from both prediction constraints and terminal
+admission. The given path remains the lane/CLF and terminal reference.
+Optional road widths do not affect the retained problem. Controller metadata
+reports `roadConstraintsEnforced=false`; road-margin measurements belong to
+the offline experiment audit.
+
 MATLAB Optimization Toolbox and Control System Toolbox are required. There
 is no native build or MPFR dependency. Endpoint Jacobian enclosures are cached
 construction work. The online solve evaluates its defining nonlinear RK4

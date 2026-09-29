@@ -17,6 +17,12 @@ family. Its construction and numerical scope are described below. The
 controller retains the feasible continuation, including its slack budget,
 and executes it immediately whenever revalidation succeeds.
 
+Road boundaries are currently excluded from the controller problem, including
+the finite prediction and indefinite endpoint admission. The given path still
+defines lane recovery, cruise and terminal references. This is one controller;
+there is no road-constraint switch or additional driving mode. Optional road
+widths are metadata, and changing them does not invalidate a retained plan.
+
 ## Model, clock and input memory
 
 The ego state is `x = [X; Y; psi; vx; vy; r]`, with input
@@ -62,7 +68,7 @@ to zero; nearby non-cardinal headings retain their transverse motion.
 Every target prediction uses the original epoch and an **absolute integer
 half-sample index**. This preserves retained node and midpoint evaluations
 under a shift. Later observations cannot reinitialize the forecast. A changed
-target trajectory, road, physical constraint set or prediction model requires
+target trajectory, reference path, physical constraint set or prediction model requires
 an explicit new problem (`previousState=[]`). A timestamp gap is rejected.
 Equivalent headings across the +/-pi representation boundary are compared
 modulo one turn and do not invalidate or restart the fixed target epoch.
@@ -76,7 +82,7 @@ let `M` be the fixed endpoint selected during initialization. Define
 `H_k = max(N,M-k)`. The first `N` stages form the PCBF prefix. Stages
 `N,...,H_k-1` are the completion tail.
 
-At each stage, collision and road constraints are evaluated at its start
+At each stage, collision constraints are evaluated at its start
 and midpoint. The prefix uses one shared nonnegative slack for these samples.
 The completion tail uses **zero slack**. Input limits, slew limits and
 velocity bounds at nodes and midpoints remain hard everywhere. The endpoint
@@ -152,12 +158,12 @@ The endpoint is restricted to a positive-speed, unsaturated local Fiala
 chart; this restriction does not restrict the prefix to that chart. These
 are sufficient local bounds and can yield a small, conservative seed.
 
-The reference footprint plus the enclosed deviations must also fit the road
-and remain separated from the target for **all future times**. Straight
+The reference footprint plus the enclosed deviations must remain separated
+from the target for **all future times**. Straight
 motion uses extrema of relative quadratic progress, including both ahead
 and behind separation and signed reversal. Circular motion uses sufficient
-orbit/ray bounds. Midpoint pose deviations and the discrepancy between the
-sampled reference orbit and road circle are included. These all-future bounds
+orbit/ray bounds. Midpoint pose deviations relative to the sampled reference
+orbit are included. No road-edge or lane-width condition is imposed. These all-future bounds
 apply only to the endpoint seed. The finite completion compares the two
 vehicles at matching times, allowing earlier passages through locations
 that the target reaches later.
@@ -296,7 +302,7 @@ transition's slack inequality.
 
 ## Interfaces and limits
 
-State format **52** stores the absolute sample index, target epoch, endpoint
+State format **53** stores the absolute sample index, target epoch, endpoint
 family, full input/state continuation, achieved prefix slacks, and problem
 context. Old state formats are discarded. Predictions include the whole
 prefix plus completion; metadata distinguishes their lengths. No lane/

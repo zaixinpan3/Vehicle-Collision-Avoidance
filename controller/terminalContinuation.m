@@ -104,6 +104,8 @@ classdef terminalContinuation
         function margin = separation(seed,q,frame,cfg)
             % Sufficient all-future geometry for the endpoint only. The finite
             % completion tail compares vehicles at matching absolute times.
+            % The given path defines the reference; road edges are not constraints.
+            if isempty(q),margin=Inf;return;end
             x=seed.epochState;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
             reach=norm(shape(1:2)+abs(shape(3:4)));
             positionError=norm(seed.samplePositionBound);headingError=seed.sampleHeadingBound;
@@ -115,9 +117,6 @@ classdef terminalContinuation
                 side=n.'*(x(1:2)-frame(1:2));extent=n.'*corners;
                 padding=positionError+reach*headingError;
                 egoSide=[side+min(extent)-padding;side+max(extent)+padding];
-                road=min(egoSide(1)+frame(5),frame(6)-egoSide(2));
-                if abs(n.'*velocity)>1e-10,road=-Inf;end
-                if isempty(q),margin=road;return;end
                 if q(6)~=0 && any(q(4:5)~=0)
                     [center,~,outer]=localOrbit(q);
                     side=n.'*(center-frame(1:2))+[-outer;outer];
@@ -148,9 +147,6 @@ classdef terminalContinuation
                 centerLocal=(eye(2)-localRotation(seed.increment(3)))\seed.increment(1:2);
                 center=x(1:2)+localRotation(x(3))*centerLocal;radius=norm(centerLocal);
                 width=reach+positionError;
-                laneCenter=frame(1:2)+n/frame(4);
-                road=min(frame(5:6))-abs(radius-abs(1/frame(4)))-norm(center-laneCenter)-width;
-                if isempty(q),margin=road;return;end
                 if q(6)~=0 && any(q(4:5)~=0)
                     [targetCenter,inner,outer]=localOrbit(q);d=norm(center-targetCenter);
                     nearest=max([0,d-outer,inner-d]);farthest=d+outer;
@@ -164,7 +160,7 @@ classdef terminalContinuation
                 end
                 collision=max(nearest-radius-width,radius-width-farthest);
             end
-            margin=min(road,collision-clearance);
+            margin=collision-clearance;
         end
     end
 end

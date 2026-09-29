@@ -105,11 +105,17 @@ def audit(result):
     feasible = bool(result['trace']) and all(feasible_hold(hold) for hold in result['trace'])
     collision_free = samples > 0 and minimum > 0
     clearance_satisfied = samples > 0 and clearance_passes(minimum, result['requiredClearanceMeters'])
-    passed = (feasible and zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
+    # Older exports enforced a road corridor. New exports retain its distance
+    # only as a diagnostic, with an explicit record of the controller scope.
+    road_enforced = result.get('roadConstraintsEnforced', True)
+    road_satisfied = samples > 0 and road_margin >= -1e-9
+    passed = (feasible and zero_slack and complete and samples > 0 and clearance_match
+              and (not road_enforced or road_satisfied)
               and clearance_satisfied)
     return dict(scenario=name, passed=passed, samples=samples,
                 minimumClearanceMeters=minimum if math.isfinite(minimum) else None,
                 minimumRoadMarginMeters=road_margin if math.isfinite(road_margin) else None,
+                roadConstraintsEnforced=road_enforced, roadBoundarySatisfied=road_satisfied,
                 agreesWithMatlabGeometry=clearance_match, allPredictionsZeroSlack=zero_slack,
                 everyHoldFeasible=feasible, everyHoldInvokedOptimizer=optimized,
                 everyHoldConverged=converged,

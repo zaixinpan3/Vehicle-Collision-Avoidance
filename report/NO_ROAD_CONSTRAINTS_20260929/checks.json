@@ -1,0 +1,9 @@
+{
+  "matlabTestsPassed": 240,
+  "matlabTestsFailed": 0,
+  "pythonAuditTestsPassed": 12,
+  "pythonCompilationPassed": true,
+  "codeAnalyzerFiles": 8,
+  "codeAnalyzerSparseIndexingAdvisories": 13,
+  "verification": "All 14 baseline collisions independently confirmed; four completed replays remain collision-free at dense audit samples; ten initialization failures retained; no new conic solves in 636 running calls."
+}

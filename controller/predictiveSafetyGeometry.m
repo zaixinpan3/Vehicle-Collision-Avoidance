@@ -110,7 +110,7 @@ classdef predictiveSafetyGeometry
                 'normal',normal,'mu',mu,'lambda',lambda,'signedDistance',min(values));
         end
 
-        function frame = roadFrame(lane,road)
+        function frame = roadFrame(lane,~)
             if isfield(lane,'referenceCurve')
                 curve=lane.referenceCurve;origin=curve.origin;heading=curve.heading;k=curve.curvature;
             else
@@ -119,9 +119,8 @@ classdef predictiveSafetyGeometry
                 end
                 origin=lane.segmentStart(1,:).';heading=atan2(lane.tangent(1,2),lane.tangent(1,1));k=0;
             end
-            clearance=road.lateralClearance;
-            if isempty(clearance),clearance=[1e100;1e100];end
-            frame=[origin;heading;k;clearance];
+            % Only the given path enters control; optional road widths are metadata.
+            frame=[origin;heading;k];
         end
 
     end

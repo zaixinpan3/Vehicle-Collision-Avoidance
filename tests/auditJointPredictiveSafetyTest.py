@@ -42,6 +42,30 @@ class CollisionAuditTest(unittest.TestCase):
     def test_small_positive_hard_residual_is_not_feasible(self):
         self.assertFalse(feasible_hold(dict(hardResidual=1e-12, source='sequentialConvexification', solverCalls=2)))
 
+    def test_road_departure_is_diagnostic_when_road_constraints_are_absent(self):
+        result = road_departure_result()
+        result['roadConstraintsEnforced'] = False
+        checked = audit(result)
+        self.assertTrue(checked['passed'])
+        self.assertTrue(checked['strictlyCollisionFree'])
+        self.assertLess(checked['minimumRoadMarginMeters'], 0)
+        self.assertFalse(checked['roadBoundarySatisfied'])
+        self.assertFalse(checked['roadConstraintsEnforced'])
+
+    def test_historical_exports_still_require_their_road_constraint(self):
+        checked = audit(road_departure_result())
+        self.assertFalse(checked['passed'])
+        self.assertTrue(checked['roadConstraintsEnforced'])
+
+    def test_removing_road_constraints_does_not_accept_a_collision(self):
+        result = road_departure_result()
+        result['roadConstraintsEnforced'] = False
+        result['targetInitialState'][0] = 0
+        result['minimumReplayClearanceMeters'] = 0
+        checked = audit(result)
+        self.assertFalse(checked['passed'])
+        self.assertFalse(checked['strictlyCollisionFree'])
+
     def test_constant_acceleration_changes_velocity_and_heading_rate(self):
         initial = [0, 0, .2, 6, 1.5, .1, 1.6, 2.4, .95, 0, 0]
         future = target_state(initial, 2)
@@ -71,6 +95,17 @@ class CollisionAuditTest(unittest.TestCase):
         self.assertFalse(clearance_passes(0, 0))
         self.assertFalse(clearance_passes(-1e-12, 0))
         self.assertTrue(clearance_passes(1e-12, 0))
+
+
+def road_departure_result():
+    hold = dict(time=0, auditTimes=[0], auditStates=[[0, 5, 0, 8, 0, 0]],
+                predictiveBarrierValue=0, hardResidual=0, source='feasibleInitialization',
+                solverCalls=0, scvxConverged=True)
+    return dict(scenario='oncoming', targetInitialState=[20, 5, 0, 8, 0, 0, 1.6, 2.4, .95, 0, 0],
+                trace=[hold], completed=True, executedFrames=1, requestedFrames=1,
+                minimumReplayClearanceMeters=15.2, requiredClearanceMeters=.006,
+                finalTransverseError=[5],
+                configuration=dict(vehicle=dict(length=4.8, width=1.9, rectangleOffset=[0, 0])))
 
 
 if __name__ == '__main__':

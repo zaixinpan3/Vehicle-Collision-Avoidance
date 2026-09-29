@@ -20,6 +20,11 @@ The deterministic fixtures cover lane recovery, circular lane following,
 oncoming avoidance and a turning target. Every issued control is replayed
 with tight `ode45` tolerances at 31 samples per hold. This offline audit
 reports sampled safety and timing; it does not authorize online execution.
+The controller currently excludes road boundaries. New exports state
+`roadConstraintsEnforced=false`; measured road departures remain diagnostics
+and do not fail the avoidance audit. Historical exports retain their original
+road-constraint interpretation. The given path still supplies the cruise and
+recovery reference.
 
 `runNonlinearPredictiveSafetyValidation` also accepts `Scenarios`, `Frames`,
 `ControllerConfiguration`, and `OutputFile` for individual runs. Additional

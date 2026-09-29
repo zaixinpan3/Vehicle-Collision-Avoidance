@@ -1,5 +1,5 @@
 function [ego,lane,road,target] = readControllerInputs(egoState,targetEstimate,laneCenterline,cfg)
-%readControllerInputs Normalize the nominal joint state and global lane corridor.
+%readControllerInputs Normalize joint state, reference path and optional road metadata.
     if isempty(targetEstimate) && isstruct(egoState) && isfield(egoState,'targetEstimate')
         targetEstimate=egoState.targetEstimate;
     end

@@ -24,7 +24,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             if isfield(previousState.witness,'stageCost')
                 shifted=previousState.witness;
                 shifted.inputs=shifted.inputs(:,2:end);shifted.states=shifted.states(:,2:end);
-                for name=["stageSafety","stageHard","stageCost","stageCollision","stageRoad"]
+                for name=["stageSafety","stageHard","stageCost","stageCollision"]
                     shifted.(name)=shifted.(name)(2:end);
                 end
                 solution=localNominalEvaluation(anchor,model,shifted,size(shifted.inputs,2)+1);
@@ -339,8 +339,8 @@ end
 
 function [values,jacobian]=localSafetyRows(x,time,model)
     cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    count=4*~isempty(model.target);values=zeros(count+8,1);
-    if nargout>1,jacobian=zeros(count+8,6);end
+    count=4*~isempty(model.target);values=zeros(count,1);
+    if nargout>1,jacobian=zeros(count,6);end
     if count>0
         projection=laneGeometry.project(x(1:2),model.lane);
         preferred=[-sin(projection.heading);cos(projection.heading)];
@@ -348,17 +348,6 @@ function [values,jacobian]=localSafetyRows(x,time,model)
         dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(8:11),preferred);
         values(1:4)=dual.value-cfg.collision.safetyMarginMeters;
         if nargout>1,jacobian(1:4,1:3)=dual.jacobian;end
-    end
-    rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
-    body=shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1];
-    projection=laneGeometry.project(x(1:2)+rotation*body,model.lane);
-    values(count+(1:8))=reshape([projection.lateralPosition+model.frame(5); ...
-        model.frame(6)-projection.lateralPosition],[],1);
-    if nargout>1
-        normals=[-sin(projection.heading);cos(projection.heading)];
-        yaw=sum(normals.*(rotation*[0,-1;1,0]*body),1);
-        gradient=[normals.',yaw.',zeros(4,3)];
-        jacobian(count+(1:2:8),:)=gradient;jacobian(count+(2:2:8),:)=-gradient;
     end
 end
 
@@ -369,7 +358,7 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first)
     [low,high]=localStateLimits(cfg);halfDuration=cfg.controller.sampleTime/2;
     states=zeros(6,count+1);states(:,1)=model.initialState;
     stageSafety=zeros(1,count);stageHard=stageSafety;stageCost=stageSafety;
-    stageCollision=Inf(1,count);stageRoad=stageCollision;
+    stageCollision=Inf(1,count);
     if nargin<3,first=1;
     else
         assert(isequal(inputs(:,1:first-1),cached.inputs(:,1:first-1)) ...
@@ -380,7 +369,6 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first)
         stageHard(1:first-1)=cached.stageHard(1:first-1);
         stageCost(1:first-1)=cached.stageCost(1:first-1);
         stageCollision(1:first-1)=cached.stageCollision(1:first-1);
-        stageRoad(1:first-1)=cached.stageRoad(1:first-1);
     end
     x=states(:,first);
     for index=first:count
@@ -390,9 +378,6 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first)
         stageSafety(index)=max([0;-values;-middleValues]);
         if ~isempty(model.target)
             stageCollision(index)=min([values(1:4);middleValues(1:4)]);
-            stageRoad(index)=min([values(5:end);middleValues(5:end)]);
-        else
-            stageRoad(index)=min([values;middleValues]);
         end
         x=nonlinearBicycleModel.sample(middle,inputs(:,index),cfg,[],halfDuration);states(:,index+1)=x;
         stageHard(index)=max([0;low-x(4:6);x(4:6)-high;low-middle(4:6);middle(4:6)-high]);
@@ -415,10 +400,10 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first)
     slacks=stageSafety(1:prefix);
     evaluation=struct('inputs',inputs,'states',states,'safety',sum(slacks),'stageSlacks',slacks, ...
         'hard',hard,'clfSlack',clf,'clfInitialValue',v0,'clfNextValue',v1, ...
-        'minimumCollisionMargin',min(stageCollision),'minimumRoadMargin',min(stageRoad), ...
+        'minimumCollisionMargin',min(stageCollision), ...
         'cost',sum(stageCost)/count+cfg.clf.relaxationWeight*clf^2, ...
         'stageSafety',stageSafety,'stageHard',stageHard,'stageCost',stageCost, ...
-        'stageCollision',stageCollision,'stageRoad',stageRoad);
+        'stageCollision',stageCollision);
 end
 
 function [low,high]=localStateLimits(cfg)

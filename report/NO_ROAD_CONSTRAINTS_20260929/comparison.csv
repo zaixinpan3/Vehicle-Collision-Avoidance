@@ -1,0 +1,15 @@
+speedMetersPerSecond,scenario,completed,collisionAvoided,executedFrames,minimumClearanceMeters,minimumRoadMarginMeters,initializationSeconds,failedInitializationSeconds,maximumRunningSeconds,runningDeadlineMisses,runningConicCalls,failure,previousCompleted,previousMinimumClearanceMeters,previousMaximumRunningSeconds
+8,headOn,True,True,160,0.04402624574674782,0.7590428317020002,1.196536,,0.026989,0,0,,True,0.04402630192777782,0.029032
+8,acceleratingHeadOn,True,True,160,0.005773406904837726,0.7365404506997111,0.804017,,0.024647,0,0,,True,0.005773051944181394,0.025985
+8,brakingLead,False,False,0,,,,5.012352,,0,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).,False,,
+8,crossing,False,False,0,,,,5.003617,,0,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).,False,,
+8,turningCrossing,False,False,0,,,,5.012295,,0,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).,False,,
+8,curvedHeadOn,False,False,0,,,,0.466499,,0,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.,False,,
+8,curvedCrossing,False,False,0,,,,0.148146,,0,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.,False,,
+15,headOn,True,True,160,0.08168496344525132,-0.004774106381438159,1.668894,,0.027594,0,0,,True,0.01953966988311585,0.027755
+15,acceleratingHeadOn,True,True,160,0.026026603671439587,-0.11315546188643921,1.322373,,0.026626,0,0,,True,0.04533976991294698,0.027843
+15,brakingLead,False,False,0,,,,5.001617,,0,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).,False,,
+15,crossing,False,False,0,,,,5.009012,,0,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).,False,,
+15,turningCrossing,False,False,0,,,,5.010749,,0,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).,False,,
+15,curvedHeadOn,False,False,0,,,,0.4197,,0,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.,False,,
+15,curvedCrossing,False,False,0,,,,0.13978,,0,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.,False,,

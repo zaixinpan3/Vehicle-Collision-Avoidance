@@ -50,7 +50,8 @@ def check_case(entry):
     checked = audit(result)
     avoided = bool(result['completed'] and checked['strictlyCollisionFree']
                    and checked['agreesWithMatlabGeometry'] and checked['everyHoldFeasible']
-                   and checked['allPredictionsZeroSlack'] and checked['minimumRoadMarginMeters'] >= -1e-9)
+                   and checked['allPredictionsZeroSlack']
+                   and (not checked['roadConstraintsEnforced'] or checked['roadBoundarySatisfied']))
     return dict(**entry, sourceSha256=hashlib.sha256(path.read_bytes()).hexdigest(),
                 independentBaselineCollision=True, baselineStrictOverlapSamples=int(np.sum(collision)),
                 baselineInitialClearanceMeters=initial, baselineMaximumOverlapDepthMeters=max(penetration),

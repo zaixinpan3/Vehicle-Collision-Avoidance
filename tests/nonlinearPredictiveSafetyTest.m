@@ -167,7 +167,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,52);
+            testCase.verifyEqual(state.version,53);
         end
         function everyCallAppliesTheReturnedFeasibleFirstControl(testCase)
             [ego,road,cfg]=localFixture();
@@ -217,7 +217,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior);cfg.solver.timeLimitSeconds=1e-12;
             [~,cachedPlan,cached]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            prior.witness=rmfield(prior.witness,{'stageSafety','stageHard','stageCost','stageCollision','stageRoad'});
+            prior.witness=rmfield(prior.witness,{'stageSafety','stageHard','stageCost','stageCollision'});
             [~,freshPlan,fresh]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEqual(cachedPlan,freshPlan);
             testCase.verifyEqual(cached.solution.states,fresh.solution.states,AbsTol=1e-12);
@@ -285,12 +285,14 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
         function oncomingAvoidanceStartsFromALaneRollout(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=60;
+            road.lateralClearance=[.05;.05];
             target=localTarget([24;0;pi;8;0;0;1.6;2.4;.95;0;0]);
             [~,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyGreaterThan(max(abs(plan(1,:))),.01);
             testCase.verifyFalse(problem.metadata.preplannedAvoidanceTrajectoryRequired);
             testCase.verifyFalse(problem.metadata.drivingModeSwitching);
+            testCase.verifyFalse(problem.metadata.roadConstraintsEnforced);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
             steps=problem.metadata.search.sequentialIterations;
             testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
@@ -313,7 +315,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.solution.hard,0);
             testCase.verifyEqual(problem.solution.safety,0);
             testCase.verifyGreaterThan(problem.metadata.minimumCollisionMargin,0);
-            testCase.verifyGreaterThan(problem.metadata.minimumRoadMargin,0);
+            testCase.verifyFalse(problem.metadata.roadConstraintsEnforced);
             endpoint=[problem.solution.states(:,end);plan(:,end)];
             value=terminalContinuation.membership(endpoint, ...
                 problem.model.sampleIndex+size(plan,2),problem.model.terminal);
@@ -325,11 +327,11 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(steps{end}.secondaryReturned);
             testCase.verifyTrue(steps{end}.retainedAsWitness);
         end
-        function terminalLaneFeedbackWorksOnBothCurvatureSigns(testCase,curvature)
+        function terminalLaneFeedbackNeedsNoRoadClearance(testCase,curvature)
             [ego,~,cfg]=localFixture();trim=nonlinearBicycleModel.cruise(cfg,curvature);
             ego.yaw=trim.state(3);ego.speed=trim.state(4);ego.lateralVelocity=trim.state(5);ego.yawRate=trim.state(6);
             road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200), ...
-                'lateralClearance',[4;4]);
+                'lateralClearance',[.05;.05]);
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.solver.feasibilityTolerance);
