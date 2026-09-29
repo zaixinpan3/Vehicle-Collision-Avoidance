@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "videoSha256": "758ac80271c23d251cd89ac852b1c9479b3434c48901f910a23bff785fca3ce1",
+  "sourceHashesVerified": 14,
+  "chapterCount": 14,
+  "decodedFrames": 4504,
+  "firstChapterIncludesOpeningCover": true,
+  "durationSeconds": 150.13333333333333,
+  "resolution": [
+    1600,
+    900
+  ],
+  "fps": 30,
+  "codec": "h264",
+  "pixelFormat": "yuv420p",
+  "fullDecodeCommand": [
+    "ffmpeg",
+    "-v",
+    "error",
+    "-i",
+    "/home/zai/.cache/collisionAvoidance/fourteen-scenario-video-20260929-150838/collision-avoidance-fourteen-scenarios.mp4",
+    "-f",
+    "null",
+    "-"
+  ],
+  "fullDecodeExitCode": 0,
+  "fullDecodeErrors": "",
+  "visualInspection": "Encoded stills from all fourteen chapters, closest approach in scene 07, and corrected renderer previews reviewed",
+  "scope": "Visualization of existing exact-observation results; no controller modification or new simulation"
+}

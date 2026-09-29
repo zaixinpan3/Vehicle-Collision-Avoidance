@@ -1,0 +1,73 @@
+;FFMETADATA1
+title=Collision avoidance: fourteen recorded scenarios
+comment=Exact observations. True geometry. Slow replay near closest approaches.
+[CHAPTER]
+TIMEBASE=1/1000
+START=2200
+END=8100
+title=01 - 8 m/s - Lane recovery
+[CHAPTER]
+TIMEBASE=1/1000
+START=8100
+END=14000
+title=02 - 8 m/s - Curved-road tracking
+[CHAPTER]
+TIMEBASE=1/1000
+START=14000
+END=26133
+title=03 - 8 m/s - Braking target beside the road
+[CHAPTER]
+TIMEBASE=1/1000
+START=26133
+END=38267
+title=04 - 8 m/s - Turning target
+[CHAPTER]
+TIMEBASE=1/1000
+START=38267
+END=50400
+title=05 - 8 m/s - Accelerating turn
+[CHAPTER]
+TIMEBASE=1/1000
+START=50400
+END=62533
+title=06 - 8 m/s - Constant-speed head-on encounter
+[CHAPTER]
+TIMEBASE=1/1000
+START=62533
+END=74667
+title=07 - 8 m/s - Accelerating head-on encounter
+[CHAPTER]
+TIMEBASE=1/1000
+START=74667
+END=80567
+title=08 - 15 m/s - Lane recovery
+[CHAPTER]
+TIMEBASE=1/1000
+START=80567
+END=86467
+title=09 - 15 m/s - Curved-road tracking
+[CHAPTER]
+TIMEBASE=1/1000
+START=86467
+END=98600
+title=10 - 15 m/s - Braking target beside the road
+[CHAPTER]
+TIMEBASE=1/1000
+START=98600
+END=110733
+title=11 - 15 m/s - Turning target
+[CHAPTER]
+TIMEBASE=1/1000
+START=110733
+END=122867
+title=12 - 15 m/s - Accelerating turn
+[CHAPTER]
+TIMEBASE=1/1000
+START=122867
+END=135000
+title=13 - 15 m/s - Constant-speed head-on encounter
+[CHAPTER]
+TIMEBASE=1/1000
+START=135000
+END=147133
+title=14 - 15 m/s - Accelerating head-on encounter
