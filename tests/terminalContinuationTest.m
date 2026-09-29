@@ -2,6 +2,7 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
     %terminalContinuationTest Endpoint closure and retained-witness behavior.
     properties (TestParameter)
         curvature = {0,-.005,.005}
+        phaseMeters = {-20,0,20}
     end
     methods (TestClassSetup)
         function addControllerPaths(testCase)
@@ -17,13 +18,67 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             testCase.verifyLessThan(seed.contractionBound*seed.radius+seed.defectBound,seed.radius);
             testCase.verifySize(seed.factor,[8,8]);
         end
-        function endpointControlsReachTheNextAbsoluteSlice(testCase,curvature)
+        function endpointControlsReachTheNextAbsoluteSlice(testCase,curvature,phaseMeters)
             [seed,cfg]=localSeed(curvature);
+            seed.phaseMeters=phaseMeters;
             [values,inputs,slew]=localClosureSamples(seed,cfg);
             testCase.verifyLessThanOrEqual(values,zeros(size(values)));
             testCase.verifyLessThan(abs(inputs(1,:)),cfg.model.frontWheelSteeringAngleMaximum);
             testCase.verifyLessThan(abs(inputs(2,:)),1);
             testCase.verifyLessThan(slew,.5*cfg.controller.sampleTime);
+        end
+        function shiftedReferenceStatesBelongToTheirOwnTerminalFamily(testCase,curvature)
+            [seed,~]=localSeed(curvature);shifted=seed;shifted.phaseMeters=-20;
+            y=terminalContinuation.referenceAt(shifted,seed.epochIndex);
+            testCase.verifyGreaterThan(terminalContinuation.membership(y,seed.epochIndex,seed),0);
+            testCase.verifyLessThan(terminalContinuation.membership(y,seed.epochIndex,shifted),0);
+            testCase.verifyEqual(terminalContinuation.control(y,seed.epochIndex,shifted),seed.reference.input,AbsTol=1e-12);
+        end
+        function phaseTangentsMatchTheReferenceAndMembership(testCase,curvature)
+            [seed,~]=localSeed(curvature);seed.phaseMeters=-12.3;index=seed.epochIndex+17;
+            [y,tangent]=terminalContinuation.referenceAt(seed,index);
+            y=y+[.01;-.02;.001;.03;-.01;.002;0;0];
+            [~,~,~,derivative]=terminalContinuation.membership(y,index,seed);
+            lo=seed;hi=seed;h=1e-4;lo.phaseMeters=lo.phaseMeters-h;hi.phaseMeters=hi.phaseMeters+h;
+            finite=(terminalContinuation.referenceAt(hi,index)-terminalContinuation.referenceAt(lo,index))/(2*h);
+            [~,~,lowError]=terminalContinuation.membership(y,index,lo);
+            [~,~,highError]=terminalContinuation.membership(y,index,hi);
+            testCase.verifyEqual(tangent,finite,AbsTol=2e-8);
+            testCase.verifyEqual(derivative,(highError-lowError)/(2*h),AbsTol=2e-8);
+        end
+        function aDifferentPhaseMustRecheckFutureTargetSeparation(testCase)
+            [seed,cfg]=localSeed(0);t=[cos(.2);sin(.2)];frame=[0;0;.2;0];
+            q=[seed.epochState(1:2)+20*t;.2;0;0;0;1.6;2.4;.95;0;0];
+            unsafe=terminalContinuation.separation(seed,q,frame,cfg);
+            seed.phaseMeters=40;
+            [safe,derivative]=terminalContinuation.separation(seed,q,frame,cfg);
+            testCase.verifyLessThan(unsafe,0);
+            testCase.verifyGreaterThan(safe,0);
+            testCase.verifyEqual(derivative,1,AbsTol=1e-12);
+        end
+        function separationUsesTheSameAbsoluteTimeAsTheEndpoint(testCase)
+            [seed,cfg]=localSeed(0);seed.phaseMeters=40;t=[cos(.2);sin(.2)];frame=[0;0;.2;0];
+            q=[seed.epochState(1:2)+20*t;.2;4;0;0;1.6;2.4;.95;0;0];
+            initial=terminalContinuation.separation(seed,q,frame,cfg);
+            qNext=predictiveSafetyGeometry.targetFlow(q,10*cfg.controller.sampleTime);
+            later=terminalContinuation.separation(seed,qNext,frame,cfg,seed.epochIndex+10);
+            before=terminalContinuation.referenceAt(seed,seed.epochIndex);
+            after=terminalContinuation.referenceAt(seed,seed.epochIndex+10);
+            expected=initial+t.'*(after(1:2)-before(1:2)-qNext(1:2)+q(1:2));
+            testCase.verifyEqual(later,expected,AbsTol=1e-11);
+        end
+        function aLongitudinalDelayCanChooseANewTerminalPhase(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=10;
+            [~,~,~,first]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,first);ego.position(1)=ego.position(1)-5;
+            [~,~,problem,delayed]=collisionAvoidanceController(ego,[],road,cfg,first);
+            cfg.solver.timeLimitSeconds=1e-12;
+            [last,hard,~,counts]=localContinue(delayed,ego,road,cfg,24);
+            testCase.verifyLessThan(problem.metadata.terminalPhaseMeters,-4);
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(last.terminal.phaseMeters,delayed.terminal.phaseMeters,AbsTol=1e-12);
+            testCase.verifyEqual(hard,zeros(size(hard)),AbsTol=0);
+            testCase.verifyEqual(counts,zeros(size(counts)));
         end
         function inputMemoryIsPartOfMembership(testCase)
             [seed,~]=localSeed(0);y=terminalContinuation.referenceAt(seed,seed.epochIndex);

@@ -1,4 +1,4 @@
-# PCBF, lane CLF and time-indexed terminal continuation
+# PCBF, lane CLF and free-phase terminal continuation
 
 ## Scope
 
@@ -97,7 +97,7 @@ additional physical collision buffer defaults to 0.006 m and can be explicitly
 set to zero. It applies at the prediction constraint samples and in the
 terminal separation certificate; it is not a continuous-time clearance guarantee.
 
-With the endpoint family `B_j` defined below, the terminal tube is represented
+With the union of endpoint families `B_j` defined below, the terminal tube is represented
 implicitly by
 
 \[
@@ -120,16 +120,22 @@ lane LQR remains a CLF/preference ingredient. It is not an invariance proof.
 The endpoint construction instead linearizes the **actual global RK4 map**
 at the cruise state, includes input memory, transforms the successor into a
 moving reference frame, and designs a discrete augmented feedback gain `K`.
-Let `R` be its nonsingular norm factor. The endpoint family is
+Let `R` be its nonsingular norm factor and let `sigma` denote longitudinal
+reference phase in meters. For each fixed phase the endpoint family is
 
 \[
-B_j=\{y:\|R e_j(y)\|_2\le r\},\qquad
-\kappa_{B,j}(y)=u^r+K e_j(y).
+B_j(\sigma)=\{y:\|R e_j(y;\sigma)\|_2\le r\},\qquad
+\kappa_{B,j}(y;\sigma)=u^r+K e_j(y;\sigma).
 \]
 
-The reference pose follows the sampled RK4 pose increment from a fixed
-absolute endpoint epoch. On a curved road this gives the discrete pose
-orbit, rather than assuming that a Frenet integration equals global RK4.
+The reference pose follows the sampled RK4 pose increment from an absolute
+endpoint epoch. Its phase is a free scalar decision variable, with no prescribed
+value, phase penalty or explicit phase bound. On a straight path, phase
+translates the reference along its cruise direction. On a circular path, phase
+rotates it about the same discrete orbit center. If `ell` is the straight
+distance or circular arc length per reference increment, the pose group power
+uses `j - epochIndex + sigma/ell` increments. On a curved road this gives the
+discrete pose orbit, rather than assuming that a Frenet integration equals global RK4.
 The body-state trim need not be numerically exact: its successor defect is
 included in the bound below.
 
@@ -150,6 +156,16 @@ and the RK4 internal domain. It fails explicitly if it cannot establish a
 nonempty admissible neighborhood. It never infers nonlinear invariance from
 LQR eigenvalues or a finite collection of sampled states.
 
+The global bicycle RK4 map is equivariant to rigid planar translations and
+rotations: applying a fixed pose transform before a step gives the same result
+as applying it after that step. Body velocities, tire forces and actuator
+constraints are unchanged. Each fixed-phase reference is such a transform of
+the original reference, so its moving-frame closed-loop error map `Phi` is the
+same. The existing gain, norm, defect and contraction bounds therefore apply
+to every phase without a new enclosure computation. This argument uses the
+spatially homogeneous nominal model and absence of road-edge constraints;
+it does not translate the target or discard its separation requirement.
+
 The enclosure implementation uses outward-padded double interval operations,
 Taylor remainders for sine/cosine and exponential, analytic differentiation
 through RK4, and a checked positive-definiteness bound for the proposed
@@ -168,6 +184,31 @@ apply only to the endpoint seed. The finite completion compares the two
 vehicles at matching times, allowing earlier passages through locations
 that the target reaches later.
 
+Let `c_j(sigma)` be this sufficient all-future separation margin, evaluated
+using the phase-adjusted reference and the target at the **same absolute
+endpoint time**. The effective endpoint set is
+
+\[
+\mathcal A_j=\{\sigma:c_j(\sigma)\ge0\},\qquad
+B_j=\bigcup_{\sigma\in\mathcal A_j}B_j(\sigma).
+\]
+
+The controller retains the selected phase as part of the feasibility witness.
+It never assumes that an arbitrary longitudinal shift preserves target safety.
+Straight-path separation uses a maximum of sufficient separating-axis bounds;
+the active branch provides the affine search row, followed by full nonlinear
+rechecking. Circular phase preserves the full orbit, so the conservative
+all-future orbit separation is independent of phase. Consequently this change
+does not resolve rejection of intersecting circular terminal orbits.
+
+This union removes the requirement to recover a preselected longitudinal
+position at the endpoint time. It retains a finite completion horizon and a
+local cruise-state condition at its end. Initialization still selects endpoint
+index `M` from the lane rollout; no free terminal-time optimization or general
+viability-kernel computation is implemented. A terminal condition necessarily
+restricts admissible trajectories, and this sufficient construction can remain
+conservative even with free phase.
+
 If no endpoint with this sufficient continuation can be found within
 `maximumHorizonSteps`, initialization reports failure. This does not establish
 that the original nonlinear problem has no other viable terminal family.
@@ -176,10 +217,14 @@ There is no finite-only fallback masquerading as an indefinite tail.
 ## Sequential convexification and acceptance
 
 A lane-feedback rollout initializes the search; no avoidance trajectory is
-required. The fixed endpoint is selected once from that rollout. Each SCvx
+required. The endpoint index and orbit anchor are selected once from that
+rollout; its longitudinal phase is subsequently free. Each SCvx
 step uses variational RK4 dynamics and linearized support-dual geometry.
 The endpoint is represented by its actual **2-norm cone**, with ego state
-and final input in the cone. The previous inscribed 1-norm polytope has been
+and final input in the cone. One additional scalar phase increment enters the
+cone through the analytic derivative of the full eight-coordinate moving-frame
+error. A separate affine row enforces the sufficient future-separation branch.
+The previous inscribed 1-norm polytope has been
 removed. `coneprog` solves the primary slack problem and the secondary
 quadratic lane/CLF objective. Each stage and the CLF penalty has its own
 small squared-norm cone epigraph; their epigraph values sum to the total
@@ -221,10 +266,12 @@ If hard completion rows make a convex subproblem infeasible, a numerical
 restoration step temporarily uses elastic completion rows. This is only a
 search direction. It cannot be retained unless a fresh nonlinear rollout
 satisfies the original **hard, zero-slack** completion. A short shooting
-correction of the final controls removes terminal linearization defects only
+correction jointly adjusts the final controls and reference phase to remove
+terminal linearization defects only
 when endpoint membership fails. A feasible candidate bypasses correction;
 correction ends as soon as feasibility is reached. All corrected inputs,
-slew limits, safety samples and endpoint membership are reevaluated;
+slew limits, safety samples, endpoint membership and phase-dependent future
+target separation are reevaluated;
 selected controls are not clipped.
 
 Evaluation stores per-stage safety, physical residuals and costs. During an
@@ -271,10 +318,21 @@ as numerical settings, not treated as theorem hypotheses already proved.
 
 For `k+N < M`, remove the first input from the retained prefix/completion.
 The old first completion input enters the new prefix with zero slack. The
-remaining completion reaches the same fixed endpoint. Once `H_k=N`, append
-`kappa_(B,k+N)` at the **old** absolute terminal time and state. Endpoint
-invariance puts its successor in `B_(k+N+1)` and supplies zero appended slack.
+remaining completion reaches the same endpoint with the same stored phase.
+Once `H_k=N`, append `kappa_(B,k+N)(.;sigma)` at the **old** absolute terminal
+time and state, retaining that phase. Fixed-phase endpoint invariance puts its
+successor in `B_(k+N+1)(sigma)` and supplies zero appended slack. The already
+certified all-future separation also covers this later suffix; its future set
+is a subset of the one previously checked. The implemented sufficient
+straight-progress and full-orbit bounds preserve this suffix property in the
+nominal real-arithmetic construction.
 Input memory makes the appended slew constraint part of the same result.
+
+The phase is therefore free during a new search and fixed when constructing
+the shifted feasibility candidate. A later accepted search may change it only
+after rechecking the full nonlinear constraints and future separation. The
+existence of the old fixed-phase candidate is sufficient for the recursive
+argument; the optimizer need not select the same phase in every new search.
 
 Every retained start, midpoint, target evaluation and input comparison has
 unchanged absolute time and values. Thus the shifted sequence is feasible
@@ -302,8 +360,8 @@ transition's slack inequality.
 
 ## Interfaces and limits
 
-State format **53** stores the absolute sample index, target epoch, endpoint
-family, full input/state continuation, achieved prefix slacks, and problem
+State format **54** stores the absolute sample index, target epoch, endpoint
+family and its chosen phase, full input/state continuation, achieved prefix slacks, and problem
 context. Old state formats are discarded. Predictions include the whole
 prefix plus completion; metadata distinguishes their lengths. No lane/
 avoidance mode switch is introduced.
@@ -325,3 +383,11 @@ zero-slack append condition in place of a fixed invariant terminal set.
 Polygon support duals follow the convex collision-avoidance formulation of
 Li et al. (2023), with both moving rectangles represented explicitly.
 The local source PDFs are in `reference/`.
+
+Optimizing a reference parameter is related to the artificial-reference idea
+in Limon, Alvarado, Alamo and Camacho, [*MPC for tracking piecewise constant
+references for constrained linear systems*](https://doi.org/10.1016/j.automatica.2008.01.023),
+Automatica 44(9), 2382--2387 (2008). Only the publisher's indexed abstract was
+consulted here. That linear-system result is not a proof for this nonlinear,
+moving-target controller; the specific fixed-phase equivariance and retained
+witness argument above supplies the structural extension used here.

@@ -1,0 +1,83 @@
+from pathlib import Path
+import csv
+import hashlib
+import json
+
+root = Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance')
+raw = Path(__file__).parent
+audit = json.loads((raw / 'independent-audit.json').read_text())
+old = json.loads((root / 'report/NO_ROAD_CONSTRAINTS_20260929/independent-audit.json').read_text())
+old_cases = {(x['referenceSpeedMetersPerSecond'], x['scenario']): x for x in old['results']}
+rows = []
+for entry in audit['results']:
+    export = json.loads(Path(entry['source']).read_text())
+    assert export['stateObservation'] == 'ode45 ego successor; fixed target epoch; no observer, noise or delay'
+    result = export['results']
+    key = (entry['referenceSpeedMetersPerSecond'], entry['scenario'])
+    trace = result['trace']
+    running = trace[1:]
+    assert result['roadConstraintsEnforced'] is False
+    assert entry['independentBaselineCollision']
+    if entry['completed']:
+        assert len(trace) == 160
+        assert entry['geometryAudit']['everyHoldFeasible']
+        assert entry['geometryAudit']['allPredictionsZeroSlack']
+        assert entry['geometryAudit']['strictlyCollisionFree']
+        assert all(t['terminalPhaseMeters'] == trace[0]['terminalPhaseMeters'] for t in trace)
+        assert all(t['terminalSeparationMargin'] >= 0 for t in trace)
+    else:
+        assert not trace and entry['executedFrames'] == 0
+    rows.append(dict(
+        speedMetersPerSecond=key[0], scenario=key[1], completed=entry['completed'],
+        collisionAvoided=entry['collisionAvoided'], executedFrames=entry['executedFrames'],
+        minimumClearanceMeters=entry['minimumReplayClearanceMeters'],
+        initializationSeconds=entry['initializationSeconds'],
+        failedInitializationSeconds=entry['failedFrameSeconds'],
+        maximumRunningSeconds=entry['maximumRunningSeconds'],
+        runningFrames=len(running), runningDeadlineMisses=sum(t['controllerSeconds'] > .05 for t in running),
+        runningConicCalls=sum(t['solverCalls'] for t in running),
+        terminalPhaseMeters=trace[0]['terminalPhaseMeters'] if trace else None,
+        initialEndpointSeconds=trace[0]['endpointIndex'] * result['sampleTimeSeconds'] if trace else None,
+        initialConicCalls=trace[0]['solverCalls'] if trace else None,
+        failure=entry['failure'], previousCompleted=old_cases[key]['completed'],
+        previousMinimumClearanceMeters=old_cases[key]['minimumReplayClearanceMeters']))
+with (raw / 'comparison.csv').open('w', newline='') as handle:
+    writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator='\n')
+    writer.writeheader()
+    writer.writerows(rows)
+tests = []
+for name in ['initial-tests.csv', 'remaining-tests.csv']:
+    tests.extend(csv.DictReader((raw / name).open()))
+assert len(tests) == 255 and all(t['Passed'] == '1' and t['Failed'] == '0' and t['Incomplete'] == '0' for t in tests)
+summary = dict(
+    scope='Free terminal longitudinal phase; unchanged fourteen exact-observation cruise-collision threats',
+    sourceBaseCommit='8f552d0df9d539793ff43adc1e0fd93ad6c189fd',
+    scenarios=len(rows), completed=sum(r['completed'] for r in rows),
+    collisionAvoided=sum(r['collisionAvoided'] for r in rows),
+    initializationFailures=sum(not r['completed'] for r in rows),
+    maximumRunningSeconds=audit['maximumCompletedRunningSeconds'],
+    minimumCompletedClearanceMeters=audit['minimumCompletedClearanceMeters'],
+    totalRunningFrames=sum(r['runningFrames'] for r in rows),
+    totalRunningDeadlineMisses=sum(r['runningDeadlineMisses'] for r in rows),
+    totalRunningConicCalls=sum(r['runningConicCalls'] for r in rows),
+    selectedMatlabTestsPassed=len(tests), pythonAuditTestsPassed=12, rows=rows)
+(raw / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
+source_paths = sorted({*root.glob('controller/*.m'), *root.glob('config/*.m'),
+    *(root / 'tests' / (name + '.m') for name in [
+        'terminalContinuationTest', 'nonlinearPredictiveSafetyTest', 'modifiedFialaTireTest',
+        'collisionAvoidanceControllerConfigTest', 'controllerSourceBudgetTest',
+        'longitudinalRoadLoadTest', 'controllerInputGeometryTest', 'collisionThreatScenarioTest']),
+    *(root / 'scripts' / name for name in ['runCollisionThreatValidation.m',
+        'runNonlinearPredictiveSafetyValidation.m', 'collisionThreatScenario.m', 'givenPathCollisionBaseline.m',
+        'auditCollisionThreats.py', 'auditJointPredictiveSafety.py'])})
+assert all(p.is_file() for p in source_paths)
+(raw / 'source-manifest.json').write_text(json.dumps(dict(
+    baseCommit=summary['sourceBaseCommit'],
+    scope='Post-run hashes of execution sources; no execution-source changes after the recorded validations',
+    files={str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in source_paths}), indent=2) + '\n')
+artifacts = [*raw.glob('*.json'), *raw.glob('speed*/*.json'), *raw.glob('*tests.csv'),
+             raw / 'runValidation.m', raw / 'analyze.py', raw / 'comparison.csv',
+             raw / 'initial-tests.log', raw / 'validation.log', raw / 'python-tests.log']
+(raw / 'raw-artifact-hashes.json').write_text(json.dumps({str(p): hashlib.sha256(p.read_bytes()).hexdigest()
+    for p in sorted(artifacts) if p.name != 'raw-artifact-hashes.json'}, indent=2) + '\n')
+print(json.dumps({k: v for k, v in summary.items() if k != 'rows'}, indent=2))

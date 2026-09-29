@@ -9,7 +9,7 @@ The current formulation and its guarantee scope are in
 | `collisionAvoidanceController.m` | Fixed target epoch, absolute clock, input memory and first control output |
 | `readControllerInputs.m` | Ego, one target and road input normalization |
 | `solvePredictiveControl.m` | First feasible PCBF continuation, conic restoration guided by safety and lane costs, and retained witness |
-| `terminalContinuation.m` | Augmented endpoint set/controller, cached RK4 contraction bounds and indefinite seed geometry |
+| `terminalContinuation.m` | Free-phase augmented endpoint family/controller, cached RK4 contraction bounds and phase-dependent indefinite target separation |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim and lane CLF |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Constant-parameter target flow, signed polygon duals and road frame |
@@ -19,6 +19,11 @@ The current formulation and its guarantee scope are in
 The time-indexed tube is stored implicitly as a feasible hard completion
 and its endpoint family. A valid witness is executed immediately; search runs
 only when nonlinear revalidation finds no admissible continuation.
+The endpoint longitudinal phase is a free scalar decision variable, rather
+than a prescribed progress target. An accepted phase is stored and held fixed
+when shifting/appending that witness. The finite completion horizon and
+certified cruise neighborhood remain; changing phase must pass the endpoint
+target-separation test again.
 Both zero-slack safe prefixes and positive-slack recovery prefixes can run;
 positive slack does not imply collision-free motion. The last applied input
 belongs to the terminal state. The fixed lane ellipsoid, terminal input band,

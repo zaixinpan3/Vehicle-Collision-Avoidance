@@ -1,0 +1,31 @@
+{
+  "baseCommit": "8f552d0df9d539793ff43adc1e0fd93ad6c189fd",
+  "scope": "Post-run hashes of execution sources; no execution-source changes after the recorded validations",
+  "files": {
+    "config/collisionAvoidanceControllerConfig.m": "e3529546f96890c49a04f3838d3a3d38286efbc14c976323d781eff0965c8ee5",
+    "config/estimatorControllerIntegrationConfig.m": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "config/nrmmTrackingConfig.m": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+    "controller/collisionAvoidanceController.m": "db987eb18e0503487f7b32d44dc4f43565e77cc8817a61c6b599739de1c3989c",
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "1613b06662f57e29afa4edb2bd2f7cde61622defd94725a348bbc7bff2e8f420",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "7b9ca9e020d7a46747e209cb56b412e7ada9802b5519e554d3c0541962172f39",
+    "controller/terminalContinuation.m": "40ac0f3a35b2935054b36e66b0bc9b3d3720c9a5b9b8b00768e40fd62d955abc",
+    "scripts/auditCollisionThreats.py": "55f114e36aff747ef449916ea0cda64ad45f84994ccfe227c62cccabc3ac997e",
+    "scripts/auditJointPredictiveSafety.py": "5ec5f55b44c114d550f03a9369ffea95c99195d37866f44e17738fdc1b122d8b",
+    "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "scripts/givenPathCollisionBaseline.m": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+    "scripts/runCollisionThreatValidation.m": "f4c634b0c94fe6484504d06698e3971d3e485840f36f45fbf7ecd680d0359e31",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "d92c2cf85ab21258147727dc2f1c4e6a31091f481e091230084281592424e944",
+    "tests/collisionAvoidanceControllerConfigTest.m": "3ee7e3bfbd85c12e38d3a6855e922886d8f8fc750741c8fb63417a24b8b46c97",
+    "tests/collisionThreatScenarioTest.m": "df8c80aeff58ac96ed133626c7c1b1bbd36be8282909ad091e3fdbda197823a2",
+    "tests/controllerInputGeometryTest.m": "4abf8d0aa19e3c9c6c04efe8289b3b44588681553f670a8c9c80e250690376eb",
+    "tests/controllerSourceBudgetTest.m": "50484401ae89480681b5f47006b76e77f8680766b2e72f1209afcf2ae1ad3082",
+    "tests/longitudinalRoadLoadTest.m": "5425e5d182a050c91d825090a2a937dd87c258d9ab500d59673163eb56eb8d24",
+    "tests/modifiedFialaTireTest.m": "906e74544157f8f0e05eb0e26ae710d16276a693c7da583bf97c061fddafdcad",
+    "tests/nonlinearPredictiveSafetyTest.m": "b06de6cd4004c2b2d96611d502906c768caa69c022637dd952b3dd1ccb522433",
+    "tests/terminalContinuationTest.m": "37238510a587b5aa9461c2efef41e49b7cfd6e6a51722a51b76d75aa117507b9"
+  }
+}
