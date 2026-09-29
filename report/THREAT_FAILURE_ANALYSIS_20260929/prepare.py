@@ -1,0 +1,42 @@
+from pathlib import Path
+import shutil,hashlib,json,difflib
+root=Path.cwd();raw=Path('/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929');source=raw/'source'
+for folder in ['controller','config']:shutil.copytree(root/folder,source/folder,dirs_exist_ok=True)
+(source/'scripts').mkdir(exist_ok=True)
+for name in ['collisionThreatScenario.m','givenPathCollisionBaseline.m']:shutil.copy2(root/'scripts'/name,source/'scripts'/name)
+p=source/'controller/collisionAvoidanceController.m';s=p.read_text();old='    [solution,search,model]=solvePredictiveControl(model,previousState,timer);';s=s.replace(old,'    global failureModel failureDiagnostic\n    failureModel=model;\n'+old+'\n    failureDiagnostic.search=search;failureDiagnostic.model=model;failureDiagnostic.solution=solution;');p.write_text(s)
+p=source/'controller/solvePredictiveControl.m';s=p.read_text()
+s=s.replace('    cfg=model.cfg;solution=[];model.slackCap=Inf;',"    global failureDiagnostic\n    failureDiagnostic=struct('evaluations',{{}},'solves',{{}},'seedAttempts',{{}},'seedSeconds',NaN);\n    cfg=model.cfg;solution=[];model.slackCap=Inf;")
+s=s.replace('        [anchor,model.terminal]=localSeed(model);',"        seedTimer=tic;[anchor,model.terminal]=localSeed(model);\n        failureDiagnostic.seedSeconds=toc(seedTimer);failureDiagnostic.initialAnchor=anchor;failureDiagnostic.initialModel=model;")
+s=s.replace('    cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;',"    global failureDiagnostic\n    cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;")
+old='        if value<0 && terminalContinuation.separation(seed,q,model.frame,cfg)>0';new="        separation=terminalContinuation.separation(seed,q,model.frame,cfg);\n        failureDiagnostic.seedAttempts{end+1}=struct('index',index,'membership',value,'separation',separation,'state',x,'target',q);\n        if value<0 && separation>0";assert old in s;s=s.replace(old,new)
+s=s.replace("    info=struct('calls',0", "    global failureDiagnostic\n    info=struct('calls',0")
+for key,obj,cones,out in [('primary','objective','endpoint','first'),('restoration','restoration','endpoint','first'),('secondary','objective','cones','second')]:
+ old=f'[{out},~,flag]=coneprog({obj},{cones},a,b,equal,rhs,lower,upper,options);'
+ new=f"solveTimer=tic;[{out},~,flag,solverOutput]=coneprog({obj},{cones},a,b,equal,rhs,lower,upper,options);\n    failureDiagnostic.solves{{end+1}}=struct('stage','{key}','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel({obj}),'rows',size(a,1),'radius',radius,'hasPoint',~isempty({out}));"
+ assert old in s;s=s.replace(old,new)
+s=s.replace('    cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;', '    global failureDiagnostic\n    cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;')
+old="        'stageCollision',stageCollision,'stageRoad',stageRoad);"
+new=old+"\n    entry=evaluation;entry.terminalResidual=norm(model.terminal.factor*deviation)-model.terminal.radius;\n    entry.completionSafety=max(stageSafety(prefix+1:end));entry.stateViolation=max(stageHard);\n    entry.inputViolation=max([0;reshape(lo-inputs,[],1);reshape(inputs-hi,[],1)]);\n    entry.slewViolation=max([0;reshape(abs(diff([model.previousInput,inputs],1,2))-rate,[],1)]);\n    failureDiagnostic.evaluations{end+1}=entry;"
+assert old in s;s=s.replace(old,new);p.write_text(s)
+start=s.index('\nfunction feasible=localFeasible')
+helper="function [evaluation,model]=evaluateFailureInputs(model,inputs,polish)\n    if nargin<2,[inputs,model.terminal]=localSeed(model);end\n    model.slackCap=Inf;evaluation=localNominalEvaluation(inputs,model);\n    if nargin>2 && polish,evaluation=localPolishEndpoint(evaluation,model,tic);end\nend\n"+s[start:]
+(source/'controller/evaluateFailureInputs.m').write_text(helper)
+
+# Expose the first affine program without solving or changing production code.
+a=s.index('function [inputs,info,candidate]=localSequentialStep')
+b=s.index('    solveTimer=tic;[first,~,flag,solverOutput]=coneprog',a)
+header=s[a:b].replace('function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)',
+    'function program=captureFirstAffine(anchor,model,radius)\n    timer=tic;model.cfg.solver.timeLimitSeconds=Inf;')
+collector="""    widths=cellfun(@(r)size(r,1),rows(1:rowCount));starts=cumsum([0,widths]);collisionRows=[];roadRows=[];
+    for k=find(widths==12),collisionRows=[collisionRows,starts(k)+(1:4)];roadRows=[roadRows,starts(k)+(5:12)];end
+    program=struct('objective',objective,'endpoint',endpoint,'a',a,'b',b,'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'collisionRows',collisionRows,'roadRows',roadRows);
+end
+"""
+(source/'controller/captureFirstAffine.m').write_text(header+collector+s[s.index('function [values,jacobian]=localSafetyRows'):])
+
+for folder in ['controller','config']:
+ for orig in (root/folder).glob('*.m'):
+  cp=source/folder/orig.name
+  if cp.read_bytes()!=orig.read_bytes():(raw/f'{orig.stem}-instrumentation.patch').write_text(''.join(difflib.unified_diff(orig.read_text().splitlines(True),cp.read_text().splitlines(True),fromfile=str(orig.relative_to(root)),tofile='diagnostic-copy/'+str(orig.relative_to(root)),n=0)))
+(raw/'source-manifest.json').write_text(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['controller','config','scripts'] for p in (root/folder).glob('*.m')},indent=2)+'\n')

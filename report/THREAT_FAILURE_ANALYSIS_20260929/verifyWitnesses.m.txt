@@ -1,0 +1,39 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');
+global failureDiagnostic
+files=dir(fullfile(raw,'witness-*.mat'));rows=struct([]);
+for f=files.'
+ c=load(fullfile(f.folder,f.name));model=c.trialModel;e=c.candidate;cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+ count=size(e.inputs,2);x=model.initialState;minimum=Inf;road=Inf;states=[];times=[];stateViolation=0;
+ for k=1:count
+  [t,y]=ode45(@(~,z)nonlinearBicycleModel.derivative(z,e.inputs(:,k),cfg),linspace(0,.05,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
+  for j=1:numel(t)
+   q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,(k-1)*.05+t(j));
+   minimum=min(minimum,predictiveSafetyGeometry.rectangle(y(j,1:3).',shape,q(1:3),q(8:11)));
+   r=[cos(y(j,3)),-sin(y(j,3));sin(y(j,3)),cos(y(j,3))];body=y(j,1:2).'+r*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
+   road=min(road,4-max(abs(body(2,:))));
+   stateViolation=max([stateViolation;1.0001-y(j,4);y(j,4)-18;abs(y(j,5))-12;abs(y(j,6))-5]);
+  end
+  x=y(end,:).';times=[times;(k-1)*.05+t];states=[states;y]; %#ok<AGROW>
+ end
+ terminalValue=terminalContinuation.membership([x;e.inputs(:,end)],count,model.terminal);
+ original=load(fullfile(raw,"speed"+c.entry.speed+"-"+c.entry.scenario+"-budget5.mat"));fixed=original.diagnostic.initialModel;originalCount=size(original.diagnostic.initialAnchor,2);
+ inputs=e.inputs;next=e.states(:,end);previous=inputs(:,end);
+ while size(inputs,2)<originalCount
+  step=size(inputs,2);u=terminalContinuation.control([next;previous],step,model.terminal);inputs(:,end+1)=u;
+  next=nonlinearBicycleModel.sample(next,u,cfg);previous=u;
+ end
+ failureDiagnostic=struct('evaluations',{{}});fixedEvaluation=evaluateFailureInputs(fixed,inputs(:,1:originalCount));
+ entry=struct('speed',c.entry.speed,'scenario',c.entry.scenario,'amplitude',c.entry.amplitude,'speedOffset',c.entry.speedOffset, ...
+  'witnessHorizonSeconds',count*.05,'originalHorizonSeconds',originalCount*.05,'nominalHard',e.hard,'nominalSafety',e.safety, ...
+  'nominalCollisionMargin',e.minimumCollisionMargin,'ode45MinimumDistance',minimum,'ode45MinimumRoadMargin',road,'ode45MaximumStateViolation',stateViolation, ...
+  'ode45FinalEndpointMembership',terminalValue,'fixedEndpointHard',fixedEvaluation.hard,'fixedEndpointCollisionMargin',fixedEvaluation.minimumCollisionMargin, ...
+  'fixedEndpointRoadMargin',fixedEvaluation.minimumRoadMargin,'maximumEgoSpeed',max(states(:,4)),'minimumEgoSpeed',min(states(:,4)));
+ assert(e.hard==0 && e.safety==0 && minimum>0 && road>=0 && stateViolation==0);
+ [~,~,delta]=terminalContinuation.membership([fixedEvaluation.states(:,end);fixedEvaluation.inputs(:,end)],originalCount,fixed.terminal);
+ entry.fixedEndpointResidual=norm(fixed.terminal.factor*delta)-fixed.terminal.radius;
+ if isempty(rows),rows=entry;else,rows(end+1)=entry;end
+ replay=struct('source',f.name,'times',times,'states',states,'targetInitialState',model.targetEpoch,'configuration',cfg,'metrics',entry);
+ file=fopen(fullfile(raw,"replay-"+c.entry.speed+"-"+c.entry.scenario+".json"),'w');fprintf(file,'%s\n',jsonencode(replay));fclose(file);
+ fprintf('VERIFIED %g %s min %.6f road %.6f tail %.2f original %.2f fixedHard %.5g fixedTerminal %.5g\n',entry.speed,entry.scenario,minimum,road,count*.05,originalCount*.05,entry.fixedEndpointHard,entry.fixedEndpointResidual);
+end
+file=fopen(fullfile(raw,'witness-verification.json'),'w');fprintf(file,'%s\n',jsonencode(rows));fclose(file);

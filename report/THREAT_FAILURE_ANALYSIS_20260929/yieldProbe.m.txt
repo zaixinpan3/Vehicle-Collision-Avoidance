@@ -1,0 +1,52 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config','scripts');
+global failureDiagnostic
+% Candidate construction is an offline feasibility probe, not a new controller.
+for speed=[8,15]
+ for name=["crossing","turningCrossing"]
+  c=load(fullfile(raw,"speed"+speed+"-"+name+"-budget5.mat"));model=c.diagnostic.initialModel;cfg=model.cfg;
+  found=false;attempts=struct([]);
+  for amplitude=0
+   for speedOffset=[-4,-6,-8]
+    reference=model.terminal.reference;x=model.initialState;previous=model.previousInput;inputs=zeros(2,512);states=zeros(6,513);states(:,1)=x;
+    release=2.1;ramp=1.1;if name=="brakingLead",release=7.2;ramp=1.7;end
+    reason="";accepted=false;candidate=[];
+    try
+     for index=1:512
+      t=(index-1)*cfg.controller.sampleTime;
+      [d,dDot]=bump(t,amplitude,ramp,release);
+      desiredSpeed=speed;if t<release,desiredSpeed=min(17.8,max(2,speed+speedOffset));end
+      e=nonlinearBicycleModel.error(x,model.lane,reference);e(1)=e(1)-d;e(2)=e(2)-atan2(dDot,desiredSpeed);e(3)=e(3)+speed-desiredSpeed;
+      u=reference.input+reference.gain*e;u=min([cfg.model.frontWheelSteeringAngleMaximum;1-1e-8],max([-cfg.model.frontWheelSteeringAngleMaximum;-1+1e-8],u));
+      inputs(:,index)=u;x=nonlinearBicycleModel.sample(x,u,cfg);states(:,index+1)=x;previous=u;
+      if t<release+ramp+1,continue;end
+      endpoint=terminalContinuation.anchor(model.terminal,x,index,model.lane);
+      membership=terminalContinuation.membership([x;u],index,endpoint);
+      separation=terminalContinuation.separation(endpoint,predictiveSafetyGeometry.targetFlow(model.targetEpoch,index*.05),model.frame,cfg);
+      if membership<0 && separation>0
+       trialModel=model;trialModel.terminal=endpoint;failureDiagnostic=struct('evaluations',{{}});
+       candidate=evaluateFailureInputs(trialModel,inputs(:,1:index));accepted=candidate.hard==0 && candidate.safety==0;
+       break;
+      end
+     end
+    catch ex,reason=string(ex.identifier)+": "+string(ex.message);end
+    entry=struct('speed',speed,'scenario',name,'amplitude',amplitude,'speedOffset',speedOffset,'accepted',accepted,'failure',reason,'steps',index,'hard',NaN,'collisionMargin',NaN,'roadMargin',NaN);
+    if ~isempty(candidate),entry.hard=candidate.hard;entry.collisionMargin=candidate.minimumCollisionMargin;entry.roadMargin=candidate.minimumRoadMargin;end
+    if isempty(attempts),attempts=entry;else,attempts(end+1)=entry;end
+    fprintf('WITNESS %g %s amp %g speedOff %g accept %d hard %.6f collision %.6f road %.6f\n',speed,name,amplitude,speedOffset,accepted,entry.hard,entry.collisionMargin,entry.roadMargin);
+    if accepted
+     found=true;save(fullfile(raw,"witness-"+speed+"-"+name+".mat"),'candidate','trialModel','entry');break;
+    end
+   end
+   if found,break;end
+  end
+  saveJson(fullfile(raw,"yield-search-"+speed+"-"+name+".json"),attempts);
+ end
+end
+function r=rotation(a),r=[cos(a),-sin(a);sin(a),cos(a)];end
+function [d,dp]=bump(t,a,ramp,release)
+ if t<ramp,d=a*(1-cos(pi*t/ramp))/2;dp=a*pi/ramp*sin(pi*t/ramp)/2;
+ elseif t<release,d=a;dp=0;
+ elseif t<release+ramp,z=(t-release)/ramp;d=a*(1+cos(pi*z))/2;dp=-a*pi/ramp*sin(pi*z)/2;
+ else,d=0;dp=0;end
+end
+function saveJson(file,value),f=fopen(file,'w');assert(f>=0);fprintf(f,'%s\n',jsonencode(value));fclose(f);end

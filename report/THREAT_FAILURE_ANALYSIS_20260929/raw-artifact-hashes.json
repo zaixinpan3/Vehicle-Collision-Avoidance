@@ -1,0 +1,322 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/affine-controls.json",
+    "sha256": "8816409a0b60a37662b478485e10e7eee2c27e73098fb3bca0e9530161dbd445"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/affineControls.m",
+    "sha256": "fd0846266f8aa1c707c9c4de73f3c2214cc1c7d77277dcb85a3a1069e01adda8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/analyze.py",
+    "sha256": "17d48c879ed9a95587e6da10b687f89cb22def481a849372ac2df8ca93df6dc9"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/collisionAvoidanceController-instrumentation.patch",
+    "sha256": "12e11d81e0e47ef514ec1feb6d7f2d14889e7715b8da058db77da28b7eb80e93"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/controls.m",
+    "sha256": "24c68cb999e5d2f215147dacf3ba339b0e8d57b24adf7c457f27ccbec4dfe79a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/curve-15-curvedCrossing.json",
+    "sha256": "0c63bf0ff517f3014206badd6cf16e98eccd0a8f17d39ff81d077d16c8615d6d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/curve-15-curvedHeadOn.json",
+    "sha256": "bfbc01d255f483f85571dddf5b8c5d79022bc9d67f3203c2f4e34b1f4e1535e7"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/curve-8-curvedCrossing.json",
+    "sha256": "7d24056c43924999f1928cbc5a50d59c5efcf86ff3a532e9170b392431208ede"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/curve-8-curvedHeadOn.json",
+    "sha256": "a8bf0633fce966c4eb27de6640efd3eb70c934fe49a186262619551905c38c7a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/diagnose.m",
+    "sha256": "530257f4a53ccb294699484ed8918b28cf3c4210c953b0d9486ac51f00368a6e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/evaluations.csv",
+    "sha256": "73183a2430302c57119bedd7d5d590da1a0b260b7350588415fa439b9cf244f0"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/extended-budget-intersample-collision.json",
+    "sha256": "f35a286966585e8bedd07538f1aeca2ae220b013e415940cc04f8e556901cd95"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/extended-budget-verification.json",
+    "sha256": "abd740b0e59a58ed5ea5d80cd19727f15a6adcb1a2ad4eb5e71364ebbc7e3bb4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/finalizeDiagnostics.py",
+    "sha256": "86675850edf3a8a9cb4daa2f2e221258c6ee1e54649deb1be713c80e88567ef6"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/iterations.csv",
+    "sha256": "a8c74da521b8cf6ec49ccf14ffcced441ab626393ba5e68a044035fb716ed2d7"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/original-replay-8-turningCrossing.json",
+    "sha256": "a016f1908914f0d14afda61dfb9fecef3e8a1cabda082553ab569ed47c0e04b3"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/prepare.py",
+    "sha256": "1ac692e18a8f6b34d5c77849d9934c3020886c55faa19549ea5072f91d5ec898"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/replay-15-brakingLead.json",
+    "sha256": "afc67af7dd14cc8a68709216010f69202d0cb7462a085383cbda30fc36f914c8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/replay-15-crossing.json",
+    "sha256": "9d8ddc7879da0fd25c8425bdac2fa03b9fbe7748169fb9518c92f492c4663560"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/replay-15-turningCrossing.json",
+    "sha256": "5cd8b2c0b01ed2dd10075d62e5ea64c70f93a0f22542e34e714a694bd9b538e8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/replay-8-brakingLead.json",
+    "sha256": "540633d449ae9836ccfe6a2ff81d9e6372d340e4c8fc0731ec2584625edf756b"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/replay-8-crossing.json",
+    "sha256": "753c04b73436cbc0ed7fe23291576d597f0053832ad67d3d4ad31409ca63b598"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/replay-8-turningCrossing.json",
+    "sha256": "0fd6d44d9567fd722eacaa80ebf6184b62bd949683658e3ab58c4f16f440232d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/returned-witness.mat",
+    "sha256": "462b90084c272bfb196f75454f3765b77fe03e2dea172a413d324da1d0ec4a6e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/single-node-controls.json",
+    "sha256": "811fc045794b643c43379d1efed6cc0735b5f9219450368cb269ae2a8f9964f9"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/solvePredictiveControl-instrumentation.patch",
+    "sha256": "4c94d1852d28bb50301fa5cd3920cd0bcda2939cc0a5f1718b48fd45e3d9965e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/source-manifest.json",
+    "sha256": "1c14fda50f61e210223425adc9141335991034f085454a3d12a38dd04e04c37d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-brakingLead-budget30.json",
+    "sha256": "089371b9e2ad97df72b6991bf37097f5cc5e85125d0cb9bae54932f1e09ab5f9"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-brakingLead-budget30.mat",
+    "sha256": "63830693739379a0a4171692901761c90209f57059015a946fcafdc9fe594c5d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-brakingLead-budget5.json",
+    "sha256": "e3556713a660d37a72d1615c023cbf20d87650a79a82564e136485e904e0d2ef"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-brakingLead-budget5.mat",
+    "sha256": "455ef78db14ec442ab91028eb21b149e51b0a418d37c308c014a3ebcbb240a17"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-crossing-budget30.json",
+    "sha256": "d93725e274f26c0a823a43dc2663e558065553b08b29e22b4d7977babb325f1b"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-crossing-budget30.mat",
+    "sha256": "9c19feec98914e49b896c30a5d90c095a15dfe4828ee0e8b9623e525305b741a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-crossing-budget5.json",
+    "sha256": "f5f028d3aa1087176feae73e468e90204f5f2788a44859b9e5d1e6e7b9e67ce0"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-crossing-budget5.mat",
+    "sha256": "2ae73881c038a5952e24a64e52c2b6571705e1ed05635ded9a5b683b406cbc4e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-curvedCrossing-budget5.json",
+    "sha256": "15a27c423b906e235a468171a0ff85284db8940f0010e85b3f142eaea3879683"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-curvedCrossing-budget5.mat",
+    "sha256": "6a61a9489fa123fe7bf14ccce7ecbefc76cad3215c1a7aa6bfb0af2e6a07c39b"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-curvedHeadOn-budget5.json",
+    "sha256": "d3e711b7ba20e6a30ae260ede99554df72b4e8bb48a0fcb67eb51cc81a9db2a4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-curvedHeadOn-budget5.mat",
+    "sha256": "edd92d119ba850d4c3b28fce01cb785100e45c834940cd0a682320dffd831dc3"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-turningCrossing-budget30.json",
+    "sha256": "c361c0e96eb9889b5ff9cf166a890d6d56327bdfa9dd47ec6702882e976190a2"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-turningCrossing-budget30.mat",
+    "sha256": "77c711e30676a31c57fdc045bab2a2a790baf1ff2615a59e79cd48bbb45a1dc8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-turningCrossing-budget5.json",
+    "sha256": "8b2b5c0010f622588aac1a6c73400de81c73e210c4d23c69de330919dc5c2ba3"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed15-turningCrossing-budget5.mat",
+    "sha256": "529b2928fac2cc36a1b1b98d1eb6d7ae326d8037c5b6ad926e60f7eb3455a8a0"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-brakingLead-budget30.json",
+    "sha256": "3ccd3f49fda3353e48851c3421f537c644c289eaba779ee115cc89cc3854439c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-brakingLead-budget30.mat",
+    "sha256": "2ac2fbddead064f0ce4cf4230fb07f125e5823ef3ad4670e105127eb5a4d5c8f"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-brakingLead-budget5.json",
+    "sha256": "914c98ab61a33c5eb97ea9dbc5eb8a068ef8ee0eeb1ee2db042d7ca8217bf381"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-brakingLead-budget5.mat",
+    "sha256": "5efc43036ee9bcad670c873dda7540c2a55cf7a9a6f723c5ee63fe650eb88a5b"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-crossing-budget30.json",
+    "sha256": "3914b6a6ebaa73329ab6a4f38af7777aa962fc3fa5d772612c6eaf16c1de4ff8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-crossing-budget30.mat",
+    "sha256": "ed1b1ac2b957988697c698d71f93ccead3b7cbbc77e218f70c31ddb84d83fa4d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-crossing-budget5.json",
+    "sha256": "7b831733c4f10eda7537ed862ffaa3df01201a1071964d5fd5744fda30508ef4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-crossing-budget5.mat",
+    "sha256": "1953c54ebee3d01835e8ae382c16926ee3da87db2f3e7824b4a4893e5c5ac235"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-curvedCrossing-budget5.json",
+    "sha256": "1b18f7136963dd5850641a2ada0324954fc9ada5a4ca4c67e008d5c5ee3f3957"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-curvedCrossing-budget5.mat",
+    "sha256": "2f7166aef70b565bca4c183ef4b6d2cc17dd169f3666ddd701ad654c87879af8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-curvedHeadOn-budget5.json",
+    "sha256": "ebfaf949c3a4c3b9d39d9cd815d520c92bbbd9fdf8f257d2c72ce12b7172ec2a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-curvedHeadOn-budget5.mat",
+    "sha256": "00183b716a9da6e913c0dfbc2437dc2214e1bf3c33237b0b1bd0380c6578f0d3"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-turningCrossing-budget30.json",
+    "sha256": "bc28bc239e372b74b829d499382495b1fe0f7f9164b6237b2090f12c26f0a5f4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-turningCrossing-budget30.mat",
+    "sha256": "c2202759c35281c3e805be3a70bf87188ba934ae6e38e77cb572d2298c10e57c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-turningCrossing-budget5.json",
+    "sha256": "3aa250db628550537e1695ca8043b1a50f7b7fb215654c669f27c0196424062d"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/speed8-turningCrossing-budget5.mat",
+    "sha256": "23384d440b7a2458e54ae4b9d1401f0166358def0c6d405ddd60323b19b57fe1"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/summary.json",
+    "sha256": "f0532bb288047dd32aabf0a16630afa07c3f838bf2d7eba8269082e97795d514"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/verifyOriginalWitness.m",
+    "sha256": "4357aaa9c301abf7faf2b4025014d6148f3e45475bb1ddfb4b92af3842d97577"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/verifyWitnesses.m",
+    "sha256": "be6e751a2e878a745b35f160b62887a6158bba53936a8f025cf82b9b84fb24a9"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-15-brakingLead.mat",
+    "sha256": "30cc89f5da6ffadafe465dcd4ddeaa74e19cbfb5fdbe3b54c88772e3b2ea861f"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-15-crossing.mat",
+    "sha256": "1644a65e56540d3d9a266087f6fedfed131c55c8439f1fa1e81d61032bce6461"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-15-turningCrossing.mat",
+    "sha256": "e727234b50bc4c5ca735d08fc5d862868e92445beaaf590ff6c442d930f2d885"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-8-brakingLead.mat",
+    "sha256": "e70fb69e819beba693414ad1d83f619f5ecc2ad02c1eb7e640fce928bb9f4fb7"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-8-crossing.mat",
+    "sha256": "9a33e5f267baae721a4753a13f5ca7150da204e502a5909798b6c4ce14a6a116"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-8-turningCrossing.mat",
+    "sha256": "858604eab8db1106c9f499f4b843014471e757a3c02ea35543b6daa0984087ac"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-search-15-brakingLead.json",
+    "sha256": "45b8a4e7af03b45c364b8f90c98fcc45abb398fdcc72a7c4ea21509cbb3defe0"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-search-15-crossing.json",
+    "sha256": "cc0931554285a7368d34f58dfea482a239b8f09e778c0ce4153a4f172f4bb388"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-search-15-turningCrossing.json",
+    "sha256": "f2df13a16e2c55128e62af395485e960363c46a56ab102cc0023dfd84584f014"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-search-8-brakingLead.json",
+    "sha256": "e1b5238b27a3a5ebd522b3745eaeb4e407fe8faec1f8ccadf1916e536973b225"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-search-8-crossing.json",
+    "sha256": "4df9aeb484fca7d8634d42a2e56ab265a055cd6eca0729f7b5af4d4cfae35d99"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-search-8-turningCrossing.json",
+    "sha256": "97614adf32597b39e37ed789347fe86cba1250a0ba06fc597afc9d4ecfddc3a7"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/witness-verification.json",
+    "sha256": "748cba3b0941d413ea7d905c97375e6d6c82119a43dfcd0068c3d57825c030ea"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/yield-search-15-crossing.json",
+    "sha256": "9ab4c5ff8a9d939e2bdac5db261d29c3afc27f42825652ee09f97a033dca0e41"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/yield-search-15-turningCrossing.json",
+    "sha256": "ce669fff677cc0cef3f475f81a144b93b30a61403ffcb9f8af820280edac57e7"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/yield-search-8-crossing.json",
+    "sha256": "d408c8fdf22fdb51fbd8d141fa794fffe37933e3513296632502cba8c0d6ad03"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/yield-search-8-turningCrossing.json",
+    "sha256": "4c426259ff102594867a9989dc0dc85aa38991fba29b439218d2ebb49c0d0e5e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/threat-failure-analysis-20260929/yieldProbe.m",
+    "sha256": "b2ff38fa7ca1db13d1eb9002b3f47885628a7d319cc915da82cc10d57531a17e"
+  }
+]

@@ -1,0 +1,6 @@
+WITNESS 8 crossing amp 0 speedOff -4 accept 1 hard 0.000000 collision 0.381749 road 3.050000
+WITNESS 8 turningCrossing amp 0 speedOff -4 accept 1 hard 0.000000 collision 0.789240 road 3.050000
+WITNESS 15 crossing amp 0 speedOff -4 accept 0 hard 0.956000 collision -0.956000 road 3.050000
+WITNESS 15 crossing amp 0 speedOff -6 accept 1 hard 0.000000 collision 0.253348 road 3.050000
+WITNESS 15 turningCrossing amp 0 speedOff -4 accept 0 hard 0.625858 collision -0.625858 road 3.050000
+WITNESS 15 turningCrossing amp 0 speedOff -6 accept 1 hard 0.000000 collision 0.961758 road 3.050000

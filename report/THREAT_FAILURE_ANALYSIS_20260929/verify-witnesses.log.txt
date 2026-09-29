@@ -1,0 +1,6 @@
+VERIFIED 15 brakingLead min 0.294421 road 0.475479 tail 13.25 original 6.70 fixedHard 16.811 fixedTerminal 16.811
+VERIFIED 15 crossing min 0.232786 road 3.050000 tail 4.25 original 3.80 fixedHard 115.76 fixedTerminal 115.76
+VERIFIED 15 turningCrossing min 0.963812 road 3.050000 tail 7.00 original 6.15 fixedHard 115.76 fixedTerminal 115.76
+VERIFIED 8 brakingLead min 0.299478 road 0.453334 tail 16.35 original 6.70 fixedHard 19.521 fixedTerminal 19.521
+VERIFIED 8 crossing min 0.376916 road 3.050000 tail 4.25 original 3.40 fixedHard 76.995 fixedTerminal 76.995
+VERIFIED 8 turningCrossing min 0.795186 road 3.050000 tail 11.15 original 10.05 fixedHard 76.995 fixedTerminal 76.995

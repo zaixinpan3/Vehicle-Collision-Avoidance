@@ -1,0 +1,21 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');
+rows=struct([]);
+for speed=[8,15]
+ for name=["brakingLead","crossing","turningCrossing"]
+  c=load(fullfile(raw,"speed"+speed+"-"+name+"-budget5.mat"));model=c.diagnostic.initialModel;anchor=c.diagnostic.initialAnchor;
+  for condition=["full","noCollision","noRoad","noEndpoint","wideTrust","wideTrustNoRoad"]
+   radius=.5;if startsWith(condition,"wide"),radius=1;end
+   p=captureFirstAffine(anchor,model,radius);a=p.a;b=p.b;endpoint=p.endpoint;
+   if condition=="noCollision",a(p.collisionRows,:)=[];b(p.collisionRows)=[];end
+   if condition=="noRoad" || condition=="wideTrustNoRoad",a(p.roadRows,:)=[];b(p.roadRows)=[];end
+   if condition=="noEndpoint",endpoint=[];end
+   timer=tic;[z,~,flag,output]=coneprog(p.objective,endpoint,a,b,p.equal,p.rhs,p.lower,p.upper, ...
+    optimoptions('coneprog','Display','none','MaxTime',5,'MaxIterations',400,'ConstraintTolerance',1e-8,'OptimalityTolerance',1e-7));
+   residual=NaN;if ~isempty(z),residual=max([0;a*z-b;abs(p.equal*z-p.rhs);p.lower-z;z-p.upper]);end
+   e=struct('speed',speed,'scenario',name,'condition',condition,'flag',flag,'seconds',toc(timer),'linearResidual',residual,'solverOutput',output);
+   if isempty(rows),rows=e;else,rows(end+1)=e;end
+   fprintf('AFFINE %g %s %s flag %g residual %.4g\n',speed,name,condition,flag,residual);
+  end
+ end
+end
+f=fopen(fullfile(raw,'affine-controls.json'),'w');fprintf(f,'%s\n',jsonencode(rows));fclose(f);

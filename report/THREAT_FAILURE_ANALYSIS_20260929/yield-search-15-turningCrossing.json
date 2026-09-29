@@ -1,0 +1,1 @@
+[{"speed":15,"scenario":"turningCrossing","amplitude":0,"speedOffset":-4,"accepted":false,"failure":"","steps":134,"hard":0.62585773042087189,"collisionMargin":-0.62585773042087189,"roadMargin":3.05},{"speed":15,"scenario":"turningCrossing","amplitude":0,"speedOffset":-6,"accepted":true,"failure":"","steps":140,"hard":0,"collisionMargin":0.961757710184447,"roadMargin":3.05}]

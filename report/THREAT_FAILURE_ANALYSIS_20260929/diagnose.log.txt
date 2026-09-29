@@ -1,0 +1,16 @@
+8 brakingLead budget 5: 5.020 s, 6 solves, 13 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+8 brakingLead budget 30: 30.017 s, 47 solves, 64 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+8 crossing budget 5: 5.007 s, 22 solves, 16 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+8 crossing budget 30: 9.035 s, 48 solves, 16 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (safetySolveFailed).
+8 turningCrossing budget 5: 5.015 s, 6 solves, 12 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+8 turningCrossing budget 30: 17.784 s, 23 solves, 43 evaluations;
+8 curvedHeadOn budget 5: 0.488 s, 0 solves, 0 evaluations; collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.
+8 curvedCrossing budget 5: 0.148 s, 0 solves, 0 evaluations; collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.
+15 brakingLead budget 5: 5.026 s, 8 solves, 20 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+15 brakingLead budget 30: 30.028 s, 46 solves, 41 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+15 crossing budget 5: 5.010 s, 21 solves, 38 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+15 crossing budget 30: 11.152 s, 48 solves, 79 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (iterationLimit).
+15 turningCrossing budget 5: 5.004 s, 12 solves, 30 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+15 turningCrossing budget 30: 19.710 s, 48 solves, 115 evaluations; collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (iterationLimit).
+15 curvedHeadOn budget 5: 0.412 s, 0 solves, 0 evaluations; collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.
+15 curvedCrossing budget 5: 0.143 s, 0 solves, 0 evaluations; collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.

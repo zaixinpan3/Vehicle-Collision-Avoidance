@@ -1,0 +1,1842 @@
+{
+  "scope": "Instrumented replay and controlled diagnostic probes; no production controller mutation",
+  "sourceCommit": "17c5a756bcfa8abb183510abf08e972d48a57bb3",
+  "diagnosticRuns": [
+    {
+      "scenario": "brakingLead",
+      "speed": 15,
+      "budget": 30,
+      "instrumentedSeconds": 30.027857,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 46,
+      "conicSeconds": 25.062089,
+      "evaluationCount": 41,
+      "seedSeconds": 0.035473,
+      "seedAttempts": 59,
+      "lastSeedTimeSeconds": 6.7,
+      "minimumEndpointSeparation": -1.906446821309197,
+      "maximumEndpointSeparation": 0.1660531786907881,
+      "solverFlagCounts": {
+        "-2": 23,
+        "1": 15,
+        "-7": 7,
+        "0": 1
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 1.906,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -1.906,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.0009765625,
+        "completionSafety": 1.906,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 1.7295511362148515,
+        "clfSlack": 0.06017262915759693,
+        "clfInitialValue": 0,
+        "clfNextValue": 0.06017262915759693,
+        "minimumCollisionMargin": -1.7295511362148515,
+        "minimumRoadMargin": 0.6817100560596394,
+        "cost": 121.96624185833993,
+        "terminalResidual": -0.0007277281145905623,
+        "completionSafety": 1.7295511362148515,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "brakingLead",
+      "speed": 15,
+      "budget": 5,
+      "instrumentedSeconds": 5.026272,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 8,
+      "conicSeconds": 3.498986,
+      "evaluationCount": 20,
+      "seedSeconds": 0.035551,
+      "seedAttempts": 59,
+      "lastSeedTimeSeconds": 6.7,
+      "minimumEndpointSeparation": -1.906446821309197,
+      "maximumEndpointSeparation": 0.1660531786907881,
+      "solverFlagCounts": {
+        "-2": 4,
+        "1": 3,
+        "0": 1
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 1.906,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -1.906,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.0009765625,
+        "completionSafety": 1.906,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 1.7296872855911685,
+        "clfSlack": 0.057382741450787984,
+        "clfInitialValue": 0,
+        "clfNextValue": 0.057382741450787984,
+        "minimumCollisionMargin": -1.7296872855911685,
+        "minimumRoadMargin": 0.7138779575097609,
+        "cost": 118.21129685511714,
+        "terminalResidual": -0.0009758843177423533,
+        "completionSafety": 1.7296872855911685,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "crossing",
+      "speed": 15,
+      "budget": 30,
+      "instrumentedSeconds": 11.152493,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (iterationLimit).",
+      "solverCalls": 48,
+      "conicSeconds": 7.037479,
+      "evaluationCount": 79,
+      "seedSeconds": 0.018835,
+      "seedAttempts": 1,
+      "lastSeedTimeSeconds": 3.8000000000000003,
+      "minimumEndpointSeparation": 3.049553178690803,
+      "maximumEndpointSeparation": 3.049553178690803,
+      "solverFlagCounts": {
+        "-2": 24,
+        "1": 24
+      },
+      "termination": "iterationLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.3559999999999994,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.3559999999999994,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.0009765625,
+        "completionSafety": 3.3559999999999994,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 0.7352735950560632,
+        "clfSlack": 2.4567209872669764,
+        "clfInitialValue": 0,
+        "clfNextValue": 2.4567209872669764,
+        "minimumCollisionMargin": -0.7352735950560632,
+        "minimumRoadMargin": 0.0001638167138895419,
+        "cost": 912.3927982692867,
+        "terminalResidual": 0.0018126252587606557,
+        "completionSafety": 0.7352735950560632,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "crossing",
+      "speed": 15,
+      "budget": 5,
+      "instrumentedSeconds": 5.009503,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 21,
+      "conicSeconds": 3.105049,
+      "evaluationCount": 38,
+      "seedSeconds": 0.01898,
+      "seedAttempts": 1,
+      "lastSeedTimeSeconds": 3.8000000000000003,
+      "minimumEndpointSeparation": 3.049553178690803,
+      "maximumEndpointSeparation": 3.049553178690803,
+      "solverFlagCounts": {
+        "-2": 10,
+        "1": 10,
+        "0": 1
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.3559999999999994,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.3559999999999994,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.0009765625,
+        "completionSafety": 3.3559999999999994,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 0.9669618938786175,
+        "clfSlack": 2.263274321498678,
+        "clfInitialValue": 0,
+        "clfNextValue": 2.263274321498678,
+        "minimumCollisionMargin": -0.9669618938786175,
+        "minimumRoadMargin": 0.009968184294811167,
+        "cost": 797.6480020492556,
+        "terminalResidual": 0.0875375996808112,
+        "completionSafety": 0.9669618938786175,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "curvedCrossing",
+      "speed": 15,
+      "budget": 5,
+      "instrumentedSeconds": 0.142512,
+      "failure": "collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.",
+      "solverCalls": 0,
+      "conicSeconds": 0,
+      "evaluationCount": 0,
+      "seedSeconds": null,
+      "seedAttempts": 437,
+      "lastSeedTimeSeconds": 25.6,
+      "minimumEndpointSeparation": -39.748107731366254,
+      "maximumEndpointSeparation": -39.748107731365515,
+      "solverFlagCounts": {},
+      "termination": null,
+      "initialEvaluation": null,
+      "bestEvaluation": null
+    },
+    {
+      "scenario": "curvedHeadOn",
+      "speed": 15,
+      "budget": 5,
+      "instrumentedSeconds": 0.411856,
+      "failure": "collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.",
+      "solverCalls": 0,
+      "conicSeconds": 0,
+      "evaluationCount": 0,
+      "seedSeconds": null,
+      "seedAttempts": 437,
+      "lastSeedTimeSeconds": 25.6,
+      "minimumEndpointSeparation": -3.5437190326943635,
+      "maximumEndpointSeparation": -3.543719032694136,
+      "solverFlagCounts": {},
+      "termination": null,
+      "initialEvaluation": null,
+      "bestEvaluation": null
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 15,
+      "budget": 30,
+      "instrumentedSeconds": 19.709666,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (iterationLimit).",
+      "solverCalls": 48,
+      "conicSeconds": 13.024093,
+      "evaluationCount": 115,
+      "seedSeconds": 0.031607,
+      "seedAttempts": 48,
+      "lastSeedTimeSeconds": 6.15,
+      "minimumEndpointSeparation": -34.12187437857506,
+      "maximumEndpointSeparation": 0.6647883981773293,
+      "solverFlagCounts": {
+        "-2": 24,
+        "1": 24
+      },
+      "termination": "iterationLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.4004808357550593,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.4004808357550593,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.0009765625,
+        "completionSafety": 3.4004808357550593,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 0.18538911929726676,
+        "clfSlack": 1.943607862814963,
+        "clfInitialValue": 0,
+        "clfNextValue": 1.943607862814963,
+        "minimumCollisionMargin": -0.18538911929726676,
+        "minimumRoadMargin": -0.007337863966037084,
+        "cost": 603.4509993430058,
+        "terminalResidual": 0.0018413602576652912,
+        "completionSafety": 0.18538911929726676,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 15,
+      "budget": 5,
+      "instrumentedSeconds": 5.003856,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 12,
+      "conicSeconds": 3.051956,
+      "evaluationCount": 30,
+      "seedSeconds": 0.031805,
+      "seedAttempts": 48,
+      "lastSeedTimeSeconds": 6.15,
+      "minimumEndpointSeparation": -34.12187437857506,
+      "maximumEndpointSeparation": 0.6647883981773293,
+      "solverFlagCounts": {
+        "-2": 6,
+        "1": 6
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.4004808357550593,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.4004808357550593,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.0009765625,
+        "completionSafety": 3.4004808357550593,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 0.6848986171334415,
+        "clfSlack": 1.070487585631561,
+        "clfInitialValue": 0,
+        "clfNextValue": 1.070487585631561,
+        "minimumCollisionMargin": -0.6848986171334415,
+        "minimumRoadMargin": 0.059912527122797155,
+        "cost": 307.2990460482366,
+        "terminalResidual": 0.16784695893546955,
+        "completionSafety": 0.6848986171334415,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "brakingLead",
+      "speed": 8,
+      "budget": 30,
+      "instrumentedSeconds": 30.016592,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 47,
+      "conicSeconds": 24.065623,
+      "evaluationCount": 64,
+      "seedSeconds": 0.044036,
+      "seedAttempts": 67,
+      "lastSeedTimeSeconds": 6.7,
+      "minimumEndpointSeparation": -1.9060698740949091,
+      "maximumEndpointSeparation": 0.16643012590608494,
+      "solverFlagCounts": {
+        "-2": 25,
+        "1": 19,
+        "-7": 2,
+        "0": 1
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 1.906,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -1.906,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.00012207031243505552,
+        "completionSafety": 1.906,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 1.4789665345481777,
+        "clfSlack": 2.183887301146488,
+        "clfInitialValue": 0,
+        "clfNextValue": 2.183887301146488,
+        "minimumCollisionMargin": -1.4789665345481777,
+        "minimumRoadMargin": -0.1382961378096983,
+        "cost": 804.6798048812732,
+        "terminalResidual": 1.1733821066629224,
+        "completionSafety": 1.4789665345481777,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "brakingLead",
+      "speed": 8,
+      "budget": 5,
+      "instrumentedSeconds": 5.01964,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 6,
+      "conicSeconds": 3.066679,
+      "evaluationCount": 13,
+      "seedSeconds": 0.063066,
+      "seedAttempts": 67,
+      "lastSeedTimeSeconds": 6.7,
+      "minimumEndpointSeparation": -1.9060698740949091,
+      "maximumEndpointSeparation": 0.16643012590608494,
+      "solverFlagCounts": {
+        "-2": 3,
+        "1": 2,
+        "0": 1
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 1.906,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -1.906,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.00012207031243505552,
+        "completionSafety": 1.906,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 1.906,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -1.906,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.00012207031243505552,
+        "completionSafety": 1.906,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "crossing",
+      "speed": 8,
+      "budget": 30,
+      "instrumentedSeconds": 9.034579,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (safetySolveFailed).",
+      "solverCalls": 48,
+      "conicSeconds": 6.7088980000000005,
+      "evaluationCount": 16,
+      "seedSeconds": 0.017109,
+      "seedAttempts": 1,
+      "lastSeedTimeSeconds": 3.4000000000000004,
+      "minimumEndpointSeparation": 3.0499301259050906,
+      "maximumEndpointSeparation": 3.0499301259050906,
+      "solverFlagCounts": {
+        "-2": 40,
+        "1": 5,
+        "-7": 3
+      },
+      "termination": "safetySolveFailed",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.3559999999999994,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.3559999999999994,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.00012207031243505552,
+        "completionSafety": 3.3559999999999994,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 2.1871663052796024,
+        "clfSlack": 2.0187984573682844,
+        "clfInitialValue": 0,
+        "clfNextValue": 2.0187984573682844,
+        "minimumCollisionMargin": -1.6243361894207335,
+        "minimumRoadMargin": 1.3257707292713259,
+        "cost": 547.6362154291753,
+        "terminalResidual": 2.1871663052796024,
+        "completionSafety": 1.6243361894207335,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "crossing",
+      "speed": 8,
+      "budget": 5,
+      "instrumentedSeconds": 5.006594,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 22,
+      "conicSeconds": 3.633484,
+      "evaluationCount": 16,
+      "seedSeconds": 0.017587,
+      "seedAttempts": 1,
+      "lastSeedTimeSeconds": 3.4000000000000004,
+      "minimumEndpointSeparation": 3.0499301259050906,
+      "maximumEndpointSeparation": 3.0499301259050906,
+      "solverFlagCounts": {
+        "-2": 13,
+        "1": 5,
+        "-7": 3,
+        "0": 1
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.3559999999999994,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.3559999999999994,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.00012207031243505552,
+        "completionSafety": 3.3559999999999994,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 2.1871663052796024,
+        "clfSlack": 2.0187984573682844,
+        "clfInitialValue": 0,
+        "clfNextValue": 2.0187984573682844,
+        "minimumCollisionMargin": -1.6243361894207335,
+        "minimumRoadMargin": 1.3257707292713259,
+        "cost": 547.6362154291753,
+        "terminalResidual": 2.1871663052796024,
+        "completionSafety": 1.6243361894207335,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "curvedCrossing",
+      "speed": 8,
+      "budget": 5,
+      "instrumentedSeconds": 0.148121,
+      "failure": "collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.",
+      "solverCalls": 0,
+      "conicSeconds": 0,
+      "evaluationCount": 0,
+      "seedSeconds": null,
+      "seedAttempts": 445,
+      "lastSeedTimeSeconds": 25.6,
+      "minimumEndpointSeparation": -39.748003303051696,
+      "maximumEndpointSeparation": -39.7480033030488,
+      "solverFlagCounts": {},
+      "termination": null,
+      "initialEvaluation": null,
+      "bestEvaluation": null
+    },
+    {
+      "scenario": "curvedHeadOn",
+      "speed": 8,
+      "budget": 5,
+      "instrumentedSeconds": 0.488066,
+      "failure": "collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.",
+      "solverCalls": 0,
+      "conicSeconds": 0,
+      "evaluationCount": 0,
+      "seedSeconds": null,
+      "seedAttempts": 445,
+      "lastSeedTimeSeconds": 25.6,
+      "minimumEndpointSeparation": -3.5436146043823893,
+      "maximumEndpointSeparation": -3.5436146043821903,
+      "solverFlagCounts": {},
+      "termination": null,
+      "initialEvaluation": null,
+      "bestEvaluation": null
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 8,
+      "budget": 30,
+      "instrumentedSeconds": 17.7843,
+      "failure": "",
+      "solverCalls": 23,
+      "conicSeconds": 12.946744,
+      "evaluationCount": 43,
+      "seedSeconds": 0.055361,
+      "seedAttempts": 134,
+      "lastSeedTimeSeconds": 10.05,
+      "minimumEndpointSeparation": -34.121497431360766,
+      "maximumEndpointSeparation": 0.015165345392162749,
+      "solverFlagCounts": {
+        "-2": 11,
+        "1": 12
+      },
+      "termination": "feasibleWitness",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.4004808357550593,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.4004808357550593,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.00012207031237011103,
+        "completionSafety": 3.4004808357550593,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 0,
+        "clfSlack": 1.9623224341558703,
+        "clfInitialValue": 0,
+        "clfNextValue": 1.9623224341558703,
+        "minimumCollisionMargin": 0.023461823036319947,
+        "minimumRoadMargin": 0.20263426274863727,
+        "cost": 596.2295979520736,
+        "terminalResidual": -9.770228642624235e-05,
+        "completionSafety": 0,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 8,
+      "budget": 5,
+      "instrumentedSeconds": 5.014677,
+      "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+      "solverCalls": 6,
+      "conicSeconds": 3.427264,
+      "evaluationCount": 12,
+      "seedSeconds": 0.059432,
+      "seedAttempts": 134,
+      "lastSeedTimeSeconds": 10.05,
+      "minimumEndpointSeparation": -34.121497431360766,
+      "maximumEndpointSeparation": 0.015165345392162749,
+      "solverFlagCounts": {
+        "-2": 3,
+        "1": 3
+      },
+      "termination": "timeLimit",
+      "initialEvaluation": {
+        "safety": 0,
+        "hard": 3.4004808357550593,
+        "clfSlack": 0,
+        "clfInitialValue": 0,
+        "clfNextValue": 0,
+        "minimumCollisionMargin": -3.4004808357550593,
+        "minimumRoadMargin": 3.05,
+        "cost": 0,
+        "terminalResidual": -0.00012207031237011103,
+        "completionSafety": 3.4004808357550593,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      },
+      "bestEvaluation": {
+        "safety": 0,
+        "hard": 2.445750289496103,
+        "clfSlack": 0.6085638854637356,
+        "clfInitialValue": 0,
+        "clfNextValue": 0.6085638854637356,
+        "minimumCollisionMargin": -2.445750289496103,
+        "minimumRoadMargin": 2.671135366314938,
+        "cost": 49.43437194913063,
+        "terminalResidual": 1.1445833363468028,
+        "completionSafety": 2.445750289496103,
+        "stateViolation": 0,
+        "inputViolation": 0,
+        "slewViolation": 0
+      }
+    }
+  ],
+  "nodeControls": [
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "linearizationTime": 5,
+      "seedHorizonSeconds": 6.7,
+      "terminalRadius": 0.0001220703125,
+      "egoPose": [
+        40.000000000000306,
+        0,
+        0
+      ],
+      "targetPose": [
+        40,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "collisionValues": [
+        -1.906,
+        -1.906,
+        -0.006,
+        -0.006
+      ],
+      "requiredCollisionRelaxationWithTrustHalf": 0,
+      "requiredCollisionRelaxationWithTrustQuarter": 0.6559999999999999,
+      "requiredCollisionRelaxationWithoutTrust": 0,
+      "lpFlags": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "linearizationTime": 1.6,
+      "seedHorizonSeconds": 3.4000000000000004,
+      "terminalRadius": 0.0001220703125,
+      "egoPose": [
+        12.799999999999974,
+        0,
+        0
+      ],
+      "targetPose": [
+        12.8,
+        0,
+        -1.5707963267948966
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "collisionValues": [
+        -3.3559999999999994,
+        -3.3559999999999994,
+        -1.456,
+        -1.456
+      ],
+      "requiredCollisionRelaxationWithTrustHalf": 0.8559999999999994,
+      "requiredCollisionRelaxationWithTrustQuarter": 2.1059999999999994,
+      "requiredCollisionRelaxationWithoutTrust": 0.3059999999999996,
+      "lpFlags": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "linearizationTime": 1.6,
+      "seedHorizonSeconds": 10.05,
+      "terminalRadius": 0.0001220703125,
+      "egoPose": [
+        12.799999999999974,
+        0,
+        0
+      ],
+      "targetPose": [
+        12.8,
+        -3.552713678800501e-15,
+        -1.6207963267948964
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "collisionValues": [
+        -3.4004808357550593,
+        -3.4004808357550593,
+        -1.5004808357550599,
+        -1.5004808357550599
+      ],
+      "requiredCollisionRelaxationWithTrustHalf": 0.9004808357550593,
+      "requiredCollisionRelaxationWithTrustQuarter": 2.1504808357550593,
+      "requiredCollisionRelaxationWithoutTrust": 0.3504808357550595,
+      "lpFlags": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "linearizationTime": 5,
+      "seedHorizonSeconds": 6.7,
+      "terminalRadius": 0.0009765625,
+      "egoPose": [
+        75,
+        0,
+        0
+      ],
+      "targetPose": [
+        75,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "collisionValues": [
+        -1.906,
+        -1.906,
+        -0.006,
+        -0.006
+      ],
+      "requiredCollisionRelaxationWithTrustHalf": 0,
+      "requiredCollisionRelaxationWithTrustQuarter": 0.6559999999999999,
+      "requiredCollisionRelaxationWithoutTrust": 0,
+      "lpFlags": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "linearizationTime": 1.6,
+      "seedHorizonSeconds": 3.8000000000000003,
+      "terminalRadius": 0.0009765625,
+      "egoPose": [
+        24,
+        0,
+        0
+      ],
+      "targetPose": [
+        24,
+        0,
+        -1.5707963267948966
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "collisionValues": [
+        -3.3559999999999994,
+        -3.3559999999999994,
+        -1.456,
+        -1.456
+      ],
+      "requiredCollisionRelaxationWithTrustHalf": 0.8559999999999994,
+      "requiredCollisionRelaxationWithTrustQuarter": 2.1059999999999994,
+      "requiredCollisionRelaxationWithoutTrust": 0.3059999999999996,
+      "lpFlags": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "linearizationTime": 1.6,
+      "seedHorizonSeconds": 6.15,
+      "terminalRadius": 0.0009765625,
+      "egoPose": [
+        24,
+        0,
+        0
+      ],
+      "targetPose": [
+        24,
+        -3.552713678800501e-15,
+        -1.6207963267948964
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "collisionValues": [
+        -3.4004808357550593,
+        -3.4004808357550593,
+        -1.5004808357550599,
+        -1.5004808357550599
+      ],
+      "requiredCollisionRelaxationWithTrustHalf": 0.9004808357550593,
+      "requiredCollisionRelaxationWithTrustQuarter": 2.1504808357550593,
+      "requiredCollisionRelaxationWithoutTrust": 0.3504808357550595,
+      "lpFlags": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "curveControls": [
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "endpointAttempts": 437,
+      "firstSeconds": 3.8000000000000003,
+      "lastSeconds": 25.6,
+      "minimumMembership": -2.384185791015625e-07,
+      "maximumMembership": -2.384185791015625e-07,
+      "minimumSeparation": -39.748107731366254,
+      "maximumSeparation": -39.748107731365515,
+      "roadOnlyMargin": 1.4186810697089953,
+      "egoRadius": 200,
+      "egoCenter": [
+        -1.9895196601282805e-13,
+        200.00000000000057
+      ],
+      "targetCenter": [
+        63.66537882784682,
+        6.228038289395219
+      ],
+      "targetInnerRadius": 39.028664390764305,
+      "targetOuterRadius": 41.12366190907393,
+      "centerDistance": 203.96287310799872,
+      "egoTubeWidth": 2.5813189302904025
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "endpointAttempts": 437,
+      "firstSeconds": 3.8000000000000003,
+      "lastSeconds": 25.6,
+      "minimumMembership": -2.384185791015625e-07,
+      "maximumMembership": -2.384185791015625e-07,
+      "minimumSeparation": -3.5437190326943635,
+      "maximumSeparation": -3.543719032694136,
+      "roadOnlyMargin": 1.4186810697089953,
+      "egoRadius": 200,
+      "egoCenter": [
+        -1.9895196601282805e-13,
+        200.00000000000057
+      ],
+      "targetCenter": [
+        -5.684341886080802e-14,
+        200.00000000000006
+      ],
+      "targetInnerRadius": 199.04359989759675,
+      "targetOuterRadius": 200.983408120684,
+      "centerDistance": 5.30961349689659e-13,
+      "egoTubeWidth": 2.5813189302904025
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "endpointAttempts": 445,
+      "firstSeconds": 3.4000000000000004,
+      "lastSeconds": 25.6,
+      "minimumMembership": -1.4901161193847656e-08,
+      "maximumMembership": -1.4901161193847655e-08,
+      "minimumSeparation": -39.748003303051696,
+      "maximumSeparation": -39.7480033030488,
+      "roadOnlyMargin": 1.4187854980209798,
+      "egoRadius": 200,
+      "egoCenter": [
+        1.8189894035458565e-12,
+        200.000000000003
+      ],
+      "targetCenter": [
+        52.7200184304299,
+        2.9683952682603465
+      ],
+      "targetInnerRadius": 39.028664390764305,
+      "targetOuterRadius": 41.12366190907393,
+      "centerDistance": 203.96287310800062,
+      "egoTubeWidth": 2.581214501975501
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "endpointAttempts": 445,
+      "firstSeconds": 3.4000000000000004,
+      "lastSeconds": 25.6,
+      "minimumMembership": -1.4901161193847656e-08,
+      "maximumMembership": -1.4901161193847655e-08,
+      "minimumSeparation": -3.5436146043823893,
+      "maximumSeparation": -3.5436146043821903,
+      "roadOnlyMargin": 1.4187854980209798,
+      "egoRadius": 200,
+      "egoCenter": [
+        1.8189894035458565e-12,
+        200.000000000003
+      ],
+      "targetCenter": [
+        -2.842170943040401e-14,
+        200
+      ],
+      "targetInnerRadius": 199.04359989759675,
+      "targetOuterRadius": 200.983408120684,
+      "centerDistance": 3.5340198554276674e-12,
+      "egoTubeWidth": 2.581214501975501
+    }
+  ],
+  "affineControls": [
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "condition": "full",
+      "flag": -2,
+      "seconds": 0.21025,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 10,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "condition": "noCollision",
+      "flag": 1,
+      "seconds": 0.108039,
+      "linearResidual": 2.5641419450728215e-11,
+      "solverOutput": {
+        "iterations": 6,
+        "primalfeasibility": 2.7866536664407314e-12,
+        "dualfeasibility": 2.576552673747688e-13,
+        "dualitygap": 1.0090522673096087e-14,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "condition": "noRoad",
+      "flag": -2,
+      "seconds": 0.106926,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "condition": "noEndpoint",
+      "flag": 1,
+      "seconds": 0.214447,
+      "linearResidual": 1.0023360058619701e-09,
+      "solverOutput": {
+        "iterations": 11,
+        "primalfeasibility": 8.443981099954008e-11,
+        "dualfeasibility": 7.46534711542039e-12,
+        "dualitygap": 3.107137337167958e-13,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "condition": "wideTrust",
+      "flag": -2,
+      "seconds": 0.21097,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 11,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "condition": "wideTrustNoRoad",
+      "flag": -2,
+      "seconds": 0.136134,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 11,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "condition": "full",
+      "flag": -2,
+      "seconds": 0.068561,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "condition": "noCollision",
+      "flag": 1,
+      "seconds": 0.051274,
+      "linearResidual": 2.2020673758461956e-11,
+      "solverOutput": {
+        "iterations": 6,
+        "primalfeasibility": 2.3989913503994794e-12,
+        "dualfeasibility": 2.2181089302634778e-13,
+        "dualitygap": 1.6969343108587304e-14,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "condition": "noRoad",
+      "flag": -2,
+      "seconds": 0.04335,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "condition": "noEndpoint",
+      "flag": -2,
+      "seconds": 0.08303,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "condition": "wideTrust",
+      "flag": -2,
+      "seconds": 0.075389,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "condition": "wideTrustNoRoad",
+      "flag": -2,
+      "seconds": 0.056663,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 10,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "condition": "full",
+      "flag": -2,
+      "seconds": 0.224253,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "condition": "noCollision",
+      "flag": 1,
+      "seconds": 0.150813,
+      "linearResidual": 2.6090537050480058e-11,
+      "solverOutput": {
+        "iterations": 6,
+        "primalfeasibility": 2.833099272422636e-12,
+        "dualfeasibility": 2.6195029423657246e-13,
+        "dualitygap": 6.859792574900893e-15,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "condition": "noRoad",
+      "flag": -2,
+      "seconds": 0.136034,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "condition": "noEndpoint",
+      "flag": -2,
+      "seconds": 0.211448,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "condition": "wideTrust",
+      "flag": -2,
+      "seconds": 0.236452,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "condition": "wideTrustNoRoad",
+      "flag": -2,
+      "seconds": 0.12535,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "condition": "full",
+      "flag": -2,
+      "seconds": 0.191708,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 12,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "condition": "noCollision",
+      "flag": 1,
+      "seconds": 0.090965,
+      "linearResidual": 1.7280219257803355e-09,
+      "solverOutput": {
+        "iterations": 6,
+        "primalfeasibility": 1.4828435453545557e-10,
+        "dualfeasibility": 1.3892444179432067e-11,
+        "dualitygap": 1.044893315902203e-12,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "condition": "noRoad",
+      "flag": -2,
+      "seconds": 0.119087,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 11,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "condition": "noEndpoint",
+      "flag": 1,
+      "seconds": 0.178909,
+      "linearResidual": 1.1710235506973143e-09,
+      "solverOutput": {
+        "iterations": 10,
+        "primalfeasibility": 8.027798039631329e-11,
+        "dualfeasibility": 7.001747704969004e-12,
+        "dualitygap": 5.569677016343128e-13,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "condition": "wideTrust",
+      "flag": -2,
+      "seconds": 0.255791,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 16,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "condition": "wideTrustNoRoad",
+      "flag": -2,
+      "seconds": 0.131615,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 12,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "condition": "full",
+      "flag": -2,
+      "seconds": 0.078574,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "condition": "noCollision",
+      "flag": 1,
+      "seconds": 0.044593,
+      "linearResidual": 1.8135407520396845e-09,
+      "solverOutput": {
+        "iterations": 6,
+        "primalfeasibility": 1.56051399491172e-10,
+        "dualfeasibility": 1.4620124194927807e-11,
+        "dualitygap": 1.9222098912238634e-12,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "condition": "noRoad",
+      "flag": -2,
+      "seconds": 0.04623,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "condition": "noEndpoint",
+      "flag": -2,
+      "seconds": 0.068033,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 8,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "condition": "wideTrust",
+      "flag": -2,
+      "seconds": 0.0783,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "condition": "wideTrustNoRoad",
+      "flag": -2,
+      "seconds": 0.051606,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "condition": "full",
+      "flag": -2,
+      "seconds": 0.133577,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "condition": "noCollision",
+      "flag": 1,
+      "seconds": 0.071362,
+      "linearResidual": 1.7413092198668464e-09,
+      "solverOutput": {
+        "iterations": 6,
+        "primalfeasibility": 1.494728953818362e-10,
+        "dualfeasibility": 1.4003801361162005e-11,
+        "dualitygap": 1.1463030879891996e-12,
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Optimal solution found."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "condition": "noRoad",
+      "flag": -2,
+      "seconds": 0.085153,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "condition": "noEndpoint",
+      "flag": -2,
+      "seconds": 0.130754,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "condition": "wideTrust",
+      "flag": -2,
+      "seconds": 0.133985,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "condition": "wideTrustNoRoad",
+      "flag": -2,
+      "seconds": 0.085511,
+      "linearResidual": null,
+      "solverOutput": {
+        "iterations": 9,
+        "primalfeasibility": [],
+        "dualfeasibility": [],
+        "dualitygap": [],
+        "algorithm": "interior-point",
+        "linearsolver": "augmented",
+        "message": "Problem is infeasible."
+      }
+    }
+  ],
+  "witnessControls": [
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "amplitude": 2.2,
+      "speedOffset": 0,
+      "witnessHorizonSeconds": 13.25,
+      "originalHorizonSeconds": 6.7,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.28842116194500855,
+      "ode45MinimumDistance": 0.2944207276545334,
+      "ode45MinimumRoadMargin": 0.4754793907215493,
+      "ode45MaximumStateViolation": 0,
+      "ode45FinalEndpointMembership": -1.2614521521001023e-07,
+      "fixedEndpointHard": 16.810986340950368,
+      "fixedEndpointCollisionMargin": 0.28842116194500855,
+      "fixedEndpointRoadMargin": 0.47560212614301767,
+      "maximumEgoSpeed": 15.000001159555325,
+      "minimumEgoSpeed": 14.988683532742034,
+      "fixedEndpointResidual": 16.810986340950368
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "amplitude": 0,
+      "speedOffset": -6,
+      "witnessHorizonSeconds": 4.25,
+      "originalHorizonSeconds": 3.8000000000000003,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.25334833822557834,
+      "ode45MinimumDistance": 0.2327863327555986,
+      "ode45MinimumRoadMargin": 3.05,
+      "ode45MaximumStateViolation": 0,
+      "ode45FinalEndpointMembership": -9.5367431640625e-07,
+      "fixedEndpointHard": 115.76416438701291,
+      "fixedEndpointCollisionMargin": 0.25334833822557834,
+      "fixedEndpointRoadMargin": 3.05,
+      "maximumEgoSpeed": 15.000000000000007,
+      "minimumEgoSpeed": 9.002259234385226,
+      "fixedEndpointResidual": 115.76416438701291
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "amplitude": 0,
+      "speedOffset": -6,
+      "witnessHorizonSeconds": 7,
+      "originalHorizonSeconds": 6.15,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.961757710184447,
+      "ode45MinimumDistance": 0.9638117800716889,
+      "ode45MinimumRoadMargin": 3.05,
+      "ode45MaximumStateViolation": 0,
+      "ode45FinalEndpointMembership": -9.536743164062498e-07,
+      "fixedEndpointHard": 115.7641643870129,
+      "fixedEndpointCollisionMargin": 0.961757710184447,
+      "fixedEndpointRoadMargin": 3.05,
+      "maximumEgoSpeed": 15.000000000000007,
+      "minimumEgoSpeed": 9.002259234385226,
+      "fixedEndpointResidual": 115.7641643870129
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "amplitude": 2.2,
+      "speedOffset": 0,
+      "witnessHorizonSeconds": 16.35,
+      "originalHorizonSeconds": 6.7,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.29348912205077116,
+      "ode45MinimumDistance": 0.2994776926516669,
+      "ode45MinimumRoadMargin": 0.4533340010512257,
+      "ode45MaximumStateViolation": 0,
+      "ode45FinalEndpointMembership": -8.245250601097393e-10,
+      "fixedEndpointHard": 19.52056560969659,
+      "fixedEndpointCollisionMargin": 0.29348912205077116,
+      "fixedEndpointRoadMargin": 0.45367492814668164,
+      "maximumEgoSpeed": 8.001877697033883,
+      "minimumEgoSpeed": 7.987615822749387,
+      "fixedEndpointResidual": 19.52056560969659
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "amplitude": 0,
+      "speedOffset": -4,
+      "witnessHorizonSeconds": 4.25,
+      "originalHorizonSeconds": 3.4000000000000004,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.3817489569358836,
+      "ode45MinimumDistance": 0.37691619786059305,
+      "ode45MinimumRoadMargin": 3.049999999999999,
+      "ode45MaximumStateViolation": 0,
+      "ode45FinalEndpointMembership": -1.4901161193847656e-08,
+      "fixedEndpointHard": 76.99527526825547,
+      "fixedEndpointCollisionMargin": 0.3817489569358836,
+      "fixedEndpointRoadMargin": 3.049999999999999,
+      "maximumEgoSpeed": 8.000000000000007,
+      "minimumEgoSpeed": 4.000753096884335,
+      "fixedEndpointResidual": 76.99527526825547
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "amplitude": 0,
+      "speedOffset": -4,
+      "witnessHorizonSeconds": 11.15,
+      "originalHorizonSeconds": 10.05,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.7892397968083638,
+      "ode45MinimumDistance": 0.7951858126600281,
+      "ode45MinimumRoadMargin": 3.049999999999999,
+      "ode45MaximumStateViolation": 0,
+      "ode45FinalEndpointMembership": -1.4901161193847555e-08,
+      "fixedEndpointHard": 76.99527526824919,
+      "fixedEndpointCollisionMargin": 0.7892397968083638,
+      "fixedEndpointRoadMargin": 3.049999999999999,
+      "maximumEgoSpeed": 8.000000000000007,
+      "minimumEgoSpeed": 4.000753096884335,
+      "fixedEndpointResidual": 76.99527526824919
+    }
+  ],
+  "extendedBudgetWitness": {
+    "speed": 8,
+    "scenario": "turningCrossing",
+    "amplitude": null,
+    "speedOffset": null,
+    "witnessHorizonSeconds": 10.05,
+    "originalHorizonSeconds": 10.05,
+    "nominalHard": 0,
+    "nominalSafety": 0,
+    "nominalCollisionMargin": 0.023461823036319947,
+    "ode45MinimumDistance": 0,
+    "ode45MinimumRoadMargin": 0.2026064635482836,
+    "ode45MaximumStateViolation": 0,
+    "ode45FinalEndpointMembership": 3.943362684451045e-09,
+    "fixedEndpointHard": 0,
+    "fixedEndpointCollisionMargin": 0.023461823036319947,
+    "fixedEndpointRoadMargin": 0.20263426274863727,
+    "maximumEgoSpeed": 10.064350502540846,
+    "minimumEgoSpeed": 4.143166243691751,
+    "allReplayChecksPass": false,
+    "fixedEndpointResidual": -9.770228642624235e-05
+  },
+  "intersampleCollision": {
+    "minimumClearance": 0.0,
+    "nodeMidpointMinimum": 0.029460330700896934,
+    "overlapCount": 8,
+    "firstOverlap": {
+      "time": 1.6600000000000001,
+      "penetration": 0.0060967502839783805
+    },
+    "lastOverlap": {
+      "time": 1.6716666666666669,
+      "penetration": 0.0011988097427246824
+    },
+    "maximumSatPenetration": 0.037025450138175486
+  },
+  "independentReplayChecks": [
+    {
+      "replay": "original-replay-8-turningCrossing.json",
+      "samples": 6231,
+      "minimumDistance": 0.0,
+      "minimumRoadMargin": 0.2026064635482836,
+      "geometryAgrees": true,
+      "collisionFree": false
+    },
+    {
+      "replay": "replay-15-brakingLead.json",
+      "samples": 8215,
+      "minimumDistance": 0.2944207276545334,
+      "minimumRoadMargin": 0.47547939072154977,
+      "geometryAgrees": true,
+      "collisionFree": true
+    },
+    {
+      "replay": "replay-15-crossing.json",
+      "samples": 2635,
+      "minimumDistance": 0.2327863327555986,
+      "minimumRoadMargin": 3.05,
+      "geometryAgrees": true,
+      "collisionFree": true
+    },
+    {
+      "replay": "replay-15-turningCrossing.json",
+      "samples": 4340,
+      "minimumDistance": 0.9638117800716915,
+      "minimumRoadMargin": 3.05,
+      "geometryAgrees": true,
+      "collisionFree": true
+    },
+    {
+      "replay": "replay-8-brakingLead.json",
+      "samples": 10137,
+      "minimumDistance": 0.2994776926516669,
+      "minimumRoadMargin": 0.45333400105122523,
+      "geometryAgrees": true,
+      "collisionFree": true
+    },
+    {
+      "replay": "replay-8-crossing.json",
+      "samples": 2635,
+      "minimumDistance": 0.3769161978605946,
+      "minimumRoadMargin": 3.049999999999999,
+      "geometryAgrees": true,
+      "collisionFree": true
+    },
+    {
+      "replay": "replay-8-turningCrossing.json",
+      "samples": 6913,
+      "minimumDistance": 0.7951858126600281,
+      "minimumRoadMargin": 3.049999999999999,
+      "geometryAgrees": true,
+      "collisionFree": true
+    }
+  ]
+}

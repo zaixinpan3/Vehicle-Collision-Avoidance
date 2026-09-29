@@ -1,0 +1,68 @@
+NODE 8 brakingLead normal [0.000 1.000] relaxation 0.000000 0.656000 0.000000
+NODE 8 crossing normal [0.000 1.000] relaxation 0.856000 2.106000 0.306000
+NODE 8 turningCrossing normal [0.000 1.000] relaxation 0.900481 2.150481 0.350481
+NODE 15 brakingLead normal [0.000 1.000] relaxation 0.000000 0.656000 0.000000
+NODE 15 crossing normal [0.000 1.000] relaxation 0.856000 2.106000 0.306000
+NODE 15 turningCrossing normal [0.000 1.000] relaxation 0.900481 2.150481 0.350481
+WITNESS 8 brakingLead amp 2.2 speedOff 0 accept 1 hard 0.000000 collision 0.293489 road 0.453675
+WITNESS 8 crossing amp 2.2 speedOff 0 accept 0 hard 1.968011 collision -1.968011 road 0.409879
+WITNESS 8 crossing amp 2.2 speedOff 2 accept 0 hard 3.342294 collision -3.342294 road 0.438304
+WITNESS 8 crossing amp 2.2 speedOff -2 accept 0 hard 0.493529 collision -0.493529 road 0.719964
+WITNESS 8 crossing amp -2.2 speedOff 0 accept 0 hard 2.305062 collision -2.305062 road 0.409879
+WITNESS 8 crossing amp -2.2 speedOff 2 accept 0 hard 0.802740 collision -0.802740 road 0.438304
+WITNESS 8 crossing amp -2.2 speedOff -2 accept 0 hard 2.425394 collision -2.425394 road 0.719964
+WITNESS 8 crossing amp 2.6 speedOff 0 accept 0 hard 1.716526 collision -1.716526 road -0.046089
+WITNESS 8 crossing amp 2.6 speedOff 2 accept 0 hard 3.019486 collision -3.019486 road -0.006858
+WITNESS 8 crossing amp 2.6 speedOff -2 accept 0 hard 0.342957 collision -0.342957 road 0.379061
+WITNESS 8 crossing amp -2.6 speedOff 0 accept 0 hard 2.186338 collision -2.186338 road -0.046089
+WITNESS 8 crossing amp -2.6 speedOff 2 accept 0 hard 0.588212 collision -0.588212 road -0.006858
+WITNESS 8 crossing amp -2.6 speedOff -2 accept 0 hard 2.560763 collision -2.560763 road 0.379061
+WITNESS 8 crossing amp 0 speedOff 0 accept 0 hard 3.356000 collision -3.356000 road 3.050000
+WITNESS 8 crossing amp 0 speedOff 2 accept 0 hard 1.956000 collision -1.956000 road 3.050000
+WITNESS 8 crossing amp 0 speedOff -2 accept 0 hard 1.599790 collision -1.599790 road 3.050000
+WITNESS 8 turningCrossing amp 2.2 speedOff 0 accept 0 hard 2.057988 collision -2.057988 road 0.409879
+WITNESS 8 turningCrossing amp 2.2 speedOff 2 accept 0 hard 3.372586 collision -3.372586 road 0.438304
+WITNESS 8 turningCrossing amp 2.2 speedOff -2 accept 0 hard 0.424603 collision -0.424603 road 0.719964
+WITNESS 8 turningCrossing amp -2.2 speedOff 0 accept 0 hard 2.516128 collision -2.516128 road 0.409879
+WITNESS 8 turningCrossing amp -2.2 speedOff 2 accept 0 hard 2.102210 collision -2.102210 road 0.438304
+WITNESS 8 turningCrossing amp -2.2 speedOff -2 accept 0 hard 2.154895 collision -2.154895 road 0.719964
+WITNESS 8 turningCrossing amp 2.6 speedOff 0 accept 0 hard 1.819718 collision -1.819718 road -0.046089
+WITNESS 8 turningCrossing amp 2.6 speedOff 2 accept 0 hard 3.281272 collision -3.281272 road -0.006858
+WITNESS 8 turningCrossing amp 2.6 speedOff -2 accept 0 hard 0.258312 collision -0.258312 road 0.379061
+WITNESS 8 turningCrossing amp -2.6 speedOff 0 accept 0 hard 2.356686 collision -2.356686 road -0.046089
+WITNESS 8 turningCrossing amp -2.6 speedOff 2 accept 0 hard 1.864636 collision -1.864636 road -0.006858
+WITNESS 8 turningCrossing amp -2.6 speedOff -2 accept 0 hard 2.234207 collision -2.234207 road 0.379061
+WITNESS 8 turningCrossing amp 0 speedOff 0 accept 0 hard 3.400481 collision -3.400481 road 3.050000
+WITNESS 8 turningCrossing amp 0 speedOff 2 accept 0 hard 2.571759 collision -2.571759 road 3.050000
+WITNESS 8 turningCrossing amp 0 speedOff -2 accept 0 hard 1.413450 collision -1.413450 road 3.050000
+WITNESS 15 brakingLead amp 2.2 speedOff 0 accept 1 hard 0.000000 collision 0.288421 road 0.475602
+WITNESS 15 crossing amp 2.2 speedOff 0 accept 0 hard 1.525976 collision -1.525976 road 0.347568
+WITNESS 15 crossing amp 2.2 speedOff 2 accept 0 hard 2.346304 collision -2.346304 road 0.235080
+WITNESS 15 crossing amp 2.2 speedOff -2 accept 0 hard 0.487722 collision -0.487722 road 0.539950
+WITNESS 15 crossing amp -2.2 speedOff 0 accept 0 hard 1.704046 collision -1.704046 road 0.347568
+WITNESS 15 crossing amp -2.2 speedOff 2 accept 0 hard 0.576388 collision -0.576388 road 0.235080
+WITNESS 15 crossing amp -2.2 speedOff -2 accept 0 hard 2.999424 collision -2.999424 road 0.539950
+WITNESS 15 crossing amp 2.6 speedOff 0 accept 0 hard 1.168440 collision -1.168440 road -0.178873
+WITNESS 15 crossing amp 2.6 speedOff 2 accept 0 hard 2.103320 collision -2.103320 road -0.344394
+WITNESS 15 crossing amp 2.6 speedOff -2 accept 0 hard 0.230034 collision -0.230034 road 0.113517
+WITNESS 15 crossing amp -2.6 speedOff 0 accept 0 hard 1.388921 collision -1.388921 road -0.178873
+WITNESS 15 crossing amp -2.6 speedOff 2 accept 0 hard 0.344394 collision -0.195601 road -0.344394
+WITNESS 15 crossing amp -2.6 speedOff -2 accept 0 hard 2.767547 collision -2.767547 road 0.113517
+WITNESS 15 crossing amp 0 speedOff 0 accept 0 hard 3.356000 collision -3.356000 road 3.050000
+WITNESS 15 crossing amp 0 speedOff 2 accept 0 hard 2.356000 collision -2.356000 road 3.050000
+WITNESS 15 crossing amp 0 speedOff -2 accept 0 hard 2.156000 collision -2.156000 road 3.050000
+WITNESS 15 turningCrossing amp 2.2 speedOff 0 accept 0 hard 1.554471 collision -1.554471 road 0.347568
+WITNESS 15 turningCrossing amp 2.2 speedOff 2 accept 0 hard 2.658147 collision -2.658147 road 0.235080
+WITNESS 15 turningCrossing amp 2.2 speedOff -2 accept 0 hard 0.411125 collision -0.411125 road 0.539950
+WITNESS 15 turningCrossing amp -2.2 speedOff 0 accept 0 hard 1.759018 collision -1.759018 road 0.347568
+WITNESS 15 turningCrossing amp -2.2 speedOff 2 accept 0 hard 0.571374 collision -0.571374 road 0.235080
+WITNESS 15 turningCrossing amp -2.2 speedOff -2 accept 0 hard 3.317620 collision -3.317620 road 0.539950
+WITNESS 15 turningCrossing amp 2.6 speedOff 0 accept 0 hard 1.299802 collision -1.299802 road -0.178873
+WITNESS 15 turningCrossing amp 2.6 speedOff 2 accept 0 hard 2.339565 collision -2.339565 road -0.344394
+WITNESS 15 turningCrossing amp 2.6 speedOff -2 accept 0 hard 0.215294 collision -0.215294 road 0.113517
+WITNESS 15 turningCrossing amp -2.6 speedOff 0 accept 0 hard 1.500551 collision -1.500551 road -0.178873
+WITNESS 15 turningCrossing amp -2.6 speedOff 2 accept 0 hard 0.344394 collision -0.249702 road -0.344394
+WITNESS 15 turningCrossing amp -2.6 speedOff -2 accept 0 hard 3.231218 collision -3.231218 road 0.113517
+WITNESS 15 turningCrossing amp 0 speedOff 0 accept 0 hard 3.400481 collision -3.400481 road 3.050000
+WITNESS 15 turningCrossing amp 0 speedOff 2 accept 0 hard 2.188919 collision -2.188919 road 3.050000
+WITNESS 15 turningCrossing amp 0 speedOff -2 accept 0 hard 1.996315 collision -1.996315 road 3.050000

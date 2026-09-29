@@ -1,0 +1,10 @@
+{Error using assert
+Assertion failed.
+
+Error in verifyOriginalWitness (line 32)
+ assert(e.hard==0 && e.safety==0 && minimum>0 && road>=0 && stateViolation==0);
+ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in run (line 100)
+evalin('caller', strcat(scriptStem, ';'));
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+}
