@@ -1,0 +1,284 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "h264",
+      "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "profile": "High",
+      "codec_type": "video",
+      "codec_tag_string": "avc1",
+      "codec_tag": "0x31637661",
+      "mime_codec_string": "avc1.640028",
+      "width": 1600,
+      "height": 900,
+      "coded_width": 1600,
+      "coded_height": 900,
+      "has_b_frames": 2,
+      "pix_fmt": "yuv420p",
+      "level": 40,
+      "chroma_location": "left",
+      "field_order": "progressive",
+      "is_avc": "true",
+      "nal_length_size": "4",
+      "id": "0x1",
+      "r_frame_rate": "30/1",
+      "avg_frame_rate": "30/1",
+      "time_base": "1/15360",
+      "start_pts": 0,
+      "start_time": "0.000000",
+      "duration_ts": 2689024,
+      "duration": "175.066667",
+      "bit_rate": "498873",
+      "bits_per_raw_sample": "8",
+      "nb_frames": "5252",
+      "extradata_size": 47,
+      "disposition": {
+        "default": 1,
+        "dub": 0,
+        "original": 0,
+        "comment": 0,
+        "lyrics": 0,
+        "karaoke": 0,
+        "forced": 0,
+        "hearing_impaired": 0,
+        "visual_impaired": 0,
+        "clean_effects": 0,
+        "attached_pic": 0,
+        "timed_thumbnails": 0,
+        "non_diegetic": 0,
+        "captions": 0,
+        "descriptions": 0,
+        "metadata": 0,
+        "dependent": 0,
+        "still_image": 0,
+        "multilayer": 0
+      },
+      "tags": {
+        "language": "und",
+        "handler_name": "VideoHandler",
+        "encoder": "Lavc63.1.102 libx264"
+      }
+    },
+    {
+      "index": 1,
+      "codec_name": "bin_data",
+      "codec_long_name": "binary data",
+      "codec_type": "data",
+      "codec_tag_string": "text",
+      "codec_tag": "0x74786574",
+      "id": "0x2",
+      "r_frame_rate": "0/0",
+      "avg_frame_rate": "0/0",
+      "time_base": "1/15360",
+      "start_pts": 0,
+      "start_time": "0.000000",
+      "duration_ts": 2642949,
+      "duration": "172.066992",
+      "bit_rate": "36",
+      "nb_frames": "14",
+      "extradata_size": 63,
+      "disposition": {
+        "default": 0,
+        "dub": 0,
+        "original": 0,
+        "comment": 0,
+        "lyrics": 0,
+        "karaoke": 0,
+        "forced": 0,
+        "hearing_impaired": 0,
+        "visual_impaired": 0,
+        "clean_effects": 0,
+        "attached_pic": 0,
+        "timed_thumbnails": 0,
+        "non_diegetic": 0,
+        "captions": 0,
+        "descriptions": 0,
+        "metadata": 0,
+        "dependent": 0,
+        "still_image": 0,
+        "multilayer": 0
+      },
+      "tags": {
+        "language": "eng",
+        "handler_name": "SubtitleHandler"
+      }
+    }
+  ],
+  "chapters": [
+    {
+      "id": 0,
+      "time_base": "1/15360",
+      "start": 0,
+      "start_time": "0.000000",
+      "end": 220155,
+      "end_time": "14.333008",
+      "tags": {
+        "title": "01 - 8 m/s - Constant-speed head-on encounter"
+      }
+    },
+    {
+      "id": 1,
+      "time_base": "1/15360",
+      "start": 220155,
+      "start_time": "14.333008",
+      "end": 406533,
+      "end_time": "26.466992",
+      "tags": {
+        "title": "02 - 8 m/s - Accelerating head-on encounter"
+      }
+    },
+    {
+      "id": 2,
+      "time_base": "1/15360",
+      "start": 406533,
+      "start_time": "26.466992",
+      "end": 592896,
+      "end_time": "38.600000",
+      "tags": {
+        "title": "03 - 8 m/s - Braking lead vehicle"
+      }
+    },
+    {
+      "id": 3,
+      "time_base": "1/15360",
+      "start": 592896,
+      "start_time": "38.600000",
+      "end": 779259,
+      "end_time": "50.733008",
+      "tags": {
+        "title": "04 - 8 m/s - Crossing vehicle"
+      }
+    },
+    {
+      "id": 4,
+      "time_base": "1/15360",
+      "start": 779259,
+      "start_time": "50.733008",
+      "end": 965637,
+      "end_time": "62.866992",
+      "tags": {
+        "title": "05 - 8 m/s - Accelerating turning crossing"
+      }
+    },
+    {
+      "id": 5,
+      "time_base": "1/15360",
+      "start": 965637,
+      "start_time": "62.866992",
+      "end": 1152000,
+      "end_time": "75.000000",
+      "tags": {
+        "title": "06 - 8 m/s - Head-on encounter on a curved road"
+      }
+    },
+    {
+      "id": 6,
+      "time_base": "1/15360",
+      "start": 1152000,
+      "start_time": "75.000000",
+      "end": 1338363,
+      "end_time": "87.133008",
+      "tags": {
+        "title": "07 - 8 m/s - Crossing encounter on a curved road"
+      }
+    },
+    {
+      "id": 7,
+      "time_base": "1/15360",
+      "start": 1338363,
+      "start_time": "87.133008",
+      "end": 1524741,
+      "end_time": "99.266992",
+      "tags": {
+        "title": "08 - 15 m/s - Constant-speed head-on encounter"
+      }
+    },
+    {
+      "id": 8,
+      "time_base": "1/15360",
+      "start": 1524741,
+      "start_time": "99.266992",
+      "end": 1711104,
+      "end_time": "111.400000",
+      "tags": {
+        "title": "09 - 15 m/s - Accelerating head-on encounter"
+      }
+    },
+    {
+      "id": 9,
+      "time_base": "1/15360",
+      "start": 1711104,
+      "start_time": "111.400000",
+      "end": 1897467,
+      "end_time": "123.533008",
+      "tags": {
+        "title": "10 - 15 m/s - Braking lead vehicle"
+      }
+    },
+    {
+      "id": 10,
+      "time_base": "1/15360",
+      "start": 1897467,
+      "start_time": "123.533008",
+      "end": 2083845,
+      "end_time": "135.666992",
+      "tags": {
+        "title": "11 - 15 m/s - Crossing vehicle"
+      }
+    },
+    {
+      "id": 11,
+      "time_base": "1/15360",
+      "start": 2083845,
+      "start_time": "135.666992",
+      "end": 2270208,
+      "end_time": "147.800000",
+      "tags": {
+        "title": "12 - 15 m/s - Accelerating turning crossing"
+      }
+    },
+    {
+      "id": 12,
+      "time_base": "1/15360",
+      "start": 2270208,
+      "start_time": "147.800000",
+      "end": 2456571,
+      "end_time": "159.933008",
+      "tags": {
+        "title": "13 - 15 m/s - Head-on encounter on a curved road"
+      }
+    },
+    {
+      "id": 13,
+      "time_base": "1/15360",
+      "start": 2456571,
+      "start_time": "159.933008",
+      "end": 2642949,
+      "end_time": "172.066992",
+      "tags": {
+        "title": "14 - 15 m/s - Crossing encounter on a curved road"
+      }
+    }
+  ],
+  "format": {
+    "filename": "/tmp/collision-threat-video-20260929/collision-threats.mp4",
+    "nb_streams": 2,
+    "nb_programs": 0,
+    "nb_stream_groups": 0,
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "format_long_name": "QuickTime / MOV",
+    "start_time": "0.000000",
+    "duration": "175.066667",
+    "size": "10981163",
+    "bit_rate": "501804",
+    "probe_score": 100,
+    "tags": {
+      "major_brand": "isom",
+      "minor_version": "512",
+      "compatible_brands": "isomiso2avc1mp41",
+      "title": "Collision avoidance: fourteen recorded scenarios",
+      "encoder": "Lavf63.1.102",
+      "comment": "Exact observations. True geometry. Slow replay near closest approaches."
+    }
+  }
+}

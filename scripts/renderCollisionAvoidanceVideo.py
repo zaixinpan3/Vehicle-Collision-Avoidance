@@ -35,7 +35,13 @@ TITLES = {'recovery': 'Lane recovery', 'circular': 'Curved-road tracking',
           'brakingTarget': 'Braking target beside the road',
           'turningTarget': 'Turning target', 'acceleratingTurn': 'Accelerating turn',
           'oncoming': 'Constant-speed head-on encounter',
-          'acceleratingTarget': 'Accelerating head-on encounter'}
+          'acceleratingTarget': 'Accelerating head-on encounter',
+          'headOn': 'Constant-speed head-on encounter',
+          'acceleratingHeadOn': 'Accelerating head-on encounter',
+          'brakingLead': 'Braking lead vehicle', 'crossing': 'Crossing vehicle',
+          'turningCrossing': 'Accelerating turning crossing',
+          'curvedHeadOn': 'Head-on encounter on a curved road',
+          'curvedCrossing': 'Crossing encounter on a curved road'}
 DESCRIPTIONS = {
     'recovery': ['A 10 mm initial lane offset.', 'Watch the lateral-error curve.'],
     'circular': ['A 200 m radius road.', 'Watch the heading and steering.'],
@@ -49,6 +55,13 @@ DESCRIPTIONS = {
                  'Watch the ego move aside and return.'],
     'acceleratingTarget': ['The target accelerates at 1 m/s².',
                            'Watch the tightest passing distance.'],
+    'headOn': ['Both vehicles approach on the same path.', 'Cruise without avoidance would collide.'],
+    'acceleratingHeadOn': ['The oncoming target accelerates.', 'Cruise without avoidance would collide.'],
+    'brakingLead': ['The lead vehicle brakes in the ego lane.', 'Cruise without avoidance would collide.'],
+    'crossing': ['The target crosses the ego path.', 'Cruise without avoidance would collide.'],
+    'turningCrossing': ['The target turns and accelerates into the path.', 'Cruise without avoidance would collide.'],
+    'curvedHeadOn': ['Oncoming traffic follows the same curve.', 'Cruise without avoidance would collide.'],
+    'curvedCrossing': ['The target crosses the curved ego path.', 'Cruise without avoidance would collide.'],
 }
 FONT = Path('/home/zai/.local/share/fonts/Inter/Inter.ttc')
 FALLBACK_FONT = Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
@@ -96,7 +109,9 @@ def nearest_pair(a, b):
 
 def prepare_scene(path, speed, index):
     source = json.loads(path.read_text())['results']
-    assert source['completed'] and source['failure'] == ''
+    baseline_only = not source['completed']
+    if baseline_only:
+        assert source.get('baselineCruise', {}).get('collisionDetected') and not source['trace']
     assert source['configuration']['collision']['safetyMarginMeters'] == .006
     trace = source['trace']
     times, states = [], []
@@ -108,6 +123,10 @@ def prepare_scene(path, speed, index):
                 continue
             times.append(time)
             states.append(state)
+    if baseline_only:
+        times = source['baselineCruise']['times']
+        poses = np.asarray(source['baselineCruise']['egoPoses'])
+        states = np.column_stack([poses, np.full(len(times), speed), np.zeros((len(times), 2))])
     times = np.array(times)
     states = np.array(states)
     assert np.all(np.diff(times) > 0)
@@ -120,16 +139,22 @@ def prepare_scene(path, speed, index):
         targets = np.array([target_state(target, float(t)) for t in times])
         gaps = np.array([distance(rectangle(*x[:3], shape), rectangle(*q[:3], target[7:11]))
                          for x, q in zip(states, targets)])
-        assert np.min(gaps) > 0
-        assert abs(float(np.min(gaps)) - source['minimumReplayClearanceMeters']) < 1e-9
-        closest = int(np.argmin(gaps))
+        if not baseline_only:
+            assert np.min(gaps) > 0
+            assert abs(float(np.min(gaps)) - source['minimumReplayClearanceMeters']) < 1e-9
+        closest = (int(np.searchsorted(times, source['baselineCruise']['firstCollisionSeconds']))
+                   if baseline_only else int(np.argmin(gaps)))
     else:
         closest = len(times) - 1
     lateral = states[:, 1]
-    if source['scenario'] == 'circular':
+    curved = source['scenario'] == 'circular' or source.get('baselineCruise', {}).get('referenceCurve', {}).get('curvature') == .005
+    if curved:
         lateral = 200 - np.hypot(states[:, 0], states[:, 1] - 200)
     inputs = np.array([h['input'] for h in trace])
     node_times = np.array([h['time'] for h in trace])
+    if baseline_only:
+        inputs = np.array([[np.nan, np.nan]])
+        node_times = np.array([0.])
     bounds = states[:, :2]
     if targets is not None:
         bounds = np.concatenate([bounds, targets[:, :2]])
@@ -138,7 +163,9 @@ def prepare_scene(path, speed, index):
                  states=states, target=target, targets=targets, gaps=gaps,
                  closest_time=float(times[closest]), shape=shape, lateral=lateral,
                  inputs=inputs, node_times=node_times, bounds=(lower, upper),
-                 duration=float(times[-1]), name=source['scenario'])
+                 duration=float(times[-1]), name=source['scenario'], curved=curved,
+                 baseline=source.get('baselineCruise'), baseline_only=baseline_only,
+                 minimum_display=float(np.min(gaps)) if baseline_only else source['minimumReplayClearanceMeters'])
     scene['charts'] = make_charts(scene)
     return scene
 
@@ -156,7 +183,7 @@ def sample(scene, time):
 
 def road_points(scene, start=-80, end=200):
     s = np.linspace(start, end, 600)
-    if scene['name'] == 'circular':
+    if scene['curved']:
         k = .005
         center = np.column_stack([np.sin(k * s) / k, (1 - np.cos(k * s)) / k])
         normal = np.column_stack([-np.sin(k * s), np.cos(k * s)])
@@ -219,6 +246,14 @@ def make_charts(scene):
         draw = ImageDraw.Draw(image)
         label(draw, (16, 10), title, 13, MUTED)
         label(draw, (479, 10), units, 13, MUTED, 'ra')
+        if scene['baseline_only'] and title == 'STEERING':
+            label(draw, (24, 53), 'NO EXECUTED CONTROL', 23, TARGET)
+            label(draw, (24, 92), 'Initialization did not produce a feasible plan.', 15, MUTED)
+            charts.append(image)
+            continue
+        if scene['baseline_only']:
+            draw.rectangle((0, 0, 340, 30), fill=PANEL)
+            label(draw, (16, 10), 'BASELINE ' + title, 13, MUTED)
         if logarithmic:
             vals = np.log10(np.maximum(values, 1e-6))
             low, high = min(-3, vals.min() - .15), math.ceil(vals.max())
@@ -233,13 +268,13 @@ def make_charts(scene):
             y = bottom - fraction * (bottom - top)
             draw.line([(left, y), (right, y)], fill=BORDER)
             value = low + fraction * (high - low)
-            tick = f'{10 ** value:.3g}' if logarithmic else f'{value:.2g}'
+            tick = f'{10 ** value:.1g}' if logarithmic else f'{value:.2g}'
             label(draw, (45, y - 7), tick, 12, MUTED, 'ra')
         points = [(left + t / scene['duration'] * (right - left),
                    bottom - (v - low) / (high - low) * (bottom - top))
                   for t, v in zip(times, vals)]
         draw.line(points, fill=color, width=2)
-        if logarithmic:
+        if logarithmic and not scene['baseline_only']:
             y = bottom - (math.log10(.006) - low) / (high - low) * (bottom - top)
             draw.line([(left, y), (right, y)], fill='#AB7855', width=1)
             label(draw, (right - 3, y - 15), '6 mm at constraint samples', 10, GOLD, 'ra')
@@ -255,7 +290,7 @@ def map_view(scene, time, closest=False):
     draw = ImageDraw.Draw(image)
     x, q, control, body, other, gap = sample(scene, time)
     center = np.array([x[0] + 10, 0])
-    if scene['name'] == 'circular':
+    if scene['curved']:
         s = 200 * math.atan2(x[0], 200 - x[1]) + 10
         center = np.array([200 * math.sin(s / 200), 200 * (1 - math.cos(s / 200))])
     scale = w / 46
@@ -270,15 +305,31 @@ def map_view(scene, time, closest=False):
         if px < w - 110:
             label(draw, (px + 4, h - 21), f'{gx:.0f}', 12, MUTED)
     draw_road(draw, scene, transform)
+    baseline = scene['baseline']
+    if baseline and baseline['collisionDetected'] and not scene['baseline_only']:
+        pose = [np.interp(time, baseline['times'], np.asarray(baseline['egoPoses'])[:, j]) for j in range(3)]
+        polygon = rectangle(*pose, scene['shape'])
+        danger = baseline['firstCollisionSeconds'] <= time <= baseline['lastCollisionSeconds']
+        color = '#F16D7C' if danger else '#8391A3'
+        for start, end in zip(polygon, polygon[1:] + [polygon[0]]):
+            for fraction in np.arange(0, 1, .25):
+                a = np.asarray(start) + fraction * (np.asarray(end) - start)
+                b = np.asarray(start) + min(1, fraction + .14) * (np.asarray(end) - start)
+                draw.line([transform(a), transform(b)], fill=color, width=2)
+        point = transform(pose[:2])
+        label(draw, (point[0], point[1] + 59), 'BASELINE COLLISION' if danger else 'CRUISE BASELINE', 12, color, 'ma')
     end = np.searchsorted(scene['times'], time, side='right')
     start = np.searchsorted(scene['times'], max(0, time - 2.5))
     if end - start > 1:
-        draw.line([transform(p) for p in scene['states'][start:end:10, :2]], fill=EGO, width=3)
+        draw.line([transform(p) for p in scene['states'][start:end:10, :2]],
+                  fill=MUTED if scene['baseline_only'] else EGO, width=3)
         if scene['targets'] is not None:
             draw.line([transform(p) for p in scene['targets'][start:end:10, :2]], fill=TARGET, width=3)
-    vehicle(draw, x, scene['shape'], transform, EGO, control[0])
+    vehicle(draw, x, scene['shape'], transform, MUTED if scene['baseline_only'] else EGO,
+            0 if scene['baseline_only'] else control[0])
     ego_point = transform(x[:2])
-    label(draw, (ego_point[0], ego_point[1] - 47), 'EGO', 15, EGO, 'ma')
+    label(draw, (ego_point[0], ego_point[1] - 47), 'CRUISE BASELINE' if scene['baseline_only'] else 'EGO',
+          15, MUTED if scene['baseline_only'] else EGO, 'ma')
     if q is not None:
         vehicle(draw, q, scene['target'][7:11], transform, TARGET)
         target_point = transform(q[:2])
@@ -287,14 +338,16 @@ def map_view(scene, time, closest=False):
         else:
             side = 'left' if target_point[0] < 0 else 'right' if target_point[0] > w else 'above'
             label(draw, (w - 18, 42), f'Target off-screen: {side}', 14, TARGET, 'ra')
-        if gap < 1:
+        if 0 < gap < 1:
             _, p, v = nearest_pair(body, other)
             draw.line([transform(p), transform(v)], fill=GOLD, width=1)
     label(draw, (18, 14), 'FOLLOW CAMERA · TRUE BODY SCALE', 13, MUTED)
+    if scene['baseline_only']:
+        label(draw, (18, 39), 'COUNTERFACTUAL ONLY · INITIALIZATION FAILED', 16, TARGET)
     label(draw, (w - 17, h - 21), 'world X / m', 12, MUTED, 'ra')
     if closest:
         draw.rounded_rectangle((w - 258, 10, w - 15, 39), 8, fill='#473724')
-        label(draw, (w - 135, 16), 'CLOSEST RECORDED APPROACH', 12, GOLD, 'ma')
+        label(draw, (w - 135, 16), 'BASELINE COLLISION' if scene['baseline_only'] else 'CLOSEST RECORDED APPROACH', 12, GOLD, 'ma')
     # A real-world scale bar makes the body dimensions explicit.
     draw.line([(22, h - 47), (22 + 5 * scale, h - 47)], fill=TEXT, width=2)
     label(draw, (22 + 2.5 * scale, h - 67), '5 m', 12, TEXT, 'ma')
@@ -305,7 +358,7 @@ def side_view(scene, time):
     w, h = SIDE_BOX[2] - SIDE_BOX[0], SIDE_BOX[3] - SIDE_BOX[1]
     image = Image.new('RGB', (w, h), PANEL)
     draw = ImageDraw.Draw(image)
-    label(draw, (16, 12), 'FULL REPLAY OVERVIEW', 13, MUTED)
+    label(draw, (16, 12), 'CRUISE BASELINE OVERVIEW' if scene['baseline_only'] else 'FULL REPLAY OVERVIEW', 13, MUTED)
     lo, hi = scene['bounds']
     scale = min((w - 40) / (hi[0] - lo[0]), 131 / (hi[1] - lo[1]))
     center = (lo + hi) / 2
@@ -318,18 +371,19 @@ def side_view(scene, time):
     overview = Image.new('RGB', (w, 158), PANEL)
     od = ImageDraw.Draw(overview)
     od.polygon([transform(p) for p in np.concatenate([upper, lower[::-1]])], fill='#1F3041')
-    od.line([transform(p) for p in scene['states'][::12, :2]], fill='#388D91', width=2)
+    od.line([transform(p) for p in scene['states'][::12, :2]], fill=MUTED if scene['baseline_only'] else '#388D91', width=2)
     if scene['targets'] is not None:
         od.line([transform(p) for p in scene['targets'][::12, :2]], fill='#9F665E', width=2)
     x, q, _, body, other, gap = sample(scene, time)
-    for pose, color in [(x, EGO), (q, TARGET)]:
+    for pose, color in [(x, MUTED if scene['baseline_only'] else EGO), (q, TARGET)]:
         if pose is not None:
             p = transform(pose[:2]);od.ellipse((p[0] - 4, p[1] - 4, p[0] + 4, p[1] + 4), fill=color)
     image.paste(overview.crop((0, 30, w, 158)), (0, 30))
     draw = ImageDraw.Draw(image)
     draw.line([(16, 164), (w - 16, 164)], fill=BORDER)
     if gap is not None and gap < .6:
-        label(draw, (16, 177), 'GAP DETAIL · EQUAL AXIS SCALE', 12, MUTED)
+        label(draw, (16, 177), 'BASELINE OVERLAP · EQUAL AXIS SCALE' if scene['baseline_only'] and gap == 0
+              else 'GAP DETAIL · EQUAL AXIS SCALE', 12, MUTED)
         _, a, b = nearest_pair(body, other)
         center = (a + b) / 2
         span = max(.34, gap * 2.5 + .15)
@@ -341,43 +395,52 @@ def side_view(scene, time):
             return (detail.width / 2 + (p[0] - center[0]) * scale,
                     detail.height / 2 - (p[1] - center[1]) * scale)
 
-        for polygon, color in [(body, EGO), (other, TARGET)]:
+        for polygon, color in [(body, MUTED if scene['baseline_only'] else EGO), (other, TARGET)]:
             dd.polygon([close(p) for p in polygon], fill=color)
-        dd.line([close(a), close(b)], fill=GOLD, width=1)
+        if gap > 0:
+            dd.line([close(a), close(b)], fill=GOLD, width=1)
         image.paste(detail, (16, 202))
         label(draw, (16, 351), format_gap(gap), 24, GOLD)
-        label(draw, (w - 16, 360), 'actual body distance', 12, MUTED, 'ra')
+        label(draw, (w - 16, 360), 'baseline body distance' if scene['baseline_only'] else 'actual body distance', 12, MUTED, 'ra')
     else:
         label(draw, (16, 180), 'WHAT TO WATCH', 12, MUTED)
         for index, text in enumerate(DESCRIPTIONS[scene['name']]):
             label(draw, (16, 210 + 25 * index), text, 16, TEXT)
-        label(draw, (16, 287), 'MINIMUM RECORDED DISTANCE', 12, MUTED)
-        label(draw, (16, 311), format_gap(scene['source']['minimumReplayClearanceMeters']), 28,
+        label(draw, (16, 287), 'BASELINE MINIMUM DISTANCE' if scene['baseline_only'] else 'MINIMUM RECORDED DISTANCE', 12, MUTED)
+        label(draw, (16, 311), format_gap(scene['minimum_display']), 28,
               GOLD if scene['target'] else TEXT)
-        label(draw, (16, 354), 'Recorded paths are shown in the overview.', 13, MUTED)
+        note = (f"Baseline collision starts at {scene['baseline']['firstCollisionSeconds']:.3f} s"
+                if scene['baseline'] and scene['baseline']['collisionDetected']
+                else 'Recorded paths are shown in the overview.')
+        label(draw, (16, 354), note, 13, MUTED)
     return image
 
 
 def render_frame(scene, time, rate=1, closest=False, intro=False):
     image = Image.new('RGB', (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
-    label(draw, (32, 20), 'COLLISION AVOIDANCE / RECORDED EXPERIMENTS', 14, MUTED)
+    label(draw, (32, 20), 'COLLISION AVOIDANCE / COUNTERFACTUAL CRUISE' if scene['baseline_only']
+          else 'COLLISION AVOIDANCE / RECORDED EXPERIMENTS', 14, MUTED)
     label(draw, (32, 48), TITLES[scene['name']], 34)
-    label(draw, (32, 101), f"Reference {scene['speed']} m/s  ·  {scene['speed'] * 3.6:.1f} km/h  ·  "
-          f"Closest: {format_gap(scene['source']['minimumReplayClearanceMeters'])}", 19, MUTED)
+    subtitle = (f"Reference {scene['speed']} m/s  ·  {scene['speed'] * 3.6:.1f} km/h  ·  "
+                f"{'Baseline minimum' if scene['baseline_only'] else 'Closest'}: {format_gap(scene['minimum_display'])}")
+    if scene['baseline'] and scene['baseline']['collisionDetected']:
+        subtitle += f"  ·  Baseline collision at {scene['baseline']['firstCollisionSeconds']:.3f} s"
+    label(draw, (32, 101), subtitle, 19, MUTED)
     label(draw, (1566, 48), f"{scene['index']:02d} / 14", 30, TEXT, 'ra')
-    label(draw, (1440, 94), 'EGO', 15, MUTED)
+    label(draw, (1392 if scene['baseline_only'] else 1440, 94), 'BASELINE' if scene['baseline_only'] else 'EGO', 15, MUTED)
     label(draw, (1507, 94), 'TARGET', 15, MUTED)
-    draw.ellipse((1421, 100, 1429, 108), fill=EGO)
+    first_dot = 1373 if scene['baseline_only'] else 1421
+    draw.ellipse((first_dot, 100, first_dot+8, 108), fill=MUTED if scene['baseline_only'] else EGO)
     draw.ellipse((1488, 100, 1496, 108), fill=TARGET)
     for index in range(14):
         left = 32 + index * 110
         color = EGO if index == scene['index'] - 1 else '#38606A' if index < scene['index'] - 1 else BORDER
         draw.rounded_rectangle((left, 145, left + 99, 150), 2, fill=color)
     x, q, control, _, _, gap = sample(scene, time)
-    values = [('EGO SPEED', f'{math.hypot(x[3], x[4]):.2f} m/s', EGO),
-              ('STEERING', f'{math.degrees(control[0]):+.2f} deg', EGO),
-              ('CURRENT BODY GAP', format_gap(gap), GOLD if q is not None else MUTED),
+    values = [('BASELINE SPEED' if scene['baseline_only'] else 'EGO SPEED', f'{math.hypot(x[3], x[4]):.2f} m/s', EGO),
+              ('STEERING', 'No command' if scene['baseline_only'] else f'{math.degrees(control[0]):+.2f} deg', EGO),
+              ('BASELINE BODY GAP' if scene['baseline_only'] else 'CURRENT BODY GAP', format_gap(gap), GOLD if q is not None else MUTED),
               ('SIMULATION TIME', f"{time:.2f} / {scene['duration']:.0f} s", TEXT)]
     for index, (title, value, color) in enumerate(values):
         left = 32 + index * 388
@@ -398,10 +461,19 @@ def render_frame(scene, time, rate=1, closest=False, intro=False):
         image.paste(chart, (left, 686))
         draw = ImageDraw.Draw(image)
         cursor = left + 53 + time / scene['duration'] * 424
-        draw.line([(cursor, 724), (cursor, 803)], fill='#D2E1EC', width=1)
+        if not (scene['baseline_only'] and index == 1):
+            draw.line([(cursor, 724), (cursor, 803)], fill='#D2E1EC', width=1)
         draw.rounded_rectangle((left, 686, left + 496, 840), 12, outline=BORDER, width=1)
     playback = 'Paused at closest approach' if closest else '0.5x replay' if rate == .5 else '1x replay'
-    label(draw, (32, 860), 'True body geometry  ·  recorded ode45 motion  ·  6 mm buffer at constraint samples', 14, MUTED)
+    if closest and scene['baseline_only']:
+        playback = 'Paused at baseline collision'
+    footer = ('Dashed ghost: given-path constant-speed cruise without avoidance  ·  6 mm at constraint samples'
+              if scene['baseline'] and scene['baseline']['collisionDetected']
+              else 'True body geometry  ·  recorded ode45 motion  ·  6 mm buffer at constraint samples')
+    if scene['baseline_only']:
+        reason = scene['source']['failure'].split(':', 2)[1]
+        footer = f'No avoidance trajectory available: {reason}. Showing cruise counterfactual only.'
+    label(draw, (32, 860), footer, 14, MUTED)
     label(draw, (1568, 860), playback, 14, GOLD, 'ra')
     return image
 
@@ -428,9 +500,10 @@ def cover(scenes, final=False):
     image = Image.new('RGB', (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
     label(draw, (44, 28), 'COLLISION AVOIDANCE / NOMINAL CLOSED-LOOP REPLAY', 16, MUTED)
-    label(draw, (44, 77), 'Fourteen scenarios. One controller.', 48)
+    threats = all(s['baseline'] and s['baseline']['collisionDetected'] for s in scenes)
+    label(draw, (44, 77), 'Fourteen real collision threats.' if threats else 'Fourteen scenarios. One controller.', 48)
     label(draw, (44, 145), '8 and 15 m/s  ·  true vehicle dimensions  ·  slowed closest approaches', 22, MUTED)
-    selected = [scenes[5], scenes[6], scenes[12], scenes[8]]
+    selected = [scenes[0], scenes[1], scenes[3], scenes[5]] if threats else [scenes[5], scenes[6], scenes[12], scenes[8]]
     for i, scene in enumerate(selected):
         left, top = 44 + (i % 2) * 772, 219 + (i // 2) * 256
         frame = map_view(scene, scene['closest_time'])
@@ -440,7 +513,9 @@ def cover(scenes, final=False):
         draw.rounded_rectangle((left + 12, top + 13, left + 564, top + 47), 7, fill='#101E2F')
         label(draw, (left + 24, top + 20), f"{scene['speed']} m/s · {TITLES[scene['name']]}", 16)
     if final:
-        headline = '14 completed · no collision detected in the recorded replay'
+        complete = sum(not s['baseline_only'] for s in scenes)
+        headline = (f'{complete}/14 avoidance replays completed · {14-complete} initialization failures'
+                    if complete < 14 else '14 completed · no collision detected in the recorded replay')
         minimum = min(s['source']['minimumReplayClearanceMeters'] for s in scenes
                       if s['source']['minimumReplayClearanceMeters'] is not None)
         maximum = max(h['controllerSeconds'] for s in scenes for h in s['source']['trace'][1:])
@@ -448,7 +523,8 @@ def cover(scenes, final=False):
                   f'max running control call {maximum * 1000:.3f} ms')
     else:
         headline = 'Cyan: ego vehicle     Coral: target vehicle'
-        detail = 'Closest-approach pauses and gap details show the actual recorded geometry.'
+        detail = ('Gray: cruise baseline. Failed initializations show counterfactual motion only.' if threats
+                  else 'Closest-approach pauses and gap details show the actual recorded geometry.')
     label(draw, (44, 750), headline, 25, EGO if final else TEXT)
     label(draw, (44, 800), detail, 18, MUTED)
     label(draw, (44, 853), 'Exact observations · no injected sensing or computation delay · recorded 6 mm configuration', 14, MUTED)
@@ -461,15 +537,21 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--fps', type=int, default=30)
     parser.add_argument('--preview-only', action='store_true')
+    parser.add_argument('--campaign', type=Path, help='Use baseline-certified scenario order from a campaign JSON')
     args = parser.parse_args()
     assert args.fps > 0
     args.output.parent.mkdir(parents=True, exist_ok=True)
     scenes = []
-    for speed in [8, 15]:
-        for name in NAMES:
-            scene = prepare_scene(args.data_directory / f'speed{speed}' / f'{name}.json', speed, len(scenes) + 1)
-            scenes.append(scene)
-            print(f"Prepared {scene['index']:02d}: {speed} m/s {name}; closest {scene['closest_time']:.6f} s", flush=True)
+    cases = (json.loads(args.campaign.read_text())['results'] if args.campaign else
+             [dict(referenceSpeedMetersPerSecond=speed, scenario=name) for speed in [8, 15] for name in NAMES])
+    assert len(cases) == 14
+    for case in cases:
+        speed, name = case['referenceSpeedMetersPerSecond'], case['scenario']
+        scene = prepare_scene(args.data_directory / f'speed{speed}' / f'{name}.json', speed, len(scenes) + 1)
+        if args.campaign:
+            assert scene['baseline']['collisionDetected'] and scene['baseline']['initialClearanceMeters'] > 0
+        scenes.append(scene)
+        print(f"Prepared {scene['index']:02d}: {speed} m/s {name}; closest {scene['closest_time']:.6f} s", flush=True)
     manifest = dict(width=WIDTH, height=HEIGHT, fps=args.fps,
                     observations='Exact observations; no injected sensing or computation latency',
                     trajectory='Recorded ode45 hold replay; interpolation at video frames',
@@ -481,7 +563,10 @@ def main():
             sourceSha256=hashlib.sha256(scene['path'].read_bytes()).hexdigest(),
             simulationSeconds=scene['duration'], closestSimulationSeconds=scene['closest_time'],
             minimumBodyClearanceMeters=scene['source']['minimumReplayClearanceMeters'],
-            independentGeometryAgrees=True))
+            independentGeometryAgrees=not scene['baseline_only'],
+            completed=scene['source']['completed'], rolloutType='counterfactualBaselineOnly' if scene['baseline_only'] else 'executedAvoidance',
+            initializationFailure=scene['source']['failure'],
+            baselineCollisionConfirmed=bool(scene['baseline'] and scene['baseline']['collisionDetected'])))
     for index in [1, 2, 6, 7, 13, 14]:
         scene = scenes[index - 1]
         render_frame(scene, scene['closest_time'], closest=bool(scene['target'])).save(

@@ -72,7 +72,9 @@ def feasible_hold(hold):
 def audit(result):
     name = result['scenario']
     if name not in ('oncoming', 'recovery', 'circular', 'turningTarget',
-                    'acceleratingTarget', 'acceleratingTurn', 'brakingTarget'):
+                    'acceleratingTarget', 'acceleratingTurn', 'brakingTarget',
+                    'headOn', 'acceleratingHeadOn', 'brakingLead', 'crossing',
+                    'turningCrossing', 'curvedHeadOn', 'curvedCrossing'):
         raise ValueError(f'Unsupported fixture: {name}')
     initial = result['targetInitialState']
     vehicle = result['configuration']['vehicle']
@@ -84,7 +86,7 @@ def audit(result):
         for relative_time, state in zip(hold['auditTimes'], hold['auditStates']):
             samples += 1
             body = rectangle(*state[:3], shape=ego_shape)
-            if name == 'circular':
+            if name == 'circular' or result.get('baselineCruise', {}).get('referenceCurve', {}).get('curvature') == .005:
                 # Positive 0.005 1/m curvature: center (0, 200), radius 200.
                 lateral = [200 - math.hypot(x, y - 200) for x, y in body]
             else:

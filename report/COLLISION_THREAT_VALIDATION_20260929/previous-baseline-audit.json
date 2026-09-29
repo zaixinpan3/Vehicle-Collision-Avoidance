@@ -1,0 +1,103 @@
+{
+  "scope": "Ideal given-path constant-speed cruise, independent rectangle SAT at 600 Hz over 8 seconds",
+  "results": [
+    {
+      "speed": 8,
+      "scenario": "recovery",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": null
+    },
+    {
+      "speed": 8,
+      "scenario": "circular",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": null
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingTarget",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": 4.1
+    },
+    {
+      "speed": 8,
+      "scenario": "turningTarget",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": 4.262471482308368
+    },
+    {
+      "speed": 8,
+      "scenario": "acceleratingTurn",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": 2.5763767112828
+    },
+    {
+      "speed": 8,
+      "scenario": "oncoming",
+      "baselineCollision": true,
+      "firstOverlapSeconds": 1.2016666666666667,
+      "minimumClearanceMeters": 0.0
+    },
+    {
+      "speed": 8,
+      "scenario": "acceleratingTarget",
+      "baselineCollision": true,
+      "firstOverlapSeconds": 1.1583333333333334,
+      "minimumClearanceMeters": 0.0
+    },
+    {
+      "speed": 15,
+      "scenario": "recovery",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": null
+    },
+    {
+      "speed": 15,
+      "scenario": "circular",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": null
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingTarget",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": 4.1
+    },
+    {
+      "speed": 15,
+      "scenario": "turningTarget",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": 1.0040021396893455
+    },
+    {
+      "speed": 15,
+      "scenario": "acceleratingTurn",
+      "baselineCollision": false,
+      "firstOverlapSeconds": null,
+      "minimumClearanceMeters": 1.2624888129980023
+    },
+    {
+      "speed": 15,
+      "scenario": "oncoming",
+      "baselineCollision": true,
+      "firstOverlapSeconds": 0.835,
+      "minimumClearanceMeters": 0.0
+    },
+    {
+      "speed": 15,
+      "scenario": "acceleratingTarget",
+      "baselineCollision": true,
+      "firstOverlapSeconds": 0.8216666666666667,
+      "minimumClearanceMeters": 0.0
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "producingControllerCommit": "86939fee8915337f4662b53342104cde288a5ef7",
+  "sourceFiles": [
+    {
+      "path": "scripts/givenPathCollisionBaseline.m",
+      "sha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09"
+    },
+    {
+      "path": "scripts/collisionThreatScenario.m",
+      "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310"
+    },
+    {
+      "path": "scripts/runCollisionThreatValidation.m",
+      "sha256": "f4c634b0c94fe6484504d06698e3971d3e485840f36f45fbf7ecd680d0359e31"
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "1842c8223118737b5e53527ad821b3b5a07dce61630b62edc3966feb24ca9ce7"
+    },
+    {
+      "path": "scripts/auditCollisionThreats.py",
+      "sha256": "e3c99b44c103224ae208c880de14348d970e183f5ef432aba0e3ac74c04b79e6"
+    },
+    {
+      "path": "scripts/auditJointPredictiveSafety.py",
+      "sha256": "14b6bdcb5aa27b64ea8dcc748401d50a7aafde3f680b6ef266badf665eb631d4"
+    },
+    {
+      "path": "scripts/renderCollisionAvoidanceVideo.py",
+      "sha256": "bdbeef2d54c332b2be8d889afc4a84ea6677b88b3ca4d4db0f4e84123c17c985"
+    },
+    {
+      "path": "tests/collisionThreatScenarioTest.m",
+      "sha256": "df8c80aeff58ac96ed133626c7c1b1bbd36be8282909ad091e3fdbda197823a2"
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc"
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "f227b5af54b941f81a5d6245e1514f53167bed7facae91048d4d792e0fceeb88"
+    },
+    {
+      "path": "controller/nonlinearBicycleModel.m",
+      "sha256": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1"
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256": "db23d19a88297cec88799506619e794c0a6e180b0d303a4233aa8bde10b67436"
+    },
+    {
+      "path": "controller/readControllerInputs.m",
+      "sha256": "0f82004d6d799bb9c15396619858747fc16cbcb2efb5af8db89f5c2791df4718"
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "793a3f56ca2205e1319e8769602bd38d06a21cc4975c2ce4dba8e0c1be18146e"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "6164ff5b7f2b13c91a71fcba024de0e8e8584f43929b13d2e51797de2c88618c"
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "e3529546f96890c49a04f3838d3a3d38286efbc14c976323d781eff0965c8ee5"
+    }
+  ],
+  "rawFiles": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed15/acceleratingHeadOn.json",
+      "sha256": "a4f137c3b0a86b0d120980442f63eba73ec9c3a4b0e2a8477f72c8d81eced413"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed15/brakingLead.json",
+      "sha256": "99b98412d495ea29fe16388c4578fb8047078e2daea0145bb8a7ca763cc166fd"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed15/crossing.json",
+      "sha256": "d46d3c82d0b953386d881528ca016defa8077c49a508e6c70da7461fad77aa2a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed15/curvedCrossing.json",
+      "sha256": "a7f80af7dd8e2555cdfffba7ea36102bc1b9ce28017510d52876472cc52c0b1c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed15/curvedHeadOn.json",
+      "sha256": "ec6b2219a3603e6f67739c5adf758cec184504186f73d5ba5370e0faad2e8b76"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed15/headOn.json",
+      "sha256": "c8ef10714a5482b6ea867c9030fc231e0096be8a53723a9964683bed2bdb817b"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed15/turningCrossing.json",
+      "sha256": "d21f51d2a1188152beb0aa888ea3387826d6087d52575a8bee916e0acb4e530f"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed8/acceleratingHeadOn.json",
+      "sha256": "b2b31a7d920bd2c278430283e35574ec5ab0c18e25ceabe44cd57195b335a259"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed8/brakingLead.json",
+      "sha256": "eee06a502aa0e692a94d9b4d60e876b61971a0ad438b029c329ca6140e7e6466"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed8/crossing.json",
+      "sha256": "5f44dbc1554837a6a3fe8d5a95610fe014824e66950987b5b5281f2c5f3e8939"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed8/curvedCrossing.json",
+      "sha256": "dd2dbf86afb321d41bad998e1918fa728d582ef9ed7c814bc409f02f131d9966"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed8/curvedHeadOn.json",
+      "sha256": "cd11143327d24701eacab5d4c43c7f0236c43b6d1c9db2fc17e398e02dab7df1"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed8/headOn.json",
+      "sha256": "0e2d253266099b978086e96f6e752f5dc9aa177b9e1f8789b9b7a2ba65e1dbe0"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-threat-20260929/speed8/turningCrossing.json",
+      "sha256": "7dc613791cd07dae180c3db06fb0df1123196766c2a7bdbb8de6df5110be3a15"
+    }
+  ]
+}

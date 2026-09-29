@@ -10,12 +10,18 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'controller',struct('horizonSteps',8))
         options.StateTransition (1,1) string {mustBeMember(options.StateTransition,["ode45","nominalRk4"])} = "ode45"
         options.ImproveAfterInitialization (1,1) logical = true
+        options.RequireCollisionThreat (1,1) logical = false
     end
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'controller'),fullfile(root,'config'));
     results=cell(1,numel(options.Scenarios));
     for index=1:numel(options.Scenarios)
         name=options.Scenarios(index);
         [ego,target,road,cfg,initialTarget]=localFixture(name,options.ControllerConfiguration);prior=[];
+        baseline=givenPathCollisionBaseline(road,initialTarget,cfg,options.Frames*cfg.controller.sampleTime);
+        if options.RequireCollisionThreat && (~baseline.collisionDetected || baseline.initialClearanceMeters<=0)
+            error('runNonlinearPredictiveSafetyValidation:notCollisionThreat', ...
+                'Scenario %s must start separated and collide under given-path constant-speed cruise.',name);
+        end
         frames=0;minimumClearance=Inf;minimumRoadMargin=Inf;maximumSeconds=0;failure="";
         firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;warmStartedFrames=0;finalError=[];
         trace=struct([]);failedFrameSeconds=NaN;failureTime=NaN;passedTarget=false;
@@ -96,7 +102,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'firstFrameSeconds',firstSeconds,'subsequentMedianSeconds',medianLater, ...
             'subsequentP95Seconds',p95Later,'deadlineMisses',nnz(seconds>cfg.controller.sampleTime), ...
             'failedFrameSeconds',failedFrameSeconds,'failureTime',failureTime,'passedTarget',passedTarget, ...
-            'totalSolverCalls',solverCalls,'targetInitialState',initialTarget,'configuration',cfg,'trace',trace);
+            'totalSolverCalls',solverCalls,'targetInitialState',initialTarget,'configuration',cfg, ...
+            'baselineCruise',baseline,'trace',trace);
         fprintf('%s: %d/%d frames, max %.3f s, failure %s\n',name,frames,options.Frames,maximumSeconds,failure);
     end
     report=struct('model',"nonlinear combined-slip Fiala; one constant-acceleration/constant-sideslip target", ...
@@ -132,6 +139,8 @@ function [ego,target,road,cfg,q]=localFixture(name,controllerConfiguration)
             q=[24;0;pi;8;1;atan(-.1*lr);lr;2.4;.95;0;0];
         case "brakingTarget"
             q=[24;6;pi;2;-1;0;lr;2.4;.95;0;0];
+        case {"headOn","acceleratingHeadOn","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"}
+            [x,q,road,cfg]=collisionThreatScenario(name,controllerConfiguration);
         otherwise,error('runNonlinearPredictiveSafetyValidation:unknownScenario','Unknown scenario %s.',name);
     end
     if ~isempty(q),target=localTarget(q);end

@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "baselineCollisions": 14,
+  "executedAvoidanceChapters": 4,
+  "counterfactualOnlyChapters": 10,
+  "frameCount": 5252,
+  "durationSeconds": 175.06666666666666,
+  "completeDecodeExitCode": 0,
+  "completeDecodeErrors": "",
+  "videoSha256": "d82aaa57a860cbe6df77dbdccfbfd9fe58a109b13053a88a6d32e637019fad9f",
+  "temporaryVideo": "/tmp/collision-threat-video-20260929/collision-threats.mp4",
+  "permanentMediaAdmission": false
+}
