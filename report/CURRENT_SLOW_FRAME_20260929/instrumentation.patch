@@ -1,0 +1,91 @@
+--- a/controller/solvePredictiveControl.m
++++ b/controller/solvePredictiveControl.m
+@@ -5,0 +6,5 @@
++    global frameTiming;
++    frameTiming=struct('timer',tic,'controllerBeforeSolveSeconds',toc(timer),'iteration',0, ...
++        'events',struct([]),'coneCalls',struct([]),'candidates',struct([]), ...
++        'roadRowsSeconds',0,'collisionRowsSeconds',0,'safetyRowsCalls',0,'polishTrials',0,'polishIterations',0);
++    initialPhase=localPhase("initialEvaluation");
+@@ -51,0 +57,3 @@
++    clear initialPhase;
++    frameTiming.baseline=localCandidateMetrics(baseline,model);
++    frameTiming.terminalRadius=model.terminal.radius;
+@@ -53,0 +62 @@
++        frameTiming.iteration=iteration;
+@@ -72 +81,3 @@
+-            candidate=localNominalEvaluation(inputs,model);
++            candidatePhase=localPhase("candidateEvaluation");
++            candidate=localNominalEvaluation(inputs,model);clear candidatePhase;
++            candidateRecord=struct('iteration',iteration,'before',localCandidateMetrics(candidate,model));
+@@ -73,0 +85,3 @@
++            candidateRecord.after=localCandidateMetrics(candidate,model);
++            if isempty(frameTiming.candidates),frameTiming.candidates=candidateRecord;
++            else,frameTiming.candidates(end+1)=candidateRecord;end
+@@ -96,0 +111 @@
++            clear candidatePhase;
+@@ -106 +121 @@
+-    search.elapsedSeconds=toc(timer);
++    search.elapsedSeconds=toc(timer);frameTiming.returned=localCandidateMetrics(solution,model);
+@@ -121,0 +137,2 @@
++    global frameTiming;
++    polishPhase=localPhase("endpointPolish"); %#ok<NASGU>
+@@ -130,0 +148 @@
++        frameTiming.polishIterations=frameTiming.polishIterations+1;
+@@ -152,0 +171 @@
++                frameTiming.polishTrials=frameTiming.polishTrials+1;
+@@ -196,0 +216 @@
++    assemblyPhase=localPhase("assembly");
+@@ -268,0 +289 @@
++    clear assemblyPhase;
+@@ -279 +300 @@
+-        [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
++        [first,~,flag]=localTimedCone("primary",objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
+@@ -289 +310 @@
+-        [first,~,flag]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
++        [first,~,flag]=localTimedCone("restoration",restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
+@@ -295,0 +317 @@
++    secondarySetupPhase=localPhase("secondarySetup");
+@@ -321 +343,2 @@
+-    [second,~,flag]=coneprog(objective,cones,a,b,equal,rhs,lower,upper,options);
++    clear secondarySetupPhase;
++    [second,~,flag]=localTimedCone("secondary",objective,cones,a,b,equal,rhs,lower,upper,options);
+@@ -333,0 +357,2 @@
++    global frameTiming;rowTimer=tic;
++    frameTiming.safetyRowsCalls=frameTiming.safetyRowsCalls+1;
+@@ -344,0 +370 @@
++    frameTiming.collisionRowsSeconds=frameTiming.collisionRowsSeconds+toc(rowTimer);rowTimer=tic;
+@@ -355,0 +382 @@
++    frameTiming.roadRowsSeconds=frameTiming.roadRowsSeconds+toc(rowTimer);
+@@ -426,0 +454,32 @@
++
++function guard=localPhase(name)
++    global frameTiming;
++    started=tic;absoluteStart=toc(frameTiming.timer);iteration=frameTiming.iteration;
++    guard=onCleanup(@()localRecordPhase(name,started,absoluteStart,iteration));
++end
++function localRecordPhase(name,started,absoluteStart,iteration)
++    global frameTiming;
++    event=struct('phase',name,'seconds',toc(started),'startSeconds',absoluteStart,'iteration',iteration);
++    if isempty(frameTiming.events),frameTiming.events=event;else,frameTiming.events(end+1)=event;end
++end
++function [x,value,flag]=localTimedCone(kind,varargin)
++    global frameTiming;
++    phase=localPhase(kind);started=tic;
++    [x,value,flag,output]=coneprog(varargin{:});
++    entry=struct('kind',kind,'iteration',frameTiming.iteration,'seconds',toc(started), ...
++        'exitFlag',flag,'objective',value,'output',output,'budgetSeconds',varargin{9}.MaxTime, ...
++        'variables',numel(varargin{1}),'cones',numel(varargin{2}), ...
++        'inequalities',size(varargin{3},1),'equalities',size(varargin{5},1));
++    if isempty(frameTiming.coneCalls),frameTiming.coneCalls=entry;else,frameTiming.coneCalls(end+1)=entry;end
++    clear phase;
++end
++function result=localCandidateMetrics(candidate,model)
++    if isempty(candidate),result=struct('available',false);return;end
++    [~,~,deviation]=terminalContinuation.membership([candidate.states(:,end);candidate.inputs(:,end)], ...
++        model.sampleIndex+size(candidate.inputs,2),model.terminal);
++    result=struct('available',true,'cost',candidate.cost,'hard',candidate.hard,'safety',candidate.safety, ...
++        'clfSlack',candidate.clfSlack,'terminalNorm',norm(model.terminal.factor*deviation), ...
++        'terminalExcess',max(0,norm(model.terminal.factor*deviation)-model.terminal.radius), ...
++        'stagePhysicalViolation',max(candidate.stageHard), ...
++        'completionSafetyViolation',max([0,candidate.stageSafety(model.cfg.controller.horizonSteps+1:end)]));
++end

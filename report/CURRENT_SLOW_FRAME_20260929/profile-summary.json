@@ -1,0 +1,734 @@
+{
+  "seconds": 5.244849,
+  "inputError": 0,
+  "search": {
+    "solverCalls": 7,
+    "source": "sequentialConvexification",
+    "terminationReason": "iterationLimit",
+    "sequentialIterations": [
+      {
+        "calls": 1,
+        "safetyOptimum": 0,
+        "secondarySafety": 1.015110826483609e-06,
+        "safetyCap": 1e-06,
+        "clfSlack": 33.13005856791874,
+        "status": "solved",
+        "safetyExitFlag": null,
+        "secondaryExitFlag": -7,
+        "completionRestoration": false,
+        "secondaryReturned": true,
+        "safetyBoundAttained": true,
+        "solverResidual": 8.698884172986254e-07,
+        "iteration": 1,
+        "trustRadius": 0.5,
+        "acceptedIterate": false,
+        "retainedAsWitness": false,
+        "nominalSafetySlack": 0,
+        "nominalHardViolation": 37.86376728747361
+      },
+      {
+        "calls": 1,
+        "safetyOptimum": 0,
+        "secondarySafety": 1.0022816922035897e-06,
+        "safetyCap": 1e-06,
+        "clfSlack": 38.35029457062363,
+        "status": "solved",
+        "safetyExitFlag": null,
+        "secondaryExitFlag": -7,
+        "completionRestoration": false,
+        "secondaryReturned": true,
+        "safetyBoundAttained": true,
+        "solverResidual": 2.0736654704478497e-07,
+        "iteration": 2,
+        "trustRadius": 0.25,
+        "acceptedIterate": false,
+        "retainedAsWitness": false,
+        "nominalSafetySlack": 0,
+        "nominalHardViolation": 10.361069591359906
+      },
+      {
+        "calls": 1,
+        "safetyOptimum": 0,
+        "secondarySafety": 1.002351306169004e-06,
+        "safetyCap": 1e-06,
+        "clfSlack": 40.96040967686099,
+        "status": "solved",
+        "safetyExitFlag": null,
+        "secondaryExitFlag": -7,
+        "completionRestoration": false,
+        "secondaryReturned": true,
+        "safetyBoundAttained": true,
+        "solverResidual": 2.5258012215090275e-07,
+        "iteration": 3,
+        "trustRadius": 0.125,
+        "acceptedIterate": false,
+        "retainedAsWitness": false,
+        "nominalSafetySlack": 0,
+        "nominalHardViolation": 2.654376915730348
+      },
+      {
+        "calls": 1,
+        "safetyOptimum": 0,
+        "secondarySafety": 1.0017385455901976e-06,
+        "safetyCap": 1e-06,
+        "clfSlack": 42.265467673976104,
+        "status": "solved",
+        "safetyExitFlag": null,
+        "secondaryExitFlag": -7,
+        "completionRestoration": false,
+        "secondaryReturned": true,
+        "safetyBoundAttained": true,
+        "solverResidual": 2.0061038696894684e-07,
+        "iteration": 4,
+        "trustRadius": 0.0625,
+        "acceptedIterate": false,
+        "retainedAsWitness": false,
+        "nominalSafetySlack": 0,
+        "nominalHardViolation": 0.5284586526777694
+      },
+      {
+        "calls": 1,
+        "safetyOptimum": 0,
+        "secondarySafety": 1.0138397389541598e-06,
+        "safetyCap": 1e-06,
+        "clfSlack": 42.974781813076675,
+        "status": "solved",
+        "safetyExitFlag": null,
+        "secondaryExitFlag": -7,
+        "completionRestoration": false,
+        "secondaryReturned": true,
+        "safetyBoundAttained": true,
+        "solverResidual": 1.7672998708917476e-06,
+        "iteration": 5,
+        "trustRadius": 0.03125,
+        "acceptedIterate": false,
+        "retainedAsWitness": false,
+        "nominalSafetySlack": 0,
+        "nominalHardViolation": 0.07070141705667794
+      },
+      {
+        "calls": 1,
+        "safetyOptimum": 0,
+        "secondarySafety": 1.039391210581865e-06,
+        "safetyCap": 1e-06,
+        "clfSlack": 43.34140354557063,
+        "status": "solved",
+        "safetyExitFlag": null,
+        "secondaryExitFlag": -7,
+        "completionRestoration": false,
+        "secondaryReturned": true,
+        "safetyBoundAttained": true,
+        "solverResidual": 6.440883822733667e-06,
+        "iteration": 6,
+        "trustRadius": 0.015625,
+        "acceptedIterate": false,
+        "retainedAsWitness": false,
+        "nominalSafetySlack": 0,
+        "nominalHardViolation": 0.017160326140940832
+      },
+      {
+        "calls": 1,
+        "safetyOptimum": 0,
+        "secondarySafety": 1.1618518080027962e-06,
+        "safetyCap": 1e-06,
+        "clfSlack": 43.524712653466494,
+        "status": "solved",
+        "safetyExitFlag": null,
+        "secondaryExitFlag": -7,
+        "completionRestoration": false,
+        "secondaryReturned": true,
+        "safetyBoundAttained": true,
+        "solverResidual": 2.761577228227452e-05,
+        "iteration": 7,
+        "trustRadius": 0.0078125,
+        "acceptedIterate": true,
+        "retainedAsWitness": true,
+        "nominalSafetySlack": 0,
+        "nominalHardViolation": 0
+      }
+    ],
+    "initialization": "restorationFromChangedEgoState",
+    "safetySlack": 0,
+    "shiftAvailable": false,
+    "slackCap": null,
+    "converged": false,
+    "failures": [],
+    "elapsedSeconds": 5.235961
+  },
+  "timing": {
+    "controllerBeforeSolveSeconds": 0.023768,
+    "iteration": 7,
+    "events": [
+      {
+        "phase": "initialEvaluation",
+        "seconds": 0.082305,
+        "startSeconds": 0.000277,
+        "iteration": 0
+      },
+      {
+        "phase": "assembly",
+        "seconds": 0.146814,
+        "startSeconds": 0.08606,
+        "iteration": 1
+      },
+      {
+        "phase": "secondarySetup",
+        "seconds": 0.009622,
+        "startSeconds": 0.245676,
+        "iteration": 1
+      },
+      {
+        "phase": "secondary",
+        "seconds": 0.571073,
+        "startSeconds": 0.255857,
+        "iteration": 1
+      },
+      {
+        "phase": "candidateEvaluation",
+        "seconds": 0.044501,
+        "startSeconds": 0.829293,
+        "iteration": 1
+      },
+      {
+        "phase": "endpointPolish",
+        "seconds": 0.038693,
+        "startSeconds": 0.874415,
+        "iteration": 1
+      },
+      {
+        "phase": "assembly",
+        "seconds": 0.108134,
+        "startSeconds": 0.914676,
+        "iteration": 2
+      },
+      {
+        "phase": "secondarySetup",
+        "seconds": 0.002596,
+        "startSeconds": 1.025702,
+        "iteration": 2
+      },
+      {
+        "phase": "secondary",
+        "seconds": 0.553854,
+        "startSeconds": 1.028499,
+        "iteration": 2
+      },
+      {
+        "phase": "candidateEvaluation",
+        "seconds": 0.040903,
+        "startSeconds": 1.582979,
+        "iteration": 2
+      },
+      {
+        "phase": "endpointPolish",
+        "seconds": 0.02869,
+        "startSeconds": 1.624154,
+        "iteration": 2
+      },
+      {
+        "phase": "assembly",
+        "seconds": 0.112227,
+        "startSeconds": 1.653932,
+        "iteration": 3
+      },
+      {
+        "phase": "secondarySetup",
+        "seconds": 0.00207,
+        "startSeconds": 1.766694,
+        "iteration": 3
+      },
+      {
+        "phase": "secondary",
+        "seconds": 0.757512,
+        "startSeconds": 1.76882,
+        "iteration": 3
+      },
+      {
+        "phase": "candidateEvaluation",
+        "seconds": 0.041017,
+        "startSeconds": 2.526693,
+        "iteration": 3
+      },
+      {
+        "phase": "endpointPolish",
+        "seconds": 0.033876,
+        "startSeconds": 2.567834,
+        "iteration": 3
+      },
+      {
+        "phase": "assembly",
+        "seconds": 0.110289,
+        "startSeconds": 2.602559,
+        "iteration": 4
+      },
+      {
+        "phase": "secondarySetup",
+        "seconds": 0.002026,
+        "startSeconds": 2.713368,
+        "iteration": 4
+      },
+      {
+        "phase": "secondary",
+        "seconds": 0.5325,
+        "startSeconds": 2.715438,
+        "iteration": 4
+      },
+      {
+        "phase": "candidateEvaluation",
+        "seconds": 0.042022,
+        "startSeconds": 3.248322,
+        "iteration": 4
+      },
+      {
+        "phase": "endpointPolish",
+        "seconds": 0.028874,
+        "startSeconds": 3.290467,
+        "iteration": 4
+      },
+      {
+        "phase": "assembly",
+        "seconds": 0.104609,
+        "startSeconds": 3.319487,
+        "iteration": 5
+      },
+      {
+        "phase": "secondarySetup",
+        "seconds": 0.001939,
+        "startSeconds": 3.424605,
+        "iteration": 5
+      },
+      {
+        "phase": "secondary",
+        "seconds": 0.397463,
+        "startSeconds": 3.426586,
+        "iteration": 5
+      },
+      {
+        "phase": "candidateEvaluation",
+        "seconds": 0.041083,
+        "startSeconds": 3.824401,
+        "iteration": 5
+      },
+      {
+        "phase": "endpointPolish",
+        "seconds": 0.033885,
+        "startSeconds": 3.865613,
+        "iteration": 5
+      },
+      {
+        "phase": "assembly",
+        "seconds": 0.108021,
+        "startSeconds": 3.899662,
+        "iteration": 6
+      },
+      {
+        "phase": "secondarySetup",
+        "seconds": 0.002079,
+        "startSeconds": 4.008219,
+        "iteration": 6
+      },
+      {
+        "phase": "secondary",
+        "seconds": 0.412678,
+        "startSeconds": 4.010341,
+        "iteration": 6
+      },
+      {
+        "phase": "candidateEvaluation",
+        "seconds": 0.041191,
+        "startSeconds": 4.423302,
+        "iteration": 6
+      },
+      {
+        "phase": "endpointPolish",
+        "seconds": 0.11828,
+        "startSeconds": 4.464613,
+        "iteration": 6
+      },
+      {
+        "phase": "assembly",
+        "seconds": 0.107446,
+        "startSeconds": 4.583051,
+        "iteration": 7
+      },
+      {
+        "phase": "secondarySetup",
+        "seconds": 0.002095,
+        "startSeconds": 4.691124,
+        "iteration": 7
+      },
+      {
+        "phase": "secondary",
+        "seconds": 0.347887,
+        "startSeconds": 4.693262,
+        "iteration": 7
+      },
+      {
+        "phase": "candidateEvaluation",
+        "seconds": 0.042269,
+        "startSeconds": 5.041462,
+        "iteration": 7
+      },
+      {
+        "phase": "endpointPolish",
+        "seconds": 0.127046,
+        "startSeconds": 5.083843,
+        "iteration": 7
+      }
+    ],
+    "coneCalls": [
+      {
+        "kind": "secondary",
+        "iteration": 1,
+        "seconds": 0.569771,
+        "exitFlag": -7,
+        "objective": 109881.85318880859,
+        "output": {
+          "iterations": 55,
+          "primalfeasibility": 4.574570126615619e-13,
+          "dualfeasibility": 0.0031510639384689505,
+          "dualitygap": 1.503382262815562e-15,
+          "algorithm": "interior-point",
+          "linearsolver": "augmented",
+          "message": "Search direction is small and current iterate is not within the specified constraint and/or optimality tolerance."
+        },
+        "budgetSeconds": 59.721396,
+        "variables": 629,
+        "cones": 64,
+        "inequalities": 1875,
+        "equalities": 378
+      },
+      {
+        "kind": "secondary",
+        "iteration": 2,
+        "seconds": 0.553091,
+        "exitFlag": -7,
+        "objective": 147199.0509309753,
+        "output": {
+          "iterations": 57,
+          "primalfeasibility": 2.2986164600373943e-14,
+          "dualfeasibility": 0.03582152191836649,
+          "dualitygap": 4.717218131996697e-16,
+          "algorithm": "interior-point",
+          "linearsolver": "augmented",
+          "message": "Search direction is small and current iterate is not within the specified constraint and/or optimality tolerance."
+        },
+        "budgetSeconds": 58.948008,
+        "variables": 629,
+        "cones": 64,
+        "inequalities": 1875,
+        "equalities": 378
+      },
+      {
+        "kind": "secondary",
+        "iteration": 3,
+        "seconds": 0.756906,
+        "exitFlag": -7,
+        "objective": 167902.07780483962,
+        "output": {
+          "iterations": 77,
+          "primalfeasibility": 3.268487318668666e-13,
+          "dualfeasibility": 0.2618063177278906,
+          "dualitygap": 1.941020336571096e-15,
+          "algorithm": "interior-point",
+          "linearsolver": "augmented",
+          "message": "Search direction is small and current iterate is not within the specified constraint and/or optimality tolerance."
+        },
+        "budgetSeconds": 58.207547,
+        "variables": 629,
+        "cones": 64,
+        "inequalities": 1875,
+        "equalities": 378
+      },
+      {
+        "kind": "secondary",
+        "iteration": 4,
+        "seconds": 0.532296,
+        "exitFlag": -7,
+        "objective": 178764.8537969461,
+        "output": {
+          "iterations": 57,
+          "primalfeasibility": 1.4799198898589246e-13,
+          "dualfeasibility": 0.425089267639922,
+          "dualitygap": 1.5120067027282976e-15,
+          "algorithm": "interior-point",
+          "linearsolver": "augmented",
+          "message": "Search direction is small and current iterate is not within the specified constraint and/or optimality tolerance."
+        },
+        "budgetSeconds": 57.26091,
+        "variables": 629,
+        "cones": 64,
+        "inequalities": 1875,
+        "equalities": 378
+      },
+      {
+        "kind": "secondary",
+        "iteration": 5,
+        "seconds": 0.397256,
+        "exitFlag": -7,
+        "objective": 184811.7450305929,
+        "output": {
+          "iterations": 43,
+          "primalfeasibility": 1.2726046192380886e-12,
+          "dualfeasibility": 0.4449621177868394,
+          "dualitygap": 8.439991135590986e-16,
+          "algorithm": "interior-point",
+          "linearsolver": "augmented",
+          "message": "Search direction is small and current iterate is not within the specified constraint and/or optimality tolerance."
+        },
+        "budgetSeconds": 56.549751,
+        "variables": 629,
+        "cones": 64,
+        "inequalities": 1875,
+        "equalities": 378
+      },
+      {
+        "kind": "secondary",
+        "iteration": 6,
+        "seconds": 0.412525,
+        "exitFlag": -7,
+        "objective": 187976.70539360365,
+        "output": {
+          "iterations": 45,
+          "primalfeasibility": 4.3100842421013535e-12,
+          "dualfeasibility": 4.572212370190387,
+          "dualitygap": 4.588405703066823e-15,
+          "algorithm": "interior-point",
+          "linearsolver": "augmented",
+          "message": "Search direction is small and current iterate is not within the specified constraint and/or optimality tolerance."
+        },
+        "budgetSeconds": 55.965997,
+        "variables": 629,
+        "cones": 64,
+        "inequalities": 1875,
+        "equalities": 378
+      },
+      {
+        "kind": "secondary",
+        "iteration": 7,
+        "seconds": 0.347737,
+        "exitFlag": -7,
+        "objective": 189569.30915286954,
+        "output": {
+          "iterations": 38,
+          "primalfeasibility": 1.8616242843382607e-11,
+          "dualfeasibility": 0.5002527896355566,
+          "dualitygap": 1.9364087431510198e-14,
+          "algorithm": "interior-point",
+          "linearsolver": "augmented",
+          "message": "Search direction is small and current iterate is not within the specified constraint and/or optimality tolerance."
+        },
+        "budgetSeconds": 55.283075,
+        "variables": 629,
+        "cones": 64,
+        "inequalities": 1875,
+        "equalities": 378
+      }
+    ],
+    "candidates": [
+      {
+        "iteration": 1,
+        "before": {
+          "available": true,
+          "cost": 132559.1750809503,
+          "hard": 37.86376728747361,
+          "safety": 0,
+          "clfSlack": 36.33349964713136,
+          "terminalNorm": 37.86474384997361,
+          "terminalExcess": 37.86376728747361,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 1.6360550575352208
+        },
+        "after": {
+          "available": true,
+          "cost": 132559.1750809503,
+          "hard": 37.86376728747361,
+          "safety": 0,
+          "clfSlack": 36.33349964713136,
+          "terminalNorm": 37.86474384997361,
+          "terminalExcess": 37.86376728747361,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 1.6360550575352208
+        }
+      },
+      {
+        "iteration": 2,
+        "before": {
+          "available": true,
+          "cost": 153910.687654587,
+          "hard": 10.361069591359906,
+          "safety": 0,
+          "clfSlack": 39.211335337345645,
+          "terminalNorm": 10.362046153859906,
+          "terminalExcess": 10.361069591359906,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        },
+        "after": {
+          "available": true,
+          "cost": 153910.687654587,
+          "hard": 10.361069591359906,
+          "safety": 0,
+          "clfSlack": 39.211335337345645,
+          "terminalNorm": 10.362046153859906,
+          "terminalExcess": 10.361069591359906,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        }
+      },
+      {
+        "iteration": 3,
+        "before": {
+          "available": true,
+          "cost": 169811.5123862387,
+          "hard": 2.654376915730348,
+          "safety": 0,
+          "clfSlack": 41.19251948917082,
+          "terminalNorm": 2.655353478230348,
+          "terminalExcess": 2.654376915730348,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        },
+        "after": {
+          "available": true,
+          "cost": 169811.5123862387,
+          "hard": 2.654376915730348,
+          "safety": 0,
+          "clfSlack": 41.19251948917082,
+          "terminalNorm": 2.655353478230348,
+          "terminalExcess": 2.654376915730348,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        }
+      },
+      {
+        "iteration": 4,
+        "before": {
+          "available": true,
+          "cost": 179315.00170981363,
+          "hard": 0.5284586526777694,
+          "safety": 0,
+          "clfSlack": 42.33047622679277,
+          "terminalNorm": 0.5294352151777694,
+          "terminalExcess": 0.5284586526777694,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        },
+        "after": {
+          "available": true,
+          "cost": 179315.00170981363,
+          "hard": 0.5284586526777694,
+          "safety": 0,
+          "clfSlack": 42.33047622679277,
+          "terminalNorm": 0.5294352151777694,
+          "terminalExcess": 0.5284586526777694,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        }
+      },
+      {
+        "iteration": 5,
+        "before": {
+          "available": true,
+          "cost": 184957.2943538245,
+          "hard": 0.07070141705667794,
+          "safety": 0,
+          "clfSlack": 42.99170945176013,
+          "terminalNorm": 0.07167797955667794,
+          "terminalExcess": 0.07070141705667794,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        },
+        "after": {
+          "available": true,
+          "cost": 184957.2943538245,
+          "hard": 0.07070141705667794,
+          "safety": 0,
+          "clfSlack": 42.99170945176013,
+          "terminalNorm": 0.07167797955667794,
+          "terminalExcess": 0.07070141705667794,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        }
+      },
+      {
+        "iteration": 6,
+        "before": {
+          "available": true,
+          "cost": 188013.51840505426,
+          "hard": 0.017980376000970646,
+          "safety": 0,
+          "clfSlack": 43.345649651127474,
+          "terminalNorm": 0.018956938500970646,
+          "terminalExcess": 0.017980376000970646,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        },
+        "after": {
+          "available": true,
+          "cost": 188013.51846451216,
+          "hard": 0.017160326140940832,
+          "safety": 0,
+          "clfSlack": 43.345649651127474,
+          "terminalNorm": 0.018136888640940832,
+          "terminalExcess": 0.017160326140940832,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        }
+      },
+      {
+        "iteration": 7,
+        "before": {
+          "available": true,
+          "cost": 189578.58404925678,
+          "hard": 0.0361284529650935,
+          "safety": 0,
+          "clfSlack": 43.525778207164365,
+          "terminalNorm": 0.0371050154650935,
+          "terminalExcess": 0.0361284529650935,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        },
+        "after": {
+          "available": true,
+          "cost": 189578.5873709961,
+          "hard": 0,
+          "safety": 0,
+          "clfSlack": 43.525778207164365,
+          "terminalNorm": 6.238667276246242e-05,
+          "terminalExcess": 0,
+          "stagePhysicalViolation": 0,
+          "completionSafetyViolation": 0
+        }
+      }
+    ],
+    "roadRowsSeconds": 0.03293400000000041,
+    "collisionRowsSeconds": 0.19645199999999766,
+    "safetyRowsCalls": 2080,
+    "polishTrials": 5,
+    "polishIterations": 12,
+    "baseline": {
+      "available": true,
+      "cost": 191168.73622489185,
+      "hard": 0,
+      "safety": 0,
+      "clfSlack": 43.708026325353785,
+      "terminalNorm": 2.0297668903115656e-05,
+      "terminalExcess": 0,
+      "stagePhysicalViolation": 0,
+      "completionSafetyViolation": 0
+    },
+    "terminalRadius": 0.0009765625,
+    "returned": {
+      "available": true,
+      "cost": 189578.5873709961,
+      "hard": 0,
+      "safety": 0,
+      "clfSlack": 43.525778207164365,
+      "terminalNorm": 6.238667276246242e-05,
+      "terminalExcess": 0,
+      "stagePhysicalViolation": 0,
+      "completionSafetyViolation": 0
+    }
+  }
+}

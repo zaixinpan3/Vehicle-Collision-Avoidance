@@ -1,0 +1,37 @@
+out=fileparts(mfilename('fullpath'));cd(fullfile(out,'source'));addpath('controller','config');
+original=jsondecode(fileread('/home/zai/.cache/collisionAvoidance/controller-efficiency-20260929-050658/speed15/acceleratingTarget.json'));
+r=original.results;cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',15,'controller',struct('horizonSteps',16)));
+road=struct('centerline',[-100,0;1000,0],'lateralClearance',[4;4]);target=localTarget(r.targetInitialState);
+previousState=[];reconstruction=struct([]);
+for index=1:14
+    saved=r.trace(index);previousInput=[0;0];if index>1,previousInput=r.trace(index-1).input;end
+    ego=localEgo(saved.state,saved.time,previousInput);captureCfg=cfg;
+    if string(saved.source)=="feasibleInitialization",captureCfg.solver.timeLimitSeconds=1e-12;
+    else,captureCfg.solver.timeLimitSeconds=60;
+    end
+    wall=tic;[command,~,problem,previousState]=collisionAvoidanceController(ego,target,road,captureCfg,previousState);
+    difference=max(abs(command.actuatorInput-saved.input));
+    entry=struct('frame',index,'seconds',toc(wall),'inputMaxError',difference, ...
+        'horizonSteps',problem.metadata.horizonSteps,'hardResidual',problem.solution.hard, ...
+        'safetySlack',problem.solution.safety,'clfSlackError',abs(problem.solution.clfSlack-saved.clfSlack), ...
+        'source',problem.metadata.search.source,'originalSource',saved.source, ...
+        'search',problem.metadata.search);
+    if isempty(reconstruction),reconstruction=entry;else,reconstruction(index)=entry;end
+    f=fopen(fullfile(out,'reconstruction.json'),'w');fprintf(f,'%s\n',jsonencode(reconstruction));fclose(f);
+    fprintf('Frame %d: input error %.3g, CLF error %.3g, horizon %d, %.3f seconds\n',index,difference,entry.clfSlackError,entry.horizonSteps,entry.seconds);
+    assert(difference==0 && entry.clfSlackError==0,'Reconstruction changed the recorded control or CLF outcome.');
+    assert(size(previousState.inputTrajectory,2)==saved.horizonSteps && problem.model.sampleIndex==saved.absoluteSampleIndex && problem.model.terminal.epochIndex==saved.endpointIndex);
+    q=predictiveSafetyGeometry.targetFlow(problem.model.targetEpoch,(problem.model.sampleIndex+1)*cfg.controller.sampleTime);target=localTarget(q);
+end
+saved=r.trace(15);ego=localEgo(saved.state,saved.time,r.trace(14).input);
+save(fullfile(out,'captured-frame.mat'),'ego','target','road','cfg','previousState','reconstruction','saved');
+fprintf('CAPTURE COMPLETE\n');
+function ego=localEgo(x,time,input)
+    ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6),'stateTime',time,'heldActuatorInput',input);
+end
+function target=localTarget(q)
+    direction=[cos(q(3)+q(6));sin(q(3)+q(6))];velocity=q(4)*direction;yawRate=q(4)*sin(q(6))/q(7);
+    target=struct('targetPositionInertial',q(1:2),'targetVelocityInertial',velocity,'targetYawInertial',q(3),'targetYawRate',yawRate,'targetSideslip',q(6), ...
+        'targetTangentialAcceleration',q(5),'targetRearAxleDistance',q(7),'targetAccelerationInertial',q(5)*direction+yawRate*[-velocity(2);velocity(1)], ...
+        'targetLength',2*q(8),'targetWidth',2*q(9),'targetRectangleOffset',q(10:11));
+end

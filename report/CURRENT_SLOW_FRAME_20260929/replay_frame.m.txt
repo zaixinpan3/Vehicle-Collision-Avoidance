@@ -1,0 +1,41 @@
+out=fileparts(mfilename('fullpath'));load(fullfile(out,'captured-frame.mat'));
+for kind=["source","profile-source"]
+    restoredefaultpath;cd(fullfile(out,kind));addpath('controller','config');clear functions;
+    assert(strcmp(which('solvePredictiveControl'),fullfile(out,kind,'controller','solvePredictiveControl.m')));
+    global frameTiming;entries=struct([]);
+    for index=1:4
+        wall=tic;[command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,previousState);seconds=toc(wall);
+        entry=struct('index',index,'warmup',index==1,'seconds',seconds,'input',command.actuatorInput, ...
+            'inputError',max(abs(command.actuatorInput-saved.input)),'hard',problem.solution.hard,'safety',problem.solution.safety, ...
+            'cost',problem.solution.cost,'clfSlack',problem.solution.clfSlack,'horizon',problem.metadata.horizonSteps,'search',problem.metadata.search);
+        if kind=="profile-source",entry.timing=rmfield(frameTiming,'timer');end
+        if isempty(entries),entries=entry;else,entries(index)=entry;end
+        fprintf('%s replay %d: %.6f s, %d calls, input error %.3g, %s\n',kind,index,seconds,problem.metadata.solverCallCount,entry.inputError,problem.metadata.search.terminationReason);
+        assert(problem.solution.hard==0 && problem.solution.safety==0);
+        localSave(fullfile(out,kind+"-replays.json"),entries);
+    end
+end
+fixedCfg=cfg;fixedCfg.solver.timeLimitSeconds=60;fixedCfg.nonlinear.maximumIterations=7;
+wall=tic;[command,~,problem]=collisionAvoidanceController(ego,target,road,fixedCfg,previousState);seconds=toc(wall);
+entry=struct('seconds',seconds,'inputError',max(abs(command.actuatorInput-saved.input)),'timing',rmfield(frameTiming,'timer'), ...
+    'search',problem.metadata.search,'hard',problem.solution.hard,'safety',problem.solution.safety,'cost',problem.solution.cost,'clfSlack',problem.solution.clfSlack);
+localSave(fullfile(out,'fixed-seven-iterations.json'),entry);
+assert(entry.inputError==0 && entry.hard==0 && entry.safety==0 && problem.metadata.solverCallCount==7);
+fprintf('Fixed seven iterations: %.6f seconds; exact original applied input.\n',seconds);
+profile clear;profile on;
+wall=tic;[command,~,problem]=collisionAvoidanceController(ego,target,road,fixedCfg,previousState);profileSeconds=toc(wall);
+profile off;data=profile('info');timing=rmfield(frameTiming,'timer');save(fullfile(out,'profile.mat'),'data','problem','timing','profileSeconds');
+hot=struct([]);
+for index=1:numel(data.FunctionTable)
+    f=data.FunctionTable(index);childTime=0;if ~isempty(f.Children),childTime=sum([f.Children.TotalTime]);end
+    entry=struct('name',f.FunctionName,'file',f.FileName,'calls',f.NumCalls,'inclusiveSeconds',f.TotalTime, ...
+        'selfSeconds',max(0,f.TotalTime-childTime),'executedLines',f.ExecutedLines);
+    if isempty(hot),hot=entry;else,hot(index)=entry;end
+end
+entry=struct('seconds',profileSeconds,'inputError',max(abs(command.actuatorInput-saved.input)),'timing',timing,'search',problem.metadata.search,'functions',hot);
+localSave(fullfile(out,'profile.json'),entry);
+assert(entry.inputError==0 && problem.solution.hard==0 && problem.solution.safety==0 && problem.metadata.solverCallCount==7);
+fprintf('PROFILE COMPLETE: %.6f seconds, exact original applied input.\n',profileSeconds);
+function localSave(path,value)
+    f=fopen(path,'w');assert(f>=0);fprintf(f,'%s\n',jsonencode(value));fclose(f);
+end
