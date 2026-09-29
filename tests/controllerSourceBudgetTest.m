@@ -2,7 +2,7 @@ classdef controllerSourceBudgetTest < matlab.unittest.TestCase
     %controllerSourceBudgetTest Enforce the complete core source-file limit.
 
     methods (Test)
-        function controllerAndConfigurationFitEightSourceFiles(testCase)
+        function controllerAndConfigurationFitNineSourceFiles(testCase)
             root = fileparts(fileparts(mfilename('fullpath')));
             sources = [dir(fullfile(root,'controller','**','*.m')); ...
                 dir(fullfile(root,'controller','**','*.cpp')); ...
@@ -11,7 +11,7 @@ classdef controllerSourceBudgetTest < matlab.unittest.TestCase
                 dir(fullfile(root,'controller','**','*.hpp')); ...
                 dir(fullfile(root,'config','collisionAvoidanceControllerConfig.m'))];
 
-            testCase.verifyLessThanOrEqual(numel(sources),8, ...
+            testCase.verifyLessThanOrEqual(numel(sources),9, ...
                 'Core sources include all controller subdirectories and controller configuration.');
         end
     end

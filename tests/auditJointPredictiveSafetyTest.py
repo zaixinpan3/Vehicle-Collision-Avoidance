@@ -6,10 +6,16 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state
+from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state, feasible_hold
 
 
 class CollisionAuditTest(unittest.TestCase):
+    def test_retained_witness_does_not_require_a_new_solve(self):
+        self.assertTrue(feasible_hold(dict(hardResidual=0, source='retainedContinuation', solverCalls=0)))
+
+    def test_small_positive_hard_residual_is_not_feasible(self):
+        self.assertFalse(feasible_hold(dict(hardResidual=1e-12, source='sequentialConvexification', solverCalls=2)))
+
     def test_constant_acceleration_changes_velocity_and_heading_rate(self):
         initial = [0, 0, .2, 6, 1.5, .1, 1.6, 2.4, .95, 0, 0]
         future = target_state(initial, 2)

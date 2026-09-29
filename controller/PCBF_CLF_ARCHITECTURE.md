@@ -1,308 +1,266 @@
-# Joint-state PCBF, lane CLF and sequential convexification
+# PCBF, lane CLF and time-indexed terminal continuation
 
-## Implemented design
+## Scope
 
-The controller has one receding-horizon optimization:
+The controller uses one nonlinear ego bicycle model and one known target
+trajectory. A Huang-style primary objective minimizes the sum of safety
+slacks over a fixed MPC prefix. A soft lane CLF supplies the secondary
+objective. Li-style polygon support duals and sequential convexification
+supply numerical search directions. Both zero-slack and positive-slack
+**feasible** prefixes can be executed. Positive slack describes recovery;
+it does not imply collision-free motion.
 
-\[
-\boxed{\text{PCBF safety priority} + \text{lane-following CLF}
-       + \text{SCvx with polygon distance duals}.}
-\]
+The terminal condition is an implicit backward-reachable tube, represented
+by a hard completion trajectory and an indefinitely admissible endpoint
+family. Its construction and numerical scope are described below. The
+controller retains the feasible continuation, including its slack budget,
+so an unsuccessful improvement solve does not discard an available control.
 
-`collisionAvoidanceController` parses the current joint state,
-`solvePredictiveControl` solves the nominal MPC problem, and the first
-input of its solution is applied. `predictiveSafetyGeometry` supplies the
-constant-parameter target flow, polygon duals and terminal geometry.
-`nonlinearBicycleModel` supplies the nominal dynamics, analytic tangents and
-lane LQR ingredients. There is no interval integration, MPFR library,
-nonlinear certificate, immutable target epoch, or exact-successor admission
-contract in this execution path.
+## Model, clock and input memory
 
-The public four-output call remains:
+The ego state is `x = [X; Y; psi; vx; vy; r]`, with input
+`u = [frontWheelSteeringAngle; brakingRatio]`. Combined-slip modified Fiala
+forces, aerodynamic drag and rolling resistance enter the nonlinear bicycle
+model. The positive longitudinal-speed model domain is hard.
 
-```matlab
-[command, inputs, problem, state] = ...
-    collisionAvoidanceController(ego, target, road, cfg, previousState);
-```
-
-Use `state` as the next call's `previousState`. The optional persistent state
-can still be reset with `collisionAvoidanceController("resetNominalTrajectory")`.
-`problem.solution` contains nominal states, inputs, stage slacks, CLF values
-and optimization residuals. State format 51 stores `inputTrajectory` and
-`stateTrajectory` solely for the next numerical warm start. An older state
-starts a fresh solve. Each call runs the optimizer and directly applies its
-first returned control, for both zero and positive safety slack. If no
-optimizer result exists, the call raises `optimizationFailed`.
-
-Use `metadata.optimizationReturned`, `zeroSlack`, `predictiveBarrierValue`,
-`hardConstraintResidual`, `scvxConverged`, `controlSource` and `search` for
-diagnostics. `zeroSlack` means within `solver.feasibilityTolerance`; it does
-not mean an exact real-arithmetic zero. Neither the slack sign nor the reported nonlinear residual
-selects an execution mode. The first input always matches `inputs(:,1)`.
-
-## Joint prediction model
-
-There is at most one target. The ego state and input are
+The nominal transition `f_h` is the global-coordinate held-input RK4 map in
+`nonlinearBicycleModel.sample`. One even mesh is used for a full hold and its
+two half holds. This is a discrete numerical prediction model, not an exact
+continuous-time plant flow. The augmented state and transition are
 
 \[
-x_e=(X_e,Y_e,\psi_e,v_{x,e},v_{y,e},r_e),\qquad
-u=(\delta_f,\beta).
+y_j=(x_j,w_j),\quad w_j=u_{j-1},\qquad F(y_j,u_j)=(f_h(x_j,u_j),u_j).
 \]
 
-The ego uses the nonlinear combined-slip Fiala bicycle equations and RK4
-prediction under a held input. Its analytic force and kinematic derivatives
-are integrated with the RK4 variational equations. This tire model requires
-longitudinal velocity above `model.scheduleSpeedFloor` (1 m/s by default).
+Terminal membership therefore has eight coordinates. It retains position
+and previous input. Magnitude and slew restrictions are imposed in the
+optimization and in nonlinear evaluation. The terminal policy is never
+clipped after selection.
 
-The target has constant tangential acceleration \(A_C\) and constant
-sideslip \(\beta_C\). Its rear-axle distance \(l_{r,C}>0\) is fixed. The
-single-track kinematics agree with the existing NRMM target model on its
-positive-speed domain:
+The target is stored once as
+`q = [X; Y; psi; V; A; beta; lr; halfLength; halfWidth; offsetX; offsetY]`.
+Its tangential acceleration `A` and sideslip `beta` are constant:
 
 \[
-\dot p_C=V_C[\cos(\psi_C+\beta_C),\sin(\psi_C+\beta_C)]^T,\qquad
-\dot V_C=A_C,\qquad \dot\psi_C=\kappa_C V_C,
-\]
-\[
-\kappa_C=\frac{\sin\beta_C}{l_{r,C}},\qquad
-\dot A_C=\dot\beta_C=0.
+\dot V=A,\quad \dot\psi=V\sin\beta/l_r,\quad
+\dot p=V[\cos(\psi+\beta),\sin(\psi+\beta)]^T.
 \]
 
-Thus curvature is constant and heading rate changes with speed. With signed
-arc length \(s(h)=V_C h+A_C h^2/2\), the exact flow is
+`targetFlow` integrates this model analytically using traveled signed arc
+length `V*t + A*t^2/2`. A braking target continues through zero signed speed
+and retraces its path. No stopping rule or constant independent yaw rate is
+introduced. Eliminating the autonomous target trajectory from the numerical
+variables preserves the joint ego/target model.
 
-\[
-p_C^+=p_C+s(h)\operatorname{sinc}(\kappa_C s(h)/2)
- \begin{bmatrix}\cos(\psi_C+\beta_C+\kappa_C s(h)/2)\\
- \sin(\psi_C+\beta_C+\kappa_C s(h)/2)\end{bmatrix},
-\]
-\[
-\psi_C^+=\psi_C+\kappa_C s(h),\qquad V_C^+=V_C+A_C h,
-\]
+Every target prediction uses the original epoch and an **absolute integer
+half-sample index**. This preserves retained node and midpoint evaluations
+under a shift. Later observations cannot reinitialize the forecast. A changed
+target trajectory, road, physical constraint set or prediction model requires
+an explicit new problem (`previousState=[]`). A timestamp gap is rejected.
+A changed measured ego state or input memory invokes fresh feasibility
+restoration and disables the shifted slack guarantee for that transition.
 
-where \(\operatorname{sinc}(a)=\sin(a)/a\), including its limit at zero.
-The joint state is \(z=(x_e,p_C,\psi_C,V_C)\in\mathbb R^{10}\). The target's autonomous
-coordinates are eliminated analytically from the optimization; they remain
-in `model.jointState` and `predictedJointState`. With finite slew limits, the
-previous applied input is an additional memory coordinate for MPC reasoning.
+## The nonlinear MPC problem
 
-`model.target` stores `[X; Y; psi; V; A; beta; lr; halfLength; halfWidth;
-offsetX; offsetY]`. Its last seven entries are `model.targetParameters`.
-The target block of the exact joint-state Jacobian includes
-\(\partial p_C^+/\partial V_C=h[\cos(\psi_C^++\beta_C),
-\sin(\psi_C^++\beta_C)]^T\) and
-\(\partial\psi_C^+/\partial V_C=h\kappa_C\).
+Let `N = controller.horizonSteps`, let `k` be the absolute sample index and
+let `M` be the fixed endpoint selected during initialization. Define
+`H_k = max(N,M-k)`. The first `N` stages form the PCBF prefix. Stages
+`N,...,H_k-1` are the completion tail.
 
-The input accepts `targetTangentialAcceleration` or the NRMM field
-`targetScalarAcceleration`. If neither is supplied, acceleration is the
-projection of `targetAccelerationInertial` (or its framed equivalent) along
-\([\cos(\psi_C+\beta_C),\sin(\psi_C+\beta_C)]^T\); missing acceleration defaults
-to zero. `targetSideslip` may be supplied, or is inferred from velocity and
-explicit body heading on the branch \(|\beta_C|<\pi/2\). At zero velocity it
-defaults to zero unless supplied. A supplied `targetRearAxleDistance` overrides
-`cfg.target.rearAxleDistance` (1.6 m by default). The NRMM estimate publishes its
-own rear-axle distance. `targetYawRate` is no longer a prediction parameter;
-heading rate is always calculated from \(V_C\sin\beta_C/l_{r,C}\).
+At each stage, collision and road constraints are evaluated at its start
+and midpoint. The prefix uses one shared nonnegative slack for these samples.
+The completion tail uses **zero slack**. Input limits, slew limits and
+velocity bounds at nodes and midpoints remain hard everywhere. The endpoint
+also has hard sampled safety constraints. Internal RK4 stages must remain
+in the tire/model domain.
 
-The prediction retains constant acceleration through zero using **signed
-tangential velocity**. A braking target can stop instantaneously and then
-reverse along the same path; no stop-and-hold clamp changes \(A_C\). In reverse,
-\(\beta_C\) defines the body's forward tangent and the velocity course differs
-by \(\pi\). The NRMM observer's positive-speed operating domain is unchanged.
-This continuation is a mathematical modeling assumption, not a prediction
-that a physical braking driver must reverse.
+The signed collision predicate uses nonnegative support dual variables for
+both oriented rectangles and a unit separating normal. During overlap, a
+signed support gap supplies a restoration direction. An unsigned rectangle
+distance of zero is never used as evidence of separation. The configured
+additional physical collision buffer remains zero by default.
 
-Each new target observation initializes the target part of the current state.
-During a missing observation, the previous target is propagated by this flow;
-a timestamp supplies elapsed time when available, otherwise one sample is used.
-The controller is nominal: uncertainty fields are not propagated into tubes.
-Changing measurements can require renewed feasibility restoration.
-
-## Huang-style primary problem
-
-Let \(c(z_i,u_i)\le0\) collect polygon clearance and road containment at the
-stage start and its predicted midpoint. A scalar slack covers both samples of
-each hold. The primary problem is
+With the endpoint family `B_j` defined below, the terminal tube is represented
+implicitly by
 
 \[
-V_N(z)=\min_{\mathbf u,\mathbf z,\boldsymbol\xi}
-                  \sum_{i=0}^{N-1}\xi_i
+K_j=\operatorname{Pre}_j(K_{j+1}),\quad K_M=B_M,\qquad
+K_j=B_j\quad(j\ge M).
 \]
 
-subject to
+Here `Pre` uses the nonlinear RK4 transition, hard physical constraints and
+zero-slack stage safety. The optimized continuation from `y_(N|k)` to
+`B_(k+H_k)` is a membership witness for `K_(k+N)`. Its first input is the
+terminal selector. The final input is part of endpoint membership; there is
+no separate conservative input-radius band.
+
+## Indefinite endpoint construction
+
+`terminalContinuation` constructs an eight-dimensional local continuation
+family once per model configuration and curvature. The existing five-state
+lane LQR remains a CLF/preference ingredient. It is not an invariance proof.
+
+The endpoint construction instead linearizes the **actual global RK4 map**
+at the cruise state, includes input memory, transforms the successor into a
+moving reference frame, and designs a discrete augmented feedback gain `K`.
+Let `R` be its nonsingular norm factor. The endpoint family is
 
 \[
-z_0=z,\quad z_{i+1}=F_h(z_i,u_i),\quad
-u_i\in U,\quad |u_i-u_{i-1}|\le h\dot u_{\max},
-\]
-\[
-c(z_i,u_i)\le\xi_i,\quad \xi_i\ge0,\quad z_N\in Z_f.
+B_j=\{y:\|R e_j(y)\|_2\le r\},\qquad
+\kappa_{B,j}(y)=u^r+K e_j(y).
 \]
 
-Velocity-domain limits and terminal constraints are hard. The horizon starts
-from the configured minimum request and is extended during the initial lane
-rollout to cover the encounter and terminal lane set, up to the configured
-maximum. Subsequent shifts keep the selected horizon length.
+The reference pose follows the sampled RK4 pose increment from a fixed
+absolute endpoint epoch. On a curved road this gives the discrete pose
+orbit, rather than assuming that a Frenet integration equals global RK4.
+The body-state trim need not be numerically exact: its successor defect is
+included in the bound below.
 
-This follows Huang et al., problem (8), with the additional midpoint samples
-sharing the stage slack. The additional samples preserve the shift argument.
-A zero-slack feasible solution attains the global lower bound of the safety
-objective. Positive slack represents safety recovery; it does **not** assert
-collision-free execution. Both zero-slack and positive-slack optimizer results are executed directly
-and returned with their achieved slack sum.
-
-## Polygon duals and SCvx
-
-The physical collision criterion is strictly positive rectangle distance.
-`collision.safetyMarginMeters` defaults to zero: there is no required additional
-0.10 m buffer. A nonnegative optional buffer can be configured explicitly.
-The optimizer imposes nonnegative signed separation at its constraint samples;
-these closed inequalities and their numerical tolerances cannot certify a
-strict inequality or exclude contact between samples. Offline collision checks
-therefore require distance strictly greater than zero, with no tolerance that
-would admit touching or overlapping rectangles. A reported zero safety slack
-alone is not a strict collision-free certificate.
-
-Both vehicles are oriented rectangles, including optional offsets from their
-state reference points. For body-frame halfspaces \(A b\le d\), rotations
-\(R_e,R_t\), and a target-to-ego unit normal \(n\), the distance dual uses
+A cached enclosure of the closed-loop RK4 Jacobian establishes a sufficient
+contraction bound `gamma`, including the error in the computed inverse of
+`R`. A separate center evaluation bounds the reference defect `d`. The
+radius is reduced until all these conditions hold:
 
 \[
-A^T\mu=-R_e^T n,\quad A^T\lambda=R_t^T n,\quad
-\mu,\lambda\ge0,\quad \|n\|_2\le1,
-\]
-\[
-n^T(p_e-p_t)-d_e^T\mu-d_t^T\lambda\ge d_{\mathrm{safe}}-\xi.
+\sup_{\|Re\|\le r}\|R D\Phi(e)R^{-1}\|_2\le\gamma<1,
+\qquad \|R\Phi(0)\|_2\le d,
+\qquad \gamma r+d<r.
 \]
 
-For separated rectangles, the closest-point direction supplies an optimal
-distance dual. At overlap, signed support gaps supply a nonzero restoration
-direction; a lateral tie-break avoids a zero gradient at a symmetric encounter.
-The four ego-vertex support rows retain heading dependence. Their pose
-Jacobians and the dynamics are linearized at each current SCvx iterate.
-This extends Li et al.'s fixed-dual convex trajectory step to two rectangular
-footprints. Joint pose/dual optimization remains nonconvex.
+Consequently `Phi` maps the whole selected neighborhood into itself. The
+same construction bounds input magnitude, `K e - (w-u^r)`, velocity bounds
+and the RK4 internal domain. It fails explicitly if it cannot establish a
+nonempty admissible neighborhood. It never infers nonlinear invariance from
+LQR eigenvalues or a finite collection of sampled states.
 
-Each iteration solves a safety LP and then a CLF QP with the same dynamics,
-input, geometry and terminal rows. The QP constrains the slack sum to the LP
-optimum plus `solver.lexicographicTieTolerance`. A trust region compares actual and predicted reductions of the nominal
-rollout merit to control linearization error. These are
-numerical optimizer operations. No formal verifier follows the solver.
+The enclosure implementation uses outward-padded double interval operations,
+Taylor remainders for sine/cosine and exponential, analytic differentiation
+through RK4, and a checked positive-definiteness bound for the proposed
+matrix norm. The inverse residual is handled by a Neumann-series bound.
+The endpoint is restricted to a positive-speed, unsaturated local Fiala
+chart; this restriction does not restrict the prefix to that chart. These
+are sufficient local bounds and can yield a small, conservative seed.
 
-The initial center is a clipped lane-feedback rollout. It may intersect the
-target, so no preplanned avoidance trajectory is needed. Later calls shift the
-previous input sequence and append lane terminal feedback to initialize SCvx.
-That initialization is never an executable fallback. At least one LP result
-from the current call is required. If a QP fails, its successful primary LP
-result remains the current iteration's optimizer result. If later SCvx
-iterations fail or exhaust their budget, the solve returns the numerical
-iterate already obtained during this call. LP/QP exit status determines whether the solver returned a solution.
-Its linear constraint residual is reported without an execution veto.
+The reference footprint plus the enclosed deviations must also fit the road
+and remain separated from the target for **all future times**. Straight
+motion uses extrema of relative quadratic progress, including both ahead
+and behind separation and signed reversal. Circular motion uses sufficient
+orbit/ray bounds. Midpoint pose deviations and the discrepancy between the
+sampled reference orbit and road circle are included. These all-future bounds
+apply only to the endpoint seed. The finite completion compares the two
+vehicles at matching times, allowing earlier passages through locations
+that the target reaches later.
 
-Trial iterates outside the bicycle model domain shrink the trust region.
-Cold and warm starts use the same SCvx iteration budget.
-Nominal rollout merit chooses SCvx updates; the CLF linearization residual
-also enters its stopping condition. A finite iteration budget can leave
-nonlinear residuals. They are reported without a separate execution veto.
-The soft time budget is checked between iterations and can be overrun by a
-running LP/QP. It does not supply a real-time deadline guarantee.
+If no endpoint with this sufficient continuation can be found within
+`maximumHorizonSteps`, initialization reports failure. This does not establish
+that the original nonlinear problem has no other viable terminal family.
+There is no finite-only fallback masquerading as an indefinite tail.
 
-## Secondary lane-following CLF
+## Sequential convexification and acceptance
 
-The lane error is
+A lane-feedback rollout initializes the search; no avoidance trajectory is
+required. The fixed endpoint is selected once from that rollout. Each SCvx
+step uses variational RK4 dynamics and linearized support-dual geometry.
+The endpoint is represented by its actual **2-norm cone**, with ego state
+and final input in the cone. The previous inscribed 1-norm polytope has been
+removed. `coneprog` solves the primary slack problem and the secondary
+quadratic lane/CLF objective represented by a cone epigraph.
 
-\[
-e=(e_y,e_\psi,v_x-v_x^r,v_y-v_y^r,r-r^r),\quad W(e)=e^TPe,
-\]
-
-where \(P\) and \(K\) come from the discrete LQR design about a realizable
-constant-curvature cruise trim. The first predicted hold uses
+The soft first-step CLF is
 
 \[
-W(e_1)-(1-\alpha)W(e_0)\le\rho,\qquad \rho\ge0.
+W(e_{1|k})-(1-\alpha)W(e_{0|k})\le\rho,\qquad\rho\ge0.
 \]
 
-Its linearization enters the QP, along with the horizon lane-error cost,
-small input-effort cost and `clf.relaxationWeight` times \(\rho^2\). The returned
-CLF slack is recomputed from the nominal prediction. A positive CLF slack
-allows avoidance to take priority; the same objective encourages lane return
-as the collision constraints relax. There is no lane/avoidance mode selector.
+The secondary solve is constrained by the primary slack optimum plus the
+configured numerical tie tolerance, and by the retained slack budget when
+one is available. Neither CLF optimality nor asymptotic lane convergence is
+asserted merely because the feasibility proof holds.
 
-## Terminal ingredients and recursive feasibility
+If hard completion rows make a convex subproblem infeasible, a numerical
+restoration step temporarily uses elastic completion rows. This is only a
+search direction. It cannot be retained unless a fresh nonlinear rollout
+satisfies the original **hard, zero-slack** completion. A short shooting
+correction of the final controls removes terminal linearization defects.
+All corrected inputs, slew limits, safety samples and endpoint membership
+are reevaluated; selected controls are not clipped.
 
-The terminal lane controller is \(u_f=u^r+Ke\). A local ellipsoid
-\(\|P^{1/2}e\|_2\le r_f\) defines its error domain. Analytic row norms bound
-state and input deviations and limit the configured radius using actuator,
-velocity and slew limits. The QP uses an inscribed 1-norm polytope for this
-ellipsoid. Terminal input memory leaves room for the next lane-feedback input.
+Finite suboptimal secondary conic iterates remain eligible even when the
+solver stops without an optimal exit flag. Their reported exit flags are
+retained. A returned conic point is insufficient for execution. Nonlinear trajectories
+are generated by the defining RK4 map. A candidate replaces the retained
+witness only if its hard residual is zero and its achieved prefix slack sum
+meets the retained bound. A positive solver feasibility tolerance never
+licenses a positive hard residual. `zeroSlack` means an achieved sum exactly
+zero in the numerical evaluation; it no longer means `sum <= 1e-5`.
+A feasible initialization can also supply a witness. If none exists and
+search fails, the controller reports `noFeasibleContinuation`.
 
-Straight and constant-curvature global lane corridors are supported. A
-closed-form terminal geometry constraint separates the whole terminal lane
-tube from the target's remaining straight path or circular orbit. For
-\(\kappa_C\ne0\), the fixed orbit radius is \(1/|\kappa_C|\), independent of
-acceleration. A target with both \(V_C=A_C=0\) remains a fixed rectangle.
-For a straight target path, analytic quadratic extrema bound all future
-displacement \(V_C t+A_Ct^2/2\), including any reversal. On a straight road,
-separation can be lateral, or the ego rear can remain ahead of the target's
-maximum relative forward excursion. This accounts for the ego terminal
-progress lower bound and the target's acceleration. An accelerating target
-behind the ego cannot qualify merely because its current speed is lower.
-On a circular road the target path gives separated radial ranges.
-This is a sufficient terminal set, so it can exclude some feasible
-maneuvers; it avoids infinite-horizon numerical search and interval arithmetic.
+The endpoint enclosure is cached construction work, not a per-trajectory
+interval verifier. There is no MPFR library or native verification pipeline.
+Ordinary floating-point evaluation is not a formal proof of exact real
+arithmetic, nor a robustness guarantee against plant/integration errors.
+The structural theorem concerns the declared nominal map under consistent
+state, clock, target and constraint assumptions. Boundary decisions in
+floating-point geometry and unmodeled disturbances require a separate error
+analysis for a stronger execution guarantee. Solver tolerances are reported
+as numerical settings, not treated as theorem hypotheses already proved.
 
-**Nominal recursive-feasibility statement.** Assume that the selected terminal
-set is invariant for the prediction model under \(u_f\), satisfies the hard
-constraints and has zero stage slack. Shifting any feasible input sequence and appending
-\(u_f\) gives a feasible successor sequence with slack values
-\((\xi_1,\ldots,\xi_{N-1},0)\). Consequently, an optimal primary solve satisfies
+## Shift and slack proof
+
+For `k+N < M`, remove the first input from the retained prefix/completion.
+The old first completion input enters the new prefix with zero slack. The
+remaining completion reaches the same fixed endpoint. Once `H_k=N`, append
+`kappa_(B,k+N)` at the **old** absolute terminal time and state. Endpoint
+invariance puts its successor in `B_(k+N+1)` and supplies zero appended slack.
+Input memory makes the appended slew constraint part of the same result.
+
+Every retained start, midpoint, target evaluation and input comparison has
+unchanged absolute time and values. Thus the shifted sequence is feasible
+for the next nonlinear problem, under the nominal successor assumption.
+The completion witness and endpoint policy together realize
 
 \[
-V_N(z^+)\le V_N(z)-\xi_0.
+y\in K_j\implies\kappa_{f,j}(y)\in U_{\mathrm{safe},j}(y),\quad
+F(y,\kappa_{f,j}(y))\in K_{j+1}.
 \]
 
-Feasible suboptimal updates that improve upon that shift retain the same
-cost inequality. In particular, a zero-slack feasible solution preserves the
-nominal sampled safe set under the shift. CLF optimization is secondary and
-cannot override this safety priority.
+For an exact primary optimum this yields Huang's shifted-value inequality
+`V_N(k+1) <= V_N(k) - xi_(0|k)`. SCvx is not a global optimizer of this
+nonconvex problem. The implementation therefore retains achieved slacks
+and imposes the component-sum budget
 
-The LQR design proves contraction for the local linearized terminal model;
-nonlinear invariance of a selected radius remains a model/design assumption.
-SCvx is a local numerical solver, so a finite iteration/time limit is not a
-proof of the global positive-slack PCBF optimum or Huang's global recovery
-result. The direct execution implementation does not enforce a separate
-comparison with the shifted cost or a nonlinear feasibility admission rule.
-`predictiveBarrierValue` reports the achieved nominal slack sum; it need not
-equal the globally optimal PCBF value. A returned result by itself therefore
-does not establish the hypotheses of the recursive-feasibility theorem.
-The nominal sampling and integration model also does not establish continuous
-intersample safety or robustness to disturbances and estimation error.
-These limits are documented rather than enforced through a formal runtime
-certificate layer. The online implementation contains no universal
-`recursiveFeasibilityGuaranteed` flag.
+\[
+S_{k+1}\le\sum_{i=1}^{N-1}\xi_{i|k}=S_k-\xi_{0|k}.
+\]
 
-## Validation and references
+The shifted witness already meets it. Improvements cannot increase it,
+and failed solves retain it. A changed measured ego state invalidates the
+old shift proof; renewed feasibility does not retroactively repair that
+transition's slack inequality.
 
-Run the focused implementation checks and independent closed-loop replays:
+## Interfaces and limits
 
-```matlab
-addpath('scripts');
-validateNonlinearPredictiveController(outputDirectory);
-```
+State format **52** stores the absolute sample index, target epoch, endpoint
+family, full input/state continuation, achieved prefix slacks, and problem
+context. Old state formats are discarded. Predictions include the whole
+prefix plus completion; metadata distinguishes their lengths. No lane/
+avoidance mode switch is introduced.
 
-The MATLAB entry requires Optimization Toolbox and Control System Toolbox.
-No MEX build or MPFR installation is needed. See
-`report/DIRECT_PCBF_CLEANUP_20260928.md` for the executed scope and measured timing.
-The revised target model and its checks are recorded in
-`report/TARGET_ACCELERATION_SIDESLIP_20260928.md`.
-Offline replay and Python geometry audits produce research evidence, and are
-not called when the controller issues an input.
+The time limit is checked between complete numerical steps and passed to
+each conic solve as its soft `MaxTime`. A running factorization or terminal
+correction can overrun it. Real-time completion within a
+50 ms period is not established. Independent ODE replay is an experiment,
+not part of execution admission. Sampled start/midpoint safety does not by
+itself establish continuous-intersample collision freedom.
 
-- J. Huang, H. Wang, K. Margellos and P. Goulart, *Predictive Control Barrier
-  Functions: Bridging Model Predictive Control and Control Barrier Functions*,
-  ECC 2025, problem (8), Lemmas III.1/III.5 and Section III.C.
-  [Author preprint](https://arxiv.org/abs/2502.08400).
-- G. Li, X. Zhang, H. Guo, B. Lenzo and N. Guo, *Real-Time Optimal Trajectory
-  Planning for Autonomous Driving with Collision Avoidance Using Convex
-  Optimization*, Automotive Innovation 6, 481–491 (2023), Sections 3.1–3.2.
-  [Publisher](https://doi.org/10.1007/s42154-023-00222-7).
+## Literature
+
+The primary slack objective and shift reasoning follow Huang, Wang,
+Margellos and Goulart, *Predictive Control Barrier Functions: Bridging model
+predictive control and control barrier functions* (2025), problem (8) and
+its recursive-feasibility argument. The terminal family above supplies the
+zero-slack append condition in place of a fixed invariant terminal set.
+Polygon support duals follow the convex collision-avoidance formulation of
+Li et al. (2023), with both moving rectangles represented explicitly.
+The local source PDFs are in `reference/`.

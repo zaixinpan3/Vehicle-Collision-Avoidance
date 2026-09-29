@@ -62,6 +62,13 @@ def clearance_passes(minimum, margin):
     return minimum > 0 and minimum >= margin - 1e-9
 
 
+def feasible_hold(hold):
+    """A retained witness is executable without a new optimization result."""
+    return (hold.get('hardResidual') == 0
+            and hold.get('source') in ('sequentialConvexification',
+                                       'retainedContinuation', 'feasibleInitialization'))
+
+
 def audit(result):
     name = result['scenario']
     if name not in ('oncoming', 'recovery', 'circular', 'turningTarget',
@@ -90,16 +97,18 @@ def audit(result):
     complete = result['completed'] and result['executedFrames'] == result['requestedFrames']
     reported = result['minimumReplayClearanceMeters']
     clearance_match = reported is None or abs(minimum - reported) < 1e-9
-    zero_slack = all(hold.get('predictiveBarrierValue', 0) <= 1e-5 for hold in result['trace'])
+    zero_slack = all(hold.get('predictiveBarrierValue') == 0 for hold in result['trace'])
     solved = all(hold['solverCalls'] >= 2 for hold in result['trace'])
+    feasible = all(feasible_hold(hold) for hold in result['trace'])
     collision_free = minimum > 0
     clearance_satisfied = clearance_passes(minimum, result['requiredClearanceMeters'])
-    passed = (solved and zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
+    passed = (feasible and zero_slack and complete and samples > 0 and clearance_match and road_margin >= -1e-9
               and clearance_satisfied)
     return dict(scenario=name, passed=passed, samples=samples,
                 minimumClearanceMeters=minimum if math.isfinite(minimum) else None,
                 minimumRoadMarginMeters=road_margin,
-                agreesWithMatlabGeometry=clearance_match, allPredictionsZeroSlack=zero_slack, everyHoldSolved=solved,
+                agreesWithMatlabGeometry=clearance_match, allPredictionsZeroSlack=zero_slack,
+                everyHoldFeasible=feasible, everyHoldSolved=solved,
                 strictlyCollisionFree=collision_free, configuredClearanceSatisfied=clearance_satisfied,
                 finalLateralErrorMeters=result['finalTransverseError'][0])
 

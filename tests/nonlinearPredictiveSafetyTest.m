@@ -121,36 +121,40 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.actuatorInput,inputs(:,1));
             testCase.verifyGreaterThan(problem.metadata.minimumCollisionMargin,0);
         end
-        function targetMeasurementsInitializeEachNewJointState(testCase)
-            [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;.05;1.6;2.4;.95;0;0]);
+        function changedTargetForecastRequiresExplicitReinitialization(testCase)
+            [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;0;1.6;2.4;.95;0;0]);
             [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            ego=localSuccessor(ego,prior);ego.position(2)=ego.position(2)+1e-4;
-            target.targetPositionInertial=[30.4;5.01];
-            target.targetVelocityInertial=7*[cos(.05);sin(.05)];
-            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
-            testCase.verifyEqual(problem.model.jointState(7:8),[30.4;5.01]);
-            testCase.verifyEqual(problem.model.jointState(10),7,AbsTol=1e-14);
-            testCase.verifyEqual(problem.metadata.jointStateDimension,10);
-            testCase.verifyEqual(problem.predictedJointState(10,:),7+(0:size(problem.inputTrajectory,2))*cfg.controller.sampleTime,AbsTol=1e-13);
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedWarmStart");
+            ego=localSuccessor(ego,prior);target.targetPositionInertial=[30.4;5.01];
+            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,prior), ...
+                'collisionAvoidanceController:changedTargetTrajectory');
         end
-        function targetDropoutUsesTheConstantParameterPrediction(testCase)
-            [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;.05;1.6;2.4;.95;0;0]);ego.stateTime=10;
-            [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            ego=localSuccessor(ego,prior);
-            ego.stateTime=10.17;
-            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
-            expected=predictiveSafetyGeometry.targetFlow(prior.target,.17);
+        function targetDropoutUsesOneFixedAbsoluteEpoch(testCase)
+            [ego,road,cfg]=localFixture();q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];ego.stateTime=10;
+            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            ego=localSuccessor(ego,prior);ego.stateTime=10+cfg.controller.sampleTime;
+            cfg.solver.timeLimitSeconds=1e-12;
+            [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            expected=predictiveSafetyGeometry.targetFlow(q,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
+            testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
+            testCase.verifyEqual(problem.predictedJointState(7:10,1:end-1),prior.predictedJointState(7:10,2:end-1));
+            testCase.verifyEqual(state.sampleIndex,1);
+        end
+        function nonconsecutiveSampleTimesCannotReuseTheWitness(testCase)
+            [ego,road,cfg]=localFixture();ego.stateTime=10;
+            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,prior);ego.stateTime=10.17;
+            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
+                'collisionAvoidanceController:invalidSampleTime');
         end
         function retiredStateCannotRestoreTheOldTargetMotion(testCase)
             [ego,road,cfg]=localFixture();prior=struct('version',50,'target',ones(10,1));
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,51);
+            testCase.verifyEqual(state.version,52);
         end
-        function everyCallSolvesAndAppliesTheReturnedFirstControl(testCase)
+        function everyCallAppliesTheReturnedFeasibleFirstControl(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior);
@@ -158,15 +162,18 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(problem.metadata.solverCallCount,2);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1));
             testCase.verifyEqual(state.appliedInput,inputs(:,1));
-            testCase.verifyEqual(problem.metadata.controlSource,"sequentialConvexification");
+            testCase.verifyTrue(problem.metadata.search.shiftAvailable);
             testCase.verifyTrue(problem.metadata.zeroSlack);
         end
-        function noOptimizerResultRaisesAnErrorEvenWithAWarmStart(testCase)
+        function solverDeadlineRetainsTheFeasibleContinuation(testCase)
             [ego,road,cfg]=localFixture();
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior);cfg.solver.timeLimitSeconds=1e-12;
-            testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
-                'collisionAvoidanceController:optimizationFailed');
+            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyEqual(command.actuatorInput,prior.inputTrajectory(:,2));
+            testCase.verifyEqual(problem.metadata.controlSource,"retainedContinuation");
+            testCase.verifyEqual(problem.solution.hard,0);
+            testCase.verifyLessThanOrEqual(problem.solution.safety,sum(prior.witness.stageSlacks(2:end)));
         end
         function positiveSlackReportsSafetyRecoveryWithoutClaimingSafety(testCase)
             [ego,road,cfg]=localFixture();cfg.nonlinear.maximumIterations=2;
@@ -203,37 +210,36 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.solver.feasibilityTolerance);
         end
-        function returningTargetOrbitIsExcludedByTheTerminalSet(testCase)
-            [~,~,cfg]=localFixture();frame=[0;0;0;0;4;4];
-            terminal=predictiveSafetyGeometry.terminalSet(cfg,frame);
-            % This complete circular sweep still reaches the lane ahead.
+        function returningTargetOrbitMustBeSeparatedAtTheEndpointSeed(testCase)
+            [~,~,cfg]=localFixture();frame=[0;0;0;0;4;4];seed=localSeedAtOrigin(cfg,0);
             q=[10;0;0;8;1;asin(.16);1.6;2.4;.95;0;0];
-            margin=predictiveSafetyGeometry.terminalMargin([0;0;0;8;0;0],q,frame,terminal,[2.4;.95;0;0],.1);
+            margin=terminalContinuation.separation(seed,q,frame,cfg);
             testCase.verifyLessThan(margin,0);
         end
-        function acceleratingTargetBehindCannotUseAConstantSpeedTail(testCase)
-            [~,~,cfg]=localFixture();frame=[0;0;0;0;4;4];terminal=predictiveSafetyGeometry.terminalSet(cfg,frame);
+        function acceleratingTargetBehindCannotUseAConstantSpeedSeed(testCase)
+            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
             q=[-20;0;0;4;1;0;1.6;2.4;.95;0;0];
-            margin=predictiveSafetyGeometry.terminalMargin([0;0;0;8;0;0],q,frame,terminal,[2.4;.95;0;0],0);
-            testCase.verifyLessThan(margin,0);
+            testCase.verifyLessThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
+        end
+        function acceleratingTargetAheadAllowsIndefiniteFollowing(testCase)
+            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
+            q=[20;0;0;10;1;0;1.6;2.4;.95;0;0];
+            testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
         end
         function deceleratingTargetHasABoundedForwardExcursion(testCase)
-            [~,~,cfg]=localFixture();frame=[0;0;0;0;4;4];terminal=predictiveSafetyGeometry.terminalSet(cfg,frame);
+            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
             q=[-20;0;0;10;-2;0;1.6;2.4;.95;0;0];
-            margin=predictiveSafetyGeometry.terminalMargin([0;0;0;8;0;0],q,frame,terminal,[2.4;.95;0;0],0);
-            testCase.verifyGreaterThan(margin,0);
+            testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
         end
         function aBrakingTargetCanReturnFromOutsideACircularLane(testCase)
-            [~,~,cfg]=localFixture();frame=[0;0;0;.005;4;4];terminal=predictiveSafetyGeometry.terminalSet(cfg,frame);
+            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,.005);
             q=[250;200;0;5;-1;0;1.6;2.4;.95;0;0];
-            margin=predictiveSafetyGeometry.terminalMargin([0;0;0;8;0;0],q,frame,terminal,[2.4;.95;0;0],0);
-            testCase.verifyLessThan(margin,0);
+            testCase.verifyLessThan(terminalContinuation.separation(seed,q,[0;0;0;.005;4;4],cfg),0);
         end
         function aStationaryTargetWithSideslipRemainsAFixedRectangle(testCase)
-            [~,~,cfg]=localFixture();frame=[0;0;0;0;4;4];terminal=predictiveSafetyGeometry.terminalSet(cfg,frame);
+            [~,~,cfg]=localFixture();seed=localSeedAtOrigin(cfg,0);
             q=[0;10;0;0;0;-.2;1.6;2.4;.95;0;0];
-            margin=predictiveSafetyGeometry.terminalMargin([0;0;0;8;0;0],q,frame,terminal,[2.4;.95;0;0],0);
-            testCase.verifyGreaterThan(margin,0);
+            testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
         end
         function finiteSlewLimitsUseAppliedInputMemory(testCase)
             [ego,road,cfg]=localFixture();cfg.model.frontWheelSteeringRateMaximum=.5;
@@ -270,4 +276,10 @@ end
 function ego=localSuccessor(ego,prior)
     x=prior.stateTrajectory(:,2);ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
     ego.lateralVelocity=x(5);ego.yawRate=x(6);ego.heldActuatorInput=prior.appliedInput;
+end
+
+function seed=localSeedAtOrigin(cfg,curvature)
+    seed=terminalContinuation.build(cfg,curvature);
+    lane=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
+    seed=terminalContinuation.anchor(seed,seed.reference.state,0,lane);
 end

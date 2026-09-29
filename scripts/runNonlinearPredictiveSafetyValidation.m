@@ -8,6 +8,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         options.OutputFile (1,1) string = ""
         options.ControllerConfiguration (1,1) struct = struct('referenceSpeed',8, ...
             'controller',struct('horizonSteps',8))
+        options.StateTransition (1,1) string {mustBeMember(options.StateTransition,["ode45","nominalRk4"])} = "ode45"
+        options.ImproveAfterInitialization (1,1) logical = true
     end
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'controller'),fullfile(root,'config'));
     results=cell(1,numel(options.Scenarios));
@@ -20,7 +22,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         for frame=1:options.Frames
             frameTimer=tic;
             try
-                [command,~,problem,prior]=collisionAvoidanceController(ego,target,road,cfg,prior);
+                solveCfg=cfg;
+                if frame>1 && ~options.ImproveAfterInitialization,solveCfg.solver.timeLimitSeconds=1e-12;end
+                [command,~,problem,prior]=collisionAvoidanceController(ego,target,road,solveCfg,prior);
                 frameSeconds=toc(frameTimer);
                 maximumSeconds=max(maximumSeconds,frameSeconds);maxHorizon=max(maxHorizon,problem.metadata.horizonSteps);
                 x=problem.model.initialState;input=command.actuatorInput;
@@ -29,7 +33,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     linspace(0,h,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
                 for j=1:numel(times)
-                    q=predictiveSafetyGeometry.targetFlow(problem.model.target,times(j));
+                    q=predictiveSafetyGeometry.targetFlow(problem.model.targetEpoch,problem.model.sampleIndex*h+times(j));
                     if ~isempty(q)
                         distance=predictiveSafetyGeometry.rectangle(states(j,1:3).',shape,q(1:3),q(8:11));
                         minimumClearance=min(minimumClearance,distance);
@@ -43,13 +47,18 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 end
                 if frame==1,firstClf=problem.metadata.clfInitialValue;end
                 lastClf=problem.metadata.clfNextValue;maximumSlack=max(maximumSlack,problem.metadata.clfSlack);
-                next=states(end,:).';ego=localEgo(next,ego.stateTime+h,input);
+                next=states(end,:).';
+                if options.StateTransition=="nominalRk4",next=nonlinearBicycleModel.sample(x,input,cfg);end
+                ego=localEgo(next,ego.stateTime+h,input);
                 finalError=nonlinearBicycleModel.error(next,problem.model.lane,problem.model.terminal.reference);
-                warmStartedFrames=warmStartedFrames+(problem.metadata.search.initialization=="shiftedWarmStart");
+                warmStartedFrames=warmStartedFrames+(problem.metadata.search.initialization=="shiftedContinuation");
                 search=problem.metadata.search;
                 entry=struct('time',ego.stateTime-h,'controllerSeconds',frameSeconds, ...
                     'horizonSteps',problem.metadata.horizonSteps,'source',search.source, ...
                     'solverCalls',search.solverCalls,'initialization',search.initialization, ...
+                    'shiftAvailable',search.shiftAvailable,'slackCap',search.slackCap, ...
+                    'absoluteSampleIndex',problem.model.sampleIndex,'endpointIndex',problem.model.terminal.epochIndex, ...
+                    'completionSteps',problem.metadata.completionSteps, ...
                     'scvxConverged',search.converged,'terminationReason',search.terminationReason, ...
                     'sequentialIterations',{search.sequentialIterations},'solverFailures',search.failures, ...
                     'predictiveBarrierValue',problem.metadata.predictiveBarrierValue, ...
@@ -59,7 +68,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     'predictionCollisionMargin',problem.metadata.minimumCollisionMargin);
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 if ~isempty(target)
-                    q=predictiveSafetyGeometry.targetFlow(problem.model.target,h);
+                    q=predictiveSafetyGeometry.targetFlow(problem.model.targetEpoch,(problem.model.sampleIndex+1)*h);
                     target=localTarget(q);
                     passedTarget=passedTarget || next(1)-q(1)>cfg.vehicle.length/2+q(8);
                 end
@@ -93,7 +102,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     report=struct('model',"nonlinear combined-slip Fiala; one constant-acceleration/constant-sideslip target", ...
         'targetStateOrder',["X","Y","psi","V","A","beta","lr","halfLength","halfWidth","offsetX","offsetY"], ...
         'scope',"nominal PCBF/CLF/SCvx with independent offline replay", ...
-        'stateObservation',"exact ego and target states; no observer, noise or delay", ...
+        'stateObservation',options.StateTransition+" ego successor; fixed target epoch; no observer, noise or delay", ...
+        'improveAfterInitialization',options.ImproveAfterInitialization, ...
         'replay',struct('integrator',"ode45",'relativeTolerance',1e-11, ...
             'absoluteTolerance',1e-12,'samplesPerHold',31),'results',[results{:}]);
     if strlength(options.OutputFile)>0
