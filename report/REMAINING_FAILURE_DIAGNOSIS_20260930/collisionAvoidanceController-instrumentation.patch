@@ -1,0 +1,7 @@
+--- controller/collisionAvoidanceController.m
++++ diagnostic-copy/controller/collisionAvoidanceController.m
+@@ -63,0 +64,2 @@
++    global failureModel failureDiagnostic
++    failureModel=model;
+@@ -64,0 +67 @@
++    failureDiagnostic.search=search;failureDiagnostic.model=model;failureDiagnostic.solution=solution;

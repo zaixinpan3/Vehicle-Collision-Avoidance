@@ -1,0 +1,32 @@
+from pathlib import Path
+import json, math
+import numpy as np
+raw=Path(__file__).parent
+results=[]
+for c in json.loads((raw/'curve-controls.json').read_text()):
+    cfg=c['configuration'];h=cfg['controller']['sampleTime'];omega=c['referenceIncrement'][2]/h
+    t=np.arange(0,2*math.pi/abs(omega)*2,.005)
+    q=np.array(c['targetAtEndpoint']);arc=q[3]*t+.5*q[4]*t*t;curvature=math.sin(q[5])/q[6]
+    targetHeading=q[2]+curvature*arc;angle=curvature*arc/2
+    travel=arc*np.sinc(angle/math.pi)
+    targetPosition=np.column_stack((q[0]+travel*np.cos(q[2]+q[5]+angle),q[1]+travel*np.sin(q[2]+q[5]+angle)))
+    center=np.array(c['egoCenter']);epoch=np.array(c['referenceEpochState']);delta=epoch[:2]-center
+    egoShape=np.array([cfg['vehicle']['length']/2,cfg['vehicle']['width']/2]);targetShape=q[7:9]
+    for phase in c['phases']:
+        theta=phase/c['phaseStepMeters']*c['referenceIncrement'][2]+omega*t
+        egoPosition=center+np.column_stack((np.cos(theta)*delta[0]-np.sin(theta)*delta[1],np.sin(theta)*delta[0]+np.cos(theta)*delta[1]))
+        egoHeading=epoch[2]+theta
+        egoPosition+=np.column_stack((np.cos(egoHeading),np.sin(egoHeading)))*cfg['vehicle']['rectangleOffset'][0]+np.column_stack((-np.sin(egoHeading),np.cos(egoHeading)))*cfg['vehicle']['rectangleOffset'][1]
+        other=targetPosition+np.column_stack((np.cos(targetHeading),np.sin(targetHeading)))*q[9]+np.column_stack((-np.sin(targetHeading),np.cos(targetHeading)))*q[10]
+        relative=egoPosition-other;gap=np.full(t.shape,-np.inf)
+        for axis in [egoHeading,egoHeading+math.pi/2,targetHeading,targetHeading+math.pi/2]:
+            projected=abs(relative[:,0]*np.cos(axis)+relative[:,1]*np.sin(axis))
+            supportE=egoShape[0]*abs(np.cos(axis-egoHeading))+egoShape[1]*abs(np.sin(axis-egoHeading))
+            supportT=targetShape[0]*abs(np.cos(axis-targetHeading))+targetShape[1]*abs(np.sin(axis-targetHeading))
+            gap=np.maximum(gap,projected-supportE-supportT)
+        hits=np.flatnonzero(gap < -1e-9)
+        results.append(dict(speed=c['speed'],scenario=c['scenario'],phaseMeters=phase,endpointSeconds=c['endIndex']*h,
+            checkedFutureSeconds=float(t[-1]),sampleStepSeconds=.005,strictOverlapSamples=int(len(hits)),
+            firstOverlapDelaySeconds=float(t[hits[0]]) if len(hits) else None,maximumSatPenetrationMeters=float(max(0,-gap.min()))))
+(raw/'curve-timing.json').write_text(json.dumps(results,indent=2)+'\n')
+for e in results:print(e['speed'],e['scenario'],'phase',round(e['phaseMeters'],2),'future hit',e['firstOverlapDelaySeconds'])

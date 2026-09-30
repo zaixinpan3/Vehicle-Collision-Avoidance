@@ -1,0 +1,23 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');global failureDiagnostic polishProbe
+failureDiagnostic=struct('evaluations',{{}});c=load(fullfile(raw,'restart-turningCrossing.mat'));
+it=c.diagnostic.iterates{19};before=it.baseline;model=it.model;model.collisionRefinement=model.collisionRefinement | it.candidate.interiorViolation>0;
+[after,~]=evaluateFailureInputs(model,before.inputs,before.terminalPhaseMeters);
+entry=struct('oldMerit',before.restorationMerit,'oldHard',before.hard,'newMerit',after.restorationMerit,'newHard',after.hard,'newInteriorViolation',max(after.interiorViolation), ...
+ 'newStageIndices',find(model.collisionRefinement),'candidateMerit',it.candidate.restorationMerit,'radius',it.radius);
+f=fopen(fullfile(raw,'refinement-comparison.json'),'w');fprintf(f,'%s\n',jsonencode(entry));fclose(f);fprintf('REFINEMENT old %.6g new %.6g candidate %.6g\n',entry.oldMerit,entry.newMerit,entry.candidateMerit);
+c=load(fullfile(raw,'speed15-turningCrossing-budget30.mat'));entries=[c.diagnostic.evaluations{:}];[~,bestIndex]=min([entries.restorationMerit]);best=entries(bestIndex);model=c.diagnostic.model;model.cfg.solver.timeLimitSeconds=30;
+polishProbe={};timer=tic;[solution,model]=probeBoundedMinimumNorm(model,best.inputs,best.terminalPhaseMeters,true);seconds=toc(timer);events=polishProbe;
+save(fullfile(raw,'bounded-minimum-norm.mat'),'solution','model','seconds','events');entry=struct('initialHard',best.hard,'seconds',seconds,'hard',solution.hard,'merit',solution.restorationMerit,'events',{events});
+f=fopen(fullfile(raw,'bounded-minimum-norm.json'),'w');fprintf(f,'%s\n',jsonencode(entry));fclose(f);fprintf('MINNORM %.6g -> %.6g\n',best.hard,solution.hard);
+model=c.diagnostic.model;model.cfg.solver.timeLimitSeconds=30;
+wall=tic;[solution,search,model]=solveFromRebasedAnchor(model,best.inputs,best.terminalPhaseMeters);seconds=toc(wall);diagnostic=failureDiagnostic;
+save(fullfile(raw,'restart-rebased.mat'),'solution','model','search','seconds','diagnostic');entry=struct('accepted',~isempty(solution),'seconds',seconds,'search',search);
+f=fopen(fullfile(raw,'rebased-restart.json'),'w');fprintf(f,'%s\n',jsonencode(entry));fclose(f);fprintf('REBASED accepted %d %.3f seconds %d solves\n',entry.accepted,seconds,search.solverCalls);
+% Export the best unaccepted candidates for independent dense replay.
+for name=["brakingLead","crossing","turningCrossing"]
+ budgets=5;if name=="turningCrossing",budgets=[5,30];end
+ for budget=budgets
+  c=load(fullfile(raw,"speed15-"+name+"-budget"+budget+".mat"));entries=[c.diagnostic.evaluations{:}];[~,bestIndex]=min([entries.restorationMerit]);solution=entries(bestIndex);model=c.diagnostic.model;model.terminal.phaseMeters=solution.terminalPhaseMeters;
+  save(fullfile(raw,"unaccepted-"+name+"-budget"+budget+".mat"),'solution','model');
+ end
+end

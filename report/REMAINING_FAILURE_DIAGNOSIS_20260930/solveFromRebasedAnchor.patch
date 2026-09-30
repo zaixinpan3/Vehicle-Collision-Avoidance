@@ -1,0 +1,21 @@
+--- solveFromDiagnosticAnchor.m
++++ solveFromRebasedAnchor.m
+@@ -1,4 +1,4 @@
+-function [solution,search,model] = solveFromDiagnosticAnchor(model,initialInputs,initialPhase,timer)
++function [solution,search,model] = solveFromRebasedAnchor(model,initialInputs,initialPhase,timer)
+     previousState=[];model.terminal.phaseMeters=initialPhase;
+ %solvePredictiveControl Return the first admissible nonlinear continuation.
+ % Safety and lane/CLF costs guide restoration only while no witness exists.
+@@ -86,7 +86,11 @@
+                 if radius<1e-7,break;end
+                 continue;
+             end
+-            model.collisionRefinement=model.collisionRefinement | candidate.interiorViolation>0;
++            refinement=model.collisionRefinement | candidate.interiorViolation>0;
++            changed=any(refinement~=model.collisionRefinement);model.collisionRefinement=refinement;
++            if changed
++                baseline=localNominalEvaluation(baseline.inputs,model,[],1,baseline.terminalPhaseMeters);
++            end
+             step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;step.nominalRestorationMerit=candidate.restorationMerit;
+             if localFeasible(candidate,model)
+                 solution=candidate;search.source="sequentialConvexification";

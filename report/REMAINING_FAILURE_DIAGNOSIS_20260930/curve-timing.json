@@ -1,0 +1,178 @@
+[
+  {
+    "speed": 8,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 0,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 483,
+    "firstOverlapDelaySeconds": 54.24,
+    "maximumSatPenetrationMeters": 1.9343120823817694
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 314.1592653589793,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 483,
+    "firstOverlapDelaySeconds": 34.605000000000004,
+    "maximumSatPenetrationMeters": 1.9343120614483458
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 628.3185307179587,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 483,
+    "firstOverlapDelaySeconds": 14.97,
+    "maximumSatPenetrationMeters": 1.9343120378035241
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 942.4777960769379,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 483,
+    "firstOverlapDelaySeconds": 73.875,
+    "maximumSatPenetrationMeters": 1.934312100605168
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 0,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 7,
+    "firstOverlapDelaySeconds": 300.395,
+    "maximumSatPenetrationMeters": 0.6007057971152652
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 314.1592653589793,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 9,
+    "firstOverlapDelaySeconds": 250.735,
+    "maximumSatPenetrationMeters": 2.299146295320814
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 628.3185307179587,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 10,
+    "firstOverlapDelaySeconds": 221.215,
+    "maximumSatPenetrationMeters": 1.463698903841851
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 942.4777960769379,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 314.15500000000003,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 24,
+    "firstOverlapDelaySeconds": 171.975,
+    "maximumSatPenetrationMeters": 2.3117736806068887
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 0,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 252,
+    "firstOverlapDelaySeconds": 30.43,
+    "maximumSatPenetrationMeters": 1.9182047623061482
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 314.1592653589793,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 251,
+    "firstOverlapDelaySeconds": 16.77,
+    "maximumSatPenetrationMeters": 1.9182042483814254
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 628.3185307179587,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 336,
+    "firstOverlapDelaySeconds": 3.11,
+    "maximumSatPenetrationMeters": 1.9182046991490567
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedHeadOn",
+    "phaseMeters": 942.4777960769379,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 251,
+    "firstOverlapDelaySeconds": 44.09,
+    "maximumSatPenetrationMeters": 1.9182033315067506
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 0,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 14,
+    "firstOverlapDelaySeconds": 148.755,
+    "maximumSatPenetrationMeters": 2.9869661927099718
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 314.1592653589793,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 0,
+    "firstOverlapDelaySeconds": null,
+    "maximumSatPenetrationMeters": 0.0
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 628.3185307179587,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 0,
+    "firstOverlapDelaySeconds": null,
+    "maximumSatPenetrationMeters": 0.0
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedCrossing",
+    "phaseMeters": 942.4777960769379,
+    "endpointSeconds": 25.6,
+    "checkedFutureSeconds": 167.55,
+    "sampleStepSeconds": 0.005,
+    "strictOverlapSamples": 0,
+    "firstOverlapDelaySeconds": null,
+    "maximumSatPenetrationMeters": 0.0
+  }
+]

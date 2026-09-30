@@ -1,0 +1,55 @@
+from pathlib import Path
+import collections,csv,hashlib,json,math,sys
+root=Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance');raw=Path(__file__).parent
+sys.path.insert(0,str(root/'scripts'))
+from auditJointPredictiveSafety import rectangle,target_state,distance
+summaries=[];evaluations=[];iterations=[]
+for file in sorted(raw.glob('speed*-budget*.json')):
+ r=json.loads(file.read_text());d=r['diagnostic'];seed=d['seedAttempts'];ev=d['evaluations'];solves=d['solves']
+ item=dict(scenario=r['scenario'],speed=r['speed'],budget=r['budget'],instrumentedSeconds=r['seconds'],failure=r['failure'],
+  solverCalls=len(solves),conicSeconds=sum(s['seconds'] for s in solves),evaluationSeconds=sum(e['seconds'] for e in ev),evaluationCount=len(ev),seedAttempts=len(seed),
+  lastSeedTimeSeconds=seed[-1]['index']*.05,maximumSeedSeparation=max(s['separation'] for s in seed),
+  solverFlagCounts=dict(collections.Counter(str(s['flag']) for s in solves)),termination=d.get('search',{}).get('terminationReason'),
+  initialEvaluation=ev[0] if ev else None,bestLoggedCandidate=min(ev,key=lambda e:e['restorationMerit']) if ev else None)
+ summaries.append(item)
+ for i,e in enumerate(ev):evaluations.append(dict(speed=r['speed'],scenario=r['scenario'],budget=r['budget'],evaluation=i+1,**e))
+ for e in d.get('search',{}).get('sequentialIterations',[]):iterations.append(dict(speed=r['speed'],scenario=r['scenario'],budget=r['budget'],**e))
+assert len(summaries)==10
+checks=[]
+for file in sorted(raw.glob('replay-*.json')):
+ if file.name=='replay-summary.json':continue
+ r=json.loads(file.read_text());q=r['targetInitialState'];v=r['configuration']['vehicle'];shape=[v['length']/2,v['width']/2,*v['rectangleOffset']]
+ minimum=math.inf;node_minimum=math.inf;overlaps=[]
+ for time,state in zip(r['times'],r['states']):
+  a=rectangle(*state[:3],shape);b=rectangle(*target_state(q,time)[:3],q[7:11]);gap=distance(a,b);minimum=min(minimum,gap)
+  if abs(time/.025-round(time/.025))<1e-8:node_minimum=min(node_minimum,gap)
+  if gap==0:
+   depth=math.inf
+   for poly in (a,b):
+    for i,p in enumerate(poly):
+     end=poly[(i+1)%4];nx,ny=p[1]-end[1],end[0]-p[0];length=math.hypot(nx,ny);nx/=length;ny/=length
+     pa=[nx*x+ny*y for x,y in a];pb=[nx*x+ny*y for x,y in b];depth=min(depth,max(pa)-min(pb),max(pb)-min(pa))
+   if depth>1e-9:overlaps.append(dict(time=time,penetration=depth))
+ assert abs(minimum-r['metrics']['ode45MinimumDistance'])<1e-9
+ assert abs(node_minimum-r['metrics']['ode45NodeMidpointMinimumDistance'])<1e-9
+ checks.append(dict(replay=file.name,samples=len(r['times']),minimumDistanceMeters=minimum,nodeMidpointMinimumMeters=node_minimum,
+  overlapCount=len(overlaps),firstOverlap=overlaps[0] if overlaps else None,lastOverlap=overlaps[-1] if overlaps else None,
+  maximumSatPenetrationMeters=max((v['penetration'] for v in overlaps),default=0),geometryAgrees=True,collisionFree=minimum>0,
+  admittedNominally=r['metrics']['nominalHard']==0 and r['metrics']['nominalSafety']==0,metrics=r['metrics']))
+assert len(checks)==6
+summary=dict(scope='Failure diagnosis of unchanged 395a8cb; diagnostic copies and counterfactual controls only; open-loop audits do not revise the closed-loop 7/14 result',
+ sourceCommit='395a8cbdc937945f6c1aef925997f731f6c9c9f8',diagnosticRuns=summaries,
+ affineControls=json.loads((raw/'affine-controls.json').read_text()),curveControls=json.loads((raw/'curve-controls.json').read_text()),curveTiming=json.loads((raw/'curve-timing.json').read_text()),
+ endpointProbe=json.loads((raw/'endpoint-probe.json').read_text()),boundedProbe=json.loads((raw/'bounded-probe.json').read_text()),boundedMinimumNorm=json.loads((raw/'bounded-minimum-norm.json').read_text()),
+ refinementComparison=json.loads((raw/'refinement-comparison.json').read_text()),restart=json.loads((raw/'restart-controls.json').read_text()),rebasedRestart=json.loads((raw/'rebased-restart.json').read_text()),
+ independentReplays=checks)
+(raw/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+(raw/'independent-replay-audit.json').write_text(json.dumps(checks,indent=2)+'\n')
+for name,records in [('evaluations.csv',evaluations),('iterations.csv',iterations)]:
+ columns=list(dict.fromkeys(k for r in records for k in r))
+ with (raw/name).open('w',newline='') as f:
+  w=csv.DictWriter(f,fieldnames=columns,lineterminator='\n');w.writeheader();w.writerows(records)
+for name,digest in json.loads((raw/'source-manifest.json').read_text()).items():assert hashlib.sha256((root/name).read_bytes()).hexdigest()==digest,name
+(raw/'raw-artifact-hashes.json').write_text(json.dumps({str(p.relative_to(raw)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(raw.iterdir()) if p.is_file() and p.name!='raw-artifact-hashes.json'},indent=2)+'\n')
+print('Verified unchanged production sources;',len(summaries),'diagnostic calls,',len(evaluations),'evaluations,',len(iterations),'iterations;',len(checks),'independent replays.')
+for c in checks:print(c['replay'],'gap',c['minimumDistanceMeters'],'overlaps',c['overlapCount'],'penetration',c['maximumSatPenetrationMeters'])

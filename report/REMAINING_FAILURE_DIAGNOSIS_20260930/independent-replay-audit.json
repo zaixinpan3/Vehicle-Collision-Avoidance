@@ -1,0 +1,164 @@
+[
+  {
+    "replay": "replay-speed15-brakingLead-budget30.json",
+    "samples": 4154,
+    "minimumDistanceMeters": 0.26049440316783506,
+    "nodeMidpointMinimumMeters": 0.26177807816766613,
+    "overlapCount": 0,
+    "firstOverlap": null,
+    "lastOverlap": null,
+    "maximumSatPenetrationMeters": 0,
+    "geometryAgrees": true,
+    "collisionFree": true,
+    "admittedNominally": true,
+    "metrics": {
+      "source": "speed15-brakingLead-budget30.mat",
+      "horizonSeconds": 6.7,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.25463313977222435,
+      "terminalPhaseMeters": 3.645347698544082,
+      "ode45MinimumDistance": 0.26049440316783506,
+      "ode45NodeMidpointMinimumDistance": 0.26177807816766613,
+      "ode45EndpointMembership": -9.29959154539352e-07
+    }
+  },
+  {
+    "replay": "replay-speed15-crossing-budget30.json",
+    "samples": 2356,
+    "minimumDistanceMeters": 0.06015179484836881,
+    "nodeMidpointMinimumMeters": 0.0884958681596486,
+    "overlapCount": 0,
+    "firstOverlap": null,
+    "lastOverlap": null,
+    "maximumSatPenetrationMeters": 0,
+    "geometryAgrees": true,
+    "collisionFree": true,
+    "admittedNominally": true,
+    "metrics": {
+      "source": "speed15-crossing-budget30.mat",
+      "horizonSeconds": 3.8000000000000003,
+      "nominalHard": 0,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.0755173494899497,
+      "terminalPhaseMeters": -3.560883172275983,
+      "ode45MinimumDistance": 0.060151794848368426,
+      "ode45NodeMidpointMinimumDistance": 0.0884958681596486,
+      "ode45EndpointMembership": -8.647634289801919e-07
+    }
+  },
+  {
+    "replay": "replay-unaccepted-brakingLead-budget5.json",
+    "samples": 4154,
+    "minimumDistanceMeters": 0.21086147846573833,
+    "nodeMidpointMinimumMeters": 0.2111864707305855,
+    "overlapCount": 0,
+    "firstOverlap": null,
+    "lastOverlap": null,
+    "maximumSatPenetrationMeters": 0,
+    "geometryAgrees": true,
+    "collisionFree": true,
+    "admittedNominally": false,
+    "metrics": {
+      "source": "unaccepted-brakingLead-budget5.mat",
+      "horizonSeconds": 6.7,
+      "nominalHard": 9.351543541879188,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.20518647093797893,
+      "terminalPhaseMeters": 3.2303912786167324,
+      "ode45MinimumDistance": 0.21086147846573855,
+      "ode45NodeMidpointMinimumDistance": 0.21118647073058572,
+      "ode45EndpointMembership": 87.469756909101
+    }
+  },
+  {
+    "replay": "replay-unaccepted-crossing-budget5.json",
+    "samples": 2356,
+    "minimumDistanceMeters": 0.0,
+    "nodeMidpointMinimumMeters": 0.0,
+    "overlapCount": 66,
+    "firstOverlap": {
+      "time": 1.4833333333333336,
+      "penetration": 0.013545098235034914
+    },
+    "lastOverlap": {
+      "time": 1.5883333333333334,
+      "penetration": 0.004694261016373158
+    },
+    "maximumSatPenetrationMeters": 0.51902599204023,
+    "geometryAgrees": true,
+    "collisionFree": false,
+    "admittedNominally": false,
+    "metrics": {
+      "source": "unaccepted-crossing-budget5.mat",
+      "horizonSeconds": 3.8000000000000003,
+      "nominalHard": 0.4734967400604313,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": -0.4734967400604313,
+      "terminalPhaseMeters": -1.8009769535957338,
+      "ode45MinimumDistance": 0,
+      "ode45NodeMidpointMinimumDistance": 0,
+      "ode45EndpointMembership": -9.534930071900538e-07
+    }
+  },
+  {
+    "replay": "replay-unaccepted-turningCrossing-budget30.json",
+    "samples": 3813,
+    "minimumDistanceMeters": 0.0,
+    "nodeMidpointMinimumMeters": 0.02850309729152193,
+    "overlapCount": 11,
+    "firstOverlap": {
+      "time": 1.53,
+      "penetration": 0.00778268579358965
+    },
+    "lastOverlap": {
+      "time": 1.5466666666666666,
+      "penetration": 0.004440003830703532
+    },
+    "maximumSatPenetrationMeters": 0.10014603459256577,
+    "geometryAgrees": true,
+    "collisionFree": false,
+    "admittedNominally": false,
+    "metrics": {
+      "source": "unaccepted-turningCrossing-budget30.mat",
+      "horizonSeconds": 6.15,
+      "nominalHard": 0.025184475402102037,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": 0.02250369005280218,
+      "terminalPhaseMeters": 0.5624503427348755,
+      "ode45MinimumDistance": 0,
+      "ode45NodeMidpointMinimumDistance": 0.028503097291520098,
+      "ode45EndpointMembership": 0.0006894012681135065
+    }
+  },
+  {
+    "replay": "replay-unaccepted-turningCrossing-budget5.json",
+    "samples": 3813,
+    "minimumDistanceMeters": 0.0,
+    "nodeMidpointMinimumMeters": 0.0,
+    "overlapCount": 36,
+    "firstOverlap": {
+      "time": 1.5116666666666667,
+      "penetration": 0.007221249896119275
+    },
+    "lastOverlap": {
+      "time": 1.5683333333333334,
+      "penetration": 0.008477033191070404
+    },
+    "maximumSatPenetrationMeters": 0.33318767469241806,
+    "geometryAgrees": true,
+    "collisionFree": false,
+    "admittedNominally": false,
+    "metrics": {
+      "source": "unaccepted-turningCrossing-budget5.mat",
+      "horizonSeconds": 6.15,
+      "nominalHard": 3.197050815849828,
+      "nominalSafety": 0,
+      "nominalCollisionMargin": -0.19913023867620416,
+      "terminalPhaseMeters": -0.6073229054971536,
+      "ode45MinimumDistance": 0,
+      "ode45NodeMidpointMinimumDistance": 0,
+      "ode45EndpointMembership": 10.227716285679556
+    }
+  }
+]

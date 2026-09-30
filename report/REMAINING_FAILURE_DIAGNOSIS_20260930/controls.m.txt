@@ -1,0 +1,26 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config','scripts');global failureDiagnostic
+rows=struct([]);
+for name=["brakingLead","crossing","turningCrossing"]
+ c=load(fullfile(raw,"speed15-"+name+"-budget5.mat"));model=c.diagnostic.initialModel;baseline=c.diagnostic.evaluations{1};
+ for condition=["full","noCollision","noEndpoint","noFutureSeparation","wideTrust","elastic"]
+  radius=.5;if condition=="wideTrust",radius=1;end
+  p=captureAffine(baseline,model,radius);a=p.a;b=p.b;cone=p.endpoint;upper=p.upper;objective=p.objective;
+  if condition=="noCollision",a(p.collisionRows,:)=[];b(p.collisionRows)=[];end
+  if condition=="noEndpoint",cone=[];end
+  if condition=="noFutureSeparation",selected=find(a(:,p.ie(2)),1);a(selected,:)=[];b(selected)=[];end
+  if condition=="elastic",upper(p.is(model.cfg.controller.horizonSteps+1:end))=Inf;upper(p.ie)=Inf;objective(p.is(model.cfg.controller.horizonSteps+1:end))=100;objective(p.ie)=100;end
+  timer=tic;[z,~,flag,output]=coneprog(objective,cone,a,b,p.equal,p.rhs,p.lower,upper,optimoptions('coneprog','Display','none','MaxTime',5,'MaxIterations',400,'ConstraintTolerance',1e-8,'OptimalityTolerance',1e-7));
+  residual=NaN;if ~isempty(z),residual=max([0;a*z-b;abs(p.equal*z-p.rhs);p.lower-z;z-upper]);end
+  e=struct('scenario',name,'condition',condition,'radius',radius,'flag',flag,'hasPoint',~isempty(z),'seconds',toc(timer),'linearResidual',residual,'output',output);
+  if isempty(rows),rows=e;else,rows(end+1)=e;end
+  fprintf('CONTROL %s %s flag %d residual %.4g\n',name,condition,flag,residual);
+ end
+end
+saveJson(fullfile(raw,'affine-controls.json'),rows);
+% Restart the best turning-crossing candidate without changing its horizon or physical constraints.
+c=load(fullfile(raw,'speed15-turningCrossing-budget30.mat'));e=[c.diagnostic.evaluations{:}];[~,i]=min([e.restorationMerit]);best=e(i);model=c.diagnostic.model;model.cfg.solver.timeLimitSeconds=30;
+wall=tic;[solution,search,model]=solveFromDiagnosticAnchor(model,best.inputs,best.terminalPhaseMeters);seconds=toc(wall);diagnostic=failureDiagnostic;
+save(fullfile(raw,'restart-turningCrossing.mat'),'solution','model','search','seconds','diagnostic');
+r=struct('startingMerit',best.restorationMerit,'startingHard',best.hard,'seconds',seconds,'accepted',~isempty(solution),'search',search);
+saveJson(fullfile(raw,'restart-controls.json'),r);fprintf('RESTART accepted %d %.3f seconds %d solves\n',r.accepted,seconds,search.solverCalls);
+function saveJson(file,value),f=fopen(file,'w');assert(f>=0);fprintf(f,'%s\n',jsonencode(value));fclose(f);end

@@ -1,0 +1,42 @@
+--- evaluateFailureInputs.m
++++ probeEndpoint.m
+@@ -1,4 +1,4 @@
+-function [evaluation,model]=evaluateFailureInputs(model,inputs,phase,polish)
++function [evaluation,model]=probeEndpoint(model,inputs,phase,polish)
+     if nargin<2,[inputs,model.terminal]=localSeed(model);end
+     if nargin<3,phase=model.terminal.phaseMeters;end
+     model.slackCap=Inf;evaluation=localNominalEvaluation(inputs,model,[],1,phase);
+@@ -31,6 +31,7 @@
+     % A small shooting correction removes the nonlinear terminal defect of
+     % an affine SCvx step. It is a search step: no corrected input is clipped,
+     % and all nonlinear constraints and the PCBF budget are checked afterward.
++    global polishProbe
+     cfg=model.cfg;count=size(candidate.inputs,2);seed=model.terminal;working=candidate;
+     tail=max(1,count-cfg.controller.horizonSteps);length=min(count,max(8,min(20,tail)));
+     first=count-length+1;endIndex=model.sampleIndex+count;
+@@ -50,6 +51,9 @@
+         memory=zeros(2,2*length);memory(:,end-1:end)=eye(2);
+         tangent=seed.factor*[transform*[sensitivity;memory],phaseDerivative];
+         correction=-pinv(tangent)*(seed.factor*deviation);
++        polishProbe{end+1}=struct('event','direction','iteration',iteration,'before',norm(seed.factor*deviation), ...
++          'singularValues',svd(tangent),'linearError',norm(tangent*correction+seed.factor*deviation), ...
++          'steeringChange',max(abs(correction(1:2:end-1))),'brakingChange',max(abs(correction(2:2:end-1))),'phaseChange',correction(end));
+         improved=false;
+         for exponent=0:5
+             if toc(timer)>=cfg.solver.timeLimitSeconds,return;end
+@@ -59,6 +63,7 @@
+             hi=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
+             rate=cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+             if any(inputs<lo | inputs>hi,'all') || any(abs(diff([model.previousInput,inputs],1,2))>rate,'all')
++                polishProbe{end+1}=struct('event','inputRejected','iteration',iteration,'scale',2^-exponent);
+                 continue;
+             end
+             try
+@@ -67,6 +72,7 @@
+                 if localDomainFailure(exception),continue;end
+                 rethrow(exception);
+             end
++            polishProbe{end+1}=struct('event','trial','iteration',iteration,'scale',2^-exponent,'hard',trial.hard,'merit',trial.restorationMerit,'terminalViolation',trial.terminalViolation);
+             if localBetter(trial,candidate,model),candidate=trial;end
+             if localFeasible(candidate,model),return;end
+             trialSeed=seed;trialSeed.phaseMeters=trial.terminalPhaseMeters;

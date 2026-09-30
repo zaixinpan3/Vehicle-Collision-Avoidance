@@ -1,0 +1,58 @@
+from pathlib import Path
+import shutil, hashlib, json, difflib
+root=Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance');raw=Path(__file__).parent;source=raw/'source'
+for folder in ['controller','config']:shutil.copytree(root/folder,source/folder,dirs_exist_ok=True)
+(source/'scripts').mkdir(exist_ok=True)
+for name in ['collisionThreatScenario.m','givenPathCollisionBaseline.m']:shutil.copy2(root/'scripts'/name,source/'scripts'/name)
+p=source/'controller/collisionAvoidanceController.m';s=p.read_text();old='    [solution,search,model]=solvePredictiveControl(model,previousState,timer);';assert old in s
+s=s.replace(old,'    global failureModel failureDiagnostic\n    failureModel=model;\n'+old+'\n    failureDiagnostic.search=search;failureDiagnostic.model=model;failureDiagnostic.solution=solution;');p.write_text(s)
+p=source/'controller/solvePredictiveControl.m';s=p.read_text()
+s=s.replace('    cfg=model.cfg;solution=[];model.slackCap=Inf;',"    global failureDiagnostic\n    failureDiagnostic=struct('evaluations',{{}},'solves',{{}},'seedAttempts',{{}},'iterates',{{}},'seedSeconds',NaN);\n    cfg=model.cfg;solution=[];model.slackCap=Inf;")
+s=s.replace('        [anchor,model.terminal]=localSeed(model);',"        seedTimer=tic;[anchor,model.terminal]=localSeed(model);\n        failureDiagnostic.seedSeconds=toc(seedTimer);failureDiagnostic.initialAnchor=anchor;failureDiagnostic.initialModel=model;")
+s=s.replace('            [candidate,step]=localSequentialStep(baseline,model,radius,timer);',"            iterationTimer=tic;[candidate,step]=localSequentialStep(baseline,model,radius,timer);\n            failureDiagnostic.iterates{end+1}=struct('baseline',baseline,'candidate',candidate,'model',model,'radius',radius,'seconds',toc(iterationTimer));")
+s=s.replace('    cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;',"    global failureDiagnostic\n    cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;")
+old='        if value<0 && terminalContinuation.separation(seed,q,model.frame,cfg)>0';assert old in s
+s=s.replace(old,"        separation=terminalContinuation.separation(seed,q,model.frame,cfg);\n        failureDiagnostic.seedAttempts{end+1}=struct('index',index,'membership',value,'separation',separation,'state',x,'target',q);\n        if value<0 && separation>0")
+s=s.replace("    info=struct('calls',0", "    global failureDiagnostic\n    info=struct('calls',0")
+for key,obj,cones,out in [('primary','objective','endpoint','first'),('restoration','restoration','endpoint','first'),('secondary','objective','cones','second')]:
+ old=f'[{out},~,flag]=coneprog({obj},{cones},a,b,equal,rhs,lower,upper,options);'
+ new=f"solveTimer=tic;[{out},~,flag,solverOutput]=coneprog({obj},{cones},a,b,equal,rhs,lower,upper,options);\n    failureDiagnostic.solves{{end+1}}=struct('stage','{key}','seconds',toc(solveTimer),'flag',flag,'output',solverOutput,'variables',numel({obj}),'rows',size(a,1),'radius',radius,'hasPoint',~isempty({out}));"
+ assert old in s;s=s.replace(old,new)
+s=s.replace('    cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;', '    global failureDiagnostic\n    evaluationTimer=tic;cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;')
+old="        'stageCollision',stageCollision);";assert old in s
+s=s.replace(old,old+"""
+    entry=evaluation;entry.terminalResidual=norm(seed.factor*deviation)-seed.radius;
+    entry.terminalError=deviation;entry.terminalRadius=seed.radius;
+    [entry.completionSafety,entry.worstCompletionOffset]=max([0,stageSafety(prefix+1:end)]);
+    entry.stateViolation=max(stageHard);entry.endpointSafety=max([0;-localSafetyRows(x,count*cfg.controller.sampleTime,model)]);
+    entry.inputViolation=max([0;reshape(lo-inputs,[],1);reshape(inputs-hi,[],1)]);
+    entry.slewViolation=max([0;reshape(abs(diff([model.previousInput,inputs],1,2))-rate,[],1)]);
+    entry.seconds=toc(evaluationTimer);stack=dbstack;entry.caller=string(stack(2).name);
+    failureDiagnostic.evaluations{end+1}=entry;""")
+p.write_text(s)
+start=s.index('\nfunction feasible=localFeasible')
+helper="""function [evaluation,model]=evaluateFailureInputs(model,inputs,phase,polish)
+    if nargin<2,[inputs,model.terminal]=localSeed(model);end
+    if nargin<3,phase=model.terminal.phaseMeters;end
+    model.slackCap=Inf;evaluation=localNominalEvaluation(inputs,model,[],1,phase);
+    if nargin>3 && polish,evaluation=localPolishEndpoint(evaluation,model,tic);end
+end
+"""+s[start:]
+(source/'controller/evaluateFailureInputs.m').write_text(helper)
+a=s.index('function [candidate,info]=localSequentialStep');b=s.index('    if any(lower>upper)',a)
+header=s[a:b].replace('function [candidate,info]=localSequentialStep(baseline,model,radius,timer)',
+ 'function program=captureAffine(baseline,model,radius)\n    timer=tic;model.cfg.solver.timeLimitSeconds=Inf;\n    if ~isfield(model,\'collisionRefinement\'),model.collisionRefinement=baseline.interiorViolation>0;end')
+collector="""    widths=cellfun(@(r)size(r,1),rows(1:rowCount));starts=cumsum([0,widths]);collisionRows=[];
+    for k=find(widths==4),collisionRows=[collisionRows,starts(k)+(1:4)];end
+    program=struct('objective',objective,'endpoint',endpoint,'a',a,'b',b,'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'collisionRows',collisionRows,'ix',ix,'iu',iu,'ip',ip,'is',is,'ie',ie,'costMatrix',costMatrix);
+end
+"""
+(source/'controller/captureAffine.m').write_text(header+collector+s[s.index('function [values,jacobian]=localSafetyRows'):])
+s2=s.replace('function [solution,search,model] = solvePredictiveControl(model,previousState,timer)', 'function [solution,search,model] = solveFromDiagnosticAnchor(model,initialInputs,initialPhase,timer)\n    previousState=[];model.terminal.phaseMeters=initialPhase;')
+s2=s2.replace('if nargin<3,timer=tic;end','if nargin<4,timer=tic;end').replace('[anchor,model.terminal]=localSeed(model);','anchor=initialInputs;')
+(source/'controller/solveFromDiagnosticAnchor.m').write_text(s2)
+for folder in ['controller','config']:
+ for orig in (root/folder).glob('*.m'):
+  cp=source/folder/orig.name
+  if cp.read_bytes()!=orig.read_bytes():(raw/f'{orig.stem}-instrumentation.patch').write_text(''.join(difflib.unified_diff(orig.read_text().splitlines(True),cp.read_text().splitlines(True),fromfile=str(orig.relative_to(root)),tofile='diagnostic-copy/'+str(orig.relative_to(root)),n=0)))
+(raw/'source-manifest.json').write_text(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for folder in ['controller','config','scripts'] for p in (root/folder).glob('*.m')},indent=2)+'\n')

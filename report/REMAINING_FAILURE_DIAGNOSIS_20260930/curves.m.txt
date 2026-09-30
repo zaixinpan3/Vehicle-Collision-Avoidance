@@ -1,0 +1,31 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');rows=struct([]);
+for speed=[8,15]
+ for name=["curvedHeadOn","curvedCrossing"]
+  c=load(fullfile(raw,"speed"+speed+"-"+name+"-budget5.mat"));model=c.model;cfg=model.cfg;attempts=c.diagnostic.seedAttempts;last=attempts{end};seed=terminalContinuation.anchor(model.terminal,last.state,last.index,model.lane);q=last.target;
+  centerLocal=(eye(2)-rotation(seed.increment(3)))\seed.increment(1:2);egoCenter=seed.epochState(1:2)+rotation(seed.epochState(3))*centerLocal;
+  radius=q(7)/sin(q(6));targetCenter=q(1:2)+radius*[-sin(q(3)+q(6));cos(q(3)+q(6))];
+  offset=[-radius*sin(q(6));radius*cos(q(6))]-q(10:11);inner=norm(max(0,abs(offset)-q(8:9)));outer=norm(abs(offset)+q(8:9));
+  separation=cellfun(@(a)a.separation,attempts);membership=cellfun(@(a)a.membership,attempts);
+  phases=(0:3)*pi/2*norm(centerLocal);margins=zeros(size(phases));gradients=margins;contacts={};
+  for k=1:numel(phases)
+   seed.phaseMeters=phases(k);[margins(k),gradients(k)]=terminalContinuation.separation(seed,q,model.frame,cfg,last.index);
+   if name=="curvedHeadOn"
+    ref=terminalContinuation.referenceAt(seed,last.index);egoAngle=atan2(ref(2)-egoCenter(2),ref(1)-egoCenter(1));targetAngle=atan2(q(2)-targetCenter(2),q(1)-targetCenter(1));
+    rate=seed.increment(3)/cfg.controller.sampleTime-q(4)*sin(q(6))/q(7);delay=mod(targetAngle-egoAngle,2*pi)/rate;period=2*pi/rate;
+    ref=terminalContinuation.referenceAt(seed,last.index+delay/cfg.controller.sampleTime);future=predictiveSafetyGeometry.targetFlow(q,delay);
+    gap=predictiveSafetyGeometry.rectangle(ref(1:3),[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset],future(1:3),future(8:11));
+    contacts{end+1}=struct('phase',phases(k),'delayToMeeting',delay,'repeatPeriodSeconds',period,'centerSeparationAtMeeting',norm(ref(1:2)-future(1:2)),'bodyDistanceAtMeeting',gap);
+   end
+  end
+  seed.phaseMeters=0;
+  e=struct('speed',speed,'scenario',name,'attempts',numel(attempts),'membershipPasses',sum(membership<0),'firstTime',attempts{1}.index*.05,'lastTime',last.index*.05, ...
+   'minimumMembership',min(membership),'maximumMembership',max(membership),'minimumSeparation',min(separation),'maximumSeparation',max(separation), ...
+   'egoRadius',norm(centerLocal),'egoCenter',egoCenter,'targetCenter',targetCenter,'targetInnerRadius',inner,'targetOuterRadius',outer,'centerDistance',norm(egoCenter-targetCenter), ...
+   'phases',phases,'phaseMargins',margins,'phaseGradients',gradients,'headOnMeetings',{contacts}, ...
+   'referenceEpochState',seed.epochState,'referenceIncrement',seed.increment,'phaseStepMeters',seed.phaseStepMeters,'endIndex',last.index,'targetAtEndpoint',q,'configuration',cfg);
+  if isempty(rows),rows=e;else,rows(end+1)=e;end
+  fprintf('CURVE %g %s %d admissions / %d, separation %.9g phase spread %.3g\n',speed,name,sum(membership<0),numel(attempts),max(separation),max(margins)-min(margins));
+ end
+end
+f=fopen(fullfile(raw,'curve-controls.json'),'w');fprintf(f,'%s\n',jsonencode(rows));fclose(f);
+function r=rotation(a),r=[cos(a),-sin(a);sin(a),cos(a)];end

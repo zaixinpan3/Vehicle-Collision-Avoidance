@@ -1,0 +1,15 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');global failureDiagnostic polishProbe
+failureDiagnostic=struct('evaluations',{{}});rows={};
+for name=["brakingLead","turningCrossing"]
+ budgets=5;if name=="turningCrossing",budgets=[5,30];end
+ for budget=budgets
+  c=load(fullfile(raw,"speed15-"+name+"-budget"+budget+".mat"));entries=[c.diagnostic.evaluations{:}];[~,bestIndex]=min([entries.restorationMerit]);best=entries(bestIndex);model=c.diagnostic.model;model.cfg.solver.timeLimitSeconds=30;
+  polishProbe={};timer=tic;[solution,model]=probeBoundedEndpoint(model,best.inputs,best.terminalPhaseMeters,true);seconds=toc(timer);events=polishProbe;
+  count=size(best.inputs,2);first=count-min(count,max(8,min(20,count-model.cfg.controller.horizonSteps)))+1;
+  row=struct('scenario',name,'budget',budget,'initialHard',best.hard,'initialMerit',best.restorationMerit,'seconds',seconds,'hard',solution.hard,'safety',solution.safety,'merit',solution.restorationMerit, ...
+   'tailMinimumInput',min(best.inputs(:,first:end),[],2),'tailMaximumInput',max(best.inputs(:,first:end),[],2),'events',{events});rows{end+1}=row;
+  save(fullfile(raw,"bounded-"+name+"-budget"+budget+".mat"),'solution','model','seconds','events');
+  fprintf('BOUNDED %s budget %g: %.6g -> %.6g %.3f sec\n',name,budget,best.hard,solution.hard,seconds);
+ end
+end
+f=fopen(fullfile(raw,'bounded-probe.json'),'w');fprintf(f,'%s\n',jsonencode(rows));fclose(f);

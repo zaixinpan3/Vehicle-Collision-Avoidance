@@ -1,0 +1,10 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'source'));addpath('controller','config');global failureDiagnostic polishProbe
+c=load(fullfile(raw,'speed15-turningCrossing-budget30.mat'));entries=[c.diagnostic.evaluations{:}];[~,bestIndex]=min([entries.restorationMerit]);best=entries(bestIndex);model=c.diagnostic.model;model.cfg.solver.timeLimitSeconds=30;
+polishProbe={};timer=tic;[result,model]=probeEndpoint(model,best.inputs,best.terminalPhaseMeters,true);seconds=toc(timer);normal=polishProbe;
+polishProbe={};timer=tic;[longResult,model]=probeEndpointMore(model,best.inputs,best.terminalPhaseMeters,true);longSeconds=toc(timer);extended=polishProbe;
+save(fullfile(raw,'endpoint-probe.mat'),'best','model','result','longResult','normal','extended');
+entry=struct('initialHard',best.hard,'initialError',best.terminalError,'terminalRadius',best.terminalRadius, ...
+ 'coordinateBounds',model.terminal.errorBound,'seconds',seconds,'resultHard',result.hard,'resultMerit',result.restorationMerit,'normal', {normal}, ...
+ 'extendedSeconds',longSeconds,'extendedHard',longResult.hard,'extendedMerit',longResult.restorationMerit,'extended',{extended});
+f=fopen(fullfile(raw,'endpoint-probe.json'),'w');fprintf(f,'%s\n',jsonencode(entry));fclose(f);
+fprintf('POLISH %.4g -> %.4g (5) %.4g (20)\n',best.hard,result.hard,longResult.hard);
