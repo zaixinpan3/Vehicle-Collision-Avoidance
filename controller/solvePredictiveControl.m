@@ -24,7 +24,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             if isfield(previousState.witness,'stageCost')
                 shifted=previousState.witness;
                 shifted.inputs=shifted.inputs(:,2:end);shifted.states=shifted.states(:,2:end);
-                for name=["stageSafety","stageHard","stageCost","stageCollision"]
+                for name=["stageSafety","stageHard","stageCost","stageCollision","interiorViolation"]
                     shifted.(name)=shifted.(name)(2:end);
                 end
                 solution=localNominalEvaluation(anchor,model,shifted,size(shifted.inputs,2)+1);
@@ -54,37 +54,43 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         search.converged=true;search.terminationReason="feasibleWitness";
         search.safetySlack=solution.safety;search.elapsedSeconds=toc(timer);return;
     end
+    model.collisionRefinement=baseline.interiorViolation>0;
     radius=cfg.nonlinear.trustRadius;
     for iteration=1:cfg.nonlinear.maximumIterations
         if toc(timer)>=cfg.solver.timeLimitSeconds,search.terminationReason="timeLimit";break;end
         try
-            [inputs,step,candidate]=localSequentialStep(anchor,model,radius,timer);
+            [candidate,step]=localSequentialStep(baseline,model,radius,timer);
             search.solverCalls=search.solverCalls+step.calls;
             step.iteration=iteration;step.trustRadius=radius;step.acceptedIterate=false;
-            step.retainedAsWitness=false;step.nominalSafetySlack=Inf;step.nominalHardViolation=Inf;
+            step.retainedAsWitness=false;step.nominalSafetySlack=Inf;step.nominalHardViolation=Inf;step.nominalRestorationMerit=Inf;
             if isempty(candidate) && toc(timer)>=cfg.solver.timeLimitSeconds
                 search.terminationReason="timeLimit";search.sequentialIterations{end+1}=step;break;
             end
-            if isempty(inputs)
-                search.terminationReason=step.status;radius=radius/2;
+            if isempty(candidate)
+                search.terminationReason=step.status;
+                if step.status=="restorationInfeasible"
+                    nextRadius=min(1,max(cfg.nonlinear.trustRadius,2*radius));
+                    if nextRadius<=radius,search.sequentialIterations{end+1}=step;break;end
+                    radius=nextRadius;
+                elseif step.status=="restorationSolverFailure"
+                    search.sequentialIterations{end+1}=step;break;
+                else
+                    radius=radius/2;
+                end
                 search.sequentialIterations{end+1}=step;
                 if radius<1e-7,break;end
                 continue;
             end
-            if isempty(candidate),candidate=localNominalEvaluation(inputs,model,[],1,step.terminalPhaseMeters);end
-            if ~localFeasible(candidate,model),candidate=localPolishEndpoint(candidate,model,timer);end
-            inputs=candidate.inputs;
-            step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;
+            model.collisionRefinement=model.collisionRefinement | candidate.interiorViolation>0;
+            step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;step.nominalRestorationMerit=candidate.restorationMerit;
             if localFeasible(candidate,model)
                 solution=candidate;search.source="sequentialConvexification";
                 step.acceptedIterate=true;step.retainedAsWitness=true;
                 search.sequentialIterations{end+1}=step;
                 search.converged=true;search.terminationReason="feasibleWitness";break;
             end
-            merit=baseline.safety+100*baseline.hard;nextMerit=candidate.safety+100*candidate.hard;
-            improves=nextMerit<merit || (candidate.hard==0 && candidate.safety<=baseline.safety && candidate.cost<baseline.cost);
-            if improves
-                anchor=inputs;baseline=candidate;step.acceptedIterate=true;
+            if localBetter(candidate,baseline,model)
+                baseline=candidate;step.acceptedIterate=true;
                 model.terminal.phaseMeters=candidate.terminalPhaseMeters;
                 radius=min(1,1.25*radius);
             else
@@ -113,6 +119,17 @@ function feasible=localFeasible(candidate,model)
     feasible=~isempty(candidate) && candidate.hard==0 && candidate.safety<=model.slackCap;
 end
 
+function better=localBetter(candidate,baseline,model)
+    % Compare actual nonlinear trajectories, including raw and polished points.
+    better=false;if isempty(candidate),return;end
+    if isempty(baseline),better=true;return;end
+    feasible=localFeasible(candidate,model);previous=localFeasible(baseline,model);
+    if feasible~=previous,better=feasible;return;end
+    merit=candidate.restorationMerit;before=baseline.restorationMerit;
+    better=merit<before || (merit==before && candidate.terminalViolation<baseline.terminalViolation) ...
+        || (candidate.hard==0 && candidate.safety<=baseline.safety && candidate.cost<baseline.cost);
+end
+
 function yes=localDomainFailure(exception)
     yes=any(strcmp(exception.identifier,{'collisionAvoidanceController:nonlinearDomain', ...
         'collisionAvoidanceController:invalidTireOperatingPoint'}));
@@ -122,20 +139,20 @@ function candidate=localPolishEndpoint(candidate,model,timer)
     % A small shooting correction removes the nonlinear terminal defect of
     % an affine SCvx step. It is a search step: no corrected input is clipped,
     % and all nonlinear constraints and the PCBF budget are checked afterward.
-    cfg=model.cfg;count=size(candidate.inputs,2);seed=model.terminal;
+    cfg=model.cfg;count=size(candidate.inputs,2);seed=model.terminal;working=candidate;
     tail=max(1,count-cfg.controller.horizonSteps);length=min(count,max(8,min(20,tail)));
     first=count-length+1;endIndex=model.sampleIndex+count;
     for iteration=1:5
         if localFeasible(candidate,model),return;end
         if toc(timer)>=cfg.solver.timeLimitSeconds,return;end
-        seed.phaseMeters=candidate.terminalPhaseMeters;
+        seed.phaseMeters=working.terminalPhaseMeters;
         ref=terminalContinuation.referenceAt(seed,endIndex);
         transform=blkdiag([cos(ref(3)),sin(ref(3));-sin(ref(3)),cos(ref(3))],eye(6));
-        [~,~,deviation,phaseDerivative]=terminalContinuation.membership([candidate.states(:,end);candidate.inputs(:,end)],endIndex,seed);
+        [~,~,deviation,phaseDerivative]=terminalContinuation.membership([working.states(:,end);working.inputs(:,end)],endIndex,seed);
         if norm(seed.factor*deviation)<=seed.radius,return;end
-        sensitivity=zeros(6,2*length);x=candidate.states(:,first);
+        sensitivity=zeros(6,2*length);x=working.states(:,first);
         for index=first:count
-            [x,a,b]=nonlinearBicycleModel.sample(x,candidate.inputs(:,index),cfg);
+            [x,a,b]=nonlinearBicycleModel.sample(x,working.inputs(:,index),cfg);
             sensitivity=a*sensitivity;sensitivity(:,2*(index-first)+(1:2))=b;
         end
         memory=zeros(2,2*length);memory(:,end-1:end)=eye(2);
@@ -144,8 +161,8 @@ function candidate=localPolishEndpoint(candidate,model,timer)
         improved=false;
         for exponent=0:5
             if toc(timer)>=cfg.solver.timeLimitSeconds,return;end
-            inputs=candidate.inputs;inputs(:,first:end)=inputs(:,first:end)+reshape(correction(1:end-1),2,[])*2^-exponent;
-            phase=candidate.terminalPhaseMeters+correction(end)*2^-exponent;
+            inputs=working.inputs;inputs(:,first:end)=inputs(:,first:end)+reshape(correction(1:end-1),2,[])*2^-exponent;
+            phase=working.terminalPhaseMeters+correction(end)*2^-exponent;
             lo=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
             hi=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
             rate=cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
@@ -153,15 +170,17 @@ function candidate=localPolishEndpoint(candidate,model,timer)
                 continue;
             end
             try
-                trial=localNominalEvaluation(inputs,model,candidate,first,phase);
+                trial=localNominalEvaluation(inputs,model,working,first,phase);
             catch exception
                 if localDomainFailure(exception),continue;end
                 rethrow(exception);
             end
+            if localBetter(trial,candidate,model),candidate=trial;end
+            if localFeasible(candidate,model),return;end
             trialSeed=seed;trialSeed.phaseMeters=trial.terminalPhaseMeters;
             [~,~,nextDeviation]=terminalContinuation.membership([trial.states(:,end);inputs(:,end)],endIndex,trialSeed);
             if norm(seed.factor*nextDeviation)<norm(seed.factor*deviation)
-                candidate=trial;improved=true;break;
+                working=trial;improved=true;break;
             end
         end
         if ~improved,return;end
@@ -197,14 +216,16 @@ function u=localClip(u,previous,cfg)
     u=min(upper,max(lower,min(previous+rate,max(previous-rate,u))));
 end
 
-function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
+function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     info=struct('calls',0,'safetyOptimum',Inf,'secondarySafety',Inf,'safetyCap',Inf, ...
         'clfSlack',Inf,'status',"infeasibleBounds",'safetyExitFlag',NaN,'secondaryExitFlag',NaN, ...
         'completionRestoration',false,'secondaryReturned',false, ...
-        'terminalPhaseMeters',model.terminal.phaseMeters);inputs=[];candidate=[];
-    cfg=model.cfg;count=size(anchor,2);prefix=cfg.controller.horizonSteps;reference=model.terminal.reference;
+        'terminalPhaseMeters',model.terminal.phaseMeters,'primaryRawMerit',Inf, ...
+        'primaryMerit',Inf,'secondaryRawMerit',Inf,'secondaryMerit',Inf, ...
+        'restorationRawMerit',Inf,'restorationMerit',Inf,'candidateStage',"none",'hardRowInfeasible',false);candidate=[];
+    anchor=baseline.inputs;cfg=model.cfg;count=size(anchor,2);prefix=cfg.controller.horizonSteps;reference=model.terminal.reference;
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
-    is=iu(end)+(1:count);ic=is(end)+1;it=ic+1;ip=it+1;nv=ip;
+    is=iu(end)+(1:count);ic=is(end)+1;it=ic+1;ip=it+1;ie=ip+(1:2);nv=ie(end);
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
     rows=cell(1,4*count+6);bounds=cell(1,4*count+6);rowCount=0;
     costMatrix=sparse(7*count+1,nv);costOffset=zeros(7*count+1,1);
@@ -212,7 +233,7 @@ function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
     stateTrust=radius*[5;5;.5;5;3;1.5];inputTrust=radius*[.15;.25];
     lower(ix(:))=-repmat(stateTrust,count+1,1);upper(ix(:))=-lower(ix(:));
     lower(iu(:))=-repmat(inputTrust,count,1);upper(iu(:))=-lower(iu(:));lower([is,ic,it])=0;
-    upper(is(prefix+1:end))=0;
+    upper(is(prefix+1:end))=0;lower(ie)=0;upper(ie)=0;
     inputLower=[-cfg.model.frontWheelSteeringAngleMaximum;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
     inputUpper=[cfg.model.frontWheelSteeringAngleMaximum;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
     rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
@@ -242,6 +263,19 @@ function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         rowCount=rowCount+1;rows{rowCount}=[map(4:6,:);-map(4:6,:)];
         bounds{rowCount}=[physicalUpper-middle(4:6);middle(4:6)-physicalLower];
+        if model.collisionRefinement(index)
+            for half=0:1
+                base=x;if half==1,base=middle;end
+                for duration=localInteriorTimes(cfg)
+                    [interior,ai,bi]=nonlinearBicycleModel.sample(base,anchor(:,index),cfg,[],duration);
+                    if half==1,bi=ai*bm+bi;ai=ai*am;end
+                    map=sparse(6,nv);map(:,ix(:,index))=ai;map(:,iu(:,index))=bi;
+                    [gi,ji]=localSafetyRows(interior,(index-1+half/2)*cfg.controller.sampleTime+duration,model);
+                    r=-ji*map;r(:,is(index))=-1;
+                    rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=gi;
+                end
+            end
+        end
         [e,j]=nonlinearBicycleModel.errorLinearization(next,model.lane,reference);jx=ix(:,index+1);
         ci=7*(index-1)+(1:7);costMatrix(ci(1:5),jx)=reference.factor*j/sqrt(count);
         costOffset(ci(1:5))=reference.factor*e/sqrt(count);
@@ -264,15 +298,16 @@ function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
     [~,~,deviation,phaseDerivative]=terminalContinuation.membership(y,endIndex,seed);
     map=sparse(8,nv);map(1:6,ix(:,end))=eye(6);map(7:8,iu(:,end))=eye(2);
     map=transform*map;map(:,ip)=phaseDerivative;
-    endpoint=secondordercone(seed.factor*map,-seed.factor*deviation,zeros(nv,1),-seed.radius);
+    elastic=zeros(nv,1);elastic(ie(1))=1;
+    endpoint=secondordercone(seed.factor*map,-seed.factor*deviation,elastic,-seed.radius);
     if ~isempty(model.target)
         q=localTargetAt(model,count*cfg.controller.sampleTime);
         [separation,phaseGradient]=terminalContinuation.separation(seed,q,model.frame,cfg,endIndex);
-        r=sparse(1,nv);r(ip)=-phaseGradient;
+        r=sparse(1,nv);r(ip)=-phaseGradient;r(ie(2))=-1;
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=separation;
     end
     [g,j]=localSafetyRows(x,count*cfg.controller.sampleTime,model);
-    r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+    r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;r(:,ie(2))=-1;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     objective=zeros(nv,1);objective(is(1:prefix))=1;
     if isfinite(model.slackCap)
         rowCount=rowCount+1;rows{rowCount}=sparse(objective.');bounds{rowCount}=model.slackCap;
@@ -284,36 +319,51 @@ function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
     options=optimoptions('coneprog','Display','none','MaxIterations',cfg.solver.maxIterations, ...
         'ConstraintTolerance',cfg.solver.constraintTolerance,'OptimalityTolerance',cfg.solver.optimalityTolerance, ...
         'MaxTime',remaining);
-    [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
+    % A row already impossible within variable bounds cannot be repaired by
+    % the hard conic solve. Proceed directly to elastic restoration.
+    [row,column,value]=find(a);contribution=value.*lower(column);
+    negative=value<0;contribution(negative)=value(negative).*upper(column(negative));
+    rowMinimum=accumarray(row,contribution,[size(a,1),1],@sum,0);
+    info.hardRowInfeasible=any(rowMinimum>b+1e-10*max(1,abs(b)));
+    first=[];flag=-2;
+    if ~info.hardRowInfeasible
+        [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
+    end
     info.safetyExitFlag=flag;
-    if ~isempty(first) && all(isfinite(first)) && toc(timer)<cfg.solver.timeLimitSeconds
-        primaryInputs=anchor+reshape(first(iu(:)),2,[]);
-        try
-            primaryCandidate=localNominalEvaluation(primaryInputs,model,[],1,seed.phaseMeters+first(ip));
-            % Repair terminal defects before replacing a usable primary plan.
-            primaryCandidate=localPolishEndpoint(primaryCandidate,model,timer);
-            primaryInputs=primaryCandidate.inputs;
-            if localFeasible(primaryCandidate,model)
-                inputs=primaryInputs;candidate=primaryCandidate;info.status="primaryFeasible";
-                info.terminalPhaseMeters=candidate.terminalPhaseMeters;
-                info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;return;
-            end
-        catch exception
-            if ~localDomainFailure(exception),rethrow(exception);end
+    [candidate,info.primaryRawMerit]=localConicEvaluation(first,iu,ip,baseline,model,timer);
+    if ~isempty(candidate)
+        info.candidateStage="primary";info.primaryMerit=candidate.restorationMerit;
+        if localFeasible(candidate,model) || localBetter(candidate,baseline,model)
+            info.status="primaryProgress";if localFeasible(candidate,model),info.status="primaryFeasible";end
+            info.terminalPhaseMeters=candidate.terminalPhaseMeters;
+            info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;return;
         end
     end
     if flag<=0 || isempty(first)
-        % Elastic rows are a numerical restoration step only. The completion
-        % remains hard in the MPC problem and in nonlinear witness admission.
-        upper(is(prefix+1:end))=Inf;restoration=objective;restoration(is(prefix+1:end))=100;
+        % Endpoint elastic variables are enabled only in the search problem.
+        % Nonlinear witness admission still checks every original hard row.
+        upper(is(prefix+1:end))=Inf;upper(ie)=Inf;
+        restoration=objective;restoration(is(prefix+1:end))=100;restoration(ie)=100;
         remaining=cfg.solver.timeLimitSeconds-toc(timer);
         if remaining<=0,info.status="timeLimit";return;end
         options.MaxTime=remaining;
         [first,~,flag]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
-        if flag<=0 || isempty(first),info.status="safetySolveFailed";return;end
         info.completionRestoration=true;info.status="restoringCompletion";
-        info.secondarySafety=sum(max(0,first(is(1:prefix))));info.clfSlack=max(0,first(ic));
-        inputs=anchor+reshape(first(iu(:)),2,[]);info.terminalPhaseMeters=seed.phaseMeters+first(ip);return;
+        [trial,info.restorationRawMerit]=localConicEvaluation(first,iu,ip,baseline,model,timer);
+        if ~isempty(trial)
+            info.restorationMerit=trial.restorationMerit;
+            if localBetter(trial,candidate,model),candidate=trial;info.candidateStage="restoration";end
+        end
+        if isempty(candidate)
+            if toc(timer)>=cfg.solver.timeLimitSeconds,info.status="timeLimit";
+            elseif flag==-2,info.status="restorationInfeasible";
+            else,info.status="restorationSolverFailure";
+            end
+        else
+            info.terminalPhaseMeters=candidate.terminalPhaseMeters;
+            info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;
+        end
+        return;
     end
     if toc(timer)>=cfg.solver.timeLimitSeconds,info.status="timeLimit";return;end
     info.safetyOptimum=sum(max(0,first(is(1:prefix))));info.safetyCap=min(model.slackCap,info.safetyOptimum+cfg.solver.lexicographicTieTolerance);
@@ -343,15 +393,37 @@ function [inputs,info,candidate]=localSequentialStep(anchor,model,radius,timer)
     options.MaxTime=remaining;
     [second,~,flag]=coneprog(objective,cones,a,b,equal,rhs,lower,upper,options);
     info.calls=info.calls+1;info.secondaryExitFlag=flag;
-    % A finite suboptimal conic point can still improve the nonlinear MPC.
-    % Its original hard constraints and achieved slack budget decide admission.
-    if ~isempty(second) && all(isfinite(second))
-        first=second;info.secondaryReturned=true;
-    end
+    % Keep the best nonlinear candidate across both conic stages and polish.
+    info.secondaryReturned=~isempty(second) && all(isfinite(second));
+    if info.secondaryReturned,first=second;end
     info.solverResidual=max([0;a*first-b;abs(equal*first-rhs);lower-first;first-upper]);
     info.secondarySafety=sum(max(0,first(is(1:prefix))));info.clfSlack=max(0,first(ic));info.status="solved";
-    inputs=anchor+reshape(first(iu(:)),2,[]);
-    info.terminalPhaseMeters=seed.phaseMeters+first(ip);
+    [trial,info.secondaryRawMerit]=localConicEvaluation(second,iu,ip,baseline,model,timer);
+    if ~isempty(trial)
+        info.secondaryMerit=trial.restorationMerit;
+        if localBetter(trial,candidate,model),candidate=trial;info.candidateStage="secondary";end
+    end
+    if ~isempty(candidate),info.terminalPhaseMeters=candidate.terminalPhaseMeters;end
+end
+
+function [candidate,rawMerit]=localConicEvaluation(point,iu,ip,baseline,model,timer)
+    candidate=[];rawMerit=Inf;
+    if isempty(point) || any(~isfinite(point)) || toc(timer)>=model.cfg.solver.timeLimitSeconds,return;end
+    delta=reshape(point(iu(:)),2,[]);
+    for scale=[1,.5,.25]
+        if toc(timer)>=model.cfg.solver.timeLimitSeconds,return;end
+        try
+            trial=localNominalEvaluation(baseline.inputs+scale*delta,model,[],1,model.terminal.phaseMeters+scale*point(ip));
+            if scale==1,rawMerit=trial.restorationMerit;end
+            if localBetter(trial,candidate,model),candidate=trial;end
+            if localFeasible(candidate,model),return;end
+            trial=localPolishEndpoint(trial,model,timer);
+            if localBetter(trial,candidate,model),candidate=trial;end
+            if localFeasible(candidate,model) || localBetter(candidate,baseline,model),return;end
+        catch exception
+            if ~localDomainFailure(exception),rethrow(exception);end
+        end
+    end
 end
 
 function [values,jacobian]=localSafetyRows(x,time,model)
@@ -410,11 +482,37 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,phase)
     endIndex=model.sampleIndex+count;
     [~,~,deviation]=terminalContinuation.membership([x;inputs(:,end)],endIndex,seed);
     separation=terminalContinuation.separation(seed,localTargetAt(model,count*cfg.controller.sampleTime),model.frame,cfg,endIndex);
-    hard=max([0;low-model.initialState(4:6);model.initialState(4:6)-high; ...
-        stageHard.';stageSafety(prefix+1:end).';norm(seed.factor*deviation)-seed.radius;-separation; ...
-        -localSafetyRows(x,count*cfg.controller.sampleTime,model); ...
+    terminalViolation=max(0,norm(seed.factor*deviation)-seed.radius);
+    terminalGeometry=max([0;-separation;-localSafetyRows(x,count*cfg.controller.sampleTime,model)]);
+    physical=max([0;low-model.initialState(4:6);model.initialState(4:6)-high;stageHard.'; ...
         reshape(lo-inputs,[],1);reshape(inputs-hi,[],1); ...
         reshape(abs(diff([model.previousInput,inputs],1,2))-rate,[],1)]);
+    hard=max([physical;stageSafety(prefix+1:end).';terminalViolation;terminalGeometry]);
+    interiorViolation=zeros(1,count);
+    if nargin>=3 && ~isempty(cached) && isfield(cached,'interiorViolation')
+        interiorViolation(1:first-1)=cached.interiorViolation(1:first-1);
+    end
+    refinement=false(1,count);
+    if isfield(model,'collisionRefinement'),refinement=model.collisionRefinement;end
+    checkWitness=hard==0 && sum(stageSafety(1:prefix))<=model.slackCap;
+    for index=1:count
+        time=(index-1)*cfg.controller.sampleTime;
+        if ~(refinement(index) || (checkWitness && localCloseEncounter(stageCollision(index),time,model))),continue;end
+        middle=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),cfg,[],halfDuration);
+        for half=0:1
+            base=states(:,index);if half==1,base=middle;end
+            for duration=localInteriorTimes(cfg)
+                interior=nonlinearBicycleModel.sample(base,inputs(:,index),cfg,[],duration);
+                values=localSafetyRows(interior,time+half*halfDuration+duration,model);
+                violation=max([0;-values]);interiorViolation(index)=max(interiorViolation(index),violation);
+                stageSafety(index)=max(stageSafety(index),violation);
+                stageCollision(index)=min([stageCollision(index);values]);
+            end
+        end
+    end
+    hard=max([hard;stageSafety(prefix+1:end).']);
+    restorationMerit=sum(stageSafety(1:prefix))+100*(sum(stageSafety(prefix+1:end)) ...
+        +terminalViolation+terminalGeometry+physical);
     reference=model.terminal.reference;before=nonlinearBicycleModel.error(states(:,1),model.lane,reference);
     after=nonlinearBicycleModel.error(states(:,2),model.lane,reference);
     v0=norm(reference.factor*before)^2;v1=norm(reference.factor*after)^2;clf=max(0,v1-(1-cfg.nonlinear.clfDecay)*v0);
@@ -423,6 +521,7 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,phase)
         'hard',hard,'clfSlack',clf,'clfInitialValue',v0,'clfNextValue',v1, ...
         'minimumCollisionMargin',min(stageCollision),'terminalPhaseMeters',phase, ...
         'terminalSeparationMargin',separation, ...
+        'terminalViolation',terminalViolation,'restorationMerit',restorationMerit,'interiorViolation',interiorViolation, ...
         'cost',sum(stageCost)/count+cfg.clf.relaxationWeight*clf^2, ...
         'stageSafety',stageSafety,'stageHard',stageHard,'stageCost',stageCost, ...
         'stageCollision',stageCollision);
@@ -433,8 +532,28 @@ function [low,high]=localStateLimits(cfg)
     high=[cfg.model.speedMaximum;cfg.model.lateralVelocityMaximum;cfg.model.yawRateMaximum];
 end
 
+function times=localInteriorTimes(cfg)
+    % Reuse interior nodes of the defining half-hold RK4 mesh.
+    count=max(1,ceil(cfg.controller.sampleTime/(2*cfg.nonlinear.integrationStep)));
+    times=(1:count-1)*(cfg.controller.sampleTime/(2*count));
+end
+
+function close=localCloseEncounter(margin,time,model)
+    close=false;if isempty(model.target),return;end
+    cfg=model.cfg;h=cfg.controller.sampleTime;q=localTargetAt(model,time);
+    egoRadius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
+    targetRadius=norm(q(8:9))+norm(q(10:11));speed=abs(q(4))+abs(q(5))*h;
+    travel=h*(hypot(cfg.model.speedMaximum,cfg.model.lateralVelocityMaximum) ...
+        +cfg.model.yawRateMaximum*egoRadius+speed*(1+abs(sin(q(6))/q(7))*targetRadius));
+    close=margin<=travel;
+end
+
 function q=localTargetAt(model,time)
     h=model.cfg.controller.sampleTime;
-    halfIndex=2*model.sampleIndex+round(2*time/h);
-    q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,halfIndex*(h/2));
+    count=max(1,ceil(h/(2*model.cfg.nonlinear.integrationStep)));
+    tick=2*count*model.sampleIndex+round(2*count*time/h);
+    if mod(tick,count)==0,absoluteTime=(tick/count)*(h/2);
+    else,absoluteTime=tick*(h/(2*count));
+    end
+    q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,absoluteTime);
 end

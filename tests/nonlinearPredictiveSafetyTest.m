@@ -163,11 +163,11 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidSampleTime');
         end
         function retiredStateCannotRestoreTheOldTargetMotion(testCase)
-            [ego,road,cfg]=localFixture();prior=struct('version',50,'target',ones(10,1));
+            [ego,road,cfg]=localFixture();prior=struct('version',54,'target',ones(10,1));
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,54);
+            testCase.verifyEqual(state.version,55);
         end
         function everyCallAppliesTheReturnedFeasibleFirstControl(testCase)
             [ego,road,cfg]=localFixture();
@@ -326,6 +326,59 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(steps{end}.calls,1);
             testCase.verifyFalse(steps{end}.secondaryReturned);
             testCase.verifyTrue(steps{end}.retainedAsWitness);
+        end
+        function brakingLeadRestorationPreservesBetterNonlinearCandidates(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
+            cfg.nonlinear.maximumIterations=6;
+            target=localTarget([6.25;0;0;8;-.5;0;1.6;2.4;.95;0;0]);
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            steps=problem.metadata.search.sequentialIterations;
+            selected=cellfun(@(step)step.nominalRestorationMerit,steps);
+            raw=cellfun(@(step)min([step.primaryRawMerit,step.secondaryRawMerit,step.restorationRawMerit]),steps);
+            accepted=cellfun(@(step)step.acceptedIterate,steps);
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
+            testCase.verifyLessThanOrEqual(selected,raw);
+            testCase.verifyTrue(any(selected<raw));
+            testCase.verifyLessThanOrEqual(diff(selected(accepted)),zeros(1,sum(accepted)-1));
+            testCase.verifyLessThanOrEqual(numel(steps),6);
+        end
+        function turningCrossingRestorationStillRequiresTheOriginalTerminalSet(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
+            impact=[8*1.6;0;-pi/2-.05;10;1;.05;1.6;2.4;.95;0;0];
+            target=localTarget(predictiveSafetyGeometry.targetFlow(impact,-1.6));
+            [command,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            endpoint=[problem.solution.states(:,end);plan(:,end)];
+            value=terminalContinuation.membership(endpoint,size(plan,2),problem.model.terminal);
+            steps=problem.metadata.search.sequentialIterations;
+            testCase.verifyEqual(command.actuatorInput,plan(:,1));
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
+            testCase.verifyLessThanOrEqual(value,0);
+            testCase.verifyGreaterThanOrEqual(problem.solution.terminalSeparationMargin,0);
+            testCase.verifyTrue(any(cellfun(@(step)step.completionRestoration,steps)));
+            testCase.verifyTrue(steps{end}.retainedAsWitness);
+            testCase.verifyEqual(sum(cellfun(@(step)step.retainedAsWitness,steps)),1);
+            testCase.verifyFalse(problem.metadata.drivingModeSwitching);
+        end
+        function restoredCrossingRemainsSeparatedBetweenConstraintSamples(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
+            q=[12.8;12.8;-pi/2;8;0;0;1.6;2.4;.95;0;0];
+            [~,plan,problem]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            x=problem.model.initialState;minimum=Inf;h=cfg.controller.sampleTime;
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            for index=1:size(plan,2)
+                [times,states]=ode45(@(~,state)nonlinearBicycleModel.derivative(state,plan(:,index),cfg), ...
+                    linspace(0,h,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
+                for sample=1:numel(times)
+                    target=predictiveSafetyGeometry.targetFlow(q,(index-1)*h+times(sample));
+                    minimum=min(minimum,predictiveSafetyGeometry.rectangle(states(sample,1:3).',shape,target(1:3),target(8:11)));
+                end
+                x=states(end,:).';
+            end
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
+            testCase.verifyGreaterThan(minimum,cfg.collision.safetyMarginMeters);
         end
         function terminalLaneFeedbackNeedsNoRoadClearance(testCase,curvature)
             [ego,~,cfg]=localFixture();trim=nonlinearBicycleModel.cruise(cfg,curvature);

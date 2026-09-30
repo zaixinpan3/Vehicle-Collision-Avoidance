@@ -57,13 +57,20 @@ classdef terminalContinuation
                     seed.contractionBound=gamma;seed.defectBound=drift;
                     seed.samplePositionBound=max(samples(1:2,:),[],2);
                     seed.sampleHeadingBound=max(samples(3,:));
-                    half=nonlinearBicycleModel.sample(base,reference.input,cfg,[],cfg.controller.sampleTime/2);
-                    if next(3)==0
-                        seed.samplePositionBound=seed.samplePositionBound+abs(half(1:2)-next(1:2)/2);
-                    else
-                        center=(eye(2)-localRotation(next(3)))\next(1:2);
-                        seed.samplePositionBound=seed.samplePositionBound+abs(norm(half(1:2)-center)-norm(center));
+                    count=2*max(1,ceil(cfg.controller.sampleTime/(2*cfg.nonlinear.integrationStep)));
+                    positionDefect=zeros(2,1);headingDefect=0;
+                    if next(3)~=0,center=(eye(2)-localRotation(next(3)))\next(1:2);end
+                    for sample=1:count-1
+                        fraction=sample/count;
+                        point=nonlinearBicycleModel.sample(base,reference.input,cfg,[],fraction*cfg.controller.sampleTime);
+                        if next(3)==0,defect=abs(point(1:2)-fraction*next(1:2));
+                        else,defect=repmat(abs(norm(point(1:2)-center)-norm(center)),2,1);
+                        end
+                        positionDefect=max(positionDefect,defect);
+                        headingDefect=max(headingDefect,abs(point(3)-fraction*next(3)));
                     end
+                    seed.samplePositionBound=seed.samplePositionBound+positionDefect;
+                    seed.sampleHeadingBound=seed.sampleHeadingBound+headingDefect;
                     seed.construction="boundedRk4JacobianContraction";
                     savedKey=key;saved=seed;return;
                 end
@@ -226,12 +233,12 @@ function [jacobian,defect,samples,domain] = localEnclosure(base,input,gain,bound
                 total=localAdd(localAdd(f1{i},localScale(f2{i},2)),localAdd(localScale(f3{i},2),f4{i}));
                 x{i}=localAdd(x{i},localScale(total,h/6));
             end
-            if k==count/2 || k==count
-                nominal=nonlinearBicycleModel.sample(nominal,input,cfg,[],cfg.controller.sampleTime/2);
-                width=zeros(3,1);
-                for i=1:3,width(i)=max(abs(x{i}(1,:)-nominal(i)));end
-                samples(:,end+1)=width; %#ok<AGROW>
-            end
+            % The terminal collision tube covers every integration node,
+            % including points checked by finite-horizon constraint generation.
+            nominal=nonlinearBicycleModel.sample(nominal,input,cfg,[],h);
+            width=zeros(3,1);
+            for i=1:3,width(i)=max(abs(x{i}(1,:)-nominal(i)));end
+            samples(:,end+1)=width; %#ok<AGROW>
             localDomain(x,cfg);
         end
         jacobian=zeros(8,8,2);

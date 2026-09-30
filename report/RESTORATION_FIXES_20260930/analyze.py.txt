@@ -1,0 +1,51 @@
+from pathlib import Path
+import csv, hashlib, json
+
+root = Path('/home/zai/Downloads/ResearchProjects/collisionAvoidance')
+raw = Path(__file__).parent
+current = json.loads((raw / 'independent-audit.json').read_text())
+old = json.loads((root / 'report/FREE_TERMINAL_PHASE_20260929/independent-audit.json').read_text())
+before = {(e['referenceSpeedMetersPerSecond'], e['scenario']): e for e in old['results']}
+rows, running = [], []
+for e in current['results']:
+    export = json.loads(Path(e['source']).read_text())
+    r = export['results']; trace = r['trace']; key = (e['referenceSpeedMetersPerSecond'], e['scenario'])
+    assert export['stateObservation'] == 'ode45 ego successor; fixed target epoch; no observer, noise or delay'
+    assert r['roadConstraintsEnforced'] is False and e['independentBaselineCollision']
+    if e['completed']:
+        assert len(trace) == 160 and e['collisionAvoided']
+        assert e['geometryAudit']['allPredictionsZeroSlack'] and e['geometryAudit']['everyHoldFeasible']
+    else:
+        assert not trace
+    if before[key]['collisionAvoided']:
+        assert e['collisionAvoided'], f'Regression: {key}'
+    rows.append(dict(speedMetersPerSecond=key[0], scenario=key[1],
+        previouslyAvoided=before[key]['collisionAvoided'], collisionAvoided=e['collisionAvoided'], completed=e['completed'],
+        minimumClearanceMeters=e['minimumReplayClearanceMeters'], initializationSeconds=e['initializationSeconds'],
+        failedInitializationSeconds=e['failedFrameSeconds'], maximumRunningSeconds=e['maximumRunningSeconds'],
+        runningDeadlineMisses=sum(t['controllerSeconds'] > .05 for t in trace[1:]),
+        initialConicCalls=trace[0]['solverCalls'] if trace else None,
+        runningConicCalls=sum(t['solverCalls'] for t in trace[1:]), failure=e['failure']))
+    running.extend(dict(speed=key[0], scenario=key[1], **t) for t in trace[1:])
+with (raw / 'comparison.csv').open('w', newline='') as f:
+    writer=csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator='\n');writer.writeheader();writer.writerows(rows)
+tests=list(csv.DictReader((raw / 'tests.csv').open()))
+assert len(tests)==258 and all(t['Passed']=='1' and t['Failed']=='0' and t['Incomplete']=='0' for t in tests)
+worst=max(running,key=lambda t:t['controllerSeconds'])
+summary=dict(scope='Focused restoration fixes with generated interior collision rows; same fourteen threats and five-second soft initialization budget',
+    sourceBaseCommit='2c5c8d6ec244ff002db0265c4b106d5b4861a18d',
+    previousAvoided=sum(e['collisionAvoided'] for e in old['results']), scenarios=len(rows),
+    collisionAvoided=sum(r['collisionAvoided'] for r in rows), completed=sum(r['completed'] for r in rows),
+    initializationFailures=sum(not r['completed'] for r in rows), selectedMatlabTestsPassed=len(tests),
+    runningFrames=len(running), runningDeadlineMisses=sum(t['controllerSeconds']>.05 for t in running),
+    maximumRunningSeconds=worst['controllerSeconds'],
+    worstRunningFrame={k:worst[k] for k in ['speed','scenario','time','controllerSeconds','solverCalls','source','horizonSteps','sequentialIterations']},
+    minimumCompletedClearanceMeters=current['minimumCompletedClearanceMeters'], rows=rows)
+(raw / 'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+sources=sorted({*root.glob('controller/*.m'),root/'controller/PCBF_CLF_ARCHITECTURE.md',root/'config/collisionAvoidanceControllerConfig.m',
+    root/'tests/nonlinearPredictiveSafetyTest.m',root/'scripts/runCollisionThreatValidation.m',root/'scripts/runNonlinearPredictiveSafetyValidation.m',
+    root/'scripts/auditCollisionThreats.py',root/'scripts/auditJointPredictiveSafety.py'})
+(raw/'source-manifest.json').write_text(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},indent=2)+'\n')
+artifacts=sorted({*raw.glob('*.json'),*raw.glob('*.csv'),*raw.glob('*.log'),*raw.glob('*.m'),*raw.glob('*.py'),*raw.glob('verified-campaign/**/*.json')})
+(raw/'raw-artifact-hashes.json').write_text(json.dumps({str(p.relative_to(raw)):hashlib.sha256(p.read_bytes()).hexdigest() for p in artifacts if p.name!='raw-artifact-hashes.json'},indent=2)+'\n')
+print(json.dumps({k:v for k,v in summary.items() if k not in ['rows','worstRunningFrame']}))

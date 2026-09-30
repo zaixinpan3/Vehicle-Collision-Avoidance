@@ -1,0 +1,15 @@
+speedMetersPerSecond,scenario,previouslyAvoided,collisionAvoided,completed,minimumClearanceMeters,initializationSeconds,failedInitializationSeconds,maximumRunningSeconds,runningDeadlineMisses,initialConicCalls,runningConicCalls,failure
+8,headOn,True,True,True,0.6281138866565619,1.399815,,0.039547,0,5,0,
+8,acceleratingHeadOn,True,True,True,0.5117831270709245,0.944001,,0.03337,0,5,0,
+8,brakingLead,False,True,True,1.2307129819672977,2.238981,,0.071547,26,5,0,
+8,crossing,True,True,True,0.2506702623139936,2.488174,,0.03365,0,8,0,
+8,turningCrossing,False,True,True,0.7289556796304542,4.909288,,0.808422,74,7,4,
+8,curvedHeadOn,False,False,False,,,0.473973,,0,,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.
+8,curvedCrossing,False,False,False,,,0.151421,,0,,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.
+15,headOn,True,True,True,0.34069550371533047,0.989842,,0.034651,0,3,0,
+15,acceleratingHeadOn,True,True,True,0.26911439081452393,0.669822,,0.033971,0,3,0,
+15,brakingLead,False,False,False,,,5.020704,,0,,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+15,crossing,False,False,False,,,5.012197,,0,,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+15,turningCrossing,False,False,False,,,5.009071,,0,,0,collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).
+15,curvedHeadOn,False,False,False,,,0.417201,,0,,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.
+15,curvedCrossing,False,False,False,,,0.146348,,0,,0,collisionAvoidanceController:noTerminalContinuation: No indefinitely admissible endpoint was reached within maximumHorizonSteps.

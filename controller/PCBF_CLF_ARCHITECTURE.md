@@ -66,7 +66,9 @@ of world-coordinate dot products. No small physical acceleration is thresholded
 to zero; nearby non-cardinal headings retain their transverse motion.
 
 Every target prediction uses the original epoch and an **absolute integer
-half-sample index**. This preserves retained node and midpoint evaluations
+subsample index**. Nodes and midpoints retain the same half-sample arithmetic;
+additional collision checks use the interior nodes of the half-hold integration
+mesh, when present. This preserves repeated absolute-time evaluations
 under a shift. Later observations cannot reinitialize the forecast. A changed
 target trajectory, reference path, physical constraint set or prediction model requires
 an explicit new problem (`previousState=[]`). A timestamp gap is rejected.
@@ -82,8 +84,15 @@ let `M` be the fixed endpoint selected during initialization. Define
 `H_k = max(N,M-k)`. The first `N` stages form the PCBF prefix. Stages
 `N,...,H_k-1` are the completion tail.
 
-At each stage, collision constraints are evaluated at its start
-and midpoint. The prefix uses one shared nonnegative slack for these samples.
+At each stage, collision constraints are evaluated at its start and midpoint.
+Before admitting a candidate, nearby encounters are also checked at the interior
+half-hold integration nodes. Proximity uses a one-hold travel estimate from the
+configured ego speed/yaw bounds and predicted target motion; it is a screening
+rule, not a continuous-time certificate. An interior violation adds the affected
+stage's interior linearized collision rows to subsequent convex subproblems.
+Thus additional rows are generated when a nominally feasible candidate exposes
+a missed collision, rather than inserted throughout every initial restoration.
+The prefix uses one shared nonnegative slack for all checked stage samples.
 The completion tail uses **zero slack**. Input limits, slew limits and
 velocity bounds at nodes and midpoints remain hard everywhere. The endpoint
 also has hard sampled safety constraints. Internal RK4 stages must remain
@@ -96,6 +105,11 @@ distance of zero is never used as evidence of separation. The configured
 additional physical collision buffer defaults to 0.006 m and can be explicitly
 set to zero. It applies at the prediction constraint samples and in the
 terminal separation certificate; it is not a continuous-time clearance guarantee.
+The terminal interval construction encloses pose deviations at every RK4
+integration node. Its reference-orbit padding also takes the maximum nominal
+position/heading defect over those nodes. This covers the same additional
+numerical sample times used by finite-horizon collision refinement without
+changing the terminal feedback policy or relaxing membership.
 
 With the union of endpoint families `B_j` defined below, the terminal tube is represented
 implicitly by
@@ -178,7 +192,7 @@ The reference footprint plus the enclosed deviations must remain separated
 from the target for **all future times**. Straight
 motion uses extrema of relative quadratic progress, including both ahead
 and behind separation and signed reversal. Circular motion uses sufficient
-orbit/ray bounds. Midpoint pose deviations relative to the sampled reference
+orbit/ray bounds. Integration-node pose deviations relative to the sampled reference
 orbit are included. No road-edge or lane-width condition is imposed. These all-future bounds
 apply only to the endpoint seed. The finite completion compares the two
 vehicles at matching times, allowing earlier passages through locations
@@ -239,15 +253,34 @@ secondary cost may be large. Neither objective optimality nor agreement
 between affine and nonlinear CLF slack is required for execution.
 
 When no witness exists, every finite primary conic result is checked against
-the original nonlinear constraints while time remains. If endpoint membership
-fails, the existing endpoint correction runs on that primary candidate before
-it can be replaced by a secondary cost solution. The corrected inputs are
-reevaluated against every original hard constraint and the PCBF slack budget.
-A feasible primary result is returned before constructing or solving the secondary problem.
-Otherwise restoration or the secondary objective continues to guide search.
-The first admitted nonlinear candidate ends the outer iteration immediately;
-there is no subsequent search for a lower-cost witness. `search.converged`
-and its legacy `scvxConverged` metadata field denote satisfaction of this
+the nonlinear constraints while time remains. Raw, endpoint-corrected and
+secondary candidates are compared using their nonlinear evaluations. Endpoint
+correction may follow a working trajectory with decreasing terminal error, but
+retains the best complete evaluation independently. A later solver result or
+correction cannot overwrite a better evaluated candidate merely because it
+exists. An admitted candidate always has priority over an inadmissible one.
+
+The numerical restoration score is
+
+\[
+\Theta=\sum_{i<N}\xi_i+
+100\left(\sum_{i\ge N}\xi_i+v_T+v_G+v_P\right),
+\]
+
+where `v_T` is terminal-norm excess, `v_G` is the maximum endpoint/future
+separation deficit, and `v_P` is the maximum physical/input/slew violation.
+This heuristic score guides search and matches the completion-slack sum in the
+elastic subproblem; it is not the PCBF value or a distance with uniform units.
+The original hard residual is still the maximum original violation. Equal
+scores prefer smaller terminal excess, with the existing feasible cost tie
+rule retained.
+
+A feasible primary returns immediately. An improving but inadmissible primary
+returns to the outer loop for relinearization before optional secondary cost
+work. Conic steps that fail to improve can be checked at half and quarter
+amplitude, within the same time budget. The first admitted nonlinear candidate
+ends the iteration; no subsequent cost improvement is required.
+`search.converged` and its legacy `scvxConverged` metadata field describe this
 feasibility stopping target, not numerical optimality. Positive prefix slack
 still describes recovery and is not labeled zero-slack or collision-free.
 
@@ -262,17 +295,25 @@ configured numerical tie tolerance, and by the retained slack budget when
 one is available. Neither CLF optimality nor asymptotic lane convergence is
 asserted merely because the feasibility proof holds.
 
-If hard completion rows make a convex subproblem infeasible, a numerical
-restoration step temporarily uses elastic completion rows. This is only a
-search direction. It cannot be retained unless a fresh nonlinear rollout
-satisfies the original **hard, zero-slack** completion. A short shooting
-correction jointly adjusts the final controls and reference phase to remove
-terminal linearization defects only
-when endpoint membership fails. A feasible candidate bypasses correction;
-correction ends as soon as feasibility is reached. All corrected inputs,
-slew limits, safety samples, endpoint membership and phase-dependent future
-target separation are reevaluated;
-selected controls are not clipped.
+If the hard convex subproblem is infeasible, numerical restoration enables
+elastic completion collision rows, terminal membership and endpoint/future
+separation. The two terminal elastic variables are fixed to zero in the hard
+primary and secondary programs. All elastic variables are search devices:
+admission still requires the original hard completion, terminal membership,
+future separation and physical constraints. The configured collision buffer
+is unchanged.
+
+A cheap lower bound for each affine row over the variable bounds skips a hard
+conic solve when that row is already impossible. If the elastic program itself
+is infeasible, the outer loop allows bounded trust expansion instead of
+repeated shrinking. Unresolved restoration solver failures stop the attempt;
+evaluated nonlinear rejection still supports backtracking or shrinking. No
+radius update establishes global feasibility.
+
+A short endpoint correction jointly adjusts final inputs and free phase.
+A feasible candidate bypasses correction and ends it immediately. Every trial
+retains the best complete nonlinear candidate before following a terminal-error
+improvement; inputs are never clipped after the solve.
 
 Evaluation stores per-stage safety, physical residuals and costs. During an
 endpoint correction the unchanged prefix is reused and only the modified suffix
@@ -360,9 +401,10 @@ transition's slack inequality.
 
 ## Interfaces and limits
 
-State format **54** stores the absolute sample index, target epoch, endpoint
+State format **55** stores the absolute sample index, target epoch, endpoint
 family and its chosen phase, full input/state continuation, achieved prefix slacks, and problem
-context. Old state formats are discarded. Predictions include the whole
+context. Format 55 invalidates cached plans admitted without interior collision
+checks. Old state formats are discarded. Predictions include the whole
 prefix plus completion; metadata distinguishes their lengths. No lane/
 avoidance mode switch is introduced.
 
