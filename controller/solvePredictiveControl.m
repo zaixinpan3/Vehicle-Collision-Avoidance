@@ -3,7 +3,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % Safety and lane/CLF costs guide restoration only while no witness exists.
 % The endpoint family supplies every newly appended input.
     if nargin<3,timer=tic;end
-    cfg=model.cfg;solution=[];model.slackCap=Inf;
+    cfg=model.cfg;solution=[];baseline=[];model.slackCap=Inf;
     search=struct('solverCalls',0,'source',"sequentialConvexification", ...
         'terminationReason',"iterationLimit",'sequentialIterations',{{}}, ...
         'initialization',"laneFeedbackRollout",'safetySlack',Inf,'shiftAvailable',false, ...
@@ -27,15 +27,11 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 for name=["stageSafety","stageHard","stageCost","stageCollision","interiorViolation"]
                     shifted.(name)=shifted.(name)(2:end);
                 end
-                solution=localNominalEvaluation(anchor,model,shifted,size(shifted.inputs,2)+1);
+                baseline=localNominalEvaluation(anchor,model,shifted,size(shifted.inputs,2)+1,false);
             else
-                solution=localNominalEvaluation(anchor,model);
+                baseline=localNominalEvaluation(anchor,model,[],1,false);
             end
-            if solution.hard>0 || solution.safety>model.slackCap
-                error('collisionAvoidanceController:invalidRetainedContinuation', ...
-                    'The retained nominal witness failed its successor constraints or slack budget.');
-            end
-            search.shiftAvailable=true;search.source="retainedContinuation";
+            search.shiftAvailable=localFeasible(baseline,model);
         else
             search.initialization="restorationFromChangedEgoState";
         end
@@ -44,11 +40,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     end
     search.slackCap=model.slackCap;
     search.initializationCandidates=struct([]);
-    if isempty(solution),baseline=localNominalEvaluation(anchor,model);
-    else,baseline=solution;
-    end
-    if isempty(solution) && localFeasible(baseline,model)
+    if isempty(baseline),baseline=localNominalEvaluation(anchor,model);end
+    if localFeasible(baseline,model)
         solution=baseline;search.source="feasibleInitialization";
+        if search.shiftAvailable,search.source="retainedContinuation";end
     end
     % Screen bounded target-aware rollouts only when no transferable witness
     % exists. Tiny replay differences still repair the retained trajectory.
@@ -80,7 +75,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         end
     end
     if ~isempty(solution)
-        model.terminal.phaseMeters=solution.terminalPhaseMeters;
+        model.terminal=solution.terminal;
         search.converged=true;search.terminationReason="feasibleWitness";
         search.safetySlack=solution.safety;search.elapsedSeconds=toc(timer);return;
     end
@@ -114,7 +109,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             refinement=model.collisionRefinement | candidate.interiorViolation>0;
             if any(refinement & ~model.collisionRefinement)
                 model.collisionRefinement=refinement;
-                baseline=localNominalEvaluation(baseline.inputs,model,[],1,baseline.terminalPhaseMeters);
+                baseline=localNominalEvaluation(baseline.inputs,model);
                 radius=max(radius,cfg.nonlinear.trustRadius);
             end
             step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;step.nominalRestorationMerit=candidate.restorationMerit;
@@ -126,7 +121,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             end
             if localBetter(candidate,baseline,model)
                 baseline=candidate;step.acceptedIterate=true;
-                model.terminal.phaseMeters=candidate.terminalPhaseMeters;
+                model.terminal=candidate.terminal;
                 radius=min(1,1.25*radius);
             else
                 radius=radius/2;
@@ -143,7 +138,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         end
     end
     if ~isempty(solution)
-        model.terminal.phaseMeters=solution.terminalPhaseMeters;search.safetySlack=solution.safety;
+        model.terminal=solution.terminal;search.safetySlack=solution.safety;
     end
     search.elapsedSeconds=toc(timer);
 end
@@ -175,28 +170,24 @@ function candidate=localPolishEndpoint(candidate,model,timer)
     % and all nonlinear constraints and the PCBF budget are checked afterward.
     cfg=model.cfg;count=size(candidate.inputs,2);seed=model.terminal;working=candidate;
     tail=max(1,count-cfg.controller.horizonSteps);length=min(count,max(8,min(20,tail)));
-    first=count-length+1;endIndex=model.sampleIndex+count;
+    first=count-length+1;
     for iteration=1:5
         if localFeasible(candidate,model),return;end
         if toc(timer)>=cfg.solver.timeLimitSeconds,return;end
-        seed.phaseMeters=working.terminalPhaseMeters;
-        ref=terminalContinuation.referenceAt(seed,endIndex);
-        transform=blkdiag([cos(ref(3)),sin(ref(3));-sin(ref(3)),cos(ref(3))],eye(6));
-        [~,~,deviation,phaseDerivative]=terminalContinuation.membership([working.states(:,end);working.inputs(:,end)],endIndex,seed);
-        if norm(seed.factor*deviation)<=seed.radius,return;end
+        deviation=[working.states(4:6,end);working.inputs(:,end)]-[seed.base(4:6);seed.reference.input];
+        if norm(seed.quotientFactor*deviation)<=seed.radius,return;end
         sensitivity=zeros(6,2*length);x=working.states(:,first);
         for index=first:count
             [x,a,b]=nonlinearBicycleModel.sample(x,working.inputs(:,index),cfg);
             sensitivity=a*sensitivity;sensitivity(:,2*(index-first)+(1:2))=b;
         end
         memory=zeros(2,2*length);memory(:,end-1:end)=eye(2);
-        tangent=seed.factor*[transform*[sensitivity;memory],phaseDerivative];
-        correction=-pinv(tangent)*(seed.factor*deviation);
+        tangent=seed.quotientFactor*[sensitivity(4:6,:);memory];
+        correction=-pinv(tangent)*(seed.quotientFactor*deviation);
         improved=false;
         for exponent=0:5
             if toc(timer)>=cfg.solver.timeLimitSeconds,return;end
-            inputs=working.inputs;inputs(:,first:end)=inputs(:,first:end)+reshape(correction(1:end-1),2,[])*2^-exponent;
-            phase=working.terminalPhaseMeters+correction(end)*2^-exponent;
+            inputs=working.inputs;inputs(:,first:end)=inputs(:,first:end)+reshape(correction,2,[])*2^-exponent;
             lo=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
             hi=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
             rate=cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
@@ -204,16 +195,15 @@ function candidate=localPolishEndpoint(candidate,model,timer)
                 continue;
             end
             try
-                trial=localNominalEvaluation(inputs,model,working,first,phase);
+                trial=localNominalEvaluation(inputs,model,working,first);
             catch exception
                 if localDomainFailure(exception),continue;end
                 rethrow(exception);
             end
             if localBetter(trial,candidate,model),candidate=trial;end
             if localFeasible(candidate,model),return;end
-            trialSeed=seed;trialSeed.phaseMeters=trial.terminalPhaseMeters;
-            [~,~,nextDeviation]=terminalContinuation.membership([trial.states(:,end);inputs(:,end)],endIndex,trialSeed);
-            if norm(seed.factor*nextDeviation)<norm(seed.factor*deviation)
+            nextDeviation=[trial.states(4:6,end);inputs(:,end)]-[seed.base(4:6);seed.reference.input];
+            if norm(seed.quotientFactor*nextDeviation)<norm(seed.quotientFactor*deviation)
                 working=trial;improved=true;break;
             end
         end
@@ -222,15 +212,22 @@ function candidate=localPolishEndpoint(candidate,model,timer)
 end
 
 function [inputs,seed]=localSeed(model)
-    cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;
+    cfg=model.cfg;seed=model.terminal;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
     required=cfg.controller.horizonSteps+ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime);
     required=min(required,cfg.controller.maximumHorizonSteps);inputs=zeros(2,cfg.controller.maximumHorizonSteps);
     for index=1:size(inputs,2)
-        deviation=nonlinearBicycleModel.error(x,model.lane,reference);
-        u=localClip(reference.input+reference.gain*deviation,previous,cfg);inputs(:,index)=u;
+        if index<=required
+            deviation=nonlinearBicycleModel.error(x,model.lane,reference);
+            u=reference.input+reference.gain*deviation;
+        else
+            seed=terminalContinuation.fit(seed,[x;previous],model.sampleIndex+index-1);
+            [~,~,deviation]=terminalContinuation.membership([x;previous],seed.epochIndex,seed);
+            u=seed.reference.input+seed.gain*deviation;
+        end
+        u=localClip(u,previous,cfg);inputs(:,index)=u;
         x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;
         if index<required,continue;end
-        seed=terminalContinuation.anchor(seed,x,model.sampleIndex+index,model.lane);
+        seed=terminalContinuation.fit(seed,[x;u],model.sampleIndex+index);
         value=terminalContinuation.membership([x;u],seed.epochIndex,seed);
         q=localTargetAt(model,index*cfg.controller.sampleTime);
         if value<0 && terminalContinuation.separation(seed,q,model.frame,cfg)>0
@@ -245,13 +242,13 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
     % The transported fluid velocity is a temporary guide. Limited feedback
     % inputs and the actual nonlinear model, not an ideal point path, define
     % the anchor used by dynamics, tires and rectangle separation constraints.
-    cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;
+    cfg=model.cfg;seed=model.terminal;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
     h=cfg.controller.sampleTime;count=cfg.controller.maximumHorizonSteps;
     required=min(count,cfg.controller.horizonSteps+ceil(cfg.nonlinear.recoveryHorizonSeconds/h));
     inputs=zeros(2,count);
     egoRadius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
     radius=egoRadius+norm(model.target(8:9))+norm(model.target(10:11))+cfg.collision.safetyMarginMeters;
-    station=[];
+    station=[];completionStarted=false;
     for index=1:count
         if mod(index-1,16)==0 && toc(timer)>=cfg.solver.timeLimitSeconds,inputs=[];return;end
         time=(model.sampleIndex+index-1)*h;
@@ -269,7 +266,7 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
             end
             if norm(position-future(1:2))<radius+1,active=true;break;end
         end
-        if active
+        if active && ~completionStarted
             yaw=q(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];offset=rotation*q(10:11);
             omega=q(4)*sin(q(6))/q(7);
             translation=q(4)*[cos(yaw+q(6));sin(yaw+q(6))]+omega*[-offset(2);offset(1)];
@@ -282,7 +279,14 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
             deviation(1)=0;deviation(2)=atan2(sin(x(3)-heading),cos(x(3)-heading));
             deviation(3)=x(4)-desiredSpeed;
         end
-        u=reference.input+reference.gain*deviation;
+        if index>required && (~active || completionStarted)
+            completionStarted=true;
+            seed=terminalContinuation.fit(seed,[x;previous],model.sampleIndex+index-1);
+            [~,~,deviation]=terminalContinuation.membership([x;previous],seed.epochIndex,seed);
+            u=seed.reference.input+seed.gain*deviation;
+        else
+            u=reference.input+reference.gain*deviation;
+        end
         steering=min(cfg.model.frontWheelSteeringAngleMaximum, ...
             atan(cfg.vehicle.wheelbase*.8*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity/max(x(4)^2,1)));
         lo=[-steering;max(cfg.actuation.brakingRatioMinimum,-.35)];
@@ -290,7 +294,7 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
         u=localClip(min(hi,max(lo,u)),previous,cfg);inputs(:,index)=u;
         x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;
         if index<required,continue;end
-        seed=terminalContinuation.anchor(seed,x,model.sampleIndex+index,model.lane);
+        seed=terminalContinuation.fit(seed,[x;u],model.sampleIndex+index);
         membership=terminalContinuation.membership([x;u],seed.epochIndex,seed);
         future=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time+h);
         separation=terminalContinuation.separation(seed,future,model.frame,cfg);
@@ -315,9 +319,9 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
         'terminalPhaseMeters',model.terminal.phaseMeters,'primaryRawMerit',Inf, ...
         'primaryMerit',Inf,'secondaryRawMerit',Inf,'secondaryMerit',Inf, ...
         'restorationRawMerit',Inf,'restorationMerit',Inf,'candidateStage',"none",'hardRowInfeasible',false);candidate=[];
-    anchor=baseline.inputs;cfg=model.cfg;count=size(anchor,2);prefix=cfg.controller.horizonSteps;reference=model.terminal.reference;
+    anchor=baseline.inputs;cfg=model.cfg;count=size(anchor,2);prefix=cfg.controller.horizonSteps;reference=model.nominalReference;
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
-    is=iu(end)+(1:count);ic=is(end)+1;it=ic+1;ip=it+1;ie=ip+(1:2);nv=ie(end);
+    is=iu(end)+(1:count);ic=is(end)+1;it=ic+1;ie=it+(1:2);nv=ie(end);
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
     rows=cell(1,4*count+6);bounds=cell(1,4*count+6);rowCount=0;
     costMatrix=sparse(7*count+1,nv);costOffset=zeros(7*count+1,1);
@@ -385,18 +389,16 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     end
     % The same 2-norm endpoint membership is used here and in the nonlinear
     % rollout. There is no inscribed-polytope/ellipsoid mismatch.
-    endIndex=model.sampleIndex+count;y=[x;anchor(:,end)];seed=model.terminal;
-    ref=terminalContinuation.referenceAt(seed,endIndex);
-    transform=blkdiag([cos(ref(3)),sin(ref(3));-sin(ref(3)),cos(ref(3))],eye(6));
-    [~,~,deviation,phaseDerivative]=terminalContinuation.membership(y,endIndex,seed);
+    endIndex=model.sampleIndex+count;y=[x;anchor(:,end)];
+    [seed,poseJacobian]=terminalContinuation.fit(model.terminal,y,endIndex);
+    deviation=y(4:8)-[seed.base(4:6);seed.reference.input];
     map=sparse(8,nv);map(1:6,ix(:,end))=eye(6);map(7:8,iu(:,end))=eye(2);
-    map=transform*map;map(:,ip)=phaseDerivative;
     elastic=zeros(nv,1);elastic(ie(1))=1;
-    endpoint=secondordercone(seed.factor*map,-seed.factor*deviation,elastic,-seed.radius);
+    endpoint=secondordercone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,elastic,-seed.radius);
     if ~isempty(model.target)
         q=localTargetAt(model,count*cfg.controller.sampleTime);
-        [separation,phaseGradient]=terminalContinuation.separation(seed,q,model.frame,cfg,endIndex);
-        r=sparse(1,nv);r(ip)=-phaseGradient;r(ie(2))=-1;
+        [separation,~,poseGradient]=terminalContinuation.separation(seed,q,model.frame,cfg,endIndex);
+        r=-poseGradient*poseJacobian*map;r(ie(2))=-1;
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=separation;
     end
     [g,j]=localSafetyRows(x,count*cfg.controller.sampleTime,model);
@@ -423,7 +425,7 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
         [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
     end
     info.safetyExitFlag=flag;
-    [candidate,info.primaryRawMerit]=localConicEvaluation(first,iu,ip,baseline,model,timer);
+    [candidate,info.primaryRawMerit]=localConicEvaluation(first,iu,baseline,model,timer);
     if ~isempty(candidate)
         info.candidateStage="primary";info.primaryMerit=candidate.restorationMerit;
         if localFeasible(candidate,model) || localBetter(candidate,baseline,model)
@@ -442,7 +444,7 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
         options.MaxTime=remaining;
         [first,~,flag]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
         info.completionRestoration=true;info.status="restoringCompletion";
-        [trial,info.restorationRawMerit]=localConicEvaluation(first,iu,ip,baseline,model,timer);
+        [trial,info.restorationRawMerit]=localConicEvaluation(first,iu,baseline,model,timer);
         if ~isempty(trial)
             info.restorationMerit=trial.restorationMerit;
             if localBetter(trial,candidate,model),candidate=trial;info.candidateStage="restoration";end
@@ -465,7 +467,7 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     % A sum of small squared-norm epigraphs is exactly the same quadratic
     % objective, without one horizon-wide cone coupling every stage.
     groups=count+1;expanded=nv+groups;
-    endpoint=secondordercone([endpoint.A,sparse(8,groups)],endpoint.b, ...
+    endpoint=secondordercone([endpoint.A,sparse(size(endpoint.A,1),groups)],endpoint.b, ...
         [endpoint.d;zeros(groups,1)],endpoint.gamma);
     cones=repmat(endpoint,1,groups+1);epigraph=zeros(groups,1);
     for group=1:groups
@@ -491,7 +493,7 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     if info.secondaryReturned,first=second;end
     info.solverResidual=max([0;a*first-b;abs(equal*first-rhs);lower-first;first-upper]);
     info.secondarySafety=sum(max(0,first(is(1:prefix))));info.clfSlack=max(0,first(ic));info.status="solved";
-    [trial,info.secondaryRawMerit]=localConicEvaluation(second,iu,ip,baseline,model,timer);
+    [trial,info.secondaryRawMerit]=localConicEvaluation(second,iu,baseline,model,timer);
     if ~isempty(trial)
         info.secondaryMerit=trial.restorationMerit;
         if localBetter(trial,candidate,model),candidate=trial;info.candidateStage="secondary";end
@@ -499,14 +501,14 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     if ~isempty(candidate),info.terminalPhaseMeters=candidate.terminalPhaseMeters;end
 end
 
-function [candidate,rawMerit]=localConicEvaluation(point,iu,ip,baseline,model,timer)
+function [candidate,rawMerit]=localConicEvaluation(point,iu,baseline,model,timer)
     candidate=[];rawMerit=Inf;
     if isempty(point) || any(~isfinite(point)) || toc(timer)>=model.cfg.solver.timeLimitSeconds,return;end
     delta=reshape(point(iu(:)),2,[]);
     for scale=[1,.5,.25]
         if toc(timer)>=model.cfg.solver.timeLimitSeconds,return;end
         try
-            trial=localNominalEvaluation(baseline.inputs+scale*delta,model,[],1,model.terminal.phaseMeters+scale*point(ip));
+            trial=localNominalEvaluation(baseline.inputs+scale*delta,model);
             if scale==1,rawMerit=trial.restorationMerit;end
             if localBetter(trial,candidate,model),candidate=trial;end
             if localFeasible(candidate,model),return;end
@@ -533,12 +535,12 @@ function [values,jacobian]=localSafetyRows(x,time,model)
     end
 end
 
-function evaluation=localNominalEvaluation(inputs,model,cached,first,phase)
+function evaluation=localNominalEvaluation(inputs,model,cached,first,refit)
     % Reuse only an exactly unchanged input/state prefix in the same problem.
     % A shifted cache is supplied only after the nominal successor check.
     cfg=model.cfg;count=size(inputs,2);prefix=cfg.controller.horizonSteps;
-    if nargin<5,phase=model.terminal.phaseMeters;end
-    seed=model.terminal;seed.phaseMeters=phase;
+    if nargin<5,refit=true;end
+    seed=model.terminal;
     [low,high]=localStateLimits(cfg);halfDuration=cfg.controller.sampleTime/2;
     states=zeros(6,count+1);states(:,1)=model.initialState;
     stageSafety=zeros(1,count);stageHard=stageSafety;stageCost=stageSafety;
@@ -565,15 +567,16 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,phase)
         end
         x=nonlinearBicycleModel.sample(middle,inputs(:,index),cfg,[],halfDuration);states(:,index+1)=x;
         stageHard(index)=max([0;low-x(4:6);x(4:6)-high;low-middle(4:6);middle(4:6)-high]);
-        deviation=nonlinearBicycleModel.error(x,model.lane,model.terminal.reference);
+        deviation=nonlinearBicycleModel.error(x,model.lane,model.nominalReference);
         % Input proximity belongs to the local search step, not an absolute
         % input penalty in the retained nonlinear trajectory's nominal cost.
-        stageCost(index)=norm(model.terminal.reference.factor*deviation)^2;
+        stageCost(index)=norm(model.nominalReference.factor*deviation)^2;
     end
     rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     lo=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
     hi=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
     endIndex=model.sampleIndex+count;
+    if refit,seed=terminalContinuation.fit(seed,[x;inputs(:,end)],endIndex);end
     [~,~,deviation]=terminalContinuation.membership([x;inputs(:,end)],endIndex,seed);
     separation=terminalContinuation.separation(seed,localTargetAt(model,count*cfg.controller.sampleTime),model.frame,cfg,endIndex);
     terminalViolation=max(0,norm(seed.factor*deviation)-seed.radius);
@@ -607,13 +610,13 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,phase)
     hard=max([hard;stageSafety(prefix+1:end).']);
     restorationMerit=sum(stageSafety(1:prefix))+100*(sum(stageSafety(prefix+1:end)) ...
         +terminalViolation+terminalGeometry+physical);
-    reference=model.terminal.reference;before=nonlinearBicycleModel.error(states(:,1),model.lane,reference);
+    reference=model.nominalReference;before=nonlinearBicycleModel.error(states(:,1),model.lane,reference);
     after=nonlinearBicycleModel.error(states(:,2),model.lane,reference);
     v0=norm(reference.factor*before)^2;v1=norm(reference.factor*after)^2;clf=max(0,v1-(1-cfg.nonlinear.clfDecay)*v0);
     slacks=stageSafety(1:prefix);
     evaluation=struct('inputs',inputs,'states',states,'safety',sum(slacks),'stageSlacks',slacks, ...
         'hard',hard,'clfSlack',clf,'clfInitialValue',v0,'clfNextValue',v1, ...
-        'minimumCollisionMargin',min(stageCollision),'terminalPhaseMeters',phase, ...
+        'minimumCollisionMargin',min(stageCollision),'terminalPhaseMeters',seed.phaseMeters,'terminal',seed, ...
         'terminalSeparationMargin',separation, ...
         'terminalViolation',terminalViolation,'restorationMerit',restorationMerit,'interiorViolation',interiorViolation, ...
         'cost',sum(stageCost)/count+cfg.clf.relaxationWeight*clf^2, ...

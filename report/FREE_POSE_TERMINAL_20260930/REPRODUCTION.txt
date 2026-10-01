@@ -1,0 +1,42 @@
+Free-pose terminal formulation, 2026-09-30
+
+From the repository root, choose an output directory and run:
+matlab -singleCompThread -batch "addpath('scripts'); runCollisionThreatValidation(OutputDirectory='OUTPUT');"
+python scripts/auditCollisionThreats.py OUTPUT/campaign.json --output OUTPUT/audit.json
+Run the ten suites listed in runChecks.m.txt after updating its root/raw paths.
+The source-manifest hashes identify the final tested code. No scenario, target,
+vehicle, solver-budget, sampling or collision-margin configuration changed.
+
+Fourteen scenarios: seven named conflict geometries at 8 and 15 m/s. Each uses
+160 holds of 50 ms, exact observations and a fixed target epoch. Prefix length
+8/16, maximum 512 holds, 5 s soft call budget, 24 iterations, 6 mm collision
+margin and no road constraints. All nominal given-path cruise baselines collide
+without initial overlap. No random draws. JSON null represents infinite slew
+limits; finite limits are checked by unit tests. ODE45 tolerances 1e-11/1e-12,
+31 geometry samples per hold; measured ODE successors feed back into control.
+The Python audit independently recomputes target motion and rectangle geometry.
+It does not prove collision freedom between audited samples.
+
+The prior comparison uses the immediately preceding recorded same-day campaign
+at bd0fcfca4938409e60bfb786ab1d6d07ad31c5d0. It is not a new baseline rerun.
+Configuration, target, given-path baseline and random-seed records match exactly.
+Actual controller-call wall times are unprofiled and single-threaded, with
+process-local warmup; first calls are separated from running-call statistics.
+Controller-calls.csv includes both sets and tracking errors. The final maximum
+lateral displacement from the path is a disclosed first-feasible-policy outcome.
+No backup controller or nominal-versus-retained execution selector is included.
+
+The analytical pose fit is an SE(2) Schur-complement elimination of terminal
+membership; the selected pose must separately pass future target separation.
+Original eight-dimensional membership is still checked after every new search.
+Existing terminal reference utilities also test curved trims and phase, but the
+production controller constructs exactly one straight-cruise core and has no
+terminal-mode decision. The selected rigid placement is fixed in the shift and
+append feasibility construction. A failed solve without current admission
+reports failure; positive-slack seeds are never authorized for execution.
+
+The compact bundle contains actual per-call metrics, independent audits,
+fixture/configuration records, tests, analyzer findings and source/raw hashes.
+Full pose JSON, MAT/prototype files, copied source trees and build products stay
+under the cache directory in summary.json. No solver/vendor trees or unrelated
+estimator/manuscript changes belong to this experiment.

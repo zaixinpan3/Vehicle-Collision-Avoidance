@@ -1,0 +1,177 @@
+[
+  {
+    "file": "controller/solvePredictiveControl.m",
+    "findings": [
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 345,
+        "column": [
+          9,
+          13
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 345,
+        "column": [
+          40,
+          44
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 345,
+        "column": [
+          65,
+          69
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 348,
+        "column": [
+          24,
+          24
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 349,
+        "column": [
+          20,
+          20
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 352,
+        "column": [
+          26,
+          28
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 356,
+        "column": [
+          9,
+          11
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 356,
+        "column": [
+          31,
+          33
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 368,
+        "column": [
+          38,
+          40
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 368,
+        "column": [
+          60,
+          62
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 376,
+        "column": [
+          30,
+          39
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 378,
+        "column": [
+          9,
+          18
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 384,
+        "column": [
+          28,
+          28
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 384,
+        "column": [
+          59,
+          59
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 475,
+        "column": [
+          30,
+          30
+        ]
+      }
+    ]
+  },
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "findings": []
+  },
+  {
+    "file": "controller/terminalContinuation.m",
+    "findings": []
+  },
+  {
+    "file": "tests/nonlinearPredictiveSafetyTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/movingTargetFlowTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/freePoseTerminalTest.m",
+    "findings": []
+  }
+]

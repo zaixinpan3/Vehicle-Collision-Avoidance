@@ -67,16 +67,16 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             expected=initial+t.'*(after(1:2)-before(1:2)-qNext(1:2)+q(1:2));
             testCase.verifyEqual(later,expected,AbsTol=1e-11);
         end
-        function aLongitudinalDelayCanChooseANewTerminalPhase(testCase)
+        function aLongitudinalDelayCanTranslateTheTerminalCore(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=10;
             [~,~,~,first]=collisionAvoidanceController(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,first);ego.position(1)=ego.position(1)-5;
             [~,~,problem,delayed]=collisionAvoidanceController(ego,[],road,cfg,first);
             cfg.solver.timeLimitSeconds=1e-12;
             [last,hard,~,counts]=localContinue(delayed,ego,road,cfg,24);
-            testCase.verifyLessThan(problem.metadata.terminalPhaseMeters,-4);
+            testCase.verifyLessThan(delayed.terminal.epochState(1)-first.terminal.epochState(1),-4);
             testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
-            testCase.verifyEqual(last.terminal.phaseMeters,delayed.terminal.phaseMeters,AbsTol=1e-12);
+            testCase.verifyEqual(last.terminal.epochState,delayed.terminal.epochState,AbsTol=1e-12);
             testCase.verifyEqual(hard,zeros(size(hard)),AbsTol=0);
             testCase.verifyEqual(counts,zeros(size(counts)));
         end

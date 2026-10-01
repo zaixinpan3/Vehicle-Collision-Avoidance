@@ -163,11 +163,11 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidSampleTime');
         end
         function retiredStateCannotRestoreTheOldTargetMotion(testCase)
-            [ego,road,cfg]=localFixture();prior=struct('version',55,'target',ones(10,1));
+            [ego,road,cfg]=localFixture();prior=struct('version',56,'target',ones(10,1));
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,56);
+            testCase.verifyEqual(state.version,57);
         end
         function everyCallAppliesTheReturnedFeasibleFirstControl(testCase)
             [ego,road,cfg]=localFixture();

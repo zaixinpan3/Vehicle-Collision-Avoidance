@@ -1,0 +1,14 @@
+{
+  "commit": "bd0fcfca4938409e60bfb786ab1d6d07ad31c5d0",
+  "sources": {
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/collisionAvoidanceController.m": "cc8117ca5d1dcda221fc1cc448a17f0cbd631bf0d7c6916ec7c41c6f1951084a",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "e1b97c6edb3815887ead0460b74e580ac1472bb859ffc7579eb95af5b959b312",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "00c243512e4f265ef1dd2bea2f4c9be894de04cb1a37e9d83c3b839b831305be",
+    "controller/terminalContinuation.m": "a93e03292a843175803333a02abb47270eb99fe982a1ae44f9ba74fe4ed03ce8",
+    "config/collisionAvoidanceControllerConfig.m": "e3529546f96890c49a04f3838d3a3d38286efbc14c976323d781eff0965c8ee5"
+  }
+}

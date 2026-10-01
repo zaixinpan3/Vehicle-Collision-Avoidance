@@ -1,5 +1,5 @@
 classdef terminalContinuation
-    %terminalContinuation Free-phase endpoint family for a hard completion tail.
+    %terminalContinuation Rigidly placed endpoint family for a hard completion tail.
     % A cached local RK4 contraction construction closes the infinite suffix.
     % It is a nominal numerical-model result, not a continuous-plant certificate.
     methods (Static)
@@ -33,7 +33,10 @@ classdef terminalContinuation
             [~,arithmetic,~,centerDomain]=localEnclosure(base,reference.input,gain,zeros(8,1),cfg,inverse);
             arithmetic=norm(factor,'fro')*arithmetic;
             radius=cfg.nonlinear.terminalRadius;
+            poseGain=-(p(1:3,1:3)\p(1:3,4:8));
+            quotient=p(4:8,4:8)+p(4:8,1:3)*poseGain;
             seed=struct('reference',reference,'gain',gain,'factor',factor,'matrix',p, ...
+                'poseGain',poseGain,'quotientFactor',chol((quotient+quotient.')/2), ...
                 'increment',next(1:3),'base',base,'radius',0,'errorBound',zeros(8,1), ...
                 'phaseMeters',0,'phaseStepMeters',phaseStep);
             for attempt=1:32
@@ -87,6 +90,23 @@ classdef terminalContinuation
             seed.phaseMeters=0;
         end
 
+        function [seed,jacobian] = fit(seed,y,sampleIndex)
+            % Eliminate free SE(2) pose by the Schur complement of the core.
+            % The selected pose is retained as part of the safety witness.
+            intrinsic=y(4:8)-[seed.base(4:6);seed.reference.input];
+            poseError=seed.poseGain*intrinsic;
+            heading=y(3)-poseError(3);rotation=localRotation(heading);
+            seed.epochState=[y(1:2)-rotation*poseError(1:2);heading;seed.base(4:6)];
+            seed.epochIndex=sampleIndex;seed.phaseMeters=0;
+            if nargout>1
+                select=[zeros(5,3),eye(5)];
+                angle=[0,0,1,zeros(1,5)]-seed.poseGain(3,:)*select;
+                position=[eye(2),zeros(2,6)]-rotation*seed.poseGain(1:2,:)*select ...
+                    -rotation*[-poseError(2);poseError(1)]*angle;
+                jacobian=[position;angle];
+            end
+        end
+
         function [y,tangent] = referenceAt(seed,index)
             % Phase translates a straight reference or rotates a circular one.
             % A selected phase stays constant when the feasible witness shifts.
@@ -127,11 +147,12 @@ classdef terminalContinuation
             u=seed.reference.input+seed.gain*deviation;
         end
 
-        function [margin,phaseDerivative] = separation(seed,q,frame,cfg,index)
+        function [margin,phaseDerivative,poseGradient] = separation(seed,q,frame,cfg,index)
             % Sufficient all-future geometry for the endpoint only. The finite
             % completion tail compares vehicles at matching absolute times.
-            % The given path defines the reference; road edges are not constraints.
-            phaseDerivative=0;if isempty(q),margin=Inf;return;end
+            % Road-frame axes only parameterize a sufficient separation test.
+            % poseGradient differentiates the straight reference pose at index.
+            phaseDerivative=0;poseGradient=zeros(1,3);if isempty(q),margin=Inf;return;end
             if nargin<5,index=seed.epochIndex;end
             [reference,tangent]=terminalContinuation.referenceAt(seed,index);
             x=reference(1:6);shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
@@ -142,17 +163,17 @@ classdef terminalContinuation
             t=[cos(frame(3));sin(frame(3))];n=[-t(2);t(1)];
             if seed.increment(3)==0
                 velocity=localRotation(x(3))*seed.increment(1:2)/cfg.controller.sampleTime;
-                side=n.'*(x(1:2)-frame(1:2));extent=n.'*corners;
                 padding=positionError+reach*headingError;
-                egoSide=[side+min(extent)-padding;side+max(extent)+padding];
                 if q(6)~=0 && any(q(4:5)~=0)
                     [center,~,outer]=localOrbit(q);
-                    side=n.'*(center-frame(1:2))+[-outer;outer];
-                    forward=t.'*(x(1:2)-center)+min(t.'*corners)-padding-outer;
-                    if t.'*velocity<0,forward=-Inf;end
-                    [collision,active]=max([egoSide(1)-side(2),side(1)-egoSide(2),forward]);
-                    derivatives=[n.'*tangent(1:2),-n.'*tangent(1:2),t.'*tangent(1:2)];
-                    phaseDerivative=derivatives(active);
+                    relative=x(1:2)-center;
+                    time=max(0,-relative.'*velocity/(velocity.'*velocity));
+                    closest=relative+time*velocity;distance=norm(closest);
+                    collision=distance-outer-reach-positionError;
+                    if distance>0
+                        normal=closest/distance;
+                        poseGradient=[normal.',time*normal.'*[-velocity(2);velocity(1)]];
+                    end
                 else
                     targetVertices=q(1:2)+localRotation(q(3))*(q(10:11)+q(8:9).*[-1,1,1,-1;-1,-1,1,1]);
                     direction=predictiveSafetyGeometry.direction(q(3)+q(6)-frame(3));
@@ -168,13 +189,18 @@ classdef terminalContinuation
                     normals=[t,-t,n,-n];
                     for axis=1:4
                         normal=normals(:,axis);
-                        lower=localProgressMinimum(speeds(axis),accelerations(axis));
-                        gap=min(normal.'*(x(1:2)+corners))-max(normal.'*targetVertices)-padding+lower;
+                        [lower,time]=localProgressMinimum(speeds(axis),accelerations(axis));
+                        [support,corner]=min(normal.'*corners);
+                        gap=normal.'*x(1:2)+support-max(normal.'*targetVertices)-padding+lower;
                         if gap>collision
-                            collision=gap;phaseDerivative=normal.'*tangent(1:2);
+                            collision=gap;
+                            headingGradient=normal.'*[-corners(2,corner);corners(1,corner)] ...
+                                +time*normal.'*[-velocity(2);velocity(1)];
+                            poseGradient=[normal.',headingGradient];
                         end
                     end
                 end
+                phaseDerivative=poseGradient*tangent(1:3);
             else
                 centerLocal=(eye(2)-localRotation(seed.increment(3)))\seed.increment(1:2);
                 center=x(1:2)+localRotation(x(3))*centerLocal;radius=norm(centerLocal);
@@ -201,9 +227,10 @@ function rotation=localRotation(angle)
     rotation=[cos(angle),-sin(angle);sin(angle),cos(angle)];
 end
 
-function minimum=localProgressMinimum(v,a)
-    if a<0 || (a==0 && v<0),minimum=-Inf;
-    elseif a>0,minimum=-min(v,0)^2/(2*a);
+function [minimum,time]=localProgressMinimum(v,a)
+    time=0;
+    if a<0 || (a==0 && v<0),minimum=-Inf;time=Inf;
+    elseif a>0,time=-min(v,0)/a;minimum=-min(v,0)^2/(2*a);
     else,minimum=0;
     end
 end
