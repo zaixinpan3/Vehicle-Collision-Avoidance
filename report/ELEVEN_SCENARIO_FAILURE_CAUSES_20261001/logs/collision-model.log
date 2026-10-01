@@ -1,0 +1,42 @@
+COLLISION headOn 0.55 base flag=1 safety=1.0827538e-08
+ROLLOUT headOn 0.55 affineGap=0.0093146883 nonlinearGap=0 holds=76 maxPosition=0.3677491
+COLLISION headOn 0.55 noTerminalCone flag=1 safety=1.0072031e-08
+COLLISION headOn 0.55 noTailCollision flag=1 safety=1.0720246e-07
+COLLISION headOn 0.55 noStateTrust flag=1 safety=1.6942547e-07
+COLLISION headOn 0.55 noTrust flag=1 safety=1.3073601e-07
+COLLISION headOn 0.55 noClfCone flag=1 safety=7.2752841e-09
+COLLISION headOn 0.60 base flag=1 safety=0.0023843445
+ROLLOUT headOn 0.60 affineGap=0.0036152161 nonlinearGap=0 holds=76 maxPosition=0.8054622
+COLLISION headOn 0.60 noTerminalCone flag=1 safety=0.0023843452
+COLLISION headOn 0.60 noTailCollision flag=1 safety=0.0023843472
+COLLISION headOn 0.60 noStateTrust flag=1 safety=0.002384367
+COLLISION headOn 0.60 noTrust flag=1 safety=1.639207e-06
+COLLISION headOn 0.60 noClfCone flag=1 safety=0.0023843385
+COLLISION headOn 0.65 base flag=1 safety=0.003438075
+ROLLOUT headOn 0.65 affineGap=0.0025613864 nonlinearGap=0 holds=76 maxPosition=0.5079078
+COLLISION headOn 0.65 noTerminalCone flag=1 safety=0.0034380383
+COLLISION headOn 0.65 noTailCollision flag=1 safety=0.0034380133
+COLLISION headOn 0.65 noStateTrust flag=1 safety=0.0034380275
+COLLISION headOn 0.65 noTrust flag=1 safety=2.7311055e-08
+COLLISION headOn 0.65 noClfCone flag=1 safety=0.0034380536
+COLLISION acceleratingHeadOn 0.60 base flag=1 safety=3.9751445e-08
+ROLLOUT acceleratingHeadOn 0.60 affineGap=0.011039756 nonlinearGap=0.005896428 holds=76 maxPosition=0.2294572
+COLLISION acceleratingHeadOn 0.60 noTerminalCone flag=1 safety=2.731509e-08
+COLLISION acceleratingHeadOn 0.60 noTailCollision flag=1 safety=1.0256067e-08
+COLLISION acceleratingHeadOn 0.60 noStateTrust flag=1 safety=1.7802191e-07
+COLLISION acceleratingHeadOn 0.60 noTrust flag=1 safety=2.1099231e-07
+COLLISION acceleratingHeadOn 0.60 noClfCone flag=1 safety=2.7409395e-08
+COLLISION acceleratingHeadOn 0.65 base flag=1 safety=0.00083790787
+ROLLOUT acceleratingHeadOn 0.65 affineGap=0.0051606616 nonlinearGap=0.00097319752 holds=76 maxPosition=0.1035947
+COLLISION acceleratingHeadOn 0.65 noTerminalCone flag=1 safety=0.0008378942
+COLLISION acceleratingHeadOn 0.65 noTailCollision flag=1 safety=0.00083693784
+COLLISION acceleratingHeadOn 0.65 noStateTrust flag=1 safety=0.00083919047
+COLLISION acceleratingHeadOn 0.65 noTrust flag=1 safety=3.0682206e-08
+COLLISION acceleratingHeadOn 0.65 noClfCone flag=1 safety=0.00083789903
+COLLISION acceleratingHeadOn 0.70 base flag=1 safety=0.0007934414
+ROLLOUT acceleratingHeadOn 0.70 affineGap=0.0052063426 nonlinearGap=0.0049432761 holds=76 maxPosition=0.195657
+COLLISION acceleratingHeadOn 0.70 noTerminalCone flag=1 safety=0.00079343653
+COLLISION acceleratingHeadOn 0.70 noTailCollision flag=1 safety=0.00079337601
+COLLISION acceleratingHeadOn 0.70 noStateTrust flag=1 safety=0.00079383652
+COLLISION acceleratingHeadOn 0.70 noTrust flag=1 safety=3.1391846e-08
+COLLISION acceleratingHeadOn 0.70 noClfCone flag=1 safety=0.000793441

@@ -1,0 +1,16 @@
+RECOVERY 8 acceleratingHeadOn noFirstInputTrust u=[-0.41975 -0.99993] rho=1.0452e+05 best-gap=2857.5 predDiff=8413.7 realDiff=13384
+RECOVERY 8 acceleratingHeadOn recenterFirstInputTrust u=[-0.074738 -0.1122] rho=1.0848e+05 best-gap=0.23047 predDiff=12370 realDiff=12033
+RECOVERY 8 turningCrossing noFirstInputTrust u=[0.42134 -0.99991] rho=73365 best-gap=2418 predDiff=5748.8 realDiff=9988.3
+RECOVERY 8 turningCrossing recenterFirstInputTrust u=[0.075427 -0.11219] rho=76701 best-gap=0.20955 predDiff=9085.4 realDiff=8804.1
+RECOVERY 8 curvedCrossing noFirstInputTrust u=[0.42326 -0.99989] rho=48303 best-gap=1478.9 predDiff=8718.2 realDiff=11371
+RECOVERY 8 curvedCrossing recenterFirstInputTrust u=[0.07684 -0.11214] rho=50506 best-gap=0.046573 predDiff=10921 realDiff=10745
+RECOVERY 15 headOn noFirstInputTrust u=[-0.36476 -0.99989] rho=3.4651e+05 best-gap=7310.1 predDiff=38745 realDiff=47766
+RECOVERY 15 headOn recenterFirstInputTrust u=[-0.069923 -0.11623] rho=3.538e+05 best-gap=5.0572 predDiff=46037 realDiff=44971
+RECOVERY 15 acceleratingHeadOn noFirstInputTrust u=[-0.36623 -0.99997] rho=3.4873e+05 best-gap=7196 predDiff=39256 realDiff=48265
+RECOVERY 15 acceleratingHeadOn recenterFirstInputTrust u=[-0.067624 -0.10091] rho=3.5604e+05 best-gap=2.3414 predDiff=46569 realDiff=45450
+RECOVERY 15 crossing noFirstInputTrust u=[0.40643 -0.99982] rho=2.5148e+05 best-gap=5822 predDiff=20521 realDiff=29844
+RECOVERY 15 crossing recenterFirstInputTrust u=[0.068868 -0.074916] rho=2.5898e+05 best-gap=1.3851 predDiff=28021 realDiff=27097
+RECOVERY 15 turningCrossing noFirstInputTrust u=[0.36773 -0.99996] rho=3.408e+05 best-gap=6928.6 predDiff=28866 realDiff=37618
+RECOVERY 15 turningCrossing recenterFirstInputTrust u=[0.067398 -0.10069] rho=3.4778e+05 best-gap=3.4376 predDiff=35838 realDiff=34762
+RECOVERY 15 curvedCrossing noFirstInputTrust u=[0.36723 -0.9837] rho=99510 best-gap=3812.8 predDiff=14382 realDiff=18829
+RECOVERY 15 curvedCrossing recenterFirstInputTrust u=[0.068142 -0.097015] rho=1.0329e+05 best-gap=0.35606 predDiff=18164 realDiff=17598

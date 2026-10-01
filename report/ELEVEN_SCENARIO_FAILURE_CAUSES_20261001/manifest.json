@@ -1,0 +1,368 @@
+{
+  "testedControllerCommit": "0466fd95800e80d53434cf90b8021da5989932b0",
+  "priorExperimentReportCommit": "efc5e1d33d4dfa76c6d59c096105babdc49a85d5",
+  "rawCache": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001",
+  "sourceSnapshot": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source",
+  "source": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/config/collisionAvoidanceControllerConfig.m",
+      "bytes": 7411,
+      "sha256": "7c531a69ba71301e7f7351cba65a96d10a16edf6d1c141317b5013696a280e50"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/collisionAvoidanceController.m",
+      "bytes": 9639,
+      "sha256": "ef863b09809f4263be742ab0fc45f8fd5897593de897f29c1890286133399fb1"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/laneGeometry.m",
+      "bytes": 5788,
+      "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/modifiedFialaTire.m",
+      "bytes": 7155,
+      "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/nonlinearBicycleModel.m",
+      "bytes": 14509,
+      "sha256": "7ea8e251b8b15d9f714e5bba91da7558a6cb6806e76717c78410c48fe56a7882"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/predictiveSafetyGeometry.m",
+      "bytes": 13688,
+      "sha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/readControllerInputs.m",
+      "bytes": 19229,
+      "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/solvePredictiveControl.m",
+      "bytes": 16359,
+      "sha256": "2e6622dde84add2adb0ca2a4e1364d4e524f39af75e86ac660393076c5c3cbe5"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/controller/terminalContinuation.m",
+      "bytes": 27918,
+      "sha256": "ef737228dcfe0c12f8af73ef53849a2f6434221ff1708101a7669c9779f9c932"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/scripts/auditJointPredictiveSafety.py",
+      "bytes": 9171,
+      "sha256": "a6dc7a55806652d1b2842283237eb0dd606907eec6d6e1bd93d95d8fc5c4d889"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/scripts/collisionThreatScenario.m",
+      "bytes": 2460,
+      "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/scripts/givenPathCollisionBaseline.m",
+      "bytes": 3633,
+      "sha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/scripts/prepareCollisionAvoidanceController.m",
+      "bytes": 818,
+      "sha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/scripts/runNonlinearPredictiveSafetyValidation.m",
+      "bytes": 15491,
+      "sha256": "9b8caa6656f92b5535cd43b18be68c5bfdc35ce35f7bed46c6537396c8b3fbf1"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/solver/controller/bicycleSampleKernelMex.mexa64",
+      "bytes": 41176,
+      "sha256": "dfd4ef44acf72bb3e22128dd394d2c7c583097cc8a9a81d8feb2d16a4fcc54e9"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/solver/controller/dualKernelMex.mexa64",
+      "bytes": 31728,
+      "sha256": "d6a96de418c2c981f441db1f66fec423c634cf303a730ec6603944c85c146f0a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/direct-two-stage-scenarios-20261001/source/solver/controller/rectangleKernelMex.mexa64",
+      "bytes": 27512,
+      "sha256": "82d5b2189584d3228aaed9272f31f0c83c7c561973d245c2a42abca3f75e0599"
+    }
+  ],
+  "raw": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/baseline.mat",
+      "bytes": 647957,
+      "sha256": "b9d36cd59adbf602fac75b955d8c3f172ed521736057435cd5e91bc0ba6a762e"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/early-problems.mat",
+      "bytes": 705226,
+      "sha256": "cb095fc8503a4bebf6d6c94cd40fa639d81d5b08ba71c95faa7e63ef5bf28d6e"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/linear-certificates.mat",
+      "bytes": 204622,
+      "sha256": "65c97790c593d2e1d0457a6d7114e22575e33653f1015c407d6e1ed4a4daba91"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/onset-problems.mat",
+      "bytes": 505732,
+      "sha256": "4e867286a7948deda931b14a9e40472911f16811ae134d5f192a5a99363267f4"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/primary-ablation.mat",
+      "bytes": 4134,
+      "sha256": "7f1ddd1a4ccd51467fb4dd1e869840d45c9cbe889d039e51eca1ee95d2c9c081"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/problems.mat",
+      "bytes": 337755337,
+      "sha256": "3da3302d3ed344cc5556058dfbf059e46ec225e2219986798bba782deeb4d7aa"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/baseline.log",
+      "bytes": 4042,
+      "sha256": "2bc2c8df752afb0f835756ab7f52b2643af050e50c36a6777005d05cc574d5ea"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/probes.log",
+      "bytes": 7743,
+      "sha256": "25a62e5cd272ec0e623f8c608d44d9699ea629280bc215eb79a14196bb61c402"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/early-capture.log",
+      "bytes": 168,
+      "sha256": "6ded2f6dc06a407c7984bcaacdf6a6b38af0fa952243797faa3924badf20a28c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/early-probe.log",
+      "bytes": 6880,
+      "sha256": "2c53d3a3df8d98479691468aa3669948c04db9f6fe91b0a559fef757b3ecaaca"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/first-input-trust.log",
+      "bytes": 2057,
+      "sha256": "f6c61e6c6f0e27adcf241f246423d8e3132ebb8caa02f3927b069b4503a71ad0"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/onset.log",
+      "bytes": 4602,
+      "sha256": "ddef71993d9b0b9986a75dca3c7ff1bf4a51967f5e8ed741f0057b4e81799a11"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/collision-model.log",
+      "bytes": 3001,
+      "sha256": "40b10df50aaec1d788743d1589671ed1b0f9bdf9164f5e8d9df6cc1e094fe65d"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/late-seed-reuse.log",
+      "bytes": 267,
+      "sha256": "c7b2326c3a87eac34be5c25a9a6e365c65fd9d77a3e0585b4708122c23ed69ed"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/strict-rollout.log",
+      "bytes": 65,
+      "sha256": "9135edac57fa8dbbcf7e05e3a683a46561dc3bfde42d5b7a40da486006bdf1f0"
+    }
+  ],
+  "exports": [
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/baseline.json",
+      "bytes": 9697,
+      "sha256": "7b6acd304423ea92ee86eb91b709155167802497494ef332685aa5a260420a38"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/clf-lower-bound.json",
+      "bytes": 2428,
+      "sha256": "2a3a40dc2d73b8fa8e891e94e749e00cf5416272df155e8a63b8d4777dad2e0b"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/collision-model-probe.json",
+      "bytes": 17486,
+      "sha256": "7753477315355eb53bf5eb2d8835b3a611f58bda5e7010122deb903614984442"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/early-probe.json",
+      "bytes": 74507,
+      "sha256": "190c44ed65f80c94e88f16ba44eb335283e4546f046c1de2cbf5002bef7f0faf"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/first-input-trust.json",
+      "bytes": 11808,
+      "sha256": "d695818363fff80d7472e8338ba1e5ee968267879217ea519ebbf94498068f24"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/late-seed-reuse.json",
+      "bytes": 745,
+      "sha256": "3d4b3f726080708fca315603a1824ce221a323b651967227ea57ed74d1374d04"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/linear-certificates.json",
+      "bytes": 16215,
+      "sha256": "22eb73195dabde6b4b6f4370f14a23bf88e2e912f21c5626c07fef6c1414fb01"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/baseline.log",
+      "bytes": 3994,
+      "sha256": "a5371a18348e8cd93769fcbd2bd40b2e3ed2f70a7ec3b4fc41e9f33a75240ead"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/collision-model.log",
+      "bytes": 3001,
+      "sha256": "40b10df50aaec1d788743d1589671ed1b0f9bdf9164f5e8d9df6cc1e094fe65d"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/early-capture.log",
+      "bytes": 168,
+      "sha256": "6ded2f6dc06a407c7984bcaacdf6a6b38af0fa952243797faa3924badf20a28c"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/early-probe.log",
+      "bytes": 6880,
+      "sha256": "2c53d3a3df8d98479691468aa3669948c04db9f6fe91b0a559fef757b3ecaaca"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/first-input-trust.log",
+      "bytes": 2057,
+      "sha256": "f6c61e6c6f0e27adcf241f246423d8e3132ebb8caa02f3927b069b4503a71ad0"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/late-seed-reuse.log",
+      "bytes": 265,
+      "sha256": "00928d60b78d7530a8005b308fe785fe5db80646f7144089d5c7672255d322bb"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/onset.log",
+      "bytes": 4602,
+      "sha256": "ddef71993d9b0b9986a75dca3c7ff1bf4a51967f5e8ed741f0057b4e81799a11"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/probes.log",
+      "bytes": 7743,
+      "sha256": "25a62e5cd272ec0e623f8c608d44d9699ea629280bc215eb79a14196bb61c402"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/logs/strict-rollout.log",
+      "bytes": 65,
+      "sha256": "9135edac57fa8dbbcf7e05e3a683a46561dc3bfde42d5b7a40da486006bdf1f0"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/baseline.m",
+      "bytes": 1499,
+      "sha256": "fb87180dcfef047e3bfb04cdb66abf6549b1f913652d3db3737d275d01eeaed4"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/capture.m",
+      "bytes": 1397,
+      "sha256": "ff3290530f8b000c0873d2601113ebef3f4cce8010d1b7b2dc4c9e37264d61b7"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/clfLowerBound.m",
+      "bytes": 1608,
+      "sha256": "3686e7fd0a136abbb04e40b16a708a4441b2bbe4bd0384c57397e0e0443696c0"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/collisionModelProbe.m",
+      "bytes": 3948,
+      "sha256": "344cf432fda029123a0b5e05e8938fe8a9d7cee6731a27c335bcd7e3e4284d29"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/earlyCapture.m",
+      "bytes": 2390,
+      "sha256": "9d785833ea42298e775c085059f30c917b499d76f6e50bc4e53e60c7ce5215a7"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/earlyProbe.m",
+      "bytes": 4274,
+      "sha256": "3aeda6690a80a73dc0c0b63a708ead81b7788d04c8f1183cc84c83e34a95b592"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/firstInputTrust.m",
+      "bytes": 4384,
+      "sha256": "2590cc4885f33ae027f5789c03bdd08cb64035789be093482bd3461f668e351f"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/lateSeedReuse.m",
+      "bytes": 1486,
+      "sha256": "d93109849e404d1fce0ba73dec1356e64c21df0616ba69de63011494dbbff76c"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/linearCertificate.m",
+      "bytes": 3866,
+      "sha256": "418bd070c3b871dc5a0ffff95e4a0d7ac9adf86bfd374028686c5debecbf4238"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/onsetCapture.m",
+      "bytes": 2357,
+      "sha256": "351ab8fac30c0f0e4fa05b6df9635fcf0f4cad694ae7c085ce99cfdcadca8c35"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/onsetProbe.m",
+      "bytes": 4274,
+      "sha256": "6cbfc3414b83ca4b2db0c5233cb9107d3dc69bb0c0c9c3ab3a8897b01cd8a3b1"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/prepare.py",
+      "bytes": 2910,
+      "sha256": "750a55257ef70a22d69e34c3ce3d20898023366b45e71d9177cf3f04dca005b2"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/primaryAblation.m",
+      "bytes": 2394,
+      "sha256": "2cedc68e11a922e4b0a91c715cf198674ea8318b168e762da7942a81e84bea2c"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/recoveryProbe.m",
+      "bytes": 3886,
+      "sha256": "d9ddbc16ad9b734a589846476413f163256cb7971f71a2e285665bd7e3495ada"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/runProbe.m",
+      "bytes": 1088,
+      "sha256": "881e251be8b4d99ce6624c922a8f1d95fc6c2041310fbff8f0f7c151e2aec0d7"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/methods/strictRolloutProbe.m",
+      "bytes": 1906,
+      "sha256": "c5ed216629ccaa07d48efa9185a0dd838b67e335d0ba461e06c8ce845f6e01de"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/onset-probe.json",
+      "bytes": 49388,
+      "sha256": "b94a1cc1d6fb196b6c5b3115ab781e57d0f4b43dbc695031e3f6be17a4badf58"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/onset-replay-checks.json",
+      "bytes": 174,
+      "sha256": "a90544e5b2b7247cbdcd02ef3a848bde05cc2e73b65e96a88d1e564f2b4b3751"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/primary-ablation.json",
+      "bytes": 8395,
+      "sha256": "73ab2b4a37fd5ea58f8203412d721be18fa519aee83732594ad71947b0cae4f3"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/recovery-probe.json",
+      "bytes": 29251,
+      "sha256": "b7fa2feb1e47d81b52c59c5b271920379a27648ce8e952757abf9aa7d8052bae"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/recovery-summary.csv",
+      "bytes": 1771,
+      "sha256": "46ef46873540e95b7018066b26ddf520e9cbfbd6b688527093334ef463c106ac"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/replay-checks.json",
+      "bytes": 266,
+      "sha256": "4b3b430c210232d1008847aec0acd22d9c217462f12f6b89bab6ce2166300596"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/strict-rollout.json",
+      "bytes": 289,
+      "sha256": "a564e7b92090351be510ead8c939c90f6ba8edd53ea9f6d3833fc6ce0b006227"
+    }
+  ],
+  "logExportFormatting": "Export copies omit terminal backspace control characters and trailing whitespace; original console files are retained and hashed in raw."
+}

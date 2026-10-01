@@ -1,0 +1,38 @@
+REPLAY 15 headOn frames=14 maxInputDifference=0
+REPLAY 15 acceleratingHeadOn frames=15 maxInputDifference=0
+EARLY 15 headOn t=0.55 base valid=1 flag=1 slack=1.082754e-08 u=[0.114 -0.3575] predDV=67.949 realDV=63.954 gap=5.81766
+EARLY 15 headOn t=0.55 zeroSlack valid=1 flag=1 slack=0 u=[0.114 -0.3575] predDV=67.949 realDV=63.954 gap=5.81766
+EARLY 15 headOn t=0.55 noFirstInputTrust valid=1 flag=1 slack=3.541932e-07 u=[-0.69813 1] predDV=39.113 realDV=11.098 gap=5.80406
+EARLY 15 headOn t=0.55 noInputTrust valid=1 flag=1 slack=2.248654e-08 u=[-0.69813 1] predDV=39.113 realDV=11.093 gap=5.80407
+EARLY 15 headOn t=0.55 rerollAnchor valid=1 flag=1 slack=1.1363e-07 u=[0.114 -0.3575] predDV=68.368 realDV=63.955 gap=5.81766
+EARLY 15 headOn t=0.55 coldSeed valid=1 flag=1 slack=6.191695e-08 u=[0.04369 -0.225] predDV=52.685 realDV=48.591 gap=5.81664
+EARLY 15 headOn t=0.60 base valid=1 flag=1 slack=0.002384345 u=[0.15131 -0.29832] predDV=78.746 realDV=75.754 gap=4.77539
+EARLY 15 headOn t=0.60 zeroSlack valid=1 flag=-2 slack=NaN
+EARLY 15 headOn t=0.60 noFirstInputTrust valid=1 flag=1 slack=7.069386e-09 u=[0.69813 1] predDV=59.915 realDV=50.706 gap=4.76039
+EARLY 15 headOn t=0.60 noInputTrust valid=1 flag=1 slack=6.594842e-08 u=[0.69813 1] predDV=59.915 realDV=50.7 gap=4.76039
+EARLY 15 headOn t=0.60 rerollAnchor valid=1 flag=1 slack=5.083158e-08 u=[0.3013 -0.29832] predDV=78.796 realDV=78.748 gap=4.77616
+EARLY 15 headOn t=0.60 coldSeed valid=1 flag=1 slack=2.663587e-08 u=[0.042586 -0.225] predDV=61.284 realDV=56.875 gap=4.77459
+EARLY 15 headOn t=0.65 base valid=1 flag=1 slack=0.003438075 u=[0.2126 -0.47871] predDV=101.93 realDV=96.098 gap=3.74796
+EARLY 15 headOn t=0.65 zeroSlack valid=1 flag=-2 slack=NaN
+EARLY 15 headOn t=0.65 noFirstInputTrust valid=1 flag=1 slack=4.050901e-09 u=[0.2926 0.99998] predDV=70.822 realDV=46.877 gap=3.73031
+EARLY 15 headOn t=0.65 noInputTrust valid=1 flag=1 slack=4.105414e-08 u=[0.16016 1] predDV=55.467 realDV=42.252 gap=3.73019
+EARLY 15 headOn t=0.65 rerollAnchor valid=1 flag=1 slack=1.752263e-08 u=[0.15039 -0.22873] predDV=86.748 realDV=86.701 gap=3.74526
+EARLY 15 headOn t=0.65 coldSeed valid=1 flag=1 slack=4.190947e-07 u=[0.047894 -0.225] predDV=73.629 realDV=68.741 gap=3.74484
+EARLY 15 acceleratingHeadOn t=0.60 base valid=1 flag=1 slack=3.975145e-08 u=[0.15135 -0.055973] predDV=88.156 realDV=84.765 gap=4.47034
+EARLY 15 acceleratingHeadOn t=0.60 zeroSlack valid=1 flag=1 slack=0 u=[0.15135 -0.055973] predDV=88.156 realDV=84.765 gap=4.47034
+EARLY 15 acceleratingHeadOn t=0.60 noFirstInputTrust valid=1 flag=1 slack=2.03326e-08 u=[0.073561 0.99999] predDV=77.666 realDV=59.57 gap=4.45668
+EARLY 15 acceleratingHeadOn t=0.60 noInputTrust valid=1 flag=1 slack=7.175065e-09 u=[-0.69813 0.99999] predDV=71.959 realDV=39.474 gap=4.45829
+EARLY 15 acceleratingHeadOn t=0.60 rerollAnchor valid=1 flag=1 slack=4.190038e-08 u=[0.15135 -0.055973] predDV=88.355 realDV=84.765 gap=4.47034
+EARLY 15 acceleratingHeadOn t=0.60 coldSeed valid=1 flag=1 slack=3.914207e-09 u=[0.050047 -0.225] predDV=75.906 realDV=70.616 gap=4.47158
+EARLY 15 acceleratingHeadOn t=0.65 base valid=1 flag=1 slack=0.0008379079 u=[0.31412 -0.099372] predDV=105.55 realDV=105.23 gap=3.38004
+EARLY 15 acceleratingHeadOn t=0.65 zeroSlack valid=1 flag=-2 slack=NaN
+EARLY 15 acceleratingHeadOn t=0.65 noFirstInputTrust valid=1 flag=1 slack=0.0005298136 u=[0.69813 0.11] predDV=104.47 realDV=102.02 gap=3.37987
+EARLY 15 acceleratingHeadOn t=0.65 noInputTrust valid=1 flag=1 slack=2.169696e-08 u=[0.20313 1] predDV=94.863 realDV=77.584 gap=3.365
+EARLY 15 acceleratingHeadOn t=0.65 rerollAnchor valid=1 flag=1 slack=1.77314e-08 u=[0.16412 -0.043564] predDV=104.3 realDV=101.07 gap=3.37865
+EARLY 15 acceleratingHeadOn t=0.65 coldSeed valid=1 flag=1 slack=2.29227e-08 u=[0.048115 -0.225] predDV=90.058 realDV=84.267 gap=3.37948
+EARLY 15 acceleratingHeadOn t=0.70 base valid=1 flag=1 slack=0.0007934414 u=[0.16609 -0.097634] predDV=123.93 realDV=120.5 gap=2.31525
+EARLY 15 acceleratingHeadOn t=0.70 zeroSlack valid=1 flag=-2 slack=NaN
+EARLY 15 acceleratingHeadOn t=0.70 noFirstInputTrust valid=1 flag=1 slack=6.191338e-09 u=[0.30723 0.61812] predDV=116.41 realDV=109.41 gap=2.30921
+EARLY 15 acceleratingHeadOn t=0.70 noInputTrust valid=1 flag=1 slack=1.508422e-08 u=[0.69813 1] predDV=112.14 realDV=113.57 gap=2.30399
+EARLY 15 acceleratingHeadOn t=0.70 rerollAnchor valid=1 flag=1 slack=7.531289e-09 u=[0.31607 -0.097641] predDV=123.79 realDV=123.69 gap=2.31613
+EARLY 15 acceleratingHeadOn t=0.70 coldSeed valid=1 flag=1 slack=3.995766e-09 u=[0.048553 -0.225] predDV=107.23 realDV=100.89 gap=2.3134

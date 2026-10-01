@@ -1,0 +1,3 @@
+REPLAY 8 acceleratingHeadOn frames=201 maxInputDifference=0
+REPLAY 15 headOn frames=22 maxInputDifference=0
+REPLAY 15 acceleratingHeadOn frames=21 maxInputDifference=0

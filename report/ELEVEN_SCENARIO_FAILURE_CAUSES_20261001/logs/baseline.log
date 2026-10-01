@@ -1,0 +1,62 @@
+CAPTURE 8 headOn variables=559 rows=808 terminalRadius=0.000244140625 mismatch=0.0412059862
+CAPTURE 8 acceleratingHeadOn variables=559 rows=408 terminalRadius=0.000244140625 mismatch=0.0138610996
+CAPTURE 8 brakingLead variables=559 rows=957 terminalRadius=0.000244140625 mismatch=0.0862403753
+CAPTURE 8 turningCrossing variables=559 rows=408 terminalRadius=0.000244140625 mismatch=0.0136802027
+CAPTURE 8 curvedCrossing variables=559 rows=408 terminalRadius=0.000244140625 mismatch=0.0134875011
+CAPTURE 15 headOn variables=631 rows=456 terminalRadius=0.0009765625 mismatch=0.0291719733
+CAPTURE 15 acceleratingHeadOn variables=631 rows=456 terminalRadius=0.0009765625 mismatch=0.0297081998
+CAPTURE 15 brakingLead variables=631 rows=1069 terminalRadius=0.0009765625 mismatch=0.0295020859
+CAPTURE 15 crossing variables=631 rows=1069 terminalRadius=0.0009765625 mismatch=0.0163887497
+CAPTURE 15 turningCrossing variables=631 rows=456 terminalRadius=0.0009765625 mismatch=0.0295625659
+CAPTURE 15 curvedCrossing variables=631 rows=456 terminalRadius=0.0009765625 mismatch=0.028759601
+BASE 8 headOn primary=-2
+BASE 8 acceleratingHeadOn primary=1 secondary=1 rho=109308.187 normalized=0.011373603 safety=8.9318461e-07 residual=9.20423379e-10 dual=9.86414544e-11
+BASE 8 brakingLead primary=-2
+BASE 8 turningCrossing primary=1 secondary=1 rho=77404.3083 normalized=0.0114476214 safety=8.98629946e-07 residual=2.16228189e-09 dual=1.06459515e-10
+BASE 8 curvedCrossing primary=1 secondary=1 rho=50960.3902 normalized=0.0128738446 safety=8.92001945e-07 residual=6.51332227e-10 dual=6.73188576e-11
+BASE 15 headOn primary=1 secondary=1 rho=355552.878 normalized=0.0115529214 safety=9.47842755e-07 residual=8.52285699e-10 dual=9.79264677e-11
+BASE 15 acceleratingHeadOn primary=1 secondary=1 rho=357785.972 normalized=0.0115612051 safety=1.15440132e-06 residual=1.53612013e-07 dual=1.73264622e-09
+BASE 15 brakingLead primary=-2
+BASE 15 crossing primary=1 secondary=1 rho=260692.792 normalized=0.0112873178 safety=9.67321616e-07 residual=2.51053572e-09 dual=9.66743397e-09
+BASE 15 turningCrossing primary=1 secondary=1 rho=349453.526 normalized=0.0112026824 safety=1.42967693e-06 residual=4.28894264e-07 dual=1.64431648e-09
+BASE 15 curvedCrossing primary=1 secondary=1 rho=104198.857 normalized=0.012240326 safety=1.120492e-06 residual=1.19722117e-07 dual=9.97221556e-09
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 acceleratingHeadOn rho=109308.1646 returned=109308.1866 gap=0.0220102
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 turningCrossing rho=77404.26795 returned=77404.30833 gap=0.040382
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 curvedCrossing rho=50960.38423 returned=50960.39015 gap=0.00592513
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 headOn rho=355552.8131 returned=355552.8775 gap=0.0644214
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 acceleratingHeadOn rho=357782.7583 returned=357785.9718 gap=3.21349
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 crossing rho=260692.5902 returned=260692.7925 gap=0.202235
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 turningCrossing rho=349450.1735 returned=349453.5262 gap=3.35266
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 curvedCrossing rho=104197.9629 returned=104198.8572 gap=0.894315

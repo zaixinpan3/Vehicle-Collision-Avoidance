@@ -1,0 +1,311 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,xurl,hyperref}
+\setlength{\emergencystretch}{3em}
+\title{Root Causes in the Eleven Former CLF-Interrupted Scenarios}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+\section{Finding and scope}
+Removing the solver-status admission gate fixed a numerical interruption,
+not the controller's avoidance and recovery behavior. This diagnosis covers
+all eleven formerly CLF-interrupted cases from the direct two-stage campaign.
+Three later stop at an infeasible PCBF problem. Eight continue for 80 s without
+nominal recovery; two of those eight also collide.
+
+The common structural issue is how an affine prediction becomes the next
+linearization reference under fixed hard correction boxes. A dynamically
+inconsistent reference can make the next subproblem infeasible. Its shifted
+future inputs can also exclude the current recovery action even when the
+CLF objective is being minimized correctly. Positive PCBF relaxation then
+allows collision-containing local plans to be issued. Nonlinear prediction
+error is an additional measured issue, not a substitute explanation for a
+plan that already predicts a collision.
+
+No production controller, configuration, online check, retry, fallback or
+mode was added. All interventions below are offline diagnostic ablations;
+none is presented as a validated replacement algorithm.
+
+\section{Methods and coverage}
+The controller under study is commit
+\path{0466fd95800e80d53434cf90b8021da5989932b0}; the complete campaign is
+reported by commit \path{efc5e1d33d4dfa76c6d59c096105babdc49a85d5} in
+\path{report/DIRECT_TWO_STAGE_SCENARIOS_20261001.tex}.
+Conditions remain exact state and known target motion, no road constraints,
+6-mm collision buffer, 50-ms holds, horizons of 68/76 holds at 8/15 m/s,
+and one PCBF solve followed by one CLF solve. No random draws are used.
+
+The three later failure problems are captured at their actual failing calls.
+For the eight 80-s cases, the final saved physical state and previous affine
+prediction reconstruct the next hypothetical call at 80.00 s. These are
+one-call diagnostics, not extra executed campaign frames. Earlier contexts
+are reconstructed by replaying the controller against saved actual states.
+All 201 replayed inputs for 8-m/s acceleratingHeadOn, 22 for 15-m/s headOn,
+and 21 for 15-m/s acceleratingHeadOn match the original inputs exactly.
+Additional onset replays also match exactly.
+
+Instrumentation copies the unchanged formulation, labels constraint rows,
+and captures matrices before solving. Offline coneprog uses 400 iterations,
+constraint tolerance $10^{-8}$, optimality tolerance $10^{-7}$ and a 5-s soft
+budget. Linear feasibility and Farkas probes use linprog tolerances $10^{-9}$.
+Where stated, ODE45 evaluates a held input or complete planned sequence with
+relative/absolute tolerances $10^{-11}/10^{-12}$. These evaluations do not
+run in the controller. No new runtime benchmark is inferred from diagnostic
+calls. Source/native identity was verified against the frozen campaign copy.
+
+\begin{center}\small
+\begin{tabular}{r l l}
+\toprule
+Speed (m/s) & Scenario & Observed outcome / diagnosed mechanism\\
+\midrule
+8 & headOn & PCBF failure at 2.35 s; dynamics/trust conflict\\
+8 & acceleratingHeadOn & 80 s unrecovered; recovery input restricted\\
+8 & brakingLead & PCBF failure at 11.40 s; dynamics/trust conflict\\
+8 & turningCrossing & 80 s unrecovered; recovery input restricted\\
+8 & curvedCrossing & 80 s unrecovered; recovery input restricted\\
+15 & headOn & Collision; also unrecovered at 80 s\\
+15 & acceleratingHeadOn & Collision; also unrecovered at 80 s\\
+15 & brakingLead & PCBF failure at 23.95 s; dynamics/trust conflict\\
+15 & crossing & 80 s unrecovered; recovery input restricted\\
+15 & turningCrossing & 80 s unrecovered; recovery input restricted\\
+15 & curvedCrossing & 80 s unrecovered; recovery input restricted\\
+\bottomrule
+\end{tabular}\end{center}
+The other three original PCBF-interrupted scenarios are excluded from this
+new set of eleven; their causes are documented in the preceding reports.
+
+\section{Eight unrecovered cases: the optimizer cannot choose the return input}
+\subsection{The restriction is centered on a future plan, not the actuator}
+The implementation shifts the prior affine states and inputs without
+regenerating the state sequence from the new physical state. It then imposes
+\[
+ |\delta_i-\bar\delta_i|\le0.075\ \mathrm{rad},\qquad
+ |b_i-\bar b_i|\le0.125.
+\]
+Here $\bar u_0$ is the previous plan's \emph{second} input. These are hard
+local approximation restrictions, not the physical actuator limits
+($|\delta|\le40^\circ$, $|b|\lesssim1$). The tested configuration has no finite
+actuator slew limit, so these cannot be justified as a measured slew bound.
+
+At 80 s in 8-m/s acceleratingHeadOn, the ego is 354.07 m above its path with
+heading error $0.7582$ rad. The shifted steering anchor is $0.0752319$ rad,
+so the first steering must lie in
+\[
+ [0.0002319,\ 0.1502319]\ \mathrm{rad}.
+\]
+The optimizer requests approximately the lower bound, $0.0002339$ rad.
+It cannot choose a negative steering input to turn back. The situation was
+already established at 10 s: the allowable lower endpoint and returned
+steering are approximately $+0.0013436$ rad, while lateral error is 35.30 m.
+The problem is not that the CLF solver elected to stop improving too early.
+It has reached the useful edge of the allowed input set.
+
+\begin{center}\small
+\begin{tabular}{r l r r r r}
+\toprule
+Speed & Scenario & $e_y$ (m) & Anchor $\bar\delta$ & Allowed $\delta$ interval & Returned $\delta$\\
+\midrule
+8 & acceleratingHeadOn & 354.07 & 0.07523 & $[0.00023,0.15023]$ & 0.00023\\
+8 & turningCrossing & -296.94 & -0.07455 & $[-0.14955,0.00045]$ & 0.00045\\
+8 & curvedCrossing & -224.23 & -0.07315 & $[-0.14815,0.00185]$ & 0.00185\\
+15 & headOn & 725.12 & 0.07970 & $[0.00470,0.15470]$ & 0.00470\\
+15 & acceleratingHeadOn & 727.14 & 0.08218 & $[0.00718,0.15718]$ & 0.00727\\
+15 & crossing & -628.85 & -0.08686 & $[-0.16186,-0.01186]$ & -0.01186\\
+15 & turningCrossing & -728.69 & -0.08280 & $[-0.15780,-0.00780]$ & -0.00793\\
+15 & curvedCrossing & -373.19 & -0.08168 & $[-0.15668,-0.00668]$ & -0.00672\\
+\bottomrule
+\end{tabular}\end{center}
+Steering values are in radians. The two collision cases' late states belong
+to the simulation without impact dynamics, not a physical post-impact model.
+
+\subsection{Independent optimization and causal interventions}
+Eliminating the first affine transition expresses the CLF objective as a
+quadratic in just two first-input increments,
+\[
+ V_1(d)=\alpha\|Gd+c\|^2,\qquad
+ \rho=\max\{0,V_1(d)-0.99V_0\}.
+\]
+Minimizing this quadratic exactly over its two-dimensional box, with all
+future constraints removed, gives a lower bound for the complete problem.
+For all eight late cases the exact minimizer is at both input-box boundaries
+(the steering direction shown above and the lower braking-ratio endpoint).
+The complete conic solutions nearly attain that lower bound: absolute CLF
+slack gaps are 0.0059--3.3527 against slack values of about
+$5.10\times10^4$--$3.58\times10^5$. All eight reconstructed calls return
+positive solver flags for both stages.
+
+Removing the terminal cone, removing future trust restrictions while keeping
+the first-input box, or refreshing only the first-state tangent does not
+restore meaningful first-input steering. This rules out those mechanisms as
+the immediate cause of the late weak steering. Recentring just the first
+input box on the previous \emph{applied} input permits corrective steering in
+all eight diagnostic calls and reduces the actual one-step CLF growth.
+That intervention alone is not evidence of complete recovery.
+
+There is a stronger earlier counterfactual. At 2.00 s in 8-m/s
+acceleratingHeadOn, $V_0=4124.991$. The original problem has essentially zero
+PCBF optimum, CLF slack 68.606, predicted $\Delta V=+27.356$, and actual
+$\Delta V=+20.138$. Relaxing only the first-input trust box to the unchanged
+physical limits, while retaining all other horizon constraints, gives CLF
+slack about $1.75\times10^{-4}$, predicted $\Delta V=-45.664$, and actual
+$\Delta V=-64.326$. The 1\% requirement is $\Delta V\le-41.250$.
+The actual sampled clearance over that hold remains at least 1.214 m.
+Thus the original input restriction excludes an available dissipating action
+at this state. This is a one-hold causal result, not a full alternative rollout.
+
+\subsection{Why the reference keeps creating the restriction}
+The second stage minimizes only a one-step CLF slack. The future controls
+have no nominal-recovery objective of their own. They participate in
+feasibility and terminal admission, but when multiple tails have the same
+first-step objective, the objective does not select the one that provides a
+useful next linearization input. The free-pose terminal core constrains
+intrinsic motion, not return to the given path. Shifting this underdetermined
+tail and using it as the center of a hard input box promotes a numerical
+future choice into a restriction on the next real action.
+
+A positive slack also allows $V$ to increase. Minimizing it cannot establish
+convergence unless the admissible input set allows dissipation. The quadratic
+matrix was derived by LQR around a nominal trim; the code does not establish
+a global CLF property for hundreds of metres of lateral error and large
+heading errors. Even removing all trust bounds in the late affine problems
+does not make the prescribed 1\% contraction feasible. Moreover, the large
+steps then proposed can perform worse in the actual nonlinear model.
+Therefore wholesale trust-bound deletion is not justified as a fix. The
+measured early exclusion and late reference trapping are concrete failures;
+a global convergence theorem is not claimed in either direction.
+
+\section{Three later PCBF failures: artificial infeasibility from shifted states}
+The local affine equation is
+\[
+ d x_{i+1}-A_i d x_i-B_i d u_i
+ =F_h(\bar x_i,\bar u_i)-\bar x_{i+1}.
+\]
+Because $\bar x$ is a shifted affine prediction rather than a rollout,
+the right-hand side can be large. The state corrections are restricted to
+$\pm(2.5,2.5,0.25,2.5,1.5,0.75)$ in their respective units, and the input
+corrections to $\pm(0.075,0.125)$. Repairing all dynamics defects simultaneously
+can then be impossible.
+
+\begin{center}\small
+\begin{tabular}{r l r r l}
+\toprule
+Speed & Scenario & Failure time & Farkas value & Largest one-step defect\\
+\midrule
+8 & headOn & 2.35 s & -0.1698601 & yaw rate: 0.777009 rad/s, stage 16\\
+8 & brakingLead & 11.40 s & -0.0503176 & yaw rate: 0.231437 rad/s, stage 1\\
+15 & brakingLead & 23.95 s & -0.0344165 & lateral speed: 1.029350 m/s, stage 19\\
+\bottomrule
+\end{tabular}\end{center}
+These defect magnitudes are differences between successor states, not rates
+of change of the listed quantities. In all three cases:
+\begin{itemize}
+\item Removing collision rows, terminal conditions, or the CLF cone individually
+  does not restore feasibility.
+\item Keeping \emph{only} dynamics and state/input trust boxes is already
+  infeasible as a linear program, without any safety, road or terminal rows.
+\item Zeroing dynamics defects in a diagnostic problem restores linear
+  feasibility; zeroing only the initial-state mismatch does not.
+\item Removing input trust bounds while preserving physical actuator/state
+  limits restores conic feasibility, with PCBF optima below $2.2\times10^{-7}$.
+\end{itemize}
+Farkas witnesses for the original linear subsystems have nonnegative inequality
+multipliers, negative combined right-hand sides as tabulated, and equality
+residuals at most $2.23\times10^{-16}$. They distinguish mathematical
+inconsistency from a slow or unsuccessful numerical search.
+
+A fresh flow seed at the same physical state restores both solver stages in
+the two 8-m/s cases. It does not restore the 15-m/s brakingLead case. Seed
+reset is therefore not a universal cure; the conflict between model defects
+and hard neighborhoods is the established cause in these three captured
+problems. None of these results establishes physical unavoidability.
+
+\section{Two collisions: lost zero-slack feasibility followed by relaxed execution}
+The 15-m/s headOn and acceleratingHeadOn cases first overlap at approximately
+1.09833 s and 1.05000 s, respectively, in the previous dense sampled audit.
+The corresponding control calls are at 1.05 s and 1.00 s.
+
+\subsection{The local model loses zero-slack feasibility before contact}
+The first materially positive PCBF optima appear at 0.60 s for headOn and
+0.65 s for acceleratingHeadOn:
+\begin{center}\small
+\begin{tabular}{l r r r}
+\toprule
+Case / call time & Original PCBF optimum & Reroll same input anchor & New flow anchor\\
+\midrule
+headOn / 0.60 s & $2.3843\times10^{-3}$ & $5.0832\times10^{-8}$ & $2.6636\times10^{-8}$\\
+acceleratingHeadOn / 0.65 s & $8.3791\times10^{-4}$ & $1.7731\times10^{-8}$ & $2.2923\times10^{-8}$\\
+\bottomrule
+\end{tabular}\end{center}
+Rerolling means retaining the same shifted input sequence, integrating it from
+the current actual state, and rebuilding dynamics and geometry around those
+states. It is a diagnostic reconstruction, not a production validation step.
+Forcing zero slack in the original problems is infeasible. Removing terminal
+conditions, hard tail collision rows, or state trust bounds individually does
+not remove their positive optima. Removing input trust bounds nearly removes
+them; changing the reference removes them without changing physical limits.
+These facts implicate the local reference, its geometry, and restricted input
+corrections rather than proving no avoidance trajectory exists physically.
+
+\subsection{Even near-zero affine slack is not equivalent to the nonlinear plan}
+At 0.55 s in headOn, the original PCBF optimum is
+$1.08\times10^{-8}$ and the returned affine trajectory has minimum node
+clearance 9.315 mm. Holding its planned input sequence in an independent
+nonlinear rollout produces strict overlap: the minimum separating-axis gap is $-4.172$ mm
+at absolute time 1.10 s. Maximum position disagreement over that
+3.8-s rollout is 0.368 m. At 0.60 s in acceleratingHeadOn, the corresponding
+affine minimum node clearance is 11.040 mm, while the nonlinear rollout's
+start/midpoint/end samples reach 5.896 mm, below the configured 6-mm margin.
+These are full planned-sequence counterfactuals, not the actual future
+receding-horizon trajectory. They demonstrate the missing implication from
+affine feasibility to the nonlinear continuation.
+
+\subsection{The actual collision inputs already come from collision predictions}
+At the eventual collision-producing calls, the optimum slack sums are
+0.023411 and 0.006588. Both returned affine endpoint rectangles already
+overlap the target; the actual ODE45 endpoint rectangles also overlap.
+The first input's endpoint is constrained at the next stage, whose safety
+slack may be positive. A nearly zero first-stage slack is therefore not a
+safe-next-endpoint test.
+
+The first-step affine position errors at these two calls are only about
+0.044 mm and 0.0094 mm in Euclidean norm. Thus these particular impacts
+cannot be described as a large unpredicted first-step deviation. The optimizer
+already accepts a relaxed collision-containing prediction. Safety slack sums
+are aggregate residuals, not a required clearance in metres or a direct
+penetration depth. Once positive slack is the best local result, its numerical
+existence alone does not make collision avoidance successful.
+
+\section{Design implications and limits}
+The evidence supports three connected design priorities within the existing
+two-stage architecture: generate a dynamically consistent and useful
+linearization reference; avoid turning underdetermined future controls into
+hard exclusions of the next recovery action; and distinguish minimization of
+a collision relaxation from actually achieving avoidance. The CLF also needs
+an admissible recovery mechanism beyond an unsupported global use of a
+local one-step quadratic. These are formulation issues; longer simulation,
+more solver time, gate removal, road removal, or changing the terminal cone
+alone does not address the observed mechanisms.
+
+No modified controller was validated here. In particular, directly removing
+all trust bounds can produce inaccurate large-step predictions, and changing
+a seed at one call does not prove an entire scenario will succeed. No extra
+online nonlinear checking or backup architecture is required by this diagnosis.
+
+\section{Artifacts and verification}
+The accompanying directory
+\path{report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/}
+contains captured-problem statistics, eight-case recovery bounds,
+27 later-failure ablations, three Farkas witnesses, collision-onset and
+pre-impact counterfactuals, exact replay comparisons, diagnostic scripts and an instrumentation generator,
+actual console exports and source/raw hashes. Console exports omit terminal
+backspace characters and trailing whitespace; original logs remain in the
+cache with recorded hashes. Large MAT captures remain in
+\path{/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/}.
+The generated instrumentation is research evidence and is not on the production
+controller path. MATLAB scripts executed as recorded in the logs; this report
+was compiled and text extraction checked. No production unit suite was rerun
+for the unchanged controller. All claims about recovery are limited to the
+observed trajectories and the explicitly identified diagnostic calls.
+\end{document}

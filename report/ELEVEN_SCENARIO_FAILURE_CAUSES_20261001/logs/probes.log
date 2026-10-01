@@ -1,0 +1,82 @@
+RECOVERY 8 acceleratingHeadOn base u=[0.0002339 0.012522] rho=1.0931e+05 best-gap=0.020674 predDiff=13201 realDiff=13028
+RECOVERY 8 acceleratingHeadOn noTerminal u=[0.00023527 0.012523] rho=1.0931e+05 best-gap=0.035168 predDiff=13201 realDiff=13028
+RECOVERY 8 acceleratingHeadOn noFutureTrust u=[0.00034573 0.014701] rho=1.0931e+05 best-gap=2.1658 predDiff=13203 realDiff=13031
+RECOVERY 8 acceleratingHeadOn noTrust u=[-0.69812 -0.99972] rho=1.0166e+05 best-gap=0.23233 predDiff=5556.5 realDiff=13820
+RECOVERY 8 acceleratingHeadOn freshFirstTangent u=[0.00023253 0.012538] rho=1.0932e+05 best-gap=0.013464 predDiff=13218 realDiff=13028
+RECOVERY 8 turningCrossing base u=[0.00045367 0.012661] rho=77404 best-gap=0.038248 predDiff=9788.2 realDiff=9642.4
+RECOVERY 8 turningCrossing noTerminal u=[0.00044758 0.012726] rho=77404 best-gap=0.11409 predDiff=9788.3 realDiff=9642.4
+RECOVERY 8 turningCrossing noFutureTrust u=[0.00041828 0.012799] rho=77405 best-gap=0.39757 predDiff=9788.6 realDiff=9642.9
+RECOVERY 8 turningCrossing noTrust u=[0.69812 -0.99975] rho=70947 best-gap=0.16137 predDiff=3330.9 realDiff=10357
+RECOVERY 8 turningCrossing freshFirstTangent u=[0.00043998 0.012686] rho=77418 best-gap=0.16459 predDiff=9802 realDiff=9642.5
+RECOVERY 8 curvedCrossing base u=[0.0018527 0.012806] rho=50960 best-gap=0.0050847 predDiff=11376 realDiff=11288
+RECOVERY 8 curvedCrossing noTerminal u=[0.0018527 0.012806] rho=50960 best-gap=0.0049966 predDiff=11376 realDiff=11288
+RECOVERY 8 curvedCrossing noFutureTrust u=[0.0018187 0.013053] rho=50961 best-gap=0.28217 predDiff=11376 realDiff=11288
+RECOVERY 8 curvedCrossing noTrust u=[0.69812 -0.9994] rho=46824 best-gap=0.2949 predDiff=7239.7 realDiff=11608
+RECOVERY 8 curvedCrossing freshFirstTangent u=[0.0018526 0.0128] rho=50968 best-gap=0.0037426 predDiff=11384 realDiff=11288
+RECOVERY 15 headOn base u=[0.0046988 0.0069975] rho=3.5555e+05 best-gap=0.061173 predDiff=47793 realDiff=47286
+RECOVERY 15 headOn noTerminal u=[0.004759 0.0086349] rho=3.5556e+05 best-gap=2.8969 predDiff=47796 realDiff=47290
+RECOVERY 15 headOn noFutureTrust u=[0.0047459 0.0070385] rho=3.5555e+05 best-gap=1.1351 predDiff=47794 realDiff=47288
+RECOVERY 15 headOn noTrust u=[-0.69811 -0.9999] rho=3.392e+05 best-gap=0.61614 predDiff=31436 realDiff=48910
+RECOVERY 15 headOn freshFirstTangent u=[0.004702 0.0069866] rho=3.5561e+05 best-gap=0.11881 predDiff=47853 realDiff=47287
+RECOVERY 15 acceleratingHeadOn base u=[0.0072694 0.02546] rho=3.5779e+05 best-gap=3.1924 predDiff=48315 realDiff=47806
+RECOVERY 15 acceleratingHeadOn noTerminal u=[0.0071825 0.024123] rho=3.5778e+05 best-gap=0.070847 predDiff=48312 realDiff=47801
+RECOVERY 15 acceleratingHeadOn noFutureTrust u=[0.0073783 0.032956] rho=3.578e+05 best-gap=12.456 predDiff=48324 realDiff=47815
+RECOVERY 15 acceleratingHeadOn noTrust u=[-0.69811 -0.99944] rho=3.4153e+05 best-gap=1.0317 predDiff=32061 realDiff=49293
+RECOVERY 15 acceleratingHeadOn freshFirstTangent u=[0.0073343 0.026979] rho=3.5785e+05 best-gap=5.8541 predDiff=48378 realDiff=47809
+RECOVERY 15 crossing base u=[-0.011861 0.041076] rho=2.6069e+05 best-gap=0.19994 predDiff=29732 realDiff=29349
+RECOVERY 15 crossing noTerminal u=[-0.0119 0.041003] rho=2.6069e+05 best-gap=0.93326 predDiff=29733 realDiff=29350
+RECOVERY 15 crossing noFutureTrust u=[-0.011965 0.041013] rho=2.607e+05 best-gap=2.2389 predDiff=29734 realDiff=29352
+RECOVERY 15 crossing noTrust u=[0.69799 -0.9972] rho=2.4567e+05 best-gap=5.0911 predDiff=14704 realDiff=30596
+RECOVERY 15 crossing freshFirstTangent u=[-0.011857 0.040928] rho=2.6074e+05 best-gap=1.6466e-06 predDiff=29779 realDiff=29348
+RECOVERY 15 turningCrossing base u=[-0.0079316 0.025323] rho=3.4945e+05 best-gap=3.3411 predDiff=37516 realDiff=37031
+RECOVERY 15 turningCrossing noTerminal u=[-0.0078068 0.024442] rho=3.4945e+05 best-gap=0.068375 predDiff=37513 realDiff=37026
+RECOVERY 15 turningCrossing noFutureTrust u=[-0.0078179 0.024492] rho=3.4945e+05 best-gap=0.33807 predDiff=37513 realDiff=37026
+RECOVERY 15 turningCrossing noTrust u=[0.69812 -0.9993] rho=3.3388e+05 best-gap=0.83702 predDiff=21938 realDiff=38588
+RECOVERY 15 turningCrossing freshFirstTangent u=[-0.0079379 0.024541] rho=3.4951e+05 best-gap=2.7909 predDiff=37574 realDiff=37031
+RECOVERY 15 curvedCrossing base u=[-0.0067213 0.012245] rho=1.042e+05 best-gap=0.89441 predDiff=19071 realDiff=18810
+RECOVERY 15 curvedCrossing noTerminal u=[-0.0066817 0.011083] rho=1.042e+05 best-gap=0.0044965 predDiff=19070 realDiff=18808
+RECOVERY 15 curvedCrossing noFutureTrust u=[-0.0066834 0.01122] rho=1.042e+05 best-gap=0.075177 predDiff=19071 realDiff=18808
+RECOVERY 15 curvedCrossing noTrust u=[0.69811 -0.9995] rho=95697 best-gap=0.38786 predDiff=10570 realDiff=19709
+RECOVERY 15 curvedCrossing freshFirstTangent u=[-0.0067287 0.012658] rho=1.0423e+05 best-gap=1.1074 predDiff=19103 realDiff=18810
+PRIMARY 8 headOn base flag=-2 objective=NaN residual=NaN
+PRIMARY 8 headOn noTerminalCone flag=-2 objective=NaN residual=NaN
+PRIMARY 8 headOn noTerminalGeometry flag=-2 objective=NaN residual=NaN
+PRIMARY 8 headOn noCollisionRows flag=-2 objective=NaN residual=NaN
+PRIMARY 8 headOn noTailCollisionRows flag=-2 objective=NaN residual=NaN
+PRIMARY 8 headOn noStateTrust flag=1 objective=1.11253618e-05 residual=1.36079419e-06
+PRIMARY 8 headOn noInputTrust flag=1 objective=4.15778862e-08 residual=9.65397984e-10
+PRIMARY 8 headOn noTrust flag=1 objective=5.07650242e-07 residual=4.37249937e-08
+PRIMARY 8 headOn noClfCone flag=-2 objective=NaN residual=NaN
+PRIMARY 8 brakingLead base flag=-2 objective=NaN residual=NaN
+PRIMARY 8 brakingLead noTerminalCone flag=-2 objective=NaN residual=NaN
+PRIMARY 8 brakingLead noTerminalGeometry flag=-2 objective=NaN residual=NaN
+PRIMARY 8 brakingLead noCollisionRows flag=-2 objective=NaN residual=NaN
+PRIMARY 8 brakingLead noTailCollisionRows flag=-2 objective=NaN residual=NaN
+PRIMARY 8 brakingLead noStateTrust flag=-2 objective=NaN residual=NaN
+PRIMARY 8 brakingLead noInputTrust flag=1 objective=2.13489558e-07 residual=7.82458966e-09
+PRIMARY 8 brakingLead noTrust flag=1 objective=2.2988978e-07 residual=3.25075263e-07
+PRIMARY 8 brakingLead noClfCone flag=-2 objective=NaN residual=NaN
+PRIMARY 15 brakingLead base flag=-2 objective=NaN residual=NaN
+PRIMARY 15 brakingLead noTerminalCone flag=-2 objective=NaN residual=NaN
+PRIMARY 15 brakingLead noTerminalGeometry flag=-2 objective=NaN residual=NaN
+PRIMARY 15 brakingLead noCollisionRows flag=-2 objective=NaN residual=NaN
+PRIMARY 15 brakingLead noTailCollisionRows flag=-2 objective=NaN residual=NaN
+PRIMARY 15 brakingLead noStateTrust flag=1 objective=4.08815885e-08 residual=3.9688349e-09
+PRIMARY 15 brakingLead noInputTrust flag=1 objective=1.24583143e-07 residual=1.11782805e-09
+PRIMARY 15 brakingLead noTrust flag=1 objective=5.99343928e-08 residual=7.62103524e-09
+PRIMARY 15 brakingLead noClfCone flag=-2 objective=NaN residual=NaN
+LINEAR 8 headOn original flag=-2
+LINEAR 8 headOn zeroDynamicsDefect flag=1
+LINEAR 8 headOn zeroInitialMismatch flag=-2
+LINEAR 8 headOn onlyDynamicsAndTrust flag=-2
+CERTIFICATE 8 headOn value=-0.169860098 residual=1.73e-18 support=37 maxDefect=0.777009 coordinate=6 stage=16
+LINEAR 8 brakingLead original flag=-2
+LINEAR 8 brakingLead zeroDynamicsDefect flag=1
+LINEAR 8 brakingLead zeroInitialMismatch flag=-2
+LINEAR 8 brakingLead onlyDynamicsAndTrust flag=-2
+CERTIFICATE 8 brakingLead value=-0.0503176086 residual=5.55e-17 support=13 maxDefect=0.231437 coordinate=6 stage=1
+LINEAR 15 brakingLead original flag=-2
+LINEAR 15 brakingLead zeroDynamicsDefect flag=1
+LINEAR 15 brakingLead zeroInitialMismatch flag=-2
+LINEAR 15 brakingLead onlyDynamicsAndTrust flag=-2
+CERTIFICATE 15 brakingLead value=-0.0344165233 residual=2.22e-16 support=45 maxDefect=1.02935 coordinate=5 stage=19

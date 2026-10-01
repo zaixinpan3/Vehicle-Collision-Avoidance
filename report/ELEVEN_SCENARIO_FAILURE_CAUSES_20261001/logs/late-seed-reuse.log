@@ -1,0 +1,3 @@
+COLD-SEED 8 headOn returned=1 flags=[1  1]
+COLD-SEED 8 brakingLead returned=1 flags=[1  1]
+COLD-SEED 15 brakingLead returned=0 flags=[] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
