@@ -1,0 +1,63 @@
+\begin{longtable}{llrrr}
+
+\toprule
+
+Speed (m/s) & Scenario & Prior (s) & Current (s) & Gap (mm) \\
+
+\midrule
+
+\endhead
+
+8 & acceleratingHeadOn & 725.90 & 13.05 & 66.286 \\
+
+8 & brakingLead & 793.10 & 14.80 & 6.002 \\
+
+8 & crossing & 559.75 & 13.05 & 6.942 \\
+
+8 & curvedCrossing & >300 & 17.90 & 9.867 \\
+
+8 & curvedHeadOn & >300 & 19.60 & 26.029 \\
+
+8 & headOn & 670.05 & 13.05 & 142.060 \\
+
+8 & turningCrossing & 556.45 & 16.00 & 24.696 \\
+
+15 & acceleratingHeadOn & 19.55 & 14.75 & 11.312 \\
+
+15 & brakingLead & 36.10 & 16.15 & 5.976 \\
+
+15 & crossing & 47.35 & 13.05 & 6.630 \\
+
+15 & curvedCrossing & >300 & 16.45 & 7.479 \\
+
+15 & curvedHeadOn & >300 & 13.05 & 6.497 \\
+
+15 & headOn & 20.80 & 13.05 & 88.310 \\
+
+15 & turningCrossing & 60.05 & 15.60 & 12.344 \\
+
+\bottomrule
+
+\end{longtable}
+
+All fourteen final closed-loop runs complete without a controller failure, preserve positive independently sampled clearance, and satisfy the observed nominal-recovery dwell. The full 6-mm replay buffer is satisfied in 13 of fourteen runs.
+
+The below-buffer results are 15 m/s brakingLead (5.97552 mm). They remain collision-free; a 6-mm prediction-sample constraint is not claimed as an identical ODE45 clearance bound.
+
+Maximum final lateral error over the fourteen stopping states is 0.032547 m. The reported zero-slack flag agrees with the actual roundoff-only CLF predicate in every trace.
+
+The largest controller-call time is 5.539001 s (8 m/s turningCrossing). Across cases, subsequent-call medians range from 0.036740 to 0.127972 s. These times include formulation, nonlinear checking and correction, not only conic optimization.
+
+The maximum absolute lateral error anywhere in a final threat run is 4.445576 m. Final zero-CLF-slack suffixes last at least 5.05 s. The largest positive independently observed ODE successor excess over the predicted 0.99-W bound, normalized by max(1,W), is 1.49127e-07. This difference is retained rather than absorbed into the reported CLF slack.
+
+Across the fourteen runs, 536 holds retain an admitted safety witness while reporting incomplete CLF optimization, and 8 holds report positive local stationarity. These are not reported as attained zero-slack optima or globally infeasible zero-slack problems.
+
+\begin{center}\begin{tabular}{rrrr}\toprule Speed & No-target duration (s) & Maximum $W$ & Final $|e_y|$ (m) \\ \midrule
+
+15 & 60.0 & 8.75e-20 & 2.81e-12 \\
+
+8 & 60.0 & 6.96e-21 & 8.75e-12 \\
+
+\bottomrule\end{tabular}\end{center}
+
+All 305 targeted MATLAB tests in thirteen files and all 15 independent Python audit tests pass. Factory Code Analyzer findings are retained in the bundle; performance advisories remain. The unrelated full repository suite was not run.

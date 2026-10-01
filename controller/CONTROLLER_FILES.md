@@ -12,17 +12,28 @@ The current formulation and its guarantee scope are in
 | `terminalContinuation.m` | Rigidly placed augmented terminal core, Schur pose elimination, RK4 contraction bounds and indefinite target separation |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim and lane CLF |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Target prediction, transported flow guidance, signed polygon duals and road frame |
+| `predictiveSafetyGeometry.m` | Target prediction, transported flow guidance, polygon duals and adaptive interval separation |
 | `laneGeometry.m` | Straight and circular lane coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
 The time-indexed tube is stored implicitly as a feasible hard completion
 and its endpoint family. A valid witness establishes the zero minimum of the
-primary PCBF objective. Positive CLF slack still triggers the secondary solve,
-with zero collision slack and unchanged hard constraints. Only a CLF penalty
-already at its nonnegative lower bound, within numerical tolerance, can skip
-that solve; further horizon-cost refinement is then unnecessary for the CLF
-stopping contract. A time-limited call reports incomplete CLF work explicitly.
+primary PCBF objective. The next priority is actual nonlinear CLF relaxation.
+A zero-slack witness reaches its global nonnegative lower bound; tracking and
+input-deviation costs cannot purchase positive CLF slack. Nonlinear constraint
+correction restores the CLF sublevel first and then repairs later inputs while
+fixing the first input. Conic optimization and a minimum-deviation correction
+QP remain parts of the same solve. Positive local stationarity and incomplete
+budget-limited work are reported separately from zero-slack dissipation.
+Open-loop proposals that leave the model domain, or defined full conic
+proposals with an admissible first stage but an inadmissible continuation,
+use linear-quadratic defect feedback to construct a nonlinear candidate.
+The first input is preserved and the same complete admission is required
+before execution; a defined raw candidate remains eligible.
+At positive relaxation, predictive-cost refinement fixes the minimizing first
+input and optimizes later controls, preserving that first-step CLF value.
+The moving horizon retains the configured completion allowance, extending by
+the admitted endpoint policy rather than counting that allowance down to zero.
 The terminal core is built at straight cruise and may be translated and
 rotated independently of the nominal given path. Completing the square in its
 eight-dimensional metric eliminates the three pose coordinates exactly for
@@ -47,10 +58,10 @@ the offline experiment audit.
 MATLAB Optimization Toolbox and Control System Toolbox are required. There
 is no native build or MPFR dependency. Endpoint Jacobian enclosures are cached
 construction work. The online solve evaluates its defining nonlinear RK4
-constraints directly. See the architecture for numerical limitations.
+constraints and the separation of its pose interpolants. See the architecture for numerical limitations.
 
 Behavior tests include `freePoseTerminalTest`, `terminalContinuationTest`,
-`nonlinearPredictiveSafetyTest`, `controllerInputGeometryTest`,
+`nonlinearPredictiveSafetyTest`, `clfNominalRecoveryTest`, `sweptCollisionIntervalTest`, `controllerInputGeometryTest`,
 `longitudinalRoadLoadTest`, `modifiedFialaTireTest` and
 `collisionAvoidanceControllerConfigTest`. `controllerSourceBudgetTest`
 includes the separate endpoint-construction module in its nine-file limit.

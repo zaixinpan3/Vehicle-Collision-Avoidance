@@ -1,0 +1,226 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlength{\emergencystretch}{2em}
+\title{Restore CLF Priority and Post-Avoidance Nominal Recovery}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Problem and implementation}
+The preceding causal study, \path{CLF_CAUSAL_DIAGNOSIS_20260930.tex},
+found complete zero-CLF-slack trajectories at states where the controller
+instead issued an energy-increasing input. Whole-trajectory backtracking
+removed useful first-input descent to repair the nonlinear terminal core.
+Any small same-state slack improvement then counted as completed CLF work.
+A weighted squared-slack objective could also prefer positive relaxation
+over available zero relaxation. Finally, shifting consumed the initial
+completion allowance until a short straight-terminal countdown reached the
+issued input, even during unobstructed circular cruise.
+
+The implementation changes the numerical realization of the same predictive
+controller in \path{controller/solvePredictiveControl.m}. The target model,
+continuous vehicle dynamics, nominal path, collision buffer and physical
+admission constraints are retained. The existing RK4/safety/terminal mesh
+is refined consistently as described below. Road boundaries remain absent.
+
+\begin{enumerate}
+\item \textbf{Give actual CLF slack priority.} An admitted zero-safety
+witness establishes the primary PCBF minimum. If its CLF slack is positive,
+optimization continues. A conic subproblem first seeks zero CLF slack, with
+tracking and input-deviation costs inside that slice. If the slice cannot
+be solved, the relaxed subproblem minimizes CLF slack alone. Positive slack leaves later inputs undetermined; a subsequent
+predictive-cost solve fixes the minimizing first input and optimizes the
+later trajectory without changing that first-step nonlinear CLF value. The former
+\texttt{clf.relaxationWeight} is removed and rejected by configuration
+validation. Input proximity is measured from the current linearization
+input, never from zero.
+\item \textbf{Preserve first-input descent during nonlinear correction.}
+Analytic first-step Gauss--Newton directions seek the actual CLF sublevel.
+Their input displacement is bounded by the existing local input trust box;
+relinearization, rather than a single extrapolated Newton jump, supplies
+larger changes. Unbounded correction steps in an intermediate experiment
+reached extreme combined-slip inputs and produced an ill-conditioned
+prediction during a later encounter.
+Later-input correction fixes the first control while repairing terminal
+membership. When other constraints also need correction, a condensed
+minimum-input-deviation QP includes sampled collision, physical, slew and
+terminal-separation rows. Every trial is replayed through the nonlinear
+model and passes the original hard/zero-safety-slack admission before it
+can issue a control. Raw and corrected candidates remain independently
+eligible. These operations are within the existing optimizer.
+\item \textbf{Repair nonlinear rollout defects.} A small measured-successor
+discrepancy can grow along an unstable open-loop tail until its tire model
+is no longer evaluable. The same issue can invalidate a conic proposal
+before endpoint correction becomes available. A defined rollout can also
+accumulate enough error to destroy terminal or collision feasibility.
+An unevaluable proposal, or an inadmissible full conic proposal with an
+admissible first stage, is projected
+onto nonlinear dynamics using finite-horizon linear-quadratic feedback
+around its proposed state path. The first input is fixed; only later
+inputs compensate rollout error. Gains are built along the evaluable
+anchor using existing numerical state scales and input weights.
+The resulting trajectory is a search candidate and must pass the same
+complete nonlinear admission.
+\item \textbf{Use a meaningful stopping condition.} The global
+nonnegative CLF lower bound is attained only by an admitted trajectory
+whose actual residual is zero, apart from floating-point roundoff.
+Positive local stationarity is reported separately. A time or iteration
+limit retains the best admitted witness and reports incomplete CLF work.
+A mere improvement over the incumbent is no longer sufficient.
+\item \textbf{Maintain the moving completion allowance.} The prediction
+length may shorten to
+\[
+H_{\min}=\min\{H_{\max},N+\lceil T_{\rm recovery}/h\rceil\},
+\]
+then grows its endpoint with the already admitted terminal policy as the
+window advances. The existing three-second allowance is preserved. It is
+a prediction length, not a required recovery time or fixed endpoint pose.
+The shift-and-append recursive-feasibility construction is unchanged.
+\end{enumerate}
+
+The zero-slack cone is represented directly as
+\(\|L\widehat e_1\|_2\le\sqrt{(1-\alpha)W(e_0)}\), avoiding cancellation
+between nearly equal rotated-cone constants near trim. Positive scaling
+of the CLF and tracking expressions improves numerical conditioning
+without changing feasible sets or objective ordering. Endpoint corrections
+cannot modify the actual first successor they are intended to preserve.
+The added correction QP has at most 100 active-set iterations; up to five
+nonlinear correction steps share the existing soft call budget.
+For a conic step of size $d$ near a regular anchor, its affine dynamic
+defect is second order. The projected rollout error has the local form
+\[
+\epsilon_{j+1}=(A_j+B_jK_j)\epsilon_j+O(\|d\|^2),
+\qquad \widetilde u_0=u_0.
+\]
+This is a numerical retraction that preserves the proposed first-step
+CLF value. It does not impose a scheduled path position, change the
+terminal set or establish a new closed-loop robustness theorem.
+
+\section{Conditional recovery statement}
+The nominal error contains lateral position, heading relative to curved
+trim, body longitudinal/lateral velocity, and yaw rate. It does not contain
+a scheduled longitudinal position. The positive-definite LQR metric is
+\(W(e)=e^TPe=\|Le\|_2^2\). The controller evaluates
+\[
+\rho_k=\max\{0,W(e_{1|k})-(1-\alpha)W(e_k)\},\qquad\alpha=0.01.
+\]
+For the declared nominal transition, if zero relaxation continues to be
+achieved after some index $k_0$, then
+\[
+W(e_k)\le(1-\alpha)^{k-k_0}W(e_{k_0})\longrightarrow0.
+\]
+Positive definiteness implies convergence of all five nominal errors,
+hence given-path constant-speed cruising. No settling-time requirement is
+introduced. The original local Riccati construction is retained; this
+work does not prove that its metric is a global nonlinear CLF.
+
+The implementation reports the raw residual and uses only
+\(64\operatorname{eps}(\max\{1,W_k,W_{k+1}\})\) for lower-bound stopping.
+This entails a tiny practical numerical bound rather than an exact-real
+arithmetic claim. A positive local stationary result does not prove that
+zero relaxation is globally infeasible. A finite-budget local solver
+cannot guarantee finding every disconnected feasible zero-slack solution.
+Absence of an obstacle alone is not substituted for a successful actual
+CLF/trajectory check. Likewise, the RK4 statement is distinct from the
+tightly integrated ODE45 experimental plant.
+
+\section{Validation protocol and results}
+The final production source hashes are recorded with the compact evidence
+in \path{CLF_NOMINAL_RECOVERY_20261001/}. The fourteen original threat
+fixtures, at 8 and 15 m/s, are unchanged. Every fixture starts separated
+and collides if the ego follows its given path at constant speed.
+The hold is 50 ms; prediction uses the existing RK4 map and a 6-mm
+collision buffer. Tight ODE45 supplies measured ego successors with
+relative/absolute tolerances $10^{-11}$/$10^{-12}$; independent rectangle
+geometry checks 31 times per hold. There is no observer, noise, delay,
+random draw or road constraint.
+
+An initial implementation-only campaign exposed short corner contacts
+between the former 8.33-ms collision-check nodes. For example, the
+15-m/s turning-crossing replay overlaps at 1.860--1.865 s while both
+neighboring prediction nodes satisfy the buffer. The final default
+integration step is 5 ms, giving ten intervals per hold, consistently
+refining the dynamics, finite collision checks and terminal enclosures.
+A second campaign showed that mesh refinement alone could still miss a
+short corner contact. The final admission therefore also bounds the
+rectangle distance on every interval of the nominal pose interpolant.
+
+Let $d_a,d_b$ be the endpoint distances on an interval of duration $\tau$,
+and let $L_d$ bound the relative translational speed plus the two angular
+speeds multiplied by their respective body radii. Distance is Lipschitz,
+so a valid lower bound is
+\[
+\underline d=\min\{d_a,d_b,(d_a+d_b-L_d\tau)/2\}.
+\]
+An interval is accepted when this bound exceeds half the declared sampled
+margin. Otherwise, it is bisected and the new midpoint must satisfy the
+\emph{full} sampled margin. At the default 6-mm sampled margin the
+admitted nominal interpolant thus has a strictly positive 3-mm interval
+bound. The relative-speed construction cancels common translation.
+Additional midpoint rows are supplied to the same optimization and
+nonlinear correction problems. Curved terminal enclosures include the
+nominal interpolation chord error.
+
+An intermediate implementation also exposed an unchecked-prefix cache
+defect: a not-yet-validated interval could survive endpoint correction as
+if it had been checked. All target-bearing intervals now start as
+uncertified, and only actually checked unchanged prefixes may be reused.
+The measured-successor regression independently reconstructs every
+returned plan to guard this admission property. A shifted trajectory
+that loses admission is first offered to the same later-input correction
+before a full conic problem is rebuilt.
+
+No audit threshold or physical collision buffer was weakened. This
+interval argument concerns linear interpolation of the nominal RK4 ego
+poses and the exact prescribed target flow. It is not an error bound
+between that interpolant and the physical continuous-time plant.
+
+Each threat run stops after all five absolute errors remain below
+\[
+[0.10\,\mathrm m,1^\circ,0.10\,\mathrm{m/s},0.05\,\mathrm{m/s},
+0.01\,\mathrm{rad/s}]
+\]
+for five seconds, no earlier than eight seconds.
+The observation cap is 80 seconds, not a required settling time. A finite
+dwell is an observed recovery criterion, not an asymptotic proof.
+Two additional no-target controls retain exact circular cruise for 60
+seconds. Behavior tests also start with a 0.1-m lateral perturbation and
+check geometric CLF decay beyond the original initialization-tail length.
+
+\input{CLF_NOMINAL_RECOVERY_20261001/metrics.tex}
+
+\section{Scope, residual limitations and reproduction}
+The collision audit separately records strict positive clearance and the
+configured 6-mm buffer. A prediction-sample buffer does not establish the
+same minimum at every independent ODE45 sample or at every continuous
+time. All measured discrepancies are retained; the audit threshold is
+not weakened to make a report pass.
+
+The opposing circular-target and accelerating turning-crossing fixtures
+can have recurring conflicts by their original definitions. In particular,
+the 8-m/s turning-crossing target approaches again around nine seconds;
+it has not permanently departed after the initial crossing.
+Recovering nominal cruise for the observed
+dwell does not establish permanent nominal cruise through all later
+opposing encounters. The algorithm retains the original fixed target
+epoch and indefinite terminal separation test, without assuming one-time
+departure or editing those fixtures.
+
+Concurrent single-thread MATLAB workers provide functional validation,
+not an isolated timing benchmark. The existing five-second budget remains
+soft: an in-flight factorization or validation may finish beyond it.
+Some conflict frames still exhaust that budget. This work establishes
+the reported recovery improvement, not a 50-ms real-time guarantee.
+
+The compact bundle includes per-case and per-second metrics, independent
+audits, final test results, source/raw hashes and actual reproduction
+commands. Full JSON/MAT trajectories and generated PDFs remain in the
+external research cache. Preliminary prototypes and interrupted runs are
+identified separately and are not counted as final validation. Unrelated
+observer work and external solver dependencies are excluded from this
+change.
+\end{document}

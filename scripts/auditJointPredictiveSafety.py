@@ -66,7 +66,8 @@ def feasible_hold(hold):
     """A retained witness is executable without a new optimization result."""
     return (hold.get('hardResidual') == 0
             and hold.get('source') in ('sequentialConvexification',
-                                       'retainedContinuation', 'feasibleInitialization'))
+                                       'retainedContinuation', 'feasibleInitialization',
+                                       'nonlinearConstraintCorrection'))
 
 
 def recovery_completed(result):

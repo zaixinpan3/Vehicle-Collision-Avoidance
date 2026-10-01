@@ -1,0 +1,921 @@
+{
+  "baseCommit": "2a49daf10ff2ae119e8c39c8f072b033405e5837",
+  "scope": "Current source, final and explicitly identified development experiment artifacts; no archive report hashes.",
+  "sources": {
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/collisionAvoidanceController.m": "d11ee84165e883784bb6bb141d61829367f56cafbb88fcc786fb215dfb20635c",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "a005f337ae1ae4ac75ddf212e0a15f09ffd6765cce99a12b241725342e7e1567",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "aeb41b0f8c8d8d9fec724c53be9fbb75fa3993c2b5457d564cf1314dd7c27ea1",
+    "controller/terminalContinuation.m": "cea3e6ea542a179a67c81bd4b87c7804b3706f8dd7c41419a8ee9d733b5a5be2",
+    "config/estimatorControllerIntegrationConfig.m": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "config/nrmmTrackingConfig.m": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+    "config/collisionAvoidanceControllerConfig.m": "f3d977cb3aa0197fa56628f46b01198ec83877888cff1701c07019a39b1a2746",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "c5be082dfaf7891ba46a148506e18d89278d4aee7ab24a8b9796fd1bd2abd69b",
+    "scripts/auditJointPredictiveSafety.py": "4d053dd8f09c660b3c95648971fa1424cbfb8323a61aa358019f0a5d13ebf424",
+    "scripts/givenPathCollisionBaseline.m": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+    "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310"
+  },
+  "raw": {
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed15/acceleratingHeadOn.json": {
+      "bytes": 6666369,
+      "sha256": "da6ed98b4e86271f1116f1bca77f3e3bb5fa4c568a0001ac6ca2d714d741bcf5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed15/brakingLead.json": {
+      "bytes": 5319826,
+      "sha256": "d6cabed648aeb4c9c534fe0ad59e32ef62bcc5ef83f9dbd683e4316f90dfaf9c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed15/headOn.json": {
+      "bytes": 6174239,
+      "sha256": "e384fb98c9fdec98bba54fbfadf486ab5b1bdf4042dc8fdac82255a0c97e12e6"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed15/turningCrossing.json": {
+      "bytes": 7995703,
+      "sha256": "a8d67001957042307f8d4ef4bf172b5d03ac06c1e1640ee7eb1cd2d67d9ac1ee"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed8/acceleratingHeadOn.json": {
+      "bytes": 7169871,
+      "sha256": "6fdce28499532005ad406c6bf2fb05271ec5b6a4e61d5da4da92b3fe7f23bad3"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed8/brakingLead.json": {
+      "bytes": 5972851,
+      "sha256": "001c5ececfd46a19029c200d97c8191841bfa14b2270482f4bbec4842a031a94"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed8/crossing.json": {
+      "bytes": 6239264,
+      "sha256": "4246c084f02cc96b1b6bb66d5edd088fb980b4b792de6479bf3f37477ed65e8b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed8/curvedCrossing.json": {
+      "bytes": 9400149,
+      "sha256": "57b665a3b371d9edc40105709a643f80c4f7b1238868f5b20477fba065a07ab4"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed8/curvedHeadOn.json": {
+      "bytes": 10033704,
+      "sha256": "7fdef8fd3dbc45d21bd859b60e5eba7a57c23d74d4f5ae10e551bd6c9fe117e9"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed8/headOn.json": {
+      "bytes": 7951722,
+      "sha256": "603f3ebcfacecf8b49720df2dcbb79374f343109226076646babebad5113800d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-final/speed8/turningCrossing.json": {
+      "bytes": 6638622,
+      "sha256": "3052bf1e459950b8bfb91d12fac8ac0daef40a462ca5bd704fcd119a7ba294e9"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed15/acceleratingHeadOn.json": {
+      "bytes": 6223506,
+      "sha256": "a952b9c30a5e4b9deda3ef299a451bed3c18f32726169ae544fc32ccaadd8840"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed15/brakingLead.json": {
+      "bytes": 4835017,
+      "sha256": "5c14bc10363aacd0248b5ea64223f8c3dc9a1e628e20ebf03ed0884246045082"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed15/crossing.json": {
+      "bytes": 6004632,
+      "sha256": "b0265793738a7d666624173bbb194ad6f854a24a02d25129150dd05bf17a6d9b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed15/curvedCrossing.json": {
+      "bytes": 8298916,
+      "sha256": "03b427fef36203f970bb9e7d74563db0001680e4b7882e3370c57279f090df1e"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed15/curvedHeadOn.json": {
+      "bytes": 8735117,
+      "sha256": "434f4f13040bb9762cca96511fe04c6aa9746a2127192055860eb40715543165"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed15/headOn.json": {
+      "bytes": 6548145,
+      "sha256": "aaee2d75a98ecc32f2067988a9013edcbf02ebb96c47e63e60847fbe570860aa"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed15/turningCrossing.json": {
+      "bytes": 7825722,
+      "sha256": "24343a19a3b0ef975f2585e5469d17946a760d1073cdec71ef5d990ceccf31c3"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed8/acceleratingHeadOn.json": {
+      "bytes": 6427585,
+      "sha256": "0657f4d2805d9804ab139982fb1c495f9627df1c4fdd7fb1d4abeffebf1cfb69"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed8/brakingLead.json": {
+      "bytes": 5274343,
+      "sha256": "b9145b1a85551b7f3992223e96d47c2cb6b45b994f79b2d678bd2f82630242e2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed8/crossing.json": {
+      "bytes": 6197180,
+      "sha256": "ee1ef2e08a5634e533971ef34adb727f4ab40ec6732d2b4222f58803d26bd409"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed8/curvedCrossing.json": {
+      "bytes": 8961526,
+      "sha256": "c9db1b176213dada869b918795dba950eafd7792c354384f045e65554ef5dae1"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed8/curvedHeadOn.json": {
+      "bytes": 15438974,
+      "sha256": "4f9aec707cca0256ca11896e7ce880745c06a2985702db9e4aed728b58f1bb85"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed8/headOn.json": {
+      "bytes": 6498887,
+      "sha256": "dcaf070c20bc8299f991396a185ae6b34846e1a63e22ed0f500c95103c2eb7c8"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval/speed8/turningCrossing.json": {
+      "bytes": 6229947,
+      "sha256": "b867105a7acbcbfa0851d970452a6ecf1c325d7337ae80ce4826acb5f1eae7de"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix/speed15/brakingLead.json": {
+      "bytes": 351022,
+      "sha256": "08a9efacba6b51ea6b204cabe8861e122b793c85cd05e039e413918922f9614d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix/speed15/turningCrossing.json": {
+      "bytes": 258679,
+      "sha256": "f8372979fdfff48e0038ad546fb065ecbcff2ccc770d59c4e179d9c33ee338aa"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix/speed8/curvedCrossing.json": {
+      "bytes": 339051,
+      "sha256": "7d4eeacef1033742582b553c7825602d27ca013e8d14bb8c35e5ea9ae41a1de0"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix/speed8/turningCrossing.json": {
+      "bytes": 268599,
+      "sha256": "9e6764a4e87d4b8ea98c1fb1b36156ed0878e07473328c0faab724456cb2dc58"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed15/brakingLead.json": {
+      "bytes": 683562,
+      "sha256": "d3ea4d0ee3af4789f24c6c9456df2e34c7f2e39fd1d4440a66547681f7bb966f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed15/brakingLead.mat": {
+      "bytes": 3261536,
+      "sha256": "d85e7d8c407a604cb4114478f0abe5fb1a7333e6c14e5072fafe227aefb1c3e3"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed15/turningCrossing.json": {
+      "bytes": 850958,
+      "sha256": "f681cee915c8faf1cfb027f5919e703d187dfdb8d9d74bc0be881db6da35d36c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed15/turningCrossing.mat": {
+      "bytes": 4872230,
+      "sha256": "95b4c4f5a9ca86d68349fec3ac118e085a95acfb3be40937adae08f5fce84899"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed8/curvedCrossing.json": {
+      "bytes": 819459,
+      "sha256": "7a495882759ff3d1baea555a7a070bc4e0cb1ed21d1ac2839bb58688cc702a20"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed8/curvedCrossing.mat": {
+      "bytes": 2864183,
+      "sha256": "db82c86bd8edbbe96c39d435616884f8030a69dd69b10fe063a5a3f2b934c37c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed8/turningCrossing.json": {
+      "bytes": 731006,
+      "sha256": "d3b8d9fe067a60b8f9b13323648221ccdaa36a7883ddcf28c2865d6a664bcf22"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-certified/speed8/turningCrossing.mat": {
+      "bytes": 2606389,
+      "sha256": "0a93739aaad945da9b87c4f5b67cd3818ef59586f74b9640ddc48391f9e94679"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-fixed/speed15/brakingLead.json": {
+      "bytes": 529828,
+      "sha256": "180ecbb9782f6d6deb2587887ad0eb319ef7d5a83dae272d76af383b0ca13683"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-fixed/speed15/turningCrossing.json": {
+      "bytes": 358082,
+      "sha256": "2409f1204dc12bcfba2481cec3c30f6f0a8f3259fb56301d6a852255112e7887"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-fixed/speed8/curvedCrossing.json": {
+      "bytes": 522533,
+      "sha256": "93e85a4350f6f71cc372e8159d482bc130bd4b2a0fdcfa5784a290cb063a2b8d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-interval-prefix-fixed/speed8/turningCrossing.json": {
+      "bytes": 407592,
+      "sha256": "6bbcd676c0d0d4c86642a647383382e5f953005ed478d67bfccc09a1aa5d5cd9"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed15/acceleratingHeadOn.json": {
+      "bytes": 6291186,
+      "sha256": "b3abbbc164387b9f97793d27966d7b088de156cef89e5914f5f1d157167ad3e7"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed15/brakingLead.json": {
+      "bytes": 4917861,
+      "sha256": "31d215910ca3238de2e3278048d3c370252cfb115021238ad4b8afa961f696e5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed15/crossing.json": {
+      "bytes": 6034663,
+      "sha256": "449efe5ca08d47c5aea8959e0f42c064cb1598c9ebe144e97051b35d77e39a7f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed15/curvedCrossing.json": {
+      "bytes": 9527593,
+      "sha256": "a8187728e643294a1c8ec40ca9b53866f766d7008aca27c37b63468ea09d16ea"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed15/curvedHeadOn.json": {
+      "bytes": 9858673,
+      "sha256": "ba963a50d1a46063ad369395a7a4063ff711ecea1d154a401a50c62dcba37a35"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed15/headOn.json": {
+      "bytes": 6632887,
+      "sha256": "487be2ad8353aece6a995f05d701d183b2c80fc18064642b4eba04b3315e59e5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed15/turningCrossing.json": {
+      "bytes": 6596363,
+      "sha256": "df3cc76ca72067bec13face38f6d5c24cdf5a6a3a937521afcaaad0cd317a995"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed8/acceleratingHeadOn.json": {
+      "bytes": 6485814,
+      "sha256": "57d37d73a5be66340a9157af1dc18b9e20d78992c9600ec02404e83a48078ad7"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed8/brakingLead.json": {
+      "bytes": 5721045,
+      "sha256": "d4b2c21a36ddf89cf7df44a889ad04ec7be1f707f6156a054efed968aea5628f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed8/crossing.json": {
+      "bytes": 6260470,
+      "sha256": "736637a695d0a90d6f6b1a2f5f8f4d3a11d1538e5b50a4c7873552436071777b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed8/curvedHeadOn.json": {
+      "bytes": 9380853,
+      "sha256": "a16fec9047e4628aefe0822134d97aa89f44baf462d5a0d0f6a22ef54fdebbd8"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed8/headOn.json": {
+      "bytes": 6382829,
+      "sha256": "629bbc78a2c0db15c010a727732f1992cb07ddc2ff9703a0eb344134334790b4"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-projection/speed8/turningCrossing.json": {
+      "bytes": 6611485,
+      "sha256": "d8e2696f704c52f552e95b5c8d27773d934c1242d27c8fc3ec225689ed610959"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed15/acceleratingHeadOn.json": {
+      "bytes": 6192343,
+      "sha256": "05251914b8d6fbf7d961308dc33ba94dd77893c83d1e9bc7df93408a2341032b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed15/brakingLead.json": {
+      "bytes": 4738282,
+      "sha256": "4970ffead86f9540256adeb62bf28b5b6c6eeaf005667bbae107b8a486e871e4"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed15/headOn.json": {
+      "bytes": 6348577,
+      "sha256": "a5e53c82234f3ec92e39cde40ab055fd3c6dab4220fb2f8f1b046e8dcae589c1"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed8/acceleratingHeadOn.json": {
+      "bytes": 6447084,
+      "sha256": "0e2d5bf2ff69b65640745339bc46a45d4f346433ddddd8d228abffe5a0e291f3"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed8/crossing.json": {
+      "bytes": 6227348,
+      "sha256": "897770530e24a5b0abf2da65917a0fd521c8f964d9f0446c7998024d517489f1"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed8/curvedCrossing.json": {
+      "bytes": 8493487,
+      "sha256": "446b5e8e276f8fc3020fa6a2ab41a106503fcd6c1ccca74c626e8e5ccb3a32c7"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed8/headOn.json": {
+      "bytes": 6622738,
+      "sha256": "a81465d703e1c111daf35da62b4734f3500aecd878a9bbc97653748375517911"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-refined/speed8/turningCrossing.json": {
+      "bytes": 6429920,
+      "sha256": "715459f055b6336f30cd9b6e30f3503cde5192ac1ffb8ec5359ab523a6ff0630"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/acceleratingHeadOn.json": {
+      "bytes": 6428021,
+      "sha256": "c24d310180ffa07a9b5dfc65ccbf35c0a52ed436a029deff0dd4c1f5158c4fbd"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/acceleratingHeadOn.mat": {
+      "bytes": 7605069,
+      "sha256": "e70c141d9ab0aa29b832d976e4ac65888fe64a87eb2d8818985c444cbe672fdb"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/brakingLead.json": {
+      "bytes": 4869157,
+      "sha256": "e965fe5ccaf36ce0d55753dae5f03838cd071dd0a585b01539767ca3b7c0a746"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/brakingLead.mat": {
+      "bytes": 9985588,
+      "sha256": "07047265145499d74659ccaf3570cca35a1afa446676630499b13adf8876463a"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/crossing.json": {
+      "bytes": 6013079,
+      "sha256": "aa50a93ab1e7d0f5bb47965b3a0d05ea552914f41a9e9255e77ab10c68ae183f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/crossing.mat": {
+      "bytes": 6812556,
+      "sha256": "4051a4a71172b78141f1b006bb0989a3cfb255813a80e6e1a1afa265d1e6d851"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/curvedCrossing.json": {
+      "bytes": 8082255,
+      "sha256": "1aaa5783fb3ab7eb19c9b75a2faac8bb6aaa98ea18eea411b18fe7c9997b110c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/curvedCrossing.mat": {
+      "bytes": 9599910,
+      "sha256": "38653d072fcb983f273f7a12c82f68fcda163f0aa4ad94d1b03ba065e3243b84"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/curvedHeadOn.json": {
+      "bytes": 7738006,
+      "sha256": "9e0db4f7fa4870468b626ef10a9f116f8c5e05e5b838ec86a911ce8db8e04d0d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/curvedHeadOn.mat": {
+      "bytes": 8284088,
+      "sha256": "5098de93c3184be13187777959f4c2532eb8aa9619fd5719a091c9a9375e7487"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/headOn.json": {
+      "bytes": 6145094,
+      "sha256": "ffa5e55de6c69645847e1415bdecc291eb8e6b197a9b3fbd793e3a7ae00580e8"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/headOn.mat": {
+      "bytes": 6426622,
+      "sha256": "64394d27bb6d020dc1b78b90e561a58604565e71fe65cb7a0fb19d851b512de8"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/turningCrossing.json": {
+      "bytes": 6382134,
+      "sha256": "6d8dcf3fb046a4addee9df0571d26ad6bca6ee9d30417fa28238a7e84b973417"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/turningCrossing.mat": {
+      "bytes": 8737787,
+      "sha256": "f6b6db69c4403b03926beac94a0bd36fdbfb1b733f4ca7a2c454830a8293f200"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/acceleratingHeadOn.json": {
+      "bytes": 6452254,
+      "sha256": "7b04bcd0626e68bafc0c692da7de6f345b2ffa6ff99ef16509f7962fa02a7f47"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/acceleratingHeadOn.mat": {
+      "bytes": 7480098,
+      "sha256": "5a36bdb087784c8e5c01cc7ccbdcb029ed2f8993afbf9e9a2f6bf0af99416243"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/brakingLead.json": {
+      "bytes": 4903761,
+      "sha256": "8a2be0b4e912bc9678f0a373570fc2bc67b3350d0556e2e41ef83d7c7799662a"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/brakingLead.mat": {
+      "bytes": 9632780,
+      "sha256": "d74c3f71b5b843f7fbc0c216b367c0e4a3ab2e27050d99dc62b0b6482bf4f2d2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/crossing.json": {
+      "bytes": 6222465,
+      "sha256": "756520718df79eaa5abf16265b9b8d0e786f8c38d49eea659be70063f5dd6d55"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/crossing.mat": {
+      "bytes": 6652328,
+      "sha256": "ea214a4f66845344950e38fdcb46e54193f8213065fb54064d94cd6782c80c62"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/curvedCrossing.json": {
+      "bytes": 8423165,
+      "sha256": "c12d5dd36071c8174b9774f3d4a718ffd235821b74704fcbfe245c8849a7f82b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/curvedCrossing.mat": {
+      "bytes": 10579560,
+      "sha256": "55c5af6eeb5d052ce1c2c8cc2c8042dc68bf74c5c5a8b27adb41b72441674109"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/curvedHeadOn.json": {
+      "bytes": 8654017,
+      "sha256": "54c6aa7afa77f680cb9d38da44282aac076b75ce31b2c25d96b8ba486d5e007d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/curvedHeadOn.mat": {
+      "bytes": 11173316,
+      "sha256": "3e3c83b478e8f79d9ca4ffeaf6a28d68ac6cb1633a6e183def9fb9feb6d26044"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/headOn.json": {
+      "bytes": 6384008,
+      "sha256": "81a2958f40a99c21c8c3470a8b8fbd8cc734cf7dccc969cad7cb823727615d3c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/headOn.mat": {
+      "bytes": 7367392,
+      "sha256": "c1319ad71e0651aedabbdac1ed2e0faed2b1034daf0567474fca47c4d182e033"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/turningCrossing.json": {
+      "bytes": 6575780,
+      "sha256": "e054d358e04819c78060d3e56d8b8aec45368c53548f8fa07d6c18a1b0e2c25a"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/turningCrossing.mat": {
+      "bytes": 7738344,
+      "sha256": "6035d3f946fb333a5b3965921c9c863cf7ae89c04d25248f1be5f688b1b0eae2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed15/acceleratingHeadOn.json": {
+      "bytes": 6219321,
+      "sha256": "3aac453e37fc9de8191d6f720886adb92c0cbac49a097b2d3dc907ab8c4e211b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed15/curvedHeadOn.json": {
+      "bytes": 7748355,
+      "sha256": "85b645c3c3ad5fd650f1e029110a37376e15a2683876504300d8e8cf96c2b51d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed15/headOn.json": {
+      "bytes": 6168943,
+      "sha256": "10a72049b58a6bf8a5d639a9b273ec2211104037ad8b1b917d08c3dd2cce78e6"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed15/turningCrossing.json": {
+      "bytes": 6636301,
+      "sha256": "67798404991dfec062a755fcf5a5c9663bf3e37f0909f919342282c717d4e4f9"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed8/acceleratingHeadOn.json": {
+      "bytes": 6467125,
+      "sha256": "dd1125c53303fe8932dfeaed55554f9d13b0917d5c3c75a7855bb23d59cc03c5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed8/crossing.json": {
+      "bytes": 5486275,
+      "sha256": "b2e9b4cd770102ea801be6fe8a95963de209ec1efe4900fc9322dff706fee33a"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed8/headOn.json": {
+      "bytes": 6931858,
+      "sha256": "d6ff0ecdde665925bc0aa9a0acf5e87d9ecf0c5fcd3030271c4d2a5c513dec52"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-trust/speed8/turningCrossing.json": {
+      "bytes": 6670217,
+      "sha256": "3a1a8d51e9f100df76598a81444f5c19e7bb699990f09c7545a64a1da0de3dd3"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedAnalysis.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedAnalysis.m": {
+      "bytes": 759,
+      "sha256": "e28476a045a075855a1bfe0d187d4ffb7ba1fa072e34beb7ffdcefb858bf00ac"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedTests.log": {
+      "bytes": 1817,
+      "sha256": "e8d8c5a8a014bd37ed726cf45a9d8ab4da69273ba90c904ad0a293238aff7c21"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedTests.m": {
+      "bytes": 692,
+      "sha256": "b917b757960ca4165e7d739841908568cd49e4bf6580cd428d31a9a153f04466"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedWorker0.log": {
+      "bytes": 56443,
+      "sha256": "a2552f3828db8ff68c003265561704f1c7f9a5ff2a74e48504b2fa53daf2b6be"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedWorker0.m": {
+      "bytes": 2322,
+      "sha256": "37c196a20f7464485927c54bce80c9b45551925cabe4e63bae29dab3e6122c14"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedWorker1.log": {
+      "bytes": 33297,
+      "sha256": "bc82de7b721d1081d3ea5a03181afc8a01c46ac5c1bf98bf47347a5c20837c2d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/certifiedWorker1.m": {
+      "bytes": 2351,
+      "sha256": "ea027acc796dba4e411cd96cd3e0d7da9147fec756f5afdc7ebaf5fb26fe74a2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circular15-stable.json": {
+      "bytes": 9135020,
+      "sha256": "bc9332d7d4080596655d27f56395f3400ae5c3698d331ab55d6ad987fd486315"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circular8-stable.json": {
+      "bytes": 9220739,
+      "sha256": "b09bcd14c130f9399c1d9d5bf09fb3222bffc538206b9f9f713bc2cc17d2682a"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularCertified.log": {
+      "bytes": 46098,
+      "sha256": "de3473695eb1c258af0e0e5bb6faa79cc94a8af32a1c2db316c2fc24b32c4166"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularCertified.m": {
+      "bytes": 603,
+      "sha256": "144d29df29fea87b6ed4ea24215422f9d5697880c4de1a01d5960d8c0057d2dd"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularProjection.log": {
+      "bytes": 46098,
+      "sha256": "4c7975d216454cfa7d7dc6d105ee01bc279fa2224005d36febdaca42c04177ee"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularProjection.m": {
+      "bytes": 628,
+      "sha256": "163cffc400012176650dff5a0c5af29cf498e81a73d41cbcba8a4a9fa969e405"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularStable.log": {
+      "bytes": 46098,
+      "sha256": "a24768ed5aa7d4779f0771fc38138bf3458f0165b91d4f09d21a9b3b8785eab2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularStable.m": {
+      "bytes": 616,
+      "sha256": "5e144c6ddc586b87b97a44a1a3b4bc99187dd753b33712a0622fe59cfcf63f0b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularTrust.log": {
+      "bytes": 46098,
+      "sha256": "346ed9c2b9ca2bbf879b3096a3ebae11d90d07622e43a15c79ea3ec4dee9ef1b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circularTrust.m": {
+      "bytes": 613,
+      "sha256": "da8731a97c03ea396deb0f8b5aea78f07d1c42280bc81f65a98fbaecae05bbaa"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/collectCertified.py": {
+      "bytes": 4842,
+      "sha256": "ed52c27bcb912930a833929efd80c60fb2f0acc845edfa447dc184d1f429b430"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/collectProjection.py": {
+      "bytes": 5051,
+      "sha256": "621aad1e5134a52bbe6f6acf28dfe2bd21ec12c7ca7c5d2a51fb24d1f8c11a66"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/collectStable.py": {
+      "bytes": 5076,
+      "sha256": "6774d27c8f5096c7a58b026d7729bc8c0b136f18531b549470681c46580508b2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/collectTrust.py": {
+      "bytes": 4868,
+      "sha256": "d337ab8683e7904d2e3c77e192408a76747c88e3d398f986442dddbc6810f0eb"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/domainFailure.log": {
+      "bytes": 2170,
+      "sha256": "61030e6285a09f16b3cabeeaa3b03480e694aee3e601b10d0b4e7ee6d5fe6afd"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/domainFailure.m": {
+      "bytes": 765,
+      "sha256": "90950331c66b5e314319af496ccf6a08810242a1aa6be467ee6c80377171d285"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/finalizeEvidence.py": {
+      "bytes": 7096,
+      "sha256": "94dc1af59f02ede679644be1139b752fe3ef2a36e3aaa9dac6e149da7eedb87b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/interval-campaign-outcomes.json": {
+      "bytes": 1781,
+      "sha256": "90d0fee94122285255d54ce8bf4206983e60153aec375348db25655a8c02b40e"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/interval-source-before-cache-fix.json": {
+      "bytes": 1200,
+      "sha256": "512e680d22d24beac2621940053269ce1c71f2952e0e3f1a67dd0b7bb307e94d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/interval-source-before-empty-cut-fix.json": {
+      "bytes": 1200,
+      "sha256": "0e567739ddf3b40641bd2ad8e9e21eb23fcfc762387f68c7e162cb127f4e1ba7"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/interval-source.json": {
+      "bytes": 1200,
+      "sha256": "510b882d77eb84e7f7c9d96752e9b5f6f82fc837065f9108d98074faac85a292"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified15brakingLead.log": {
+      "bytes": 1541,
+      "sha256": "a73d9a377b8281d6adcf152079aa194c99af98c26668078af1e318c1366d07eb"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified15brakingLead.m": {
+      "bytes": 566,
+      "sha256": "eba0e152f4d0d43e811901a5a4e710c7fedab15faf9d498b34a16425d3129880"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified15turningCrossing.log": {
+      "bytes": 1590,
+      "sha256": "dc9386c1972f5cb88500215afddcba1be058bc7f546196dd3f5652022da93bc7"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified15turningCrossing.m": {
+      "bytes": 578,
+      "sha256": "51309be69e5331899ce3c0341f71ab1fcd1eff57e9dbc8c4389cbd7bd948a75f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified8curvedCrossing.log": {
+      "bytes": 1563,
+      "sha256": "691c2487b9b3f45446a8bdedb79f87a95d20c71b08622273b225b6f374f147cf"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified8curvedCrossing.m": {
+      "bytes": 571,
+      "sha256": "a40ed6d9e73536f7880817904e76a2247a0a5263303c358e5799acef933c37e6"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified8turningCrossing.log": {
+      "bytes": 1584,
+      "sha256": "ec5fb858d1063c04eeac12592e3da155a2b47a67aab89bb850b74d975b934de5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prefixCertified8turningCrossing.m": {
+      "bytes": 574,
+      "sha256": "fb7de161d40eba0bc67a0810dc7bef399e2a1767a55f464a39f9cfd1cd38a4ac"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prepareProjection.py": {
+      "bytes": 3501,
+      "sha256": "bca607d68405e83e6bb5422f9aabee61c3b15d11da88d2aa8e5eaafc807bc3d5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/prepareStable.py": {
+      "bytes": 2550,
+      "sha256": "0dff6a40a2f1b0e69d8b572282280cabc61829af4407dd3a5f086bb332501185"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projection-campaign-interruption.json": {
+      "bytes": 1424,
+      "sha256": "276b836ad1959d8a5424b598cb098305b140c770cb8ba6e49cef836e7f347d93"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projection-code-analysis.json": {
+      "bytes": 5265,
+      "sha256": "9be8b3513c9d89b38e2b8dc68498ada527343aefab1a7bd6603db80c44450743"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projection-source.json": {
+      "bytes": 1200,
+      "sha256": "4f9d0accc5c11e1c9ece3939edba0701027bc3b14446e3b4fa194c9df4e88aaf"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projection-tests.csv": {
+      "bytes": 33514,
+      "sha256": "5233ef4a95219a357f5a77d59ed07ead6ce3d1a5dcf77713c9c3a03ede472d60"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionAnalysis.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionAnalysis.m": {
+      "bytes": 783,
+      "sha256": "a02874ec1d036bffe8877735cfd99f895e41cf3a15653427764461d29bf362cf"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionFailure.log": {
+      "bytes": 1130,
+      "sha256": "40cb48c6d7d01695ad55846b1e88e77842762cd27056dcbaaf7f187b691ca9bd"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionFailure.m": {
+      "bytes": 771,
+      "sha256": "173cc182a65428a9f50c33f36d0f850442ef2e6c2aa219d0bee09daf52d70ce9"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionTests.log": {
+      "bytes": 1817,
+      "sha256": "72847775fbf21998d3daa760d057f17a4fd53f7b15d568ed4d26d8962ddc4898"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionTests.m": {
+      "bytes": 716,
+      "sha256": "4172630ef9180e394ce715751048aebc9ecb23e55e74060097a62f90abc703da"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker0.log": {
+      "bytes": 15753,
+      "sha256": "76e41f6bf64de8484424f488b2af586779bff4758802786f1e9aad855fa8aa09"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker0.m": {
+      "bytes": 1003,
+      "sha256": "a831a7c25c6035f8f249c07c9402d54f125e08f94948d8a236f0390ee2eb35bb"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker1.log": {
+      "bytes": 22873,
+      "sha256": "1b5bee775939e4301513954e735f0fe52c580dfe064c005fee2a774ec63eebd6"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker1.m": {
+      "bytes": 1474,
+      "sha256": "81aecf3925cc0ddcebd72dfe51e8c33cec22c6499680c821a67f3f16f5aded2c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker2.log": {
+      "bytes": 25439,
+      "sha256": "2e18ad855e885cf62d3f02fd5054923d287b2d481790aa5371dcb05fb0cc1747"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker2.m": {
+      "bytes": 1502,
+      "sha256": "da5b2e09f7816f7372f05fb2b9b8e7cc76817f48b459f402ab9d282302d78d25"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker3.log": {
+      "bytes": 24133,
+      "sha256": "cc5fd5d1587c8bddfa56e0a64c6aa6b942a8765a522f57b62efcacb78057dbc4"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker3.m": {
+      "bytes": 1442,
+      "sha256": "1a5a266cc81700192dc6377571df8a8867e607e4c9ddfbf95f92efdc9b69943a"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker4.log": {
+      "bytes": 16147,
+      "sha256": "affcca39d35104de4bf17f44cda1ac7c06648cf2d2f99a58f7e99f4ba0978c21"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/projectionWorker4.m": {
+      "bytes": 1502,
+      "sha256": "1304decc1a804a9cf059c27a142ad6b1df43851ce47f1c27b0a74ec97cabe63c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/python-tests.log": {
+      "bytes": 2774,
+      "sha256": "904d748dabc1c6f4813c41ee7cf547166894deda5de1fdced424b20b23b3590f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified15brakingLead.log": {
+      "bytes": 4784,
+      "sha256": "acc2c130117dc6c9f5a1bf730094fe510ab5fc9ff262b9d5e24ac9219024cd8e"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified15brakingLead.m": {
+      "bytes": 664,
+      "sha256": "92c8fdf44bd92385785f14d2aecb5a8fd50aa3f9ebbdff937fe6f4b23d0610e0"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified15turningCrossing.log": {
+      "bytes": 9493,
+      "sha256": "33195bc7bbfc5230e056c2086f6c903441b7d6a0f6ff4d04144966e6a22dc602"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified15turningCrossing.m": {
+      "bytes": 680,
+      "sha256": "d5fed395212d0dce9afe4c908be664a09a19f4c66d2f6b560e44b90235a5df7c"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified8curvedCrossing.log": {
+      "bytes": 7862,
+      "sha256": "0dc69047f4c07c28397eb13cddb182506ef685156a16080c5c394229f2e7a151"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified8curvedCrossing.m": {
+      "bytes": 671,
+      "sha256": "39b81214bb1efe0670e17ca23b5e1a0a028bfeb36d6e52db2fd9e43817f19111"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified8turningCrossing.log": {
+      "bytes": 3196,
+      "sha256": "14988ae022f32241fce1c964ec5bed25ed7e35326f54803150120fe641b65bd8"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/resumeCertified8turningCrossing.m": {
+      "bytes": 675,
+      "sha256": "418ffee3f06eb185c4d1810a94b4dc5f644f459e6488d07d8f7eca86c87c6f78"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/same-frame.json": {
+      "bytes": 1067,
+      "sha256": "ec71a06af35425fb81c274efd36e09faee91fd728a7a3826a4304cafd519ae78"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/sameFrame.m": {
+      "bytes": 1366,
+      "sha256": "b4a00acb26f20c152b72ebf5de0fb75e0300f55739597a386283dc53fc51b64b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stable-audit-cache.json": {
+      "bytes": 10743,
+      "sha256": "f6696033505cf0549453e510590b14a8e91be8134c42b63c9799659a92f65787"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stable-code-analysis.json": {
+      "bytes": 5265,
+      "sha256": "9be8b3513c9d89b38e2b8dc68498ada527343aefab1a7bd6603db80c44450743"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stable-source.json": {
+      "bytes": 1200,
+      "sha256": "bd041f6fdae319f28583cd4503e83e3c6f5ae1ec1f62007f07d0f55129695fd3"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stable-tests.csv": {
+      "bytes": 33509,
+      "sha256": "1cad08df6790c423c07e5e73b70eaa21512a767e82d07bcc5bf21337430b2bcb"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableAnalysis.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableAnalysis.m": {
+      "bytes": 775,
+      "sha256": "2f995d14e790222a75fd552e715ae61311f98ef338c8e4e2c5ead1936ad578be"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableCritical.log": {
+      "bytes": 7376,
+      "sha256": "3e7b17cf31dec2ed950c20672c95536388ebdd9ae6b88d7db8ac55eccb4b3680"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableCritical.m": {
+      "bytes": 554,
+      "sha256": "c2d9ca42aad3dcf3c15b9d4acc0199edf82ad1a5fea515563aaf7abf588968f4"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableTests.log": {
+      "bytes": 1817,
+      "sha256": "b9737c7df5d389c66ef583cef398249826e5367838d3d8fcd7fadfe7ddf763be"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableTests.m": {
+      "bytes": 708,
+      "sha256": "5716f0e5ba534795581f50d720658bcbe9eb38c38b879c516bc4e6506400d8d5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker0.log": {
+      "bytes": 10092,
+      "sha256": "e94198f5ae79d15320af38ebb20e0123789902481d4b206af0da4183809e67fc"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker0.m": {
+      "bytes": 981,
+      "sha256": "a2570cf7484311f2176f91e6662e74ab13d58e760f1930256ee85e9773c9ab01"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker1.log": {
+      "bytes": 10534,
+      "sha256": "74193bf7a36d3bf74362bef93461994ab259b1019bafbce6e6a9c8f501a0fb94"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker1.m": {
+      "bytes": 999,
+      "sha256": "941ee0cfc5f778373648238fe650707d150bf387d06e64bcd255b50cd4240ec2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker2.log": {
+      "bytes": 12135,
+      "sha256": "aa36a0b436538f41518155c3d77cba02e527960d81c7ca043512cc361b5cff04"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker2.m": {
+      "bytes": 993,
+      "sha256": "9ac915a3272baab85be360b28c71d029beb6c6a537500fdff2d2fe5a8ffbcb3a"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker3.log": {
+      "bytes": 9933,
+      "sha256": "5e7cc5216c7064e1d33a685b4758d850ec9c167fe99f0ac6ceae18268cbeae05"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker3.m": {
+      "bytes": 975,
+      "sha256": "688ca131ec7b8f954180a4eb72184721e33c7bbb2b16a7e08482e34f89c5ecfc"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker4.log": {
+      "bytes": 13328,
+      "sha256": "0c2f14124dc38844284c58a17d81cd4f9af04e5f57156fa12f5e2bef836e895f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker4.m": {
+      "bytes": 1017,
+      "sha256": "5e9e6f0dc86e7790cf9b6b1ab11e3fcb9f4a99e40193131057a2128c7cb3f611"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker5.log": {
+      "bytes": 21137,
+      "sha256": "1a1c5be6b6fcb26fb575348ffcfd3738a7fca535ac417913de08b9ff275573fa"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/stableWorker5.m": {
+      "bytes": 1474,
+      "sha256": "51062c9fa032696cb205d41984cb228656dd871ff7430b36f000ebec170d415b"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trust-campaign-interruption.json": {
+      "bytes": 987,
+      "sha256": "32e118f03edd031b98a70fd4bcc4c83344f89ed0d5a99fd72211ab52be9bb203"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trust-code-analysis.json": {
+      "bytes": 5017,
+      "sha256": "640776453e64f543708baa7790b6d4ccc5269b096001c165913fd1cc6b2530d3"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trust-geometry-tests.csv": {
+      "bytes": 1429,
+      "sha256": "7fcd06edc650e9349fabb8cce6e9f460dddfd4228442d27e0c1fd743600b0fcb"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trust-pilot-audit.json": {
+      "bytes": 574,
+      "sha256": "f2fe124fee5b30a4b1f889e8663764e80c0eeb4253fa01b73f9063d6e7908e99"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trust-source.json": {
+      "bytes": 1200,
+      "sha256": "bcc0e01ab526db60b53ff8100ad4b7b658b951e46a2a1fededc72dbe76b64a31"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trust-tests.csv": {
+      "bytes": 33418,
+      "sha256": "333344d9c9f5d604f554f4a9ee48224dfaa7b4ef52448010b4669f561bb07cb5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trust-zero-test.csv": {
+      "bytes": 136,
+      "sha256": "26d3a9a935d355cf11ca92b495fe9bfd3fe933332bedda7fb8107e72a389d97f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustAnalysis.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustAnalysis.m": {
+      "bytes": 773,
+      "sha256": "5ef35f58676948a0a3a6d99189d390c4ad436c6c9bae682fc9ec3cb3b013b5fe"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustCold15.log": {
+      "bytes": 6651,
+      "sha256": "2f688587fec69a49f5fa363604f1bb805f7af281a4209da584feaab81099eed5"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustCold15.m": {
+      "bytes": 558,
+      "sha256": "5807ee5ef1924a04a134a057c51713fa59d5cd32f59bd38bb2343b0050db10bf"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustCold8.log": {
+      "bytes": 6607,
+      "sha256": "9df0cbd8f5de0d1f8df47598aaf5fb7680f25c4e84d342f7b31f1320266aa65d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustCold8.m": {
+      "bytes": 554,
+      "sha256": "f0c242aac1049005766ae6cf0123f1e6d8d78b33bd47d41770e277bc549acd7d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustGeometryTests.log": {
+      "bytes": 98,
+      "sha256": "ec7b401bec7d06d44cda9713c8418077e6d347b382d1109a0b3da810c57307a0"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustGeometryTests.m": {
+      "bytes": 255,
+      "sha256": "6f8a57978520b1f7d19ba54ce1efaee244b1261e432528993f15586c7492d857"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustPilot.log": {
+      "bytes": 10147,
+      "sha256": "dca65fa0fd88290d401ff42e2dc64dc16834d033532488e74d530cda7d113001"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustPilot.m": {
+      "bytes": 665,
+      "sha256": "da93eadde53e506080248710a42c5c59b8cd81451fe43fb3a5150c8c66653d56"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustPilot8turningCrossing.json": {
+      "bytes": 8241863,
+      "sha256": "7cf5a534daa47e3259a4a96bf6d679a8836518c5747047eb6b7f091147e81521"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustPilot8turningCrossing.mat": {
+      "bytes": 18188321,
+      "sha256": "bc228c52043e08ad77b7c005d70c8033d2cf2cca4a83a02d63e9880a50d80425"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustTests.log": {
+      "bytes": 10137,
+      "sha256": "71cbd4d00dc18cbdd38175216e1134bdd26ae85880d4e7e4751ab1f8dc5f6348"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustTests.m": {
+      "bytes": 706,
+      "sha256": "46be5d22b3aeac3bcfa93b1bcc3ae804e63cbc9ed8f61a8095b8cc05c97eb525"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker0.log": {
+      "bytes": 17353,
+      "sha256": "b9fd327bd3a4ff93b72e1c7286c5bcd2a8455d070fc23683826db064f862611d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker0.m": {
+      "bytes": 1443,
+      "sha256": "665152ea318e874c78eb0d4b680b712001dd9b5655c2aafde8fabf71283ce0a2"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker1.log": {
+      "bytes": 15609,
+      "sha256": "f4645517f15b7921d78e4fe5642ea2b61383c74b1103e70e9c6fce01bd848b4d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker1.m": {
+      "bytes": 1449,
+      "sha256": "d058df6032ffc6297da6fb8227a8d8d70acfe524ce3482a72ff835e673f6235f"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker2.log": {
+      "bytes": 5637,
+      "sha256": "55ba9ae0839c56d92010b004472a1a5af8d8b6e4ba2640bde2d01495b512f513"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker2.m": {
+      "bytes": 1439,
+      "sha256": "5a818dfc3cdf2b75ee38be19db0cdac8df327b4cdf1b16ff0d28bc1aedfc9839"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker3.log": {
+      "bytes": 4428,
+      "sha256": "fa10290669b1dc8595839cf8fc4874afb72b0ca34244ba8798f84b3824f092a0"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustWorker3.m": {
+      "bytes": 1415,
+      "sha256": "14d6855b3f46bad36d4ca09626a8a94080e849a7a1b5059efb5fef69ca549451"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustZeroTest.log": {
+      "bytes": 87,
+      "sha256": "ef09ac68320f7b7ab0664058e12c4036e3856ad213eaa5289542489738c0f940"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/trustZeroTest.m": {
+      "bytes": 303,
+      "sha256": "5a0d891b7435887fc08669eee2e0a5a9a35ce6dd98e65298f4dae9d43269701d"
+    },
+    "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/validateStable.py": {
+      "bytes": 1689,
+      "sha256": "579bd0b93b3bb40cac17085e16fa0a3215fcb9c001343a7caa2b1c71d2b3258d"
+    }
+  },
+  "compactEvidence": {
+    "report/CLF_NOMINAL_RECOVERY_20261001/REPRODUCTION.txt": "4fd27dda25dcf422dba69e8632eca3efb179f5b4934a6d4d1729e6ab320d680f",
+    "report/CLF_NOMINAL_RECOVERY_20261001/code-analysis.json": "9be8b3513c9d89b38e2b8dc68498ada527343aefab1a7bd6603db80c44450743",
+    "report/CLF_NOMINAL_RECOVERY_20261001/metrics.tex": "26b5f186daf8ccbe3e6baca3d04ad6cdf80420d644bb254afa08b7df2fe6eea6",
+    "report/CLF_NOMINAL_RECOVERY_20261001/results.csv": "958a19929f54120ac4ef404d329a131fd36406bf980e38688913da6710b11787",
+    "report/CLF_NOMINAL_RECOVERY_20261001/sampled-traces.csv": "60952349e2d8c7dc87c0019ac63b46fc1fb3f69059db5df19adab215637d3659",
+    "report/CLF_NOMINAL_RECOVERY_20261001/summary.json": "5affd9da45ce279ac9aceda957c25612438ea89a9212c198e019b8a349cd9a17",
+    "report/CLF_NOMINAL_RECOVERY_20261001/tests.csv": "1cad08df6790c423c07e5e73b70eaa21512a767e82d07bcc5bf21337430b2bcb",
+    "report/CLF_NOMINAL_RECOVERY_20261001/validation.json": "0b0e2b5bd13ff54759c6abe5750b523353d5708b78cfd6b76481caedb5fc028f"
+  }
+}

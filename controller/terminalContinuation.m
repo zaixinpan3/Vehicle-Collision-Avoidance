@@ -74,6 +74,12 @@ classdef terminalContinuation
                     end
                     seed.samplePositionBound=seed.samplePositionBound+positionDefect;
                     seed.sampleHeadingBound=seed.sampleHeadingBound+headingDefect;
+                    % A linear pose interpolant stays in the convex hull of
+                    % endpoint errors. A circular reference adds its chord sag.
+                    seed.interpolationPadding=0;
+                    if next(3)~=0
+                        seed.interpolationPadding=2*norm(center)*sin(next(3)/(4*count))^2;
+                    end
                     seed.construction="boundedRk4JacobianContraction";
                     savedKey=key;saved=seed;return;
                 end
@@ -157,7 +163,8 @@ classdef terminalContinuation
             [reference,tangent]=terminalContinuation.referenceAt(seed,index);
             x=reference(1:6);shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
             reach=norm(shape(1:2)+abs(shape(3:4)));
-            positionError=norm(seed.samplePositionBound);headingError=seed.sampleHeadingBound;
+            positionError=norm(seed.samplePositionBound)+seed.interpolationPadding;
+            headingError=seed.sampleHeadingBound;
             body=shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1];
             corners=localRotation(x(3))*body;clearance=cfg.collision.safetyMarginMeters;
             t=[cos(frame(3));sin(frame(3))];n=[-t(2);t(1)];

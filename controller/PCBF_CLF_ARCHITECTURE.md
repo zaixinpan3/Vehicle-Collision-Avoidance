@@ -43,6 +43,12 @@ continuous-time plant flow. The augmented state and transition are
 y_j=(x_j,w_j),\quad w_j=u_{j-1},\qquad F(y_j,u_j)=(f_h(x_j,u_j),u_j).
 \]
 
+The default integration step is 0.005 s. At the default 50-ms hold this
+defines ten integration intervals, shared by prediction, near-contact checks
+and terminal-core construction. A coarser former mesh missed short corner
+contacts between its nodes in the CLF-recovery campaign. This consistent mesh
+refinement improves numerical resolution; it is not a continuous-time proof.
+
 Terminal membership therefore has eight coordinates. It retains position
 and previous input. Magnitude and slew restrictions are imposed in the
 optimization and in nonlinear evaluation. The terminal policy is never
@@ -69,11 +75,13 @@ projects motion using relative headings in the road frame, avoiding cancellation
 of world-coordinate dot products. No small physical acceleration is thresholded
 to zero; nearby non-cardinal headings retain their transverse motion.
 
-Every target prediction uses the original epoch and an **absolute integer
-subsample index**. Nodes and midpoints retain the same half-sample arithmetic;
+Every target prediction uses the original epoch and an absolute time.
+Regular mesh nodes use an **absolute integer subsample index**.
+Nodes and midpoints retain the same half-sample arithmetic;
 additional collision checks use the interior nodes of the half-hold integration
 mesh, when present. This preserves repeated absolute-time evaluations
-under a shift. Later observations cannot reinitialize the forecast. A changed
+under a shift. Adaptive off-mesh cuts use their actual absolute time without
+rounding to a mesh node. Later observations cannot reinitialize the forecast. A changed
 target trajectory, reference path, physical constraint set or prediction model requires
 an explicit new problem (`previousState=[]`). A timestamp gap is rejected.
 Equivalent headings across the +/-pi representation boundary are compared
@@ -84,23 +92,65 @@ restoration and disables the shifted slack guarantee for that transition.
 ## The nonlinear MPC problem
 
 Let `N = controller.horizonSteps`, let `k` be the absolute sample index and
-let `M` be the endpoint selected by the current solution. Define
-`H_k = max(N,M-k)`. The first `N` stages form the PCBF prefix. Stages
-`N,...,H_k-1` are the completion tail.
+let `M` be the endpoint selected by the current solution. The moving minimum
+prediction length is
+
+\[
+H_{\min}=\min\!\left(H_{\max},N+\left\lceil
+T_{\rm recovery}/h\right\rceil\right).
+\]
+
+The first `N` stages form the PCBF prefix. Stages `N,...,H_k-1` form the
+completion tail. An initially longer certificate may shorten down to
+`H_min`; afterward terminal-policy inputs extend its endpoint as the window
+moves. The configured three-second completion allowance is preserved rather
+than consumed as an implicit deadline. This does not fix an endpoint position,
+heading, path phase, or nominal-recovery time.
 
 At each stage, collision constraints are evaluated at its start and midpoint.
-Before admitting a candidate, nearby encounters are also checked at the interior
-half-hold integration nodes. Proximity uses a one-hold travel estimate from the
-configured ego speed/yaw bounds and predicted target motion; it is a screening
-rule, not a continuous-time certificate. An interior violation adds the affected
-stage's interior linearized collision rows to subsequent convex subproblems.
-Thus additional rows are generated when a nominally feasible candidate exposes
-a missed collision, rather than inserted throughout every initial restoration.
-The prefix uses one shared nonnegative slack for all checked stage samples.
-The completion tail uses **zero slack**. Input limits, slew limits and
-velocity bounds at nodes and midpoints remain hard everywhere. The endpoint
-also has hard sampled safety constraints. Internal RK4 stages must remain
-in the tire/model domain.
+Near a target, the RK4 integration nodes are also checked with the declared
+collision margin. The nominal pose between adjacent integration nodes is a
+linear interpolant of position and unwrapped heading. The known target keeps
+its exact absolute-time flow. A relative-motion Lipschitz bound certifies
+separation throughout each interpolation interval; unresolved intervals are
+bisected and their midpoint checks become additional convexification rows.
+This is constraint generation within the same controller, not an execution
+fallback or a separate verifier of the physical vehicle.
+
+Let the endpoint body distances on an interval of duration `dt` be `d_a,d_b`.
+For the ego-pose interpolant, a valid distance Lipschitz constant is
+
+\[
+\begin{aligned}
+L={}&\|v_E-v_T(t_{\rm mid})\|
++\tfrac12\Delta t\bigl(|A_T|+V_{T,\max}^2|\kappa_T|\bigr)\\
+&+|\omega_E|r_E+V_{T,\max}|\kappa_T|r_T .
+\end{aligned}
+\]
+
+Here the radii include rectangle offsets. Common translation cancels rather
+than causing unnecessary refinement. A sufficient lower bound is
+`min(d_a,d_b,(d_a+d_b-L*dt)/2)`. With sampled margin `delta`, a leaf is accepted
+only when this lower bound exceeds `delta/2`; every newly evaluated midpoint
+must still satisfy the full sampled margin. For positive `delta`, refinement
+has a finite resolution reserve: if all checked distances are at least
+`delta`, subinterval length below `delta/L` suffices. Zero margin still
+requires strict positive separation; unresolved floating-point intervals
+are rejected. Small roundoff padding is included, without claiming formal
+exact-real arithmetic validation.
+
+A whole-hold travel bound from the actual mesh pose increments screens distant
+encounters. Prefix stages use one shared nonnegative search slack per stage;
+the completion tail has zero slack. Input limits, slew limits and velocity
+bounds at nodes and midpoints remain hard. The endpoint has hard safety
+constraints and its indefinite certificate. Only a complete original
+nonlinear evaluation with every required interval established can authorize
+execution. Newly introduced cuts use interpolated variational derivatives;
+no off-mesh target time is rounded to a coarser integration node.
+
+The nominal interpolant is distinct from the tightly integrated ODE45 plant.
+The interval argument does not bound their difference or observer/model error.
+The independent plant replay remains necessary experimental evidence.
 
 The signed collision predicate uses nonnegative support dual variables for
 both oriented rectangles and a unit separating normal. During overlap, a
@@ -110,7 +160,9 @@ additional physical collision buffer defaults to 0.006 m and can be explicitly
 set to zero. It applies at the prediction constraint samples and in the
 terminal separation certificate; it is not a continuous-time clearance guarantee.
 The terminal interval construction encloses pose deviations at every RK4
-integration node. Its reference-orbit padding also takes the maximum nominal
+integration node. Convex interpolation preserves those endpoint-error bounds;
+a circular nominal orbit adds its chord-sag padding, while a straight core
+needs no additional padding. Its reference-orbit padding also takes the maximum nominal
 position/heading defect over those nodes. This covers the same additional
 numerical sample times used by finite-horizon collision refinement without
 changing the terminal feedback policy or relaxing membership.
@@ -335,23 +387,29 @@ there is no usable prior reference, at most two moving-target flow rollouts
 provide opposite passing biases within the same controller-call budget.
 A seed may collide or fail terminal admission; evaluated nonlinear violation
 selects the restoration anchor. A fully admissible seed enters the CLF stage,
-unless its secondary objective already meets the lower-bound stopping test.
+unless its actual CLF residual already meets the lower-bound stopping test.
 The endpoint index belongs to the selected rollout. Each SCvx step uses
 variational RK4 dynamics and linearized support-dual geometry. Its endpoint
 is the exact reduced five-dimensional **2-norm cone** obtained by eliminating
 free pose. The separate future-separation row differentiates the fitted pose
 through the endpoint state and final input. No scalar phase variable remains.
-`coneprog` solves the primary slack problem and the secondary
-quadratic lane/CLF/input-proximity objective. Each stage and the CLF penalty has its own
-small squared-norm cone epigraph; their epigraph values sum to the total
-objective. This is algebraically equivalent to one horizon-wide norm cone,
-while avoiding its global factorization coupling. The default internal
-linear solver remains unchanged.
+`coneprog` solves the primary safety-slack problem. The CLF stage first tries
+zero CLF slack with tracking and input-proximity costs inside that slice. If
+the local zero-slack slice is infeasible, a separate linear objective minimizes
+CLF slack alone. Tracking costs cannot purchase a positive CLF relaxation.
+After a positive-slack solve, the predictive cost also resolves the later-input
+nullspace while fixing the minimizing first control. This preserves its actual
+first-step CLF value. Positive first-step stationarity does not skip this
+predictive cost attempt. Raw and cost-refined nonlinear candidates are retained
+under the same admission and comparison rules.
+On the zero-slack slice, each tracking/input stage has a small squared-norm
+epigraph. There is no squared CLF-slack penalty or associated weight.
 
 A revalidated initial or shifted witness proves that the nonnegative primary
 safety objective already has minimum zero. It skips the redundant primary
-solve, but still enters the secondary solve when its CLF penalty is positive.
-Only the lower-bound test described below allows both solves to be skipped.
+solve, but still enters the CLF stage when its actual CLF residual is positive.
+A nonlinear constraint correction can attain the zero lower bound without
+another conic solve. Otherwise the secondary conic programs remain available.
 Its nonlinear hard residual and prefix safety-slack sum must both be exactly
 zero. Safety admission and secondary-stage completion are distinct records.
 
@@ -377,20 +435,21 @@ elastic subproblem; it is not the PCBF value or a distance with uniform units.
 The original hard residual is still the maximum original violation. Equal
 scores prefer smaller terminal excess. Among admitted candidates, smaller
 actual nonlinear CLF slack has priority; equal slack is broken by the nonlinear
-tracking/CLF cost. That cost excludes the input-proximity term, which depends
+tracking cost. That cost excludes the input-proximity term, which depends
 on the current linearization anchor rather than the trajectory alone.
 
 A feasible primary returns to the outer loop as the new linearization anchor
 for the CLF stage. An improving but inadmissible primary is also relinearized
 before attempting more restoration. A conic direction is checked by geometric
 backtracking, halving its amplitude within the same time budget (at most 20
-halvings). At a feasible anchor this line search replaces repeated endpoint
-shooting; endpoint correction remains available during infeasible restoration.
-A secondary
-trial is accepted only if it is nonlinearly admitted and does not increase the
-actual CLF slack. The controller stops after that accepted secondary update;
-it does not require repeated nonlinear objective minimization to stationarity.
-Positive prefix slack remains a search residual and does not authorize execution.
+halvings). Before whole-trajectory backtracking discards a useful first input,
+a nonlinear correction fixes that first input and repairs the later trajectory.
+This correction is available at feasible anchors as well as during restoration.
+A secondary trial is admitted only after the original nonlinear constraints
+pass. A slight same-state slack improvement does not complete the CLF stage.
+Poor actual versus predicted CLF improvement contracts the trust radius;
+admitted progress remains available for relinearization. Positive prefix
+collision slack remains a search residual and does not authorize execution.
 
 The soft first-step CLF is
 
@@ -409,45 +468,76 @@ It does not substitute a tangent plane of \(W\). With
 \]
 
 This is convex in the affine error; the actual nonlinear successor is still
-checked after the solve. The secondary objective is
+checked after the solve. On the zero-slack slice, a direct norm ball avoids
+subtraction of nearly equal rotated-cone constants near nominal trim:
 
 \[
-\min\quad w_\rho\rho^2+
+\|L\widehat e_1\|_2\le\sqrt{(1-\alpha)W(e_0)}.
+\]
+
+Within that slice the objective is
+
+\[
 \frac{1}{H_k}\sum_{i=0}^{H_k-1}\left(
 \|L\widehat e_{i+1}\|_2^2+0.01\|D_u(u_i-\bar u_i)\|_2^2\right),
 \quad D_u=\operatorname{diag}(\sqrt{w_\delta},\sqrt{w_\beta}).
 \]
 
-Here \(\bar u\) is the current linearization input, not zero. The existing
-configuration supplies the three positive weights. The original horizon
-tracking term shapes the future trajectory, while the original given path
-defines both that term and the CLF. With an admitted anchor, all collision slack upper
-bounds are exactly zero, as are terminal elastic variables. The conic CLF slack
-is bounded above by the anchor's actual CLF slack.
+Here `bar u` is the current linearization input, not zero. The given path
+continues to define the tracking cost and CLF. On an admitted safety anchor,
+all collision slack upper bounds and terminal elastic variables are zero.
+If the local zero-CLF slice cannot be solved, the relaxed problem minimizes
+`rho` alone, bounded above by the incumbent's actual slack. Nominal cost is
+not traded against positive relaxation. A subsequent predictive-cost solve
+fixes the attained first input and its modeled relaxation cap (with a roundoff
+allowance), so later controls are not left arbitrary by the one-step objective.
+These are stages of the same predictive
+controller, not selectable driving methods or backup policies.
 
-To avoid very large squared-slack epigraphs, the solve uses the change of units
-\(s=\max(1,\rho_{\rm anchor})\), \(\widehat\rho=\rho/s\). The CLF cone
-is divided by \(s\) in squared-norm units, and the whole secondary objective
-is divided by \(\max(1,J_{\rm anchor})\), the anchor's nonlinear tracking/CLF
-cost. These substitutions
-preserve the feasible physical inputs and objective ordering in exact
-arithmetic. Numerical optimality tolerances apply to the scaled conic program;
-the no-solve lower-bound test and nonlinear CLF comparisons remain in original
-units. Both scale factors are reported with the local solve diagnostics.
+The change of units is
+`s = max(W_initial, rho_anchor, sqrt(eps))`, `rhoHat = rho/s`.
+The CLF cone uses squared-norm units divided by `s`; the zero-slack cone uses
+the corresponding norm units. The tracking objective is scaled by
+`max(1, mean(W_anchor_stages))`. These positive scalings preserve the mathematical
+feasible set and objective ordering, while resolving small residuals near trim.
+The retired `clf.relaxationWeight` configuration is no longer accepted.
 
-The nonnegative CLF penalty has lower bound zero. When
-\(w_\rho\rho_{\rm anchor}^2\) is at most `solver.optimalityTolerance`, the
-CLF penalty is already within that absolute gap of its lower bound. This is
-the only no-solve stopping test (`clfLowerBound`). It concerns the CLF penalty,
-not the combined tracking objective. The stopping contract does not require
-additional tracking-cost refinement once CLF dissipation is attained.
-Otherwise, `clfStageAttempted` records an actual
-secondary conic call, and `clfStageCompleted` requires an accepted secondary
-update or the lower-bound test. A deadline can return the admitted incumbent
-with CLF completion false. `search.converged` and legacy `scvxConverged` record
-this bounded local-stage completion, not nonlinear/global optimality.
-Neither CLF optimality nor asymptotic lane convergence follows merely from
-the feasibility proof.
+The lower-bound stop tests the actual nonlinear residual against only
+`64*eps(max(1,W_initial,W_next))`. It no longer compares a squared penalty with
+an optimization tolerance. The raw residual remains reported without being
+rounded to zero. This is a floating-point allowance, not a proof of exact-real
+arithmetic or a material permitted CLF violation.
+
+A complete admitted zero-slack witness attains the global lower bound of the
+nonnegative CLF objective, so further cost refinement is unnecessary. Positive
+relaxation can instead terminate at a checked *local* stationarity condition:
+either conic and actual reductions are both below the scaled optimality
+tolerance after an optimal relaxed solve, or the feasible first control has
+small projected gradient for the one-step nonlinear objective with actuator
+and slew bounds. Either positive-slack stop also requires attempting the
+predictive-cost refinement. The latter is stationary also on the more restricted
+predictive feasible set. Neither test proves a global positive minimum or
+that a disconnected zero-slack solution does not exist. A finite iteration
+or time limit preserves the admitted solution while reporting incomplete CLF
+optimization. `clfStageAttempted` includes nonlinear constraint correction;
+`solverCalls` counts conic and correction-QP calls, not analytic Newton steps.
+`clfLowerBound`, `clfStationary` and `clfStageCompleted` distinguish these outcomes.
+
+If the actual zero-slack condition continues to hold after a time `k0`, then
+
+\[
+W_{k+1}\le(1-\alpha)W_k
+\quad\Longrightarrow\quad
+W_k\le(1-\alpha)^{k-k_0}W_{k_0}\longrightarrow0.
+\]
+
+Positive definiteness of `P` implies convergence of all five nominal errors,
+with no fixed path phase or prescribed arrival time. The implementation's
+roundoff allowance gives a correspondingly tiny practical residual bound.
+Temporary positive slack during conflict does not establish this premise;
+nor does a finite-budget local solve guarantee discovery of every globally
+feasible zero-slack trajectory. The closed-loop regression and campaign test
+that the intended regime is actually reached in the evaluated scenarios.
 
 If the hard convex subproblem is infeasible, numerical restoration enables
 elastic completion collision rows, terminal membership and endpoint/future
@@ -467,15 +557,54 @@ collision adds rows, the incumbent is reevaluated under the same check set
 before comparing scores. Trust is restored to at least its initial radius so
 an already shrunken search box does not conceal the new correction requirement.
 
-A short endpoint correction adjusts final inputs to reduce the intrinsic
-five-dimensional endpoint error; each trial reconstructs its core pose.
-A feasible candidate bypasses correction and ends it immediately. Every trial
-retains the best complete nonlinear candidate before following a terminal-error
-improvement; inputs are never clipped after the solve.
+Nonlinear constraint correction is triangular in time. Analytic Gauss--Newton
+directions first restore the one-step CLF sublevel by adjusting `u_0`; the
+shorter intersection with the linearized sublevel avoids requesting excessive
+one-step reduction. These directions also obey the existing input trust box
+about the correction's starting input. Actuator and slew projection further
+bounds the proposals. Larger changes require subsequent relinearization;
+one nearly singular first-step Jacobian cannot authorize an arbitrarily large
+Newton jump to a combined-slip input extreme.
+The entire nonlinear rollout is checked before any input can be issued.
+
+An unevaluable transferred or conic rollout is retracted onto the nonlinear
+dynamics using finite-horizon linear-quadratic defect feedback. A defined but
+inadmissible full conic rollout is offered the same correction when its first
+stage is admissible. This also addresses accumulated nonlinear defects before
+they leave the tire model's domain; the raw candidate remains eligible.
+The gain recursion uses the already evaluable anchor, the existing numerical
+state scales, and configured input-deviation weights. Later controls follow
+`u_j = uReference_j + K_j (x_j-xReference_j)`, projected onto amplitude and
+slew limits; `u_0` stays fixed. Near a regular anchor the affine proposal's
+defect is second order, and its propagation becomes
+`epsilon_(j+1) = (A_j+B_j K_j) epsilon_j + O(||d||^2)`.
+This supplies a nonlinear search candidate when an unstable open-loop tail
+would otherwise leave the model domain before it could be evaluated. It
+does not itself authorize execution or add a scheduled-position constraint.
+The same hard/zero-slack admission and later-input correction still apply.
+
+The later-input correction holds `u_0` fixed, so its actual first successor and
+CLF value are preserved exactly. A short endpoint correction first removes the
+intrinsic five-dimensional endpoint defect and reconstructs the free core pose.
+If other sampled constraints still fail, a minimum-input-deviation QP uses
+condensed variational dynamics to correct later inputs against collision,
+physical, slew and terminal-separation rows, with the endpoint-center tangent
+as an equality. Tight contacts use a numerical interior equal to the configured
+solver feasibility tolerance; zero-sensitivity rows are not artificially tightened.
+Every QP trial is nonlinearly replayed and its endpoint retracted before merit
+comparison. Only the original nonlinear admission test authorizes execution.
+The full correction is attempted on the full conic step; subsequent backtracking
+retains the cheaper endpoint retraction. Raw and corrected candidates remain
+independently eligible, so a failed correction cannot erase an admitted witness.
+This is a correction within the same optimization, not an alternate control law.
 
 Evaluation stores per-stage safety, physical residuals and costs. During an
 endpoint correction the unchanged prefix is reused and only the modified suffix
-is integrated again. Input magnitude/slew violations reject a correction before
+is integrated again. An interval flag defaults to unverified for a target-bearing trajectory.
+Only a completed interval argument or a valid whole-hold bound sets it true;
+endpoint correction cannot turn an unevaluated search prefix into a verified
+cache. Independent replanning tests recheck every returned interpolated plan.
+Input magnitude/slew violations reject a correction before
 integration. The actual terminal-set membership bound is used; an already
 admissible candidate is not polished further to obtain half-radius headroom.
 Under exact successor and input-memory equality, a shifted witness reuses its
@@ -484,9 +613,9 @@ rollout. Changed measured states require a fresh full evaluation. Endpoint,
 initial-state, input and slew checks are still performed for every returned plan.
 
 All restoration steps share the time remaining since controller-call entry.
-Each conic call receives the remaining budget, and no new candidate processing
+Each conic call receives the remaining budget; correction QPs have bounded iterations, and no new candidate processing
 or polishing trial is started after expiration. Initial witness construction or
-revalidation must still finish before returning any input. An in-flight conic
+revalidation must still finish before returning any input. An in-flight conic/QP
 factorization or rollout is not preemptible, so the budget remains a soft limit,
 not a real-time deadline guarantee. A verified feasible witness is returned
 even if its final validation crosses the budget. Without one, expired search
@@ -500,7 +629,9 @@ witness only if its hard residual is zero and its achieved prefix slack sum
 is zero. A positive solver feasibility tolerance never
 licenses a positive hard residual. `zeroSlack` means an achieved sum exactly
 zero in the numerical evaluation; it no longer means `sum <= 1e-5`.
-A feasible initialization can also supply a witness. If none exists and
+A shifted, slightly inconsistent iterate is first offered to the same nonlinear
+constraint correction before rebuilding a conic problem. It becomes a witness
+only after complete admission. A feasible initialization can also supply a witness. If none exists and
 search fails, the controller reports `noFeasibleContinuation`.
 
 The endpoint enclosure is cached construction work, not a per-trajectory
@@ -515,12 +646,12 @@ as numerical settings, not treated as theorem hypotheses already proved.
 
 ## Shift and slack proof
 
-For `k+N < M`, remove the first input from the retained prefix/completion.
+While `H_k > H_min`, remove the first input from the retained prefix/completion.
 The old first completion input enters the new prefix with zero slack. The
 remaining completion reaches the same endpoint with the same stored pose.
-Once `H_k=N`, append `kappa_(B,k+N)(.;g)` at the **old** absolute terminal
+Once `H_k=H_min`, append `kappa_(B,k+H_min)(.;g)` at the **old** absolute terminal
 time and state, retaining that pose. Fixed-pose endpoint invariance puts its
-successor in `B_(k+N+1)(g)` and supplies zero appended slack. The already
+successor in `B_(k+H_min+1)(g)` and supplies zero appended slack. The already
 certified all-future separation also covers this later suffix; its future set
 is a subset of the one previously checked. The implemented sufficient
 straight-progress and ego-ray/target-orbit bounds preserve this suffix property in the
@@ -563,7 +694,7 @@ transition's slack inequality.
 
 ## Interfaces and limits
 
-State format **57** stores the absolute sample index, target epoch, full
+State format **59** stores the absolute sample index, target epoch, full
 input/state continuation, the freely placed endpoint core, achieved prefix
 slacks and problem context. It separates the original-path nominal reference
 from the straight terminal trim and carries the Schur-complement construction.

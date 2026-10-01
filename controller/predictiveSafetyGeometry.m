@@ -122,6 +122,47 @@ classdef predictiveSafetyGeometry
                 'normal',normal,'mu',mu,'lambda',lambda,'signedDistance',min(values));
         end
 
+        function check = intervalClearance(first,last,shape,targetEpoch,time,duration,margin)
+            % Certify positive distance on a linear ego-pose interpolant.
+            % The target retains its exact prescribed flow. Adaptive midpoint
+            % cuts resolve a Lipschitz lower bound down to half the sampled
+            % margin. The other half supplies a finite refinement reserve.
+            % This concerns the nominal interpolant, not the continuous plant.
+            start=predictiveSafetyGeometry.targetFlow(targetEpoch,time);
+            finish=predictiveSafetyGeometry.targetFlow(targetEpoch,time+duration);
+            middle=predictiveSafetyGeometry.targetFlow(targetEpoch,time+duration/2);
+            speed=max(abs([start(4),finish(4)]));curvature=abs(sin(start(6))/start(7));
+            relative=(last(1:2)-first(1:2))/duration ...
+                -middle(4)*predictiveSafetyGeometry.direction(middle(3)+middle(6));
+            translation=norm(relative)+(abs(start(5))+speed^2*curvature)*duration/2;
+            reach=norm(shape(1:2))+norm(shape(3:4));
+            targetReach=norm(start(8:9))+norm(start(10:11));
+            lipschitz=translation+abs(last(3)-first(3))/duration*reach+speed*curvature*targetReach;
+            lipschitz=lipschitz+64*eps(max(1,lipschitz));
+            left=predictiveSafetyGeometry.rectangle(first,shape,start(1:3),start(8:11));
+            right=predictiveSafetyGeometry.rectangle(last,shape,finish(1:3),finish(8:11));
+            check=struct('certified',false,'fractions',zeros(1,0), ...
+                'minimumSampledClearance',min(left,right),'lowerBound',Inf,'lipschitz',lipschitz);
+            if min(left,right)<margin || min(left,right)<=0,check.lowerBound=0;return;end
+            pending=[0,1,left,right];
+            while ~isempty(pending)
+                row=pending(end,:);pending(end,:)=[];
+                bound=min([row(3:4),(row(3)+row(4)-lipschitz*duration*(row(2)-row(1)))/2]);
+                bound=bound-64*eps(max([1,row(3:4)]));
+                if bound>margin/2,check.lowerBound=min(check.lowerBound,bound);continue;end
+                fraction=(row(1)+row(2))/2;
+                if fraction==row(1) || fraction==row(2),check.lowerBound=0;return;end
+                pose=(1-fraction)*first+fraction*last;
+                target=predictiveSafetyGeometry.targetFlow(targetEpoch,time+fraction*duration);
+                value=predictiveSafetyGeometry.rectangle(pose,shape,target(1:3),target(8:11));
+                check.fractions(end+1)=fraction; %#ok<AGROW>
+                check.minimumSampledClearance=min(check.minimumSampledClearance,value);
+                if value<margin || value<=0,check.lowerBound=0;return;end
+                pending=[pending;row(1),fraction,row(3),value;fraction,row(2),value,row(4)]; %#ok<AGROW>
+            end
+            check.certified=true;
+        end
+
         function frame = roadFrame(lane,~)
             if isfield(lane,'referenceCurve')
                 curve=lane.referenceCurve;origin=curve.origin;heading=curve.heading;k=curve.curvature;

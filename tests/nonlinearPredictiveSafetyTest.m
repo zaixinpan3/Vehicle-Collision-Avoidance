@@ -15,6 +15,25 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function turningEncounterRemainsFeasibleAcrossMeasuredSuccessors(testCase)
+            [ego,road,cfg]=localFixture();ego.speed=15;
+            cfg.referenceSpeed=15;cfg.controller.horizonSteps=16;cfg.solver.timeLimitSeconds=10;
+            epoch=predictiveSafetyGeometry.targetFlow([24;0;-pi/2-.05;10;1;.05;1.6;2.4;.95;0;0],-1.6);
+            prior=[];
+            for frame=1:6
+                time=(frame-1)*cfg.controller.sampleTime;ego.stateTime=time;
+                target=localTarget(predictiveSafetyGeometry.targetFlow(epoch,time));
+                [command,plan,problem,prior]=collisionAvoidanceController(ego,target,road,cfg,prior);
+                testCase.verifyEqual(problem.solution.hard,0);
+                testCase.verifyEqual(problem.solution.safety,0);
+                testCase.verifyTrue(localPlanIntervalsSeparate(problem.model.initialState,plan,epoch,time,cfg), ...
+                    'Endpoint repair must not reuse an unverified prefix as an admitted witness.');
+                [~,states]=ode45(@(~,x)nonlinearBicycleModel.derivative(x,command.actuatorInput,cfg), ...
+                    [0,cfg.controller.sampleTime],problem.model.initialState,odeset('RelTol',1e-11,'AbsTol',1e-12));
+                x=states(end,:).';ego.position=x(1:2);ego.yaw=x(3);ego.speed=x(4);
+                ego.lateralVelocity=x(5);ego.yawRate=x(6);ego.heldActuatorInput=command.actuatorInput;
+            end
+        end
         function targetFlowHasTheSemigroupProperty(testCase,targetSideslip,targetAcceleration)
             q=[3;1;.2;7;targetAcceleration;targetSideslip;1.6;2.4;.95;0;0];
             first=predictiveSafetyGeometry.targetFlow(q,.37);
@@ -152,7 +171,8 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             expected=predictiveSafetyGeometry.targetFlow(q,cfg.controller.sampleTime);
             testCase.verifyEqual(problem.model.target,expected,AbsTol=1e-12);
             testCase.verifyEqual(state.targetEpoch,q,AbsTol=1e-12);
-            testCase.verifyEqual(problem.predictedJointState(7:10,1:end-1),prior.predictedJointState(7:10,2:end-1));
+            testCase.verifyEqual(problem.predictedJointState(7:10,1:size(prior.predictedJointState,2)-1), ...
+                prior.predictedJointState(7:10,2:end),AbsTol=1e-12);
             testCase.verifyEqual(state.sampleIndex,1);
         end
         function nonconsecutiveSampleTimesCannotReuseTheWitness(testCase)
@@ -167,7 +187,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,57);
+            testCase.verifyEqual(state.version,59);
         end
         function everyCallAppliesTheReturnedFeasibleFirstControl(testCase)
             [ego,road,cfg]=localFixture();
@@ -324,7 +344,6 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.search.clfStageAttempted);
             testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
             testCase.verifyEqual(problem.solution.hard,0);
-            testCase.verifyGreaterThan(problem.metadata.solverCallCount,0);
             testCase.verifyLessThan(problem.solution.clfSlack,problem.metadata.search.clfInitialSlack);
             tire=modifiedFialaTire.affineModel(problem.model.initialState,plan(:,1),cfg);
             testCase.verifyGreaterThan(tire.input(1,1),0);
@@ -350,26 +369,26 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
             steps=problem.metadata.search.sequentialIterations;
             testCase.verifyTrue(problem.metadata.search.clfStageAttempted);
-            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
-            testCase.verifyTrue(steps{end}.secondaryAttempted);
-            testCase.verifyTrue(steps{end}.secondaryAccepted);
-            testCase.verifyEqual(steps{end}.safetyCap,0,AbsTol=0);
-            testCase.verifyLessThanOrEqual(problem.solution.clfSlack,steps{end}.clfBefore);
+            testCase.verifyTrue(any(cellfun(@(step)step.secondaryAttempted,steps)) ...
+                || problem.metadata.search.clfCorrectionAttempted);
+            testCase.verifyEqual(problem.metadata.search.slackCap,0,AbsTol=0);
+            testCase.verifyLessThanOrEqual(problem.solution.clfSlack,steps{1}.clfSlack);
+            testCase.verifyEqual(problem.metadata.search.clfLowerBound, ...
+                problem.solution.clfSlack<=64*eps(max([1,problem.solution.clfInitialValue,problem.solution.clfNextValue])));
         end
         function zeroSafetySlackDoesNotSkipPositiveClfSlack(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
-            cfg.nonlinear.maximumIterations=1;
             target=localTarget([6.25;0;0;8;-.5;0;1.6;2.4;.95;0;0]);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
             testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
-            testCase.verifyEqual(problem.metadata.solverCallCount,1);
             testCase.verifyGreaterThan(problem.metadata.search.clfInitialSlack,cfg.solver.optimalityTolerance);
             testCase.verifyTrue(problem.metadata.search.clfStageAttempted);
             testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
             testCase.verifyLessThan(problem.solution.clfSlack,problem.metadata.search.clfInitialSlack);
-            testCase.verifyEqual(problem.metadata.search.sequentialIterations{1}.safetyCap,0,AbsTol=0);
-            testCase.verifyTrue(problem.metadata.search.sequentialIterations{1}.primarySkipped);
+            testCase.verifyEqual(problem.metadata.search.slackCap,0,AbsTol=0);
+            testCase.verifyTrue(problem.metadata.search.clfLowerBound);
+            testCase.verifyLessThanOrEqual(problem.solution.clfSlack,64*eps(max([1,problem.solution.clfInitialValue,problem.solution.clfNextValue])));
             testCase.verifyGreaterThan(problem.solution.cost,cfg.solver.optimalityTolerance);
 
         end
@@ -456,6 +475,22 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             ego=rmfield(ego,'heldActuatorInput');
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:missingInputMemory');
+        end
+    end
+end
+
+function safe=localPlanIntervalsSeparate(x,inputs,epoch,time,cfg)
+    count=2*max(1,ceil(cfg.controller.sampleTime/(2*cfg.nonlinear.integrationStep)));
+    duration=cfg.controller.sampleTime/count;
+    shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];safe=true;
+    for stage=1:size(inputs,2)
+        for node=1:count
+            next=nonlinearBicycleModel.sample(x,inputs(:,stage),cfg,[],duration);
+            absolute=time+(stage-1)*cfg.controller.sampleTime+(node-1)*duration;
+            check=predictiveSafetyGeometry.intervalClearance(x(1:3),next(1:3),shape,epoch,absolute,duration, ...
+                cfg.collision.safetyMarginMeters);
+            if ~check.certified,safe=false;return;end
+            x=next;
         end
     end
 end

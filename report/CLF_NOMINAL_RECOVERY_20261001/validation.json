@@ -1,0 +1,74 @@
+{
+  "matlabUniqueTests": 305,
+  "matlabPassed": 305,
+  "matlabFailed": 0,
+  "matlabIncomplete": 0,
+  "matlabSuiteScope": [
+    "clfNominalRecoveryTest",
+    "collisionAvoidanceControllerConfigTest",
+    "collisionThreatScenarioTest",
+    "controllerInputGeometryTest",
+    "controllerSourceBudgetTest",
+    "freePoseTerminalTest",
+    "longitudinalRoadLoadTest",
+    "modifiedFialaTireTest",
+    "movingTargetFlowTest",
+    "nominalRecoveryValidationTest",
+    "nonlinearPredictiveSafetyTest",
+    "sweptCollisionIntervalTest",
+    "terminalContinuationTest"
+  ],
+  "pythonAuditTests": 15,
+  "pythonPassed": 15,
+  "wholeRepositorySuiteRun": false,
+  "matlabResultMerge": "One complete final thirteen-file run after bounded first-step correction and generalized nonlinear-defect retraction; all 305 cases passed. Isolated controller/configuration and test bytes were verified equal to production.",
+  "codeAnalyzerFindings": {
+    "controller/solvePredictiveControl.m": {
+      "AGROW": 2,
+      "SPRIX": 18
+    },
+    "controller/collisionAvoidanceController.m": {},
+    "controller/predictiveSafetyGeometry.m": {
+      "MSNU": 1
+    },
+    "controller/terminalContinuation.m": {},
+    "config/collisionAvoidanceControllerConfig.m": {},
+    "tests/clfNominalRecoveryTest.m": {},
+    "tests/sweptCollisionIntervalTest.m": {},
+    "tests/nonlinearPredictiveSafetyTest.m": {},
+    "tests/collisionAvoidanceControllerConfigTest.m": {}
+  },
+  "codeAnalyzerScope": "Factory settings; performance advisories and one redundant suppression remain; no syntax errors reported.",
+  "finalProductionSourceHashes": {
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/collisionAvoidanceController.m": "d11ee84165e883784bb6bb141d61829367f56cafbb88fcc786fb215dfb20635c",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "a005f337ae1ae4ac75ddf212e0a15f09ffd6765cce99a12b241725342e7e1567",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "aeb41b0f8c8d8d9fec724c53be9fbb75fa3993c2b5457d564cf1314dd7c27ea1",
+    "controller/terminalContinuation.m": "cea3e6ea542a179a67c81bd4b87c7804b3706f8dd7c41419a8ee9d733b5a5be2",
+    "config/estimatorControllerIntegrationConfig.m": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "config/nrmmTrackingConfig.m": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+    "config/collisionAvoidanceControllerConfig.m": "f3d977cb3aa0197fa56628f46b01198ec83877888cff1701c07019a39b1a2746"
+  },
+  "limitations": [
+    "No continuous-plant safety or real-time deadline proof.",
+    "Positive local stationarity is not proof of global zero-slack infeasibility."
+  ],
+  "matlabTestSourceHashes": {
+    "tests/collisionAvoidanceControllerConfigTest.m": "51b1c441148cd47c49ffe56c5043c77ef9aac2dc45461e4731e7006f41f61bd1",
+    "tests/longitudinalRoadLoadTest.m": "5425e5d182a050c91d825090a2a937dd87c258d9ab500d59673163eb56eb8d24",
+    "tests/modifiedFialaTireTest.m": "906e74544157f8f0e05eb0e26ae710d16276a693c7da583bf97c061fddafdcad",
+    "tests/controllerSourceBudgetTest.m": "50484401ae89480681b5f47006b76e77f8680766b2e72f1209afcf2ae1ad3082",
+    "tests/nonlinearPredictiveSafetyTest.m": "32d53e15922e08e7ef94d6de7148890f90b057f825a9e5e4c3fc6bf4e4082da5",
+    "tests/controllerInputGeometryTest.m": "4abf8d0aa19e3c9c6c04efe8289b3b44588681553f670a8c9c80e250690376eb",
+    "tests/terminalContinuationTest.m": "268ced96b68d90606b969ab5ae9a0dac826342eb43ddca9ba437001756754804",
+    "tests/collisionThreatScenarioTest.m": "df8c80aeff58ac96ed133626c7c1b1bbd36be8282909ad091e3fdbda197823a2",
+    "tests/movingTargetFlowTest.m": "bff842fe0d4df15e5bcb1c0e3daa8ac3ffa46d302c598b452e8a48ad3b15f73b",
+    "tests/freePoseTerminalTest.m": "b2ba2308372310af3dd2e18f9a027ee01dd3987fea7bd799b44fcd6d7d79eb7f",
+    "tests/nominalRecoveryValidationTest.m": "45bee412371e159b4f323103ab34bcd8870e1e421c7c4e241316f8457d4097ac",
+    "tests/clfNominalRecoveryTest.m": "9ff6243f0a1db9750e5a32bc42c7197762c27a37a5c574390dc2bf23695dc19a",
+    "tests/sweptCollisionIntervalTest.m": "bc1208c629f496d81d942835b51c16f88bf248f292dc4d34f13fc35fc5cdb5ea"
+  }
+}

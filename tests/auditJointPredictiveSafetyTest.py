@@ -40,6 +40,12 @@ class CollisionAuditTest(unittest.TestCase):
     def test_retained_witness_does_not_require_a_new_solve(self):
         self.assertTrue(feasible_hold(dict(hardResidual=0, source='retainedContinuation', solverCalls=0)))
 
+    def test_nonlinear_constraint_correction_requires_an_admitted_witness(self):
+        hold = dict(hardResidual=0, source='nonlinearConstraintCorrection', solverCalls=0)
+        self.assertTrue(feasible_hold(hold))
+        hold['hardResidual'] = 1e-12
+        self.assertFalse(feasible_hold(hold))
+
     def test_feasible_witness_can_finish_without_invoking_an_optimizer(self):
         hold = dict(time=0, auditTimes=[0], auditStates=[[0, 0, 0, 8, 0, 0]],
                     predictiveBarrierValue=0, hardResidual=0, source='feasibleInitialization',

@@ -1,0 +1,1726 @@
+{
+  "scope": "Original threat fixtures; independent sampled ODE45 replay; finite observed nominal recovery",
+  "baseCommit": "2a49daf10ff2ae119e8c39c8f072b033405e5837",
+  "finalSourceHashes": {
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/collisionAvoidanceController.m": "d11ee84165e883784bb6bb141d61829367f56cafbb88fcc786fb215dfb20635c",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "a005f337ae1ae4ac75ddf212e0a15f09ffd6765cce99a12b241725342e7e1567",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "aeb41b0f8c8d8d9fec724c53be9fbb75fa3993c2b5457d564cf1314dd7c27ea1",
+    "controller/terminalContinuation.m": "cea3e6ea542a179a67c81bd4b87c7804b3706f8dd7c41419a8ee9d733b5a5be2",
+    "config/estimatorControllerIntegrationConfig.m": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "config/nrmmTrackingConfig.m": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+    "config/collisionAvoidanceControllerConfig.m": "f3d977cb3aa0197fa56628f46b01198ec83877888cff1701c07019a39b1a2746"
+  },
+  "threatCases": 14,
+  "recovered": 14,
+  "collisionFree": 14,
+  "bufferSatisfied": 13,
+  "results": [
+    {
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "frames": 295,
+      "duration": 14.75,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 9.750000000000004,
+        "confirmationTimeSeconds": 14.750000000000075
+      },
+      "finalError": [
+        0.007880132426514795,
+        -4.186657168617166e-05,
+        -7.611340411273204e-07,
+        5.847851288332389e-05,
+        -5.218680340198909e-05
+      ],
+      "finalClf": 0.0034207498492347024,
+      "maximumClf": 1267.8415886028765,
+      "maximumClfSlack": 166.10165219581518,
+      "maximumAbsLateralError": 4.4455757609735205,
+      "maximumAbsHeadingError": 0.38465300781489326,
+      "zeroClfHolds": 269,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 26,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 1.5182005748423718e-09,
+      "minimumClearance": 0.01131223359401685,
+      "audit": {
+        "scenario": "acceleratingHeadOn",
+        "passed": true,
+        "samples": 9145,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.01131223359401685,
+        "minimumRoadMarginMeters": -1.8515125304558664,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.007880132426514795
+      },
+      "maximumFrameSeconds": 5.188435,
+      "subsequentMedianSeconds": 0.040155,
+      "subsequentP95Seconds": 5.039342400000001,
+      "deadlineMisses": 81,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 95,
+      "zeroClfSuffixHolds": 269,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/acceleratingHeadOn.json",
+      "rawSha256": "c24d310180ffa07a9b5dfc65ccbf35c0a52ed436a029deff0dd4c1f5158c4fbd",
+      "terminationCounts": {
+        "timeLimit": 26,
+        "clfLowerBound": 269
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 14.550000000000072,
+        "confirmationTimeSeconds": 19.550000000000143
+      },
+      "previousFinalError": [
+        0.0015881955681616453,
+        8.270822937747803e-05,
+        2.6767743577238434e-10,
+        9.841133209406898e-11,
+        -3.707365185537585e-12
+      ],
+      "previousDuration": 19.55
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "frames": 323,
+      "duration": 16.150000000000002,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 11.150000000000023,
+        "confirmationTimeSeconds": 16.150000000000095
+      },
+      "finalError": [
+        -0.02090001225275338,
+        0.00017380601523843474,
+        1.3471931362474265e-05,
+        -6.658947909189791e-14,
+        -7.561688475036748e-15
+      ],
+      "finalClf": 0.023499668870241002,
+      "maximumClf": 351.35363616293745,
+      "maximumClfSlack": 49.015138980218694,
+      "maximumAbsLateralError": 2.0962920262846896,
+      "maximumAbsHeadingError": 0.21338306418026012,
+      "zeroClfHolds": 251,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 72,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 3.277467763851405e-08,
+      "minimumClearance": 0.0059755202624195425,
+      "audit": {
+        "scenario": "brakingLead",
+        "passed": false,
+        "samples": 10013,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.0059755202624195425,
+        "minimumRoadMarginMeters": 0.910186848854647,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": false,
+        "finalLateralErrorMeters": -0.02090001225275338
+      },
+      "maximumFrameSeconds": 5.335276,
+      "subsequentMedianSeconds": 0.08412649999999999,
+      "subsequentP95Seconds": 5.1213548,
+      "deadlineMisses": 184,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 196,
+      "zeroClfSuffixHolds": 186,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/brakingLead.json",
+      "rawSha256": "e965fe5ccaf36ce0d55753dae5f03838cd071dd0a585b01539767ca3b7c0a746",
+      "terminationCounts": {
+        "timeLimit": 72,
+        "clfLowerBound": 251
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 31.100000000000307,
+        "confirmationTimeSeconds": 36.10000000000009
+      },
+      "previousFinalError": [
+        -0.0011692864152404486,
+        -9.89022423045709e-05,
+        2.7020536919053484e-09,
+        -6.427197577807026e-09,
+        2.4212623501037047e-10
+      ],
+      "previousDuration": 36.1
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "frames": 261,
+      "duration": 13.05,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 8.04999999999998,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "finalError": [
+        -0.006877224277733757,
+        0.0005588430700796661,
+        -0.016230796792703117,
+        -1.0690529997868215e-05,
+        1.3366341337779023e-05
+      ],
+      "finalClf": 0.007131790261810203,
+      "maximumClf": 807.817868355495,
+      "maximumClfSlack": 73.60689279045914,
+      "maximumAbsLateralError": 2.396982603466954,
+      "maximumAbsHeadingError": 0.25723262181742057,
+      "zeroClfHolds": 228,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 33,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 2.8507875227123947e-10,
+      "minimumClearance": 0.006629521065222748,
+      "audit": {
+        "scenario": "crossing",
+        "passed": true,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.006629521065222748,
+        "minimumRoadMarginMeters": 0.4051728034051858,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.006877224277733757
+      },
+      "maximumFrameSeconds": 5.176041,
+      "subsequentMedianSeconds": 0.126191,
+      "subsequentP95Seconds": 5.0330580000000005,
+      "deadlineMisses": 163,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 96,
+      "zeroClfSuffixHolds": 167,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/crossing.json",
+      "rawSha256": "aa50a93ab1e7d0f5bb47965b3a0d05ea552914f41a9e9255e77ab10c68ae183f",
+      "terminationCounts": {
+        "clfLowerBound": 228,
+        "timeLimit": 33
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 42.34999999999973,
+        "confirmationTimeSeconds": 47.34999999999945
+      },
+      "previousFinalError": [
+        1.3809120548806083e-05,
+        6.711590193114313e-05,
+        1.260569915118026e-06,
+        1.3728382530500309e-05,
+        -5.171746301434886e-07
+      ],
+      "previousDuration": 47.35
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "frames": 329,
+      "duration": 16.45,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 11.450000000000028,
+        "confirmationTimeSeconds": 16.4500000000001
+      },
+      "finalError": [
+        -0.016351575881046222,
+        0.0001080625186524681,
+        -0.00028904689012243523,
+        1.3044666364807334e-05,
+        -1.637514668832718e-05
+      ],
+      "finalClf": 0.014760311286417796,
+      "maximumClf": 710.2524531356553,
+      "maximumClfSlack": 71.72173874966359,
+      "maximumAbsLateralError": 2.117632498591339,
+      "maximumAbsHeadingError": 0.26400343687706007,
+      "zeroClfHolds": 289,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 40,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 1.9146496610389363e-09,
+      "minimumClearance": 0.007478625829417034,
+      "audit": {
+        "scenario": "curvedCrossing",
+        "passed": true,
+        "samples": 10199,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.007478625829417034,
+        "minimumRoadMarginMeters": 0.7365881685677778,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.016351575881046222
+      },
+      "maximumFrameSeconds": 5.206398,
+      "subsequentMedianSeconds": 0.12581799999999999,
+      "subsequentP95Seconds": 5.0373638000000005,
+      "deadlineMisses": 264,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 156,
+      "zeroClfSuffixHolds": 178,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/curvedCrossing.json",
+      "rawSha256": "1aaa5783fb3ab7eb19c9b75a2faac8bb6aaa98ea18eea411b18fe7c9997b110c",
+      "terminationCounts": {
+        "clfLowerBound": 289,
+        "timeLimit": 40
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "previousFinalError": [
+        -178.8837910263154,
+        -0.0236124133059517,
+        -0.04006317136158444,
+        0.007068722415032442,
+        -0.02907287474711303
+      ],
+      "previousDuration": 300.0
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "frames": 261,
+      "duration": 13.05,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 8.04999999999998,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "finalError": [
+        -0.0008048623716514876,
+        2.8090654606788626e-06,
+        1.492426445537376e-06,
+        -1.879090477321585e-05,
+        1.2868340025437575e-05
+      ],
+      "finalClf": 3.680665375660139e-05,
+      "maximumClf": 547.0777752779387,
+      "maximumClfSlack": 74.41145227866599,
+      "maximumAbsLateralError": 2.5314638752888867,
+      "maximumAbsHeadingError": 0.22975184775480717,
+      "zeroClfHolds": 232,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 29,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 7.878628814528473e-09,
+      "minimumClearance": 0.006497015360142518,
+      "audit": {
+        "scenario": "curvedHeadOn",
+        "passed": true,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.006497015360142518,
+        "minimumRoadMarginMeters": 0.26350192327362265,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.0008048623716514876
+      },
+      "maximumFrameSeconds": 5.129983,
+      "subsequentMedianSeconds": 0.127671,
+      "subsequentP95Seconds": 5.030521,
+      "deadlineMisses": 211,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 98,
+      "zeroClfSuffixHolds": 167,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/curvedHeadOn.json",
+      "rawSha256": "9e0db4f7fa4870468b626ef10a9f116f8c5e05e5b838ec86a911ce8db8e04d0d",
+      "terminationCounts": {
+        "clfLowerBound": 232,
+        "timeLimit": 29
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "previousFinalError": [
+        -182.08322618791132,
+        -0.03979574544314217,
+        -0.040779723656859446,
+        0.007169887946379495,
+        -0.024375886155015188
+      ],
+      "previousDuration": 300.0
+    },
+    {
+      "speed": 15,
+      "scenario": "headOn",
+      "frames": 261,
+      "duration": 13.05,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 8.04999999999998,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "finalError": [
+        7.48761283988642e-09,
+        -1.1062111913554611e-09,
+        7.2233394869059e-05,
+        1.392976527499511e-10,
+        1.421110549005854e-09
+      ],
+      "finalClf": 1.0690844564113628e-07,
+      "maximumClf": 741.8137081649757,
+      "maximumClfSlack": 81.17800395710867,
+      "maximumAbsLateralError": 3.253300285837285,
+      "maximumAbsHeadingError": 0.3117745050543791,
+      "zeroClfHolds": 239,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 22,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 1.0200022263992005e-11,
+      "minimumClearance": 0.08831011937486473,
+      "audit": {
+        "scenario": "headOn",
+        "passed": true,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.08831011937486473,
+        "minimumRoadMarginMeters": -0.6036122513850035,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 7.48761283988642e-09
+      },
+      "maximumFrameSeconds": 5.262797,
+      "subsequentMedianSeconds": 0.1279725,
+      "subsequentP95Seconds": 5.037434,
+      "deadlineMisses": 205,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 96,
+      "zeroClfSuffixHolds": 202,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/headOn.json",
+      "rawSha256": "ffa5e55de6c69645847e1415bdecc291eb8e6b197a9b3fbd793e3a7ae00580e8",
+      "terminationCounts": {
+        "clfLowerBound": 239,
+        "timeLimit": 22
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 15.80000000000009,
+        "confirmationTimeSeconds": 20.80000000000016
+      },
+      "previousFinalError": [
+        0.00013887778258883242,
+        9.840463083663295e-06,
+        1.0827569951743499e-09,
+        -4.660222765251276e-11,
+        1.7556051952306946e-12
+      ],
+      "previousDuration": 20.8
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "frames": 312,
+      "duration": 15.600000000000001,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 10.600000000000016,
+        "confirmationTimeSeconds": 15.600000000000087
+      },
+      "finalError": [
+        0.0004153391217642094,
+        -0.0003564460239430558,
+        -0.00479588454703439,
+        -1.0207721883044266e-06,
+        -4.310869674711457e-08
+      ],
+      "finalClf": 0.0007055076646075235,
+      "maximumClf": 684.6469995409421,
+      "maximumClfSlack": 74.42494653700152,
+      "maximumAbsLateralError": 2.5072417634157613,
+      "maximumAbsHeadingError": 0.2726537837063217,
+      "zeroClfHolds": 275,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 37,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 3.0707085069137108e-09,
+      "minimumClearance": 0.012344184196410427,
+      "audit": {
+        "scenario": "turningCrossing",
+        "passed": true,
+        "samples": 9672,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.012344184196410427,
+        "minimumRoadMarginMeters": 0.2695714903773725,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.0004153391217642094
+      },
+      "maximumFrameSeconds": 5.268373,
+      "subsequentMedianSeconds": 0.123298,
+      "subsequentP95Seconds": 5.033326949999999,
+      "deadlineMisses": 241,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 136,
+      "zeroClfSuffixHolds": 180,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed15/turningCrossing.json",
+      "rawSha256": "6d8dcf3fb046a4addee9df0571d26ad6bca6ee9d30417fa28238a7e84b973417",
+      "terminationCounts": {
+        "clfLowerBound": 275,
+        "timeLimit": 37
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 55.04999999999901,
+        "confirmationTimeSeconds": 60.049999999998725
+      },
+      "previousFinalError": [
+        -0.0033807147567045245,
+        -6.317545405785005e-05,
+        5.329070518200751e-15,
+        1.9497117190841557e-20,
+        -1.5048283590084048e-21
+      ],
+      "previousDuration": 60.050000000000004
+    },
+    {
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "frames": 261,
+      "duration": 13.05,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 8.04999999999998,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "finalError": [
+        -0.03254745766156476,
+        0.0008532734719713913,
+        -1.0269118888572848e-11,
+        -4.599465005787797e-19,
+        -8.771157610309646e-19
+      ],
+      "finalClf": 0.07340701007527167,
+      "maximumClf": 1721.8719306949283,
+      "maximumClfSlack": 175.46026054183608,
+      "maximumAbsLateralError": 4.045643967527782,
+      "maximumAbsHeadingError": 0.5693068055442343,
+      "zeroClfHolds": 229,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 32,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 8.472665014025438e-09,
+      "minimumClearance": 0.06628565169414832,
+      "audit": {
+        "scenario": "acceleratingHeadOn",
+        "passed": true,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.06628565169414832,
+        "minimumRoadMarginMeters": -1.5266556607236037,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.03254745766156476
+      },
+      "maximumFrameSeconds": 5.141612,
+      "subsequentMedianSeconds": 0.0381875,
+      "subsequentP95Seconds": 5.0351490000000005,
+      "deadlineMisses": 97,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 92,
+      "zeroClfSuffixHolds": 227,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/acceleratingHeadOn.json",
+      "rawSha256": "7b04bcd0626e68bafc0c692da7de6f345b2ffa6ff99ef16509f7962fa02a7f47",
+      "terminationCounts": {
+        "clfLowerBound": 229,
+        "timeLimit": 32
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 720.8999999998921,
+        "confirmationTimeSeconds": 725.8999999998875
+      },
+      "previousFinalError": [
+        0.00381951881916405,
+        8.646287408367869e-06,
+        -4.7537837488675905e-06,
+        -0.0001907780004943911,
+        -1.4372787778362734e-05
+      ],
+      "previousDuration": 725.9000000000001
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "frames": 296,
+      "duration": 14.8,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 9.800000000000004,
+        "confirmationTimeSeconds": 14.800000000000075
+      },
+      "finalError": [
+        -0.00826856632184913,
+        0.00011919340980346437,
+        4.12215529266291e-07,
+        2.56017826576849e-16,
+        2.4905507836938485e-17
+      ],
+      "finalClf": 0.004926389996067432,
+      "maximumClf": 395.27299002655525,
+      "maximumClfSlack": 66.03450217930694,
+      "maximumAbsLateralError": 2.0107558883199332,
+      "maximumAbsHeadingError": 0.31206459916030865,
+      "zeroClfHolds": 227,
+      "stationaryHolds": 1,
+      "incompleteClfHolds": 68,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 1.4912657141248261e-07,
+      "minimumClearance": 0.006001631654859793,
+      "audit": {
+        "scenario": "brakingLead",
+        "passed": true,
+        "samples": 9176,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.006001631654859793,
+        "minimumRoadMarginMeters": 0.9476456505195454,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.00826856632184913
+      },
+      "maximumFrameSeconds": 5.329307,
+      "subsequentMedianSeconds": 0.073878,
+      "subsequentP95Seconds": 5.1208945,
+      "deadlineMisses": 200,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 195,
+      "zeroClfSuffixHolds": 165,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/brakingLead.json",
+      "rawSha256": "8a2be0b4e912bc9678f0a373570fc2bc67b3350d0556e2e41ef83d7c7799662a",
+      "terminationCounts": {
+        "timeLimit": 68,
+        "clfLowerBound": 227,
+        "clfStationary": 1
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 788.099999999831,
+        "confirmationTimeSeconds": 793.0999999998264
+      },
+      "previousFinalError": [
+        0.010855867768955488,
+        -0.0004845791280790627,
+        -1.5339818304482833e-10,
+        -6.166347918563479e-17,
+        -4.4855950368883123e-17
+      ],
+      "previousDuration": 793.1
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "frames": 261,
+      "duration": 13.05,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 8.04999999999998,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "finalError": [
+        -0.006831074530352248,
+        0.00014074421969893105,
+        7.760903031339694e-11,
+        1.9663619298340252e-19,
+        1.9216604454941187e-19
+      ],
+      "finalClf": 0.0032922939353267357,
+      "maximumClf": 407.7255262423968,
+      "maximumClfSlack": 66.25400411111832,
+      "maximumAbsLateralError": 1.0265720283831155,
+      "maximumAbsHeadingError": 0.27343407761542166,
+      "zeroClfHolds": 234,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 27,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 5.86233791899293e-08,
+      "minimumClearance": 0.006941962179496386,
+      "audit": {
+        "scenario": "crossing",
+        "passed": true,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.006941962179496386,
+        "minimumRoadMarginMeters": 1.572692969378508,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.006831074530352248
+      },
+      "maximumFrameSeconds": 5.249992,
+      "subsequentMedianSeconds": 0.037128999999999995,
+      "subsequentP95Seconds": 5.019569000000001,
+      "deadlineMisses": 99,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 93,
+      "zeroClfSuffixHolds": 225,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/crossing.json",
+      "rawSha256": "756520718df79eaa5abf16265b9b8d0e786f8c38d49eea659be70063f5dd6d55",
+      "terminationCounts": {
+        "timeLimit": 27,
+        "clfLowerBound": 234
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 554.7500000000432,
+        "confirmationTimeSeconds": 559.7500000000387
+      },
+      "previousFinalError": [
+        -0.004616232019800814,
+        0.0002653194722256091,
+        -4.781944973331065e-08,
+        8.612458574379591e-11,
+        -1.0457196032044927e-11
+      ],
+      "previousDuration": 559.75
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "frames": 358,
+      "duration": 17.900000000000002,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 12.900000000000048,
+        "confirmationTimeSeconds": 17.90000000000012
+      },
+      "finalError": [
+        0.00045509815785652887,
+        -9.510593549314634e-07,
+        -0.00014996858714511063,
+        -1.5688393385407395e-05,
+        -1.3744973839303898e-05
+      ],
+      "finalClf": 1.6034245092347838e-05,
+      "maximumClf": 389.6343086118043,
+      "maximumClfSlack": 34.472232822232115,
+      "maximumAbsLateralError": 0.584578793909936,
+      "maximumAbsHeadingError": 0.14667265813044456,
+      "zeroClfHolds": 306,
+      "stationaryHolds": 4,
+      "incompleteClfHolds": 48,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 5.458004679657293e-08,
+      "minimumClearance": 0.009867357950387687,
+      "audit": {
+        "scenario": "curvedCrossing",
+        "passed": true,
+        "samples": 11098,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.009867357950387687,
+        "minimumRoadMarginMeters": 2.2256399818683974,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.00045509815785652887
+      },
+      "maximumFrameSeconds": 5.411726,
+      "subsequentMedianSeconds": 0.122785,
+      "subsequentP95Seconds": 5.042249399999999,
+      "deadlineMisses": 273,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 254,
+      "zeroClfSuffixHolds": 101,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/curvedCrossing.json",
+      "rawSha256": "c12d5dd36071c8174b9774f3d4a718ffd235821b74704fcbfe245c8849a7f82b",
+      "terminationCounts": {
+        "timeLimit": 48,
+        "clfLowerBound": 306,
+        "clfStationary": 4
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "previousFinalError": [
+        -1809.5078360781456,
+        -0.6928495159063242,
+        -0.003299564877366379,
+        -0.040305541249059884,
+        -0.03552717256512316
+      ],
+      "previousDuration": 300.0
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "frames": 392,
+      "duration": 19.6,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 14.600000000000072,
+        "confirmationTimeSeconds": 19.600000000000144
+      },
+      "finalError": [
+        -0.0027849428816202216,
+        0.0006157584691077795,
+        -0.0013493616699777888,
+        0.0016713229044779607,
+        0.0015695686942975087
+      ],
+      "finalClf": 0.0007964515037881422,
+      "maximumClf": 1823.6076678069614,
+      "maximumClfSlack": 188.14460483630296,
+      "maximumAbsLateralError": 3.7045253128532645,
+      "maximumAbsHeadingError": 0.6254652966431856,
+      "zeroClfHolds": 350,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 42,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 1.277164942692366e-07,
+      "minimumClearance": 0.02602899512063883,
+      "audit": {
+        "scenario": "curvedHeadOn",
+        "passed": true,
+        "samples": 12152,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.02602899512063883,
+        "minimumRoadMarginMeters": -1.3518968149652437,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.0027849428816202216
+      },
+      "maximumFrameSeconds": 5.271824,
+      "subsequentMedianSeconds": 0.120373,
+      "subsequentP95Seconds": 5.03471985,
+      "deadlineMisses": 344,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 123,
+      "zeroClfSuffixHolds": 152,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/curvedHeadOn.json",
+      "rawSha256": "54c6aa7afa77f680cb9d38da44282aac076b75ce31b2c25d96b8ba486d5e007d",
+      "terminationCounts": {
+        "timeLimit": 42,
+        "clfLowerBound": 350
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "previousFinalError": [
+        -1835.541853883687,
+        -0.7376501892867167,
+        -0.0030147267575060255,
+        -0.04070560398415103,
+        -0.03632270412954746
+      ],
+      "previousDuration": 300.0
+    },
+    {
+      "speed": 8,
+      "scenario": "headOn",
+      "frames": 261,
+      "duration": 13.05,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 8.04999999999998,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "finalError": [
+        -0.000730346312882684,
+        1.772907954640183e-05,
+        -2.6645352591003757e-13,
+        4.4015054354233884e-21,
+        1.149729466573505e-20
+      ],
+      "finalClf": 3.718873813123846e-05,
+      "maximumClf": 1328.7179851665492,
+      "maximumClfSlack": 107.83960337417,
+      "maximumAbsLateralError": 2.916035304856249,
+      "maximumAbsHeadingError": 0.4705122066609533,
+      "zeroClfHolds": 230,
+      "stationaryHolds": 3,
+      "incompleteClfHolds": 28,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 1.0847344057707264e-08,
+      "minimumClearance": 0.14206041972944458,
+      "audit": {
+        "scenario": "headOn",
+        "passed": true,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.14206041972944458,
+        "minimumRoadMarginMeters": -0.5691882020558889,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.000730346312882684
+      },
+      "maximumFrameSeconds": 5.199206,
+      "subsequentMedianSeconds": 0.036739999999999995,
+      "subsequentP95Seconds": 5.0285265,
+      "deadlineMisses": 65,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 92,
+      "zeroClfSuffixHolds": 196,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/headOn.json",
+      "rawSha256": "81a2958f40a99c21c8c3470a8b8fbd8cc734cf7dccc969cad7cb823727615d3c",
+      "terminationCounts": {
+        "timeLimit": 28,
+        "clfLowerBound": 230,
+        "clfStationary": 3
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 665.0499999999429,
+        "confirmationTimeSeconds": 670.0499999999383
+      },
+      "previousFinalError": [
+        0.0028056537226758033,
+        0.0007569653318266668,
+        -1.5693394885829548e-05,
+        -0.003734878265737732,
+        -0.003424152897356477
+      ],
+      "previousDuration": 670.0500000000001
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "frames": 320,
+      "duration": 16.0,
+      "completed": true,
+      "failure": "",
+      "recovered": true,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 11.000000000000021,
+        "confirmationTimeSeconds": 16.000000000000092
+      },
+      "finalError": [
+        -5.875326099973368e-05,
+        -1.009348022286504e-06,
+        -6.983924549786025e-11,
+        5.176974592360809e-06,
+        4.32214584862403e-06
+      ],
+      "finalClf": 2.7914697376411164e-07,
+      "maximumClf": 422.9605693964682,
+      "maximumClfSlack": 49.43613928630293,
+      "maximumAbsLateralError": 0.603929682616222,
+      "maximumAbsHeadingError": 0.19178042669662382,
+      "zeroClfHolds": 288,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 32,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 2.4802345442921416e-08,
+      "minimumClearance": 0.024695972513121858,
+      "audit": {
+        "scenario": "turningCrossing",
+        "passed": true,
+        "samples": 9920,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.024695972513121858,
+        "minimumRoadMarginMeters": 2.0898949620134952,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": false,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -5.875326099973368e-05
+      },
+      "maximumFrameSeconds": 5.539001,
+      "subsequentMedianSeconds": 0.092993,
+      "subsequentP95Seconds": 5.0878438500000005,
+      "deadlineMisses": 232,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 216,
+      "zeroClfSuffixHolds": 106,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/turningCrossing.json",
+      "rawSha256": "e054d358e04819c78060d3e56d8b8aec45368c53548f8fa07d6c18a1b0e2c25a",
+      "terminationCounts": {
+        "timeLimit": 32,
+        "clfLowerBound": 288
+      },
+      "previousRecovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": 551.4500000000462,
+        "confirmationTimeSeconds": 556.4500000000417
+      },
+      "previousFinalError": [
+        -0.004661783548394859,
+        0.0002058870923247755,
+        -2.596442083557804e-08,
+        1.7835635628918687e-11,
+        -2.1656047367535506e-12
+      ],
+      "previousDuration": 556.45
+    }
+  ],
+  "noTargetControls": [
+    {
+      "speed": 15,
+      "scenario": "circular",
+      "frames": 1200,
+      "duration": 60.0,
+      "completed": true,
+      "failure": "",
+      "recovered": false,
+      "recovery": {
+        "enabled": false,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 0,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "finalError": [
+        -2.80879082773419e-12,
+        -2.067303301293235e-14,
+        -3.836930773104541e-13,
+        1.8936241463762826e-14,
+        -1.0672018824209317e-14
+      ],
+      "finalClf": 4.957985873860898e-22,
+      "maximumClf": 8.753980581807757e-20,
+      "maximumClfSlack": 8.753980540694329e-20,
+      "maximumAbsLateralError": 3.51814096646503e-11,
+      "maximumAbsHeadingError": 5.089157394111421e-12,
+      "zeroClfHolds": 1200,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 0,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 8.753682620272948e-20,
+      "minimumClearance": null,
+      "audit": {
+        "scenario": "circular",
+        "passed": true,
+        "samples": 37200,
+        "sampledRecoveryConfirmed": false,
+        "minimumClearanceMeters": null,
+        "minimumRoadMarginMeters": 3.033142953069131,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -2.80879082773419e-12
+      },
+      "maximumFrameSeconds": 0.532408,
+      "subsequentMedianSeconds": 0.072798,
+      "subsequentP95Seconds": 0.07632945,
+      "deadlineMisses": 1129,
+      "minimumPredictionHorizon": 76,
+      "maximumPredictionHorizon": 90,
+      "zeroClfSuffixHolds": 1200,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circular15-stable.json",
+      "rawSha256": "bc9332d7d4080596655d27f56395f3400ae5c3698d331ab55d6ad987fd486315",
+      "terminationCounts": {
+        "clfLowerBound": 1200
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "circular",
+      "frames": 1200,
+      "duration": 60.0,
+      "completed": true,
+      "failure": "",
+      "recovered": false,
+      "recovery": {
+        "enabled": false,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 0,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "finalError": [
+        -8.748849735625091e-12,
+        9.99721139205434e-15,
+        -1.3802292642139946e-12,
+        2.1219137558148304e-13,
+        2.54303522684296e-13
+      ],
+      "finalClf": 5.896126404079279e-21,
+      "maximumClf": 6.96001181852814e-21,
+      "maximumClfSlack": 2.8208650910111987e-22,
+      "maximumAbsLateralError": 9.467668915580544e-12,
+      "maximumAbsHeadingError": 2.7816117464940504e-13,
+      "zeroClfHolds": 1200,
+      "stationaryHolds": 0,
+      "incompleteClfHolds": 0,
+      "reportedZeroClfPassesActualPredicate": true,
+      "maximumScaledOdeClfExcessOnZeroSlackHolds": 2.79944989322663e-22,
+      "minimumClearance": null,
+      "audit": {
+        "scenario": "circular",
+        "passed": true,
+        "samples": 37200,
+        "sampledRecoveryConfirmed": false,
+        "minimumClearanceMeters": null,
+        "minimumRoadMarginMeters": 3.0220879493202233,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": true,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": true,
+        "everyHoldInvokedOptimizer": false,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -8.748849735625091e-12
+      },
+      "maximumFrameSeconds": 0.847926,
+      "subsequentMedianSeconds": 0.067719,
+      "subsequentP95Seconds": 0.08466424999999994,
+      "deadlineMisses": 1147,
+      "minimumPredictionHorizon": 68,
+      "maximumPredictionHorizon": 78,
+      "zeroClfSuffixHolds": 1200,
+      "rawFile": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/circular8-stable.json",
+      "rawSha256": "b09bcd14c130f9399c1d9d5bf09fb3222bffc538206b9f9f713bc2cc17d2682a",
+      "terminationCounts": {
+        "clfLowerBound": 1200
+      }
+    }
+  ]
+}

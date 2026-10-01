@@ -1,0 +1,154 @@
+CLF nominal-recovery correction -- October 1, 2026
+
+Repository: /home/zai/Downloads/ResearchProjects/collisionAvoidance
+Raw directory: /home/zai/.cache/collisionAvoidance/clf-recovery-20261001
+Baseline commit: 2a49daf10ff2ae119e8c39c8f072b033405e5837
+Final production bytes: summary.json and validation.json source hashes.
+MATLAB R2026a with Optimization and Control System Toolboxes.
+
+Final campaign
+--------------
+Each recorded process used:
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/NAME.m')"
+NAME takes stableCritical and stableWorker0 through stableWorker5. Logs have matching base names. All fourteen final runs start
+from the original initial conditions; no prior controller trajectory is
+imported. They ran in raw/stable-prototype, an isolated copy whose controller
+and configuration bytes were verified equal to final production. Actual
+scripts and source hashes are retained. Equivalent reproduction at the
+repository root uses:
+  addpath('scripts');
+  runNonlinearPredictiveSafetyValidation(Scenarios=SCENARIO,Frames=1600, ...
+      ControllerConfiguration=struct('referenceSpeed',SPEED, ...
+          'controller',struct('horizonSteps',PREFIX)), ...
+      RequireCollisionThreat=true,RecoveryDwellSeconds=5, ...
+      OutputFile=JSON_PATH,ContinuationFile=MAT_PATH);
+SPEED/PREFIX are 8/8 and 15/16. SCENARIO takes headOn,
+acceleratingHeadOn, brakingLead, crossing, turningCrossing, curvedHeadOn,
+curvedCrossing. Final files are raw/campaign-stable/speedSPEED/SCENARIO.*.
+Original fixtures, known target epoch and road geometry are unchanged.
+No road constraints, observer, noise, delays or random draws are introduced.
+Processes overlapped: timings are functional campaign measurements, not
+isolated benchmarks. The existing five-second soft improvement budget makes
+the last accepted iterate machine/load dependent. Exact trajectory equality
+across hardware or concurrent scheduling is not promised.
+
+circularStable.m runs both no-target controls sequentially, each using
+Scenarios='circular', Frames=1200, the same speed/prefix configurations,
+and no recovery early-stop. Exports are circular8-stable.json and
+circular15-stable.json. Measured successors use tight ODE45, not a
+self-replay of the prediction RK4 integrator.
+
+Validation
+----------
+stableTests.m executes these thirteen files in one complete run:
+  r=runtests({'tests/sweptCollisionIntervalTest.m', ...
+      'tests/clfNominalRecoveryTest.m','tests/nonlinearPredictiveSafetyTest.m', ...
+      'tests/freePoseTerminalTest.m','tests/terminalContinuationTest.m', ...
+      'tests/movingTargetFlowTest.m','tests/longitudinalRoadLoadTest.m', ...
+      'tests/nominalRecoveryValidationTest.m','tests/collisionThreatScenarioTest.m', ...
+      'tests/controllerSourceBudgetTest.m', ...
+      'tests/collisionAvoidanceControllerConfigTest.m', ...
+      'tests/controllerInputGeometryTest.m','tests/modifiedFialaTireTest.m'});
+  assertSuccess(r)
+All 305 cases pass in one complete final thirteen-file run; the final
+controller/configuration and test files were verified byte-identical to
+production. Intermediate trust-only tests exposed an artificial one-iteration
+cap and missing estimator test dependencies in the isolated copy. The final
+test preserves strict zero-CLF assertions and uses the default iteration
+allowance; the dependency copy was completed before the final suite.
+The test correction permits bounded relinearization; it does not weaken
+the CLF residual predicate. The encounter regression independently rebuilds
+and checks every returned plan, guarding against unchecked cached prefixes.
+Interval tests cover contacts between separated endpoints, common translation,
+close safe passes, touching and rotating/accelerating targets. Circular
+cruise and perturbed-cruise tests extend beyond the initial completion tail.
+Exact solver-call-count expectations were replaced by actual CLF/admission
+outcomes. Retired weighted-slack configuration is rejected.
+The unrelated full observer/perception suite was not rerun.
+
+  python -m unittest discover -s tests -p auditJointPredictiveSafetyTest.py
+All 15 Python tests pass. The audit accepts nonlinearConstraintCorrection
+only through the existing zero hard-residual predicate. Neither rectangle
+geometry nor the 6-mm buffer threshold was weakened.
+
+collectStable.py verifies frozen source hashes, calls audit(result) from
+scripts/auditJointPredictiveSafety.py on every final JSON, and writes compact
+case/per-second results. Independent geometry uses 31 samples per hold.
+ODE45 tolerances are 1e-11 relative and 1e-12 absolute. The nominal RK4 mesh
+is 5 ms. Interval admission concerns the linear ego-pose interpolant and
+exact target flow; it does not bound model error to the continuous plant.
+summary.json retains strict-positive-distance and full-buffer audit outcomes
+separately, including any full-buffer audit failure.
+
+Recovery requires all five errors below [0.1 m, 1 deg, 0.1 m/s, 0.05 m/s,
+0.01 rad/s] for five seconds beginning no earlier than eight seconds.
+The observation cap is not a requested settling time. Opposing circular
+fixtures retain recurring future encounters; observed recovery is a finite
+dwell, not permanent nominal motion through all future collisions.
+
+stableAnalysis.m runs checkcode(...,'-config=factory','-id') on the nine
+listed files. code-analysis.json retains all findings. Dynamic-size and
+sparse-index performance advisories, and one redundant suppression remain.
+No zero-warning or real-time claim is made.
+
+Development evidence, excluded from final campaign counts
+--------------------------------------------------------
+- campaign-final is an earlier CLF-only implementation: eleven completed
+  exports include three sampled collisions and a model-domain failure.
+  Three in-flight cases were interrupted. These failures motivated the
+  positive-slack predictive-cost tie-break and the common 5-ms mesh.
+- campaign-refined showed that 5-ms refinement alone could still miss a
+  short curvedCrossing contact at 8 m/s. Remaining processes were interrupted
+  to implement adaptive interval checks; those outputs are not final results.
+- campaign-interval-prefix exposed an empty-cut-vector dimension bug.
+  campaign-interval-prefix-fixed then exposed unchecked prefix-cache reuse.
+  Final campaign-interval uses corrected certification flags and the same
+  later-input correction for transferred trajectories that lose admission.
+- campaign-interval is the preceding interval-certified implementation. It
+  contains twelve recovered cases, one 8-m/s turningCrossing model-domain
+  failure at 11.05 s, and an 8-m/s curvedHeadOn run without a five-second
+  recovery dwell by the 80-second observation cap. Four focused prefixes
+  were independently audited then resumed with unchanged source/settings.
+  These results exposed extreme first-step Newton correction and motivated
+  applying the existing input trust box to that correction.
+- trustPilot.m starts from the same old 4-second turningCrossing snapshot
+  to isolate the bounded correction. It recovers at 28.45 s with minimum
+  independently sampled distance 6.81948 mm; the unbounded implementation
+  fails at 11.05 s. This paired continuation is extra diagnostic evidence,
+  not one of the fourteen final cold-start cases. The target approaches
+  again near nine seconds rather than departing permanently.
+- campaign-trust is an intermediate bounded-correction version. Its cold
+  8-m/s crossing case fails at 5 s when a shifted open-loop tail leaves the
+  Fiala chart. The actual initial state remains evaluable. Three remaining
+  intermediate workers were terminated after the cause was isolated; their
+  partial logs remain and are not counted as complete runs. See
+  trust-campaign-interruption.json. A captured-state diagnostic with the
+  added nonlinear-defect retraction returns a fully admitted zero-safety
+  witness under the original budget (projectionFailure.log).
+- campaign-projection is the intermediate version that applied defect
+  retraction only to unevaluable rollouts. Thirteen runs recovered, while the
+  8-m/s curvedCrossing rollout remained safe but diverged temporarily (at 10 s,
+  W=58494.9 and lateral error=-22.3957 m). Its remaining run was manually
+  interrupted as superseded; projection-campaign-interruption.json records
+  the actual last log lines. This is not a completed final case. The final
+  implementation also offers retraction to a defined but inadmissible full
+  conic proposal whose first stage is admissible, preserving the raw point.
+  The final cold curvedCrossing trial has W=12.0658 and lateral error=-0.184219 m
+  at 10 s, and confirms recovery at 17.9 s with 9.86736-mm minimum sampled gap.
+- sameFrame.m/clfFinalInternals.m isolate CLF correction at four states from
+  the prior causal study, retaining their original 8/10-hold horizons and
+  0.01-s integration. Endpoint correction preserves the first control;
+  all four produce admitted zero-slack witnesses (same-frame.json).
+  This probe precedes cost tie-breaking and adaptive interval checks; its
+  timings are not final campaign timings.
+- Earlier pilot, primary, probe and first campaign outputs remain in the raw
+  directory. Their intermediate failures and interruptions are not final
+  validation. Earlier test logs retain actual outcomes before corrections.
+- An accidentally regenerated wrapper in the preceding analysis cache was
+  restored byte-for-byte and checked against its existing manifest. Current
+  diagnostic wrappers stay in the current cache and do not shadow production.
+
+Compile report/CLF_NOMINAL_RECOVERY_20261001.tex from report/ using pdflatex
+with its output directory set to the raw cache. Full JSON/MAT data and
+rendered PDFs remain outside the repository. Hash manifests identify
+independent technical artifacts only; weekly/monthly reports are never hashed.
