@@ -1,13 +1,14 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl Return the first admissible nonlinear continuation.
-% Safety and lane/CLF costs guide restoration only while no witness exists.
+%solvePredictiveControl Solve safety first, then CLF under the attained safety level.
+% Zero safety slack does not terminate a still-positive CLF problem.
 % The endpoint family supplies every newly appended input.
     if nargin<3,timer=tic;end
     cfg=model.cfg;solution=[];baseline=[];model.slackCap=Inf;
     search=struct('solverCalls',0,'source',"sequentialConvexification", ...
         'terminationReason',"iterationLimit",'sequentialIterations',{{}}, ...
         'initialization',"laneFeedbackRollout",'safetySlack',Inf,'shiftAvailable',false, ...
-        'slackCap',Inf,'converged',false,'failures',strings(0,1));
+        'slackCap',Inf,'converged',false,'failures',strings(0,1), ...
+        'clfInitialSlack',Inf,'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false);
     if isstruct(previousState)
         model.terminal=previousState.terminal;
         anchor=previousState.inputTrajectory(:,2:end);
@@ -74,10 +75,14 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             end
         end
     end
+    search.clfInitialSlack=baseline.clfSlack;
     if ~isempty(solution)
-        model.terminal=solution.terminal;
-        search.converged=true;search.terminationReason="feasibleWitness";
-        search.safetySlack=solution.safety;search.elapsedSeconds=toc(timer);return;
+        baseline=solution;model.terminal=solution.terminal;model.slackCap=0;search.slackCap=0;
+        if cfg.clf.relaxationWeight*solution.clfSlack^2<=cfg.solver.optimalityTolerance
+            search.converged=true;search.terminationReason="clfLowerBound";
+            search.clfStageCompleted=true;search.clfLowerBound=true;
+            search.safetySlack=solution.safety;search.elapsedSeconds=toc(timer);return;
+        end
     end
     model.collisionRefinement=baseline.interiorViolation>0;
     radius=cfg.nonlinear.trustRadius;
@@ -86,6 +91,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         try
             [candidate,step]=localSequentialStep(baseline,model,radius,timer);
             search.solverCalls=search.solverCalls+step.calls;
+            search.clfStageAttempted=search.clfStageAttempted || step.secondaryAttempted;
             step.iteration=iteration;step.trustRadius=radius;step.acceptedIterate=false;
             step.retainedAsWitness=false;step.nominalSafetySlack=Inf;step.nominalHardViolation=Inf;step.nominalRestorationMerit=Inf;
             if isempty(candidate) && toc(timer)>=cfg.solver.timeLimitSeconds
@@ -114,10 +120,28 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
             end
             step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;step.nominalRestorationMerit=candidate.restorationMerit;
             if localFeasible(candidate,model)
-                solution=candidate;search.source="sequentialConvexification";
-                step.acceptedIterate=true;step.retainedAsWitness=true;
+                if localBetter(candidate,solution,model)
+                    solution=candidate;search.source="sequentialConvexification";
+                    step.acceptedIterate=true;step.retainedAsWitness=true;
+                end
+                lowerBound=cfg.clf.relaxationWeight*solution.clfSlack^2<=cfg.solver.optimalityTolerance;
+                % A finite suboptimal conic result can complete this local
+                % stage after nonlinear admission; its exit flag is retained.
+                secondaryComplete=step.secondaryAccepted;
+                if lowerBound || secondaryComplete
+                    search.clfLowerBound=lowerBound;search.clfStageCompleted=true;
+                    search.converged=true;search.terminationReason="clfStageComplete";
+                    if lowerBound,search.terminationReason="clfLowerBound";end
+                    search.sequentialIterations{end+1}=step;break;
+                end
+                if step.secondaryAttempted && ~step.secondaryAccepted
+                    radius=radius/2;
+                end
+                baseline=solution;model.terminal=solution.terminal;
+                model.slackCap=0;search.slackCap=0;
                 search.sequentialIterations{end+1}=step;
-                search.converged=true;search.terminationReason="feasibleWitness";break;
+                if radius<1e-7,search.terminationReason="smallTrustRegion";break;end
+                continue;
             end
             if localBetter(candidate,baseline,model)
                 baseline=candidate;step.acceptedIterate=true;
@@ -154,6 +178,11 @@ function better=localBetter(candidate,baseline,model)
     if isempty(baseline),better=true;return;end
     feasible=localFeasible(candidate,model);previous=localFeasible(baseline,model);
     if feasible~=previous,better=feasible;return;end
+    if feasible
+        better=candidate.clfSlack<baseline.clfSlack ...
+            || (candidate.clfSlack==baseline.clfSlack && candidate.cost<baseline.cost);
+        return;
+    end
     merit=candidate.restorationMerit;before=baseline.restorationMerit;
     better=merit<before || (merit==before && candidate.terminalViolation<baseline.terminalViolation) ...
         || (candidate.hard==0 && candidate.safety<=baseline.safety && candidate.cost<baseline.cost);
@@ -244,6 +273,7 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
     % the anchor used by dynamics, tires and rectangle separation constraints.
     cfg=model.cfg;seed=model.terminal;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
     h=cfg.controller.sampleTime;count=cfg.controller.maximumHorizonSteps;
+    tire=modifiedFialaTire.parameters(cfg);
     required=min(count,cfg.controller.horizonSteps+ceil(cfg.nonlinear.recoveryHorizonSeconds/h));
     inputs=zeros(2,count);
     egoRadius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
@@ -287,11 +317,15 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
         else
             u=reference.input+reference.gain*deviation;
         end
-        steering=min(cfg.model.frontWheelSteeringAngleMaximum, ...
-            atan(cfg.vehicle.wheelbase*.8*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity/max(x(4)^2,1)));
-        lo=[-steering;max(cfg.actuation.brakingRatioMinimum,-.35)];
-        hi=[steering;min(cfg.actuation.brakingRatioMaximum,.35)];
-        u=localClip(min(hi,max(lo,u)),previous,cfg);inputs(:,index)=u;
+        u(2)=min(.35,max(-.35,u(2)));u=localClip(u,previous,cfg);
+        % Invert the adhesion-branch force fraction 1-(1-q)^3. A kinematic
+        % steering cap can already saturate Fiala and erase its steering
+        % sensitivity. This is a seed preference, not an optimizer constraint.
+        slipLimit=atan(3*tire.longitudinalForceScale(1)*sqrt(1-u(2)^2) ...
+            /tire.corneringStiffness(1)*(1-(1-.8)^(1/3)));
+        zeroSlip=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
+        u(1)=min(zeroSlip+slipLimit,max(zeroSlip-slipLimit,u(1)));
+        u=localClip(u,previous,cfg);inputs(:,index)=u;
         x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;
         if index<required,continue;end
         seed=terminalContinuation.fit(seed,[x;u],model.sampleIndex+index);
@@ -315,11 +349,17 @@ end
 function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     info=struct('calls',0,'safetyOptimum',Inf,'secondarySafety',Inf,'safetyCap',Inf, ...
         'clfSlack',Inf,'status',"infeasibleBounds",'safetyExitFlag',NaN,'secondaryExitFlag',NaN, ...
-        'completionRestoration',false,'secondaryReturned',false, ...
+        'completionRestoration',false,'secondaryReturned',false,'secondaryAttempted',false, ...
+        'secondaryAccepted',false,'primarySkipped',false,'clfBefore',baseline.clfSlack, ...
         'terminalPhaseMeters',model.terminal.phaseMeters,'primaryRawMerit',Inf, ...
         'primaryMerit',Inf,'secondaryRawMerit',Inf,'secondaryMerit',Inf, ...
         'restorationRawMerit',Inf,'restorationMerit',Inf,'candidateStage',"none",'hardRowInfeasible',false);candidate=[];
     anchor=baseline.inputs;cfg=model.cfg;count=size(anchor,2);prefix=cfg.controller.horizonSteps;reference=model.nominalReference;
+    % A change of units keeps squared-slack epigraphs bounded when the
+    % physical CLF residual is large. Nonlinear admission uses original units.
+    clfScale=max(1,baseline.clfSlack);
+    objectiveScale=max(1,baseline.cost);
+    info.clfScale=clfScale;info.secondaryObjectiveScale=objectiveScale;
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
     is=iu(end)+(1:count);ic=is(end)+1;it=ic+1;ie=it+(1:2);nv=ie(end);
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
@@ -372,18 +412,17 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
                 end
             end
         end
-        [e,j]=nonlinearBicycleModel.errorLinearization(next,model.lane,reference);jx=ix(:,index+1);
-        ci=7*(index-1)+(1:7);costMatrix(ci(1:5),jx)=reference.factor*j/sqrt(count);
+        [e,j]=nonlinearBicycleModel.errorLinearization(next,model.lane,reference);
+        jx=ix(:,index+1);ci=7*(index-1)+(1:7);
+        costMatrix(ci(1:5),jx)=reference.factor*j/sqrt(count);
         costOffset(ci(1:5))=reference.factor*e/sqrt(count);
-        costMatrix(ci(6:7),iu(:,index))=.1*eye(2)/sqrt(count);
-        % The input regularizer is centered on this nonlinear rollout.
-        costOffset(ci(6:7))=0;
+        costMatrix(ci(6:7),iu(:,index))=.1*diag(sqrt([cfg.clf.frontWheelSteeringAngleWeight, ...
+            cfg.clf.brakingRatioWeight]))/sqrt(count);
         lower(jx(4:6))=max(lower(jx(4:6)),physicalLower-next(4:6));
         upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-next(4:6));
         if index==1
-            r=sparse(1,nv);r(jx)=2*e.'*reference.matrix*j;r(ic)=-1;
-            rowCount=rowCount+1;rows{rowCount}=r;
-            bounds{rowCount}=(1-cfg.nonlinear.clfDecay)*norm(reference.factor*initialError)^2-norm(reference.factor*e)^2;
+            clfMap=sparse(5,nv);clfMap(:,jx)=reference.factor*j/sqrt(clfScale);
+            clfOffset=reference.factor*e/sqrt(clfScale);
         end
         x=next;
     end
@@ -395,6 +434,10 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     map=sparse(8,nv);map(1:6,ix(:,end))=eye(6);map(7:8,iu(:,end))=eye(2);
     elastic=zeros(nv,1);elastic(ie(1))=1;
     endpoint=secondordercone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,elastic,-seed.radius);
+    clfConstant=(1-cfg.nonlinear.clfDecay)*norm(reference.factor*initialError)^2/clfScale;
+    clfAxis=sparse(1,nv);clfAxis(ic)=1;
+    clfCone=secondordercone([2*clfMap;clfAxis],[-2*clfOffset;1-clfConstant],clfAxis.',-1-clfConstant);
+    endpoint=[endpoint,clfCone];
     if ~isempty(model.target)
         q=localTargetAt(model,count*cfg.controller.sampleTime);
         [separation,~,poseGradient]=terminalContinuation.separation(seed,q,model.frame,cfg,endIndex);
@@ -420,60 +463,73 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     negative=value<0;contribution(negative)=value(negative).*upper(column(negative));
     rowMinimum=accumarray(row,contribution,[size(a,1),1],@sum,0);
     info.hardRowInfeasible=any(rowMinimum>b+1e-10*max(1,abs(b)));
-    first=[];flag=-2;
-    if ~info.hardRowInfeasible
-        [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
-    end
-    info.safetyExitFlag=flag;
-    [candidate,info.primaryRawMerit]=localConicEvaluation(first,iu,baseline,model,timer);
-    if ~isempty(candidate)
-        info.candidateStage="primary";info.primaryMerit=candidate.restorationMerit;
-        if localFeasible(candidate,model) || localBetter(candidate,baseline,model)
-            info.status="primaryProgress";if localFeasible(candidate,model),info.status="primaryFeasible";end
-            info.terminalPhaseMeters=candidate.terminalPhaseMeters;
-            info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;return;
+    if localFeasible(baseline,model)
+        first=zeros(nv,1);first(ic)=baseline.clfSlack/clfScale;
+        candidate=baseline;info.primarySkipped=true;info.candidateStage="incumbent";
+        upper(is)=0;upper(ic)=baseline.clfSlack/clfScale;
+    else
+        first=[];flag=-2;
+        if ~info.hardRowInfeasible
+            [first,~,flag]=coneprog(objective,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=1;
         end
-    end
-    if flag<=0 || isempty(first)
-        % Endpoint elastic variables are enabled only in the search problem.
-        % Nonlinear witness admission still checks every original hard row.
-        upper(is(prefix+1:end))=Inf;upper(ie)=Inf;
-        restoration=objective;restoration(is(prefix+1:end))=100;restoration(ie)=100;
-        remaining=cfg.solver.timeLimitSeconds-toc(timer);
-        if remaining<=0,info.status="timeLimit";return;end
-        options.MaxTime=remaining;
-        [first,~,flag]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
-        info.completionRestoration=true;info.status="restoringCompletion";
-        [trial,info.restorationRawMerit]=localConicEvaluation(first,iu,baseline,model,timer);
-        if ~isempty(trial)
-            info.restorationMerit=trial.restorationMerit;
-            if localBetter(trial,candidate,model),candidate=trial;info.candidateStage="restoration";end
-        end
-        if isempty(candidate)
-            if toc(timer)>=cfg.solver.timeLimitSeconds,info.status="timeLimit";
-            elseif flag==-2,info.status="restorationInfeasible";
-            else,info.status="restorationSolverFailure";
+        info.safetyExitFlag=flag;
+        [candidate,info.primaryRawMerit]=localConicEvaluation(first,iu,baseline,model,timer);
+        if ~isempty(candidate)
+            info.candidateStage="primary";info.primaryMerit=candidate.restorationMerit;
+            if localFeasible(candidate,model) || localBetter(candidate,baseline,model)
+                info.status="primaryProgress";if localFeasible(candidate,model),info.status="primaryFeasible";end
+                info.terminalPhaseMeters=candidate.terminalPhaseMeters;
+                info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;return;
             end
-        else
-            info.terminalPhaseMeters=candidate.terminalPhaseMeters;
-            info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;
         end
-        return;
+        if flag<=0 || isempty(first)
+            % Endpoint elastic variables are enabled only in the search problem.
+            % Nonlinear witness admission still checks every original hard row.
+            upper(is(prefix+1:end))=Inf;upper(ie)=Inf;
+            restoration=objective;restoration(is(prefix+1:end))=100;restoration(ie)=100;
+            remaining=cfg.solver.timeLimitSeconds-toc(timer);
+            if remaining<=0,info.status="timeLimit";return;end
+            options.MaxTime=remaining;
+            [first,~,flag]=coneprog(restoration,endpoint,a,b,equal,rhs,lower,upper,options);info.calls=info.calls+1;
+            info.completionRestoration=true;info.status="restoringCompletion";
+            [trial,info.restorationRawMerit]=localConicEvaluation(first,iu,baseline,model,timer);
+            if ~isempty(trial)
+                info.restorationMerit=trial.restorationMerit;
+                if localBetter(trial,candidate,model),candidate=trial;info.candidateStage="restoration";end
+            end
+            if isempty(candidate)
+                if toc(timer)>=cfg.solver.timeLimitSeconds,info.status="timeLimit";
+                elseif flag==-2,info.status="restorationInfeasible";
+                else,info.status="restorationSolverFailure";
+                end
+            else
+                info.terminalPhaseMeters=candidate.terminalPhaseMeters;
+                info.secondarySafety=candidate.safety;info.clfSlack=candidate.clfSlack;
+            end
+            return;
+        end
     end
     if toc(timer)>=cfg.solver.timeLimitSeconds,info.status="timeLimit";return;end
-    info.safetyOptimum=sum(max(0,first(is(1:prefix))));info.safetyCap=min(model.slackCap,info.safetyOptimum+cfg.solver.lexicographicTieTolerance);
+    info.safetyOptimum=sum(max(0,first(is(1:prefix))));
+    info.safetyCap=min(model.slackCap,info.safetyOptimum+cfg.solver.lexicographicTieTolerance);
+    if info.primarySkipped,info.safetyCap=0;end
     a=[a;objective.'];b=[b;info.safetyCap];
-    costMatrix(end,ic)=sqrt(cfg.clf.relaxationWeight);
+    costMatrix(end,ic)=sqrt(cfg.clf.relaxationWeight)*clfScale;
+    costMatrix=costMatrix/sqrt(objectiveScale);
+    costOffset=costOffset/sqrt(objectiveScale);
     % A sum of small squared-norm epigraphs is exactly the same quadratic
     % objective, without one horizon-wide cone coupling every stage.
     groups=count+1;expanded=nv+groups;
-    endpoint=secondordercone([endpoint.A,sparse(size(endpoint.A,1),groups)],endpoint.b, ...
-        [endpoint.d;zeros(groups,1)],endpoint.gamma);
-    cones=repmat(endpoint,1,groups+1);epigraph=zeros(groups,1);
+    baseCones=numel(endpoint);cones=repmat(endpoint(1),1,groups+baseCones);
+    for index=1:baseCones
+        cones(index)=secondordercone([endpoint(index).A,sparse(size(endpoint(index).A,1),groups)], ...
+            endpoint(index).b,[endpoint(index).d;zeros(groups,1)],endpoint(index).gamma);
+    end
+    epigraph=zeros(groups,1);
     for group=1:groups
         if group<=count,selected=7*(group-1)+(1:7);else,selected=7*count+1;end
         r=sparse(1,expanded);r(nv+group)=1;
-        cones(group+1)=secondordercone([[2*costMatrix(selected,:),sparse(numel(selected),groups)];r], ...
+        cones(group+baseCones)=secondordercone([[2*costMatrix(selected,:),sparse(numel(selected),groups)];r], ...
             [-2*costOffset(selected);1],r.',-1);
         epigraph(group)=norm(costMatrix(selected,:)*first+costOffset(selected))^2;
     end
@@ -486,16 +542,19 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     remaining=cfg.solver.timeLimitSeconds-toc(timer);
     if remaining<=0,info.status="timeLimit";return;end
     options.MaxTime=remaining;
+    info.secondaryAttempted=true;
     [second,~,flag]=coneprog(objective,cones,a,b,equal,rhs,lower,upper,options);
     info.calls=info.calls+1;info.secondaryExitFlag=flag;
     % Keep the best nonlinear candidate across both conic stages and polish.
     info.secondaryReturned=~isempty(second) && all(isfinite(second));
     if info.secondaryReturned,first=second;end
     info.solverResidual=max([0;a*first-b;abs(equal*first-rhs);lower-first;first-upper]);
-    info.secondarySafety=sum(max(0,first(is(1:prefix))));info.clfSlack=max(0,first(ic));info.status="solved";
+    info.secondarySafety=sum(max(0,first(is(1:prefix))));info.clfSlack=clfScale*max(0,first(ic));info.status="solved";
     [trial,info.secondaryRawMerit]=localConicEvaluation(second,iu,baseline,model,timer);
     if ~isempty(trial)
         info.secondaryMerit=trial.restorationMerit;
+        info.secondaryAccepted=localFeasible(trial,model) ...
+            && (~localFeasible(baseline,model) || trial.clfSlack<=baseline.clfSlack);
         if localBetter(trial,candidate,model),candidate=trial;info.candidateStage="secondary";end
     end
     if ~isempty(candidate),info.terminalPhaseMeters=candidate.terminalPhaseMeters;end
@@ -505,16 +564,20 @@ function [candidate,rawMerit]=localConicEvaluation(point,iu,baseline,model,timer
     candidate=[];rawMerit=Inf;
     if isempty(point) || any(~isfinite(point)) || toc(timer)>=model.cfg.solver.timeLimitSeconds,return;end
     delta=reshape(point(iu(:)),2,[]);
-    for scale=[1,.5,.25]
+    feasibleAnchor=localFeasible(baseline,model);
+    for exponent=0:20
         if toc(timer)>=model.cfg.solver.timeLimitSeconds,return;end
+        scale=2^-exponent;
         try
             trial=localNominalEvaluation(baseline.inputs+scale*delta,model);
             if scale==1,rawMerit=trial.restorationMerit;end
             if localBetter(trial,candidate,model),candidate=trial;end
-            if localFeasible(candidate,model),return;end
-            trial=localPolishEndpoint(trial,model,timer);
-            if localBetter(trial,candidate,model),candidate=trial;end
-            if localFeasible(candidate,model) || localBetter(candidate,baseline,model),return;end
+            if localFeasible(candidate,model) && (~localFeasible(baseline,model) || candidate.clfSlack<=baseline.clfSlack),return;end
+            if ~feasibleAnchor
+                trial=localPolishEndpoint(trial,model,timer);
+                if localBetter(trial,candidate,model),candidate=trial;end
+            end
+            if localBetter(candidate,baseline,model),return;end
         catch exception
             if ~localDomainFailure(exception),rethrow(exception);end
         end

@@ -3,10 +3,10 @@
 ## Scope
 
 The controller uses one nonlinear ego bicycle model and one known target
-trajectory. It returns the first admissible nonlinear continuation. While
-restoration is needed, a Huang-style primary objective minimizes the sum of
-safety slacks over a fixed MPC prefix, and a soft lane CLF guides the secondary
-search. Li-style polygon support duals and sequential convexification supply
+trajectory. A Huang-style primary objective minimizes the sum of safety
+slacks over a fixed MPC prefix. Once zero safety slack is attained, a second
+stage optimizes the soft lane CLF slack while preserving zero safety slack.
+Li-style polygon support duals and sequential convexification supply
 numerical search directions. Positive slack guides feasibility restoration;
 only a zero-prefix-slack candidate satisfying all original hard constraints
 can authorize an input. An initialization seed need not satisfy these checks.
@@ -16,7 +16,8 @@ by a hard completion trajectory and an indefinitely admissible endpoint
 family. Its construction and numerical scope are described below. The
 controller shifts the previous solution as the next numerical initialization,
 including its slack budget. The common nonlinear admission test applies to
-initializations and solver iterates alike; the first admissible one ends search.
+initializations and solver iterates alike. Finding a safe continuation alone
+does not complete the CLF stage.
 There is no separate runtime backup controller or nominal-versus-backup selector.
 
 Road boundaries are currently excluded from the controller problem, including
@@ -292,11 +293,25 @@ feedback. The flow receives a tangential bias of magnitude
 `0.6 * max(relativeGuideSpeed, 0.5 * referenceSpeed) / envelopeRadius`.
 The temporary heading and speed guide feed the existing lane-feedback gain.
 Speed guidance is bounded between half cruise speed (at least 1.5 m/s) and
-cruise speed. A steering preference based on `0.8 * mu * g` lateral acceleration
-and a longitudinal-input preference of +/-0.35 reduce aggressive seed motion;
-these are heuristic preferences, not new optimizer constraints or a certified
-friction allocation. Final clipping enforces the actual amplitude and slew
-bounds, then the nonlinear Fiala model generates the next seed state.
+cruise speed. A longitudinal-input preference of +/-0.35 is applied before
+computing the front tire's available lateral capacity
+\(F_{y,\max}=\mu_f F_{z,f}\sqrt{1-\beta^2}\). The steering preference uses
+the actual Fiala adhesion branch. Its force fraction satisfies
+\(f=1-(1-q)^3\), where \(q=C_f|\tan\alpha_f|/(3F_{y,\max})\).
+Inverting this relation at the existing 0.8 force-fraction preference gives
+
+\[
+|\alpha_f|\le\arctan\left(
+\frac{3F_{y,\max}}{C_f}\left[1-(1-0.8)^{1/3}\right]\right).
+\]
+
+The steering interval is centered at the current front-axle zero-slip heading,
+not zero steering. The previous kinematic acceleration-to-steering cap could
+already lie beyond Fiala saturation at low speed, making the front-tire
+steering derivative zero and placing the CLF search on an uninformative branch.
+The new cap is still only a seed preference, not an optimizer constraint or a
+safety certificate. Final amplitude and slew clipping has priority and may
+override the preference. The nonlinear model generates every next seed state.
 
 The actual state/input rollout supplies dynamics, tire and collision expansion
 points. The input regularizer in the convex subproblem penalizes the change
@@ -307,7 +322,7 @@ recovery prefix, seed construction fits the free core and uses its feedback to
 settle body velocities and input memory. Flow guidance remains active while
 the preview encounters the target before that completion stage. This is only
 initialization of the same optimization problem. A feasible initialization
-returns immediately. Small measured-successor
+supplies the zero-safety anchor for CLF optimization. Small measured-successor
 differences repair its shifted inputs; fresh flow candidates are considered for
 cold initialization or a state discrepancy larger than 1e-4 in the raw state
 infinity norm. This threshold is a search-cost heuristic, not a safety tolerance.
@@ -319,24 +334,26 @@ A lane-feedback rollout supplies the baseline. When it is inadmissible and
 there is no usable prior reference, at most two moving-target flow rollouts
 provide opposite passing biases within the same controller-call budget.
 A seed may collide or fail terminal admission; evaluated nonlinear violation
-selects the restoration anchor. A fully admissible seed returns immediately.
+selects the restoration anchor. A fully admissible seed enters the CLF stage,
+unless its secondary objective already meets the lower-bound stopping test.
 The endpoint index belongs to the selected rollout. Each SCvx step uses
 variational RK4 dynamics and linearized support-dual geometry. Its endpoint
 is the exact reduced five-dimensional **2-norm cone** obtained by eliminating
 free pose. The separate future-separation row differentiates the fitted pose
 through the endpoint state and final input. No scalar phase variable remains.
 `coneprog` solves the primary slack problem and the secondary
-quadratic lane/CLF objective. Each stage and the CLF penalty has its own
+quadratic lane/CLF/input-proximity objective. Each stage and the CLF penalty has its own
 small squared-norm cone epigraph; their epigraph values sum to the total
 objective. This is algebraically equivalent to one horizon-wide norm cone,
 while avoiding its global factorization coupling. The default internal
 linear solver remains unchanged.
 
-A revalidated initial or shifted witness terminates with `feasibleWitness`
-without a conic solve. Its nonlinear hard residual must be exactly zero and
-its prefix safety-slack sum must be exactly zero. The
-secondary cost may be large. Neither objective optimality nor agreement
-between affine and nonlinear CLF slack is required for execution.
+A revalidated initial or shifted witness proves that the nonnegative primary
+safety objective already has minimum zero. It skips the redundant primary
+solve, but still enters the secondary solve when its CLF penalty is positive.
+Only the lower-bound test described below allows both solves to be skipped.
+Its nonlinear hard residual and prefix safety-slack sum must both be exactly
+zero. Safety admission and secondary-stage completion are distinct records.
 
 When no witness exists, every finite primary conic result is checked against
 the nonlinear constraints while time remains. Raw, endpoint-corrected and
@@ -358,17 +375,22 @@ separation deficit, and `v_P` is the maximum physical/input/slew violation.
 This heuristic score guides search and matches the completion-slack sum in the
 elastic subproblem; it is not the PCBF value or a distance with uniform units.
 The original hard residual is still the maximum original violation. Equal
-scores prefer smaller terminal excess, with the existing feasible cost tie
-rule retained.
+scores prefer smaller terminal excess. Among admitted candidates, smaller
+actual nonlinear CLF slack has priority; equal slack is broken by the nonlinear
+tracking/CLF cost. That cost excludes the input-proximity term, which depends
+on the current linearization anchor rather than the trajectory alone.
 
-A feasible primary returns immediately. An improving but inadmissible primary
-returns to the outer loop for relinearization before optional secondary cost
-work. Conic steps that fail to improve can be checked at half and quarter
-amplitude, within the same time budget. The first admitted nonlinear candidate
-ends the iteration; no subsequent cost improvement is required.
-`search.converged` and its legacy `scvxConverged` metadata field describe this
-feasibility stopping target, not numerical optimality. Positive prefix slack
-remains a search residual and does not authorize execution.
+A feasible primary returns to the outer loop as the new linearization anchor
+for the CLF stage. An improving but inadmissible primary is also relinearized
+before attempting more restoration. A conic direction is checked by geometric
+backtracking, halving its amplitude within the same time budget (at most 20
+halvings). At a feasible anchor this line search replaces repeated endpoint
+shooting; endpoint correction remains available during infeasible restoration.
+A secondary
+trial is accepted only if it is nonlinearly admitted and does not increase the
+actual CLF slack. The controller stops after that accepted secondary update;
+it does not require repeated nonlinear objective minimization to stationarity.
+Positive prefix slack remains a search residual and does not authorize execution.
 
 The soft first-step CLF is
 
@@ -376,10 +398,56 @@ The soft first-step CLF is
 W(e_{1|k})-(1-\alpha)W(e_{0|k})\le\rho,\qquad\rho\ge0.
 \]
 
-The secondary solve is constrained by the primary slack optimum plus the
-configured numerical tie tolerance, and by the retained slack budget when
-one is available. Neither CLF optimality nor asymptotic lane convergence is
-asserted merely because the feasibility proof holds.
+For the affine first-successor error \(\widehat e_1=e_1+J_ed\), the subproblem
+retains the full convex quadratic \(\|L\widehat e_1\|_2^2\), where \(W(e)=\|Le\|_2^2\).
+It does not substitute a tangent plane of \(W\). With
+\(c=(1-\alpha)W(e_0)\), the exact second-order cone representation is
+
+\[
+\left\|\begin{bmatrix}2L\widehat e_1\\\rho+c-1\end{bmatrix}\right\|_2
+\le\rho+c+1.
+\]
+
+This is convex in the affine error; the actual nonlinear successor is still
+checked after the solve. The secondary objective is
+
+\[
+\min\quad w_\rho\rho^2+
+\frac{1}{H_k}\sum_{i=0}^{H_k-1}\left(
+\|L\widehat e_{i+1}\|_2^2+0.01\|D_u(u_i-\bar u_i)\|_2^2\right),
+\quad D_u=\operatorname{diag}(\sqrt{w_\delta},\sqrt{w_\beta}).
+\]
+
+Here \(\bar u\) is the current linearization input, not zero. The existing
+configuration supplies the three positive weights. The original horizon
+tracking term shapes the future trajectory, while the original given path
+defines both that term and the CLF. With an admitted anchor, all collision slack upper
+bounds are exactly zero, as are terminal elastic variables. The conic CLF slack
+is bounded above by the anchor's actual CLF slack.
+
+To avoid very large squared-slack epigraphs, the solve uses the change of units
+\(s=\max(1,\rho_{\rm anchor})\), \(\widehat\rho=\rho/s\). The CLF cone
+is divided by \(s\) in squared-norm units, and the whole secondary objective
+is divided by \(\max(1,J_{\rm anchor})\), the anchor's nonlinear tracking/CLF
+cost. These substitutions
+preserve the feasible physical inputs and objective ordering in exact
+arithmetic. Numerical optimality tolerances apply to the scaled conic program;
+the no-solve lower-bound test and nonlinear CLF comparisons remain in original
+units. Both scale factors are reported with the local solve diagnostics.
+
+The nonnegative CLF penalty has lower bound zero. When
+\(w_\rho\rho_{\rm anchor}^2\) is at most `solver.optimalityTolerance`, the
+CLF penalty is already within that absolute gap of its lower bound. This is
+the only no-solve stopping test (`clfLowerBound`). It concerns the CLF penalty,
+not the combined tracking objective. The stopping contract does not require
+additional tracking-cost refinement once CLF dissipation is attained.
+Otherwise, `clfStageAttempted` records an actual
+secondary conic call, and `clfStageCompleted` requires an accepted secondary
+update or the lower-bound test. A deadline can return the admitted incumbent
+with CLF completion false. `search.converged` and legacy `scvxConverged` record
+this bounded local-stage completion, not nonlinear/global optimality.
+Neither CLF optimality nor asymptotic lane convergence follows merely from
+the feasibility proof.
 
 If the hard convex subproblem is infeasible, numerical restoration enables
 elastic completion collision rows, terminal membership and endpoint/future

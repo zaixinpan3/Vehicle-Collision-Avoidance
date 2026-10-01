@@ -1,0 +1,11 @@
+{
+  "commit": "e2813a5f0d6be6ba7f8a25de4c3850bf28e9a7a6",
+  "sources": {
+    "controller/solvePredictiveControl.m": "b693d244d695449925d071c0e724baf95aa8316f96f6e1edb3812cf5d30255e9",
+    "controller/collisionAvoidanceController.m": "ef636680e7455ef0f0dde0e8f05f209b371fcefa67859ffdea29bf181b74a168",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "d92c2cf85ab21258147727dc2f1c4e6a31091f481e091230084281592424e944",
+    "tests/nonlinearPredictiveSafetyTest.m": "4231c764bde6387d2b7b1121e0f9a2bdc45a7b08ee687e79dc1a6fac612ed43a",
+    "controller/PCBF_CLF_ARCHITECTURE.md": "8034f1feb4d9682d72e0139f20eede8927566948aa94dd077364b7c2137d8e4e",
+    "controller/CONTROLLER_FILES.md": "b4cef358f829163624dfc2aa90fcce8e02b68c4fed785a9f1fe8178a20b237da"
+  }
+}

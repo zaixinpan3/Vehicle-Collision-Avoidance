@@ -8,7 +8,7 @@ The current formulation and its guarantee scope are in
 | --- | --- |
 | `collisionAvoidanceController.m` | Fixed target epoch, absolute clock, input memory and first control output |
 | `readControllerInputs.m` | Ego, one target and road input normalization |
-| `solvePredictiveControl.m` | First feasible PCBF continuation, moving-target flow initialization, conic restoration and retained witness |
+| `solvePredictiveControl.m` | PCBF safety restoration followed by CLF-slack optimization, moving-target flow initialization and nonlinear admission |
 | `terminalContinuation.m` | Rigidly placed augmented terminal core, Schur pose elimination, RK4 contraction bounds and indefinite target separation |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim and lane CLF |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -17,8 +17,12 @@ The current formulation and its guarantee scope are in
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
 The time-indexed tube is stored implicitly as a feasible hard completion
-and its endpoint family. A valid witness is executed immediately; search runs
-only when nonlinear revalidation finds no admissible continuation.
+and its endpoint family. A valid witness establishes the zero minimum of the
+primary PCBF objective. Positive CLF slack still triggers the secondary solve,
+with zero collision slack and unchanged hard constraints. Only a CLF penalty
+already at its nonnegative lower bound, within numerical tolerance, can skip
+that solve; further horizon-cost refinement is then unnecessary for the CLF
+stopping contract. A time-limited call reports incomplete CLF work explicitly.
 The terminal core is built at straight cruise and may be translated and
 rotated independently of the nominal given path. Completing the square in its
 eight-dimensional metric eliminates the three pose coordinates exactly for

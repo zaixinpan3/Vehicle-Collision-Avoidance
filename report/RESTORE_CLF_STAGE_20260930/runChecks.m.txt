@@ -1,0 +1,9 @@
+root='/home/zai/Downloads/ResearchProjects/collisionAvoidance';cd(root);addpath('controller','config','scripts');raw=fileparts(mfilename('fullpath'));
+suites={'tests/nonlinearPredictiveSafetyTest.m','tests/terminalContinuationTest.m','tests/modifiedFialaTireTest.m', ...
+ 'tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m','tests/longitudinalRoadLoadTest.m', ...
+ 'tests/controllerInputGeometryTest.m','tests/collisionThreatScenarioTest.m','tests/movingTargetFlowTest.m','tests/freePoseTerminalTest.m'};
+r=runtests(suites);entries=table(r);writetable(entries(:,{'Name','Passed','Failed','Incomplete','Duration'}),fullfile(raw,'tests.csv'));
+files={'controller/solvePredictiveControl.m','controller/collisionAvoidanceController.m','controller/terminalContinuation.m', ...
+ 'tests/nonlinearPredictiveSafetyTest.m','scripts/runNonlinearPredictiveSafetyValidation.m','tests/freePoseTerminalTest.m'};analysis=cell(size(files));
+for k=1:numel(files),analysis{k}=struct('file',files{k},'findings',checkcode(files{k},'-config=factory','-id'));end
+f=fopen(fullfile(raw,'code-analysis.json'),'w');fprintf(f,'%s\n',jsonencode([analysis{:}],PrettyPrint=true));fclose(f);assertSuccess(r);

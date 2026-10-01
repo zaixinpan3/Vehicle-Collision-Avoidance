@@ -1,0 +1,44 @@
+Restored PCBF -> CLF solve, 2026-09-30
+
+From the repository root, choose an output directory and run:
+matlab -singleCompThread -batch "addpath('scripts'); runCollisionThreatValidation(OutputDirectory='OUTPUT');"
+python scripts/auditCollisionThreats.py OUTPUT/campaign.json --output OUTPUT/audit.json
+Run the ten suites listed in runChecks.m.txt after updating its root/raw paths.
+
+Fourteen unchanged given-path collision threats, seven geometries at 8 and
+15 m/s, 160 x 50 ms holds each, exact observations, no road constraints and
+6 mm prediction margin. Prefix 8/16 holds; maximum 512; default 5 s soft call
+budget, 24 SCvx iterations. Tight ODE45 tolerances 1e-11/1e-12 and 31 audit
+samples per hold. ODE successors feed back into control. No random draws.
+Configuration, target, baseline and random-seed records match e2813a5 exactly.
+JSON null encodes infinite default slew bounds; finite slew is unit-tested.
+
+All times are actual unprofiled, single-thread full controller calls. First
+calls are excluded from running statistics. Other research MATLAB processes
+were active on this host; the preceding baseline is a recorded run, not a
+controlled simultaneous or fresh comparison. No hard deadline is claimed.
+Source hashes identify the tested implementation; no local solver/vendor tree
+or unrelated observer work is included. Full pose streams and prototype logs
+remain in the cache path identified by summary.json and raw-manifest.json.
+
+A zero safety witness skips only the primary optimization. Positive CLF slack
+triggers the secondary cone program with collision slacks fixed exactly zero.
+The CLF cone preserves the quadratic of the affine first-step error. The
+objective retains horizon tracking and weighted CLF slack squared, plus squared
+input deviation from the current anchor. Only the CLF penalty already at its
+nonnegative lower bound, within tolerance, skips secondary work; this is not a
+claim that the combined tracking objective is minimized. Accepted secondary candidates must pass nonlinear safety
+and cannot increase actual CLF slack. Finite suboptimal cone results are
+eligible; stage completion is not a claim of nonlinear/global optimality.
+At a feasible anchor, geometric backtracking tries up to 20 halvings of one
+conic direction instead of rebuilding the solve after only a quarter-step or
+repeatedly shooting the endpoint. Infeasible restoration still permits endpoint
+correction. The complete CLF-only intermediate campaign is included as a third
+comparison, not hidden as successful path recovery.
+An expired call can retain a currently admitted incumbent but reports CLF
+completion false. There is no separate backup controller or runtime selector.
+
+The independent Python audit recomputes baseline overlap, target motion and
+rectangle geometry. It certifies the listed samples only; nominal prediction
+margin is not a continuous-time or uncertain-plant margin guarantee. The
+report discloses tracking, timing, secondary completion, exit flags and failures.

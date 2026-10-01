@@ -1,0 +1,225 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\setlength{\emergencystretch}{2em}
+\title{Restoring CLF Optimization After Zero PCBF Slack}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{September 30, 2026}
+\begin{document}
+\maketitle
+\section{Confirmed defect and corrected stopping contract}
+The preceding implementation at
+\path{e2813a5f0d6be6ba7f8a25de4c3850bf28e9a7a6}
+returned as soon as a nonlinear trajectory attained zero PCBF safety slack and
+satisfied the original hard constraints. This happened both at initialization
+and after a primary optimization result. A safe shifted trajectory therefore
+bypassed CLF optimization even when its CLF slack was positive. Existing tests
+incorrectly required this behavior. The user clarified that completing safety
+feasibility must not suppress the second CLF stage.
+
+The corrected single-controller contract is:
+\begin{enumerate}
+\item Minimize the nonnegative PCBF collision-slack sum until a trajectory has
+zero slack and satisfies every original hard constraint.
+\item Preserve that zero safety level while optimizing CLF slack, with input
+proximity measured from the current linearization trajectory.
+\item Stop after a nonlinearly admitted secondary update, or when the current
+CLF penalty is already within tolerance of its nonnegative lower bound.
+\end{enumerate}
+A safe initialization proves that the primary minimum is zero, so the primary
+conic solve can be omitted. It does not prove that the CLF stage is complete.
+A soft deadline can leave the admitted incumbent as the issued plan, but the
+metadata explicitly records incomplete CLF work. No additional controller,
+backup selector, road constraint or terminal mode is introduced.
+
+\section{Secondary formulation and nonlinear admission}
+Let $\bar U$ denote the current nonlinear rollout inputs, $d_U=U-\bar U$,
+$W(e)=\|Le\|_2^2$, and $c=(1-\alpha)W(e_0)$.
+The affine first-successor error is $\widehat e_1=e_1+J_ed$.
+Instead of a tangent plane of $W$, the conic program retains its full convex
+quadratic in the affine error:
+\[
+\|L\widehat e_1\|_2^2\le c+\rho,\quad \rho\ge0
+\quad\Longleftrightarrow\quad
+\left\|\begin{bmatrix}2L\widehat e_1\\\rho+c-1\end{bmatrix}\right\|_2
+\le\rho+c+1.
+\]
+The tangent plane omitted a nonnegative quadratic error term and could
+understate the local CLF slack. This cone removes that source of underestimation;
+it does not make the nonlinear dynamics affine or remove nonlinear validation.
+The secondary objective retains the original horizon tracking cost:
+\[
+\min\quad w_\rho\rho^2+\frac{1}{H}\sum_{i=0}^{H-1}
+\left(\|L\widehat e_{i+1}\|_2^2+0.01
+\|\operatorname{diag}(\sqrt{w_\delta},\sqrt{w_\beta})d_{u,i}\|_2^2\right).
+\]
+The existing positive weights are unchanged ($w_\rho=100$ and input weights
+one by default). Input magnitude is penalized relative to $\bar U$, not zero.
+Both tracking and the CLF reference the original given path. Stored nonlinear
+tracking/CLF cost excludes input proximity because that term depends on the
+current anchor. It supplies the tie-break between equal actual CLF slacks.
+
+An intermediate simplification removed horizon tracking. Although its complete
+fourteen-case campaign remained collision-free, final lateral error reached
+74.024 m. That term was therefore restored. Earlier slow whole-tail-cost trials
+also lacked adequate scaling and feasible-anchor backtracking; they did not
+establish that the tracking term itself should be removed.
+
+At an admitted anchor all collision slacks and terminal elastic variables
+are fixed exactly to zero. The conic CLF slack has upper bound
+$\rho_{\rm anchor}$. Actual nonlinear rollout admission checks the original
+collision, physical, input, slew and terminal conditions. A secondary result
+must not increase actual CLF slack. Raw, corrected and secondary trajectories
+remain subject to the same candidate comparison.
+
+The CLF penalty alone is nonnegative. If
+$w_\rho\rho_{\rm anchor}^2$ is at most the existing $10^{-7}$ tolerance,
+its gap to the zero lower bound is certified and no secondary solve is needed.
+This does not establish optimality of the combined tracking objective.
+The stopping contract requires no further tracking-cost refinement once CLF
+dissipation is attained. Otherwise a secondary solve is attempted.
+The output distinguishes \texttt{clfStageAttempted},
+\texttt{clfStageCompleted}, and \texttt{clfLowerBound}.
+Finite suboptimal conic points can be admitted after nonlinear checking;
+reported conic exit flags are preserved. Stage completion means one accepted
+local SCvx update, not global optimality or nonlinear stationarity.
+
+\subsection{Scaling and an informative flow anchor}
+The first complete braking-lead run with the unscaled repair was collision-free
+but had 54 unfinished CLF calls and an 84.333 m final lateral error. This was
+not accepted as the final implementation. Large residuals made the squared-slack
+epigraph numerically difficult. The solver now uses
+$s=\max(1,\rho_{\rm anchor})$, $\widehat\rho=\rho/s$, divides squared CLF
+quantities by $s$, and divides the entire secondary objective by the positive constant $\max(1,J_{\rm anchor})$, using the anchor tracking/CLF cost.
+This preserves the physical feasible set and objective ordering in exact
+arithmetic. Solver tolerances apply in the scaled conic units; nonlinear
+admission and the no-solve lower-bound test use original units. All six isolated
+scaled secondary probes returned normal optimal exit flags.
+
+The old flow initializer used a kinematic steering preference. At 8 m/s its
+0.307802 rad initial limit exceeded the front Fiala saturation threshold
+0.228534 rad even at zero longitudinal input. On that branch the front-tire
+slip derivative is zero. A local CLF solve can then increase steering to reduce
+the cosine-projected saturated force, moving in an undesirable direction.
+The initializer now uses the same 0.8 force-fraction preference through the
+actual adhesion law $|F_y|/F_{y,\max}=1-(1-q)^3$:
+\[
+\alpha_{\max}=\arctan\left[
+\frac{3\mu_fF_{z,f}\sqrt{1-\beta^2}}{C_f}
+\big(1-(1-0.8)^{1/3}\big)\right].
+\]
+It centers the corresponding steering interval at the current front-axle
+zero-slip heading. At zero longitudinal input this gives 0.096275 rad.
+Actual amplitude and slew clipping takes precedence. This is only a search-seed
+preference; no optimizer constraint or vehicle model is changed. In an isolated CLF-only
+8 m/s braking-lead first-call comparison, admitted CLF slack decreased from approximately
+1.8323 with the saturated seed to 0.0571 with the informative seed.
+
+\subsection{Feasible-anchor backtracking}
+The previous trial check tried only full, half and quarter steps before
+rebuilding the conic program, and repeatedly attempted endpoint shooting even
+from an admitted anchor. Restoring horizon tracking exposed repeated five-second
+calls under that rule. The final solve instead halves one direction geometrically
+within the existing budget, up to twenty halvings. Every trial still requires
+nonlinear safety and nonincreasing actual CLF slack. Endpoint shooting remains
+available for infeasible restoration; it is not repeated along a feasible-anchor
+line search. A 160-hold 15 m/s crossing probe reduced its final lateral error
+from 74.024 m in the CLF-only variant to 18.987 m, with a maximum running call of
+0.876963 s. This remains imperfect path recovery, not a convergence proof.
+
+\section{Unchanged-fixture validation}
+14 of fourteen eight-second scenarios pass the independent sampled
+collision-avoidance audit. Each uses 160 holds of 50 ms at reference speeds
+8 or 15 m/s; the given-path constant-speed baseline collides in every fixture.
+The configuration, target, baseline and random-seed records match the previous
+campaign exactly. Road constraints remain absent and the nominal prediction
+margin remains 6 mm. Prefix lengths are 8/16, maximum horizon 512, soft budget
+5 s and outer iteration limit 24. No random draws are used.
+
+Measured ODE45 successors feed back into the controller, using relative/absolute
+tolerances $10^{-11}/10^{-12}$ and 31 rectangle-audit samples per hold.
+Python independently recomputes target motion, baseline penetration and body
+separation. All issued plans have exactly zero evaluated safety slack and
+original hard residual. The minimum independently replayed clearance is
+\textbf{0.048648 m}, above the 6 mm nominal prediction margin. The intermediate CLF-only
+replay reached 0.000436 m, below that prediction margin: RK4 prediction and
+independent ODE replay are distinct trajectories. Neither
+these finite audit samples nor zero nominal slack establishes continuous-time
+or uncertain-plant safety.
+
+\begin{center}\small
+\begin{tabular}{rlrrrr}
+\toprule
+Speed & Scenario & Holds & Min gap (m) & Max running (s) & Final $e_y$ (m)\\
+\midrule
+8 & headOn & 160 & 1.503071 & 0.717269 & -9.797 \\
+8 & acceleratingHeadOn & 160 & 1.206900 & 0.775880 & -9.882 \\
+8 & brakingLead & 160 & 0.844861 & 2.057584 & -0.868 \\
+8 & crossing & 160 & 0.784016 & 0.718353 & -11.688 \\
+8 & turningCrossing & 160 & 0.757383 & 1.938550 & -10.948 \\
+8 & curvedHeadOn & 160 & 1.662495 & 1.073695 & -12.177 \\
+8 & curvedCrossing & 160 & 0.449089 & 2.462262 & -13.833 \\
+15 & headOn & 160 & 0.179999 & 0.723179 & -0.998 \\
+15 & acceleratingHeadOn & 160 & 0.048648 & 0.982425 & -0.502 \\
+15 & brakingLead & 160 & 0.120129 & 2.452237 & -2.946 \\
+15 & crossing & 160 & 1.359353 & 0.745458 & -18.987 \\
+15 & turningCrossing & 160 & 1.362759 & 1.138676 & -24.482 \\
+15 & curvedHeadOn & 160 & 1.744633 & 0.749704 & -24.740 \\
+15 & curvedCrossing & 160 & 1.011963 & 1.297733 & -23.581 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+There are 1616 completed secondary-update calls and 624 lower-bound
+terminations. 0 issued calls report incomplete CLF work.
+Secondary conic exit-flag counts are \texttt{1: 883, -7: 743}; these are not silently
+reclassified as optimal. Actual nonlinear CLF comparisons are checked in the
+compact evidence builder. A positive soft CLF slack can remain necessary or
+locally unresolved during avoidance. The maximum final lateral error is
+24.739862 m, compared with 30.641000 m in the prior safety-only run; this is an
+eight-second observation, not a proof of asymptotic path convergence.
+
+\section{Runtime and regression checks}
+Across 2226 running calls, the mean is 470.683069 ms, median 113.279000 ms and
+maximum \textbf{2.462262 s}. The maximum occurs in 8 m/s curvedCrossing
+at $t=2.050000$ s with 213 horizon holds. Initialization is excluded;
+its separate maximum is 1.975543 s. There are 1639 running calls exceeding
+the 50 ms sample period. The preceding recorded safety-only maximum was
+0.216044 s. That value is not representative of the corrected two-stage
+algorithm because the earlier code omitted positive-CLF work.
+
+These are actual unprofiled single-thread controller-call wall times, not
+solver-reported time. Other MATLAB research processes were active on the host.
+The previous campaign is reused, not a fresh isolated-machine comparison.
+A 50 ms deadline is not established, and the five-second limit remains soft.
+
+All 290 behavior tests across ten controller/model/geometry/configuration
+classes pass in 40.870466 s. Updated cases cover positive-CLF safe seeds,
+positive-CLF exact shifted solutions, primary feasibility followed by the
+secondary stage, zero-CLF lower-bound stopping, and a deadline that must not
+claim CLF completion. MATLAB Code Analyzer finds fourteen sparse-indexing
+advisories in the solver and no findings in the other five checked files.
+The nine-source-file controller budget is unchanged.
+
+Intermediate 40-hold head-on/crossing smoke tests completed before the final campaign.
+An earlier whole-tail-cost prototype was interrupted after repeated deadline
+exhaustion and is preserved only as exploratory diagnostic evidence. It is not
+part of the final success count. After improving the seed, the previous 24 m primary-restoration unit fixture no longer needed restoration; its 22 m variant preserves that test coverage. Two closer exploratory variants at 20 and 18 m failed to find a continuation within 20 s and remain outside the unchanged fourteen-case campaign. No physical-impossibility conclusion is drawn. The experiment's transverse error diagnostic
+was also corrected to use the separate nominal reference instead of the free
+terminal reference; lateral position is unaffected, while curved trim-related
+velocity/yaw components now reference their intended nominal values.
+
+\section{Reproduction and evidence}
+Implementation and derivation are in
+\path{controller/solvePredictiveControl.m} and
+\path{controller/PCBF_CLF_ARCHITECTURE.md}. The compact bundle
+\path{report/RESTORE_CLF_STAGE_20260930/} contains per-call metrics, final, prior safety-only and intermediate CLF-only audits,
+fixture records, test results, analyzer findings, and source/raw manifests.
+\path{REPRODUCTION.txt} lists exact drivers and configuration.
+Full pose streams and prototype logs remain under
+\path{/home/zai/.cache/collisionAvoidance/restore-clf-stage-20260930/}.
+No solver/vendor tree, unrelated observer work, generated binary or copied
+source snapshot is included in the project commit.
+\end{document}

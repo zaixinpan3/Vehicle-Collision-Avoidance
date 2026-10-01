@@ -118,7 +118,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             target=localTarget([30;5;0;6;0;0;1.6;2.4;.95;0;0]);
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyFalse(problem.metadata.optimizationReturned);
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"clfLowerBound");
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1));
             testCase.verifyGreaterThan(problem.metadata.minimumCollisionMargin,0);
@@ -181,27 +181,28 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(problem.metadata.search.shiftAvailable);
             testCase.verifyTrue(problem.metadata.zeroSlack);
         end
-        function feasibleInitializationReturnsWithoutOptimization(testCase)
+        function zeroClfSlackInitializationNeedsNoImprovementSolve(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=1e-9;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyEqual(problem.solution.hard,0);
             testCase.verifyEqual(problem.solution.safety,0);
             testCase.verifyLessThanOrEqual(problem.solution.cost,cfg.solver.optimalityTolerance);
             testCase.verifyEqual(problem.metadata.solverCallCount,0);
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"clfLowerBound");
         end
-        function nontrivialFeasibleCostDoesNotTriggerAnImprovementSolve(testCase)
+        function zeroClfSlackCanStopDespiteANonzeroTrackingCost(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             cfg.nonlinear.maximumIterations=1;cfg.solver.timeLimitSeconds=60;
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyGreaterThan(problem.solution.cost,cfg.solver.optimalityTolerance);
             testCase.verifyEqual(problem.metadata.solverCallCount,0);
             testCase.verifyEmpty(problem.metadata.search.sequentialIterations);
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"clfLowerBound");
             testCase.verifyLessThan(problem.metadata.clfNextValue,problem.metadata.clfInitialValue);
+            testCase.verifyEqual(problem.solution.clfSlack,0,AbsTol=0);
             testCase.verifyEqual(problem.solution.hard,0);
         end
-        function shiftedFeasiblePlanIsExecutedDespiteItsNonzeroCost(testCase)
+        function shiftedZeroClfSlackPlanNeedsNoImprovementSolve(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior);
@@ -210,7 +211,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.solverCallCount,0);
             testCase.verifyEqual(command.actuatorInput,prior.inputTrajectory(:,2));
             testCase.verifyEqual(problem.metadata.controlSource,"retainedContinuation");
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"clfLowerBound");
         end
         function cachedContinuationMatchesAFreshNonlinearEvaluation(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.01;cfg.solver.timeLimitSeconds=60;
@@ -273,6 +274,36 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.solution.hard,0);
             testCase.verifyLessThanOrEqual(problem.solution.safety,sum(prior.witness.stageSlacks(2:end)));
         end
+        function aPositiveClfWarmStartStillRunsTheSecondStage(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
+            q=[24;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            ego=localSuccessor(ego,prior);
+            target=localTarget(predictiveSafetyGeometry.targetFlow(prior.targetEpoch,cfg.controller.sampleTime));
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            testCase.verifyTrue(problem.metadata.search.shiftAvailable);
+            testCase.verifyGreaterThan(problem.metadata.search.clfInitialSlack,1e-3);
+            testCase.verifyTrue(problem.metadata.search.clfStageAttempted);
+            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
+            testCase.verifyLessThan(problem.solution.clfSlack,problem.metadata.search.clfInitialSlack);
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+        end
+        function anExpiredBudgetDoesNotClaimClfOptimization(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
+            q=[24;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            [~,~,~,prior]=collisionAvoidanceController(ego,localTarget(q),road,cfg,[]);
+            ego=localSuccessor(ego,prior);cfg.solver.timeLimitSeconds=1e-12;
+            target=localTarget(predictiveSafetyGeometry.targetFlow(prior.targetEpoch,cfg.controller.sampleTime));
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            testCase.verifyGreaterThan(problem.solution.clfSlack,1e-3);
+            testCase.verifyFalse(problem.metadata.search.clfStageAttempted);
+            testCase.verifyFalse(problem.metadata.search.clfStageCompleted);
+            testCase.verifyFalse(problem.metadata.search.converged);
+            testCase.verifyEqual(problem.metadata.search.terminationReason,"timeLimit");
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+        end
         function aCollisionContainingInitializationCannotAuthorizeAnInput(testCase)
             [ego,road,cfg]=localFixture();cfg.nonlinear.maximumIterations=2;
             target=localTarget([0;0;pi;8;0;0;1.6;2.4;.95;0;0]);
@@ -290,15 +321,19 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(problem.metadata.drivingModeSwitching);
             testCase.verifyFalse(problem.metadata.roadConstraintsEnforced);
             testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyTrue(problem.metadata.search.clfStageAttempted);
+            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
             testCase.verifyEqual(problem.solution.hard,0);
-            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyGreaterThan(problem.metadata.solverCallCount,0);
+            testCase.verifyLessThan(problem.solution.clfSlack,problem.metadata.search.clfInitialSlack);
+            tire=modifiedFialaTire.affineModel(problem.model.initialState,plan(:,1),cfg);
+            testCase.verifyGreaterThan(tire.input(1,1),0);
         end
-        function correctedPrimaryAvoidanceReturnsBeforeCostRefinement(testCase)
+        function aFeasiblePrimaryStillProceedsToTheClfStage(testCase)
             [ego,road,cfg]=localFixture();ego.speed=15;
             cfg.referenceSpeed=15;cfg.controller.horizonSteps=16;
             cfg.solver.timeLimitSeconds=30;
-            target=localTarget([24;0;pi;8;0;0;1.6;2.4;.95;0;0]);
+            target=localTarget([22;0;pi;8;0;0;1.6;2.4;.95;0;0]);
             [command,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyEqual(command.actuatorInput,plan(:,1));
             testCase.verifyEqual(problem.solution.hard,0);
@@ -314,22 +349,29 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyTrue(all([seeds.hard]>0 | [seeds.safety]>0));
             testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
             steps=problem.metadata.search.sequentialIterations;
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
-            testCase.verifyEqual(steps{end}.status,"primaryFeasible");
-            testCase.verifyEqual(steps{end}.calls,1);
-            testCase.verifyFalse(steps{end}.secondaryReturned);
-            testCase.verifyTrue(steps{end}.retainedAsWitness);
+            testCase.verifyTrue(problem.metadata.search.clfStageAttempted);
+            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
+            testCase.verifyTrue(steps{end}.secondaryAttempted);
+            testCase.verifyTrue(steps{end}.secondaryAccepted);
+            testCase.verifyEqual(steps{end}.safetyCap,0,AbsTol=0);
+            testCase.verifyLessThanOrEqual(problem.solution.clfSlack,steps{end}.clfBefore);
         end
-        function feasibleBrakingLeadSeedDoesNotTriggerCostImprovement(testCase)
+        function zeroSafetySlackDoesNotSkipPositiveClfSlack(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
             cfg.nonlinear.maximumIterations=1;
             target=localTarget([6.25;0;0;8;-.5;0;1.6;2.4;.95;0;0]);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
             testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
-            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyEqual(problem.metadata.solverCallCount,1);
+            testCase.verifyGreaterThan(problem.metadata.search.clfInitialSlack,cfg.solver.optimalityTolerance);
+            testCase.verifyTrue(problem.metadata.search.clfStageAttempted);
+            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
+            testCase.verifyLessThan(problem.solution.clfSlack,problem.metadata.search.clfInitialSlack);
+            testCase.verifyEqual(problem.metadata.search.sequentialIterations{1}.safetyCap,0,AbsTol=0);
+            testCase.verifyTrue(problem.metadata.search.sequentialIterations{1}.primarySkipped);
             testCase.verifyGreaterThan(problem.solution.cost,cfg.solver.optimalityTolerance);
-            testCase.verifyEmpty(problem.metadata.search.sequentialIterations);
+
         end
         function turningCrossingRestorationStillRequiresTheOriginalTerminalSet(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
