@@ -1,0 +1,33 @@
+--- cache/flowSeed.m
++++ cache/flowSeedRecovery.m
+@@ -1,4 +1,4 @@
+-function [inputs,seed,states,info]=flowSeed(model,side,timer,parameters)
++function [inputs,seed,states,info]=flowSeedRecovery(model,side,timer,parameters)
+     if nargin<4,parameters=[0,.3,.6];end
+     cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;
+     h=cfg.controller.sampleTime;count=cfg.controller.maximumHorizonSteps;
+@@ -37,13 +37,22 @@
+             deviation(1)=0;deviation(2)=atan2(sin(x(3)-heading),cos(x(3)-heading));
+             deviation(3)=x(4)-desiredSpeed;activeCount=activeCount+1;
+         end
+-        u=reference.input+reference.gain*deviation;
++        if active
++            u=reference.input+reference.gain*deviation;
++        else
++            temporary=terminalContinuation.anchor(seed,x,model.sampleIndex+index-1,model.lane);
++            [~,~,recoveryError]=terminalContinuation.membership([x;previous],temporary.epochIndex,temporary);
++            u=reference.input+seed.gain*recoveryError;
++        end
+         steering=min(cfg.model.frontWheelSteeringAngleMaximum, ...
+             atan(cfg.vehicle.wheelbase*parameters(3)*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity/max(x(4)^2,1)));
+         lo=[-steering;max(cfg.actuation.brakingRatioMinimum,-.35)];
+         hi=[steering;min(cfg.actuation.brakingRatioMaximum,.35)];
+         rate=h*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
+-        u=min(hi,max(lo,min(previous+rate,max(previous-rate,u))));inputs(:,index)=u;
++        u=min(hi,max(lo,u));
++        lower=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
++        upper=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
++        u=min(upper,max(lower,min(previous+rate,max(previous-rate,u))));inputs(:,index)=u;
+         x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;states(:,index+1)=x;
+         if index<required,continue;end
+         seed=terminalContinuation.anchor(seed,x,model.sampleIndex+index,model.lane);

@@ -43,11 +43,41 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         [anchor,model.terminal]=localSeed(model);
     end
     search.slackCap=model.slackCap;
+    search.initializationCandidates=struct([]);
     if isempty(solution),baseline=localNominalEvaluation(anchor,model);
     else,baseline=solution;
     end
     if isempty(solution) && localFeasible(baseline,model)
         solution=baseline;search.source="feasibleInitialization";
+    end
+    % Screen bounded target-aware rollouts only when no transferable witness
+    % exists. Tiny replay differences still repair the retained trajectory.
+    fresh=~isstruct(previousState);
+    if ~fresh,fresh=norm(model.initialState-expected,inf)>1e-4;end
+    if isempty(solution) && ~isempty(model.target) && fresh
+        for side=[-1,1]
+            if toc(timer)>=cfg.solver.timeLimitSeconds,break;end
+            trialModel=model;seedTimer=tic;
+            try
+                [inputs,trialModel.terminal]=localFlowSeed(trialModel,side,timer);
+                if isempty(inputs),break;end
+                trial=localNominalEvaluation(inputs,trialModel);
+            catch exception
+                if localDomainFailure(exception),continue;end
+                rethrow(exception);
+            end
+            record=struct('side',side,'holds',size(inputs,2),'seconds',toc(seedTimer), ...
+                'hard',trial.hard,'safety',trial.safety,'restorationMerit',trial.restorationMerit);
+            if isempty(search.initializationCandidates),search.initializationCandidates=record;
+            else,search.initializationCandidates(end+1)=record;
+            end
+            if localBetter(trial,baseline,model)
+                baseline=trial;model=trialModel;search.initialization="movingTargetFlow";
+            end
+            if localFeasible(baseline,model)
+                solution=baseline;search.source="feasibleInitialization";break;
+            end
+        end
     end
     if ~isempty(solution)
         model.terminal.phaseMeters=solution.terminalPhaseMeters;
@@ -81,7 +111,12 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 if radius<1e-7,break;end
                 continue;
             end
-            model.collisionRefinement=model.collisionRefinement | candidate.interiorViolation>0;
+            refinement=model.collisionRefinement | candidate.interiorViolation>0;
+            if any(refinement & ~model.collisionRefinement)
+                model.collisionRefinement=refinement;
+                baseline=localNominalEvaluation(baseline.inputs,model,[],1,baseline.terminalPhaseMeters);
+                radius=max(radius,cfg.nonlinear.trustRadius);
+            end
             step.nominalSafetySlack=candidate.safety;step.nominalHardViolation=candidate.hard;step.nominalRestorationMerit=candidate.restorationMerit;
             if localFeasible(candidate,model)
                 solution=candidate;search.source="sequentialConvexification";
@@ -113,10 +148,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.elapsedSeconds=toc(timer);
 end
 
-function feasible=localFeasible(candidate,model)
-    % Preserve the original hard constraints and shifted PCBF slack budget.
-    % Positive prefix slack remains recovery, not a collision-free claim.
-    feasible=~isempty(candidate) && candidate.hard==0 && candidate.safety<=model.slackCap;
+function feasible=localFeasible(candidate,~)
+    % Positive restoration slack may guide search, but never authorize input.
+    feasible=~isempty(candidate) && candidate.hard==0 && candidate.safety==0;
 end
 
 function better=localBetter(candidate,baseline,model)
@@ -203,8 +237,66 @@ function [inputs,seed]=localSeed(model)
             inputs=inputs(:,1:index);return;
         end
     end
-    error('collisionAvoidanceController:noTerminalContinuation', ...
-        'No indefinitely admissible endpoint was reached within maximumHorizonSteps.');
+    % An uncertified endpoint is a search seed, not proof of infeasibility.
+    % Its original endpoint conditions remain in restoration and admission.
+end
+
+function [inputs,seed]=localFlowSeed(model,side,timer)
+    % The transported fluid velocity is a temporary guide. Limited feedback
+    % inputs and the actual nonlinear model, not an ideal point path, define
+    % the anchor used by dynamics, tires and rectangle separation constraints.
+    cfg=model.cfg;seed=model.terminal;reference=seed.reference;x=model.initialState;previous=model.previousInput;
+    h=cfg.controller.sampleTime;count=cfg.controller.maximumHorizonSteps;
+    required=min(count,cfg.controller.horizonSteps+ceil(cfg.nonlinear.recoveryHorizonSeconds/h));
+    inputs=zeros(2,count);
+    egoRadius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
+    radius=egoRadius+norm(model.target(8:9))+norm(model.target(10:11))+cfg.collision.safetyMarginMeters;
+    station=[];
+    for index=1:count
+        if mod(index-1,16)==0 && toc(timer)>=cfg.solver.timeLimitSeconds,inputs=[];return;end
+        time=(model.sampleIndex+index-1)*h;
+        q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time);
+        projection=laneGeometry.project(x(1:2),model.lane,station);station=projection.station;
+        direction=[cos(projection.heading);sin(projection.heading)];normal=[-direction(2);direction(1)];
+        deviation=nonlinearBicycleModel.error(x,model.lane,reference);
+        active=false;
+        for preview=[0,.5,1,1.5,2,3]
+            future=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time+preview);
+            if isfield(model.lane,'referenceCurve')
+                position=laneGeometry.referencePose(station+cfg.referenceSpeed*preview,0,model.lane.referenceCurve);
+            else
+                position=projection.point+cfg.referenceSpeed*preview*direction;
+            end
+            if norm(position-future(1:2))<radius+1,active=true;break;end
+        end
+        if active
+            yaw=q(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];offset=rotation*q(10:11);
+            omega=q(4)*sin(q(6))/q(7);
+            translation=q(4)*[cos(yaw+q(6));sin(yaw+q(6))]+omega*[-offset(2);offset(1)];
+            nominal=cfg.referenceSpeed*direction-.5*projection.lateralPosition*normal;
+            circulation=side*.6*max(norm(nominal-translation),.5*cfg.referenceSpeed)/radius;
+            velocity=predictiveSafetyGeometry.movingFlowVelocity(x(1:2),nominal,q(1:2)+offset, ...
+                translation,radius*eye(2),zeros(2),circulation);
+            heading=atan2(velocity(2),velocity(1));
+            desiredSpeed=min(cfg.referenceSpeed,max(max(1.5,.5*cfg.referenceSpeed),norm(velocity)));
+            deviation(1)=0;deviation(2)=atan2(sin(x(3)-heading),cos(x(3)-heading));
+            deviation(3)=x(4)-desiredSpeed;
+        end
+        u=reference.input+reference.gain*deviation;
+        steering=min(cfg.model.frontWheelSteeringAngleMaximum, ...
+            atan(cfg.vehicle.wheelbase*.8*min(cfg.tire.frictionCoefficient)*cfg.vehicle.gravity/max(x(4)^2,1)));
+        lo=[-steering;max(cfg.actuation.brakingRatioMinimum,-.35)];
+        hi=[steering;min(cfg.actuation.brakingRatioMaximum,.35)];
+        u=localClip(min(hi,max(lo,u)),previous,cfg);inputs(:,index)=u;
+        x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;
+        if index<required,continue;end
+        seed=terminalContinuation.anchor(seed,x,model.sampleIndex+index,model.lane);
+        membership=terminalContinuation.membership([x;u],seed.epochIndex,seed);
+        future=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time+h);
+        separation=terminalContinuation.separation(seed,future,model.frame,cfg);
+        if membership<0 && separation>0,break;end
+    end
+    inputs=inputs(:,1:index);
 end
 
 function u=localClip(u,previous,cfg)
@@ -280,7 +372,8 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
         ci=7*(index-1)+(1:7);costMatrix(ci(1:5),jx)=reference.factor*j/sqrt(count);
         costOffset(ci(1:5))=reference.factor*e/sqrt(count);
         costMatrix(ci(6:7),iu(:,index))=.1*eye(2)/sqrt(count);
-        costOffset(ci(6:7))=.1*(anchor(:,index)-reference.input)/sqrt(count);
+        % The input regularizer is centered on this nonlinear rollout.
+        costOffset(ci(6:7))=0;
         lower(jx(4:6))=max(lower(jx(4:6)),physicalLower-next(4:6));
         upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-next(4:6));
         if index==1
@@ -473,8 +566,9 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,phase)
         x=nonlinearBicycleModel.sample(middle,inputs(:,index),cfg,[],halfDuration);states(:,index+1)=x;
         stageHard(index)=max([0;low-x(4:6);x(4:6)-high;low-middle(4:6);middle(4:6)-high]);
         deviation=nonlinearBicycleModel.error(x,model.lane,model.terminal.reference);
-        stageCost(index)=norm(model.terminal.reference.factor*deviation)^2 ...
-            +.01*norm(inputs(:,index)-model.terminal.reference.input)^2;
+        % Input proximity belongs to the local search step, not an absolute
+        % input penalty in the retained nonlinear trajectory's nominal cost.
+        stageCost(index)=norm(model.terminal.reference.factor*deviation)^2;
     end
     rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     lo=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];

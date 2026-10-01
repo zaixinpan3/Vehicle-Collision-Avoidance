@@ -1,0 +1,394 @@
+[
+  {
+    "speed": 8,
+    "scenario": "headOn",
+    "side": -1,
+    "seconds": 0.150353,
+    "gap": 1.6646700556858633,
+    "holds": 251,
+    "info": {
+      "activeHolds": 43,
+      "membership": -4.0157549806667996E-10,
+      "separation": 166.38067431773297
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "headOn",
+    "side": 1,
+    "seconds": 0.105496,
+    "gap": 1.664670055685864,
+    "holds": 251,
+    "info": {
+      "activeHolds": 43,
+      "membership": -4.0157549806682058E-10,
+      "separation": 166.38067431773291
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "acceleratingHeadOn",
+    "side": -1,
+    "seconds": 0.096915,
+    "gap": 1.3782153437789251,
+    "holds": 251,
+    "info": {
+      "activeHolds": 40,
+      "membership": -8.9856720366949858E-10,
+      "separation": 245.10163403743292
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "acceleratingHeadOn",
+    "side": 1,
+    "seconds": 0.092203,
+    "gap": 1.3782153437789255,
+    "holds": 251,
+    "info": {
+      "activeHolds": 40,
+      "membership": -8.9856720366971034E-10,
+      "separation": 245.10163403743286
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "brakingLead",
+    "side": -1,
+    "seconds": 0.128773,
+    "gap": 0.85714138599723033,
+    "holds": 327,
+    "info": {
+      "activeHolds": 157,
+      "membership": -1.4279433226797834E-9,
+      "separation": 52.234674134068278
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "brakingLead",
+    "side": 1,
+    "seconds": 0.132911,
+    "gap": 0.85714138599723055,
+    "holds": 327,
+    "info": {
+      "activeHolds": 157,
+      "membership": -1.4279433226797834E-9,
+      "separation": 52.234674134068278
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "crossing",
+    "side": -1,
+    "seconds": 0.099417,
+    "gap": 1.1470956708039739,
+    "holds": 230,
+    "info": {
+      "activeHolds": 48,
+      "membership": -9.2962216446798635E-10,
+      "separation": 75.8439301259051
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "crossing",
+    "side": 1,
+    "seconds": 0.093407,
+    "gap": 0,
+    "holds": 240,
+    "info": {
+      "activeHolds": 45,
+      "membership": -9.8397261275557034E-10,
+      "separation": 79.8439301259051
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "turningCrossing",
+    "side": -1,
+    "seconds": 0.098957,
+    "gap": 1.1971810176396056,
+    "holds": 229,
+    "info": {
+      "activeHolds": 43,
+      "membership": -9.0200237144145651E-10,
+      "separation": 2.9670107733776168
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "turningCrossing",
+    "side": 1,
+    "seconds": 0.087453,
+    "gap": 0,
+    "holds": 240,
+    "info": {
+      "activeHolds": 44,
+      "membership": -1.1954694238049271E-11,
+      "separation": 12.946861394998379
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedHeadOn",
+    "side": -1,
+    "seconds": 0.204659,
+    "gap": 1.8235361704933881,
+    "holds": 512,
+    "info": {
+      "activeHolds": 45,
+      "membership": -1.4901161193847656E-8,
+      "separation": -3.5436146043822472
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedHeadOn",
+    "side": 1,
+    "seconds": 0.199072,
+    "gap": 1.7879963603192108,
+    "holds": 512,
+    "info": {
+      "activeHolds": 44,
+      "membership": -1.4901161193847655E-8,
+      "separation": -3.5436146043822756
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedCrossing",
+    "side": -1,
+    "seconds": 0.202101,
+    "gap": 0,
+    "holds": 512,
+    "info": {
+      "activeHolds": 112,
+      "membership": -1.490103442570071E-8,
+      "separation": -39.748003303048911
+    },
+    "failure": ""
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedCrossing",
+    "side": 1,
+    "seconds": 0.192149,
+    "gap": 0,
+    "holds": 512,
+    "info": {
+      "activeHolds": 90,
+      "membership": -1.4900687577024007E-8,
+      "separation": -39.748003303048968
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "headOn",
+    "side": -1,
+    "seconds": 0.054559,
+    "gap": 0,
+    "holds": 165,
+    "info": {
+      "activeHolds": 29,
+      "membership": -8.5228438476230909E-8,
+      "separation": 157.06320503016826
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "headOn",
+    "side": 1,
+    "seconds": 0.057094,
+    "gap": 0,
+    "holds": 165,
+    "info": {
+      "activeHolds": 29,
+      "membership": -8.5228438476224873E-8,
+      "separation": 157.06320503016826
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "acceleratingHeadOn",
+    "side": -1,
+    "seconds": 0.066801,
+    "gap": 0,
+    "holds": 162,
+    "info": {
+      "activeHolds": 28,
+      "membership": -1.7566382800635798E-7,
+      "separation": 186.62659961835791
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "acceleratingHeadOn",
+    "side": 1,
+    "seconds": 0.056939,
+    "gap": 0,
+    "holds": 162,
+    "info": {
+      "activeHolds": 28,
+      "membership": -1.7566382800635364E-7,
+      "separation": 186.62659961835791
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "brakingLead",
+    "side": -1,
+    "seconds": 0.110512,
+    "gap": 0.1166582847098236,
+    "holds": 280,
+    "info": {
+      "activeHolds": 156,
+      "membership": -1.923384964048604E-7,
+      "separation": 33.584226556389268
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "brakingLead",
+    "side": 1,
+    "seconds": 0.104686,
+    "gap": 0.11665828470982213,
+    "holds": 280,
+    "info": {
+      "activeHolds": 156,
+      "membership": -1.9233849640486082E-7,
+      "separation": 33.584226556389268
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "crossing",
+    "side": -1,
+    "seconds": 0.071189,
+    "gap": 1.3761977462896497,
+    "holds": 187,
+    "info": {
+      "activeHolds": 46,
+      "membership": -2.494503509051284E-8,
+      "separation": 103.90179743666398
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "crossing",
+    "side": 1,
+    "seconds": 0.075352,
+    "gap": 0.10259819940032777,
+    "holds": 198,
+    "info": {
+      "activeHolds": 41,
+      "membership": -3.8944927952338924E-8,
+      "separation": 117.84963526260519
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "turningCrossing",
+    "side": -1,
+    "seconds": 0.068363,
+    "gap": 1.4437712471382189,
+    "holds": 184,
+    "info": {
+      "activeHolds": 44,
+      "membership": -2.0710485105983262E-7,
+      "separation": 37.154617037250532
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "turningCrossing",
+    "side": 1,
+    "seconds": 0.076718,
+    "gap": 0,
+    "holds": 203,
+    "info": {
+      "activeHolds": 41,
+      "membership": -6.2804118801301813E-8,
+      "separation": 57.143150481880312
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedHeadOn",
+    "side": -1,
+    "seconds": 0.180056,
+    "gap": 1.7041576654921813,
+    "holds": 512,
+    "info": {
+      "activeHolds": 40,
+      "membership": -2.384185791015625E-7,
+      "separation": -3.54371903269425
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedHeadOn",
+    "side": 1,
+    "seconds": 0.175463,
+    "gap": 2.1200945665334521,
+    "holds": 512,
+    "info": {
+      "activeHolds": 40,
+      "membership": -2.384185791015625E-7,
+      "separation": -3.54371903269425
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedCrossing",
+    "side": -1,
+    "seconds": 0.193784,
+    "gap": 1.0110795953998983,
+    "holds": 512,
+    "info": {
+      "activeHolds": 44,
+      "membership": -2.384185791015625E-7,
+      "separation": -39.748107731365629
+    },
+    "failure": ""
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedCrossing",
+    "side": 1,
+    "seconds": 0.201052,
+    "gap": 0,
+    "holds": 512,
+    "info": {
+      "activeHolds": 41,
+      "membership": -2.384185791015625E-7,
+      "separation": -39.748107731365629
+    },
+    "failure": ""
+  }
+]

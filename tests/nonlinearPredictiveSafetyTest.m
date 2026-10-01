@@ -163,11 +163,11 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
                 'collisionAvoidanceController:invalidSampleTime');
         end
         function retiredStateCannotRestoreTheOldTargetMotion(testCase)
-            [ego,road,cfg]=localFixture();prior=struct('version',54,'target',ones(10,1));
+            [ego,road,cfg]=localFixture();prior=struct('version',55,'target',ones(10,1));
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,55);
+            testCase.verifyEqual(state.version,56);
         end
         function everyCallAppliesTheReturnedFeasibleFirstControl(testCase)
             [ego,road,cfg]=localFixture();
@@ -273,17 +273,13 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.solution.hard,0);
             testCase.verifyLessThanOrEqual(problem.solution.safety,sum(prior.witness.stageSlacks(2:end)));
         end
-        function positiveSlackReportsSafetyRecoveryWithoutClaimingSafety(testCase)
+        function aCollisionContainingInitializationCannotAuthorizeAnInput(testCase)
             [ego,road,cfg]=localFixture();cfg.nonlinear.maximumIterations=2;
             target=localTarget([0;0;pi;8;0;0;1.6;2.4;.95;0;0]);
-            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1));
-            testCase.verifyGreaterThan(problem.metadata.predictiveBarrierValue,0);
-            testCase.verifyFalse(problem.metadata.zeroSlack);
-            testCase.verifyFalse(problem.metadata.optimizationReturned);
-            testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
+            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:noFeasibleContinuation');
         end
-        function oncomingAvoidanceStartsFromALaneRollout(testCase)
+        function oncomingAvoidanceUsesATargetAwareRollout(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=60;
             road.lateralClearance=[.05;.05];
             target=localTarget([24;0;pi;8;0;0;1.6;2.4;.95;0;0]);
@@ -293,17 +289,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(problem.metadata.preplannedAvoidanceTrajectoryRequired);
             testCase.verifyFalse(problem.metadata.drivingModeSwitching);
             testCase.verifyFalse(problem.metadata.roadConstraintsEnforced);
-            testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            steps=problem.metadata.search.sequentialIterations;
+            testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
             testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
-            testCase.verifyTrue(steps{end}.retainedAsWitness);
-            testCase.verifyEqual(sum(cellfun(@(step)step.retainedAsWitness,steps)),1);
-            for j=1:numel(steps)
-                step=steps{j};
-                if step.status=="solved"
-                    testCase.verifyLessThanOrEqual(step.secondarySafety,step.safetyCap+cfg.solver.feasibilityTolerance);
-                end
-            end
+            testCase.verifyEqual(problem.solution.hard,0);
+            testCase.verifyEqual(problem.metadata.solverCallCount,0);
         end
         function correctedPrimaryAvoidanceReturnsBeforeCostRefinement(testCase)
             [ego,road,cfg]=localFixture();ego.speed=15;
@@ -320,6 +309,10 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             value=terminalContinuation.membership(endpoint, ...
                 problem.model.sampleIndex+size(plan,2),problem.model.terminal);
             testCase.verifyLessThanOrEqual(value,0);
+            seeds=problem.metadata.search.initializationCandidates;
+            testCase.verifyNotEmpty(seeds);
+            testCase.verifyTrue(all([seeds.hard]>0 | [seeds.safety]>0));
+            testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
             steps=problem.metadata.search.sequentialIterations;
             testCase.verifyEqual(problem.metadata.search.terminationReason,"feasibleWitness");
             testCase.verifyEqual(steps{end}.status,"primaryFeasible");
@@ -327,21 +320,16 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(steps{end}.secondaryReturned);
             testCase.verifyTrue(steps{end}.retainedAsWitness);
         end
-        function brakingLeadRestorationPreservesBetterNonlinearCandidates(testCase)
+        function feasibleBrakingLeadSeedDoesNotTriggerCostImprovement(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
-            cfg.nonlinear.maximumIterations=6;
+            cfg.nonlinear.maximumIterations=1;
             target=localTarget([6.25;0;0;8;-.5;0;1.6;2.4;.95;0;0]);
             [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            steps=problem.metadata.search.sequentialIterations;
-            selected=cellfun(@(step)step.nominalRestorationMerit,steps);
-            raw=cellfun(@(step)min([step.primaryRawMerit,step.secondaryRawMerit,step.restorationRawMerit]),steps);
-            accepted=cellfun(@(step)step.acceptedIterate,steps);
             testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
             testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
-            testCase.verifyLessThanOrEqual(selected,raw);
-            testCase.verifyTrue(any(selected<raw));
-            testCase.verifyLessThanOrEqual(diff(selected(accepted)),zeros(1,sum(accepted)-1));
-            testCase.verifyLessThanOrEqual(numel(steps),6);
+            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyGreaterThan(problem.solution.cost,cfg.solver.optimalityTolerance);
+            testCase.verifyEmpty(problem.metadata.search.sequentialIterations);
         end
         function turningCrossingRestorationStillRequiresTheOriginalTerminalSet(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
@@ -350,15 +338,12 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [command,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
             endpoint=[problem.solution.states(:,end);plan(:,end)];
             value=terminalContinuation.membership(endpoint,size(plan,2),problem.model.terminal);
-            steps=problem.metadata.search.sequentialIterations;
             testCase.verifyEqual(command.actuatorInput,plan(:,1));
             testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
             testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
             testCase.verifyLessThanOrEqual(value,0);
             testCase.verifyGreaterThanOrEqual(problem.solution.terminalSeparationMargin,0);
-            testCase.verifyTrue(any(cellfun(@(step)step.completionRestoration,steps)));
-            testCase.verifyTrue(steps{end}.retainedAsWitness);
-            testCase.verifyEqual(sum(cellfun(@(step)step.retainedAsWitness,steps)),1);
+            testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
             testCase.verifyFalse(problem.metadata.drivingModeSwitching);
         end
         function restoredCrossingRemainsSeparatedBetweenConstraintSamples(testCase)

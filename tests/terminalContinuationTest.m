@@ -98,18 +98,11 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             testCase.verifyEqual(counts,zeros(size(counts)));
             testCase.verifyEqual(sources,repmat("retainedContinuation",size(sources)));
         end
-        function positiveSlackIsExecutedAndItsShiftedSumDoesNotIncrease(testCase)
+        function aDeadlineCannotAuthorizeAPositiveSlackInitialization(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=1e-12;
             target=struct('targetPositionInertial',[0;0],'targetVelocityInertial',[-8;0],'targetYawInertial',pi);
-            [command,~,problem,first]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            [~,hard,cost]=localContinue(first,ego,road,cfg,12);
-            testCase.verifyEqual(command.actuatorInput,first.witness.inputs(:,1));
-            testCase.verifyGreaterThan(problem.solution.safety,0);
-            testCase.verifyFalse(problem.metadata.zeroSlack);
-            testCase.verifyEqual(hard,zeros(size(hard)));
-            testCase.verifyLessThanOrEqual(cost(1),sum(first.witness.stageSlacks(2:end)));
-            testCase.verifyLessThanOrEqual(diff(cost),zeros(1,numel(cost)-1));
-            testCase.verifyEqual(cost(end),0);
+            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:noFeasibleContinuation');
         end
         function aChangedInputMemoryCannotUseTheShiftedWitness(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=1e-12;

@@ -7,9 +7,9 @@ trajectory. It returns the first admissible nonlinear continuation. While
 restoration is needed, a Huang-style primary objective minimizes the sum of
 safety slacks over a fixed MPC prefix, and a soft lane CLF guides the secondary
 search. Li-style polygon support duals and sequential convexification supply
-numerical search directions. Both zero-slack and positive-slack
-**feasible** prefixes can be executed. Positive slack describes recovery;
-it does not imply collision-free motion.
+numerical search directions. Positive slack guides feasibility restoration;
+only a zero-prefix-slack candidate satisfying all original hard constraints
+can authorize an input. An initialization seed need not satisfy these checks.
 
 The terminal condition is an implicit backward-reachable tube, represented
 by a hard completion trajectory and an indefinitely admissible endpoint
@@ -218,21 +218,71 @@ does not resolve rejection of intersecting circular terminal orbits.
 This union removes the requirement to recover a preselected longitudinal
 position at the endpoint time. It retains a finite completion horizon and a
 local cruise-state condition at its end. Initialization still selects endpoint
-index `M` from the lane rollout; no free terminal-time optimization or general
+index `M` from a lane or moving-flow rollout; no free terminal-time optimization or general
 viability-kernel computation is implemented. A terminal condition necessarily
 restricts admissible trajectories, and this sufficient construction can remain
 conservative even with free phase.
 
-If no endpoint with this sufficient continuation can be found within
-`maximumHorizonSteps`, initialization reports failure. This does not establish
-that the original nonlinear problem has no other viable terminal family.
+If no seed endpoint passes this sufficient continuation within
+`maximumHorizonSteps`, the bounded rollout remains an uncertified search seed.
+The optimizer still has to satisfy the original terminal conditions before
+execution. Failure does not establish that other terminal families are impossible.
 There is no finite-only fallback masquerading as an indefinite tail.
+
+## Moving-target flow initialization
+
+The field is an initialization heuristic, not an extra safety constraint or a
+vehicle controller. In an ellipse frame `q = B^-1 (p-c)`, define
+
+\[
+w=B^{-1}(v_0-\dot c-\dot Bq),\qquad
+M(q)=(1+\|q\|^{-2})I-2qq^T\|q\|^{-4},
+\]
+\[
+v_F=\dot c+\dot Bq+B\left(M(q)w+\gamma Jq/\|q\|^2\right).
+\]
+
+The ideal exterior field has zero relative normal velocity on the moving
+boundary. This property is not required of an initialization trajectory.
+Inside the envelope, denominators are bounded by one so an infeasible seed
+remains numerically evaluable. The current rollout uses a circular envelope
+containing both vehicle bodies and the existing collision buffer. Its center
+velocity includes rotation of a nonzero target rectangle offset. A circle
+needs no shape-rotation transport; the general field interface also handles
+rotating and deforming ellipses.
+
+At each future hold the target is predicted from the original epoch. A bounded
+three-second preview decides whether to use the flow guide or nominal lane
+feedback. The flow receives a tangential bias of magnitude
+`0.6 * max(relativeGuideSpeed, 0.5 * referenceSpeed) / envelopeRadius`.
+The temporary heading and speed guide feed the existing lane-feedback gain.
+Speed guidance is bounded between half cruise speed (at least 1.5 m/s) and
+cruise speed. A steering preference based on `0.8 * mu * g` lateral acceleration
+and a longitudinal-input preference of +/-0.35 reduce aggressive seed motion;
+these are heuristic preferences, not new optimizer constraints or a certified
+friction allocation. Final clipping enforces the actual amplitude and slew
+bounds, then the nonlinear Fiala model generates the next seed state.
+
+The actual state/input rollout supplies dynamics, tire and collision expansion
+points. The input regularizer in the convex subproblem penalizes the change
+from this anchor; the nominal lane/CLF objective remains tied to the original
+given path. The retained nonlinear cost has no separate input-amplitude term;
+input proximity regularizes the local search step only. A valid prior witness
+returns immediately. Small measured-successor
+differences repair its shifted inputs; fresh flow candidates are considered for
+cold initialization or a state discrepancy larger than 1e-4 in the raw state
+infinity norm. This threshold is a search-cost heuristic, not a safety tolerance.
+Every issued candidate undergoes the same nonlinear admission checks.
 
 ## Sequential convexification and acceptance
 
-A lane-feedback rollout initializes the search; no avoidance trajectory is
-required. The endpoint index and orbit anchor are selected once from that
-rollout; its longitudinal phase is subsequently free. Each SCvx
+A lane-feedback rollout supplies the baseline. When it is inadmissible and
+there is no usable prior reference, at most two moving-target flow rollouts
+provide opposite passing biases within the same controller-call budget.
+A seed may collide or fail terminal admission; evaluated nonlinear violation
+selects the restoration anchor. A fully admissible seed returns immediately.
+The endpoint index and orbit anchor belong to the selected rollout, with
+longitudinal phase subsequently free. Each SCvx
 step uses variational RK4 dynamics and linearized support-dual geometry.
 The endpoint is represented by its actual **2-norm cone**, with ego state
 and final input in the cone. One additional scalar phase increment enters the
@@ -248,7 +298,7 @@ linear solver remains unchanged.
 
 A revalidated initial or shifted witness terminates with `feasibleWitness`
 without a conic solve. Its nonlinear hard residual must be exactly zero and
-its prefix safety-slack sum must satisfy the existing shifted budget. The
+its prefix safety-slack sum must be exactly zero. The
 secondary cost may be large. Neither objective optimality nor agreement
 between affine and nonlinear CLF slack is required for execution.
 
@@ -282,7 +332,7 @@ amplitude, within the same time budget. The first admitted nonlinear candidate
 ends the iteration; no subsequent cost improvement is required.
 `search.converged` and its legacy `scvxConverged` metadata field describe this
 feasibility stopping target, not numerical optimality. Positive prefix slack
-still describes recovery and is not labeled zero-slack or collision-free.
+remains a search residual and does not authorize execution.
 
 The soft first-step CLF is
 
@@ -308,7 +358,10 @@ conic solve when that row is already impossible. If the elastic program itself
 is infeasible, the outer loop allows bounded trust expansion instead of
 repeated shrinking. Unresolved restoration solver failures stop the attempt;
 evaluated nonlinear rejection still supports backtracking or shrinking. No
-radius update establishes global feasibility.
+radius update establishes global feasibility. When a newly discovered interior
+collision adds rows, the incumbent is reevaluated under the same check set
+before comparing scores. Trust is restored to at least its initial radius so
+an already shrunken search box does not conceal the new correction requirement.
 
 A short endpoint correction jointly adjusts final inputs and free phase.
 A feasible candidate bypasses correction and ends it immediately. Every trial
@@ -339,7 +392,7 @@ solver stops without an optimal exit flag. Their reported exit flags are
 retained. A returned conic point is insufficient for execution. Nonlinear trajectories
 are generated by the defining RK4 map. A candidate replaces the retained
 witness only if its hard residual is zero and its achieved prefix slack sum
-meets the retained bound. A positive solver feasibility tolerance never
+is zero. A positive solver feasibility tolerance never
 licenses a positive hard residual. `zeroSlack` means an achieved sum exactly
 zero in the numerical evaluation; it no longer means `sum <= 1e-5`.
 A feasible initialization can also supply a witness. If none exists and
@@ -394,17 +447,19 @@ and imposes the component-sum budget
 S_{k+1}\le\sum_{i=1}^{N-1}\xi_{i|k}=S_k-\xi_{0|k}.
 \]
 
-The shifted witness already meets it. Improvements cannot increase it,
+Accepted witnesses have `S_k = 0`; positive restoration candidates do not
+enter this execution induction. The shifted witness already meets the budget.
+Improvements cannot increase it,
 and failed solves retain it. A changed measured ego state invalidates the
 old shift proof; renewed feasibility does not retroactively repair that
 transition's slack inequality.
 
 ## Interfaces and limits
 
-State format **55** stores the absolute sample index, target epoch, endpoint
+State format **56** stores the absolute sample index, target epoch, endpoint
 family and its chosen phase, full input/state continuation, achieved prefix slacks, and problem
-context. Format 55 invalidates cached plans admitted without interior collision
-checks. Old state formats are discarded. Predictions include the whole
+context. Format 56 invalidates previous positive-prefix-slack execution
+semantics; the earlier interior collision checks are retained. Old state formats are discarded. Predictions include the whole
 prefix plus completion; metadata distinguishes their lengths. No lane/
 avoidance mode switch is introduced.
 

@@ -1,0 +1,266 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,hyperref}
+\usepackage[T1]{fontenc}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Moving-Target Flow Initialization: Implementation and Closed-Loop Validation}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{September 30, 2026}
+\begin{document}
+\maketitle
+
+\section{Result and scope}
+The controller now uses a moving-target fluid-inspired nonlinear rollout as a
+search initialization when it has no usable prior trajectory. The seed may
+collide or fail terminal admission. Its purpose is to improve the starting
+point of the existing optimization, not to provide an independent safety
+certificate. There remains one controller, with no driving-mode selection,
+nonlinear-shooting method, or road-boundary constraints.
+
+The new implementation completes 10 of the 14 collision-threatening fixtures.
+All three previously failing 15 m/s straight-road fixtures now complete:
+braking lead, crossing, and turning crossing. All completed runs have positive
+independently audited sampled body clearance, with a minimum of 26.779 mm
+against the unchanged 6 mm configured margin. Four circular-road fixtures still
+fail at initialization because the existing permanent-cruise terminal family
+cannot certify their future separation.
+
+This is an initialization success, not a runtime improvement. The maximum
+running controller call is 0.950391 s. Long avoidance and lane-recovery tails
+increase repeated nonlinear validation and occasional correction work. The
+50 ms control period is exceeded by 800 of 1,590 running calls. No real-time
+execution claim is supported by these results.
+
+\section{Research basis and moving-field construction}
+The local source is Cheng, Li, Liu, Li and Guo, ``Virtual Fluid-Flow-Model-Based
+Lane-Keeping Integrated With Collision Avoidance Control System Design,''
+\emph{IEEE Transactions on Intelligent Transportation Systems}, 22(10),
+6232--6241, 2021, \href{https://doi.org/10.1109/TITS.2020.2990211}{doi:10.1109/TITS.2020.2990211}.
+Its PDF remains under \path{reference/}. Equations (34)--(36) concern the
+stationary-obstacle field; the corresponding modified streamline has a
+Gaussian lateral profile. The paper does not establish the moving-target
+bicycle initialization implemented here. Its sample period is not a measured
+bound on this controller's computation time.
+
+Braquet and Bakolas, \href{https://arxiv.org/abs/2207.01747}{arXiv:2207.01747},
+provide related moving-ellipse vector-field context. Their dynamics and
+construction are not substituted for the project's vehicle model or claimed
+as the source of the following project derivation.
+
+Let the moving envelope be parameterized by center $c(t)$ and nonsingular
+shape map $B(t)$, with $q=B^{-1}(p-c)$, $r^2=q^Tq$, and
+$J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$.
+For a nominal world-frame guide $v_0$, define
+\begin{align}
+w &= B^{-1}(v_0-\dot c-\dot Bq),\\
+M(q)&=(1+r^{-2})I-2qq^Tr^{-4},\\
+v_F&=\dot c+\dot Bq+B\left(M(q)w+\gamma Jq/r^2\right).
+\end{align}
+The translation and shape-rate terms transport the relative flow into the
+world frame. Merely moving a static field's center omits these terms. Under
+ideal first-order following in the smooth exterior, $h=q^Tq-1$ obeys
+\[
+\dot h=2q^Tw\,h/r^2.
+\]
+Thus the ideal boundary has zero relative normal velocity. This identity is
+an algebraic check of the construction, \emph{not a required property of the
+initialization trajectory}. Heading tracking, input clipping, finite
+integration, and vehicle dynamics do not preserve that point-mass identity.
+Inside the envelope the implementation replaces denominator $r^2$ by
+$\max(1,r^2)$, keeping infeasible seed points finite without claiming safety.
+The preceding derivation and ideal numerical checks were recorded separately
+in ledger PDCA-20260930-004; this report records their implementation and
+vehicle-level evaluation.
+
+\section{Implementation decisions}
+\begin{enumerate}
+\item Retain and shift a valid prior continuation. Otherwise evaluate the
+lane-feedback baseline and, when appropriate, at most two flow rollouts with
+opposite tangential biases. These are bounded initialization attempts in the
+same controller, not controller modes. A fully admissible candidate returns
+immediately; no subsequent cost optimization is performed.
+\item Predict the known target at each future hold from its fixed epoch.
+Use a circular guidance envelope containing both body half-diagonals,
+rectangle offsets, and the existing collision margin. The target center
+velocity includes the rotational contribution of a nonzero rectangle offset.
+The general field helper supports rotating/deforming ellipses; production
+initialization uses a circle and zero shape-rate.
+\item Activate guidance using a bounded three-second preview at
+$\{0,0.5,1,1.5,2,3\}$ s. The nominal guide is cruise velocity along the given
+path plus lateral recovery gain 0.5. The selected circulation magnitude is
+$0.6\max(\|v_0-\dot c\|,0.5v_{\rm ref})/R$. Desired speed lies between
+$\max(1.5,0.5v_{\rm ref})$ and $v_{\rm ref}$. A steering preference based on
+$0.8\mu g$ and longitudinal-input preference $\pm0.35$ reduce aggressive
+seed motion. These are initialization heuristics, not added optimization
+constraints or a certified friction allocation.
+\item Apply the actual actuator amplitude and slew limits after the soft
+preferences, then integrate the existing nonlinear Fiala bicycle model.
+The resulting input/state rollout supplies the dynamics, tire-force and
+collision-separation linearizations together. The convex input regularizer
+penalizes input deviation from this same anchor. The nominal lane/CLF
+reference remains the original given path. The nonlinear ranking cost has
+no residual absolute-input penalty; input proximity regularizes only the
+local optimization step.
+\item If a seed cannot reach the existing terminal set within 512 holds,
+retain its bounded, evaluable trajectory as a restoration seed instead of
+aborting before optimization. Its original terminal constraints still apply
+to the final result. A cold or sufficiently changed state may request fresh
+flow seeds; a raw state infinity-norm discrepancy threshold of $10^{-4}$
+only controls this search choice. Smaller discrepancies still revalidate and
+repair the retained plan; they are not ignored by safety admission.
+\item Separate execution permission from search slack. An issued candidate
+must have zero hard residual and zero prefix safety slack. The former cold
+initialization slack cap was infinite and could accept a collision-containing
+initialization. Positive slacks now remain restoration objects only. State
+format 56 invalidates cached plans admitted under the previous semantics.
+\item When a trial activates new interior collision checks, reevaluate the
+incumbent with the same checks before comparing restoration scores. Restore
+at least the initial trust radius for this changed check set. This removes
+the stale-score rejection defect identified in the earlier diagnosis.
+\end{enumerate}
+
+The public field helper is in \path{controller/predictiveSafetyGeometry.m};
+rollout and selection are in \path{controller/solvePredictiveControl.m}.
+The core source count remains nine MATLAB files including configuration.
+Terminal-family enlargement, bounded endpoint-polish redesign and observer
+uncertainty are outside this change.
+
+\section{Experimental method and results}
+The original 14 fixtures use seven encounters at both 8 and 15 m/s. Every
+given-path constant-speed baseline has a strict body overlap during the
+eight-second experiment, and none starts in collision. Each completed run
+executes 160 holds of 50 ms. Prefix lengths are 8 and 16 holds; maximum
+completion length is 512; the call budget is 5 s and the outer iteration cap
+is 24. Observations are exact, the target motion is known, road constraints
+are disabled, and no random draws are used.
+
+Plant replay uses \texttt{ode45}, relative/absolute tolerances
+$10^{-11}/10^{-12}$, and 31 samples per hold. Its actual successor feeds the
+next controller call. An independent Python audit recomputes target motion
+and rectangle geometry at 4,960 samples per completed scenario. This is a
+finite sampled validation, not a continuous-time or uncertain-plant proof.
+Default slew bounds in the benchmark are infinite; a separate behavior test
+uses finite steering and braking slew limits. MATLAB runs single-threaded;
+timings include the complete controller call and exclude plant replay and
+the independent audit. Frame zero and subsequent running calls are separate.
+
+\begin{center}\small
+\begin{tabular}{rlrrrr}
+\toprule
+Speed & Scenario & Old/new finish & Gap (m) & Init. (s) & Max run (s)\\
+\midrule
+8 & Head-on & Y/Y & 1.63940 & 1.11484 & 0.78659\\
+8 & Accelerating head-on & Y/Y & 1.38929 & 0.22685 & 0.67851\\
+8 & Braking lead & Y/Y & 1.13396 & 0.34902 & 0.95039\\
+8 & Crossing & Y/Y & 1.15637 & 0.18703 & 0.67415\\
+8 & Turning crossing & N/Y & 1.04575 & 0.28267 & 0.61383\\
+8 & Curved head-on & N/N & --- & 5.01162* & ---\\
+8 & Curved crossing & N/N & --- & 5.07061* & ---\\
+15 & Head-on & Y/Y & 0.13959 & 1.19792 & 0.06708\\
+15 & Accelerating head-on & Y/Y & 0.02678 & 0.86868 & 0.06466\\
+15 & Braking lead & N/Y & 0.09355 & 0.30402 & 0.14723\\
+15 & Crossing & N/Y & 1.34328 & 0.16762 & 0.06813\\
+15 & Turning crossing & N/Y & 1.38045 & 0.19423 & 0.06697\\
+15 & Curved head-on & N/N & --- & 5.01654* & ---\\
+15 & Curved crossing & N/N & --- & 5.00166* & ---\\
+\bottomrule
+\end{tabular}
+\end{center}
+An asterisk denotes a failed initialization call, not a successful solve.
+All clearance and timing columns describe the new implementation. ``Old''
+is the same-environment rerun of the pre-edit snapshot at commit
+\path{c217ed9518d86e7c4c678180871b6d256a4fc2dd}, whose production controller
+was last changed at \path{395a8cbdc937945f6c1aef925997f731f6c9c9f8}.
+
+The fresh old-version run completes 6/14. The previously recorded historical
+run completed 7/14; its 8 m/s turning-crossing initialization was close to the
+five-second budget and times out in this rerun. This timing variability is
+not presented as an additional deterministic algorithmic regression. Relative
+to the historical 7/14, the three clear new successes are the 15 m/s braking
+lead, crossing and turning crossing.
+
+\paragraph{Ablation.}
+Disable only flow screening in a copy of the new implementation, retaining
+zero-slack admission, refreshed scores and the anchor-centered input cost.
+All three 15 m/s problem initializations again time out at five seconds.
+This supports the contribution of the flow seed in the combined change;
+it does not independently quantify each accompanying integration fix.
+
+\paragraph{Prototype controls.}
+The first 28 seed rollouts use circulation/lateral-acceleration factors
+0.3/0.6. An 84-rollout screen compares parameter triples
+[extra envelope radius, circulation factor, lateral-acceleration fraction]
+of [0,0.6,0.8], [3.05,0.3,0.8] and [3.05,0.6,0.8]. The first triple is selected.
+Extra envelope radius is not uniformly beneficial. Raw seed node clearance
+is not a closed-loop safety or terminal-admission result. Both high-speed
+head-on seeds can still be unsafe; their nonlinear optimization repairs them.
+A further 28-rollout control uses augmented terminal feedback for the seed's
+inactive recovery tail. It does not shorten the selected straight-road tails
+(for example 8 m/s braking lead grows from 323 to 327 holds) and is not merged.
+
+\section{Runtime regression and remaining failures}
+The new running-call mean/median are 59.305/50.162 ms, over 1,590 calls; 800
+exceed 50 ms. The old rerun's corresponding values are 16.917/6.885 ms over
+954 calls, with 72 deadline misses. These aggregates cover different sets
+of successful cases and must not be interpreted as a paired speed ratio.
+The common 8 m/s braking-lead case nevertheless demonstrates a clear
+regression: maximum running time rises from 0.117982 to 0.950391 s.
+
+The new worst call occurs at $t=0.55$ s in that case, with a 312-hold trajectory
+and one conic call. The initialization originally contained 323 holds, versus
+134 for the old run. In several 8 m/s encounters flow avoidance plus return
+to the small certified cruise neighborhood leaves 218--323 initial holds.
+Small ODE/RK4 successor differences cause full nonlinear revalidation rather
+than exact cached suffix transfer. Some frames also require endpoint
+correction and a conic solve. This trace evidence explains the increased
+work; no profiler decomposition assigning precise seconds to each function
+was performed in this task. The historical old run had maximum 0.808422 s
+in a different case that fails initialization in the fresh rerun, so neither
+old maximum alone is an adequate overall performance comparison.
+
+For the four curved fixtures, the old implementation exits before conic
+optimization when its cruise endpoint cannot establish permanent separation.
+The new code permits uncertified seeds and enters restoration, but still
+reaches the soft time limit without a witness. The unchanged circular
+terminal certificate separates complete future orbit envelopes and is
+independent of phase in these branches. Its negative margins, approximately
+$-3.5436$ and $-39.748$ m, are certificate lower bounds, not observed penetration
+depths. Flow initialization cannot repair a negative constant terminal row.
+For opposing travel around the same circle, perpetual nominal cruising also
+truly meets again eventually; timing-aware geometry alone does not make that
+particular continuation safe. These findings and their phase checks are
+documented in \path{report/REMAINING_FAILURE_DIAGNOSIS_20260930.md}.
+
+\section{Validation, evidence and limitations}
+The final rerun after removing the residual absolute-input ranking term
+preserves the ten successes and their sampled minimum clearances. All timing
+figures above come from this final run. All 273 selected tests pass across nine classes. New coverage checks moving
+boundary transport, world-velocity shifts, rotational equivariance, finite
+interior guidance, six known-target admissions, finite actuator slew, unsafe
+flow seeds repaired by optimization, and rejection of positive-slack
+execution. Source-budget and existing vehicle, terminal, geometry and
+scenario tests are included. Code analysis has only the existing 15 sparse
+indexing performance advisories in the solver among the five scanned files;
+it reports none in the other four.
+
+An initial one-frame threat harness was rejected because its 50 ms baseline
+did not contain a collision. An early implementation run exposed an empty
+struct-array insertion error in seed diagnostics; it was fixed before the
+reported campaign. The first selected test run passed 272/273, with one
+legacy test still expecting positive-slack execution; the updated behavior
+test and all other selected tests pass on rerun. Failed attempts remain
+recorded rather than counted as successful simulations.
+
+Compact evidence is in \path{report/MOVING_FLOW_INITIALIZATION_20260930/}:
+campaign and ablation summary, both independent audits, per-call timing CSV,
+fixture configurations, tests, analyzer results, prototype controls, source
+hashes, raw-output hashes and reproduction instructions. Full poses, MAT
+snapshots and copied/prototype sources remain in the named external cache.
+No solver dependency, generated binary, unrelated estimator change or
+manuscript artifact belongs to this implementation commit.
+
+The accepted scope is a useful initialization heuristic with demonstrable
+closed-loop gains in the three high-speed straight-road failures. It does
+not solve the four terminal-family failures, certify between-sample or
+uncertain-plant safety, or meet the 50 ms runtime target.
+\end{document}

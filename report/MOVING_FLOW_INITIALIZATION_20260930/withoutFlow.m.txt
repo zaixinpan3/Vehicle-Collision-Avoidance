@@ -1,0 +1,4 @@
+raw=fileparts(mfilename('fullpath'));cd(fullfile(raw,'without-flow'));addpath('controller','config','scripts');
+for name=["brakingLead","crossing","turningCrossing"]
+ runNonlinearPredictiveSafetyValidation(Frames=1,Scenarios=name,ControllerConfiguration=struct('referenceSpeed',15,'controller',struct('horizonSteps',16)),OutputFile=fullfile(raw,"without-flow-"+name+".json"));
+end

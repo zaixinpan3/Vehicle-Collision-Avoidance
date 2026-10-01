@@ -1,6 +1,18 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target flow, polygon duals and road coordinates.
     methods (Static)
+        function velocity = movingFlowVelocity(position,nominal,center,translation,map,mapRate,circulation)
+            % Transport a unit-cylinder flow through a moving ellipse frame.
+            % Outside q'*q >= 1, exact first-order following preserves that
+            % exterior. This is guidance, not a bicycle safety certificate.
+            % The interior regularization only keeps restoration seeds finite.
+            q=map\(position-center);radiusSquared=max(1,q.'*q);
+            relative=map\(nominal-translation-mapRate*q);
+            modulation=(1+1/radiusSquared)*eye(2)-2*(q*q.')/radiusSquared^2;
+            tangent=[-q(2);q(1)];
+            velocity=translation+mapRate*q+map*(modulation*relative+circulation*tangent/radiusSquared);
+        end
+
         function q = target(observation,raw,~)
             % q = [X;Y;psi;V;A;beta;lr;halfLength;halfWidth;offsetX;offsetY].
             % V is signed tangential velocity; A and beta remain constant.

@@ -1,0 +1,43 @@
+Moving-target flow initialization experiment, 2026-09-30
+
+The source manifest identifies the tested final MATLAB sources. The baseline
+snapshot manifest identifies the original pre-edit sources at c217ed9 (the
+controller implementation is unchanged since 395a8cb). Both full campaigns use
+160 holds, 50 ms sampling, exact state/target observations, 8 and 15 m/s,
+8 and 16 prefix holds, maximum 512 holds, 6 mm buffer, no road constraints,
+5 s soft call budget and no random draws. MATLAB was run single-threaded.
+The configuration JSON represents infinite default slew bounds as null.
+
+Reproduction from repository root (choose an output directory):
+matlab -singleCompThread -batch "addpath('scripts'); runCollisionThreatValidation(OutputDirectory='OUTPUT');"
+python scripts/auditCollisionThreats.py OUTPUT/campaign.json --output OUTPUT/audit.json
+Run the nine suites in runChecks.m.txt; update its absolute root/raw paths.
+For the baseline, use a separate checkout of c217ed9518d86e7c4c678180871b6d256a4fc2dd.
+Do not use Frames=1 with RequireCollisionThreat=true: that short baseline
+contains no collision. The ablation uses one initialization call only and
+retains the full-campaign fixture admission separately.
+
+The no-flow control copies the new controller/config/scripts to a cache
+workspace and changes only the target-aware seed-screening condition to
+false. It preserves zero-slack execution, incumbent re-evaluation and the
+input-proximal objective. Three 15 m/s cases all again time out without flow.
+
+Prototype screen: seed-summary.json has 28 raw rollouts with [extra envelope
+radius, circulation factor, lateral-acceleration fraction] = [0, .3, .6].
+seed-controls.json has 84 raw rollouts: experiment 1 = [0,.6,.8],
+2 = [3.05,.3,.8], 3 = [3.05,.6,.8]. Experiment 1 was selected. These are
+exploratory seed-node geometry checks, not closed-loop acceptance results.
+The prototype's preference clipping preceded the production correction to
+honor actuator slew after soft steering preferences. Both tested production
+campaigns use the source-manifest versions. recovery-summary.json has 28
+additional seed-only rollouts of a rejected augmented-feedback recovery
+variation; its patch and raw sources remain in the named cache directory.
+
+controller-calls.csv records every successful call, including frame 0;
+report running statistics exclude frame 0. Failure times are separate.
+The independent audits recompute rectangle geometry for 31 ODE samples per
+hold (4,960 per completed scenario); this does not prove between-sample safety.
+Full pose JSON, MAT snapshots, prototype sources and failed harness logs stay
+in the cache named by summary.json and are identified by raw-manifest.json.
+The compact tracked bundle omits copied controller trees, solver dependencies,
+binaries, pose streams and unrelated estimator/manuscript work.
