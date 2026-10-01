@@ -1,0 +1,14 @@
+Name,Passed,Failed,Incomplete,Duration
+twoStagePredictiveControlTest/nominalInitializationStillOptimizesBothObjectives,1,0,0,1.350995
+twoStagePredictiveControlTest/shiftedAffineTrajectoryIsOnlyTheNextLinearization,1,0,0,0.170334
+twoStagePredictiveControlTest/exhaustedBudgetDoesNotExecuteThePreviousTrajectory,1,0,0,0.119627
+twoStagePredictiveControlTest/initialOverlapIsReportedAsOptimizedPositiveSlack,1,0,0,0.307928
+twoStagePredictiveControlTest/finiteSlewAndMagnitudeBoundsConstrainTheReturnedPlan,1,0,0,0.303687
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0,lateralError=0)",1,0,0,0.517115
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0,lateralError=0.1)",1,0,0,0.050556
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0.005,lateralError=0)",1,0,0,0.064612
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0.005,lateralError=0.1)",1,0,0,0.049772
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0,lateralError=0)",1,0,0,0.181436
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0,lateralError=0.1)",1,0,0,0.055359
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0.005,lateralError=0)",1,0,0,0.059732
+"clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0.005,lateralError=0.1)",1,0,0,0.133819

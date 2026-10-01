@@ -1,0 +1,61 @@
+{
+  "baseCommit": "aa21638f136804f4c7573bc87b81f9f26c37ba2d",
+  "scope": "Two-stage affine implementation; no scenario campaign or deadline benchmark",
+  "testCounts": {
+    "matlabPassed": 255,
+    "matlabFailed": 0,
+    "matlabIncomplete": 0,
+    "pythonPassed": 18
+  },
+  "preExistingSourcesPreserved": [
+    "controller/modifiedFialaTire.m",
+    "controller/nonlinearBicycleModel.m",
+    "controller/predictiveSafetyGeometry.m",
+    "controller/terminalContinuation.m",
+    "scripts/buildControllerKernels.m",
+    "tests/controllerKernelTest.m"
+  ],
+  "preExistingConfigurationPreserved": "Default integrationStep = 0.05 seconds",
+  "sources": {
+    "config/collisionAvoidanceControllerConfig.m": "7c531a69ba71301e7f7351cba65a96d10a16edf6d1c141317b5013696a280e50",
+    "controller/collisionAvoidanceController.m": "621d02b29487bb4a1502dffb9f324134d7ab1a7928be6b46a2826e7069d4de1a",
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+    "controller/nonlinearBicycleModel.m": "7ea8e251b8b15d9f714e5bba91da7558a6cb6806e76717c78410c48fe56a7882",
+    "controller/predictiveSafetyGeometry.m": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "e956acc0ce34f4713a89257c349085ae45accf4d9a7024d5d07822de0af329c0",
+    "controller/terminalContinuation.m": "ef737228dcfe0c12f8af73ef53849a2f6434221ff1708101a7669c9779f9c932",
+    "scripts/auditJointPredictiveSafety.py": "868dc318b3a997bc76bf17951dd2d0b535b117f79421753a14324a38b8b074ba",
+    "scripts/buildControllerKernels.m": "846dc40baefa5a0ddd424d172c47bcb5e6e4e96285cdd36771d7aa57a2052c31",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "d5a959208437a59caef94838e0e2657a239d24f27faca3757a4cd6cbc3624008",
+    "scripts/validateNonlinearPredictiveController.m": "350bdfcd20fa9b234dc0e40b8388effd8fb011bb3e334fc01f0dc50f79ccefb0",
+    "tests/auditJointPredictiveSafetyTest.py": "c539d7bad12df99b9c1544aab985df3b2d1fdfbfe8891e574bef3a1c8595edd2",
+    "tests/clfNominalRecoveryTest.m": "bf5b0338c578863e7499428054e7c4760034b4172132247356fe216d9c23b745",
+    "tests/collisionAvoidanceControllerConfigTest.m": "32cd87b81ad1ab141b56397bf976ed54bf064fab882da5c1a6d75a7f3d11940f",
+    "tests/controllerKernelTest.m": "75b3d8c863d549a853db794c1033bdab7c89dc18164969de0c58f5bd8a13dccf",
+    "tests/freePoseTerminalTest.m": "a56a40b067a0bf54b8a550db12599611764c32e1d79e54980aecde4282d4dd7c",
+    "tests/movingTargetFlowTest.m": "8a1c6d33f79e32e57f9906baa418c810e50fc3401712337e37e61882928a1ae1",
+    "tests/nonlinearPredictiveSafetyTest.m": "5798dc6d6a2bc4e6b467b60ecc3b7acc646049921dfe690fc5783e843a666096",
+    "tests/terminalContinuationTest.m": "4ab2a18315a1c1cf395c273a9fc3569e055301ab7cc2b9f773785757f49cd472",
+    "tests/twoStagePredictiveControlTest.m": "978e6526af2badd33a5a3607f055fe03fc15b7d63afa592eb9dd0b595f9d336d"
+  },
+  "nativeDependenciesExcludedFromCommit": {
+    "solver/controller/bicycleSampleKernelMex.mexa64": "dfd4ef44acf72bb3e22128dd394d2c7c583097cc8a9a81d8feb2d16a4fcc54e9",
+    "solver/controller/rectangleKernelMex.mexa64": "82d5b2189584d3228aaed9272f31f0c83c7c561973d245c2a42abca3f75e0599",
+    "solver/controller/dualKernelMex.mexa64": "d6a96de418c2c981f441db1f66fec423c634cf303a730ec6603944c85c146f0a"
+  },
+  "rawResultsOutsideRepository": "/home/zai/.cache/collisionAvoidance/two-stage-20261001",
+  "artifactHashes": {
+    "targeted-tests.csv": "14eb5ac8925afe11bbc53ed0923654f431b36475d101a3dab7dfb017442ecd3e",
+    "regression-tests.csv": "c262d2d689d5497183661fdfac1459dc2ae3b173dbd846a145895d20e69de7dc",
+    "code-analysis.json": "f90612bfee13d312862a0b6406ab4a06064d43a2230376f93f84912c05cb7058",
+    "check_targeted.m": "11f7fba39660b3c23b1693ffcf507a69c5e44601c05be3c9d06c413d52238c6d",
+    "check_regression.m": "f1ef4af4bc50bd085aa6c78f873d1d4e06fd5aab70dee1f5af988ba099061a94",
+    "check_final.m": "6e5f23e9fe2fcf53cf6de8d726703fa8fa8c7b4d7d9e985b084dbffe3e6c27bf",
+    "REPRODUCTION.txt": "4af2e9c3b59cbc328c1274fa6541f8af4b179b485772baabe40299a71daa4134",
+    "targeted-tests.txt": "b36e7bfa3dc7fd7bc86a19d8b8beadd0c7a960ce0c400cc2f324c1038c384503",
+    "regression-tests.txt": "4dc243a22946f36bf0631e1376ec2c9107aed0641f1453e0f7ed5db7c7b287d7",
+    "python-tests.txt": "3b5e11ce0258bbcc11d66d0d411a359734429d0edc8a217b7ed0f051081ccb8d"
+  }
+}

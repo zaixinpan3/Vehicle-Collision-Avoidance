@@ -1,0 +1,118 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\title{One Affine Prediction and Two Lexicographic Solves}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Implemented behavior}
+At the explicit project direction, the online controller now builds one affine
+model and solves exactly two problems on each successful call:
+\[
+ J_B^*=\min\sum_{i=0}^{N-1}\xi_i,\qquad
+ \min\rho\quad\text{subject to}\quad\sum_{i=0}^{N-1}\xi_i
+ \le J_B^*+\varepsilon_{\mathrm{lex}}.
+\]
+The shared constraints include affine dynamics, actuator magnitude and slew,
+state bounds, affine rectangle separation, a first-step relaxed quadratic CLF
+and the existing augmented free-pose terminal core. The CLF error reference
+remains the given path and desired speed. The configured 6-mm buffer is
+retained in the affine rows; road constraints remain absent.
+
+The quadratic CLF and terminal ellipsoid are represented by second-order
+cones, so both stages use \texttt{coneprog}, rather than a linearly constrained
+QP. There is no outer nonlinear iteration. The second stage runs even when
+PCBF slack is zero. No tracking/input cost can trade against either slack,
+and there is no third cost tie-break. Nonunique minimizing trajectories remain
+possible.
+
+The previous affine trajectory supplies the next linearization when usable;
+otherwise a single moving-target flow rollout supplies it. Affine dynamics
+retain the reference defect, so shifted affine states need not satisfy the
+nonlinear map. The horizon is fixed at
+$\min(M_{\max},N+\lceil T_{\mathrm{completion}}/h\rceil)$, without admission-driven
+extension. The existing completion allowance is retained, giving 68 holds at
+$N=8$, $T_{\mathrm{completion}}=3$ s and $h=0.05$ s.
+
+Removed online work includes nonlinear candidate replay/admission, sequential
+convexification, restoration solves, zero-CLF trial solves, nonlinear correction
+QPs, endpoint polishing, predictive-cost refinement and retained-control
+fallback. Only the second-stage first input is issued. A failed stage or
+exhausted budget reports \texttt{noOptimizationSolution}. The previous plan is
+not an executable witness. Controller state version advances to 61.
+
+\section{Scope of the result}
+Returned states and collision margins are affine-model quantities. Positive
+optimized PCBF slack is explicitly allowed and reported; it is not a
+collision-free claim. The second-stage numerical cap can also permit a tiny
+positive slack when the primary optimum is zero. Metadata distinguishes this
+scope from nonlinear validation and nonlinear-plant recursive feasibility.
+Zero CLF slack establishes the imposed affine one-step inequality, not a new
+proof of nonlinear convergence.
+
+The existing terminal core construction and anchor-based separation/departure
+rows remain. Encounter exit is selected once on the anchor. These calculations
+are not post-solve nonlinear candidate checks. Their geometry and model tests
+are retained, without transferring their isolated mathematical results into a
+claim about realized nonlinear affine-prediction endpoints.
+
+The scenario driver exports both optimization stages and raw affine residuals.
+The offline Python audit accepts those numerical residuals only under the
+declared affine tolerance, while physical sampled clearance remains a separate
+strict check. Historical nonlinear-admission exports retain their original
+interpretation. The retired option to run later frames without optimization is
+removed; old continuation state cannot resume the new formulation.
+
+\section{Validation actually performed}
+\begin{center}
+\begin{tabular}{lrrr}\toprule
+Check & Passed & Failed & Incomplete \\\midrule
+Two-stage and affine CLF tests & 13 & 0 & 0 \\
+Model, geometry, terminal, interface and config tests & 242 & 0 & 0 \\
+Python export/audit tests & 18 & 0 & 0 \\\bottomrule
+\end{tabular}
+\end{center}
+The 13 targeted tests check both objectives, the primary cap, affine dynamics
+including shifted-reference defects, exact first-input output, finite slew and
+magnitude bounds, positive optimized slack, deadline failure without fallback,
+and zero-slack affine CLF dissipation on straight/circular references at
+8 and 15 m/s. The 242 related checks include eight existing compiled-kernel
+equivalence/domain tests (random streams 7 and 11). Existing tests of retired
+execution-witness behavior and unconditional nonlinear dissipation were replaced
+by the explicit affine-contract tests; no scenario success is inferred from
+that replacement.
+
+MATLAB Code Analyzer reports no syntax errors. It retains sparse-assembly and
+array-growth advisories in the solver and an obsolete suppression in the
+pre-existing geometry implementation. Exact findings and test results are in
+\path{report/TWO_STAGE_CONTROLLER_20261001/}. The two-stage tests and regression
+checks ran with \texttt{matlab -singleCompThread -batch}; no campaign runner was
+invoked. A preliminary single no-target call also completed both stages, but
+its cold-call timing is not a runtime benchmark.
+
+The earlier fourteen-case campaign remains stopped at the user's request.
+This change establishes neither a new avoidance success rate nor a 100-ms
+runtime bound. The configurable soft shared budget remains 5 s; a cap of two
+optimizer calls is not a measured execution deadline.
+
+\section{Reproducibility and preserved work}
+The base project commit is
+\path{aa21638f136804f4c7573bc87b81f9f26c37ba2d}. The implementation preserves and
+includes the pre-existing in-scope 50-ms mesh/interpolated-midpoint and optional
+model/geometry-kernel source changes, build script and equivalence tests. Those
+changes were already present before this simplification and are not presented
+as newly developed here. Compiled binaries and the nested \path{solver/} tree
+are excluded from the project commit. Unrelated estimator, manuscript,
+perception and report changes are preserved outside this commit.
+
+The artifact bundle contains compact test tables, analyzer findings, actual
+commands, native dependency hashes and source hashes. Existing optional kernels
+were used and checked; their build script was not rerun. Full campaign,
+closed-loop recovery, maximum-runtime and observer/perception regressions were
+not run. The current architecture is documented in
+\path{controller/PCBF_CLF_ARCHITECTURE.md}.
+\end{document}

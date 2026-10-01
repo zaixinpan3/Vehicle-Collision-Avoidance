@@ -60,7 +60,7 @@ classdef terminalContinuation
                     seed.contractionBound=gamma;seed.defectBound=drift;
                     seed.samplePositionBound=max(samples(1:2,:),[],2);
                     seed.sampleHeadingBound=max(samples(3,:));
-                    count=2*max(1,ceil(cfg.controller.sampleTime/(2*cfg.nonlinear.integrationStep)));
+                    count=nonlinearBicycleModel.meshCount(cfg);
                     positionDefect=zeros(2,1);headingDefect=0;
                     if next(3)~=0,center=(eye(2)-localRotation(next(3)))\next(1:2);end
                     for sample=1:count-1
@@ -304,7 +304,7 @@ function [jacobian,defect,samples,domain] = localEnclosure(base,input,gain,bound
     inputBound=abs(gain)*bound;
     inputTangent=localLeftInterval(gain,repmat(coordinates,1,1,2));
     for k=1:2,u{k}=[localOut(input(k)+[-inputBound(k),inputBound(k)]);reshape(inputTangent(k,:,:),8,2)];end
-    count=2*max(1,ceil(cfg.controller.sampleTime/(2*cfg.nonlinear.integrationStep)));
+    count=nonlinearBicycleModel.meshCount(cfg);
     h=cfg.controller.sampleTime/count;nominal=base;samples=bound(1:3);domain=true;
     try
         for k=1:count

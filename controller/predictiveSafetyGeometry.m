@@ -64,6 +64,26 @@ classdef predictiveSafetyGeometry
         end
 
         function [distance,certificate] = rectangle(poseE,shapeE,poseT,shapeT)
+            kernel=localKernel();
+            if isempty(kernel),[distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);
+            else,[distance,normal]=kernel.rectangle(poseE(1:3),shapeE(:),poseT(1:3),shapeT(:));
+            end
+            if nargout>1
+                re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
+                rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
+                sE=-re.'*normal;sT=rt.'*normal;
+                mu=[max(sE,0);max(-sE,0)];lambda=[max(sT,0);max(-sT,0)];
+                hE=[shapeE(1:2)+shapeE(3:4);shapeE(1:2)-shapeE(3:4)];
+                hT=[shapeT(1:2)+shapeT(3:4);shapeT(1:2)-shapeT(3:4)];
+                certificate=struct('normal',normal,'mu',mu,'lambda',lambda, ...
+                    'value',normal.'*(poseE(1:2)-poseT(1:2))-hE.'*mu-hT.'*lambda, ...
+                    'normalConvention',"targetToEgo");
+            end
+        end
+
+        function [distance,normal] = rectangleNumeric(poseE,shapeE,poseT,shapeT)
+            % Distance and target-to-ego witness normal. This numeric part
+            % is what scripts/buildControllerKernels.m compiles.
             re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
             rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
             signs=[-1,1,1,-1;-1,-1,1,1];
@@ -86,13 +106,6 @@ classdef predictiveSafetyGeometry
                     end
                 end
             end
-            sE=-re.'*normal;sT=rt.'*normal;
-            mu=[max(sE,0);max(-sE,0)];lambda=[max(sT,0);max(-sT,0)];
-            hE=[shapeE(1:2)+shapeE(3:4);shapeE(1:2)-shapeE(3:4)];
-            hT=[shapeT(1:2)+shapeT(3:4);shapeT(1:2)-shapeT(3:4)];
-            certificate=struct('normal',normal,'mu',mu,'lambda',lambda, ...
-                'value',normal.'*(poseE(1:2)-poseT(1:2))-hE.'*mu-hT.'*lambda, ...
-                'normalConvention',"targetToEgo");
         end
 
         function rows = dualLinearization(poseE,shapeE,poseT,shapeT,preferred)
@@ -100,17 +113,27 @@ classdef predictiveSafetyGeometry
             % The four ego vertex rows retain yaw dependence in each SCA step.
             % At overlap, a signed support certificate supplies a nonzero
             % restoration direction; it never certifies positive clearance.
+            kernel=localKernel();
+            if isempty(kernel)
+                [values,jacobian,normal,mu,lambda]=predictiveSafetyGeometry.dualNumeric(poseE,shapeE,poseT,shapeT,preferred);
+            else
+                [values,jacobian,normal,mu,lambda]=kernel.dual(poseE(1:3),shapeE(:),poseT(1:3),shapeT(:),preferred(:));
+            end
+            rows=struct('value',values,'jacobian',jacobian, ...
+                'normal',normal,'mu',mu,'lambda',lambda,'signedDistance',min(values));
+        end
+
+        function [values,jacobian,normal,mu,lambda] = dualNumeric(poseE,shapeE,poseT,shapeT,preferred)
             re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
             rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
             body=shapeE(3:4)+shapeE(1:2).*[-1,1,1,-1;-1,-1,1,1];
             ego=poseE(1:2)+re*body;
             target=poseT(1:2)+rt*(shapeT(3:4)+shapeT(1:2).*[-1,1,1,-1;-1,-1,1,1]);
-            [distance,witness]=predictiveSafetyGeometry.rectangle(poseE,shapeE,poseT,shapeT);
-            normal=witness.normal;
+            [distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);
             if distance==0
                 directions=[preferred/norm(preferred),-preferred/norm(preferred),re,-re,rt,-rt];
                 gaps=min(directions.'*ego,[],2)-max(directions.'*target,[],2);
-                best=max(gaps);index=find(gaps>=best-1e-10,1);normal=directions(:,index);
+                best=max(gaps);index=find(gaps>=best-1e-10,1);normal=directions(:,index(1));
             end
             se=-re.'*normal;st=rt.'*normal;
             mu=[max(se,0);max(-se,0)];lambda=[max(st,0);max(-st,0)];
@@ -118,8 +141,7 @@ classdef predictiveSafetyGeometry
             targetSupport=normal.'*poseT(1:2)+ht.'*lambda;
             values=(normal.'*ego-targetSupport).';
             yaw=(normal.'*re*[0,-1;1,0]*body).';
-            rows=struct('value',values,'jacobian',[repmat(normal.',4,1),yaw], ...
-                'normal',normal,'mu',mu,'lambda',lambda,'signedDistance',min(values));
+            jacobian=[repmat(normal.',4,1),yaw];
         end
 
         function check = intervalClearance(first,last,shape,targetEpoch,time,duration,margin)
@@ -177,6 +199,36 @@ classdef predictiveSafetyGeometry
         end
 
     end
+end
+
+function kernel=localKernel()
+    % Handles of the optional compiled copies of rectangleNumeric and
+    % dualNumeric, or empty. They are used only if they reproduce this
+    % source bitwise at probe poses, separated and overlapping.
+    persistent handles checked
+    if isempty(checked)
+        checked=true;handles=[];
+        native=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
+        if isfile(fullfile(native,['rectangleKernelMex.',mexext])) && isfile(fullfile(native,['dualKernelMex.',mexext]))
+            previous=addpath(native);candidate=struct('rectangle',@rectangleKernelMex,'dual',@dualKernelMex);
+            shape=[2.4;.95;.3;-.1];same=true;
+            for poseT=[[9;4;2.1],[1.5;.8;.6],[-30;12;-1.3]]
+                poseE=[.4;-.3;.25];
+                [d,n]=predictiveSafetyGeometry.rectangleNumeric(poseE,shape,poseT,shape);
+                [dk,nk]=candidate.rectangle(poseE,shape,poseT,shape);
+                [v,j,m,mu,la]=predictiveSafetyGeometry.dualNumeric(poseE,shape,poseT,shape,[0;1]);
+                [vk,jk,mk,muk,lak]=candidate.dual(poseE,shape,poseT,shape,[0;1]);
+                same=same && isequal({d,n,v,j,m,mu,la},{dk,nk,vk,jk,mk,muk,lak});
+            end
+            path(previous);
+            if same,handles=candidate;
+            else
+                warning('collisionAvoidanceController:staleGeometryKernel', ...
+                    'The compiled geometry kernels differ from the source and are not used. Rebuild them with buildControllerKernels.');
+            end
+        end
+    end
+    kernel=handles;
 end
 
 function [distance,point]=localPointSegment(vertex,first,last)

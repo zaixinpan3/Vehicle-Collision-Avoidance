@@ -26,6 +26,17 @@ classdef modifiedFialaTire
                 "force",force,"operatingInput",point,"operatingState",state);
         end
         function parameters = parameters(cfg)
+            if ~coder.target('MATLAB')
+                % Generated code evaluates the constants of a validated configuration.
+                normalLoad = cfg.vehicle.m*cfg.vehicle.gravity/(cfg.vehicle.lf+cfg.vehicle.lr) ...
+                    *[cfg.vehicle.lr;cfg.vehicle.lf];
+                forceScale = cfg.tire.frictionCoefficient.*normalLoad;
+                parameters = struct("corneringStiffness", cfg.tire.corneringStiffness, ...
+                    "frictionCoefficient", cfg.tire.frictionCoefficient, ...
+                    "staticNormalLoad", normalLoad,"longitudinalForceScale", forceScale, ...
+                    "brakingRatioAccelerationGain", sum(forceScale)/cfg.vehicle.m);
+                return;
+            end
             persistent priorKey priorParameters
             key = [cfg.vehicle.m;cfg.vehicle.gravity;cfg.vehicle.lf;cfg.vehicle.lr; ...
                 cfg.tire.corneringStiffness(:);cfg.tire.frictionCoefficient(:)];

@@ -1,5 +1,5 @@
 function cfg = collisionAvoidanceControllerConfig(userCfg)
-%collisionAvoidanceControllerConfig Joint PCBF/CLF/SCvx parameters in SI units.
+%collisionAvoidanceControllerConfig Two-stage PCBF/CLF parameters in SI units.
 % Unknown fields are rejected so retired algorithm settings cannot silently
 % change the interpretation of a controller run.
     if nargin<1,userCfg=[];end
@@ -22,8 +22,8 @@ end
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
-    cfg.nonlinear=struct('integrationStep',.005,'terminalRadius',.25, ...
-        'maximumIterations',24,'trustRadius',.5, ...
+    cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
+        'trustRadius',.5, ...
         'recoveryHorizonSeconds',3,'clfDecay',.01);
     % A target farther than encounterRangeMeters (body to body) carries no
     % collision risk. Its constant speed-rate and sideslip motion is assumed
@@ -42,7 +42,7 @@ function cfg=localDefaults()
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
         'frontWheelSteeringAngleWeight',1,'brakingRatioWeight',1);
-    % All improvement work shares the remaining controller-call budget.
+    % The two convex solves share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
         'feasibilityTolerance',1e-5,'constraintTolerance',1e-8, ...
@@ -75,9 +75,6 @@ function localValidate(cfg)
     end
     for name=["integrationStep","terminalRadius","trustRadius","recoveryHorizonSeconds","clfDecay"]
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
-    end
-    for name="maximumIterations"
-        validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','integer','positive'});
     end
     if cfg.nonlinear.clfDecay>=1,localInvalid('CLF decay must lie in (0,1).');end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});

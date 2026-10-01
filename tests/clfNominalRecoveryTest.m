@@ -1,7 +1,9 @@
 classdef clfNominalRecoveryTest < matlab.unittest.TestCase
-    % Closed-loop dissipation beyond the original initialization/completion tail.
+    % One-step CLF dissipation in the affine model; no nonlinear stability claim.
     properties (TestParameter)
         referenceSpeed={8,15};
+        curvature={0,.005};
+        lateralError={0,.1};
     end
     methods (TestClassSetup)
         function prepare(testCase)
@@ -11,47 +13,25 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
-        function circularCruiseRemainsNominalAfterTheInitialTail(testCase,referenceSpeed)
-            result=localClosedLoop(referenceSpeed,0,140);
-            testCase.verifyLessThan(max(result.energy),1e-10);
-            testCase.verifyLessThan(max(abs(result.finalError)),1e-6);
-            testCase.verifyEqual(result.maximumHard,0,AbsTol=0);
-            testCase.verifyEqual(result.maximumSafety,0,AbsTol=0);
-            testCase.verifyTrue(all(result.clfCompleted));
-            testCase.verifyGreaterThanOrEqual(min(result.horizon),referenceSpeed+mod(referenceSpeed,2)+60);
-        end
-        function curvedTrackingErrorDissipatesAfterTheInitialTail(testCase,referenceSpeed)
-            result=localClosedLoop(referenceSpeed,.1,240);
-            testCase.verifyLessThanOrEqual(result.energy(end), ...
-                (1-.01)^240*result.energy(1)+1e-10);
-            testCase.verifyLessThanOrEqual(max(result.relaxation),1e-10);
-            testCase.verifyEqual(result.maximumHard,0,AbsTol=0);
-            testCase.verifyEqual(result.maximumSafety,0,AbsTol=0);
-            testCase.verifyTrue(all(result.clfCompleted));
-            testCase.verifyGreaterThanOrEqual(min(result.horizon),referenceSpeed+mod(referenceSpeed,2)+60);
+        function secondStageReachesZeroSlackForAnUnobstructedClf(testCase,referenceSpeed,curvature,lateralError)
+            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',referenceSpeed, ...
+                'controller',struct('horizonSteps',referenceSpeed+mod(referenceSpeed,2))));
+            road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
+            reference=nonlinearBicycleModel.cruise(cfg,curvature);x=reference.state;x(2)=lateralError;
+            ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
+                'yawRate',x(6),'heldActuatorInput',reference.input);
+            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            anchor=problem.model.linearization;
+            [error,jacobian]=nonlinearBicycleModel.errorLinearization(anchor.states(:,2),problem.model.lane,reference);
+            error=error+jacobian*(problem.predictedState(:,2)-anchor.states(:,2));
+            nextValue=norm(reference.factor*error)^2;
+            tol=cfg.solver.feasibilityTolerance*max(1,problem.solution.clfInitialValue);
+            testCase.verifyEqual(problem.solution.clfNextValue,nextValue,AbsTol=1e-8);
+            testCase.verifyLessThanOrEqual(problem.solution.clfSlack,tol);
+            testCase.verifyLessThanOrEqual(nextValue,(1-cfg.nonlinear.clfDecay)*problem.solution.clfInitialValue+tol);
+            testCase.verifyLessThanOrEqual(problem.solution.safety,problem.metadata.search.slackCap+tol);
+            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
+            testCase.verifyEqual(problem.metadata.solverCallCount,2);
         end
     end
-end
-
-function result=localClosedLoop(speed,lateralError,holds)
-    cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed, ...
-        'controller',struct('horizonSteps',speed+mod(speed,2))));
-    road=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',.005,'length',200), ...
-        'lateralClearance',[4;4]);
-    reference=nonlinearBicycleModel.cruise(cfg,.005);x=reference.state;x(2)=lateralError;
-    previous=[];input=zeros(2,1);energy=zeros(1,holds+1);relaxation=zeros(1,holds);
-    hard=0;safety=0;completed=false(1,holds);horizon=zeros(1,holds);
-    for step=1:holds
-        ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5),'yawRate',x(6), ...
-            'stateTime',(step-1)*cfg.controller.sampleTime,'heldActuatorInput',input);
-        [command,~,prediction,previous]=collisionAvoidanceController(ego,[],road,cfg,previous);
-        input=command.actuatorInput;x=nonlinearBicycleModel.sample(x,input,cfg);
-        energy(step)=prediction.solution.clfInitialValue;energy(step+1)=prediction.solution.clfNextValue;
-        relaxation(step)=prediction.solution.clfSlack;
-        hard=max(hard,prediction.solution.hard);safety=max(safety,prediction.solution.safety);
-        completed(step)=prediction.metadata.search.clfLowerBound;horizon(step)=size(previous.inputTrajectory,2);
-    end
-    result=struct('energy',energy,'relaxation',relaxation,'maximumHard',hard, ...
-        'maximumSafety',safety,'clfCompleted',completed,'horizon',horizon, ...
-        'finalError',nonlinearBicycleModel.error(x,prediction.model.lane,reference));
 end

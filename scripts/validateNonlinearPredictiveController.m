@@ -1,7 +1,7 @@
 function summary = validateNonlinearPredictiveController(outputDirectory)
-%validateNonlinearPredictiveController Reproduce the nominal PCBF/CLF/SCvx checks.
+%validateNonlinearPredictiveController Check the two-stage affine controller and offline replay.
 % Writes compact test, analyzer and independent replay results to outputDirectory.
-% The selected suites exercise the nonlinear controller and its shared kernels;
+% The selected suites exercise the affine optimizer and its nonlinear model kernels;
 % this is not the complete repository suite of estimator/perception studies.
     arguments
         outputDirectory (1,1) string
@@ -10,7 +10,8 @@ function summary = validateNonlinearPredictiveController(outputDirectory)
     cleanup=onCleanup(@()cd(previous));cd(root);
     if ~isfolder(outputDirectory),mkdir(outputDirectory);end
     addpath('controller','config','scripts');
-    suites={'tests/terminalContinuationTest.m','tests/nonlinearPredictiveSafetyTest.m','tests/modifiedFialaTireTest.m', ...
+    suites={'tests/twoStagePredictiveControlTest.m','tests/clfNominalRecoveryTest.m', ...
+        'tests/terminalContinuationTest.m','tests/nonlinearPredictiveSafetyTest.m','tests/modifiedFialaTireTest.m', ...
         'tests/collisionAvoidanceControllerConfigTest.m','tests/controllerSourceBudgetTest.m', ...
         'tests/longitudinalRoadLoadTest.m','tests/controllerInputGeometryTest.m', ...
         'tests/nrmmModelFormulationTest.m','tests/onlineNrmmTrackingRuntimeTest.m'};

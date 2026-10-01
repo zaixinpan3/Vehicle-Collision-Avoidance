@@ -34,9 +34,11 @@ passes through zero signed velocity at 2 s. Each export records the initial
 target state and parameters for independent reconstruction; the audit's
 `--files` option selects individual JSON exports. Historical exports without
 the revised target state require the audit source from their recorded commit.
-The optimizer
-executes both zero-slack and positive-slack results. The previous trajectory
-only initializes the new solve. See
+The optimizer builds one affine model and solves PCBF slack first, then CLF
+slack subject to the attained PCBF cap. It returns both zero-slack and
+positive-slack results without nonlinear admission or correction. The previous
+trajectory only supplies the next linearization. Returned prediction states
+are affine states; independent replay determines measured physical clearance. See
 [the controller architecture](../controller/PCBF_CLF_ARCHITECTURE.md).
 
 `prepareCollisionAvoidanceController` warms MATLAB and the optimizer using a
@@ -55,7 +57,7 @@ estimator adapter. Neither helper builds native controller libraries.
   `quadraticRoadBoundaryRectangleMargin` support offline curb experiments.
   Fitted curb segments are not global corridors for the current controller.
 
-Retired affine MPC, formal controller admission and native controller benchmark
+Retired controller modes, formal controller admission and native benchmark
 scripts have been removed. Their dated reports remain historical results;
 use Git history for the source associated with those reports. New reports
 and numerical results belong in `report/`.

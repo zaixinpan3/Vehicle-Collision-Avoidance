@@ -1,9 +1,7 @@
 classdef movingTargetFlowTest < matlab.unittest.TestCase
-    % Moving-boundary identities and actual nonlinear initialization behavior.
+    % Moving-boundary identities for initialization guidance.
     properties (TestParameter)
         angle = {0,.7,1.9};
-        speed = {8,15};
-        scenario = {"brakingLead","crossing","turningCrossing"};
     end
     methods (TestClassSetup)
         function prepare(testCase)
@@ -41,41 +39,5 @@ classdef movingTargetFlowTest < matlab.unittest.TestCase
             velocity=predictiveSafetyGeometry.movingFlowVelocity([2;3],[8;0],[2;3],[1;0],eye(2),zeros(2),.7);
             testCase.verifyTrue(all(isfinite(velocity)));
         end
-        function knownMovingThreatProducesAnAdmissibleNonlinearContinuation(testCase,speed,scenario)
-            [ego,target,road,cfg]=localFixture(speed,scenario);
-            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            endpoint=[problem.solution.states(:,end);inputs(:,end)];
-            membership=terminalContinuation.membership(endpoint,size(inputs,2),problem.model.terminal);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1));
-            testCase.verifyEqual(problem.solution.hard,0);
-            testCase.verifyEqual(problem.solution.safety,0);
-            testCase.verifyLessThanOrEqual(membership,0);
-            testCase.verifyGreaterThanOrEqual(problem.solution.terminalSeparationMargin,0);
-            testCase.verifyFalse(problem.metadata.drivingModeSwitching);
-            testCase.verifyFalse(problem.metadata.roadConstraintsEnforced);
-            testCase.verifyNotEmpty(problem.metadata.search.initializationCandidates);
-        end
-        function finiteActuatorRatesAreRespectedByAnAcceptedSeed(testCase)
-            [ego,target,road,cfg]=localFixture(8,"brakingLead");
-            cfg.model.frontWheelSteeringRateMaximum=.8;cfg.model.brakingRatioRateMaximum=2;
-            [~,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            differences=abs(diff([ego.heldActuatorInput,inputs],1,2));
-            limits=cfg.controller.sampleTime*[.8;2];
-            testCase.verifyLessThanOrEqual(max(differences,[],2),limits+1e-12);
-            testCase.verifyEqual(problem.solution.hard,0);
-            testCase.verifyEqual(problem.solution.safety,0);
-        end
     end
-end
-
-function [ego,target,road,cfg]=localFixture(speed,name)
-    [x,q,road,cfg]=collisionThreatScenario(name,struct('referenceSpeed',speed, ...
-        'controller',struct('horizonSteps',speed+mod(speed,2))));
-    cfg.solver.timeLimitSeconds=30;
-    ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
-        'yawRate',x(6),'stateTime',0,'heldActuatorInput',[0;0]);
-    target=struct('targetPositionInertial',q(1:2), ...
-        'targetVelocityInertial',q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))], ...
-        'targetYawInertial',q(3),'targetSideslip',q(6),'targetScalarAcceleration',q(5), ...
-        'targetRearAxleDistance',q(7),'targetLength',2*q(8),'targetWidth',2*q(9));
 end

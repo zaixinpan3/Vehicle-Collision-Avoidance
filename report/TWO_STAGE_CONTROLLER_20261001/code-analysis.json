@@ -1,0 +1,194 @@
+[
+  {
+    "file": "controller/collisionAvoidanceController.m",
+    "findings": []
+  },
+  {
+    "file": "controller/solvePredictiveControl.m",
+    "findings": [
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 83,
+        "column": [
+          17,
+          22
+        ]
+      },
+      {
+        "id": "AGROW",
+        "message": "Variable appears to change size on every loop iteration. Consider preallocating for speed.",
+        "fix": 0,
+        "line": 84,
+        "column": [
+          17,
+          22
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 170,
+        "column": [
+          26,
+          30
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 170,
+        "column": [
+          57,
+          61
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 170,
+        "column": [
+          82,
+          86
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 174,
+        "column": [
+          24,
+          24
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 175,
+        "column": [
+          20,
+          20
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 179,
+        "column": [
+          26,
+          28
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 186,
+        "column": [
+          9,
+          11
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 186,
+        "column": [
+          31,
+          33
+        ]
+      },
+      {
+        "id": "SPRIX",
+        "message": "This sparse indexing expression is likely to be slow.",
+        "fix": 0,
+        "line": 200,
+        "column": [
+          33,
+          38
+        ]
+      }
+    ]
+  },
+  {
+    "file": "controller/nonlinearBicycleModel.m",
+    "findings": []
+  },
+  {
+    "file": "controller/modifiedFialaTire.m",
+    "findings": []
+  },
+  {
+    "file": "controller/predictiveSafetyGeometry.m",
+    "findings": {
+      "id": "MSNU",
+      "message": "A Code Analyzer message was once suppressed here, but the message is no longer generated.",
+      "fix": 1,
+      "line": 180,
+      "column": [
+        50,
+        60
+      ]
+    }
+  },
+  {
+    "file": "controller/terminalContinuation.m",
+    "findings": []
+  },
+  {
+    "file": "config/collisionAvoidanceControllerConfig.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/buildControllerKernels.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "findings": []
+  },
+  {
+    "file": "scripts/validateNonlinearPredictiveController.m",
+    "findings": []
+  },
+  {
+    "file": "tests/twoStagePredictiveControlTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/clfNominalRecoveryTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/nonlinearPredictiveSafetyTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/terminalContinuationTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/freePoseTerminalTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/movingTargetFlowTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/controllerKernelTest.m",
+    "findings": []
+  },
+  {
+    "file": "tests/collisionAvoidanceControllerConfigTest.m",
+    "findings": []
+  }
+]

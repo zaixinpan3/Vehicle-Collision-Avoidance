@@ -25,23 +25,48 @@ classdef nonlinearBicycleModel
             end
         end
 
+        function count = meshCount(cfg)
+            % RK4 steps per hold: one when integrationStep covers the hold,
+            % otherwise an even number so that the midpoint is a mesh node.
+            h=cfg.controller.sampleTime;count=1;
+            if cfg.nonlinear.integrationStep<h,count=2*max(1,ceil(h/(2*cfg.nonlinear.integrationStep)));end
+        end
+
         function [next,a,b] = sample(x,u,cfg,curvature,duration)
             if nargin<4,curvature=[];end
             if nargin<5,duration=cfg.controller.sampleTime;end
-            % One even integration mesh for full holds and their midpoints.
-            fullCount=2*max(1,ceil(cfg.controller.sampleTime/(2*cfg.nonlinear.integrationStep)));
-            count=max(1,round(fullCount*duration/cfg.controller.sampleTime));
-            h=duration/count;variational=nargout>1;
-            if variational,y=[x;reshape(eye(6),[],1);zeros(12,1)];else,y=x;end
-            for index=1:count
-                k1=localFlow(y,u,cfg,curvature,variational);
-                k2=localFlow(y+h*k1/2,u,cfg,curvature,variational);
-                k3=localFlow(y+h*k2/2,u,cfg,curvature,variational);
-                k4=localFlow(y+h*k3,u,cfg,curvature,variational);
-                y=y+h*(k1+2*k2+2*k3+k4)/6;
+            variational=nargout>1;
+            if coder.target('MATLAB') && isempty(curvature)
+                % The compiled copy of this method; see scripts/buildControllerKernels.m.
+                kernel=localKernel(cfg);
+                if ~isempty(kernel)
+                    [next,a,b]=kernel(x,u,localKernelParameters(cfg),duration,variational);
+                    return;
+                end
             end
+            y=localIntegrate(x,u,cfg,curvature,duration,variational);
             next=y(1:6);
             if variational,a=reshape(y(7:42),6,6);b=reshape(y(43:54),6,2);end
+        end
+
+        function [middle,am,bm,next,a,b] = hold(x,u,cfg)
+            % One hold and its midpoint with their tangents. A one-step mesh
+            % has no midpoint node; its midpoint is the linear interpolant
+            % that the interval certificate also uses between mesh nodes.
+            half=cfg.controller.sampleTime/2;
+            if nonlinearBicycleModel.meshCount(cfg)==1
+                if nargout>1,[next,a,b]=nonlinearBicycleModel.sample(x,u,cfg);am=(eye(6)+a)/2;bm=b/2;
+                else,next=nonlinearBicycleModel.sample(x,u,cfg);
+                end
+                middle=(x+next)/2;
+            elseif nargout>1
+                [middle,am,bm]=nonlinearBicycleModel.sample(x,u,cfg,[],half);
+                [next,an,bn]=nonlinearBicycleModel.sample(middle,u,cfg,[],half);
+                a=an*am;b=an*bm+bn;
+            else
+                middle=nonlinearBicycleModel.sample(x,u,cfg,[],half);
+                next=nonlinearBicycleModel.sample(middle,u,cfg,[],half);
+            end
         end
 
         function [next,a,b] = jointSample(z,u,targetParameters,cfg)
@@ -174,6 +199,55 @@ classdef nonlinearBicycleModel
             error=[projection.lateralPosition;angle;x(4:6)-reference.state(4:6)];
         end
     end
+end
+
+function y=localIntegrate(x,u,cfg,curvature,duration,variational)
+    % One even integration mesh for full holds and their midpoints.
+    count=max(1,round(nonlinearBicycleModel.meshCount(cfg)*duration/cfg.controller.sampleTime));
+    h=duration/count;
+    if variational,y=[x;reshape(eye(6),[],1);zeros(12,1)];else,y=x;end
+    for index=1:count
+        k1=localFlow(y,u,cfg,curvature,variational);
+        k2=localFlow(y+h*k1/2,u,cfg,curvature,variational);
+        k3=localFlow(y+h*k2/2,u,cfg,curvature,variational);
+        k4=localFlow(y+h*k3,u,cfg,curvature,variational);
+        y=y+h*(k1+2*k2+2*k3+k4)/6;
+    end
+end
+
+function p=localKernelParameters(cfg)
+    p=[cfg.model.scheduleSpeedFloor;cfg.vehicle.m;cfg.vehicle.Iz;cfg.vehicle.lf;cfg.vehicle.lr; ...
+        cfg.vehicle.gravity;cfg.tire.corneringStiffness(:);cfg.tire.frictionCoefficient(:); ...
+        cfg.roadLoad.airDensity;cfg.roadLoad.dragCoefficient;cfg.roadLoad.frontalArea; ...
+        cfg.roadLoad.rollingCoefficient;cfg.roadLoad.rollingSpeedCoefficient; ...
+        cfg.roadLoad.rollingQuarticCoefficient;cfg.roadLoad.rollingTransitionSpeed; ...
+        cfg.controller.sampleTime;cfg.nonlinear.integrationStep];
+end
+
+function kernel=localKernel(cfg)
+    % Handle of the optional compiled copy of sample, or empty. It is used
+    % only if it reproduces this source bitwise at a probe point, so that a
+    % kernel built from older dynamics is never used. The handle stays valid
+    % without leaving the kernel folder on the path.
+    persistent handle checked
+    if isempty(checked)
+        checked=true;handle=[];
+        native=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
+        if isfile(fullfile(native,['bicycleSampleKernelMex.',mexext]))
+            previous=addpath(native);candidate=@bicycleSampleKernelMex;
+            x=[.3;-.2;.1;max(8,2*cfg.model.scheduleSpeedFloor);.4;-.2];u=[.05;-.3];
+            duration=cfg.controller.sampleTime/2;
+            y=localIntegrate(x,u,cfg,[],duration,true);
+            [next,a,b]=candidate(x,u,localKernelParameters(cfg),duration,true);
+            path(previous);
+            if isequal(y,[next;a(:);b(:)]),handle=candidate;
+            else
+                warning('collisionAvoidanceController:staleModelKernel', ...
+                    'The compiled bicycle kernel differs from the model source and is not used. Rebuild it with buildControllerKernels.');
+            end
+        end
+    end
+    kernel=handle;
 end
 
 function dy=localFlow(y,u,cfg,curvature,variational)

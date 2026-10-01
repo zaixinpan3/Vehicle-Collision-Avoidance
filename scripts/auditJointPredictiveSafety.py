@@ -63,11 +63,27 @@ def clearance_passes(minimum, margin):
 
 
 def feasible_hold(hold):
-    """A retained witness is executable without a new optimization result."""
+    """Check the declared optimization scope, separately from replay geometry."""
+    if hold.get('source') == 'twoStageConvexOptimization':
+        stages = hold.get('solverStages', [])
+        tolerance = hold.get('affineFeasibilityTolerance', 0)
+        return (math.isfinite(tolerance) and tolerance > 0
+                and 0 <= hold.get('hardResidual', math.inf) <= tolerance
+                and hold.get('optimizationConverged', False)
+                and hold.get('solverCalls') == 2 and len(stages) == 2
+                and [stage.get('objective') for stage in stages] == ['pcbfSlack', 'clfSlack']
+                and all(stage.get('exitFlag', 0) > 0 for stage in stages))
+    # Historical nonlinear-admission exports retain their original contract.
     return (hold.get('hardResidual') == 0
             and hold.get('source') in ('sequentialConvexification',
                                        'retainedContinuation', 'feasibleInitialization',
                                        'nonlinearConstraintCorrection'))
+
+
+def zero_slack_hold(hold):
+    tolerance = (hold.get('affineFeasibilityTolerance', 0)
+                 if hold.get('source') == 'twoStageConvexOptimization' else 0)
+    return math.isfinite(tolerance) and 0 <= hold.get('predictiveBarrierValue', math.inf) <= tolerance
 
 
 def recovery_completed(result):
@@ -124,9 +140,9 @@ def audit(result):
     complete = result['completed'] and (result['executedFrames'] == result['requestedFrames'] or recovered)
     reported = result['minimumReplayClearanceMeters']
     clearance_match = samples > 0 and (reported is None or abs(minimum - reported) < 1e-9)
-    zero_slack = bool(result['trace']) and all(hold.get('predictiveBarrierValue') == 0 for hold in result['trace'])
+    zero_slack = bool(result['trace']) and all(zero_slack_hold(hold) for hold in result['trace'])
     optimized = bool(result['trace']) and all(hold['solverCalls'] > 0 for hold in result['trace'])
-    converged = bool(result['trace']) and all(hold.get('scvxConverged', False) for hold in result['trace'])
+    converged = bool(result['trace']) and all(hold.get('optimizationConverged', hold.get('scvxConverged', False)) for hold in result['trace'])
     feasible = bool(result['trace']) and all(feasible_hold(hold) for hold in result['trace'])
     collision_free = samples > 0 and minimum > 0
     clearance_satisfied = samples > 0 and clearance_passes(minimum, result['requiredClearanceMeters'])

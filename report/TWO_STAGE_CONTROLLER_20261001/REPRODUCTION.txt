@@ -1,0 +1,33 @@
+Two-stage affine PCBF/CLF implementation, October 1, 2026
+
+Actual checks were run from the repository root with MATLAB R2026a Update 3:
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/two-stage-20261001/check_targeted.m')"
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/two-stage-20261001/check_regression.m')"
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/two-stage-20261001/check_final.m')"
+  python3 -m unittest discover -s tests -p 'auditJointPredictiveSafetyTest.py' -v
+  git diff --check
+
+The three check_*.m exports in this bundle select exactly the executed tests
+and analysis files. Only their root/output handling is made portable: run
+these helpers with MATLAB from this repository to write a new temporary
+result directory. Those exported path adaptations were inspected, not rerun.
+The tests themselves have 255 passed, zero failed and zero incomplete results;
+18 Python tests passed. Runtime columns are test-method durations, not frame
+latency benchmarks. Native kernel tests use deterministic seeds 7 and 11.
+The existing native binaries were used and independently checked, not rebuilt.
+To reproduce the optional eight kernel tests on a clean checkout, first run
+addpath('scripts'); buildControllerKernels(); with MATLAB Coder installed.
+Without those binaries, those eight optional tests report incomplete.
+
+The preliminary smoke.m in the session cache ran one cold, no-target controller
+call and saved its result. It is not a scenario campaign or timing benchmark.
+The earlier campaign remained stopped. No fourteen-case validation, nonlinear
+recovery result or 100-ms bound is claimed here. The scenario driver was checked
+with Code Analyzer after adapting metadata and removing its no-solve option;
+its closed-loop driver integration tests were not rerun.
+
+The project commit includes pre-existing, directly related 50-ms mesh and
+optional-kernel source changes so that the new controller is self-contained.
+Unrelated work and generated/nested solver artifacts are excluded. See
+manifest.json for exact source/native dependency hashes and preserved sources.
+Reports from earlier nonlinear controller versions remain historical.

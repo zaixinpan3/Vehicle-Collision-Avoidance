@@ -10,6 +10,34 @@ from auditJointPredictiveSafety import clearance_passes, distance, rectangle, ta
 
 
 class CollisionAuditTest(unittest.TestCase):
+    def test_affine_result_needs_both_completed_stages_and_its_declared_tolerance(self):
+        hold = affine_hold()
+        self.assertTrue(feasible_hold(hold))
+        hold['solverStages'][1]['exitFlag'] = 0
+        self.assertFalse(feasible_hold(hold))
+        hold = affine_hold()
+        hold['hardResidual'] = 2e-5
+        self.assertFalse(feasible_hold(hold))
+
+    def test_affine_tolerance_does_not_relax_independent_collision_geometry(self):
+        result = road_departure_result()
+        result['roadConstraintsEnforced'] = False
+        result['trace'][0].update(affine_hold())
+        self.assertTrue(audit(result)['passed'])
+        result['targetInitialState'][0] = 0
+        result['minimumReplayClearanceMeters'] = 0
+        self.assertFalse(audit(result)['passed'])
+
+    def test_positive_optimized_slack_is_not_a_zero_slack_claim(self):
+        result = road_departure_result()
+        result['roadConstraintsEnforced'] = False
+        result['trace'][0].update(affine_hold())
+        result['trace'][0]['predictiveBarrierValue'] = .1
+        checked = audit(result)
+        self.assertTrue(checked['everyHoldFeasible'])
+        self.assertFalse(checked['allPredictionsZeroSlack'])
+        self.assertFalse(checked['passed'])
+
     def test_recovery_needs_sustained_small_errors_in_every_coordinate(self):
         result = dict(sampleTimeSeconds=.05, recovery=dict(enabled=True, recovered=True,
                       dwellSeconds=.1, minimumTimeSeconds=0, tolerances=[.1]*5),
@@ -115,6 +143,13 @@ class CollisionAuditTest(unittest.TestCase):
         self.assertFalse(clearance_passes(0, 0))
         self.assertFalse(clearance_passes(-1e-12, 0))
         self.assertTrue(clearance_passes(1e-12, 0))
+
+
+def affine_hold():
+    return dict(source='twoStageConvexOptimization', solverCalls=2, hardResidual=1e-9,
+                affineFeasibilityTolerance=1e-5, optimizationConverged=True,
+                predictiveBarrierValue=1e-7,
+                solverStages=[dict(objective='pcbfSlack', exitFlag=1), dict(objective='clfSlack', exitFlag=1)])
 
 
 def road_departure_result():

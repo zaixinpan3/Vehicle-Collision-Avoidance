@@ -1,11 +1,9 @@
 classdef freePoseTerminalTest < matlab.unittest.TestCase
-    % Symmetry reduction, terminal invariance and unchanged threat admission.
+    % Symmetry reduction, terminal invariance and target geometry.
     properties (TestParameter)
         angle = {0,.7,1.9}
         motion = {[-20;12;.4;8;0;.08;1.6;2.4;.95;0;0], ...
             [-12;2;.1;4;-.2;0;1.6;2.4;.95;0;0]}
-        speed = {8,15}
-        scenario = {"curvedHeadOn","curvedCrossing"}
     end
     methods (TestClassSetup)
         function prepare(testCase)
@@ -64,26 +62,6 @@ classdef freePoseTerminalTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(slew,.5*cfg.controller.sampleTime+1e-12);
             testCase.verifyGreaterThan(separation,0);
         end
-        function curvedThreatKeepsItsOriginalTargetAndNominalPath(testCase,speed,scenario)
-            [x,q,road,cfg]=collisionThreatScenario(scenario,struct('referenceSpeed',speed, ...
-                'controller',struct('horizonSteps',speed+mod(speed,2))));
-            cfg.solver.timeLimitSeconds=30;
-            [ego,target]=localObservations(x,q);
-            [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            endpoint=[problem.solution.states(:,end);inputs(:,end)];
-            membership=terminalContinuation.membership(endpoint,size(inputs,2),problem.model.terminal);
-            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
-            difference=problem.model.targetEpoch-q;
-            difference(3)=atan2(sin(difference(3)),cos(difference(3)));
-            testCase.verifyEqual(difference,zeros(11,1),AbsTol=1e-12);
-            testCase.verifyEqual(problem.metadata.clfInitialValue,0,AbsTol=1e-18);
-            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
-            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
-            testCase.verifyLessThanOrEqual(membership,0);
-            testCase.verifyGreaterThanOrEqual(problem.solution.terminalSeparationMargin,0);
-            testCase.verifyFalse(problem.metadata.drivingModeSwitching);
-            testCase.verifyFalse(problem.metadata.roadConstraintsEnforced);
-        end
     end
 end
 
@@ -134,12 +112,4 @@ function [membership,slew,separation]=localContinueCore(seed,y,cfg)
         target=predictiveSafetyGeometry.targetFlow(q,j*cfg.controller.sampleTime);
         separation=min(separation,terminalContinuation.separation(seed,target,[0;0;0;0],cfg,11+j));
     end
-end
-function [ego,target]=localObservations(x,q)
-    ego=struct('position',x(1:2),'yaw',x(3),'speed',x(4),'lateralVelocity',x(5), ...
-        'yawRate',x(6),'stateTime',0,'heldActuatorInput',[0;0]);
-    target=struct('targetPositionInertial',q(1:2), ...
-        'targetVelocityInertial',q(4)*[cos(q(3)+q(6));sin(q(3)+q(6))], ...
-        'targetYawInertial',q(3),'targetSideslip',q(6),'targetScalarAcceleration',q(5), ...
-        'targetRearAxleDistance',q(7),'targetLength',2*q(8),'targetWidth',2*q(9));
 end

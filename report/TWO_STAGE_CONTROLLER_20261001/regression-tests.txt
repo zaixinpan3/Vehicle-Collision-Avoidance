@@ -1,0 +1,56 @@
+Running nonlinearPredictiveSafetyTest
+.......... .......... .......... .......... ..........
+.......... ..
+Done nonlinearPredictiveSafetyTest
+__________
+
+Running terminalContinuationTest
+.......... .......... ........
+Done terminalContinuationTest
+__________
+
+Running freePoseTerminalTest
+.......... .
+Done freePoseTerminalTest
+__________
+
+Running movingTargetFlowTest
+........
+Done movingTargetFlowTest
+__________
+
+Running collisionAvoidanceControllerConfigTest
+.......... .......... .......... .......... ..........
+.......... .
+Done collisionAvoidanceControllerConfigTest
+__________
+
+Running controllerKernelTest
+........
+Done controllerKernelTest
+__________
+
+Running controllerSourceBudgetTest
+.
+Done controllerSourceBudgetTest
+__________
+
+Running modifiedFialaTireTest
+.......... .......... ...
+Done modifiedFialaTireTest
+__________
+
+Running longitudinalRoadLoadTest
+.......... ..........
+Done longitudinalRoadLoadTest
+__________
+
+Running controllerInputGeometryTest
+.......... .....
+Done controllerInputGeometryTest
+__________
+
+Running sweptCollisionIntervalTest
+.....
+Done sweptCollisionIntervalTest
+__________
