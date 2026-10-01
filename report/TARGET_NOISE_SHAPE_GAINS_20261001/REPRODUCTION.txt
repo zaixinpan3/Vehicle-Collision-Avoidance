@@ -1,0 +1,47 @@
+Reproduction of report/TARGET_NOISE_SHAPE_GAINS_20261001.tex
+
+All commands run from the repository root with the YALMIP and SeDuMi trees in
+solver/. MATLAB R2026a Update 3.
+
+1. Held-out audit rerun (audit/):
+
+   matlab -singleCompThread -batch "addpath('scripts'); runSharmaFairnessAudit(OutputDirectory='simulation_output/gain_redesign_audit_20261001'); runSharmaScenarioTunedAudit('simulation_output/gain_redesign_audit_20261001'); validateSharmaFairnessAudit('simulation_output/gain_redesign_audit_20261001');"
+   python3 scripts/analyzeSharmaFairnessAudit.py simulation_output/gain_redesign_audit_20261001
+
+   The tables in audit/ are copies of that output directory without traces.mat.
+
+2. Per-domain design table (design_table.csv): synthesizeNrmmObserverGains on
+   nrmmTrackingConfig with each scenario's declared relativePositionMaximum,
+   target sideslipMaximum, ego yawRateMaximum and ego sideslipDomainMaximum
+   (scripts/runObserverComparisonScenario.m, localScenarioDefinition). The
+   "previous" rows use the synthesis of commit
+   379158bafbd72ad369074dac6d7f2fab7d41c4c0 on the same configuration.
+   Predicted noise RMS: per-axis sigma = 0.12/sqrt(2)/sqrt(3) m, hold 0.02 s,
+   stationary covariance X of (A-L*C)*X + X*(A-L*C)' + L*L'*sigma^2*0.02 = 0.
+
+3. Paired benchmark (benchmark_trials.csv, benchmark_summary.csv):
+
+   runOnlineNrmmTrackingErrorBenchmark(Report=false, BaselineRuntime=@onlineNrmmTrackingRuntime, BaselineDesign=<synthesis of commit 379158b>)
+
+   "baseline-high-gain" is the previous synthesis and "structured-high-gain"
+   the new one; seeds 7 to 11.
+
+4. Diagnostics (diagnostics/), runObserverComparisonScenario with
+   Seed=201:220, nominal noise, Estimators given as a prepared struct:
+
+   previous_gains_mncav_geometry.csv  previous synthesis, MnCAV rear-axle
+       distance, before the swerve scenario declared 0.06 rad ego sideslip
+       (domainValid is 0 for that scenario).
+   reference_gains_in_estimator.csv   commit 379158b (rear-axle distance
+       1.45 m): "structured" unchanged and "structuredT3" with
+       design.target.innovationGains = [9;27;27]. Not certifiable.
+   floor_free_certified_gains.csv     commit 379158b: previous shape scaled to
+       1.005 times the smallest bandwidth with a feasible dissipation
+       inequality at decay 0.01 1/s.
+
+   The last two were run before this change and are compared with
+   report/SHARMA_ESTIMATOR_AUDIT_20260930/scenario-tuned.csv.
+
+5. Tests:
+
+   matlab -batch "results = runtests('tests'); assertSuccess(results)"

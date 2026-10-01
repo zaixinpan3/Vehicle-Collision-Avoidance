@@ -36,7 +36,9 @@ function cfg = nrmmTrackingConfig()
     % it is not added as a fixed course-yaw disturbance. The declared
     % yaw-rate mismatch bounds unmodeled rear-tire slip and other departures
     % from omegaE = VE*sin(betaE)/lrE.
-    cfg.ego.yaw.rearAxleDistance = 1.45;             % m l_{r,E}
+    % The ego is the MnCAV test vehicle at its stock curb-weight geometry.
+    vehicle = mncavVehicleConfig();
+    cfg.ego.yaw.rearAxleDistance = vehicle.rearAxleDistance; % m l_{r,E}
     cfg.ego.yaw.sideslipDomainMaximum = 0.05;        % rad betaDomain_E
     cfg.ego.yaw.singleTrackYawRateMismatchMaximum = 0.02; % rad/s dbar_st
     % The direction certificate uses the measured GNSS speed directly; no

@@ -1,0 +1,7 @@
+Scenario,Candidate,TrainingLoss
+straightOncoming,repeated_e1.5_t3_y3,0.421363127945803
+circularCrossing,repeated_e3_t3_y1,1.14964187341725
+circularFollowing,repeated_e3_t3_y0.1,0.605378346614828
+avoidanceSwerve,lmi_e1.5_t3_y0.1,3.30290663291093
+lowRelativeVelocity,repeated_e1.5_t3_y0.1,0.442904174034075
+aggressiveEgo,repeated_e6_t6_y0.1,1.29445398878832

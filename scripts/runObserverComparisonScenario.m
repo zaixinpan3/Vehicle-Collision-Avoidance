@@ -111,7 +111,8 @@ function scenario = localScenarioDefinition(name)
     cruiseSpeed = 15.0;
     scenario = struct("name", name, "duration", 12.0, "relativePositionMaximum", 50.0, ...
         "targetSideslipMaximum", 0.015, "targetSpeedMinimum", 10.0, ...
-        "egoYawRateMaximum", 0.30, "egoSpeedMaximum", 20.0, "egoSpeedMinimum", 5.0);
+        "egoYawRateMaximum", 0.30, "egoSpeedMaximum", 20.0, "egoSpeedMinimum", 5.0, ...
+        "egoSideslipMaximum", 0.05);
     switch name
         case "straightOncoming"
             scenario.ego = localEgoProfile("straight", cruiseSpeed, radius);
@@ -140,6 +141,8 @@ function scenario = localScenarioDefinition(name)
             scenario.duration = 6.5;
             scenario.relativePositionMaximum = 100.0;
             scenario.egoYawRateMaximum = 0.40;
+            % The swerve reaches 0.053 rad with the MnCAV rear-axle distance.
+            scenario.egoSideslipMaximum = 0.06;
             scenario.description = "Straight cruise, 3.5 m double lane change with braking " ...
                 + "from t = 2 s; oncoming target at 95 m, 12 m/s";
         case "lowRelativeVelocity"
@@ -249,6 +252,7 @@ function cfg = localConfiguration(scenario, options)
     cfg.target.domain.sideslipMaximum = scenario.targetSideslipMaximum;
     cfg.target.domain.speedMinimum = scenario.targetSpeedMinimum;
     cfg.ego.domain.yawRateMaximum = scenario.egoYawRateMaximum;
+    cfg.ego.yaw.sideslipDomainMaximum = scenario.egoSideslipMaximum;
     cfg.ego.domain.speedMaximum = scenario.egoSpeedMaximum;
     cfg.ego.domain.speedMinimum = scenario.egoSpeedMinimum;
 end

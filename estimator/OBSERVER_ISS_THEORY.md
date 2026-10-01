@@ -296,8 +296,8 @@ of \(\Delta\Phi_e/\omega_T^2\) yields the sufficient condition
 -\omega_T(A_\ell^TP+PA_\ell)-\tau_q(L_q/\omega_T)^2e_2e_2^T-\tau_sL_s^2e_3e_3^T
  -(\tau_q^{-1}+\tau_s^{-1})(Pe_3)(Pe_3)^T\succeq2\lambda_TP.
 \]
-`synthesizeTargetTrackerCertificate.m` retains the normalized observer LMI
-that selects \(\ell\). For each candidate bandwidth it now solves for \(P\)
+`synthesizeTargetTrackerCertificate.m` selects \(\ell\) with the noise-shape
+program of Section 7. For each candidate bandwidth it then solves for \(P\)
 and positive multipliers together, without fixing \(A_\ell^TP+PA_\ell=-I\).
 With \(a_q=L_q/\omega_T\), \(a_s=L_s\), the equivalent Schur condition is
 \[
@@ -373,7 +373,31 @@ within-velocity cancellation and does not claim all cross-stage cancellations.
 
 ## 7. Explicit gain-selection preference and position output
 
-The target shape is unchanged. At each candidate bandwidth a free metric is
+The target shape is the solution of one semidefinite program in the physical
+gains \(L\in\mathbb R^3\). With \(A_L=A-Le_1^T\) and \(Y=PL\) it minimizes
+\(\gamma\) subject to the dissipation condition of Section 5 written in
+physical coordinates (\(\omega_T=1\)) at the decay floor
+\(\lambda_T=1/T_{\rm domain}\), and
+\[
+A_L^TP+PA_L+e_2e_2^T\preceq0,\qquad
+\begin{bmatrix}\gamma&Y^T\\Y&P\end{bmatrix}\succeq0 .
+\]
+The first inequality makes \(P\) an upper bound of the observability Gramian
+of \((A_L,e_2^T)\). For the linear error equation \(\dot e=A_Le-Ln\) driven by
+white output noise of unit intensity, the stationary velocity-error variance
+is therefore at most \(L^TPL\le\gamma\). All three conditions are linear in
+\((P,Y,\tau_q,\tau_s,\gamma)\). One metric serves the Gramian and the
+dissipation inequality, so \(\gamma\) is an upper bound of the smallest
+variance attainable among gains with a certificate, not that minimum. The
+returned gains already satisfy the dissipation inequality; they are split
+into the shape \(\ell=L\oslash(\omega_0,\omega_0^2,\omega_0^3)\) and its
+slowest closed-loop rate \(\omega_0\), so the normalized shape has unit
+slowest rate. The variance is a performance preference among certified gains.
+It ignores \(\Delta\Phi_e\) and the sampled realization, and it is not a
+deterministic error bound; the deterministic bounds remain those of Section 5
+at the selected bandwidth.
+
+At each candidate bandwidth a free metric is
 synthesized as above. A bracketed one-dimensional search selects a feasible
 local minimum of the largest ultimate physical component bound normalized by
 its operating-domain scale,

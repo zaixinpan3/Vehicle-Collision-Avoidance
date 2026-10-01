@@ -1,0 +1,296 @@
+{
+  "protocol": {
+    "options": {
+      "OutputDirectory": "simulation_output/gain_redesign_audit_20261001",
+      "TrainingSeeds": [
+        101,
+        102
+      ],
+      "TestSeeds": [
+        201,
+        202,
+        203,
+        204,
+        205,
+        206,
+        207,
+        208,
+        209,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        219,
+        220
+      ],
+      "StressSeeds": [
+        201,
+        202,
+        203,
+        204,
+        205
+      ]
+    },
+    "scenarios": [
+      "straightOncoming",
+      "circularCrossing",
+      "circularFollowing",
+      "avoidanceSwerve",
+      "lowRelativeVelocity",
+      "aggressiveEgo"
+    ],
+    "selection": "One global minimum training mean of position/0.1 + speed/0.5 + course/5",
+    "gainShapes": [
+      "lmi",
+      "repeated"
+    ],
+    "egoRates": [
+      1.5,
+      3,
+      6
+    ],
+    "targetRates": [
+      1.5,
+      3,
+      6
+    ],
+    "yawGains": [
+      0.1,
+      1,
+      3
+    ],
+    "primaryWindow": "t >= 2 seconds; also record final-half and full-run errors",
+    "noise": "bounded uniform, common draws; cfg sensor bounds",
+    "createdAt": "01-Oct-2026 11:05:23",
+    "matlabVersion": "26.1.0.3276743 (R2026a) Update 3"
+  },
+  "selectedCandidate": "repeated_e6_t6_y0.1",
+  "selection": [
+    {
+      "Candidate": "lmi_e1.5_t1.5_y0.1",
+      "TrainingLoss": 1.8614338096729917
+    },
+    {
+      "Candidate": "lmi_e1.5_t1.5_y1",
+      "TrainingLoss": 4.1726871445420235
+    },
+    {
+      "Candidate": "lmi_e1.5_t1.5_y3",
+      "TrainingLoss": 5.3150709109167744
+    },
+    {
+      "Candidate": "lmi_e1.5_t3_y0.1",
+      "TrainingLoss": 2.4784023497969985
+    },
+    {
+      "Candidate": "lmi_e1.5_t3_y1",
+      "TrainingLoss": 4.6769150190695408
+    },
+    {
+      "Candidate": "lmi_e1.5_t3_y3",
+      "TrainingLoss": 5.7784091611883808
+    },
+    {
+      "Candidate": "lmi_e1.5_t6_y0.1",
+      "TrainingLoss": 6.3253085376788052
+    },
+    {
+      "Candidate": "lmi_e1.5_t6_y1",
+      "TrainingLoss": 7.9711791968919821
+    },
+    {
+      "Candidate": "lmi_e1.5_t6_y3",
+      "TrainingLoss": null
+    },
+    {
+      "Candidate": "lmi_e3_t1.5_y0.1",
+      "TrainingLoss": 2.56776648787913
+    },
+    {
+      "Candidate": "lmi_e3_t1.5_y1",
+      "TrainingLoss": 3.6554427427217626
+    },
+    {
+      "Candidate": "lmi_e3_t1.5_y3",
+      "TrainingLoss": 4.8057396885268266
+    },
+    {
+      "Candidate": "lmi_e3_t3_y0.1",
+      "TrainingLoss": 2.9570474449891435
+    },
+    {
+      "Candidate": "lmi_e3_t3_y1",
+      "TrainingLoss": 4.02751544655028
+    },
+    {
+      "Candidate": "lmi_e3_t3_y3",
+      "TrainingLoss": 5.0752357491985345
+    },
+    {
+      "Candidate": "lmi_e3_t6_y0.1",
+      "TrainingLoss": 6.4795040960541641
+    },
+    {
+      "Candidate": "lmi_e3_t6_y1",
+      "TrainingLoss": 7.2475018138599578
+    },
+    {
+      "Candidate": "lmi_e3_t6_y3",
+      "TrainingLoss": 8.0192268108520484
+    },
+    {
+      "Candidate": "lmi_e6_t1.5_y0.1",
+      "TrainingLoss": 6.1139295738856339
+    },
+    {
+      "Candidate": "lmi_e6_t1.5_y1",
+      "TrainingLoss": 11.131153451874889
+    },
+    {
+      "Candidate": "lmi_e6_t1.5_y3",
+      "TrainingLoss": 13.243563891166142
+    },
+    {
+      "Candidate": "lmi_e6_t3_y0.1",
+      "TrainingLoss": 6.1434665119286533
+    },
+    {
+      "Candidate": "lmi_e6_t3_y1",
+      "TrainingLoss": 11.137293496383073
+    },
+    {
+      "Candidate": "lmi_e6_t3_y3",
+      "TrainingLoss": 13.2405024457156
+    },
+    {
+      "Candidate": "lmi_e6_t6_y0.1",
+      "TrainingLoss": 8.5064405241238088
+    },
+    {
+      "Candidate": "lmi_e6_t6_y1",
+      "TrainingLoss": 13.189163429207378
+    },
+    {
+      "Candidate": "lmi_e6_t6_y3",
+      "TrainingLoss": 15.161843526559169
+    },
+    {
+      "Candidate": "repeated_e1.5_t1.5_y0.1",
+      "TrainingLoss": 6.5598710635806841
+    },
+    {
+      "Candidate": "repeated_e1.5_t1.5_y1",
+      "TrainingLoss": 10.327123631959884
+    },
+    {
+      "Candidate": "repeated_e1.5_t1.5_y3",
+      "TrainingLoss": 12.054973572046071
+    },
+    {
+      "Candidate": "repeated_e1.5_t3_y0.1",
+      "TrainingLoss": 3.4820524231669689
+    },
+    {
+      "Candidate": "repeated_e1.5_t3_y1",
+      "TrainingLoss": 7.7900943830695057
+    },
+    {
+      "Candidate": "repeated_e1.5_t3_y3",
+      "TrainingLoss": 9.8114902348138653
+    },
+    {
+      "Candidate": "repeated_e1.5_t6_y0.1",
+      "TrainingLoss": 2.7828521641390207
+    },
+    {
+      "Candidate": "repeated_e1.5_t6_y1",
+      "TrainingLoss": 7.0283534213350114
+    },
+    {
+      "Candidate": "repeated_e1.5_t6_y3",
+      "TrainingLoss": 9.2801299339109438
+    },
+    {
+      "Candidate": "repeated_e3_t1.5_y0.1",
+      "TrainingLoss": 5.9817392047344518
+    },
+    {
+      "Candidate": "repeated_e3_t1.5_y1",
+      "TrainingLoss": 8.7000667962948235
+    },
+    {
+      "Candidate": "repeated_e3_t1.5_y3",
+      "TrainingLoss": 10.234588853414625
+    },
+    {
+      "Candidate": "repeated_e3_t3_y0.1",
+      "TrainingLoss": 2.7221885006167281
+    },
+    {
+      "Candidate": "repeated_e3_t3_y1",
+      "TrainingLoss": 5.9349549880550514
+    },
+    {
+      "Candidate": "repeated_e3_t3_y3",
+      "TrainingLoss": 7.8100070541422779
+    },
+    {
+      "Candidate": "repeated_e3_t6_y0.1",
+      "TrainingLoss": 1.8989397092364502
+    },
+    {
+      "Candidate": "repeated_e3_t6_y1",
+      "TrainingLoss": 5.2600189885692137
+    },
+    {
+      "Candidate": "repeated_e3_t6_y3",
+      "TrainingLoss": 7.2394972016995363
+    },
+    {
+      "Candidate": "repeated_e6_t1.5_y0.1",
+      "TrainingLoss": 5.82985631575333
+    },
+    {
+      "Candidate": "repeated_e6_t1.5_y1",
+      "TrainingLoss": 7.0885058101160263
+    },
+    {
+      "Candidate": "repeated_e6_t1.5_y3",
+      "TrainingLoss": 7.6496264840605619
+    },
+    {
+      "Candidate": "repeated_e6_t3_y0.1",
+      "TrainingLoss": 2.6143375223632117
+    },
+    {
+      "Candidate": "repeated_e6_t3_y1",
+      "TrainingLoss": 4.0776361218396788
+    },
+    {
+      "Candidate": "repeated_e6_t3_y3",
+      "TrainingLoss": 4.7885939193213263
+    },
+    {
+      "Candidate": "repeated_e6_t6_y0.1",
+      "TrainingLoss": 1.6668115924380118
+    },
+    {
+      "Candidate": "repeated_e6_t6_y1",
+      "TrainingLoss": 3.3834692476118566
+    },
+    {
+      "Candidate": "repeated_e6_t6_y3",
+      "TrainingLoss": 4.2137872714672655
+    }
+  ],
+  "elapsedSeconds": 654.56379,
+  "trainingTrialCount": 648,
+  "testTrialCount": 1278,
+  "oracleTrialCount": 320,
+  "numericalTrialCount": 36
+}

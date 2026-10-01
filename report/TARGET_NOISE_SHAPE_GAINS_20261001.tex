@@ -1,0 +1,284 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,xurl,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\setlength{\emergencystretch}{3em}
+\title{Noise-Shaped Target Gains Inside the Lipschitz Certificate\newline
+and MnCAV Ego Geometry}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Finding}
+The steady-scenario accuracy losses recorded in
+\path{report/SHARMA_ESTIMATOR_AUDIT_20260930.tex} came from the target-tracker
+injection gains, not from the estimator structure. The gains were larger than
+the certificate needs, because their shape was chosen by a criterion unrelated
+to the certificate and only one scale factor was then pushed to the
+certificate's feasibility edge. Selecting all three gains in one semidefinite
+program, with the same Lipschitz constants and the same decay floor, lowers
+the predicted radar-noise velocity error by about 32 percent and tightens the
+certified ultimate bounds by 20 to 50 percent at the same time.
+
+Rerunning the complete held-out audit with these gains and with the MnCAV ego
+geometry, against a reference whose gains are again selected per scenario on
+training seeds, the estimator has the lower mean error in five of six
+scenarios for each of relative position, target speed and target course
+(previously two, three and five of six). It remains worse in target speed at
+low relative speed (0.0584 against 0.0540 m/s) and in relative position in
+curved following (0.0290 against 0.0250 m); course in curved following is a
+statistical tie. The price is slower convergence: the time to the convergence
+tolerance rises from about 0.5 s to 0.6--1.1 s, and noise-free errors after
+2 s are larger.
+
+\section{Why the previous gains were noisy}
+The previous synthesis chose a normalized shape $\ell$ by a bounded-real LMI
+in the fixed region $\operatorname{Re}s\le-1$ and then searched the scalar
+bandwidth $\omega_T$ for the smallest normalized ultimate bound. Three
+measurements on the audited configuration explain the result.
+
+\begin{itemize}
+\item The bound objective increases with bandwidth on the feasible set, so
+the search returned the smallest certifiable bandwidth: bisection of the
+dissipation inequality gives feasibility edges 2.222 and 2.576 for decay
+floors 0.4 and 0.8~s$^{-1}$, and the synthesized bandwidths were 2.233 and
+2.591.
+\item The audited errors are the radar noise passed through these gains. For
+per-axis noise $\sigma=0.12/\sqrt2/\sqrt3$~m held for 0.02~s, the stationary
+covariance of $\dot e=(A-Le_1^T)e-Ln$ predicts velocity errors of 0.0663,
+0.0829 and 0.1406~m/s; the audited oracle target-speed RMSE values are
+0.0656, 0.0849 and 0.1476~m/s.
+\item With the reference's training-selected target gains $(9,27,27)$ copied
+into the unchanged estimator, its mean position, speed and course errors are
+lower than the scenario-tuned reference in six of six scenarios on the
+held-out seeds. Those gains are not certifiable by the dissipation inequality
+in any tested domain, so this run is a diagnostic and not a design.
+\end{itemize}
+
+The comparison was therefore between certified gains and gains selected
+without a certificate. The remaining question was whether the certificate
+itself forces the noise, or only the way the gains were chosen inside it.
+
+\section{The change}
+Let $A$ be the triple-integrator chain, $A_L=A-Le_1^T$ with physical gains
+$L\in\mathbb R^3$, and $Y=PL$. The shape program minimizes $\gamma$ subject to
+\begin{gather*}
+\begin{bmatrix}
+A_L^TP+PA_L+2\lambda_TP+\operatorname{diag}(0,\tau_qL_q^2,\tau_sL_s^2)&Pe_3&Pe_3\\
+e_3^TP&-\tau_q&0\\ e_3^TP&0&-\tau_s
+\end{bmatrix}\preceq0,\\
+A_L^TP+PA_L+e_2e_2^T\preceq0,\qquad
+\begin{bmatrix}\gamma&Y^T\\Y&P\end{bmatrix}\succeq0 .
+\end{gather*}
+The first block is the existing structured Lipschitz dissipation inequality
+at the existing decay floor $\lambda_T=1/T_{\rm domain}$, written in physical
+coordinates. The second makes $P$ an upper bound of the observability Gramian
+of the velocity error, so $L^TPL\le\gamma$ bounds the stationary velocity
+variance per unit white output-noise intensity. All conditions are linear in
+$(P,Y,\tau_q,\tau_s,\gamma)$. The returned gains are split into a shape with
+unit slowest rate and that rate; the existing bandwidth search and
+free-metric certificate then run unchanged, and every downstream field keeps
+its meaning.
+
+One metric serves both inequalities, so $\gamma$ is an upper bound of the
+smallest attainable variance. A local direct search over $L$ with an exact
+noise objective and the same feasibility test reached a velocity error about
+10 percent lower (0.0513 against 0.0572~m/s in the default domain); that
+search is not adopted. The variance is a performance preference among certified
+gains. It ignores the nonlinear term and the sampled realization and is not a
+deterministic bound. Velocity, prediction-horizon and position-plus-velocity
+weights were compared on predicted noise only; the velocity weight gave the
+lowest predicted position and velocity errors in every tested domain, with
+acceleration errors within 1 percent of the best, and was kept. No candidate
+was selected on simulated tracking error.
+
+The change is in \path{estimator/synthesizeTargetTrackerCertificate.m}
+(\texttt{localSolveNoiseShape} replaces \texttt{localSolveNormalizedShape})
+and two reported fields in \path{estimator/synthesizeNrmmObserverGains.m}.
+
+\begin{center}\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+&&&\multicolumn{2}{c}{Predicted noise RMS}&\multicolumn{3}{c}{Certified ultimate bound}\\
+Declared domain&Synthesis&Gains $L$&Pos.\ (m)&Vel.\ (m/s)&Pos.\ (m)&Vel.\ (m/s)&Acc.\ (m/s$^2$)\\
+\midrule
+100 m, $\lambda_T=0.4$&previous&(10.22, 39.39, 53.21)&0.0188&0.0663&4.40&20.66&42.5\\
+&new&(6.24, 19.31, 27.20)&0.0157&0.0452&3.54&12.46&24.6\\
+80 m, $\lambda_T=0.5$&previous&(10.63, 42.64, 59.94)&0.0191&0.0704&3.48&17.24&36.8\\
+&new&(6.50, 20.93, 30.23)&0.0160&0.0478&2.74&10.27&20.8\\
+50 m, $\lambda_T=0.8$&previous&(11.86, 53.05, 83.18)&0.0202&0.0829&2.22&12.78&30.4\\
+&new&(7.30, 26.25, 40.94)&0.0169&0.0561&1.71&7.55&16.5\\
+50 m, sideslip 0.03&previous&(16.87, 107.4, 239.5)&0.0241&0.1406&3.02&23.95&81.0\\
+&new&(10.21, 51.59, 116.4)&0.0200&0.0939&2.21&13.17&40.8\\
+\bottomrule
+\end{tabular}\end{center}
+Noise values are per axis. The certified bounds remain far above the measured
+errors; they are reported because the controller consumes bounds derived from
+the same certificate, and they did not grow.
+
+\section{MnCAV ego geometry}
+\path{config/mncavVehicleConfig.m} copies the nominal UMN MnCAV (2021 Chrysler
+Pacifica Hybrid) parameters from the Vehicle Localization repository
+(\path{config/mncavVehicleParameters.json}, review of 2026-09-25, commit
+\path{a1a73aad52a5d236e9936508bc763c861c38c0e8}). They describe the stock
+vehicle at curb weight; the loaded mass and center of gravity of the test
+vehicle are unknown. \path{config/nrmmTrackingConfig.m} now takes the ego
+rear-axle distance from it (1.714395~m instead of 1.45~m). This is the only
+vehicle parameter the estimator uses. The controller configuration and the
+PassVeh14DOF integration runs, which replace this value by the loaded plant's,
+are unchanged.
+
+With the previous gains, the MnCAV distance changes no scenario mean of
+position or speed RMSE in the fourth decimal and course by at most
+0.002~deg. In the swerve scenario the ego sideslip reaches 0.053~rad, above
+the default 0.05~rad branch domain, so that scenario now declares 0.06~rad.
+
+\section{Held-out results}
+The protocol is that of the audit: 54 reference gain candidates, training
+seeds 101--102, test seeds 201--220, six scenarios, error after 2~s. The
+campaign was rerun in full (648 training, 1,278 test, 320 oracle and 36
+refinement runs in 654.6~s, plus the scenario-tuned supplement) because the
+ego geometry changes the truth trajectories. The selected reference
+candidates are unchanged. No run of the current estimator failed in any
+variant. In the tables, P is the estimator with the previous gains (audit of
+September 30), N the estimator with the new gains, and S the scenario-tuned
+reference.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrrrrr@{}}
+\toprule
+&\multicolumn{3}{c}{Position RMSE (m)}&\multicolumn{3}{c}{Target speed RMSE (m/s)}&\multicolumn{3}{c}{Course RMSE (deg)}\\
+Scenario&P&N&S&P&N&S&P&N&S\\
+\midrule
+Straight oncoming&0.0267&0.0239&0.0249&0.0666&0.0531&0.0615&0.283&0.197&0.492\\
+Curved crossing&0.0267&0.0239&0.0251&0.0660&0.0490&0.0938&0.286&0.223&3.680\\
+Curved following&0.0352&0.0290&0.0250&0.1476&0.0974&0.1339&0.536&0.365&0.359\\
+Swerve and braking&0.0297&0.0306&0.0624&0.0763&0.0535&0.5488&0.558&0.448&6.989\\
+Low relative speed&0.0291&0.0242&0.0250&0.0849&0.0584&0.0540&0.314&0.218&0.334\\
+Ego weaving&0.0275&0.0235&0.0449&0.0788&0.0613&0.2757&0.357&0.307&1.438\\
+\bottomrule
+\end{tabular}\end{center}
+
+Paired differences $\Delta=\mathrm{RMSE}_S-\mathrm{RMSE}_N$ over the 20 test
+seeds (positive favors the estimator; 10,000 bootstrap draws of complete
+seeds; pointwise intervals conditional on these scenarios):
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+&\multicolumn{2}{c}{Position (m)}&\multicolumn{2}{c}{Target speed (m/s)}&\multicolumn{2}{c}{Course (deg)}\\
+Scenario&95\% interval&N lower&95\% interval&N lower&95\% interval&N lower\\
+\midrule
+Straight oncoming&[0.0000, 0.0021]&12&[0.0051, 0.0121]&16&[0.266, 0.321]&20\\
+Curved crossing&[$-$0.0001, 0.0025]&13&[0.0401, 0.0490]&20&[3.381, 3.540]&20\\
+Curved following&[$-$0.0044, $-$0.0036]&0&[0.0330, 0.0399]&20&[$-$0.018, 0.006]&9\\
+Swerve and braking&[0.0304, 0.0333]&20&[0.4687, 0.5218]&20&[6.347, 6.737]&20\\
+Low relative speed&[0.0005, 0.0010]&18&[$-$0.0056, $-$0.0032]&1&[0.106, 0.125]&20\\
+Ego weaving&[0.0208, 0.0220]&20&[0.2102, 0.2192]&20&[1.108, 1.152]&20\\
+\bottomrule
+\end{tabular}\end{center}
+The position advantages on the straight and curved-crossing scenarios are
+about 4 percent with intervals that reach zero; they are not substantial.
+Against the globally trained reference the new gains have the lower mean in
+all six nominal scenarios for all three metrics. Over the 36 noisy stress
+cells (six scenarios by 20 and 100~Hz sampling, doubled noise, threefold
+initial offsets, radar dropout and single-track mismatch) speed and course
+remain lower in every cell and position in 34; the two exceptions are the
+threefold-offset cells of the two 6~s scenarios (0.0368 against 0.0357~m and
+0.0362 against 0.0358~m).
+
+With exact ego inputs and the same injection gains the two target observers
+still agree (straight oncoming speed RMSE 0.053365 and 0.053356~m/s), so the
+finding of the audit that the coordinate change alone does not alter accuracy
+stands.
+
+\section{What the new gains cost}
+\begin{itemize}
+\item \textbf{Convergence.} The slowest closed-loop rate falls from
+3.0--5.0 to 1.7--2.9~s$^{-1}$, still above the decay floor. The mean time to
+the convergence tolerance rises from 0.47--0.73~s to 0.63--1.13~s (the
+scenario-tuned reference needs 0.87--2.16~s where it converges). Peak
+transient velocity and acceleration errors fall by about 22 to 27 percent.
+\item \textbf{Errors after 2~s without noise.} The residual transient is
+larger: straight oncoming position 0.0008 to 0.0091~m and speed 0.0135 to
+0.0294~m/s. The globally trained reference is better in four noise-free
+position cells (three before), two speed cells (two before) and one course
+cell (none before).
+\item \textbf{Acceleration in the 6~s scenarios.} Target-acceleration RMSE
+after 2~s rises from 0.132 to 0.151 and from 0.136 to 0.165~m/s$^2$ on the
+straight and curved-crossing scenarios, and falls in the other four
+(for example 0.448 to 0.295 in curved following).
+\item \textbf{Position during the swerve.} 0.0297 to 0.0306~m.
+\end{itemize}
+
+\section{Paired benchmark against the previous synthesis}
+\path{runOnlineNrmmTrackingErrorBenchmark} was run with the previous synthesis
+as its paired baseline (same runtime, truth, noise draws and MnCAV geometry;
+five seeds per noisy case). The new gains have lower position and velocity
+RMSE in all ten noisy cases, including the two with a maneuvering target.
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+&\multicolumn{2}{c}{Position (m)}&\multicolumn{2}{c}{Velocity (m/s)}&\multicolumn{2}{c}{Acceleration (m/s$^2$)}\\
+Case&previous&new&previous&new&previous&new\\
+\midrule
+Retained, noise&0.0283&0.0238&0.1174&0.0829&0.1788&0.1265\\
+Varying target&0.0288&0.0262&0.1286&0.1105&0.3064&0.2914\\
+Target lane change&0.0290&0.0274&0.1329&0.1222&0.3523&0.3487\\
+Radar dropout (1 s)&0.0503&0.0439&0.1659&0.1260&0.2437&0.1812\\
+Intermittent dropout&0.0299&0.0260&0.1217&0.0890&0.1845&0.1341\\
+25 Hz sampling&0.0422&0.0351&0.1771&0.1234&0.2669&0.1822\\
+Aggressive ego&0.0267&0.0231&0.1109&0.0921&0.1447&0.1307\\
+Oncoming (8 s)&0.0255&0.0222&0.0924&0.0692&0.1256&0.1390\\
+Doubled noise&0.0566&0.0475&0.2334&0.1608&0.3574&0.2417\\
+Threefold offsets&0.0283&0.0250&0.1177&0.0983&0.1800&0.1719\\
+Retained, no noise (1 run)&0.0001&0.0026&0.0154&0.0228&0.0065&0.0422\\
+\bottomrule
+\end{tabular}\end{center}
+The curvature-response lag is 0.616 and 0.608~s for the varying target and
+0.616 and 0.628~s for the lane change. The maximum acceleration error is
+larger with the new gains in three cases (threefold offsets 0.47 to 0.80,
+aggressive ego 0.36 to 0.43 and oncoming 0.30 to 0.43~m/s$^2$).
+
+\section{Validation}
+The nineteen estimator-related test classes pass 199 of 199 tests with the
+change (197 of 197 before it, with the MnCAV distance). The shape test now
+checks the dissipation and Gramian inequalities of the returned shape and
+that the exact noise variance does not exceed the reported bound; a second
+test checks that a wider target domain cannot lower that bound. The audit's
+own validation passes its 103 tests and reproduces the stored
+straight-oncoming seed bit for bit. The full
+suite (\texttt{runtests('tests')}) passes 562 of 564 tests with no failure; two
+curb-detection tests are filtered by their recorded-data assumption.
+
+\section{Scope}
+All results are synthetic, under the repository's sensor contract and exact
+Sharma-model targets except where the benchmark declares model rates. The
+new gains were designed after the audit's held-out results were known; the
+criterion is a predicted noise variance and no simulated error was used to
+choose it, but the rerun is not a preregistered confirmation. The current
+estimator receives no error-based tuning, while the reference is tuned per
+scenario. The certificate concerns the continuous vector field; the sampled
+realization is not certified. No real-vehicle claim follows from adopting
+MnCAV stock geometry.
+
+Two losses remain. Both follow from the certificate rather than the
+structure: at low relative speed the decay floor of 0.8~s$^{-1}$ keeps the
+gains above the reference's uncertified choice, and in curved following the
+declared 0.03~rad sideslip domain raises the velocity Lipschitz constant
+from 0.80 to 2.29. Reducing the conservatism of the scalar Lipschitz
+multipliers and relaxing the common-metric bound are the next steps; neither
+is done here.
+
+\section{Artifacts and reproduction}
+\path{report/TARGET_NOISE_SHAPE_GAINS_20261001/} holds the complete audit
+tables of the rerun (protocol, training, selections, seed-level trials,
+summaries, paired intervals, oracle, numerical checks, tests, validation), the
+per-domain design table, the paired benchmark tables, and the three
+diagnostic tables (previous gains with MnCAV geometry, the reference's gains
+in the estimator, and the floor-free certified variant).
+\path{REPRODUCTION.txt} in that directory lists the commands. MATLAB R2026a
+Update 3 with the existing YALMIP and SeDuMi trees; single computational
+thread for the campaigns.
+\end{document}
