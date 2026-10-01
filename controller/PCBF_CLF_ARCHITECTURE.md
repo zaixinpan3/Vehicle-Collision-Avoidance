@@ -1,10 +1,12 @@
-# Two-stage affine PCBF / CLF controller
+# Two-stage PCBF / CLF real-time iteration
 
-The online controller builds one affine prediction model and solves two convex
+The online controller normally builds one affine prediction model and solves two convex
 problems in lexicographic order: minimum PCBF slack, then minimum CLF slack
 while retaining the first-stage optimum. There is one controller and one
-initialization trajectory. There is no nonlinear candidate admission,
-sequential-convexification loop, restoration solve, correction QP, zero-CLF
+initialization trajectory per attempt. A failed warm-start solve can trigger one
+fresh flow initialization and another two-stage attempt within the same soft
+budget. There is no nonlinear candidate admission,
+convergence loop, restoration solve, correction QP, zero-CLF
 trial, predictive-cost third stage, or retained-control fallback.
 
 ## Prediction and initialization
@@ -19,8 +21,11 @@ The finite prediction length is fixed for a call:
 
 $$M=\min\{M_{\max},N+\lceil T_{\rm completion}/h\rceil\}.$$
 
-It is not increased until a candidate passes a safety test. A usable previous
-affine state/input trajectory is shifted and extended to this length. Otherwise,
+It is not increased until a candidate passes a safety test. Previous inputs are
+shifted, extended by the nominal terminal input, and rolled out from the new
+measured state. Previous affine states are not reused as dynamics references.
+If those inputs cannot be evaluated in the bicycle model's domain, or no previous
+plan exists,
 one moving-target flow rollout is constructed, using braking-ratio magnitude and
 slew limits. With no target, initialization uses lane feedback. Flow guidance
 is an initialization method, not an executable safety certificate or a second
@@ -31,16 +36,19 @@ At the fixed anchor $(\bar x_i,\bar u_i)$, the optimization uses
 $$x_{i+1}=f_h(\bar x_i,\bar u_i)
  + A_i(x_i-\bar x_i)+B_i(u_i-\bar u_i).$$
 
-The defect $f_h(\bar x_i,\bar u_i)-\bar x_{i+1}$ is retained explicitly.
-A shifted affine prediction need not itself be a nonlinear rollout. Initial
+The anchor satisfies $\bar x_{i+1}=f_h(\bar x_i,\bar u_i)$ by construction;
+the formulation still retains the defect explicitly. Initial
 state equality uses the new measurement, and braking slew constraints use the
 actual previous input. Dynamics, tire derivatives, collision directions and tracking
-error derivatives all use this same anchor. State and braking-ratio increment
-bounds remain fixed through both stages. Steering has no anchor-relative trust
-bound, magnitude bound or slew constraint. The flow initializer selects a
-tire-informed steering reference; its choice never bounds the optimized steering.
+error derivatives all use this same anchor. State and input correction bounds
+remain fixed through both stages. With numerical radius $\Delta$, input
+corrections obey $|u_i-\bar u_i|\le\Delta[0.15,0.25]^T$; the default
+$\Delta=0.5$ gives a 0.075-rad steering correction per local solve. This is an
+iteration bound recentered at every sample, not an actuator steering magnitude
+or slew constraint. It is a numerical starting choice, not a certified universal
+linearization-error bound. The flow initializer selects a tire-informed steering reference.
 The two retired steering-limit configuration fields are rejected as unknown
-options. Continuation state version 62 separates this constraint set from older
+options. Continuation state version 63 separates this reference update from older
 plans.
 
 ## Shared constraints and the two objectives
@@ -113,11 +121,18 @@ recomputation of constraint residuals or separation margins. In particular,
 a finite result with exit `-7` or an iteration-limit exit is not discarded.
 The solver's own convergence and stopping criteria remain part of `coneprog`.
 
-An empty/nonfinite result, or an exhausted shared soft budget before a solve,
-reports `collisionAvoidanceController:noOptimizationSolution`: there is no
-numerical control vector to issue. No old trajectory or first-stage-only
-result is substituted. Exit flags, objective values and timings are recorded
-separately. At most two optimizer calls are made. A first-stage value returned
+An empty/nonfinite result from either stage of a shifted-input attempt triggers
+one fresh flow rollout if time remains. Dynamics, tire tangents, collision normals,
+terminal rows and the CLF model are all rebuilt from it. The restarted primary
+objective obtains its own optimum and cap; the old cap is not carried over.
+No second restart is made, and a cold flow attempt is not repeated identically.
+Positive PCBF slack and finite nonconverged results do not trigger a restart.
+If that attempt also returns no vector, or the budget is exhausted,
+the controller reports `collisionAvoidanceController:noOptimizationSolution`.
+No old trajectory or first-stage-only result is substituted. Exit flags,
+initialization and assembly times, and each attempt's solver timings are recorded
+separately. Normally there are two optimizer calls; a failed first or second
+stage followed by a complete restart takes three or four. A first-stage value returned
 without solver convergence is the achieved value, not a certified optimum;
 the legacy `primaryOptimum` field records that value.
 
@@ -149,7 +164,14 @@ declare that affine residuals were not measured; the offline audit reports
 that affine feasibility was not verified and still measures replay clearance.
 Missing residuals serialize to JSON null and do not establish feasibility.
 
-The shared soft time budget remains configurable. Two solver calls do not by
+This is an RTI-style lexicographic successive linearization: one local update is
+carried across sampling instants instead of converging a nonlinear program within
+each frame. It does not inherit classical RTI stability guarantees automatically;
+the slack objectives, collision constraints and initialization require their own
+analysis. A useful starting point is Diehl, Bock and Schloder,
+[Real-Time Iterations for Nonlinear Optimal Feedback Control](https://cdn.syscop.de/publications/Diehl2005c.pdf).
+
+The shared soft time budget remains configurable. A bounded number of solves does not by
 themselves establish a 100-ms runtime bound, especially including initialization,
-terminal construction and matrix assembly. No new scenario campaign or runtime
-benchmark is claimed by this implementation change.
+terminal construction and matrix assembly. Measurements for this change belong
+in the dated RTI experiment report under `report/`.

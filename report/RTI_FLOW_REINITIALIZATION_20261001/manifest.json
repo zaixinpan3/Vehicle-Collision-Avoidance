@@ -1,0 +1,396 @@
+{
+  "baselineCommit": "940c25eb178328616e639d5b138c32c4b874f1f8",
+  "cache": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001",
+  "scope": "RTI-style reference reconstruction, local corrections and one flow restart after a failed warm numerical solve. Serial 20-second timing; parallel recovery extensions are not a serial runtime benchmark.",
+  "source": [
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solvePredictiveControl.m",
+      "sha256": "7c85307ed34fc750ad703333fd9168467acb42bf68b143576e442b1f21e450e2",
+      "bytes": 18885
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+      "sha256": "8f2a656cccc0d4b78df462f7476c8968c1de13964b4673e4ca348d12752381b1",
+      "bytes": 9592
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/config/collisionAvoidanceControllerConfig.m",
+      "sha256": "3ebbe546147d1234caa168e548ead70cbcf8ab86469b37bd2e8a61653cccc9e4",
+      "bytes": 7295
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/PCBF_CLF_ARCHITECTURE.md",
+      "sha256": "041ef84b80e309693d7b45ce3d45b9da544bea68c6d3cf43b712eb4bcad9805f",
+      "bytes": 10010
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/CONTROLLER_FILES.md",
+      "sha256": "df644f874df21170610de01a5a4fc7baadab07b317a662adbbfc59baafcab973",
+      "bytes": 2813
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "611692320c748777e9dfdb0d13def74657282f427e8cba3731ac7137ce78ca39",
+      "bytes": 15704
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/auditJointPredictiveSafety.py",
+      "sha256": "1134e3bfdffa8b478fe19a0a24580196f329fa744529e0b189adf17219b4af55",
+      "bytes": 9358
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/twoStagePredictiveControlTest.m",
+      "sha256": "f109709e0e02233cfcf2af1dd6fd38e40df966d7d5a52d47db5b4348acb7522c",
+      "bytes": 12350
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nonlinearPredictiveSafetyTest.m",
+      "sha256": "c3e3bad46b4072e3f4863607e7ae96503fa951d7844fa0693fefdb0006170b9c",
+      "bytes": 17011
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/auditJointPredictiveSafetyTest.py",
+      "sha256": "68d20bf9e02ce0dc172a76210b9eeccdadcc5193c7398ba0b84df056b4d53108",
+      "bytes": 9137
+    }
+  ],
+  "raw": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign.log",
+      "sha256": "6506d7a1cc40445e815b4c845a2d0bd3e7c90da3b132c103919191fb9967c677",
+      "bytes": 114514
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/extend-0.log",
+      "sha256": "00feca3432be1f74530afe4aa61637501fa54227a588abdf5df068c88b73510c",
+      "bytes": 108455
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/extend-1.log",
+      "sha256": "6d95438c963e1b36fb99f0906e3f7677ac029bc3bf20e7a43d8611621550b932",
+      "bytes": 88342
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/extend-2.log",
+      "sha256": "0a5fe42bb1a8aeef62f5810a6d3b807aab32bfbf02b547d90cb4360e94c923ee",
+      "bytes": 63450
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/postprocess.log",
+      "sha256": "fc088e50efd0fa692152262e66b2d1eaf96ead9bf55877eb02b4d18f2262aa6d",
+      "bytes": 43970
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/audit-tests.log",
+      "sha256": "244d5a0653221273c834694f46b92cd90f3b359bced7158e649fb89aef49f477",
+      "bytes": 119
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/acceleratingHeadOn.json",
+      "sha256": "99a24c620f68c8a984df84a0f16544b0f1d1da58a953f22d52f030ce9033bdea",
+      "bytes": 3755796
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/acceleratingHeadOn.mat",
+      "sha256": "f3da3cc113d5a61e33c9853b7cfa73b4677c505c9e0954d1599ed0e27c7c5b52",
+      "bytes": 14177022
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/brakingLead-20s.json",
+      "sha256": "ab754b797629a5ec69534e30cf0943a36c87b0b2aeab90b86ccd86c02004daf9",
+      "bytes": 3216006
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/brakingLead.json",
+      "sha256": "2e7382c292f3e28e4fbfdfad16387915b70564995ad8039a589e83801a0c40f8",
+      "bytes": 12896653
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/brakingLead.mat",
+      "sha256": "fdec511bed7e4eb1b5286ae1f5d9bf4180c0b1ee1e9f7c4a693cc60fc739d7c5",
+      "bytes": 58507855
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/crossing-20s.json",
+      "sha256": "e71f8b24527edddc741ed171c6ade6c84aa8cadb3b99934ec4da95ae0fbf4921",
+      "bytes": 3607658
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/crossing.json",
+      "sha256": "07d7c85e704a226bc323de9d3eca63d21cb0dbbfed5a93cec99c5f70da527b2a",
+      "bytes": 14525305
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/crossing.mat",
+      "sha256": "7c2d78a06a32201c9e4974c84bf2f281c92e166bec2cc415bc005d9c1771405a",
+      "bytes": 58343386
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/curvedCrossing-20s.json",
+      "sha256": "7e6a79e491c037f7fbcb8b053d859bf7f39c02b9a70a455e72f51e9bd373d303",
+      "bytes": 4040654
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/curvedCrossing.json",
+      "sha256": "f957c35f9e7a3de8b155eca3696e9fcdeb754eac7013f1dc1493646b6453b05d",
+      "bytes": 16130894
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/curvedCrossing.mat",
+      "sha256": "fc4dcb2119f5397596abcbc9d77df51bd443c07eef62a10064faad49c1e3246a",
+      "bytes": 60140607
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/curvedHeadOn-20s.json",
+      "sha256": "8e00b6a8167b602ba3b2f0ec6260c4b56a28c42d2dd8ec648b7e4a72e3ac3876",
+      "bytes": 4060942
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/curvedHeadOn.json",
+      "sha256": "8907a12258731c58f4f056ea09bf11758991275dd7bfa417228f4fb52cd03ced",
+      "bytes": 16217529
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/curvedHeadOn.mat",
+      "sha256": "ebcd97b1cd76fdba404f9fdf5984254d7a981941d4478bffac9b4a90005fd58e",
+      "bytes": 60068706
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/headOn.json",
+      "sha256": "2726654af078198b19a2aa455155123e72f31c51f36d64614687ef15fc7b02a6",
+      "bytes": 3739374
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/headOn.mat",
+      "sha256": "f61251bfe74c3dc4cb6008701dd6af5d244d71f2c9dc1ce972e9bf5dac3124ff",
+      "bytes": 14130579
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/turningCrossing-20s.json",
+      "sha256": "2f0e3ac26f63471a7cf11c46fa7fb0d1da9fe32808298fc57c66f16e6f228ba5",
+      "bytes": 3640131
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/turningCrossing.json",
+      "sha256": "4b08953fe3891ae2a4fb10a53f1c6708e69073656f6a787e15069029e546fcb7",
+      "bytes": 14590585
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed15/turningCrossing.mat",
+      "sha256": "9fa8e296ea6767b0961996dfc6a47e0c29264367f73aa1dfed65494335899eff",
+      "bytes": 59283311
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/acceleratingHeadOn-20s.json",
+      "sha256": "d53c393166d4d4a617807b721fef93bc8d913ade464088aa0d466ab8e0ed10b5",
+      "bytes": 3743800
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/acceleratingHeadOn.json",
+      "sha256": "8ab8d7f7cf768b194d4bd4a1eb34ca235a6fe95c0a698527ca192908c4085e11",
+      "bytes": 11537718
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/acceleratingHeadOn.mat",
+      "sha256": "cf027530ce8a8050f85b85c1edd07b1e0289597441a5aca19f65ca68bb122952",
+      "bytes": 38675999
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/brakingLead-20s.json",
+      "sha256": "96cd811db75bfa62646cc0e5c7a5a19796c2a4357d039b5c5a891c02770b7a98",
+      "bytes": 3266790
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/brakingLead.json",
+      "sha256": "2de3eb89e1883a06d26075dacfec42bcc495845b8bc9560e2d5c64ae68f8a7fa",
+      "bytes": 9773730
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/brakingLead.mat",
+      "sha256": "c7764a08b5e5d281726b76be68c74bab9114a8f307ba4d530e848cfcad935432",
+      "bytes": 38665089
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/crossing-20s.json",
+      "sha256": "b1156f62a57016951ac3a9323d41d26f43329962f95cbc219dc2f06ef616ac1a",
+      "bytes": 3694377
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/crossing.json",
+      "sha256": "393eaa24732aa0b707679e279444435544dcc4beb930915660cea3fea2fb7387",
+      "bytes": 14821206
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/crossing.mat",
+      "sha256": "ce22df39942eb3c61775ad2f800678b5800f56d73d67d2bf7a6123c8169392a1",
+      "bytes": 58370718
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/curvedCrossing-20s.json",
+      "sha256": "725e2d45fda91e85d6f07937404909149f627f3e5f0ae81568e2a8d5dbafa0a0",
+      "bytes": 4090299
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/curvedCrossing.json",
+      "sha256": "1a3feda88d0bf4255f73dedf611ffd83a2493d7c3a4e05c95f8c97d5b464909f",
+      "bytes": 16345813
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/curvedCrossing.mat",
+      "sha256": "0c0f55255a6dcf5b358d551822ae3e336705f063b5d99ed5bdb31843184c00ab",
+      "bytes": 60117150
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/curvedHeadOn-20s.json",
+      "sha256": "9bc84d272aa5857ae653db38b73e39d3a4f04e7f0a1ec66f5c5d8b7e856f16a5",
+      "bytes": 4117429
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/curvedHeadOn.json",
+      "sha256": "8716267dccbe974c32388556e7ca9aaace8d4172f7ed3515cf324dc4996278b2",
+      "bytes": 16356981
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/curvedHeadOn.mat",
+      "sha256": "0adea9499a36b5851eda51988b5a2d213f269292625cc5218ed1415df4df0f21",
+      "bytes": 60042873
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/headOn-20s.json",
+      "sha256": "95140f1ad63668258032d63d430f7ba49df9527fab38a826f0cd5e33a19e5830",
+      "bytes": 3731400
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/headOn.json",
+      "sha256": "d3759b474d13ae723a2c32dc0b543fd2a19f5c733c5186a205f34561b0f0b688",
+      "bytes": 11036097
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/headOn.mat",
+      "sha256": "d9e4374ad78debfc44aa3c9a9ef65e8b2150656293fd18ff6f78c6871e13b15e",
+      "bytes": 36155345
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/turningCrossing-20s.json",
+      "sha256": "be9e66803e0ef94336ad5f4b1088705dc547d0337bf55a5fab72bff6229d8ef5",
+      "bytes": 3681516
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/turningCrossing.json",
+      "sha256": "231a810521d4e9afe8e20a435809b49aa97d8978094522f871cd61c3d73649e3",
+      "bytes": 14682270
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-controller-20261001/campaign/speed8/turningCrossing.mat",
+      "sha256": "e5258f87e09fb692579abc59556df429f3f71eccddb2d048dc5a438e452b0a07",
+      "bytes": 59311897
+    }
+  ],
+  "exports": [
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/collision-evidence.json",
+      "sha256": "76c5e501a55137722b6f2ff40786f1b5ec08de58943a24dae6c1f3bd5ee45488",
+      "bytes": 1643
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/collision-probes.json",
+      "sha256": "7011764c1464de92384c979b0df5137dd80faf864d63de9e397593fdbc95b712",
+      "bytes": 8834
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/logs/audit-tests.log",
+      "sha256": "244d5a0653221273c834694f46b92cd90f3b359bced7158e649fb89aef49f477",
+      "bytes": 119
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/logs/campaign.log",
+      "sha256": "ad39fa7eac35b5bd96445f50216c57bd233240e89516ed7f37be0fdb991abf41",
+      "bytes": 114500
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/logs/extend-0.log",
+      "sha256": "1b0efacaaeebc57e8fdb2ea4a7208e43156d306af85dc28da82cb4686a537a69",
+      "bytes": 108450
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/logs/extend-1.log",
+      "sha256": "0911ec46c7a206e72b6996cc7c5121dc422fa9a81ff99a6d015d3169cac9a46d",
+      "bytes": 88338
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/logs/extend-2.log",
+      "sha256": "3cb95ec4f0573b2ab78f73653d3704013fbc9120f6adaed3cca2e181cc570954",
+      "bytes": 63447
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/logs/postprocess.log",
+      "sha256": "b310500d86233c84659ec08ecca66afdafed000354a616924c2c529698b130ad",
+      "bytes": 43966
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/analyze.py",
+      "sha256": "8a2c6224ffa65274ff8aec5eb20ebf14d2c4c19935490c7738672694c1bc96fd",
+      "bytes": 3293
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/buildReport.py",
+      "sha256": "7a893badb1b0bcdeedad493d91320332dcfcab899f9e2762c26e44eb033c1aed",
+      "bytes": 11331
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/campaign.m",
+      "sha256": "fd78e3c17a96fed590c977bd3fc6f7b61f7d79c1d9a325eb9b9ab154c780e539",
+      "bytes": 2590
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/collisionEvidence.py",
+      "sha256": "104c99911c241feba85b2d25c27834d81fb4fa281587a67c0b0680364afce706",
+      "bytes": 2040
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/collisionProbe.m",
+      "sha256": "b704e6e36eadb92b1d7efefc615678b6f283d1eb0af8b988146c7986d5f18169",
+      "bytes": 2855
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/extend.m",
+      "sha256": "ea7ce981eef3d4daae59eaa492bad3980c6a61a2d0fdc286cecf8f0a970350f4",
+      "bytes": 1853
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/seedProbe.m",
+      "sha256": "2806abad28fea8c3378600f69f4a92be6532faaeb3f8feeba069d2c9ecdfc8e3",
+      "bytes": 2866
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/methods/tests.m",
+      "sha256": "089e3b8471d5274aa38001098e2026db3ce1bdcbedb479ea253e963ceeec25dc",
+      "bytes": 947
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/seeds.json",
+      "sha256": "a81f38e847b968689785b4f47e62f479a75a67552e08adeff968f06d8c19be71",
+      "bytes": 4010
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/serial-summary.json",
+      "sha256": "0da30561251e623cebfa57b16faacf6f18c47326ff4a7f5b37df8d6323a2cc99",
+      "bytes": 29158
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/source-manifest.json",
+      "sha256": "7bf8b8ff24449c30f235737f53d2d16aac30050b7a42eca95e628f9c3532cae9",
+      "bytes": 2061
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/summary.json",
+      "sha256": "2bd5db37a9db282d9546857301c52e1ffc837c9ff51e6857a7d23aa93a29e313",
+      "bytes": 29269
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/RTI_FLOW_REINITIALIZATION_20261001/test-results.json",
+      "sha256": "789526e883dac0d31ae3ba0072cd599c3520f09c017cc91b842795105b8d6e83",
+      "bytes": 21338
+    }
+  ]
+}

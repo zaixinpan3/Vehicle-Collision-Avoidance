@@ -6,10 +6,19 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state, feasible_hold, audit, recovery_completed
+from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state, feasible_hold, audit, recovery_completed, zero_slack_hold
 
 
 class CollisionAuditTest(unittest.TestCase):
+    def test_rti_restart_does_not_turn_missing_residual_into_a_certificate(self):
+        hold = affine_hold()
+        hold.update(source='twoStageRealTimeIteration', solverCalls=3)
+        hold['solverStages'].insert(0, dict(objective='pcbfSlack', exitFlag=-2))
+        self.assertTrue(feasible_hold(hold))
+        self.assertTrue(zero_slack_hold(hold))
+        hold['hardResidual'] = None
+        self.assertFalse(feasible_hold(hold))
+
     def test_missing_online_residual_does_not_claim_verified_feasibility(self):
         hold = affine_hold()
         hold['hardResidual'] = None

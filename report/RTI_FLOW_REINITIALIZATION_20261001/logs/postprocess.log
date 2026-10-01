@@ -1,0 +1,264 @@
+SEED speed=8 headOn gap=1.50622063 terminalRatio=0.1956 returned=1
+SEED speed=8 acceleratingHeadOn gap=1.24777736 terminalRatio=0.03608 returned=1
+SEED speed=8 brakingLead gap=0.845493411 terminalRatio=1.151e+04 returned=1
+SEED speed=8 crossing gap=0.765442009 terminalRatio=41.78 returned=1
+SEED speed=8 turningCrossing gap=0.73811647 terminalRatio=33.94 returned=1
+SEED speed=8 curvedHeadOn gap=1.69152239 terminalRatio=0.02927 returned=1
+SEED speed=8 curvedCrossing gap=0.441031228 terminalRatio=32.68 returned=1
+SEED speed=15 headOn gap=0.200126115 terminalRatio=0.002633 returned=1
+SEED speed=15 acceleratingHeadOn gap=0.0592775096 terminalRatio=0.001917 returned=1
+SEED speed=15 brakingLead gap=1.2711902 terminalRatio=105.3 returned=1
+SEED speed=15 crossing gap=1.38698426 terminalRatio=7.009 returned=1
+SEED speed=15 turningCrossing gap=1.39851812 terminalRatio=11.07 returned=1
+SEED speed=15 curvedHeadOn gap=0 terminalRatio=1.536e-08 returned=1
+SEED speed=15 curvedCrossing gap=1.04163379 terminalRatio=12.04 returned=1
+Running twoStagePredictiveControlTest
+.......... .
+Done twoStagePredictiveControlTest
+__________
+
+Running clfNominalRecoveryTest
+........
+Done clfNominalRecoveryTest
+__________
+
+Running nonlinearPredictiveSafetyTest
+.......... .......... .......... .......... ..........
+.......... ..
+Done nonlinearPredictiveSafetyTest
+__________
+
+Running terminalContinuationTest
+.......... .......... ........
+Done terminalContinuationTest
+__________
+
+Running freePoseTerminalTest
+.......... .
+Done freePoseTerminalTest
+__________
+
+Running collisionAvoidanceControllerConfigTest
+.......... .......... .......... .......... ..........
+.......... ...
+Done collisionAvoidanceControllerConfigTest
+__________
+
+Running controllerSourceBudgetTest
+.
+Done controllerSourceBudgetTest
+__________
+
+Running movingTargetFlowTest
+........
+Done movingTargetFlowTest
+__________
+
+Running controllerKernelTest
+........
+Done controllerKernelTest
+__________
+
+                                                                        Name                                                                        Passed    Failed    Incomplete    Duration      Details
+    ____________________________________________________________________________________________________________________________________________    ______    ______    __________    ________    ____________
+
+    {'twoStagePredictiveControlTest/nominalInitializationStillOptimizesBothObjectives'                                                         }    true      false       false         0.6839    {1×1 struct}
+    {'twoStagePredictiveControlTest/shiftedInputsAreRolledOutFromTheNewMeasurement'                                                            }    true      false       false        0.17722    {1×1 struct}
+    {'twoStagePredictiveControlTest/failedShiftReinitializesFlowAndRebuildsBothStages'                                                         }    true      false       false        0.36207    {1×1 struct}
+    {'twoStagePredictiveControlTest/failedFreshInitializationDoesNotStartAnotherRetry'                                                         }    true      false       false        0.14062    {1×1 struct}
+    {'twoStagePredictiveControlTest/unevaluableShiftUsesFreshInitializationBeforeOptimization'                                                 }    true      false       false        0.30258    {1×1 struct}
+    {'twoStagePredictiveControlTest/exhaustedBudgetDoesNotExecuteThePreviousTrajectory'                                                        }    true      false       false         0.1223    {1×1 struct}
+    {'twoStagePredictiveControlTest/finiteIterationLimitResultsStillRunBothStagesAndSupplyTheCommand'                                          }    true      false       false       0.030839    {1×1 struct}
+    {'twoStagePredictiveControlTest/initialOverlapIsReportedAsOptimizedPositiveSlack'                                                          }    true      false       false        0.17925    {1×1 struct}
+    {'twoStagePredictiveControlTest/brakingSlewAndMagnitudeBoundsConstrainTheReturnedPlan'                                                     }    true      false       false        0.23726    {1×1 struct}
+    {'twoStagePredictiveControlTest/numericalSteeringCorrectionDoesNotImposeActuatorSlew'                                                      }    true      false       false        0.19662    {1×1 struct}
+    {'twoStagePredictiveControlTest/steeringMayExceedTheRetiredFortyDegreeLimit'                                                               }    true      false       false         0.2709    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0,lateralError=0)'                     }    true      false       false        0.56871    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0,lateralError=0.1)'                   }    true      false       false       0.052908    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0.005,lateralError=0)'                 }    true      false       false        0.06185    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=8,curvature=0.005,lateralError=0.1)'               }    true      false       false       0.051205    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0,lateralError=0)'                    }    true      false       false        0.17219    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0,lateralError=0.1)'                  }    true      false       false        0.05768    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0.005,lateralError=0)'                }    true      false       false       0.060841    {1×1 struct}
+    {'clfNominalRecoveryTest/secondStageReachesZeroSlackForAnUnobstructedClf(referenceSpeed=15,curvature=0.005,lateralError=0.1)'              }    true      false       false        0.14819    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0,targetAcceleration=0)'                                  }    true      false       false        0.12071    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0,targetAcceleration=1.2)'                                }    true      false       false          0.002    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0,targetAcceleration=-1.2)'                               }    true      false       false       0.000924    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=1e-12,targetAcceleration=0)'                              }    true      false       false        0.00107    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=1e-12,targetAcceleration=1.2)'                            }    true      false       false       0.001569    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=1e-12,targetAcceleration=-1.2)'                           }    true      false       false       0.000753    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0.08,targetAcceleration=0)'                               }    true      false       false       0.000733    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0.08,targetAcceleration=1.2)'                             }    true      false       false       0.000693    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0.08,targetAcceleration=-1.2)'                            }    true      false       false       0.000711    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=-0.08,targetAcceleration=0)'                              }    true      false       false       0.000698    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=-0.08,targetAcceleration=1.2)'                            }    true      false       false       0.000682    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=-0.08,targetAcceleration=-1.2)'                           }    true      false       false       0.000688    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0,targetAcceleration=0)'                            }    true      false       false       0.037703    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0,targetAcceleration=1.2)'                          }    true      false       false       0.006772    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0,targetAcceleration=-1.2)'                         }    true      false       false       0.003005    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=1e-12,targetAcceleration=0)'                        }    true      false       false       0.002393    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=1e-12,targetAcceleration=1.2)'                      }    true      false       false        0.01332    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=1e-12,targetAcceleration=-1.2)'                     }    true      false       false       0.001958    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0.08,targetAcceleration=0)'                         }    true      false       false       0.001565    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0.08,targetAcceleration=1.2)'                       }    true      false       false       0.001265    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0.08,targetAcceleration=-1.2)'                      }    true      false       false       0.001226    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=-0.08,targetAcceleration=0)'                        }    true      false       false       0.001244    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=-0.08,targetAcceleration=1.2)'                      }    true      false       false       0.001263    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=-0.08,targetAcceleration=-1.2)'                     }    true      false       false        0.00128    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/accelerationChangesSpeedAndHeadingRate'                                                                    }    true      false       false        0.00482    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/brakingRetainsConstantAccelerationThroughZeroVelocity'                                                     }    true      false       false       0.001394    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=0)'                                              }    true      false       false       0.001473    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=1e-12)'                                          }    true      false       false       0.001237    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=0.08)'                                           }    true      false       false       0.001219    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=-0.08)'                                          }    true      false       false       0.001239    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=0)'                                                               }    true      false       false        0.10814    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=0.5)'                                                             }    true      false       false       0.003256    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=2.9)'                                                             }    true      false       false       0.002371    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/overlapHasANonzeroRestorationDirection'                                                                    }    true      false       false       0.004043    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=0)'                                              }    true      false       false       0.030661    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=0.005)'                                          }    true      false       false       0.002775    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=-0.005)'                                         }    true      false       false       0.001992    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/jointTargetCoordinatesAreUnactuated'                                                                       }    true      false       false        0.10141    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=0)'                                         }    true      false       false        0.00294    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=1e-12)'                                     }    true      false       false       0.003548    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=0.08)'                                      }    true      false       false       0.003698    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=-0.08)'                                     }    true      false       false       0.001863    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/fullAndHalfHoldsUseTheSamePredictionMap'                                                                   }    true      false       false       0.003281    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/aOneStepMeshUsesItsInterpolantAsTheMidpoint'                                                               }    true      false       false       0.008362    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/laneFollowingRunsWithNoNativeVerifier'                                                                     }    true      false       false          0.311    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/changedTargetForecastRequiresExplicitReinitialization'                                                     }    true      false       false        0.13371    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/headingWrapPreservesTheFixedTargetForecast'                                                                }    true      false       false        0.13491    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/targetDropoutUsesOneFixedAbsoluteEpoch'                                                                    }    true      false       false        0.21985    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/nonconsecutiveSampleTimesCannotReuseTheTrajectory'                                                         }    true      false       false       0.059558    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/retiredStateCannotRestoreTheOldTargetMotion'                                                               }    true      false       false       0.058347    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/opposingHeadingPreservesExactlyStraightTargetMotion'                                                       }    true      false       false        0.00237    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/tinyPhysicalTransverseAccelerationStillAffectsInfiniteSeparation'                                          }    true      false       false       0.007061    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/straightEndpointSeparationIsIndependentOfWorldHeading(orientation=0)'                                      }    true      false       false       0.002757    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/straightEndpointSeparationIsIndependentOfWorldHeading(orientation=0.5)'                                    }    true      false       false       0.001838    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/straightEndpointSeparationIsIndependentOfWorldHeading(orientation=2.9)'                                    }    true      false       false       0.001654    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/returningTargetOrbitMustBeSeparatedAtTheEndpointSeed'                                                      }    true      false       false       0.004017    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/acceleratingTargetBehindCannotUseAConstantSpeedSeed'                                                       }    true      false       false       0.000568    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/acceleratingTargetAheadAllowsIndefiniteFollowing'                                                          }    true      false       false       0.000544    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/deceleratingTargetHasABoundedForwardExcursion'                                                             }    true      false       false       0.000555    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/aBrakingTargetCanReturnFromOutsideACircularLane'                                                           }    true      false       false         0.1333    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/aStationaryTargetWithSideslipRemainsAFixedRectangle'                                                       }    true      false       false        0.11189    {1×1 struct}
+    {'nonlinearPredictiveSafetyTest/finiteBrakingSlewUsesAppliedInputMemory'                                                                   }    true      false       false        0.37793    {1×1 struct}
+    {'terminalContinuationTest/nonlinearContractionIncludesTheReferenceDefect(curvature=0)'                                                    }    true      false       false        0.39753    {1×1 struct}
+    {'terminalContinuationTest/nonlinearContractionIncludesTheReferenceDefect(curvature=-0.005)'                                               }    true      false       false        0.13124    {1×1 struct}
+    {'terminalContinuationTest/nonlinearContractionIncludesTheReferenceDefect(curvature=0.005)'                                                }    true      false       false        0.12389    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0,phaseMeters=-20)'                                         }    true      false       false        0.12666    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0,phaseMeters=0)'                                           }    true      false       false       0.005514    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0,phaseMeters=20)'                                          }    true      false       false       0.001267    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=-0.005,phaseMeters=-20)'                                    }    true      false       false        0.13887    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=-0.005,phaseMeters=0)'                                      }    true      false       false       0.002758    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=-0.005,phaseMeters=20)'                                     }    true      false       false       0.001118    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0.005,phaseMeters=-20)'                                     }    true      false       false         0.1225    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0.005,phaseMeters=0)'                                       }    true      false       false        0.00128    {1×1 struct}
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0.005,phaseMeters=20)'                                      }    true      false       false        0.00113    {1×1 struct}
+    {'terminalContinuationTest/shiftedReferenceStatesBelongToTheirOwnTerminalFamily(curvature=0)'                                              }    true      false       false         0.1148    {1×1 struct}
+    {'terminalContinuationTest/shiftedReferenceStatesBelongToTheirOwnTerminalFamily(curvature=-0.005)'                                         }    true      false       false        0.12458    {1×1 struct}
+    {'terminalContinuationTest/shiftedReferenceStatesBelongToTheirOwnTerminalFamily(curvature=0.005)'                                          }    true      false       false        0.12269    {1×1 struct}
+    {'terminalContinuationTest/phaseTangentsMatchTheReferenceAndMembership(curvature=0)'                                                       }    true      false       false        0.11389    {1×1 struct}
+    {'terminalContinuationTest/phaseTangentsMatchTheReferenceAndMembership(curvature=-0.005)'                                                  }    true      false       false        0.12615    {1×1 struct}
+    {'terminalContinuationTest/phaseTangentsMatchTheReferenceAndMembership(curvature=0.005)'                                                   }    true      false       false         0.1224    {1×1 struct}
+    {'terminalContinuationTest/aDifferentPhaseMustRecheckFutureTargetSeparation'                                                               }    true      false       false        0.12118    {1×1 struct}
+    {'terminalContinuationTest/separationUsesTheSameAbsoluteTimeAsTheEndpoint'                                                                 }    true      false       false        0.00382    {1×1 struct}
+    {'terminalContinuationTest/departureFollowsTheEndpointPolicyUntilTheTargetIsOutOfRange'                                                    }    true      false       false        0.10965    {1×1 struct}
+    {'terminalContinuationTest/inputMemoryIsPartOfMembership'                                                                                  }    true      false       false       0.007685    {1×1 struct}
+    {'terminalContinuationTest/aDeadlineCannotAuthorizeAnUnoptimizedInitialization'                                                            }    true      false       false        0.14967    {1×1 struct}
+    {'terminalContinuationTest/aChangedConstraintSetRequiresReinitialization'                                                                  }    true      false       false       0.029444    {1×1 struct}
+    {'terminalContinuationTest/changingTheGivenPathStillRequiresReinitialization'                                                              }    true      false       false       0.016427    {1×1 struct}
+    {'terminalContinuationTest/targetSeparationDoesNotDependOnRoadWidth(curvature=0)'                                                          }    true      false       false        0.11751    {1×1 struct}
+    {'terminalContinuationTest/targetSeparationDoesNotDependOnRoadWidth(curvature=-0.005)'                                                     }    true      false       false        0.13122    {1×1 struct}
+    {'terminalContinuationTest/targetSeparationDoesNotDependOnRoadWidth(curvature=0.005)'                                                      }    true      false       false        0.21935    {1×1 struct}
+    {'freePoseTerminalTest/rigidPlacementPreservesMembershipAndControl(angle=0)'                                                               }    true      false       false        0.46278    {1×1 struct}
+    {'freePoseTerminalTest/rigidPlacementPreservesMembershipAndControl(angle=0.7)'                                                             }    true      false       false       0.006761    {1×1 struct}
+    {'freePoseTerminalTest/rigidPlacementPreservesMembershipAndControl(angle=1.9)'                                                             }    true      false       false       0.005353    {1×1 struct}
+    {'freePoseTerminalTest/fittedPoseMinimizesTheOriginalEllipsoidError'                                                                       }    true      false       false       0.005426    {1×1 struct}
+    {'freePoseTerminalTest/fittedPoseDerivativeMatchesAugmentedStatePerturbations'                                                             }    true      false       false       0.006258    {1×1 struct}
+    {'freePoseTerminalTest/separationDerivativeIncludesPoseAndInputMemory(motion=11x1_double)'                                                 }    true      false       false       0.020789    {1×1 struct}
+    {'freePoseTerminalTest/separationDerivativeIncludesPoseAndInputMemory(motion=11x1_double_1)'                                               }    true      false       false       0.011419    {1×1 struct}
+    {'freePoseTerminalTest/freePoseDoesNotAuthorizeDrivingIntoAStationaryTarget'                                                               }    true      false       false        0.00141    {1×1 struct}
+    {'freePoseTerminalTest/retainedCoreClosesTheSuffixWithFiniteBrakingSlew(angle=0)'                                                          }    true      false       false       0.010933    {1×1 struct}
+    {'freePoseTerminalTest/retainedCoreClosesTheSuffixWithFiniteBrakingSlew(angle=0.7)'                                                        }    true      false       false       0.004932    {1×1 struct}
+    {'freePoseTerminalTest/retainedCoreClosesTheSuffixWithFiniteBrakingSlew(angle=1.9)'                                                        }    true      false       false        0.13962    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/targetRearAxleDistanceIsPositiveAndIndependentOfEgoGeometry'                                      }    true      false       false        0.11348    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/smallDefaultCollisionBufferCanBeExplicitlyDisabled'                                               }    true      false       false       0.001873    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/collisionBufferCannotBeNegativeOrNonfinite'                                                       }    true      false       false       0.008811    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/encounterRangeDefaultsToThirtyMetersAndMayBeUnbounded'                                            }    true      false       false       0.001379    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/encounterRangeMustExceedTheCollisionBuffer'                                                       }    true      false       false       0.006196    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/solverPrecisionAndIterationLimitsAreValidated'                                                    }    true      false       false       0.015222    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=-0.1)'                               }    true      false       false       0.006244    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=Inf)'                                }    true      false       false       0.001537    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=NaN)'                                }    true      false       false       0.001333    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=1x2_double)'                         }    true      false       false       0.001667    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/theOldAccelerationGainCannotRedefineThePaperRatio'                                                }    true      false       false       0.001541    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct)'                                         }    true      false       false       0.001596    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_1)'                                       }    true      false       false       0.001396    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_2)'                                       }    true      false       false       0.001344    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_3)'                                       }    true      false       false       0.001419    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_4)'                                       }    true      false       false       0.001665    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_5)'                                       }    true      false       false        0.00128    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_6)'                                       }    true      false       false       0.001233    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_7)'                                       }    true      false       false        0.00126    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_8)'                                       }    true      false       false       0.001252    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_9)'                                       }    true      false       false       0.001255    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_10)'                                      }    true      false       false       0.001189    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_11)'                                      }    true      false       false       0.001256    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_12)'                                      }    true      false       false        0.00118    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_13)'                                      }    true      false       false        0.00121    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_14)'                                      }    true      false       false       0.001233    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_15)'                                      }    true      false       false       0.001239    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_16)'                                      }    true      false       false       0.001276    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_17)'                                      }    true      false       false       0.001384    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_18)'                                      }    true      false       false       0.001182    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_19)'                                      }    true      false       false       0.001351    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_20)'                                      }    true      false       false       0.001195    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_21)'                                      }    true      false       false       0.001211    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_22)'                                      }    true      false       false       0.001193    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_23)'                                      }    true      false       false       0.001193    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_24)'                                      }    true      false       false       0.001279    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_25)'                                      }    true      false       false       0.001334    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_26)'                                      }    true      false       false       0.001431    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/unknownNestedOptionsAreRejected'                                                                  }    true      false       false        0.00153    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=notANumber)'}    true      false       false       0.002041    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=infinite)'  }    true      false       false       0.001731    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=complex)'   }    true      false       false         0.0021    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=empty)'     }    true      false       false       0.001947    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=vector)'    }    true      false       false       0.002445    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=text)'      }    true      false       false       0.006335    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=logical)'   }    true      false       false       0.002145    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=notANumber)'}    true      false       false       0.001721    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=infinite)'  }    true      false       false       0.001453    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=complex)'   }    true      false       false       0.001695    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=empty)'     }    true      false       false       0.001681    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=vector)'    }    true      false       false       0.001446    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=text)'      }    true      false       false       0.002352    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=logical)'   }    true      false       false       0.001491    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=zeroWidth)'                  }    true      false       false       0.002164    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=reversed)'                   }    true      false       false       0.001621    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=positiveOnly)'               }    true      false       false       0.001797    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=negativeOnly)'               }    true      false       false       0.001597    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=outsideRange)'               }    true      false       false       0.002157    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=0x0_double)'                                     }    true      false       false       0.001806    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=1x1_double_1)'                                   }    true      false       false         0.0016    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=0x0_struct)'                                     }    true      false       false       0.001733    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/singlePrecisionBoundsAreNormalizedWithoutChangingUnits'                                           }    true      false       false       0.011393    {1×1 struct}
+    {'collisionAvoidanceControllerConfigTest/zeroMaximumStillAllowsBraking'                                                                    }    true      false       false       0.086869    {1×1 struct}
+    {'controllerSourceBudgetTest/controllerAndConfigurationFitNineSourceFiles'                                                                 }    true      false       false       0.004636    {1×1 struct}
+    {'movingTargetFlowTest/movingEllipseHasNoRelativeNormalPenetration(angle=0)'                                                               }    true      false       false        0.16381    {1×1 struct}
+    {'movingTargetFlowTest/movingEllipseHasNoRelativeNormalPenetration(angle=0.7)'                                                             }    true      false       false       0.001095    {1×1 struct}
+    {'movingTargetFlowTest/movingEllipseHasNoRelativeNormalPenetration(angle=1.9)'                                                             }    true      false       false       0.000897    {1×1 struct}
+    {'movingTargetFlowTest/changingWorldVelocityTransportsTheSameRelativeFlow'                                                                 }    true      false       false       0.003785    {1×1 struct}
+    {'movingTargetFlowTest/rotatingTheWorldRotatesTheGuidance(angle=0)'                                                                        }    true      false       false       0.001144    {1×1 struct}
+    {'movingTargetFlowTest/rotatingTheWorldRotatesTheGuidance(angle=0.7)'                                                                      }    true      false       false        0.00093    {1×1 struct}
+    {'movingTargetFlowTest/rotatingTheWorldRotatesTheGuidance(angle=1.9)'                                                                      }    true      false       false       0.000911    {1×1 struct}
+    {'movingTargetFlowTest/anInteriorSearchPointDoesNotMakeTheGuidanceSingular'                                                                }    true      false       false        0.12513    {1×1 struct}
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.005,fraction=1)'                                           }    true      false       false        0.51016    {1×1 struct}
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.005,fraction=0.5)'                                         }    true      false       false        0.15109    {1×1 struct}
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.025,fraction=1)'                                           }    true      false       false        0.12469    {1×1 struct}
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.025,fraction=0.5)'                                         }    true      false       false        0.12473    {1×1 struct}
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.05,fraction=1)'                                            }    true      false       false        0.11993    {1×1 struct}
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.05,fraction=0.5)'                                          }    true      false       false        0.12249    {1×1 struct}
+    {'controllerKernelTest/geometryKernelsReproduceTheInterpretedDistanceAndDual'                                                              }    true      false       false        0.63983    {1×1 struct}
+    {'controllerKernelTest/kernelKeepsTheModelDomainErrors'                                                                                    }    true      false       false        0.14606    {1×1 struct}

@@ -22,7 +22,7 @@ end
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
-    % trustRadius scales state and braking-ratio increments, not steering.
+    % trustRadius scales RTI state/input corrections about each fresh rollout.
     cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
         'trustRadius',.5, ...
         'recoveryHorizonSeconds',3,'clfDecay',.01);

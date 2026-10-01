@@ -64,16 +64,17 @@ def clearance_passes(minimum, margin):
 
 def feasible_hold(hold):
     """Check the declared optimization scope, separately from replay geometry."""
-    if hold.get('source') == 'twoStageConvexOptimization':
+    if hold.get('source') in ('twoStageConvexOptimization', 'twoStageRealTimeIteration'):
         stages = hold.get('solverStages', [])
+        calls = (2, 3, 4) if hold.get('source') == 'twoStageRealTimeIteration' else (2,)
         tolerance = hold.get('affineFeasibilityTolerance', 0)
         residual = hold.get('hardResidual')
         return (math.isfinite(tolerance) and tolerance > 0
                 and isinstance(residual, (int, float)) and 0 <= residual <= tolerance
                 and hold.get('optimizationConverged', False)
-                and hold.get('solverCalls') == 2 and len(stages) == 2
-                and [stage.get('objective') for stage in stages] == ['pcbfSlack', 'clfSlack']
-                and all(stage.get('exitFlag', 0) > 0 for stage in stages))
+                and hold.get('solverCalls') in calls and len(stages) == hold.get('solverCalls')
+                and [stage.get('objective') for stage in stages[-2:]] == ['pcbfSlack', 'clfSlack']
+                and all(stage.get('exitFlag', 0) > 0 for stage in stages[-2:]))
     # Historical nonlinear-admission exports retain their original contract.
     return (hold.get('hardResidual') == 0
             and hold.get('source') in ('sequentialConvexification',
@@ -83,7 +84,7 @@ def feasible_hold(hold):
 
 def zero_slack_hold(hold):
     tolerance = (hold.get('affineFeasibilityTolerance', 0)
-                 if hold.get('source') == 'twoStageConvexOptimization' else 0)
+                 if hold.get('source') in ('twoStageConvexOptimization', 'twoStageRealTimeIteration') else 0)
     return math.isfinite(tolerance) and 0 <= hold.get('predictiveBarrierValue', math.inf) <= tolerance
 
 

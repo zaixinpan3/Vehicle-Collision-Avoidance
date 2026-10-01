@@ -1,14 +1,50 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl One linearization, PCBF slack, then CLF slack.
+%solvePredictiveControl One RTI step, with one fresh initialization on failure.
 % Returned states belong to the affine prediction, not a nonlinear replay.
 % Solver exit flags are recorded, not used to admit or reject returned vectors.
-% There is no post-solve constraint audit, correction or outer search.
+% There is no post-solve constraint audit or convergence loop.
     if nargin<3,timer=tic;end
+    wall=tic;
+    [anchor,initialization,initializationFailure]=localInitialization(model,previousState);
+    initializationSeconds=toc(wall);
+    [solution,search,model]=localStep(anchor,model,initialization,timer);
+    search.initializationSeconds=initializationSeconds;
+    attempts=localAttempt(search);firstStages=search.stages;
+    restart=isempty(solution) && initialization=="shiftedInputRollout" ...
+        && any(search.terminationReason==["pcbfNoNumericalResult","clfNoNumericalResult"]) ...
+        && toc(timer)<model.cfg.solver.timeLimitSeconds;
+    if restart
+        % Rebuild dynamics and separation directions from the new flow rollout.
+        % No first-stage or previous-frame control is executed in its place.
+        reason=search.terminationReason;
+        wall=tic;anchor=localFlowSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
+        initialization="movingTargetFlow";
+        if isempty(model.target),initialization="laneFeedbackRollout";end
+        [solution,search,model]=localStep(anchor,model,initialization,timer);
+        search.initializationSeconds=initializationSeconds;
+        attempts(2)=localAttempt(search);
+        search.stages=[firstStages,search.stages];
+        initializationFailure=reason;
+    end
+    search.attempts=attempts;search.linearizationCount=numel(attempts);
+    search.solverCalls=sum([attempts.solverCalls]);search.flowRestarted=restart;
+    search.initializationFailure=initializationFailure;
+    search.elapsedSeconds=toc(timer);
+end
+
+function attempt=localAttempt(search)
+    attempt=struct('initialization',search.initialization,'terminationReason',search.terminationReason, ...
+        'solverCalls',search.solverCalls,'stages',search.stages, ...
+        'initializationSeconds',search.initializationSeconds,'formulationSeconds',search.formulationSeconds);
+end
+
+function [solution,search,model]=localStep(anchor,model,initialization,timer)
     cfg=model.cfg;solution=[];
-    [anchor,initialization]=localInitialization(model,previousState);
-    [problem,model]=localFormulate(anchor,model);
-    search=struct('solverCalls',0,'source',"twoStageConvexOptimization", ...
+    wall=tic;[problem,model]=localFormulate(anchor,model);formulationSeconds=toc(wall);
+    model.linearization=anchor;
+    search=struct('solverCalls',0,'source',"twoStageRealTimeIteration", ...
         'initialization',initialization,'returned',false,'converged',false,'terminationReason',"timeLimit", ...
+        'formulationSeconds',formulationSeconds, ...
         'primaryOptimum',NaN,'slackCap',NaN,'clfInitialSlack',problem.initialClfSlack, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{}));
@@ -59,25 +95,36 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.terminationReason="twoStagesReturned";search.elapsedSeconds=toc(timer);
 end
 
-function [anchor,source]=localInitialization(model,previous)
+function [anchor,source,failure]=localInitialization(model,previous)
     cfg=model.cfg;
     count=min(cfg.controller.maximumHorizonSteps,cfg.controller.horizonSteps ...
         +ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime));
-    source="movingTargetFlow";
+    source="movingTargetFlow";failure="";
     if isempty(model.target),source="laneFeedbackRollout";end
     if isstruct(previous)
-        states=previous.stateTrajectory(:,2:end);inputs=previous.inputTrajectory(:,2:end);
-        usable=size(states,2)==size(inputs,2)+1 && ~isempty(inputs) ...
-            && all(isfinite([states(:);inputs(:)])) ...
-            && all(states(4,:)>cfg.model.scheduleSpeedFloor) && all(abs(inputs(2,:))<1);
+        inputs=previous.inputTrajectory(:,2:end);
+        usable=~isempty(inputs) && all(isfinite(inputs(:))) && all(abs(inputs(2,:))<1);
         if usable
-            inputs=inputs(:,1:min(count,size(inputs,2)));states=states(:,1:size(inputs,2)+1);
-            while size(inputs,2)<count
-                u=localClip(model.terminal.reference.input,inputs(:,end),cfg);
-                states(:,end+1)=nonlinearBicycleModel.sample(states(:,end),u,cfg);
-                inputs(:,end+1)=u;
+            inputs=inputs(:,1:min(count,size(inputs,2)));
+            try
+                states=zeros(6,count+1);states(:,1)=model.initialState;
+                for index=1:count
+                    if index>size(inputs,2)
+                        inputs(:,index)=localClip(model.terminal.reference.input,inputs(:,end),cfg);
+                    end
+                    states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),cfg);
+                end
+                anchor=struct('inputs',inputs,'states',states);source="shiftedInputRollout";return;
+            catch exception
+                domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
+                    "collisionAvoidanceController:invalidTireOperatingPoint", ...
+                    "collisionAvoidanceController:singularTireLinearization"];
+                if ~any(string(exception.identifier)==domainErrors),rethrow(exception);end
+                % This is reference construction, never a candidate admission test.
+                failure=string(exception.identifier);
             end
-            anchor=struct('inputs',inputs,'states',states);source="shiftedLinearization";return;
+        else
+            failure="unusableShiftedInputs";
         end
     end
     anchor=localFlowSeed(model,count);
@@ -150,8 +197,9 @@ function [problem,model]=localFormulate(anchor,model)
     rows=cell(1,5*count+3);bounds=cell(size(rows));rowCount=0;
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
-    lower(iu(2,:))=-radius*.25;upper(iu(2,:))=radius*.25;lower([is,ic])=0;
-    % Steering has no magnitude, slew or anchor-relative hard bounds.
+    lower(iu(:))=-repmat(radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
+    % Numerical RTI corrections are local to the new anchor at every sample.
+    % Steering still has no actuator magnitude or slew constraint.
     inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
     inputUpper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;

@@ -26,19 +26,62 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.recursiveFeasibilityScope,"notCertifiedForNonlinearPlant");
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
-        function shiftedAffineTrajectoryIsOnlyTheNextLinearization(testCase)
+        function shiftedInputsAreRolledOutFromTheNewMeasurement(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
             [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
             ego=localSuccessor(ego,prior);ego.position(2)=ego.position(2)+.01;
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             anchor=problem.model.linearization;
-            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedLinearization");
-            testCase.verifyEqual(anchor.states(:,1:end-1),prior.stateTrajectory(:,2:end),AbsTol=0);
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyEqual(anchor.states(:,1),problem.model.initialState,AbsTol=0);
+            testCase.verifyNotEqual(anchor.states(:,1),prior.stateTrajectory(:,2));
             testCase.verifyEqual(anchor.inputs(:,1:end-1),prior.inputTrajectory(:,2:end),AbsTol=0);
             testCase.verifyEqual(problem.predictedState(:,1),problem.model.initialState,AbsTol=1e-7);
             testCase.verifyEqual(problem.metadata.solverCallCount,2);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyAffinePrediction(testCase,problem,cfg);
+            localVerifyAnchorRollout(testCase,anchor,cfg);
+        end
+        function failedShiftReinitializesFlowAndRebuildsBothStages(testCase)
+            [ego,road,cfg]=localFixture();
+            target=struct('targetPositionInertial',[0;40], ...
+                'targetVelocityInertial',[8;0],'targetYawInertial',0);
+            [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            ego=localSuccessor(ego,prior);prior.inputTrajectory(1,end-9:end)=.15;
+            [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            search=problem.metadata.search;
+            testCase.verifyTrue(search.flowRestarted);
+            testCase.verifyEqual(search.solverCalls,3);
+            testCase.verifyEqual(search.linearizationCount,2);
+            testCase.verifyEqual([search.attempts.initialization],["shiftedInputRollout","movingTargetFlow"]);
+            testCase.verifyEqual(search.initializationFailure,"pcbfNoNumericalResult");
+            testCase.verifyEqual([search.stages.objective],["pcbfSlack","pcbfSlack","clfSlack"]);
+            testCase.verifyGreaterThan([search.attempts(2).stages.exitFlag],0);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
+            localVerifyAnchorRollout(testCase,problem.model.linearization,cfg);
+            localVerifyAffinePrediction(testCase,problem,cfg);
+        end
+        function failedFreshInitializationDoesNotStartAnotherRetry(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            model=problem.model;model.initialState(4)=20;
+            [solution,search]=solvePredictiveControl(model,prior);
+            testCase.verifyEmpty(solution);
+            testCase.verifyTrue(search.flowRestarted);
+            testCase.verifyEqual(search.linearizationCount,2);
+            testCase.verifyEqual(search.solverCalls,2);
+            testCase.verifyEqual(search.terminationReason,"pcbfNoNumericalResult");
+        end
+        function unevaluableShiftUsesFreshInitializationBeforeOptimization(testCase)
+            [ego,road,cfg]=localFixture();
+            [~,~,~,prior]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            ego=localSuccessor(ego,prior);prior.inputTrajectory(1,end)=pi;
+            [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
+            testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
+            testCase.verifyEqual(problem.metadata.search.initializationFailure, ...
+                "collisionAvoidanceController:invalidTireOperatingPoint");
+            testCase.verifyFalse(problem.metadata.search.flowRestarted);
+            testCase.verifyEqual(problem.metadata.search.solverCalls,2);
         end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)
             [ego,road,cfg]=localFixture();
@@ -76,6 +119,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 problem.metadata.search.slackCap+cfg.solver.feasibilityTolerance);
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
+            testCase.verifyFalse(problem.metadata.search.flowRestarted);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
         function brakingSlewAndMagnitudeBoundsConstrainTheReturnedPlan(testCase)
@@ -89,27 +133,37 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMinimum-tol);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
-        function steeringRecoveryIsNotConfinedToTheAnchorOrPreviousInput(testCase)
+        function numericalSteeringCorrectionDoesNotImposeActuatorSlew(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;ego.yaw=.5;
             ego.heldActuatorInput=[.5;0];
             [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             steering=command.frontWheelSteeringAngle;
-            testCase.verifyLessThan(steering,-.2);
-            testCase.verifyGreaterThan(abs(steering-problem.model.linearization.inputs(1,1)),.075);
+            testCase.verifyLessThan(steering,-.1);
+            testCase.verifyLessThanOrEqual(abs(steering-problem.model.linearization.inputs(1,1)), ...
+                cfg.nonlinear.trustRadius*.15+cfg.solver.feasibilityTolerance);
             testCase.verifyGreaterThan(abs(steering-ego.heldActuatorInput(1)),.5);
             testCase.verifyEqual(problem.metadata.solverCallCount,2);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
         function steeringMayExceedTheRetiredFortyDegreeLimit(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=1;ego.yaw=.5;
-            % Widen state increments so this case exposes the retired input cap.
-            cfg.nonlinear.trustRadius=1;
+            % Widen numerical corrections to distinguish them from an actuator cap.
+            cfg.nonlinear.trustRadius=5;
             [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyLessThan(command.frontWheelSteeringAngle,-deg2rad(40)-.02);
             testCase.verifyEqual(problem.metadata.solverCallCount,2);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
     end
+end
+
+function localVerifyAnchorRollout(testCase,anchor,cfg)
+    residual=zeros(6,size(anchor.inputs,2));
+    for index=1:size(anchor.inputs,2)
+        next=nonlinearBicycleModel.sample(anchor.states(:,index),anchor.inputs(:,index),cfg);
+        residual(:,index)=next-anchor.states(:,index+1);
+    end
+    testCase.verifyLessThanOrEqual(max(abs(residual),[],'all'),1e-12);
 end
 
 function localVerifyAffinePrediction(testCase,problem,cfg)

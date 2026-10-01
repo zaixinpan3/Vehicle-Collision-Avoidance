@@ -1,0 +1,1121 @@
+{
+  "cases": [
+    {
+      "speed": 8,
+      "scenario": "headOn",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.5830946589769807,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        21.703060989453675,
+        -0.1143906413310155,
+        -0.1031826732720793,
+        -0.033497115375094096,
+        -0.02877876318630083
+      ],
+      "maxSeconds": 0.312686,
+      "medianSeconds": 0.06386449999999999,
+      "over100ms": 76,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 108,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.3679258771865119,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        25.465928456102727,
+        -0.10342664952660001,
+        -0.13689268906952368,
+        -0.03799504675662435,
+        -0.032750732041359955
+      ],
+      "maxSeconds": 0.216829,
+      "medianSeconds": 0.0583705,
+      "over100ms": 56,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 77,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 1.0601253682699725,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        -9.336409723145524,
+        -0.22710163912405915,
+        -1.9288014908492928,
+        0.1343506445600766,
+        0.09985603108989469
+      ],
+      "maxSeconds": 0.548869,
+      "medianSeconds": 0.0794445,
+      "over100ms": 102,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 44,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.6988851770997656,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        -141.0709356137584,
+        -1.5643735912087655,
+        0.005960577283902424,
+        0.006767322178269008,
+        0.0055526316189768435
+      ],
+      "maxSeconds": 0.19069,
+      "medianSeconds": 0.0838415,
+      "over100ms": 39,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 17,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.4113870990032655,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        -44.7816679803417,
+        -1.287266036898105,
+        -1.0649106253854281,
+        0.03785709311721793,
+        0.02981970314098215
+      ],
+      "maxSeconds": 0.236067,
+      "medianSeconds": 0.07494300000000001,
+      "over100ms": 58,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 12,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.6639972803488845,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        0.7540659179232289,
+        -0.34751141301950217,
+        -0.36509829442089625,
+        -0.024485865965891578,
+        -0.019456498185212938
+      ],
+      "maxSeconds": 0.279106,
+      "medianSeconds": 0.056204000000000004,
+      "over100ms": 75,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 80,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.5445079023409763,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        -15.321787267453836,
+        -1.0041147925246883,
+        7.86711090954955,
+        -1.781568130460457,
+        0.5165087633799661
+      ],
+      "maxSeconds": 0.407588,
+      "medianSeconds": 0.0807,
+      "over100ms": 85,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 9,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 15,
+      "scenario": "headOn",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        0.026640996649509086,
+        -0.0038851227549369415,
+        -0.07798091650462169,
+        -0.0009635735290572622,
+        0.005938538511315844
+      ],
+      "maxSeconds": 0.140241,
+      "medianSeconds": 0.0510075,
+      "over100ms": 13,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 1,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        0.0031013382687017305,
+        -0.0012702578762317615,
+        -0.028270282002960556,
+        -0.0007024938976836287,
+        0.0025451412435051066
+      ],
+      "maxSeconds": 0.209253,
+      "medianSeconds": 0.051546,
+      "over100ms": 19,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 7,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.6551462285292683,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        2.2417266351770393,
+        -1.264782240562411,
+        -8.732992876061942,
+        3.1876425628946423,
+        -0.7739941475360365
+      ],
+      "maxSeconds": 0.495035,
+      "medianSeconds": 0.0883415,
+      "over100ms": 94,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 11,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.3811379287958252,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        -147.93608531524117,
+        -1.6013904486240516,
+        -7.12571326762245,
+        -0.1950486042120182,
+        -0.1675603752002048
+      ],
+      "maxSeconds": 0.277553,
+      "medianSeconds": 0.098149,
+      "over100ms": 176,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 28,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.08101569739799623,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        71.20810191658136,
+        2.41178827113155,
+        -2.5985209657609225,
+        -0.020599502310870207,
+        -0.050524101033126954
+      ],
+      "maxSeconds": 0.219237,
+      "medianSeconds": 0.0857415,
+      "over100ms": 112,
+      "solverRestarts": 0,
+      "domainReinitializations": 0,
+      "nonconverged": 21,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [],
+      "baselineCollision": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.7795425816796926,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        -19.194341044410933,
+        -0.08209157281398816,
+        -1.1911254303012893,
+        0.021487834263251758,
+        -0.008475575899122872
+      ],
+      "maxSeconds": 0.175606,
+      "medianSeconds": 0.0623195,
+      "over100ms": 61,
+      "solverRestarts": 1,
+      "domainReinitializations": 0,
+      "nonconverged": 54,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [
+        0.10000000000000002
+      ],
+      "baselineCollision": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "holds": 400,
+      "seconds": 20.0,
+      "completed": true,
+      "recovered": false,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 5,
+        "minimumTimeSeconds": 8,
+        "entryTimeSeconds": null,
+        "confirmationTimeSeconds": null
+      },
+      "minimumClearance": 0.15325272033781734,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "finalError": [
+        -8.804532295384968,
+        -1.119854914623707,
+        0.5605801370027983,
+        -3.269059593370158,
+        0.4709069470804536
+      ],
+      "maxSeconds": 0.4626,
+      "medianSeconds": 0.096507,
+      "over100ms": 152,
+      "solverRestarts": 1,
+      "domainReinitializations": 0,
+      "nonconverged": 21,
+      "positiveSafetySlackHolds": 0,
+      "firstPositiveSlackTime": null,
+      "firstRestartTimes": [
+        19.800000000000146
+      ],
+      "baselineCollision": true
+    }
+  ],
+  "totalHolds": 5600,
+  "completed": 14,
+  "recovered": 0,
+  "collisionCases": 2,
+  "noResultCases": 0,
+  "medianSeconds": 0.079667,
+  "maxSeconds": 0.548869,
+  "over100ms": 1118,
+  "restarts": 2,
+  "domainReinitializations": 0,
+  "worst": {
+    "speed": 8,
+    "scenario": "brakingLead",
+    "time": 2.499999999999999,
+    "totalSeconds": 0.548869,
+    "initializationSeconds": 0.000668,
+    "formulationSeconds": 0.012256,
+    "solverSeconds": 0.5341,
+    "otherSeconds": 0.0018449999999999855,
+    "hold": {
+      "time": 2.499999999999999,
+      "controllerSeconds": 0.548869,
+      "horizonSteps": 68,
+      "source": "twoStageRealTimeIteration",
+      "solverCalls": 2,
+      "initialization": "shiftedInputRollout",
+      "flowRestarted": false,
+      "initializationFailure": "",
+      "linearizationCount": 1,
+      "attempts": {
+        "initialization": "shiftedInputRollout",
+        "terminationReason": "twoStagesReturned",
+        "solverCalls": 2,
+        "stages": [
+          {
+            "objective": "pcbfSlack",
+            "exitFlag": 1,
+            "seconds": 0.026621,
+            "value": 1.2420560933399116e-07
+          },
+          {
+            "objective": "clfSlack",
+            "exitFlag": -7,
+            "seconds": 0.507479,
+            "value": 31.660950192754523
+          }
+        ],
+        "initializationSeconds": 0.000668,
+        "formulationSeconds": 0.012256
+      },
+      "slackCap": 1.1242056093339911e-06,
+      "primaryOptimum": 1.2420560933399116e-07,
+      "absoluteSampleIndex": 50,
+      "endpointIndex": 118,
+      "terminalPhaseMeters": 0,
+      "terminalSeparationMargin": null,
+      "completionSteps": 60,
+      "optimizationReturned": true,
+      "optimizationConverged": false,
+      "terminationReason": "twoStagesReturned",
+      "solverStages": [
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.026621,
+          "value": 1.2420560933399116e-07
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": -7,
+          "seconds": 0.507479,
+          "value": 31.660950192754523
+        }
+      ],
+      "affineFeasibilityTolerance": 1e-05,
+      "affineValidationPerformed": false,
+      "nonlinearValidationPerformed": false,
+      "predictiveBarrierValue": 9.992959943738157e-07,
+      "hardResidual": null,
+      "clfSlack": 31.660950192754523,
+      "clfInitialValue": 976.8091957908521,
+      "clfNextValue": 998.7020540247928,
+      "clfStageAttempted": true,
+      "clfStageCompleted": true,
+      "clfLowerBound": false,
+      "clfInitialSlack": 42.39067014866676,
+      "state": [
+        19.40212236729592,
+        3.1927443553577,
+        0.17071271198736174,
+        7.92576618548259,
+        -0.16860371005281322,
+        -0.15050452512231569
+      ],
+      "nextState": [
+        19.794388572211858,
+        3.250217485064978,
+        0.16312213375822754,
+        7.928819791614063,
+        -0.17108230739661603,
+        -0.15264863232169504
+      ],
+      "input": [
+        -0.06069230411967266,
+        0.022862315598743493
+      ],
+      "transverseError": [
+        3.250217485064978,
+        0.16312213375822757,
+        -0.07118020838593697,
+        -0.17108230739661603,
+        -0.15264863232169504
+      ],
+      "auditTimes": [
+        0,
+        0.0016666666666666668,
+        0.0033333333333333335,
+        0.005000000000000001,
+        0.006666666666666667,
+        0.008333333333333333,
+        0.010000000000000002,
+        0.011666666666666667,
+        0.013333333333333334,
+        0.015000000000000001,
+        0.016666666666666666,
+        0.018333333333333333,
+        0.020000000000000004,
+        0.021666666666666667,
+        0.023333333333333334,
+        0.025,
+        0.02666666666666667,
+        0.028333333333333335,
+        0.030000000000000002,
+        0.03166666666666667,
+        0.03333333333333333,
+        0.035,
+        0.03666666666666667,
+        0.03833333333333334,
+        0.04000000000000001,
+        0.041666666666666664,
+        0.043333333333333335,
+        0.045000000000000005,
+        0.04666666666666667,
+        0.04833333333333334,
+        0.05
+      ],
+      "auditStates": [
+        [
+          19.40212236729592,
+          3.1927443553577,
+          0.17071271198736174,
+          7.92576618548259,
+          -0.16860371005281322,
+          -0.15050452512231569
+        ],
+        [
+          19.41518804634122,
+          3.1947098167861085,
+          0.17046176343414596,
+          7.925865279536682,
+          -0.1687287446223477,
+          -0.150632748750424
+        ],
+        [
+          19.428254416154363,
+          3.196671823898024,
+          0.17021060604722899,
+          7.925964633223476,
+          -0.1688498153276138,
+          -0.15075517167291966
+        ],
+        [
+          19.441321475544022,
+          3.1986303802690563,
+          0.1699592492675342,
+          7.926064236252492,
+          -0.16896706447676654,
+          -0.1508720640381705
+        ],
+        [
+          19.45438922332627,
+          3.2005854893636707,
+          0.16970770209634192,
+          7.9261640787666945,
+          -0.16908062875287935,
+          -0.15098368336973614
+        ],
+        [
+          19.467457658324495,
+          3.202537154538743,
+          0.16945597311583732,
+          7.9262641513237595,
+          -0.16919063944722376,
+          -0.15109027515404544
+        ],
+        [
+          19.480526779369253,
+          3.2044853790470027,
+          0.16920407050870137,
+          7.926364444878141,
+          -0.16929722268296624,
+          -0.15119207340101845
+        ],
+        [
+          19.493596585298167,
+          3.206430166040355,
+          0.1689520020767893,
+          7.92646495076389,
+          -0.16940049962964138,
+          -0.15128930117885858
+        ],
+        [
+          19.5066670749558,
+          3.2083715185730965,
+          0.16869977525893828,
+          7.926565660678228,
+          -0.16950058670874785,
+          -0.15138217112418045
+        ],
+        [
+          19.519738247193548,
+          3.2103094396050182,
+          0.16844739714794446,
+          7.9266665666658085,
+          -0.1695975957908013,
+          -0.15147088592857916
+        ],
+        [
+          19.532810100869494,
+          3.2122439320044065,
+          0.16819487450674847,
+          7.9267676611036695,
+          -0.16969163438418247,
+          -0.1515556388027314
+        ],
+        [
+          19.545882634848322,
+          3.214174998550941,
+          0.16794221378386506,
+          7.926868936686819,
+          -0.1697828058160899,
+          -0.1516366139190248
+        ],
+        [
+          19.558955848001172,
+          3.216102641938494,
+          0.1676894211280923,
+          7.926970386414461,
+          -0.16987120940590988,
+          -0.1517139868336982
+        ],
+        [
+          19.572029739205536,
+          3.2180268647778383,
+          0.16743650240253352,
+          7.927072003576807,
+          -0.1699569406313041,
+          -0.15178792488942636
+        ],
+        [
+          19.585104307345123,
+          3.2199476695992564,
+          0.16718346319796418,
+          7.927173781742467,
+          -0.17004009128730496,
+          -0.15185858759924037
+        ],
+        [
+          19.598179551309748,
+          3.2218650588550677,
+          0.16693030884557353,
+          7.9272757147463775,
+          -0.17012074963870064,
+          -0.15192612701263639
+        ],
+        [
+          19.611255469995225,
+          3.2237790349220656,
+          0.16667704442911088,
+          7.927377796678273,
+          -0.17019900056598108,
+          -0.1519906880646886
+        ],
+        [
+          19.62433206230324,
+          3.225689600103872,
+          0.16642367479646358,
+          7.927480021871646,
+          -0.17027492570510952,
+          -0.15205240890894733
+        ],
+        [
+          19.637409327141228,
+          3.227596756633215,
+          0.1661702045706936,
+          7.927582384893193,
+          -0.17034860358137285,
+          -0.1521114212348687
+        ],
+        [
+          19.650487263422274,
+          3.2295005066741247,
+          0.16591663816055804,
+          7.927684880532728,
+          -0.17042010973755817,
+          -0.1521678505704911
+        ],
+        [
+          19.663565870064986,
+          3.231400852324058,
+          0.16566297977053637,
+          7.927787503793528,
+          -0.17048951685667454,
+          -0.15222181657100073
+        ],
+        [
+          19.676645145993398,
+          3.2332977956159477,
+          0.1654092334103799,
+          7.927890249883123,
+          -0.17055689487935258,
+          -0.15227343329361862
+        ],
+        [
+          19.689725090136843,
+          3.235191338520184,
+          0.16515540290422484,
+          7.927993114204463,
+          -0.17062231111638512,
+          -0.15232280945999524
+        ],
+        [
+          19.702805701429853,
+          3.2370814829465298,
+          0.16490149189927542,
+          7.928096092347492,
+          -0.17068583035643864,
+          -0.15237004870628243
+        ],
+        [
+          19.715886978812055,
+          3.2389682307459724,
+          0.16464750387408075,
+          7.928199180081087,
+          -0.17074751496918278,
+          -0.15241524982155658
+        ],
+        [
+          19.728968921228052,
+          3.240851583712507,
+          0.16439344214642562,
+          7.928302373345342,
+          -0.17080742500404714,
+          -0.15245850697516392
+        ],
+        [
+          19.742051527627325,
+          3.2427315435848696,
+          0.16413930988085226,
+          7.928405668244204,
+          -0.1708656182847824,
+          -0.15249990993347895
+        ],
+        [
+          19.755134796964136,
+          3.2446081120482004,
+          0.16388511009581197,
+          7.928509061038439,
+          -0.17092215049976378,
+          -0.15253954426602637
+        ],
+        [
+          19.768218728197414,
+          3.2464812907356575,
+          0.16363084567049166,
+          7.928612548138905,
+          -0.1709770752885737,
+          -0.15257749154226324
+        ],
+        [
+          19.781303320290665,
+          3.248351081229976,
+          0.16337651935133074,
+          7.928716126100112,
+          -0.17103044432503006,
+          -0.1526138295194666
+        ],
+        [
+          19.794388572211858,
+          3.250217485064978,
+          0.16312213375822754,
+          7.928819791614063,
+          -0.17108230739661603,
+          -0.15264863232169504
+        ]
+      ],
+      "predictionCollisionMargin": null
+    }
+  }
+}
