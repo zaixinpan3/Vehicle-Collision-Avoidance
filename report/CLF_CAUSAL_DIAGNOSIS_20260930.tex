@@ -1,0 +1,268 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlength{\emergencystretch}{2em}
+\title{Why the Current CLF Stage Fails to Produce Nominal Recovery}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{September 30, 2026}
+\begin{document}
+\maketitle
+
+\section{Finding and scope}
+The controller does execute its CLF stage. The principal failure isolated here
+is that a useful first-input correction is almost erased while backtracking
+the entire trajectory to satisfy a very small nonlinear endpoint core. The
+remaining update is accepted because it slightly improves the incumbent's
+relaxation, even though it increases the actual nominal-error energy. In
+addition, the weighted secondary objective permits positive CLF relaxation
+when a zero-relaxation trajectory exists. Straight terminal completion and a
+shrinking horizon introduce this conflict even at exact circular cruise.
+
+These statements are supported by new same-state interventions, rather than
+inferred only from a long trajectory. Production source, configuration and
+fixtures remain unchanged at commit
+\path{17a5a19e76888079f8c7d0d0abc762a3b4150ca9}.
+The probe has no target and no road constraints. It starts from exact trim on
+a circle of radius 200 m at 8 m/s. The production controller executes 100
+50-ms holds; tight ODE45 integration supplies its successors. Four captured
+states are inspected without changing their original hard constraints.
+There is no prescribed recovery deadline and no new online controller method.
+
+\section{The CLF is locally capable of descent}
+The nominal reference uses a discrete LQR matrix $P$ constructed from the
+continuous transverse linearization and its exact zero-order-hold
+transition. With feedback $K$ (including its negative sign), the Riccati
+identity is
+\[
+P-(A+BK)^TP(A+BK)=Q+K^TRK.
+\]
+The smallest generalized eigenvalue of the left-hand side relative to $P$
+is the guaranteed relative decrease of that local linear feedback model.
+\begin{center}
+\begin{tabular}{rrr}
+\toprule
+Speed (m/s)&Curvature (1/m)&Minimum local decrease per hold\\
+\midrule
+8&0&0.0409523\\
+8&0.005&0.0409160\\
+15&0&0.0336842\\
+15&0.005&0.0326556\\
+\bottomrule
+\end{tabular}
+\end{center}
+The relative Riccati residuals are between $7.3\times10^{-16}$ and
+$2.9\times10^{-15}$. All four local decreases exceed the configured
+$\alpha=0.01$. Thus the required local decay is not unusually aggressive.
+This is a local linear result, not a global nonlinear CLF proof. The stronger
+relevant numerical evidence below is that the actual nonlinear model admits
+zero-slack complete trajectories at all four inspected states.
+
+\section{Where departure starts: the nominal state is not preserved}
+The reference CLF uses the given-path curvature, whereas
+\path{controller/collisionAvoidanceController.m} builds the terminal family
+with curvature zero. Its pose is free; there is no fixed global endpoint
+position or heading. However, the intrinsic terminal state is near straight
+cruise: body velocities, yaw rate and last input are constrained near the
+straight trim. At 8 m/s the curved nominal yaw rate is 0.04 rad/s and steering
+is 0.0156894681 rad, rather than the straight trim's zero values.
+
+The initial seed follows the nominal feedback for
+$8+\lceil3/0.05\rceil=68$ holds and then appends straight-core completion.
+It initially has 78 holds. Shifting consumes this plan; only when the count
+would fall below eight is one terminal-feedback input appended. The initial
+three-second recovery tail is not maintained as a moving preview.
+At frame 69, time 3.40 s, the first straight-completion input reaches the
+front of the shifted plan. The nominal energy before that hold is
+$4.81\times10^{-27}$, effectively zero, but the issued steering is
+$-0.0035098611$ rad and the next energy is 0.0462764. The horizon has ten
+holds and reaches its minimum eight at frame 71.
+
+This is a direct loss of nominal maintenance without an obstacle. It is not
+proof that a straight terminal family necessarily forbids curved tracking:
+complete zero-slack trajectories satisfying the same family are exhibited
+below. Rather, the current initialization, horizon update and incomplete
+correction turn a possible future straight continuation into an executed
+maneuver that the CLF stage fails to undo.
+
+\section{A same-frame causal intervention}
+Consider frame 71 at time 3.50 s, with eight predicted holds. Its current
+energy is $W=0.0678798354$; zero CLF slack requires
+$W^+\le0.99W=0.0672010371$.
+\begin{center}
+\begin{tabular}{lrrl}
+\toprule
+Candidate&Next energy $W^+$&CLF slack&Original hard constraints\\
+\midrule
+Issued production candidate&0.104943902&0.037742865&Pass\\
+Raw conic input sequence&0.052410637&0&Endpoint fails\\
+Raw first input, corrected later inputs&0.052410637&0&Pass\\
+LQR first input, corrected later inputs&0.027323953&0&Pass\\
+\bottomrule
+\end{tabular}
+\end{center}
+The raw conic sequence's only hard defect is its endpoint membership. Its
+stage physical residual and safety slack are both zero. The terminal core
+radius is $0.0001220703125$ in its weighted norm, not meters. The raw terminal
+violation is 0.0286784 in that norm; its endpoint body-speed discrepancy is
+only about $-0.003794$ m/s. This tight core is a sufficient local contraction
+construction and must not be confused with the separate 6-mm collision
+margin.
+
+The controller checks scales $1,1/2,\ldots$ of the \emph{entire} input update.
+At $1/4$ the next energy is about 0.03018, still a useful descent, but the
+terminal norm fails. The first admitted scale is $1/128$, by which point
+$W^+$ has risen to 0.1049439. Its slack improves from the shifted incumbent's
+0.0398136 to 0.0377429, and that is sufficient to finish the online CLF stage.
+
+For a discriminating intervention, the first raw control
+$[0.0424190572,\ 0.0126863962]^T$ was held exactly fixed while only the later
+seven controls were adjusted offline to reach the original endpoint center.
+The resulting trajectory passes the unchanged nonlinear admission test.
+Its largest input change is only 0.550 of the original input trust allowance;
+its largest state change is 0.1025 of the original state trust allowance.
+It therefore does not require relaxing the core or expanding those bounds.
+The first hold independently replayed with ODE45 yields $W^+=0.0524128457$,
+still well below the zero-slack threshold. Dense replay of its complete
+horizon also remains inside the physical limits and final core.
+
+The observed obstruction is therefore the numerical treatment of the
+nonlinear endpoint, not unavoidable physical conflict or absence of a
+sufficiently dissipative first input. The offline least-squares interpolation
+is an existence and causality probe, not a proposed online nonlinear-shooting
+method, backup controller or measured real-time implementation.
+
+\section{Why repeating the existing iteration is insufficient}
+At a feasible anchor, \path{controller/solvePredictiveControl.m} skips its
+endpoint-polishing routine. The only response to the trial endpoint defect
+is whole-trajectory backtracking. A linearized feasible direction generally
+has a second-order nonlinear defect: for a smooth active endpoint row,
+\[
+g(U+d)=g(U)+Dg(U)d+O(\|d\|^2).
+\]
+A tiny terminal interior permits only a small uncorrected step. Returning
+near the incumbent removes the endpoint defect by also removing the useful
+first-input correction. The measured defect decreases roughly quadratically
+with step scale, consistent with this mechanism.
+
+At the same fixed states, thirty successive calls to the unchanged local
+secondary operation give:
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+Frame&First admitted scale&Incumbent slack&After one update&After 30 updates\\
+\midrule
+69&1/32&0.0496066&0.0462764&0.0229515\\
+71&1/128&0.0398136&0.0377429&0.0100348\\
+80&1/64&0.2977394&0.2817460&0.2318087\\
+100&1/128&2.3308371&2.3077506&2.2042249\\
+\bottomrule
+\end{tabular}
+\end{center}
+In each case the energy still increases after thirty updates. Nevertheless,
+all four states admit complete zero-slack trajectories using an LQR first
+input and adjusted later controls. At frame 100 that LQR first input exceeds
+the single original input trust allowance; that distinction is recorded and
+no single-step trust-feasibility claim is made there. Frames 71 and 80 already
+supply stronger within-trust counterexamples.
+
+The online code stops after one accepted secondary update. Its reported
+\texttt{converged} and \texttt{clfStageCompleted} status means that numerical
+stage contract was met, not that a nonlinear minimum or a Lyapunov decrease
+was established. Increasing only the iteration cap leaves the demonstrated
+small-step mechanism in place.
+
+\section{A separate objective-level flaw}
+Safety is optimized first, but CLF slack is not strictly prioritized over
+tracking inside the secondary stage. The secondary criterion combines
+\[
+100\rho^2+\frac1H\sum_i W(e_i)
+ +\frac{0.01}{H}\sum_i\|u_i-\bar u_i\|_R^2.
+\]
+The input penalty is correctly centered on the linearization inputs
+$\bar u_i$, not zero. A finite squared-slack penalty does not require
+$\rho=0$ whenever zero is feasible.
+
+This can matter even at the exact nominal state. At frame 69 an offline
+local optimization with the first input fixed at curved nominal trim obtains
+objective 0.0388037973 and essentially zero slack. Freeing that first input
+obtains a lower objective, 0.0386859983, with positive slack 0.0004378607.
+Both trajectories pass the original hard constraints. Both offline solves
+terminate on step tolerance; their stationarity residuals are about
+$6\times10^{-7}$. These are local numerical results, not globally optimal
+certificates. A separate fixed-steering profile also exhibits the trade:
+a $+10^{-4}$ rad perturbation from nominal, with later controls reoptimized,
+lowers the objective to 0.0387933372 while making slack positive.
+
+Near $e=0$, a first-input perturbation of size $\epsilon$ gives
+$W^+=O(\epsilon^2)$ and hence a squared CLF-slack penalty of
+$O(\epsilon^4)$. That penalty need not dominate a first-order reduction in
+future tracking/completion cost. Merely increasing a finite weight does not
+supply nominal invariance or a strict CLF-priority theorem. Actual nonlinear
+candidate comparison by slack does not change the objective used to generate
+that candidate; lower-slack alternatives that were never generated cannot
+be selected.
+
+\section{The missing closed-loop condition and design consequences}
+The executed relaxed inequality is
+\[
+W_{k+1}\le(1-\alpha)W_k+\rho_k.
+\]
+Improving a candidate's slack relative to another candidate at the
+\emph{same state} says nothing about its size relative to $\alpha W_k$ or
+about $\rho_k$ across successive states. Strict decrease requires
+$\rho_k<\alpha W_k$. At frame 71, the issued slack is about 56 times
+$\alpha W_k$, so its slight improvement cannot imply dissipation.
+
+The last refactor corrected omission of the secondary solve, but did not
+establish this closed-loop condition. A positive relaxation can be necessary
+while avoiding a target. The missing property is eventual recovery of a
+sufficient descent condition once compatible with safety, rather than merely
+continuing to call the relaxed optimizer. No fixed fast settling time is
+needed: a state-dependent positive-definite decrement is sufficient in an
+appropriate invariant domain. A useful conditional alternative is
+$\rho_k\to0$, since the geometric-convolution bound then yields $W_k\to0$.
+The current stopping rule proves neither premise. Its no-solve numerical
+threshold also admits a small nonzero relaxation, which by itself supports
+at most a practical residual neighborhood.
+
+The diagnosis points to three coupled design obligations within the same
+controller: preserve useful first-input descent while restoring the original
+nonlinear terminal constraints; define secondary-stage success in terms of
+actual CLF priority/descent rather than any incumbent improvement; and make
+the nominal continuation compatible with the reference path and maintained
+prediction horizon. A zero-slack-first lexicographic objective can prevent
+trading feasible CLF satisfaction for tracking cost, but still needs an
+adequate nonlinear solver and an eventual-feasibility argument. An
+affine-subproblem success alone is not enough. No backup design is required
+by these findings.
+
+The earlier extended campaign's ten straight-road cases did eventually meet
+the sampled recovery criterion. Thus this report does not label every case
+nonconvergent. The two indefinitely opposing same-circle head-on fixtures
+also have recurring conflicts, a separate obstruction to permanent nominal
+cruise. Neither fact explains away this target-free counterexample. The local
+quadratic CLF is also not proved globally valid at the hundreds of meters of
+error reached later; the present failure already appears near nominal trim,
+before that global limitation becomes relevant.
+
+\section{Validation and reproducibility}
+Seven saved complete witnesses pass fresh unchanged nonlinear admission and
+independent ODE45 replay at 31 samples per hold, including the final core and
+physical state limits. The target-free safety-slack check contains no collision
+rows. These are numerical sampled-model results, not physical-plant or
+continuous-time safety certificates. No runtime speed claim is inferred from
+the offline correction or extended 120-second diagnostic budget.
+
+\path{report/CLF_CAUSAL_DIAGNOSIS_20260930/} contains compact summaries, the
+line searches, all repeated-update outcomes, onset trace, objective profile,
+Riccati checks, witness audit and exact raw/source hashes. Its reproduction
+record lists the actual commands and cache-only instrumentation scripts.
+Full snapshots and diagnostics remain under
+\path{/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/}.
+The three-panel figure is exported there as \texttt{causal\_diagnosis.pdf}
+and \texttt{causal\_diagnosis.png}. No production code was changed and no
+controller test-suite pass or full collision-campaign rerun is claimed for
+this analysis-only task.
+\end{document}

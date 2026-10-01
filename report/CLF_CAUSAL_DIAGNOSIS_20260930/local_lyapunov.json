@@ -1,0 +1,42 @@
+[
+  {
+    "speed": 8,
+    "curvature": 0,
+    "nominalInput": [
+      0,
+      0.013645140013191524
+    ],
+    "minimumFraction": 0.04095229746978294,
+    "dareRelativeResidual": 7.287334547111386e-16
+  },
+  {
+    "speed": 8,
+    "curvature": 0.005,
+    "nominalInput": [
+      0.015689468071141525,
+      0.013751456143225111
+    ],
+    "minimumFraction": 0.04091599283734684,
+    "dareRelativeResidual": 8.210395258135624e-16
+  },
+  {
+    "speed": 15,
+    "curvature": 0,
+    "nominalInput": [
+      0,
+      0.018375607123583382
+    ],
+    "minimumFraction": 0.03368421319226785,
+    "dareRelativeResidual": 2.8314140898053743e-15
+  },
+  {
+    "speed": 15,
+    "curvature": 0.005,
+    "nominalInput": [
+      0.016884748820446376,
+      0.0197492634529832
+    ],
+    "minimumFraction": 0.032655588717901855,
+    "dareRelativeResidual": 2.2064255581477888e-15
+  }
+]

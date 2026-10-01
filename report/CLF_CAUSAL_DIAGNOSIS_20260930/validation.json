@@ -1,0 +1,14 @@
+{
+  "productionControllerChanged": false,
+  "productionConfigurationChanged": false,
+  "productionHoldReplayCount": 100,
+  "exactSameFrameReproductions": 4,
+  "nonlinearZeroClfSlackExistenceWitnesses": 4,
+  "savedWitnessIndependentDenseReplaysPassed": 7,
+  "localRiccatiChecksPassed": 4,
+  "sameStateSecondaryUpdatesPerFrame": 30,
+  "weightedObjectiveFeasibleComparisonsPassed": true,
+  "sourceAndRawHashesVerified": true,
+  "controllerRegressionSuiteRerun": false,
+  "fullCollisionCampaignRerun": false
+}

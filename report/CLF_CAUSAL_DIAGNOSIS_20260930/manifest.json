@@ -1,0 +1,277 @@
+{
+  "sourceCommit": "17a5a19e76888079f8c7d0d0abc762a3b4150ca9",
+  "controllerAndConfigurationUnchanged": true,
+  "source": [
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "dc187b605081b71329054448e7a1015b8f799690bab7f6d3dd6a5234ef8f9400"
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc"
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd"
+    },
+    {
+      "path": "controller/nonlinearBicycleModel.m",
+      "sha256": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1"
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256": "e1b97c6edb3815887ead0460b74e580ac1472bb859ffc7579eb95af5b959b312"
+    },
+    {
+      "path": "controller/readControllerInputs.m",
+      "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a"
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "9072f328ff86f903f5e98a41ce18908ca132f6003136bff8c708089f07068092"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "e00f1e91b78f0ffc2c63d8cb45271118dc4d799631d4b096f9d7fe2365ab45f3"
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "e3529546f96890c49a04f3838d3a3d38286efbc14c976323d781eff0965c8ee5"
+    },
+    {
+      "path": "config/estimatorControllerIntegrationConfig.m",
+      "sha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b"
+    },
+    {
+      "path": "config/nrmmTrackingConfig.m",
+      "sha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47"
+    }
+  ],
+  "raw": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/capture.json",
+      "sha256": "b9104181c44d55100f19aaa11fa6eb66540eee4843e9f354650d8cfc4026b23a",
+      "bytes": 45650
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/capture.log",
+      "sha256": "845b719ef1ec4b037fddec3ac6778139a603863930bc7913ef9cb72881732a08",
+      "bytes": 434
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/capture.m",
+      "sha256": "0af2e61b9abe95be635868184bca3b7ab33dfdfa8974cd433883564f0c4bddb6",
+      "bytes": 1699
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/clfDiagnosticInternals.m",
+      "sha256": "81ab2c54ca8cfef57b8a8c9b55c442be536d3187bb1fcd2f2edaf91a579ccdda",
+      "bytes": 33731
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/correctedFrame069.mat",
+      "sha256": "8fe089984ae814028fa36517eeeabeceed8c91916aa2873a11a224372eb440e3",
+      "bytes": 13729
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/correctedFrame071.mat",
+      "sha256": "04b8be32b45bf8949fa31282b4b9fccb79beef7301c0cfcde8f046500a955b78",
+      "bytes": 13561
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/correctedFrame080.mat",
+      "sha256": "b822a59b9414b7de3ffa0bb631ed3017245a864473c7a2d43fbe175070385753",
+      "bytes": 13562
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/correctedFrame100.mat",
+      "sha256": "d70ac17ee8bf0b5ea0e2237c9252afcc5017cbaaed1886fbc24158ef0b4e37bd",
+      "bytes": 13565
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnose.log",
+      "sha256": "5ef7e21dbfb49aec579356434048fedf326dd23804b8f6577af2df227da9292a",
+      "bytes": 4854
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnose.m",
+      "sha256": "f0f6706ad602752b8ce153b46422de943f30a779fe52404d7dfd6a5ad455cd98",
+      "bytes": 5647
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnosis.json",
+      "sha256": "93ac6fadc1365c75d5ed562be55afe78ab55f1fb7940a5e0157a1239724c99ae",
+      "bytes": 445421
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnosticFrame069.mat",
+      "sha256": "53bbdb479105c518354795a4bc367f0249bdf1e702e1ee384be461071dfe9609",
+      "bytes": 57635
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnosticFrame071.mat",
+      "sha256": "11c2f57f04a4bbfe6136eec5f858ec48c9bc2d9502373275e81491f3e8cc7f5d",
+      "bytes": 60347
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnosticFrame080.mat",
+      "sha256": "80e9f4818aa1e85eb21ac134b905e85e1df267f4211591eeb35bbf34920aaf35",
+      "bytes": 64351
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnosticFrame100.mat",
+      "sha256": "f924a29d8e1ed6906bad3b31b8e9174c489bbff7ef364d6641f6bae1c9aa2778",
+      "bytes": 66602
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/fixedNominal.mat",
+      "sha256": "9f6c2ddab3a6f937746e2ac20bf1217649ac5b66d2f3a52504a43acb56be4d47",
+      "bytes": 16852
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/followup.json",
+      "sha256": "172a652dd454d20a41b85820a32760c7e76474b7a26672c88520456aa77746f2",
+      "bytes": 3377
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/followup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/followup.m",
+      "sha256": "69292ada91609335e79a6169d30c686bf30755707def1793a6b76b6780359951",
+      "bytes": 3747
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame065.mat",
+      "sha256": "52a6c8edf53af01bb18ec51df7e7fba75b5a481d7a84d15e5b5d8bd74b42f0de",
+      "bytes": 29872
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame066.mat",
+      "sha256": "50a1dd62b45146f140bb3ec374eff14c662c3509fbb0e7b57968dc7896f9e953",
+      "bytes": 29481
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame067.mat",
+      "sha256": "efc9d25f6647297aa5a515c235ac4bc0a9ff9278b8672ee05f5195b09dea2d2f",
+      "bytes": 29141
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame068.mat",
+      "sha256": "dd7b5f7cd27de34a9ce121d9460907e37a44078ae99e6b04c0ce6bb74dc6c753",
+      "bytes": 28812
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame069.mat",
+      "sha256": "9f36362f3a404fa1b25c9ad06220851a919a0bb293965eccc00d95c05094a020",
+      "bytes": 29085
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame070.mat",
+      "sha256": "95b3c568d23514c6da887b9cc585b04c52fbb54de6a77e70a30b4acd39fd95cb",
+      "bytes": 28880
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame071.mat",
+      "sha256": "080dc75de86cbf3367c3c3cf070cb49454f6e216017b6c5e2370cf2df8951ab2",
+      "bytes": 28741
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame072.mat",
+      "sha256": "bdd2f2cf712ac7cb0bc30a94fb4b1c3ac9c5a7babcaf5ab35015180f9ef628d7",
+      "bytes": 28602
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame073.mat",
+      "sha256": "f1b785b176d6f7a91b456cf273b24f9355e31105b7c89e54b0e6f4014641ae18",
+      "bytes": 28611
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame074.mat",
+      "sha256": "321ba6e34cf160d114d7de108788d33ef5dcea0ccd3028abbfaaafa8380966c8",
+      "bytes": 28604
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame075.mat",
+      "sha256": "19f1a067e8766c3140d734d5ab90b266da505680509867cb4c0a9ea80a09fba0",
+      "bytes": 28615
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame076.mat",
+      "sha256": "4232b74c5c9ca7cb2da248e197b1bc2067cfd0c50b155814ca1e2b94f268e4b7",
+      "bytes": 28587
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame077.mat",
+      "sha256": "5ed5d09f8e27989930d4114cd15e91a14b7252204db6c2e71f24402753d00c3c",
+      "bytes": 28605
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame078.mat",
+      "sha256": "62c3bacc7c46ecbfefbc8a8c3393ff19b45117e27f87b3bc9964b4b7ed28b100",
+      "bytes": 28611
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame079.mat",
+      "sha256": "006ab66c0a3c763dc871f785cc4e5b6d7d73f893b2133c0cd4429e944930aef9",
+      "bytes": 28606
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame080.mat",
+      "sha256": "3c4bf629b4dd2347f0de72443f9eb50530707ee40c054e9439bd04b30ab4667b",
+      "bytes": 28607
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/frame100.mat",
+      "sha256": "e1591f3a6b699c73ef6474f7e69da391e1610897fe118400d0b247a8ea7f171a",
+      "bytes": 28614
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/freeFirst.mat",
+      "sha256": "30990165e8e9bf23cf68b7c6759932c408c53338931de181da5ec257230c29ec",
+      "bytes": 16857
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/nominalWitness.mat",
+      "sha256": "9ec582601a52cf818b66982c701e49f73e0593cebae12aa1abdc85818d80fafd",
+      "bytes": 13720
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/objective.json",
+      "sha256": "af27a77e54a9d7a7929c9f74467103164eeef6f9e1194810cb0d8198409325fc",
+      "bytes": 1233
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/objectiveProbe.log",
+      "sha256": "0d7a9e6bd085075bde600114787022796852db821c732e530f2365ad730519dc",
+      "bytes": 139
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/objectiveProbe.m",
+      "sha256": "69db09945fa342516993ae104ce839455f060b6bcc1b7d2dcc74ae07531d661e",
+      "bytes": 3117
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/prepare.py",
+      "sha256": "a51c5105ab3c4aa4f1f1afa711752b2dd8203699a4bdbdcbe26f2ca6c490f9c0",
+      "bytes": 1612
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/verifyWitnesses.log",
+      "sha256": "a2616c7bea506ec152eaee7f43598f4ac0ea90344d35ff2815fd8410f31fb338",
+      "bytes": 94
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/verifyWitnesses.m",
+      "sha256": "5daa41739b4f5778e5cc5035076021c2c15a8e9f35c53ba1f7f1321ff832f81a",
+      "bytes": 2032
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/witnessAudit.json",
+      "sha256": "d7b58c0e725816d6a63187eae0d769483cd2d298048522f2b7049b9b30d980db",
+      "bytes": 1787
+    }
+  ]
+}

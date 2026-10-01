@@ -1,0 +1,55 @@
+CLF causal diagnosis, September 30, 2026
+
+Production controller/configuration baseline: 17a5a19e76888079f8c7d0d0abc762a3b4150ca9.
+No production controller, terminal constraint, configuration, or fixture was edited.
+MATLAB R2026a, single computational thread. No random draws.
+Repository: /home/zai/Downloads/ResearchProjects/collisionAvoidance
+Raw original evidence: /home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930
+
+Actual commands, from repository root:
+python /home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/prepare.py
+matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/capture.m')"
+matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/diagnose.m')"
+matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/followup.m')"
+matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/objectiveProbe.m')"
+matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/clf-causal-diagnosis-20260930/verifyWitnesses.m')"
+
+prepare.py exposes the original solver's local routines in a differently named,
+cache-only diagnostic function and adds read-only line-search instrumentation.
+It does not shadow solvePredictiveControl. capture.m runs the production controller
+for 100 holds from exact 8 m/s circular trim (curvature 0.005/m), with no target or
+road constraints. ODE45 supplies successors (RelTol 1e-11, AbsTol 1e-12). Saved
+frames 69, 71, 80, 100 are replayed in diagnose.m with a 120 s diagnostic budget;
+the first-step results exactly reproduce production. This budget only removes
+offline deadline interference, not a runtime performance proposal.
+
+Offline least-squares endpoint interpolation holds the chosen first input fixed
+and adjusts the remaining finite controls. Original nonlinear admission then checks
+all original sampled physical and terminal constraints. The endpoint residual is
+weighted intrinsic state [vx,vy,r,lastInput] minus straight trim. The initial
+lsqnonlin calls automatically selected Levenberg-Marquardt because the system is
+underdetermined; later calls name that algorithm explicitly. Those are numerical
+offline existence witnesses, not new online controller methods or safety backups.
+
+followup.m preserves each raw conic first input, corrects only the later controls,
+records the original trust-bound ratios and independently replays the first hold.
+It also verifies the discrete Riccati identity and minimum local decrease fraction
+for 8/15 m/s, straight/circular trim. diagnose.m separately repeats the original
+secondary operation up to 30 times at the same state without the online early exit.
+
+objectiveProbe.m compares a fixed nominal first input with a free first input using
+the nonlinear analogue of the existing weighted secondary objective, including
+input deviation from the same baseline. Both use the stricter endpoint center
+equality and original physical limits, rather than relaxing the original core.
+The optimizer is fmincon/SQP for OFFLINE diagnosis only. Exit flags, constraint
+violations and finite stationarity residuals are retained; these are local numerical
+solutions, not certificates of global optimality. Six fixed-steering perturbations
+record a feasible objective profile near the nominal solution.
+
+verifyWitnesses.m checks seven stored witness trajectories by fresh nonlinear
+admission and dense ODE45 replay (31 samples/hold), including the final core.
+The probe has no obstacle; the safety-slack check is therefore vacuous for collision.
+It diagnoses nominal recovery independently of collision geometry and makes no
+continuous-plant safety or global-convergence claim. No full campaign was rerun,
+and no controller regression suite was rerun because production code is unchanged.
+Exact raw scripts, snapshots, output and source hashes are listed in manifest.json.

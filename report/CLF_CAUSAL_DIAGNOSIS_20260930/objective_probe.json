@@ -1,0 +1,74 @@
+{
+  "fixedNominal": {
+    "cost": 0.03880379731619533,
+    "clfSlack": 8.351097460824739e-27,
+    "hard": 0,
+    "safety": 0,
+    "input": [
+      0.015689468071141525,
+      0.013751456143225111
+    ],
+    "exitflag": 2,
+    "iterations": 38,
+    "firstOrderOptimality": 6.744493692978359e-07,
+    "constraintViolation": 5.044109862826509e-16
+  },
+  "freeFirst": {
+    "cost": 0.0386859982505708,
+    "clfSlack": 0.00043786065560064803,
+    "hard": 0,
+    "safety": 0,
+    "input": [
+      0.017549924089273587,
+      0.013852299961963202
+    ],
+    "exitflag": 2,
+    "iterations": 31,
+    "firstOrderOptimality": 5.783723407409153e-07,
+    "constraintViolation": 2.0220167897070627e-14
+  },
+  "profile": [
+    {
+      "steeringPerturbation": -1e-05,
+      "cost": 0.03880486284790388,
+      "clfSlack": 1.272609401305418e-08,
+      "hard": 0,
+      "exitflag": 2
+    },
+    {
+      "steeringPerturbation": -0.0001,
+      "cost": 0.03881461245586139,
+      "clfSlack": 1.27297687840181e-06,
+      "hard": 0,
+      "exitflag": 2
+    },
+    {
+      "steeringPerturbation": -0.001,
+      "cost": 0.038929602660155875,
+      "clfSlack": 0.00012766475740902175,
+      "hard": 0,
+      "exitflag": 2
+    },
+    {
+      "steeringPerturbation": 1e-05,
+      "cost": 0.038802735330657506,
+      "clfSlack": 1.2725277297011827e-08,
+      "hard": 0,
+      "exitflag": 2
+    },
+    {
+      "steeringPerturbation": 0.0001,
+      "cost": 0.03879333715023803,
+      "clfSlack": 1.2721601623711542e-06,
+      "hard": 0,
+      "exitflag": 2
+    },
+    {
+      "steeringPerturbation": 0.001,
+      "cost": 0.038716695858730214,
+      "clfSlack": 0.0001268480428435776,
+      "hard": 0,
+      "exitflag": 2
+    }
+  ]
+}

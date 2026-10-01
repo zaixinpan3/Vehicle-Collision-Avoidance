@@ -1,0 +1,79 @@
+[
+  {
+    "name": "nominalWitness",
+    "rk4Hard": 0,
+    "rk4Safety": 0,
+    "odePhysicalViolation": 0,
+    "odeFirstW": 1.2505179717603328e-26,
+    "odeEndpointNorm": 1.4396840753154947e-08,
+    "coreRadius": 0.0001220703125,
+    "odeEndpointInside": true,
+    "maximumOdeStateDifference": 6.082852145958967e-07
+  },
+  {
+    "name": "correctedFrame069",
+    "rk4Hard": 0,
+    "rk4Safety": 0,
+    "odePhysicalViolation": 0,
+    "odeFirstW": 0.0008163092105497582,
+    "odeEndpointNorm": 3.979821143404984e-07,
+    "coreRadius": 0.0001220703125,
+    "odeEndpointInside": true,
+    "maximumOdeStateDifference": 9.396256318607021e-07
+  },
+  {
+    "name": "correctedFrame071",
+    "rk4Hard": 0,
+    "rk4Safety": 0,
+    "odePhysicalViolation": 0,
+    "odeFirstW": 0.05241284570051239,
+    "odeEndpointNorm": 5.072513697601467e-07,
+    "coreRadius": 0.0001220703125,
+    "odeEndpointInside": true,
+    "maximumOdeStateDifference": 1.0810353576334863e-06
+  },
+  {
+    "name": "correctedFrame080",
+    "rk4Hard": 0,
+    "rk4Safety": 0,
+    "odePhysicalViolation": 0,
+    "odeFirstW": 1.1332646545894385,
+    "odeEndpointNorm": 9.578033628509694e-07,
+    "coreRadius": 0.0001220703125,
+    "odeEndpointInside": true,
+    "maximumOdeStateDifference": 1.5174444455562375e-06
+  },
+  {
+    "name": "correctedFrame100",
+    "rk4Hard": 0,
+    "rk4Safety": 0,
+    "odePhysicalViolation": 0,
+    "odeFirstW": 20.436483847619115,
+    "odeEndpointNorm": 1.4332217677365421e-06,
+    "coreRadius": 0.0001220703125,
+    "odeEndpointInside": true,
+    "maximumOdeStateDifference": 1.5173464684298255e-06
+  },
+  {
+    "name": "fixedNominal",
+    "rk4Hard": 0,
+    "rk4Safety": 0,
+    "odePhysicalViolation": 0,
+    "odeFirstW": 1.2505179717603328e-26,
+    "odeEndpointNorm": 4.041042215559053e-07,
+    "coreRadius": 0.0001220703125,
+    "odeEndpointInside": true,
+    "maximumOdeStateDifference": 9.550328410636022e-07
+  },
+  {
+    "name": "freeFirst",
+    "rk4Hard": 0,
+    "rk4Safety": 0,
+    "odePhysicalViolation": 0,
+    "odeFirstW": 0.00043787345400199927,
+    "odeEndpointNorm": 4.0134389080205676e-07,
+    "coreRadius": 0.0001220703125,
+    "odeEndpointInside": true,
+    "maximumOdeStateDifference": 9.505579555112165e-07
+  }
+]
