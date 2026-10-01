@@ -1,0 +1,55 @@
+{
+  "baseCommit": "2016f89abbec0c1a52a607a40b979c186a843490",
+  "commands": [
+    "matlab -singleCompThread -batch \"results=runtests({'tests/twoStagePredictiveControlTest.m','tests/clfNominalRecoveryTest.m','tests/nonlinearPredictiveSafetyTest.m'}); save('/home/zai/.cache/collisionAvoidance/direct-two-stage-20261001/tests.mat','results'); assertSuccess(results);\"",
+    "python3 -m unittest discover -s tests -p auditJointPredictiveSafetyTest.py",
+    "matlab -singleCompThread -batch \"run('/home/zai/.cache/collisionAvoidance/direct-two-stage-20261001/replayFailedFrames.m')\""
+  ],
+  "sourceFiles": {
+    "controller/solvePredictiveControl.m": "2e6622dde84add2adb0ca2a4e1364d4e524f39af75e86ac660393076c5c3cbe5",
+    "controller/collisionAvoidanceController.m": "ef863b09809f4263be742ab0fc45f8fd5897593de897f29c1890286133399fb1",
+    "controller/PCBF_CLF_ARCHITECTURE.md": "44e641bbef9a1956fff78b2a07c28b8d9a96fa465faeb9bf097ce65c5d994dee",
+    "controller/CONTROLLER_FILES.md": "58b337c28ad99b3515bff0dee873f7a48a54ce548030766ee5123145b4882934",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "9b8caa6656f92b5535cd43b18be68c5bfdc35ce35f7bed46c6537396c8b3fbf1",
+    "scripts/auditJointPredictiveSafety.py": "a6dc7a55806652d1b2842283237eb0dd606907eec6d6e1bd93d95d8fc5c4d889",
+    "tests/twoStagePredictiveControlTest.m": "b8b4125c8670aa4df221401d965780a878361aaa840bceb03a84fcdaf76acbde",
+    "tests/nonlinearPredictiveSafetyTest.m": "94b76aa5681145db587206796c20dc8ef2483ecea5148f5c47cd8a98d524ca48",
+    "tests/auditJointPredictiveSafetyTest.py": "4b250a87cdc641b4b1a9b6af505ce4d99276fce2ab96b974719703ef844d1fe6"
+  },
+  "savedContinuationInputs": {
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed15/acceleratingHeadOn.mat": "3a6384c1b6110e9afbbee59aad679ad15fb5c536bcd294ee02fda5cf5e731cc4",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed15/brakingLead.mat": "b3423fff994f23df89d2310d0b85eee5fd98f1cc498e35ec9cde4ea6eb66873c",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed15/crossing.mat": "7e2e2f352fedd07f11dc88030755b0807356d45df592beb84741476abc679903",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed15/curvedCrossing.mat": "bb8a203b20ad6b86a781daae1782297719c72d17d31a0b867cd1d11fc03b51ab",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed15/curvedHeadOn.mat": "c22ca22885431032f22afbcb11ce098e7095768d703539969e94924dcdbe829b",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed15/headOn.mat": "8ab4d65ad72f1f5839a77c70ca47a91e14c8378e14d8b64b6f2f786a4f330d83",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed15/turningCrossing.mat": "85926596da39eee21ac4160cec90c57a2895b3dc2db2f366e3ab953acd63f3a5",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed8/acceleratingHeadOn.mat": "3e80987972e7f140474582ff2b3989b1360b69894530d00e7b9cfeb021bdcae5",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed8/brakingLead.mat": "1c819cb90fd7e17790888b5c64cef73ba34af45e9c0e406ce6b6f03055d66280",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed8/crossing.mat": "59c9a5339bf5dbbb9c1930821ddbb6695abe72947d931e7bd608a5430a56b49a",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed8/curvedCrossing.mat": "0cdaed243fbdabd2886f9bd32e590a981cb7120a6c4d17efe95cc929cccfcec0",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed8/curvedHeadOn.mat": "f95871ee6948a421e581511d540a246ab6c526fc871961ecd0823415ae76ad77",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed8/headOn.mat": "b72027d89dd9cd8eec68132eff1943169284a85dc897a752aa30f33d8f5fd0c1",
+    "/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign/speed8/turningCrossing.mat": "c04d375924862c899af4e8337add6234b486603752a90f66d49e45a5de03ba6d"
+  },
+  "nativeKernels": {
+    "solver/controller/bicycleSampleKernelMex.mexa64": "dfd4ef44acf72bb3e22128dd394d2c7c583097cc8a9a81d8feb2d16a4fcc54e9",
+    "solver/controller/dualKernelMex.mexa64": "d6a96de418c2c981f441db1f66fec423c634cf303a730ec6603944c85c146f0a",
+    "solver/controller/rectangleKernelMex.mexa64": "82d5b2189584d3228aaed9272f31f0c83c7c561973d245c2a42abca3f75e0599"
+  },
+  "rawFiles": {
+    "/home/zai/.cache/collisionAvoidance/direct-two-stage-20261001/tests.mat": "ba5a4d64bf8de7753cc4f265296753732bdbfa92c73b06af5bcda8042c22e631",
+    "/home/zai/.cache/collisionAvoidance/direct-two-stage-20261001/tests.log": "1fb43724696a1a200aa72f4d90810294b4c953fe7d623ae7dc976d55522e957b",
+    "/home/zai/.cache/collisionAvoidance/direct-two-stage-20261001/replay.log": "d1caff31885f63a1c66079c4764d89cd5d846b8d5d723dd73392b3bf129eaac9",
+    "/home/zai/.cache/collisionAvoidance/direct-two-stage-20261001/python-tests.log": "3b252b4b30824510c43deef68b14d0eb3a6ac95b8f91329ce07dd256a36db41c"
+  },
+  "artifacts": {
+    "report/DIRECT_TWO_STAGE_OUTPUT_20261001/failed-frame-replay.json": "fd6ff0114e02355e0a645cbf9d004b26177323a4b6c747d92b610c32db42ce8d",
+    "report/DIRECT_TWO_STAGE_OUTPUT_20261001/python-tests.txt": "3b252b4b30824510c43deef68b14d0eb3a6ac95b8f91329ce07dd256a36db41c",
+    "report/DIRECT_TWO_STAGE_OUTPUT_20261001/replay.txt": "a25640ed29ea1f9bf7736ff2216d2e7387f1fd184e47d34ae8b7ac4dd51c1fef",
+    "report/DIRECT_TWO_STAGE_OUTPUT_20261001/replayFailedFrames.m": "d757ae14e427267d741cf27b5dbe46750643c01f7ecaaeb28126afe401146271",
+    "report/DIRECT_TWO_STAGE_OUTPUT_20261001/tests.txt": "3f4b165ea770883bb141239bf1f696e5d7ba81257e09b1c0dc8210f7d511716d",
+    "report/DIRECT_TWO_STAGE_OUTPUT_20261001/validation.json": "ea2159ac397925755576b2e47b3da75e5cf07a99cd059da4e39ce0e4ab3f47ad",
+    "report/DIRECT_TWO_STAGE_OUTPUT_20261001.tex": "30ab1d982ff442590b6dde00ea4ca92cbe7281ed5c906b2e62fa9b8b1098b36b"
+  }
+}

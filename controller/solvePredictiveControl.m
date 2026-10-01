@@ -1,13 +1,14 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl One linearization, PCBF slack, then CLF slack.
 % Returned states belong to the affine prediction, not a nonlinear replay.
-% There is no candidate admission, correction, restoration or outer search.
+% Solver exit flags are recorded, not used to admit or reject returned vectors.
+% There is no post-solve constraint audit, correction or outer search.
     if nargin<3,timer=tic;end
     cfg=model.cfg;solution=[];
     [anchor,initialization]=localInitialization(model,previousState);
     [problem,model]=localFormulate(anchor,model);
     search=struct('solverCalls',0,'source',"twoStageConvexOptimization", ...
-        'initialization',initialization,'converged',false,'terminationReason',"timeLimit", ...
+        'initialization',initialization,'returned',false,'converged',false,'terminationReason',"timeLimit", ...
         'primaryOptimum',NaN,'slackCap',NaN,'clfInitialSlack',problem.initialClfSlack, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
         'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{}));
@@ -21,8 +22,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         problem.equal,problem.rhs,problem.lower,problem.upper,options);
     search.solverCalls=1;
     search.stages(1)=struct('objective',"pcbfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN);
-    if flag<=0 || isempty(first) || any(~isfinite(first))
-        search.terminationReason="pcbfSolveFailed";search.elapsedSeconds=toc(timer);return;
+    if isempty(first) || any(~isfinite(first))
+        search.terminationReason="pcbfNoNumericalResult";search.elapsedSeconds=toc(timer);return;
     end
     optimum=sum(max(0,first(problem.slackIndices)));
     search.primaryOptimum=optimum;search.stages(1).value=optimum;
@@ -36,33 +37,26 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         problem.equal,problem.rhs,problem.lower,problem.upper,options);
     search.solverCalls=2;
     search.stages(2)=struct('objective',"clfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN);
-    if flag<=0 || isempty(second) || any(~isfinite(second))
-        search.terminationReason="clfSolveFailed";search.elapsedSeconds=toc(timer);return;
+    if isempty(second) || any(~isfinite(second))
+        search.terminationReason="clfNoNumericalResult";search.elapsedSeconds=toc(timer);return;
     end
     inputs=anchor.inputs+reshape(second(problem.inputIndices),size(anchor.inputs));
     states=anchor.states+reshape(second(problem.stateIndices),size(anchor.states));
     slacks=max(0,second(problem.slackIndices));rho=problem.clfScale*max(0,second(problem.clfIndex));
     nextValue=norm(problem.clfMap*second+problem.clfOffset)^2*problem.clfScale;
-    residual=max([0;problem.a*second-problem.b;abs(problem.equal*second-problem.rhs); ...
-        problem.lower-second;second-problem.upper]);
-    for cone=problem.cones
-        residual=max(residual,norm(cone.A*second-cone.b)-cone.d.'*second+cone.gamma);
-    end
-    collision=Inf;terminalMargin=Inf;
-    if ~isempty(problem.collisionB),collision=min(problem.collisionB-problem.collisionA*second);end
-    if ~isempty(problem.terminalB),terminalMargin=min(problem.terminalB-problem.terminalA*second);end
     % Fitting the free pose only packages the endpoint; it is not an admission test.
     model.terminal=terminalContinuation.fit(model.terminal,[states(:,end);inputs(:,end)], ...
         model.sampleIndex+size(inputs,2));
     solution=struct('inputs',inputs,'states',states,'stageSlacks',slacks.', ...
-        'safety',sum(slacks),'hard',residual,'clfSlack',rho, ...
+        'safety',sum(slacks),'hard',NaN,'clfSlack',rho, ...
         'clfInitialValue',problem.initialClfValue,'clfNextValue',nextValue, ...
-        'minimumCollisionMargin',collision,'terminalSeparationMargin',terminalMargin, ...
-        'encounterExit',problem.encounterExit,'nonlinearValidationPerformed',false);
+        'minimumCollisionMargin',NaN,'terminalSeparationMargin',NaN, ...
+        'encounterExit',problem.encounterExit,'affineValidationPerformed',false,'nonlinearValidationPerformed',false);
     model.linearization=anchor;
-    search.stages(2).value=rho;search.clfStageCompleted=true;search.converged=true;
+    search.stages(2).value=rho;search.clfStageCompleted=true;search.returned=true;
+    search.converged=all([search.stages.exitFlag]>0);
     search.clfLowerBound=rho<=cfg.solver.feasibilityTolerance;
-    search.terminationReason="twoStagesSolved";search.elapsedSeconds=toc(timer);
+    search.terminationReason="twoStagesReturned";search.elapsedSeconds=toc(timer);
 end
 
 function [anchor,source]=localInitialization(model,previous)
@@ -153,7 +147,6 @@ function [problem,model]=localFormulate(anchor,model)
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
     rhs(1:6)=model.initialState-anchor.states(:,1);
     rows=cell(1,5*count+3);bounds=cell(size(rows));rowCount=0;
-    collisionA=cell(1,2*count+1);collisionB=cell(size(collisionA));collisionCount=0;
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
     lower(iu(:))=-repmat(radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
@@ -179,14 +172,12 @@ function [problem,model]=localFormulate(anchor,model)
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
         if index<=departure
             [g,j]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
-            collisionCount=collisionCount+1;collisionA{collisionCount}=-j*map;collisionB{collisionCount}=g;
             r=-j*map;if index<=prefix,r(:,is(index))=-1;end
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
         if index<=departure
             [g,j]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
-            collisionCount=collisionCount+1;collisionA{collisionCount}=-j*map;collisionB{collisionCount}=g;
             r=-j*map;if index<=prefix,r(:,is(index))=-1;end
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
@@ -218,7 +209,6 @@ function [problem,model]=localFormulate(anchor,model)
             [g,j]=localSafetyRows(y(1:6),count*cfg.controller.sampleTime,model);
             r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
-            collisionCount=collisionCount+1;collisionA{collisionCount}=r;collisionB{collisionCount}=g;
         end
     end
     objective=zeros(nv,1);objective(is)=1;
@@ -227,7 +217,6 @@ function [problem,model]=localFormulate(anchor,model)
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'clfScale',clfScale,'clfMap',clfMap,'clfOffset',clfOffset, ...
         'initialClfValue',v0,'initialClfSlack',max(0,(norm(clfOffset)^2-clfConstant)*clfScale), ...
-        'collisionA',vertcat(collisionA{1:collisionCount}),'collisionB',vertcat(collisionB{1:collisionCount}), ...
         'terminalA',terminalA,'terminalB',terminalB,'encounterExit',departure);
 end
 

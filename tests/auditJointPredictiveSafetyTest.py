@@ -10,6 +10,12 @@ from auditJointPredictiveSafety import clearance_passes, distance, rectangle, ta
 
 
 class CollisionAuditTest(unittest.TestCase):
+    def test_missing_online_residual_does_not_claim_verified_feasibility(self):
+        hold = affine_hold()
+        hold['hardResidual'] = None
+        hold['affineValidationPerformed'] = False
+        self.assertFalse(feasible_hold(hold))
+
     def test_affine_result_needs_both_completed_stages_and_its_declared_tolerance(self):
         hold = affine_hold()
         self.assertTrue(feasible_hold(hold))

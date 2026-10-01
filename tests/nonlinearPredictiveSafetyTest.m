@@ -148,7 +148,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(next(3),pi);
             testCase.verifyEqual(state.targetEpoch,prior.targetEpoch);
             testCase.verifyEqual(problem.model.target,next);
-            testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.solver.feasibilityTolerance);
+            testCase.verifyTrue(problem.metadata.optimizationReturned);
             next(3)=next(3)+.01;
             testCase.verifyError(@()collisionAvoidanceController(ego,localTarget(next),road,cfg,prior), ...
                 'collisionAvoidanceController:changedTargetTrajectory');

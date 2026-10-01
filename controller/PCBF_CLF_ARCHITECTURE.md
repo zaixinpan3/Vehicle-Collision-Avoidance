@@ -101,20 +101,33 @@ not clipped, replayed, polished or replaced after optimization. Returned
 `predictedState` values are affine predictions. A usable previous trajectory
 only supplies the next linearization. No executable `witness` is stored.
 
-A missing/unsuccessful stage, or an exhausted shared soft budget, reports
-`collisionAvoidanceController:noOptimizationSolution`. The controller does not
-execute an old trajectory or a first-stage-only result. Optimizer exit flags,
-objective values and timings are recorded separately. The maximum number of
-optimizer calls is two, with fewer calls only on an incomplete frame.
+Each finite solver result proceeds directly, regardless of its exit flag.
+The first result supplies the PCBF cap; the second supplies the applied input.
+There is no post-solve feasibility or optimality admission test, and no online
+recomputation of constraint residuals or separation margins. In particular,
+a finite result with exit `-7` or an iteration-limit exit is not discarded.
+The solver's own convergence and stopping criteria remain part of `coneprog`.
+
+An empty/nonfinite result, or an exhausted shared soft budget before a solve,
+reports `collisionAvoidanceController:noOptimizationSolution`: there is no
+numerical control vector to issue. No old trajectory or first-stage-only
+result is substituted. Exit flags, objective values and timings are recorded
+separately. At most two optimizer calls are made. A first-stage value returned
+without solver convergence is the achieved value, not a certified optimum;
+the legacy `primaryOptimum` field records that value.
 
 Metadata explicitly records:
 
 - `predictionModel = affineFialaRk4Linearization`;
 - `safetyScope = affineSampledConstraints`;
 - `nonlinearValidationPerformed = false`;
+- `affineValidationPerformed = false`;
 - `recursiveFeasibilityScope = notCertifiedForNonlinearPlant`;
-- raw convex `hardConstraintResidual`, both stage exit flags, the primary
-  optimum, and the second-stage PCBF cap;
+- `optimizationReturned` records availability of both numerical results;
+  `optimizationConverged` records positive solver exits and never gates output;
+- `hardConstraintResidual`, `minimumCollisionMargin` and
+  `terminalSeparationMargin` are `NaN` (unmeasured), not zero or a safety claim;
+- both stage exit flags, the achieved primary value, and the second-stage cap;
 - `zeroSlack` using the declared affine feasibility tolerance.
 
 Positive optimized PCBF slack is returned as a relaxed result; it does not
@@ -127,8 +140,9 @@ error model, not a proof of nonlinear closed-loop asymptotic recovery.
 Independent ODE replay and rectangle checks remain available in experiment
 scripts. They are offline measurements and do not add online acceptance steps.
 Historical audit exports retain their original interpretation. New exports
-check affine residuals under their declared tolerance and still check physical
-replay clearance independently.
+declare that affine residuals were not measured; the offline audit reports
+that affine feasibility was not verified and still measures replay clearance.
+Missing residuals serialize to JSON null and do not establish feasibility.
 
 The shared soft time budget remains configurable. Two solver calls do not by
 themselves establish a 100-ms runtime bound, especially including initialization,

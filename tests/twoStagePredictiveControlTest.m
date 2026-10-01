@@ -47,6 +47,22 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,prior), ...
                 'collisionAvoidanceController:noOptimizationSolution');
         end
+        function finiteIterationLimitResultsStillRunBothStagesAndSupplyTheCommand(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=.1;
+            cfg.solver.maxIterations=1;
+            [command,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyEqual(problem.metadata.solverCallCount,2);
+            testCase.verifyLessThanOrEqual([problem.metadata.search.stages.exitFlag],0);
+            testCase.verifyTrue(problem.metadata.optimizationReturned);
+            testCase.verifyFalse(problem.metadata.optimizationConverged);
+            testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
+            testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
+            testCase.verifyEqual(state.appliedInput,inputs(:,1),AbsTol=0);
+            testCase.verifyFalse(problem.metadata.affineValidationPerformed);
+            testCase.verifyTrue(isnan(problem.metadata.hardConstraintResidual));
+            testCase.verifyTrue(isnan(problem.metadata.minimumCollisionMargin));
+            testCase.verifyTrue(isnan(problem.metadata.terminalSeparationMargin));
+        end
         function initialOverlapIsReportedAsOptimizedPositiveSlack(testCase)
             [ego,road,cfg]=localFixture();
             target=struct('targetPositionInertial',[0;0], ...
@@ -72,7 +88,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(abs(inputs(1,:)),cfg.model.frontWheelSteeringAngleMaximum+tol);
             testCase.verifyLessThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMaximum+tol);
             testCase.verifyGreaterThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMinimum-tol);
-            testCase.verifyLessThanOrEqual(problem.solution.hard,tol);
+            localVerifyAffinePrediction(testCase,problem,cfg);
         end
     end
 end
@@ -86,7 +102,7 @@ function localVerifyAffinePrediction(testCase,problem,cfg)
         residual(:,index)=states(:,index+1)-affine;
     end
     testCase.verifyLessThanOrEqual(max(abs(residual),[],'all'),cfg.solver.feasibilityTolerance);
-    testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.solver.feasibilityTolerance);
+    testCase.verifyFalse(problem.metadata.affineValidationPerformed);
     testCase.verifyEqual(size(inputs,2),min(cfg.controller.maximumHorizonSteps, ...
         cfg.controller.horizonSteps+ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime)));
 end

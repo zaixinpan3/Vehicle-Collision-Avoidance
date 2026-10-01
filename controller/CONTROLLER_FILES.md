@@ -30,8 +30,10 @@ Generated native binaries and `solver/` dependencies are not source artifacts
 of this change. Kernel equivalence has dedicated tests.
 
 `twoStagePredictiveControlTest` checks the two objectives, primary priority,
-affine dynamics with shifted anchors, input bounds, positive-slack reporting
-and failure without fallback. `clfNominalRecoveryTest` checks one-step affine
+affine dynamics with shifted anchors, input bounds, positive-slack reporting,
+direct use of finite iteration-limit results, and missing-result failure
+without fallback. Online constraint audits are absent; unmeasured residuals
+and margins remain NaN. `clfNominalRecoveryTest` checks one-step affine
 CLF dissipation, not nonlinear convergence. Model, geometry, terminal-core and
 configuration tests retain their mathematical checks. Scenario campaigns and
 independent nonlinear replay belong in `scripts/`, with results in `report/`.

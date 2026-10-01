@@ -67,8 +67,9 @@ def feasible_hold(hold):
     if hold.get('source') == 'twoStageConvexOptimization':
         stages = hold.get('solverStages', [])
         tolerance = hold.get('affineFeasibilityTolerance', 0)
+        residual = hold.get('hardResidual')
         return (math.isfinite(tolerance) and tolerance > 0
-                and 0 <= hold.get('hardResidual', math.inf) <= tolerance
+                and isinstance(residual, (int, float)) and 0 <= residual <= tolerance
                 and hold.get('optimizationConverged', False)
                 and hold.get('solverCalls') == 2 and len(stages) == 2
                 and [stage.get('objective') for stage in stages] == ['pcbfSlack', 'clfSlack']

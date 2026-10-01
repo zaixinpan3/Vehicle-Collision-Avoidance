@@ -1,0 +1,15 @@
+8 headOn returned=1 flags=[1 -7]
+8 acceleratingHeadOn returned=1 flags=[1 -7]
+8 brakingLead returned=1 flags=[1 -7]
+8 crossing returned=0 flags=[] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+8 turningCrossing returned=1 flags=[1 -7]
+8 curvedHeadOn returned=0 flags=[] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+8 curvedCrossing returned=1 flags=[1 -7]
+15 headOn returned=1 flags=[1 -7]
+15 acceleratingHeadOn returned=1 flags=[1 -7]
+15 brakingLead returned=1 flags=[1 -7]
+15 crossing returned=1 flags=[1 -7]
+15 turningCrossing returned=1 flags=[1 -7]
+15 curvedHeadOn returned=0 flags=[] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+15 curvedCrossing returned=1 flags=[1 -7]
+{"matlabTests":76,"matlabPassed":76,"matlabFailed":0,"matlabIncomplete":0,"savedFailedFrames":14,"returnedFrames":11,"noNumericalResultFrames":3,"fullCampaignRun":false}

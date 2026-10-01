@@ -1,0 +1,68 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{xurl,hyperref}
+\setlength{\emergencystretch}{2em}
+\title{Direct Output from the Two-Stage Affine Solver}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+\section{Implemented behavior}
+The controller now uses each finite numerical solver result without an
+exit-flag admission gate. The PCBF result sets the second-stage slack cap;
+the CLF result supplies the applied first input. Negative or iteration-limit
+exit flags remain diagnostics and do not discard a returned vector. The
+shared budget and missing/nonfinite-result handling remain: an absent
+numerical result cannot supply a command. The solver's internal convergence
+criteria are unchanged.
+
+Removed post-solve evaluation of affine constraint residuals, collision
+margins and terminal margins, together with duplicate collision-row storage
+that served those evaluations. Their legacy output fields now contain NaN
+(unmeasured), and metadata declares affineValidationPerformed=false.
+optimizationReturned records numerical output availability independently of
+optimizationConverged, which records solver status only. The scenario driver
+exports both and the absence of an online constraint audit. The offline audit
+handles unmeasured JSON-null residuals without an exception or a verified
+feasibility claim.
+
+The two objectives, shared constraints, initialization and terminal set are
+unchanged. No nonlinear validation, extra solve, correction, retry or backup
+policy was added. A returned primary value with unsuccessful solver status is
+an achieved value rather than a certified optimum, despite the retained
+primaryOptimum field name. Returning finite results is not a claim that every
+such result satisfies the constraints or minimizes its objective.
+
+\section{Validation performed}
+On MATLAB R2026a Update 3, the targeted classes
+\path{tests/twoStagePredictiveControlTest.m},
+\path{tests/clfNominalRecoveryTest.m}, and
+\path{tests/nonlinearPredictiveSafetyTest.m}
+passed all 76 cases, with no failures or incomplete tests. A new behavior test
+limits both solver calls to one iteration and verifies that finite outputs
+still run through both stages and supply the command while solver convergence
+remains false. Existing affine-dynamics, input-limit and CLF assertions remain
+offline tests. The Python geometry/export audit suite passed all 19 cases,
+including missing-residual handling. MATLAB CLI was used because no MATLAB
+MCP execution tool was available in the session.
+
+Replayed the same fourteen saved failure frames from
+\path{report/TWO_STAGE_SCENARIOS_20261001} using the current controller and
+unchanged native kernels. All eleven frames previously rejected in the CLF
+stage now return a control, each after two solves with flags $(1,-7)$.
+The remaining three (8-m/s crossing, 8-m/s curvedHeadOn and 15-m/s curvedHeadOn)
+still return no numerical PCBF result. Their incompatible local constraints
+were diagnosed in \path{report/TWO_STAGE_FAILURE_CAUSES_20261001.tex} and were
+not changed here.
+
+These are saved-frame regression results, not complete scenario passes.
+No full closed-loop campaign, collision improvement, nominal recovery or new
+runtime bound is claimed. The change removes controller-side numerical result
+admission; it does not resolve the three remaining infeasible local problems.
+
+Results, logs, replay script and hashes are in
+\path{report/DIRECT_TWO_STAGE_OUTPUT_20261001/}. Original saved continuations
+remain in the documented cache and are identified by hashes. Generated test
+MAT files and this report's compiled PDF remain outside the repository.
+\end{document}
