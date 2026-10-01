@@ -1,0 +1,23 @@
+{
+  "scenario": "curvedHeadOn",
+  "speed": 15,
+  "samples": [
+    {
+      "time": 0,
+      "clearanceMeters": 31.788907145208714,
+      "outside30m": true
+    },
+    {
+      "time": 0.05,
+      "clearanceMeters": 30.64776283474686,
+      "outside30m": true
+    },
+    {
+      "time": 0.1,
+      "clearanceMeters": 29.506364450431708,
+      "outside30m": false
+    }
+  ],
+  "source": "Original saved campaign frames; unchanged scenario and encounter-range logic.",
+  "interpretation": "The first two calls start outside 30 m while approaching; localBeyondRange marks departure at zero and suppresses future collision rows and flow guidance. At 0.1 s collision rows activate on the shifted cruise reference."
+}

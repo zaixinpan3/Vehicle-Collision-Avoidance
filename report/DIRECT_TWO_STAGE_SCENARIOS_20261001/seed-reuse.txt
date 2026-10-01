@@ -1,0 +1,3 @@
+COLD-SEED 8 crossing returned=1 flags=[1  1]
+COLD-SEED 8 curvedHeadOn returned=1 flags=[1  1]
+COLD-SEED 15 curvedHeadOn returned=1 flags=[1  1]

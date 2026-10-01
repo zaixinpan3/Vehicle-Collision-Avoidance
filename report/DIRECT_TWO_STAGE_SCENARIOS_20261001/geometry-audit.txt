@@ -1,0 +1,36 @@
+AUDIT 15 acceleratingHeadOn duration 80.0 recovery False overlap True gap 0.0 error 727.140907730627 failure
+AUDIT 15 brakingLead duration 23.950000000000003 recovery False overlap False gap 0.8996665643075468 error -2.641305065745183 failure pcbfNoNumericalResult
+AUDIT 15 crossing duration 80.0 recovery False overlap False gap 0.477490553911865 error -628.8546490515694 failure
+AUDIT 15 curvedCrossing duration 80.0 recovery False overlap False gap 0.03420777046365046 error -373.1878935929621 failure
+AUDIT 15 curvedHeadOn duration 0.1 recovery False overlap False gap 29.506364450431708 error -8.023849098349406e-08 failure pcbfNoNumericalResult
+AUDIT 15 headOn duration 80.0 recovery False overlap True gap 0.0 error 725.1171953914342 failure
+AUDIT 15 turningCrossing duration 80.0 recovery False overlap False gap 0.04705337920350476 error -728.6934781866545 failure
+AUDIT 8 acceleratingHeadOn duration 80.0 recovery False overlap False gap 0.46819157417527824 error 354.0656417683977 failure
+AUDIT 8 brakingLead duration 11.4 recovery False overlap False gap 1.114299279506749 error -2.018169444914549 failure pcbfNoNumericalResult
+AUDIT 8 crossing duration 1.4000000000000001 recovery False overlap False gap 2.320467262347341 error 0.009278767368734779 failure pcbfNoNumericalResult
+AUDIT 8 curvedCrossing duration 80.0 recovery False overlap False gap 0.5661141932785164 error -224.22667093926515 failure
+AUDIT 8 curvedHeadOn duration 1.35 recovery False overlap False gap 2.855437483063177 error 2.4600046476608752 failure pcbfNoNumericalResult
+AUDIT 8 headOn duration 2.35 recovery False overlap False gap 0.615168154410518 error 4.6092785096996005 failure pcbfNoNumericalResult
+AUDIT 8 turningCrossing duration 80.0 recovery False overlap False gap 0.43540597355965227 error -296.9367591082505 failure
+{
+  "numpyVersion": "2.5.3",
+  "sourceCommit": "0466fd95800e80d53434cf90b8021da5989932b0",
+  "cases": 14,
+  "durationCompleted": 8,
+  "recovered": 0,
+  "avoidanceAndRecovery": 0,
+  "physicalOverlapCases": 2,
+  "formerClfCases": 11,
+  "formerClfRecovered": 0,
+  "formerClfAvoidanceAndRecovery": 0,
+  "returnedFrames": 13611,
+  "medianReturnedSeconds": 0.065984,
+  "maximumReturnedSeconds": 0.477619,
+  "maximumFailedFrameSeconds": 0.080605,
+  "maximumAllCallsSeconds": 0.477619,
+  "returnedFramesOver100ms": 1655,
+  "failedCallsOver100ms": 0,
+  "failureStages": {
+    "pcbfNoNumericalResult": 6
+  }
+}
