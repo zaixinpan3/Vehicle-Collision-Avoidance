@@ -78,16 +78,35 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.search.initialization,"movingTargetFlow");
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
-        function finiteSlewAndMagnitudeBoundsConstrainTheReturnedPlan(testCase)
+        function brakingSlewAndMagnitudeBoundsConstrainTheReturnedPlan(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.05;
-            cfg.model.frontWheelSteeringRateMaximum=.8;cfg.model.brakingRatioRateMaximum=2;
+            cfg.model.brakingRatioRateMaximum=2;
             ego.heldActuatorInput=[0;0];
             [~,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
-            limits=cfg.controller.sampleTime*[.8;2];tol=cfg.solver.feasibilityTolerance;
-            testCase.verifyLessThanOrEqual(max(abs(diff([ego.heldActuatorInput,inputs],1,2)),[],2),limits+tol);
-            testCase.verifyLessThanOrEqual(abs(inputs(1,:)),cfg.model.frontWheelSteeringAngleMaximum+tol);
+            limit=cfg.controller.sampleTime*2;tol=cfg.solver.feasibilityTolerance;
+            testCase.verifyLessThanOrEqual(max(abs(diff([ego.heldActuatorInput(2),inputs(2,:)]))),limit+tol);
             testCase.verifyLessThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMaximum+tol);
             testCase.verifyGreaterThanOrEqual(inputs(2,:),cfg.actuation.brakingRatioMinimum-tol);
+            localVerifyAffinePrediction(testCase,problem,cfg);
+        end
+        function steeringRecoveryIsNotConfinedToTheAnchorOrPreviousInput(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=.1;ego.yaw=.5;
+            ego.heldActuatorInput=[.5;0];
+            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            steering=command.frontWheelSteeringAngle;
+            testCase.verifyLessThan(steering,-.2);
+            testCase.verifyGreaterThan(abs(steering-problem.model.linearization.inputs(1,1)),.075);
+            testCase.verifyGreaterThan(abs(steering-ego.heldActuatorInput(1)),.5);
+            testCase.verifyEqual(problem.metadata.solverCallCount,2);
+            localVerifyAffinePrediction(testCase,problem,cfg);
+        end
+        function steeringMayExceedTheRetiredFortyDegreeLimit(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=1;ego.yaw=.5;
+            % Widen state increments so this case exposes the retired input cap.
+            cfg.nonlinear.trustRadius=1;
+            [command,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyLessThan(command.frontWheelSteeringAngle,-deg2rad(40)-.02);
+            testCase.verifyEqual(problem.metadata.solverCallCount,2);
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
     end

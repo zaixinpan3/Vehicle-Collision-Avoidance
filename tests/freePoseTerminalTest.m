@@ -54,12 +54,12 @@ classdef freePoseTerminalTest < matlab.unittest.TestCase
             margin=terminalContinuation.separation(fitted,target,[0;0;0;0],cfg,11);
             testCase.verifyLessThan(margin,0);
         end
-        function retainedCoreClosesTheSuffixWithFiniteSlew(testCase,angle)
+        function retainedCoreClosesTheSuffixWithFiniteBrakingSlew(testCase,angle)
             [seed,cfg,y]=localCore();y=localTransform(y,[12;-7;angle]);
             seed=terminalContinuation.fit(seed,y,11);
             [membership,slew,separation]=localContinueCore(seed,y,cfg);
             testCase.verifyLessThanOrEqual(membership,zeros(size(membership)));
-            testCase.verifyLessThanOrEqual(slew,.5*cfg.controller.sampleTime+1e-12);
+            testCase.verifyLessThanOrEqual(slew(2,:),.5*cfg.controller.sampleTime+1e-12);
             testCase.verifyGreaterThan(separation,0);
         end
     end
@@ -67,7 +67,7 @@ end
 
 function [seed,cfg,y]=localCore()
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'model',struct('frontWheelSteeringRateMaximum',.5,'brakingRatioRateMaximum',.5)));
+        'model',struct('brakingRatioRateMaximum',.5)));
     seed=terminalContinuation.build(cfg,0);
     direction=[1;-1;1;1;-1];
     intrinsic=seed.quotientFactor\(seed.radius*.3*direction/norm(direction));

@@ -23,9 +23,8 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             seed.phaseMeters=phaseMeters;
             [values,inputs,slew]=localClosureSamples(seed,cfg);
             testCase.verifyLessThanOrEqual(values,zeros(size(values)));
-            testCase.verifyLessThan(abs(inputs(1,:)),cfg.model.frontWheelSteeringAngleMaximum);
             testCase.verifyLessThan(abs(inputs(2,:)),1);
-            testCase.verifyLessThan(slew,.5*cfg.controller.sampleTime);
+            testCase.verifyLessThan(slew(2,:),.5*cfg.controller.sampleTime);
         end
         function shiftedReferenceStatesBelongToTheirOwnTerminalFamily(testCase,curvature)
             [seed,~]=localSeed(curvature);shifted=seed;shifted.phaseMeters=-20;
@@ -122,7 +121,7 @@ end
 
 function [seed,cfg]=localSeed(curvature)
     cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8, ...
-        'model',struct('frontWheelSteeringRateMaximum',.5,'brakingRatioRateMaximum',.5)));
+        'model',struct('brakingRatioRateMaximum',.5)));
     seed=terminalContinuation.build(cfg,curvature);
     lane=struct('referenceCurve',struct('origin',[0;0],'heading',.2,'curvature',curvature,'length',200));
     seed=terminalContinuation.anchor(seed,seed.reference.state,11,lane);

@@ -30,7 +30,8 @@ Generated native binaries and `solver/` dependencies are not source artifacts
 of this change. Kernel equivalence has dedicated tests.
 
 `twoStagePredictiveControlTest` checks the two objectives, primary priority,
-affine dynamics with shifted anchors, input bounds, positive-slack reporting,
+affine dynamics with shifted anchors, braking bounds, unrestricted steering,
+positive-slack reporting,
 direct use of finite iteration-limit results, and missing-result failure
 without fallback. Online constraint audits are absent; unmeasured residuals
 and margins remain NaN. `clfNominalRecoveryTest` checks one-step affine

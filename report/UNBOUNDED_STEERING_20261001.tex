@@ -1,0 +1,128 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\setlength{\emergencystretch}{3em}
+\title{Remove Hard Steering Bounds from the Two-Stage Controller}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+\section{Implemented behavior}
+At the user's instruction, steering no longer has an anchor-relative trust
+bound, a configured magnitude bound, or a configured slew constraint.
+The former default restrictions
+\[
+ |\delta_i-\bar\delta_i|\le0.075\ \mathrm{rad},\qquad
+ |\delta_i|\le40^\circ
+\]
+are removed rather than enlarged. Steering-rate restrictions are removed
+from formulation, initialization clipping and terminal-core admissibility.
+The configuration fields \texttt{frontWheelSteeringAngleMaximum} and
+\texttt{frontWheelSteeringRateMaximum} are retired; the existing unknown-field
+policy rejects them. Continuation state version is incremented to 62, and
+the experiment resume contract is updated accordingly.
+
+This change concerns steering. State constraints, the state trust box, braking
+magnitude/domain/slew restrictions and the braking anchor-relative bound
+$|b_i-\bar b_i|\le0.25\,\texttt{trustRadius}$ remain. The existing flow seed
+chooses a steering reference using a tire-slip shaping rule, but this rule
+does not constrain the optimized steering. Terminal membership still requires
+entry into the invariant local core; removing explicit steering limits does
+not remove this terminal condition or the tire model's mathematical domain.
+
+There is still one PCBF solve followed by one CLF solve. The objectives and
+lexicographic allowance are unchanged. No online nonlinear replay, admission,
+retry, input clipping, backup or third solve is added. The vehicle and tire
+model equations are unchanged.
+
+\section{Behavioral regression tests}
+Nine relevant MATLAB test classes pass: 197/197 tests, zero failures and zero
+incomplete tests. Coverage includes the two-stage controller, affine CLF
+recovery, nonlinear model interfaces, terminal continuation, free-pose
+invariance, configuration, source-file budget, moving flow and native-kernel
+agreement. Existing finite-slew tests now exercise braking, and obsolete
+steering-limit options are covered by the configuration's rejection tests.
+
+Two new public-interface regression cases verify that steering can reverse
+away from both the prior applied input and linearization anchor, and can
+exceed the retired 40-degree bound. In a nominal no-target fixture at 8 m/s,
+1-m lateral error, 0.5-rad heading error, and state trust radius 1, the returned
+first steering is approximately $-0.8221$ rad ($-47.10^\circ$). The wider state
+box is a test fixture used to expose the retired steering cap, not a changed
+default. Both stages complete and the affine dynamic equalities hold to the
+declared tolerance. These tests establish the changed input contract, not
+nonlinear closed-loop safety or convergence.
+
+Executed with MATLAB R2026a using \texttt{matlab -singleCompThread -batch}
+and the accompanying \path{methods/tests.m}. No random draws are used.
+
+\section{Saved-frame verification and remaining failures}
+Twenty saved contexts from
+\path{report/ELEVEN_SCENARIO_FAILURE_CAUSES_20261001/}
+were replayed through the revised public controller: eleven late contexts
+and nine earlier recovery/collision contexts. The physical state, previous
+input, target epoch, affine anchor and terminal core were retained. Only the
+continuation version and removed fields in the configuration/context were
+migrated. These are isolated counterfactual calls, not a new complete scenario
+campaign. The underlying simulations use exact observations, known target
+motion, no road constraints, a 6-mm buffer and 50-ms holds.
+
+All three previously infeasible later PCBF frames now return both stage
+results with positive solver flags:
+\begin{center}\small
+\begin{tabular}{r l r r r}
+\toprule
+Speed & Scenario & Time (s) & First steering (rad) & Largest planned $|\delta|$ (rad)\\
+\midrule
+8 & headOn & 2.35 & -0.66514 & 1.35856\\
+8 & brakingLead & 11.40 & 0.67879 & 0.67879\\
+15 & brakingLead & 23.95 & 0.57409 & 2.08453\\
+\bottomrule
+\end{tabular}\end{center}
+The eight 80-s contexts also return two-stage results. They now request
+corrective steering of approximately 0.37--0.43 rad in magnitude rather than
+being confined to the old near-zero edge. The 15-m/s turningCrossing call has
+CLF solver exit $-7$, recorded and returned under the existing direct-output
+contract. None of the eight calls achieves the required affine CLF decay.
+
+Across all twenty calls, nineteen return commands. The 15-m/s headOn context
+at 1.00 s fails during command construction with
+\texttt{invalidTireOperatingPoint}. The solved first input lies outside the
+existing Fiala slip-angle domain $|\alpha|<\pi/2$: a separate formulation
+replay returns steering $2.9911$ rad (about $171.4^\circ$) and front slip
+$-2.9266$ rad, with both solver flags positive. At 0.95 s, the returned
+plan's largest steering magnitude is 9.3093 rad, which cannot be interpreted
+as a valid continuation of that tire model. Future controls still lack their
+own recovery/input objective; removing bounds allows large affine solutions
+without correcting the reference construction or model extrapolation.
+
+The three recovered solver calls illustrate the distinction clearly. Their
+predicted one-step CLF increments are negative, but independent ODE45
+execution gives positive increments of approximately 51.86, 60.00 and 198.06.
+For 8-m/s acceleratingHeadOn at 2.00 s, the revised first steering is
+$-1.6164$ rad, the affine CLF increment is $-43.079$, and the actual increment
+is $+54.780$. This steering-only change is different from the previous
+first-input-box ablation, which also released the braking correction bound.
+It must not be credited with that earlier ablation's actual dissipation.
+
+These measured failures remain unresolved. The change removes the requested
+steering restrictions; it does not establish successful avoidance, model
+validity of all planned inputs, or nominal recovery. The domain failure was
+recorded without adding a new steering cap or changing the tire model to
+accept an undefined operating point.
+
+\section{Evidence and checks}
+The accompanying bundle includes all twenty replay outcomes, regression-test
+results, exploratory no-target probes, executed methods, console exports and
+hashes of the changed source/test files and raw diagnostic inputs. ODE45
+one-hold diagnostics use relative/absolute tolerances $10^{-11}/10^{-12}$.
+They are offline evaluations, excluded from the online algorithm. Diagnostic
+call times are not a controller runtime benchmark. Large MAT captures and
+compiled report PDFs remain outside the repository in the documented cache.
+
+The report was compiled and text extraction checked. Git scope and whitespace
+were reviewed; unrelated estimator/report work and native solver dependencies
+were excluded. Console export formatting removes terminal backspaces and
+trailing whitespace while preserving hashed original logs.
+\end{document}

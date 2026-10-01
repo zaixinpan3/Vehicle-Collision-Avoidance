@@ -177,7 +177,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,61);
+            testCase.verifyEqual(state.version,62);
         end
         function opposingHeadingPreservesExactlyStraightTargetMotion(testCase)
             q=[24;6;pi;2;-1;0;1.6;2.4;.95;0;0];
@@ -236,12 +236,12 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             q=[0;10;0;0;0;-.2;1.6;2.4;.95;0;0];
             testCase.verifyGreaterThan(terminalContinuation.separation(seed,q,[0;0;0;0;4;4],cfg),0);
         end
-        function finiteSlewLimitsUseAppliedInputMemory(testCase)
-            [ego,road,cfg]=localFixture();cfg.model.frontWheelSteeringRateMaximum=.5;
+        function finiteBrakingSlewUsesAppliedInputMemory(testCase)
+            [ego,road,cfg]=localFixture();
             cfg.model.brakingRatioRateMaximum=.5;ego.heldActuatorInput=[0;0];
             [~,plan]=collisionAvoidanceController(ego,[],road,cfg,[]);
             rate=.5*cfg.controller.sampleTime;
-            testCase.verifyLessThanOrEqual(abs(diff([ego.heldActuatorInput,plan],1,2)),rate+cfg.solver.feasibilityTolerance);
+            testCase.verifyLessThanOrEqual(abs(diff([ego.heldActuatorInput(2),plan(2,:)])),rate+cfg.solver.feasibilityTolerance);
             ego=rmfield(ego,'heldActuatorInput');
             testCase.verifyError(@()collisionAvoidanceController(ego,[],road,cfg,[]), ...
                 'collisionAvoidanceController:missingInputMemory');

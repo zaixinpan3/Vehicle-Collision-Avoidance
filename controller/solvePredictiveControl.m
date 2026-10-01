@@ -130,6 +130,7 @@ function anchor=localFlowSeed(model,count)
         else,u=reference.input+reference.gain*deviation;
         end
         u(2)=min(.35,max(-.35,u(2)));u=localClip(u,previous,cfg);
+        % Tire-informed seed shaping does not bound the optimized steering.
         slipLimit=atan(3*tire.longitudinalForceScale(1)*sqrt(1-u(2)^2) ...
             /tire.corneringStiffness(1)*(1-(1-.8)^(1/3)));
         zeroSlip=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
@@ -149,10 +150,11 @@ function [problem,model]=localFormulate(anchor,model)
     rows=cell(1,5*count+3);bounds=cell(size(rows));rowCount=0;
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
-    lower(iu(:))=-repmat(radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
-    inputLower=[-cfg.model.frontWheelSteeringAngleMaximum;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
-    inputUpper=[cfg.model.frontWheelSteeringAngleMaximum;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
-    rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
+    lower(iu(2,:))=-radius*.25;upper(iu(2,:))=radius*.25;lower([is,ic])=0;
+    % Steering has no magnitude, slew or anchor-relative hard bounds.
+    inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
+    inputUpper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
+    rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     initialError=nonlinearBicycleModel.error(model.initialState,model.lane,reference);
     v0=norm(reference.factor*initialError)^2;clfScale=max(v0,1);
@@ -221,10 +223,10 @@ function [problem,model]=localFormulate(anchor,model)
 end
 
 function u=localClip(u,previous,cfg)
-    % Only initialization controls are clipped; optimized controls are returned directly.
-    lower=[-cfg.model.frontWheelSteeringAngleMaximum;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
-    upper=[cfg.model.frontWheelSteeringAngleMaximum;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
-    rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
+    % Only initialization braking is clipped; steering passes through unchanged.
+    lower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
+    upper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)];
+    rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     u=min(upper,max(lower,min(previous+rate,max(previous-rate,u))));
 end
 

@@ -21,7 +21,7 @@ $$M=\min\{M_{\max},N+\lceil T_{\rm completion}/h\rceil\}.$$
 
 It is not increased until a candidate passes a safety test. A usable previous
 affine state/input trajectory is shifted and extended to this length. Otherwise,
-one moving-target flow rollout is constructed, using actuator magnitude and
+one moving-target flow rollout is constructed, using braking-ratio magnitude and
 slew limits. With no target, initialization uses lane feedback. Flow guidance
 is an initialization method, not an executable safety certificate or a second
 controller. No seed bank or branch comparison is performed.
@@ -33,15 +33,20 @@ $$x_{i+1}=f_h(\bar x_i,\bar u_i)
 
 The defect $f_h(\bar x_i,\bar u_i)-\bar x_{i+1}$ is retained explicitly.
 A shifted affine prediction need not itself be a nonlinear rollout. Initial
-state equality uses the new measurement, and slew constraints use the actual
-previous input. Dynamics, tire derivatives, collision directions and tracking
-error derivatives all use this same anchor. Bounds on increments remain fixed
-through both stages; the trust box is never expanded or contracted online.
+state equality uses the new measurement, and braking slew constraints use the
+actual previous input. Dynamics, tire derivatives, collision directions and tracking
+error derivatives all use this same anchor. State and braking-ratio increment
+bounds remain fixed through both stages. Steering has no anchor-relative trust
+bound, magnitude bound or slew constraint. The flow initializer selects a
+tire-informed steering reference; its choice never bounds the optimized steering.
+The two retired steering-limit configuration fields are rejected as unknown
+options. Continuation state version 62 separates this constraint set from older
+plans.
 
 ## Shared constraints and the two objectives
 
 Write the common convex feasible set as $\mathcal F(\bar X,\bar U)$.
-It contains affine dynamics, physical state bounds, actuator magnitude/slew
+It contains affine dynamics, physical state bounds, braking-ratio magnitude/slew
 bounds, sampled affine rectangle-separation rows, the terminal constraints,
 and a relaxed first-step CLF constraint. Road boundaries are excluded.
 

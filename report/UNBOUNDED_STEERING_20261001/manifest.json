@@ -1,0 +1,193 @@
+{
+  "baselineCommit": "e2e6b64833e71695c5d5ee1a244cb2faddc80a8d",
+  "cache": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001",
+  "scope": "Remove hard steering constraints only; retain state/braking restrictions and tire model domain. No successful full-scenario claim.",
+  "source": [
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/config/collisionAvoidanceControllerConfig.m",
+      "sha256": "9aa000a779350738b3bd6ef1d921716a0d3a5dbec74f6721feb4fda2aa9380c4",
+      "bytes": 7291
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solvePredictiveControl.m",
+      "sha256": "1d33f43dadad979d064e7f5c71e1a06d9f5a0e5c741f8aebdfec9d8ee6343dae",
+      "bytes": 16255
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/collisionAvoidanceController.m",
+      "sha256": "4476676b883cff9d17f4647211f20745187c6c8ced6354b0d1fdbb249ff3cd42",
+      "bytes": 9592
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/terminalContinuation.m",
+      "sha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+      "bytes": 27758
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/PCBF_CLF_ARCHITECTURE.md",
+      "sha256": "4ba63597b785f2bf6d67bd67efad3e46794bb1c90668dd8fa5a7fa17a1177e87",
+      "bytes": 8401
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/CONTROLLER_FILES.md",
+      "sha256": "a7f67a66d2de20fbad894886abd1bf0d4a184366846780374b8ce21125af7d4e",
+      "bytes": 2559
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "66ee3923f7656dda02e2b30bdebe90341795d77cb04d9c60f2a68f9f75e2a51f",
+      "bytes": 15491
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/twoStagePredictiveControlTest.m",
+      "sha256": "257268d1a75d7acb4742433466699bc6bd46b780845a6210243cfec9b0f4f2cd",
+      "bytes": 8947
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/nonlinearPredictiveSafetyTest.m",
+      "sha256": "7e98f5384de8398ae5b766aaa105945a829a5faa60be4e5c001533f0b4d34a46",
+      "bytes": 17011
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/freePoseTerminalTest.m",
+      "sha256": "d83c13842d71313297cb2b65af7621b5fe129f86c68879551a48d328d461765b",
+      "bytes": 6109
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/terminalContinuationTest.m",
+      "sha256": "de4b4149d5dbcb9b8a4555b95ca96f73f404060a750231a5b95eef50d27d8608",
+      "bytes": 9412
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/tests/collisionAvoidanceControllerConfigTest.m",
+      "sha256": "2eee9894273d84cb175dc515a18647a6838306b11625f3d7ee50e31b751e087f",
+      "bytes": 9604
+    }
+  ],
+  "raw": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001/probe.log",
+      "sha256": "a4ec488833fb5d1af4629a5993d4a5d4dae014a6e0f9a5b71fb41cd202c08193",
+      "bytes": 1270
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001/wide-state-probe.log",
+      "sha256": "152012563f1cc07474d540bf23484ff61336afcc7e091597425792cb39a7f9b3",
+      "bytes": 514
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001/tests.log",
+      "sha256": "2b533747595a5f95a4d3b732974f7035497df242422f1c0d07bef1f300160dda",
+      "bytes": 42312
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001/replay.log",
+      "sha256": "984ff9b40e5d0ac04568c114fc568448051e7779f9670abb2e6a68c409b66bb3",
+      "bytes": 2490
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001/domain-failure.log",
+      "sha256": "bd8367d466a29dfc5d8eb41f98b88f13c05fe0cfbba99953d9b31703b4c4aa11",
+      "bytes": 137
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001/test-results.mat",
+      "sha256": "802941397be94822e87c0cfdb0ddfc0a5c031da290d2cd8e135459bd9895a955",
+      "bytes": 14070
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/unbounded-steering-20261001/late-replay.mat",
+      "sha256": "3b51498bfcf4bcf676e9caa1562537dd7c5d4192d4a684e7870d72eaa20a5e78",
+      "bytes": 2634
+    }
+  ],
+  "exports": [
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/domain-failure.json",
+      "sha256": "5e9e11184f40e34850606fcfefc7c74d5256d60933f3d0436dbe90696d405ea8",
+      "bytes": 213
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/logs/domain-failure.log",
+      "sha256": "bd8367d466a29dfc5d8eb41f98b88f13c05fe0cfbba99953d9b31703b4c4aa11",
+      "bytes": 137
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/logs/probe.log",
+      "sha256": "a4ec488833fb5d1af4629a5993d4a5d4dae014a6e0f9a5b71fb41cd202c08193",
+      "bytes": 1270
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/logs/replay.log",
+      "sha256": "984ff9b40e5d0ac04568c114fc568448051e7779f9670abb2e6a68c409b66bb3",
+      "bytes": 2490
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/logs/tests.log",
+      "sha256": "1935fe404f078173380c39c03b440a3590492c65c7198f455e79e56dc27571d7",
+      "bytes": 42308
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/logs/wide-state-probe.log",
+      "sha256": "152012563f1cc07474d540bf23484ff61336afcc7e091597425792cb39a7f9b3",
+      "bytes": 514
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/methods/domainFailure.m",
+      "sha256": "51cdc488d27b2d26791f8de050dc420decd5b669e2a045aea257153111620e31",
+      "bytes": 1113
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/methods/probe.m",
+      "sha256": "4500a44fd2fedfe2e4ec0050763fcb39b8e1e414da8ea35cd8a3545e27b8eb17",
+      "bytes": 1254
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/methods/replay.m",
+      "sha256": "d6953bcd1fb7d56877ee76648c5e6d3a90c38e4105aac3a0a2004ac28be51996",
+      "bytes": 3225
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/methods/tests.m",
+      "sha256": "eaf0283e2203db520361605d4fbe9db9aa4f634094b2169a8dad2b2b0525b743",
+      "bytes": 955
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/methods/wideStateProbe.m",
+      "sha256": "e2231e39a9a2b030e3a6f8f4338c683d02dfaeccb7880dce16c7b182cb008605",
+      "bytes": 1294
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/probe.json",
+      "sha256": "7b141269d09ec88b691e963d69cf7f5ba2996d8926ae46bcdd2803f93e8ba807",
+      "bytes": 2020
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/replay.json",
+      "sha256": "f0f25c9191d41889cee7250d1ffb36b1061c4058ec3eeeca840380c158f3b9da",
+      "bytes": 10438
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/test-results.json",
+      "sha256": "be6977162a1e4a5d95af4663e8c96ba7299d7b4a0cec44981eb89806c5a65cf4",
+      "bytes": 21108
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/report/UNBOUNDED_STEERING_20261001/wide-state-probe.json",
+      "sha256": "22ee6e67303f6bf3a3602fcb65166b4726b0d4a4bc52491720a3cbfc70aa7eaf",
+      "bytes": 811
+    }
+  ],
+  "inputs": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/problems.mat",
+      "sha256": "3da3302d3ed344cc5556058dfbf059e46ec225e2219986798bba782deeb4d7aa",
+      "bytes": 337755337
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/eleven-failure-causes-20261001/early-problems.mat",
+      "sha256": "cb095fc8503a4bebf6d6c94cd40fa639d81d5b08ba71c95faa7e63ef5bf28d6e",
+      "bytes": 705226
+    }
+  ]
+}

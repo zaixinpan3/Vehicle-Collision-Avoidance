@@ -50,11 +50,10 @@ classdef terminalContinuation
                 inputBound=radius*(vecnorm(gain*inverse,2,2)+vecnorm(gain,2,2)*inverseError);
                 difference=gain-[zeros(2,6),eye(2)];
                 slewBound=radius*(vecnorm(difference*inverse,2,2)+vecnorm(difference,2,2)*inverseError);
-                low=[-cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMinimum];
-                high=[cfg.model.frontWheelSteeringAngleMaximum;cfg.actuation.brakingRatioMaximum];
-                rate=cfg.controller.sampleTime*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
-                admissible=all(reference.input-inputBound>low) && all(reference.input+inputBound<high) ...
-                    && all(slewBound<rate) && domain && centerDomain;
+                admissible=reference.input(2)-inputBound(2)>cfg.actuation.brakingRatioMinimum ...
+                    && reference.input(2)+inputBound(2)<cfg.actuation.brakingRatioMaximum ...
+                    && slewBound(2)<cfg.controller.sampleTime*cfg.model.brakingRatioRateMaximum ...
+                    && domain && centerDomain;
                 if admissible && gamma<1 && drift<(1-gamma)*radius
                     seed.radius=radius;seed.errorBound=radius*unit;
                     seed.contractionBound=gamma;seed.defectBound=drift;

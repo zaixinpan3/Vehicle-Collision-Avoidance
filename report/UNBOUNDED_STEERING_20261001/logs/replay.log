@@ -1,0 +1,20 @@
+REPLAY 8 headOn 2.35 returned=1 flags=[1  1] input=[-0.66514    0.091322] maxSteer=1.35856 rho=4.24495e-05 failure=
+REPLAY 8 acceleratingHeadOn 80.00 returned=1 flags=[1  1] input=[-0.42975    0.012621] maxSteer=0.429748 rho=104875 failure=
+REPLAY 8 brakingLead 11.40 returned=1 flags=[1  1] input=[0.67879    -0.24852] maxSteer=0.678793 rho=9.49864e-06 failure=
+REPLAY 8 turningCrossing 80.00 returned=1 flags=[1  1] input=[0.43129    0.012667] maxSteer=0.431289 rho=73621.3 failure=
+REPLAY 8 curvedCrossing 80.00 returned=1 flags=[1  1] input=[0.4331    0.012795] maxSteer=0.433101 rho=48620.7 failure=
+REPLAY 15 headOn 80.00 returned=1 flags=[1  1] input=[-0.37379    0.013491] maxSteer=0.373788 rho=347239 failure=
+REPLAY 15 acceleratingHeadOn 80.00 returned=1 flags=[1  1] input=[-0.37548    0.024163] maxSteer=0.375485 rho=349466 failure=
+REPLAY 15 brakingLead 23.95 returned=1 flags=[1  1] input=[0.57409    -0.28292] maxSteer=2.08453 rho=3.169e-05 failure=
+REPLAY 15 crossing 80.00 returned=1 flags=[1  1] input=[0.41754    0.040944] maxSteer=0.417542 rho=252102 failure=
+REPLAY 15 turningCrossing 80.00 returned=1 flags=[1 -7] input=[0.37711    0.024447] maxSteer=0.377106 rho=341358 failure=
+REPLAY 15 curvedCrossing 80.00 returned=1 flags=[1  1] input=[0.37657    0.011104] maxSteer=0.376565 rho=99768.1 failure=
+REPLAY 8 acceleratingHeadOn 2.00 returned=1 flags=[1  1] input=[-1.6164   -0.086801] maxSteer=1.69047 rho=2.40282e-06 failure=
+REPLAY 8 acceleratingHeadOn 5.00 returned=1 flags=[1  1] input=[-0.39621   -0.015401] maxSteer=0.396212 rho=472.049 failure=
+REPLAY 8 acceleratingHeadOn 10.00 returned=1 flags=[1  1] input=[-0.42891   0.0047733] maxSteer=0.428913 rho=1808.45 failure=
+REPLAY 15 headOn 0.95 returned=1 flags=[1  1] input=[0.83795  -0.0065202] maxSteer=9.30931 rho=232.847 failure=
+REPLAY 15 headOn 1.00 returned=0 flags=[] input=[] maxSteer=NaN rho=NaN failure=collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+REPLAY 15 headOn 1.05 returned=1 flags=[1  1] input=[0.13027    0.023977] maxSteer=2.51951 rho=261.057 failure=
+REPLAY 15 acceleratingHeadOn 0.90 returned=1 flags=[1  1] input=[-0.47461    -0.10657] maxSteer=5.23301 rho=224.414 failure=
+REPLAY 15 acceleratingHeadOn 0.95 returned=1 flags=[1  1] input=[0.4122    0.011552] maxSteer=7.33418 rho=248.793 failure=
+REPLAY 15 acceleratingHeadOn 1.00 returned=1 flags=[1  1] input=[-0.10624    -0.11922] maxSteer=3.65007 rho=188.428 failure=

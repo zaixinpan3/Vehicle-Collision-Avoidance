@@ -22,6 +22,7 @@ end
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
+    % trustRadius scales state and braking-ratio increments, not steering.
     cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
         'trustRadius',.5, ...
         'recoveryHorizonSeconds',3,'clfDecay',.01);
@@ -37,7 +38,6 @@ function cfg=localDefaults()
         'rollingCoefficient',.01,'rollingSpeedCoefficient',0,'rollingQuarticCoefficient',0, ...
         'rollingTransitionSpeed',.5);
     cfg.model=struct('speedMinimum',0,'speedMaximum',18,'scheduleSpeedFloor',1, ...
-        'frontWheelSteeringAngleMaximum',deg2rad(40),'frontWheelSteeringRateMaximum',Inf, ...
         'brakingRatioRateMaximum',Inf,'lateralVelocityMaximum',12,'yawRateMaximum',5);
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
@@ -101,16 +101,14 @@ function localValidate(cfg)
     end
     if cfg.roadLoad.rollingTransitionSpeed<=0,localInvalid('Rolling transition speed must be positive.');end
     validateattributes(cfg.model.speedMinimum,{'double'},{'scalar','real','finite','nonnegative'});
-    for name=["speedMaximum","scheduleSpeedFloor","frontWheelSteeringAngleMaximum", ...
+    for name=["speedMaximum","scheduleSpeedFloor", ...
             "lateralVelocityMaximum","yawRateMaximum"]
         validateattributes(cfg.model.(name),{'double'},{'scalar','real','finite','positive'});
     end
     if cfg.model.speedMaximum<=max(cfg.model.speedMinimum,cfg.model.scheduleSpeedFloor)
         localInvalid('The positive-speed model domain must have positive width.');
     end
-    for name=["frontWheelSteeringRateMaximum","brakingRatioRateMaximum"]
-        validateattributes(cfg.model.(name),{'double'},{'scalar','real','positive'});
-    end
+    validateattributes(cfg.model.brakingRatioRateMaximum,{'double'},{'scalar','real','positive'});
     for name=string(fieldnames(cfg.clf)).'
         validateattributes(cfg.clf.(name),{'double'},{'scalar','real','finite','positive'});
     end
