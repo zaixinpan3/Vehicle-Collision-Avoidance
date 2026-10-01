@@ -1,0 +1,145 @@
+{
+  "targetOrbitCenter": [
+    44.81333722324762,
+    -1.7763568394002505e-15
+  ],
+  "targetCenterOrbitRadius": 32.01333722324762,
+  "targetBodyOuterRadius": 33.16542755726586,
+  "coreRadius": 0.0001220703125,
+  "requiredHolds": 68,
+  "originalSuccessorDiscrepancy": [
+    {
+      "frame": 2,
+      "difference": [
+        -1.564193219394383e-12,
+        -1.0279200721944465e-10,
+        -1.8875417668760483e-09,
+        -6.390044049453536e-10,
+        2.5416599668676154e-08,
+        6.299599776549147e-08
+      ],
+      "infinityNorm": 6.299599776549147e-08
+    },
+    {
+      "frame": 3,
+      "difference": [
+        -2.4503621354199367e-11,
+        -3.3889564375264025e-10,
+        3.497107518282347e-09,
+        -1.6083561149571324e-09,
+        -5.174905245985961e-08,
+        -1.1407479326430714e-07
+      ],
+      "infinityNorm": 1.1407479326430714e-07
+    },
+    {
+      "frame": 4,
+      "difference": [
+        -9.80857617349784e-11,
+        1.5582791151186326e-09,
+        -2.4119448998813353e-09,
+        -2.4505029116994592e-09,
+        5.918069978516627e-09,
+        4.006771295306244e-08
+      ],
+      "infinityNorm": 4.006771295306244e-08
+    },
+    {
+      "frame": 5,
+      "difference": [
+        -2.4153923305902936e-10,
+        -1.615388999648415e-09,
+        3.0486147790248497e-09,
+        -6.746856406891766e-09,
+        -1.0019410145306606e-08,
+        -3.2486493162318247e-07
+      ],
+      "infinityNorm": 3.2486493162318247e-07
+    }
+  ],
+  "baseCommit": "16649e23d948672e4d3c04132d256afce6f41f08",
+  "scope": "Read-only reproduction of current fluid-flow seeds and terminal admission gates; no production changes.",
+  "selectedFlow": {
+    "side": -1,
+    "holds": 216,
+    "seconds": 0.153186,
+    "hard": 0,
+    "safety": 0,
+    "intervalCertified": true,
+    "initialClfSlack": 1.1994339752192968,
+    "minimumPredictionMargin": 0.7572966013865019,
+    "minimumNodeDistance": 0.7692948792215232
+  },
+  "firstCoreAdmission": {
+    "hold": 93,
+    "time": 4.65,
+    "membership": -3.649396101521942e-09,
+    "separation": -29.54783447665932,
+    "actualEndpointDistance": 24.97170895109028,
+    "state": [
+      29.529433258432352,
+      0.21479763038679206,
+      -0.43204911054009354,
+      8.000011939717803,
+      -7.462745280501955e-10,
+      9.061602158261841e-11
+    ],
+    "corePose": [
+      29.529434866782765,
+      0.21479688872533018,
+      -0.4320491105361912
+    ]
+  },
+  "firstJointTerminalAdmission": {
+    "hold": 216,
+    "time": 10.8,
+    "membership": -1.4901161193847656e-08,
+    "separation": 0.020179081423532627,
+    "actualEndpointDistance": 45.44366655699761,
+    "state": [
+      74.20842861454237,
+      -20.38684200690538,
+      -0.4320491105351453,
+      8.000000000000018,
+      -1.1188176914300302e-25,
+      1.4831956711404503e-26
+    ],
+    "corePose": [
+      74.20842861454237,
+      -20.38684200690538,
+      -0.4320491105351453
+    ]
+  },
+  "additionalGeometricWaitSeconds": 6.15,
+  "selectedFlowEndState": [
+    74.20842861454237,
+    -20.38684200690538,
+    -0.4320491105351453,
+    8.000000000000018,
+    -1.1188176914300302e-25,
+    1.4831956711404503e-26
+  ],
+  "alternativeDiagnosticFlow": {
+    "side": 1,
+    "holds": 204,
+    "seconds": 0.098112,
+    "hard": 2.308034699812111,
+    "safety": 0,
+    "intervalCertified": false,
+    "initialClfSlack": 0.8191666446357471,
+    "minimumPredictionMargin": -2.308034699812111,
+    "minimumNodeDistance": 0
+  },
+  "matchedOriginalInitializationFields": [
+    "movingTargetFlow",
+    "216 holds",
+    "CLF slack 1.1994339752192968"
+  ],
+  "interpretationLimits": [
+    "The 10.8 s endpoint belongs to this selected seed; it is not a proven minimal feasible prediction horizon.",
+    "A negative sufficient geometric certificate is not proof of simultaneous collision.",
+    "The opposite-bias flow seed is a diagnostic candidate only; its future sampled collision makes it inadmissible despite its earlier endpoint.",
+    "Original frame-5 QP call-by-call causes are not saved; integrator mismatch and first-input correction are code-level triggers, not a recovered individual call trace.",
+    "The seed endpoint lateral displacement is a planned initialization state, not executed vehicle displacement."
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "baseCommit": "16649e23d948672e4d3c04132d256afce6f41f08",
+  "kind": "Source and diagnostic artifact hashes; no weekly or monthly report hashes",
+  "productionSources": [
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "aeb41b0f8c8d8d9fec724c53be9fbb75fa3993c2b5457d564cf1314dd7c27ea1"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "cea3e6ea542a179a67c81bd4b87c7804b3706f8dd7c41419a8ee9d733b5a5be2"
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256": "a005f337ae1ae4ac75ddf212e0a15f09ffd6765cce99a12b241725342e7e1567"
+    },
+    {
+      "path": "scripts/collisionThreatScenario.m",
+      "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310"
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "f3d977cb3aa0197fa56628f46b01198ec83877888cff1701c07019a39b1a2746"
+    }
+  ],
+  "externalDiagnosticArtifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001/probe.m",
+      "sha256": "1358c316f0672675037f7be2a1ace102341975bfa4502ee17c073851c60710b3"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001/flowTailInternals.m",
+      "sha256": "64ce2a2c99bc312253aafd1eb4accc56bfd45536b622bb1ebf67e0629f4e145a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001/source.json",
+      "sha256": "274f670dc5a7f2464a174e1a2354da49c2394d24ded225f93600bf4c92bc8744"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001/probe-results.json",
+      "sha256": "eb03bed043154d6b8edcbb7ad617d68f7313ca48e6aec397f63148f7cdf88a36"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001/probe.mat",
+      "sha256": "cd37a84b56d1d4fbf728eaccbb089981c196990d9a4981910a9c640fb689731f"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001/probe.log",
+      "sha256": "a295290eeb2d4cfc4e2e206ddd82f3e1cd929befe07a2f44d212805e289e914e"
+    }
+  ],
+  "bundleArtifacts": [
+    {
+      "path": "report/FLOW_TERMINAL_TAIL_DIAGNOSIS_20261001/REPRODUCTION.txt",
+      "sha256": "9f6353fa38f71c50d01404b0240a8c729f38fa414f14d51cc65f6d3cb10bff29"
+    },
+    {
+      "path": "report/FLOW_TERMINAL_TAIL_DIAGNOSIS_20261001/summary.json",
+      "sha256": "026e6b1716d4cdd695ac6853782acce2ee180a66bd92b3612fff15d01644e37f"
+    },
+    {
+      "path": "report/FLOW_TERMINAL_TAIL_DIAGNOSIS_20261001/terminal-gates.csv",
+      "sha256": "be3d552899add63fcc945fdb12fe5ce9234e00a4079db9570d1e2fdd6e83bc47"
+    }
+  ]
+}

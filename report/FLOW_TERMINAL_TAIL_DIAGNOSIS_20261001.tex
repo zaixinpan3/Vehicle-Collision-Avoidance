@@ -1,0 +1,118 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\title{Why the Flow Seed Produces a Long Optimized Completion Tail}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Finding}
+The selected flow seed is already a fully admitted avoidance trajectory. The
+long tail is primarily caused by its late admission under the current sufficient
+all-future geometric certificate, then retained as a large optimization horizon.
+The seed is useful for safety feasibility but is not simultaneously a good
+nominal-recovery trajectory. Multiple solver calls also arise from the current
+CLF/correction sequence; their count is not a count of failed flow initializations.
+
+A diagnostic dispatcher exposes the current, unmodified local functions of
+\path{controller/solvePredictiveControl.m} outside the production tree. At the
+original 8-m/s \texttt{turningCrossing} initial state, its selected side-$-1$
+flow has 216 holds and initial CLF slack 1.1994339752192968, matching the saved
+original initialization. It takes 0.153186 seconds to generate in this probe,
+excluding construction of the cached terminal core. Complete evaluation gives
+zero hard residual, zero safety slack and all nominal interpolation intervals
+certified. The minimum evaluated prediction collision margin is 0.757297 m.
+This is a prediction result, not a continuous-plant certificate.
+
+\section{Which terminal requirement keeps the seed growing?}
+The minimum requested length is 68 holds, or 3.4 seconds: eight prefix holds
+plus the existing three-second completion allowance. The seed grows until both
+its intrinsic terminal-core membership and its all-future separation test pass.
+The measured gates along this one selected seed are:
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+Time (s) & Hold & Core residual & Geometry margin (m) & Current gap (m) \\
+\midrule
+3.40 & 68 & 12.717761 & -30.154361 & 18.972105 \\
+4.65 & 93 & $-3.6494\,10^{-9}$ & -29.547834 & 24.971709 \\
+10.75 & 215 & $-1.4901\,10^{-8}$ & -0.373690 & 44.518837 \\
+10.80 & 216 & $-1.4901\,10^{-8}$ & 0.020179 & 45.443667 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Negative core residual means membership is satisfied. Its first admission is
+at 4.65 seconds, while all-future geometry first passes at 10.80 seconds.
+Thus, along this seed, an additional 6.15 seconds after core entry is caused
+by the geometric certificate. The core itself is small: its dimensionless
+weighted radius is 0.0001220703125, not a physical distance.
+
+The target has constant sideslip 0.05 rad and acceleration 1 m/s$^2$, so its
+center follows a fixed circle even as its angular speed changes. The circle is
+centered at approximately $(44.813337,0)$ m, with radius 32.013337 m. The current
+straight-terminal branch encloses the complete target body orbit in a disk of
+radius 33.165428 m and requires the entire future ego ray, with body/core
+padding, to avoid that disk. It discards simultaneous timing and also fills
+the orbit's interior. A large actual same-time gap therefore does not make this
+sufficient test pass. Failure of this lower bound is not proof of a collision.
+
+The seed's first accepted endpoint fixes its array length. Later calls shift
+that array by one hold, so 216 becomes 212 at frame 5. The sequential programs
+use \texttt{size(anchor,2)}; they do not minimize horizon length or search all
+earlier truncations of an improved plan. The 10.8-second seed endpoint is not
+a proof that every feasible maneuver needs 10.8 seconds. Optimizing every
+input in that continuation on every frame is an implementation choice, not
+by itself a requirement of recursive-feasibility theory.
+
+\section{What the flow initialization does and does not provide}
+The initializer follows temporary moving-flow guidance, then switches its
+internal rollout to straight terminal-trim feedback. The terminal pose is free;
+its policy need not point along the given path. For the selected seed, heading
+settles near $-24.7546^\circ$. Its 10.8-second endpoint has lateral position
+$-20.386842$ m. This is the \emph{initial planned tail}, not the executed
+closed-loop vehicle trajectory. The completed campaign subsequently optimizes
+and recovers nominal behavior.
+
+Consequently, the seed is good enough to bypass safety restoration but still
+leaves substantial work for the CLF and nominal tracking objectives. The
+initialization problem, the terminal certificate and the dissipation objective
+are not computationally well aligned. A diagnostic opposite-bias seed ends at
+204 holds but has a sampled future collision and hard residual 2.308035;
+it is not an admissible shorter substitute. The original algorithm stops seed
+screening after the first admitted seed, so this second seed was evaluated only
+for the diagnosis. No new online maneuver mode was added.
+
+\section{Why several optimizations remain}
+Original frame 5 uses the shifted previous solution, not a newly generated
+flow seed. Its seven numerical calls comprise four feasibility-correction QPs
+and three CLF-related SOCPs, as established in
+\path{CLF_SLOW_FRAME_20261001.tex}. The three conic calls try zero CLF relaxation,
+then minimize positive relaxation after that local slice is infeasible, then
+refine predictive cost while fixing the minimizing first input. Safety slack
+is already zero, but final CLF slack remains 4.555671. Continuing CLF work is
+consistent with the intended hierarchy.
+
+The correction machinery exists because changing the first input changes the
+entire nonlinear suffix. A shifted plan must also be reevaluated when the
+measured state differs from its prediction. In the independent ODE45 experiment,
+frame 5 differs from the preceding RK4 successor by only about $1.6\,10^{-9}$ m
+in position and $3.25\,10^{-7}$ rad/s in yaw rate. This is integrator discrepancy,
+not simulated observation error. The implementation's exact-equality check
+therefore does not reuse the exact shifted cache. Long open-loop propagation
+and a small terminal core can amplify sensitivity, and feasibility repair may
+be needed after CLF changes. Original per-QP cause/timing records were not saved,
+so this diagnosis does not assign all four QPs solely to that discrepancy.
+
+The current organization repeatedly improves the first input, repairs later
+controls, and resolves a large conic problem. A better seed can reduce that
+work, but cannot by itself remove the conservative endpoint geometry or the
+fixed inherited horizon. The design issues are the strong geometric closure,
+the seed's off-path terminal continuation, and repeated processing of all tail
+inputs. Future simplification must preserve a valid time-aligned continuation
+certificate; simply deleting the tail after the first encounter is not justified
+for this recurring circular-target fixture. Production algorithms, constraints
+and stopping rules were not changed during this diagnosis.
+\end{document}

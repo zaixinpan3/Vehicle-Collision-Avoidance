@@ -1,0 +1,41 @@
+Flow and terminal-tail diagnosis -- October 1, 2026
+
+Production source: 16649e23d948672e4d3c04132d256afce6f41f08
+Raw directory: /home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001
+Original first-five-frame data:
+  /home/zai/.cache/collisionAvoidance/slow-frame-20261001/original-frames.json
+
+Prepared flowTailInternals.m by copying all unmodified local functions from
+controller/solvePredictiveControl.m and adding a dispatcher for localSeed,
+localFlowSeed and localNominalEvaluation. The wrapper and probe remain outside
+production. source.json records the production source hash.
+
+Executed:
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/flow-tail-diagnosis-20261001/probe.m')"
+
+The probe uses the original turningCrossing fixture, 8 m/s, eight prefix holds,
+50-ms control interval, default 5-ms RK4 mesh, exact target motion and no road
+constraints. It constructs the same initial model, evaluates each existing flow
+bias for diagnosis and checks terminal membership/separation at every prefix
+endpoint. It also compares original measured states to RK4 successors under the
+original preceding issued controls. No observer/noise or random draw is added.
+
+Checks:
+- Selected flow length 216 and initial CLF slack exactly match the original
+  first-frame trace; complete evaluation has hard=safety=0 and all intervals
+  certified.
+- First terminal-core admission at hold 93 (4.65 s); first joint terminal
+  admission at hold 216 (10.8 s), a 6.15-s additional geometric requirement
+  along this seed. Earlier membership and separation signs are preserved.
+- Opposite-bias flow is not presented as a successful alternative: it contains
+  a future sampled collision and positive hard residual.
+- Unmodified local-function text and production source hashes verified.
+- English technical report compiled twice and inspected.
+No full controller test suite was rerun: no production algorithm was edited.
+
+summary.json contains compact findings and explicit limitations.
+terminal-gates.csv retains all 420 endpoint gate measurements from the two
+seeds. Full states, target geometry, snapshots and commands are in probe-results.json,
+probe.mat and probe.m outside the repository. Timing of flow generation excludes
+terminal-core construction and should not be compared to complete controller
+call time. Original frame-5 per-QP causes remain unavailable.
