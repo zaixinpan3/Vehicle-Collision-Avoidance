@@ -1,0 +1,484 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,longtable,array,xurl,hyperref,upquote}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\setlength{\emergencystretch}{3em}
+\title{Auditing the NRMM Estimator Improvement\newline Against Sharma, Alai and Rajamani (2026)}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{September 30, 2026}
+\begin{document}
+\maketitle
+
+\section{Finding}
+The current estimator is a useful \emph{structural and maneuvering} improvement,
+but the evidence does not support uniformly superior estimation accuracy.
+After independent scenario-specific baseline tuning, it wins target-speed
+RMSE in three of six scenarios, relative-position RMSE in two of six, and
+course RMSE in five of six over the declared post-2-second window. Including
+the prescribed initialization transient, it has lower full-run speed RMSE in
+all six scenarios. It is substantially better during ego braking and
+weaving, while the reference is better on several steady-motion metrics.
+Giving both target observers exact ego inputs and the same injection gains
+nearly removes the difference. Additional GNSS velocity information and gain
+selection must therefore be separated from claims about the target algorithm.
+
+
+\section{Research question and evidence provenance}
+Does the current estimator improve on the NRMM multistage observer in
+G.~Sharma, H.~Alai and R.~Rajamani, \emph{Simultaneous ego-vehicle state
+estimation and vehicle trajectory tracking using a multistage high gain
+observer}, Transportation Research Part C 182 (2026), 105411,
+\href{https://doi.org/10.1016/j.trc.2025.105411}{doi:10.1016/j.trc.2025.105411}?
+The supplied local PDF was read, including Sections 2--4 and the conclusion;
+the university publication record independently confirms its identity.
+The experiment concerns the paper's NRMM observer, not its InMM or older RMM
+comparators. The paper evaluates a full-scale Chrysler Pacifica with GPS,
+IMU and radar. Its original vehicle recordings and executable implementation
+were not available here; the data-availability statement offers data on
+request. No author was contacted.
+
+Material passport: academic-research-suite, experiment-agent run/validate
+workflow; preparation date September 30, 2026; source is an existing local
+paper reproduction plus the unchanged production estimator. This is a new
+synthetic benchmark and a reproducibility audit, not a reproduction of the
+paper's road experiment. The pre-existing September 24 comparison and source
+files were present as uncommitted work at intake. This task audited and
+extended those sources; it did not newly create every baseline component.
+
+\section{What changed algorithmically}
+The target assumption is retained: constant scalar acceleration $A$, constant
+sideslip $\beta_C$ (equivalently constant curvature
+$\kappa=\sin\beta_C/l_{r,C}$), and strictly positive target speed.
+The new coordinates are
+\[
+ \rho=R_E^T(p_C-p_E),\quad q=R_E^T v_C,\quad s=R_E^T a_C,\qquad
+ J=\begin{bmatrix}0&-1\\1&0\end{bmatrix}.
+\]
+The implemented model satisfies
+\begin{align*}
+ \dot\rho&=q-v_E-\omega_EJ\rho, &
+ \dot q&=s-\omega_EJq, &
+ \dot s&=\Phi(q,s)-\omega_EJs,\\
+ \Phi&=-\Omega^2q+3A\Omega Jq/\|q\|, &
+ A&=q^Ts/\|q\|, &
+ \Omega&=(Jq)^Ts/\|q\|^2.
+\end{align*}
+This is a coordinate reformulation of the retained physical target model,
+not a new motion model. Unlike differentiating relative position repeatedly,
+it needs neither ego acceleration derivatives nor ego angular acceleration.
+It directly addresses the zero-ego-jerk limitation identified in the original
+paper's concluding paragraph.
+
+The ego velocity stage now estimates two body-frame components from GNSS
+velocity magnitude, accelerometer and gyro readings. It uses a forward-motion
+cone and a bounded single-track mismatch
+$\omega_E=v_{E,y}/l_E+d_{\rm st}$, rather than deriving inertial velocity
+and acceleration from GPS position. A parallel yaw estimate is used only
+for inertial outputs. Thus yaw error does not feed back into the eight-state
+body-velocity/target core. The full implementation also maintains position,
+yaw, predictors, orientation sets and error-bound histories; eight is not
+its total software-state count.
+
+\begin{longtable}{@{}p{0.20\linewidth}p{0.35\linewidth}p{0.37\linewidth}@{}}
+\toprule
+Aspect & Sharma NRMM reproduction & Current estimator \\
+\midrule
+Target coordinates & $[r_x,\dot r_x,\ddot r_x,r_y,\dot r_y,\ddot r_y]$ & $[\rho;q;s]$ in ego coordinates \\
+Ego information & GPS position and gyro for the six-state chain; IMU for yaw/target reconstruction & GNSS velocity, IMU and gyro for body velocity; position is a separate output \\
+Ego derivative assumption & $\dot a_x=\dot a_y=\dot\omega_E=0$ in the model derivation & Not needed by the covariant core \\
+Additional premises & Acceleration/course heading reconstruction must be informative & Forward cone, calibrated sensors and a quantified single-track mismatch \\
+Yaw coupling & Yaw rotates ego velocity into target dynamics & Yaw affects inertial outputs only \\
+Target nonlinearity & Positive-speed rational map; reproduction uses a 1 m/s numerical floor & Globally Lipschitz extension equal to the model on its declared domain \\
+Certificate & Theorem 1 high-gain condition; eq.~(73) treats yaw rates as fixed parameters & Structured velocity/acceleration sensitivities and a two-stage continuous ISS comparison \\
+\bottomrule
+\end{longtable}
+
+Removing derivative assumptions while adding sensor and kinematic premises is
+not an unconditional weakening of every assumption. Also, Section 8 of
+\path{estimator/OBSERVER_ISS_THEORY.md} compares the current certificate with
+an earlier yaw-mediated repository design, not directly with Sharma's
+Theorem 1. That inequality alone cannot prove that this implementation has
+uniformly lower RMSE than the paper.
+
+\section{Baseline fidelity and disclosed implementation choices}
+The existing reproduction was checked against eqs.~(26)--(33), (34)--(39),
+and (47)--(73). Its normalized LMI minimizes $\lambda_{\max}(P)$ with
+$P\succeq I$ and $\lambda=1$; the paper specifies no objective or numerical
+gains. ``Certified'' below means $\theta=1.1\max(1,\theta_0)$ using the
+printed threshold, not certification of the sampled simulation. ``Matched''
+matches the slowest real pole with the current observer; that does not match
+all poles or the noise transfer function.
+
+The yaw stage uses a signed angle between estimated inertial acceleration
+and measured body acceleration, with course fallback if its estimated
+acceleration is too small. Direct visual inspection of PDF page 7 confirms
+that printed eq.~(34) lacks the normalization needed for a dimensionless
+cosine and uses an unsigned inverse cosine. The signed \texttt{atan2}
+implementation repairs these issues; it is not algebraically identical to
+the printed expression. Gyro/acceleration thresholds are 0.05 rad/s and
+0.5 m/s$^2$, combined by an OR of magnitude tests. These values and the
+precise switching convention are reproduction choices, not recovered author
+settings. GPS-chain acceleration is a second derivative of position; the
+older comparison report's ``third derivative'' description was inaccurate.
+
+Differentiating the companion map under Assumption 1 exposes an omitted
+$\omega_EJ\dot v_E$ term in printed eqs.~(62)--(63). The existing finite
+difference test independently compares it with an exact physical trajectory.
+Both printed and corrected versions are retained in this audit. This is a
+formula-level finding; it does not establish what the authors' unavailable
+software actually implemented.
+
+Two sampled realizations are retained: zero-order-held positions and an
+intersample output predictor. IMU and gyro samples are held over a frame.
+RK4 uses at most 5 ms steps and an additional fastest-pole limit for the
+Sharma runtime. Acceleration-chain states start at zero. Every method starts
+from the same physical position/velocity/target initialization offsets.
+
+\section{Protocol fixed before held-out evaluation}
+Six open-loop geometries cover straight oncoming motion, curved crossing,
+curved following, braking with a swerve, near-zero relative velocity, and
+ego weaving. The target obeys the original Sharma model in every case.
+Four cases have constant ego body velocity/yaw rate; swerve and weaving
+deliberately violate the original zero-derivative assumption. Durations
+are respectively 6, 6, 12, 6.5, 12 and 12 s. No avoidance controller is run.
+
+Sensor draws are identical for all methods in each seed: bounded uniform
+noise with vector-norm maxima 0.12 m for GPS position and radar position,
+0.02 m/s for GNSS velocity, 0.05 m/s$^2$ for acceleration, and 0.002 rad/s
+for gyro. Two-component draws are scaled by $1/\sqrt2$. This evaluates the
+repository's sensor contract. The paper instead lists 10 Hz GPS, 100 Hz IMU
+and gyro, and 20 Hz radar; neither our synchronized 50 Hz nominal case nor
+our synchronized 20 Hz stress case recreates that asynchronous sensor suite.
+The IMU specifications in the paper are not interchangeable with the
+deterministic noise maxima used here.
+
+\paragraph{Training/test separation.}
+The baseline gets 54 alternatives: the prior LMI gain shape or normalized
+repeated-pole gains $(3,3,1)$; independent ego and target slow rates
+$\{1.5,3,6\}$ s$^{-1}$; yaw gains $\{0.1,1,3\}$ s$^{-1}$.
+All retain the paper's model and measurement choices, and use the output
+predictor. Empirical alternatives do not claim the nonlinear high-gain
+threshold. One \emph{global} candidate is selected using only training
+seeds 101--102 on all six scenarios, minimizing the mean of
+\[
+ \frac{\mathrm{RMSE}_{\rho}}{0.1\,\mathrm m}
+ +\frac{\mathrm{RMSE}_{V_C}}{0.5\,\mathrm{m/s}}
+ +\frac{\mathrm{RMSE}_{\gamma_C}}{5\,\mathrm{deg}}.
+\]
+A failed training run incurs infinite loss. No scenario-specific or
+metric-specific best baseline is selected after seeing test data. Nominal
+test seeds are 201--220. This separates noise realizations, not scenario
+geometries: no claim of generalization to unseen roads follows.
+
+A supplemental sensitivity analysis additionally selects one candidate per
+scenario using the \emph{same training rows and objective}, writing all six
+selections before its test trials. It gives the baseline knowledge of its
+scenario and tests whether the global tuning restriction affects the verdict.
+This extension was specified during the main campaign after early test
+results were visible; the selection computation uses no test errors. Its
+results are exploratory robustness evidence, not a preregistered confirmation.
+The old matched baseline and the scenario-tuned baseline also receive a
+noiseless test, to retain favorable cases for the reference method.
+
+\paragraph{Stress tests and ablation.}
+Seeds 201--205 also test 20/100 Hz synchronized sampling, doubled noise,
+threefold initialization offsets, a 0.5 s radar gap starting one third into
+each scenario, and a constant 0.02 rad/s single-track mismatch (the configured
+bound). One noiseless trial per scenario is included. Doubled noise exceeds
+the declared sensor bounds and is an empirical stress test only.
+The independent target-only ablation gives both algorithms identical exact
+ego body velocity, acceleration and yaw rate in the four compatible scenarios.
+It includes the old matched gains, training-selected corrected gains and
+the current target injection coefficients copied into the companion chain.
+This last diagnostic also retains each algorithm's own nonlinear extension;
+it is not an assertion that their nonlinear maps or rotating-coordinate
+injections are identical. Oracle inputs cannot be deployed as a sensor.
+
+\paragraph{Scoring and uncertainty.}
+The primary window is $t\ge2$ s; full-run and final-half errors are also
+recorded. Position RMSE uses the Euclidean two-dimensional error; target
+speed is the scalar norm, distinguished from vector velocity; course errors
+are wrapped before conversion to degrees. Failed/nonfinite runs and position
+errors above 1 km are counted explicitly. Timing includes the current
+implementation's bound/history work, which the baseline does not implement.
+Confidence intervals resample the 20 paired \emph{complete seeds}, not the
+correlated time frames, with 10,000 bootstrap draws (RNG 9302026).
+Intervals quantify pointwise noise uncertainty within these fixed synthetic
+scenarios, not simultaneous coverage or real-road population uncertainty.
+
+
+\section{Held-out results and the revised verdict}
+The main campaign completed 648 training runs, 1,278 full-system test runs,
+320 target-only oracle runs and 36 integration-refinement runs in 674.1 s
+(excluding MATLAB startup). The supplemental campaign added 120 nominal and
+12 noiseless full-system runs. These are 2,414 estimator executions across
+all experiment stages, not 2,414 independent trajectories or replicates.
+
+The globally selected candidate is \texttt{repeated\_e6\_t6\_y0.1}:
+ego and target gains $(18,108,216)$ in each scalar chain and yaw gain
+0.1 s$^{-1}$. Against this one global tuning, the current estimator has
+lower mean position, speed and course RMSE in all six nominal scenarios.
+Speed reductions are 41--79\%, but the curved-following position reduction
+is only 0.000231 m (0.65\%), too small to call a substantial engineering gain.
+
+That global result is \emph{not} the final dominance claim. With per-scenario
+training, the reference method achieves lower speed RMSE in three of six
+scenarios and lower position RMSE in four of six. The current method retains
+lower course RMSE in five of six. Stable-scenario losses and maneuvering
+benefits both matter. In the following table, C is the current estimator,
+G the globally trained reference, and S the scenario-trained reference.
+All entries are means of 20 held-out seed-level RMSE values after 2 s.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+&\multicolumn{3}{c}{Position RMSE (m)}&\multicolumn{3}{c}{Target speed RMSE (m/s)}\\
+Scenario&C&G&S&C&G&S\\
+\midrule
+Straight oncoming & 0.0267 & 0.0350 & 0.0249 & 0.0666 & 0.1980 & 0.0615 \\
+Curved crossing & 0.0267 & 0.0350 & 0.0251 & 0.0660 & 0.2460 & 0.0945 \\
+Curved following & 0.0352 & 0.0354 & 0.0250 & 0.1476 & 0.2521 & 0.1350 \\
+Swerve and braking & 0.0297 & 0.1087 & 0.0624 & 0.0763 & 0.3558 & 0.5486 \\
+Low relative speed & 0.0291 & 0.0354 & 0.0250 & 0.0849 & 0.2004 & 0.0540 \\
+Ego weaving & 0.0275 & 0.0448 & 0.0448 & 0.0788 & 0.2745 & 0.2745 \\
+\bottomrule
+\end{tabular}\end{center}
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrl@{}}
+\toprule
+&\multicolumn{3}{c}{Target course RMSE (deg)}&\\
+Scenario&C&G&S&Scenario-trained gain candidate\\
+\midrule
+Straight oncoming & 0.283 & 3.027 & 0.492 & \texttt{repeated\_e1.5\_t3\_y3} \\
+Curved crossing & 0.286 & 4.729 & 3.739 & \texttt{repeated\_e3\_t3\_y1} \\
+Curved following & 0.536 & 0.740 & 0.359 & \texttt{repeated\_e3\_t3\_y0.1} \\
+Swerve and braking & 0.558 & 9.489 & 7.265 & \texttt{lmi\_e1.5\_t3\_y0.1} \\
+Low relative speed & 0.314 & 0.747 & 0.334 & \texttt{repeated\_e1.5\_t3\_y0.1} \\
+Ego weaving & 0.357 & 1.437 & 1.437 & \texttt{repeated\_e6\_t6\_y0.1} \\
+\bottomrule
+\end{tabular}\end{center}
+
+Swerve/braking speed RMSE falls from 3.393 m/s in the old matched reproduction
+to 0.356 m/s after global training and 0.549 m/s after scenario training;
+the current estimator gives 0.0763 m/s. Scenario training improves the joint
+position/speed/course objective, not every component individually.
+Thus the defensible speed advantage is about 79--86\% here, not the much
+larger ratio against the old gain choice alone. Ego weaving gives
+0.0788 versus 0.2745 m/s, a 71\% reduction. Conversely, at low relative speed
+the scenario-trained reference gives 0.0540 versus 0.0849 m/s: the current
+error is about 57\% larger. No uniform accuracy improvement is supported.
+
+\paragraph{Paired uncertainty.}
+The following intervals use the scenario-trained baseline and report
+$\Delta=\mathrm{RMSE}_{S}-\mathrm{RMSE}_{C}$ in m/s; positive favors the
+current estimator. They are pointwise descriptive intervals conditional on
+these six geometries and this gain-selection rule. All trial values and all
+three metric intervals for every baseline are retained in CSV.
+\begin{center}\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Scenario&Mean $\Delta$&95\% bootstrap interval&Current lower / 20\\
+\midrule
+Straight oncoming & -0.0050 & [-0.0076, -0.0025] & 4 \\
+Curved crossing & 0.0285 & [0.0247, 0.0321] & 20 \\
+Curved following & -0.0127 & [-0.0164, -0.0089] & 1 \\
+Swerve and braking & 0.4724 & [0.4459, 0.4984] & 20 \\
+Low relative speed & -0.0309 & [-0.0326, -0.0292] & 0 \\
+Ego weaving & 0.1957 & [0.1914, 0.2008] & 20 \\
+\bottomrule
+\end{tabular}\end{center}
+
+\paragraph{Initialization versus later tracking.}
+Window choice materially changes the ranking. With the prescribed identical
+physical initialization offsets, the current method has lower full-run speed
+RMSE than the scenario-trained reference in all six cases. The following
+planned window-sensitivity check keeps that benefit visible alongside the
+post-transient counterexamples. Final-half speed errors preserve the same
+three wins and three losses as the primary window. These startup results
+are conditional on the chosen initialization, not evidence about every
+possible measurement-based initialization procedure.
+\begin{center}\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+&\multicolumn{2}{c}{Full-run speed RMSE (m/s)}&\multicolumn{2}{c}{Final-half speed RMSE (m/s)}\\
+Scenario&Current&Scenario-trained&Current&Scenario-trained\\
+\midrule
+Straight oncoming & 0.6149 & 0.8634 & 0.0658 & 0.0581 \\
+Curved crossing & 0.4225 & 1.6859 & 0.0656 & 0.0868 \\
+Curved following & 0.4272 & 0.6131 & 0.1454 & 0.1188 \\
+Swerve and braking & 0.5964 & 2.6785 & 0.0742 & 0.5270 \\
+Low relative speed & 0.4595 & 0.5727 & 0.0831 & 0.0502 \\
+Ego weaving & 0.3815 & 0.7337 & 0.0815 & 0.2911 \\
+\bottomrule
+\end{tabular}\end{center}
+
+\section{What the ablation establishes}
+With exact ego inputs and the same target injection coefficients, the two
+coordinate implementations are almost indistinguishable in these compatible
+scenarios. The table reports target-speed RMSE only; position, vector velocity
+and course are also retained in \texttt{oracle\_summary.csv}. The oracle
+input experiment is diagnostic and has no deployable sensor interpretation.
+\begin{center}\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Scenario&Current&Sharma, same injection&Sharma, global training\\
+\midrule
+Straight oncoming & 0.065586 & 0.065585 & 0.135973 \\
+Curved crossing & 0.065603 & 0.065682 & 0.136084 \\
+Curved following & 0.147582 & 0.147557 & 0.140679 \\
+Low relative speed & 0.084860 & 0.084859 & 0.139920 \\
+\bottomrule
+\end{tabular}\end{center}
+
+The globally trained reference even has lower oracle speed/course errors on
+curved following (0.1407 m/s and 0.502 deg) than the current target observer
+(0.1476 m/s and 0.526 deg). This rules out interpreting the old full-system
+multipliers as an intrinsic accuracy advantage of the target coordinate
+change. The measured gains come from a combination of upstream information,
+ego architecture, injection-gain choice and applicability during ego maneuvers.
+The experiment does not assign an exact percentage of benefit to each cause.
+
+\section{Stress results, counterexamples and numerical checks}
+Against the globally trained baseline, speed and course mean RMSE stay lower
+for the current implementation in all 36 noisy stress scenario/variant cells.
+This statement does not extend scenario-specific tuning to those stress tests;
+that additional campaign evaluated nominal and noiseless sensing only.
+Position is not uniformly better: curved following has a slightly smaller
+baseline position RMSE at 20 Hz and during radar dropout.
+The constant single-track mismatch remains within the declared 0.02 rad/s
+bound; no conclusion about large or rapidly changing tire slip follows.
+
+Noiseless matched-gain comparisons retain another counterexample. On curved
+following, final-half target course RMSE is approximately 0.08663 deg for the
+current estimator and 0.0000180 deg for the matched reference. Holding the
+current heading measurement for each 20 ms frame produces a half-frame
+rotation lag; $0.15\times0.02/2$ rad is 0.08594 deg. This is a specific sampled
+realization limitation, not a flaw in the continuous coordinate identity.
+Neither the primary 2 s window nor a final-half window establishes uniform
+asymptotic performance for every motion.
+
+The current implementation, globally trained reference and corrected reference
+have zero failed full-system runs in 306 each; the scenario-trained reference
+has zero in 126. The old matched reference also has zero in 126, and the
+threshold-gain hold realization has zero in 120. The threshold-gain output
+predictor fails in 77 of 120. These failures concern our sampled realization
+and the selected printed threshold, not the paper's continuous-time theorem
+or its unpublished experiment settings. Failed runs are counted explicitly;
+primary paired intervals compare methods with no failed nominal pairs.
+
+Restoring the omitted companion term does not reverse the measured verdict.
+Across global-reference variants, the largest mean metric changes are
+0.000561 m in position, 0.01188 m/s in speed, and 0.07897 deg in course.
+These are measurable changes and should not be described as exactly zero.
+
+Halving the RK4 step from 5 to 2.5 ms preserves all 36 failure classifications.
+For the current method, maximum changes across the six checked seeds are
+$3.47\times10^{-9}$ m in position RMSE, $3.00\times10^{-8}$ m/s in speed RMSE,
+and $9.98\times10^{-8}$ deg in course RMSE. For the tuned reference and its
+corrected variant, the maxima are $3.04\times10^{-6}$ m, 0.00118 m/s and
+0.00584 deg. The latter yaw-switch sensitivity is small relative to the
+reported full-system differences. This refinement checks numerical sensitivity,
+not sampled stability or enclosure of the true physical trajectory.
+
+Nominal mean step times range from 2.024 to 2.284 ms for the current code,
+versus 0.291 to 0.319 ms for the globally trained reference. The current code
+also computes bounds, orientation sets and histories that are absent from the
+reference, so this is implementation cost rather than an isolated comparison
+of differential equations. It is approximately seven times slower in these
+measurements, and no real-time deadline guarantee is asserted.
+
+\section{Interpretation and research decision}
+Retain the covariant formulation and yaw-independent body-velocity core:
+they remove a concrete model restriction relevant to collision-avoidance
+maneuvers and support explicit disturbance accounting. Describe the work as
+an architecture and robustness improvement under a stated sensor/kinematic
+contract. The present experiments support maneuvering advantages and reveal
+steady-scenario accuracy tradeoffs. They do not support a universal RMSE
+improvement, a new target motion model, a real-vehicle performance claim, or
+publication novelty beyond the single paper reviewed here.
+
+The next technical priorities are the conservatism/noise tradeoff in the
+certificate-selected gains, sample-aligned yaw correction, and validation
+with realistic GNSS velocity quality, bias, asynchronous sensing and
+single-track mismatch. A sensor-matched hybrid baseline and vehicle data
+would be needed to distinguish architecture from additional sensor information
+more completely. None of those additional experiments is represented as done.
+
+The prior September 24 report should not supply unqualified improvement
+multipliers for a manuscript. Its gain matching does not establish an optimal
+reference, its 756 comparisons are not independent experimental replicates,
+and its headline does not reflect the favorable per-scenario reference settings
+identified here. Historical files were preserved rather than rewritten.
+
+\paragraph{Statistical integrity review (11/11 items).}
+Scenario-stratified results avoid an aggregate Simpson reversal; no inference
+from scenario means to a road population is made. Selection/Berkson and
+collider risks are addressed by reporting all variants and failures, with no
+post-outcome trial exclusion. No prevalence/base-rate claim is made. Repeated
+measurements are paired with the same initial conditions, so a selected
+extreme pre/post improvement is not being claimed. Survivorship is explicit.
+All metrics are exported rather than selecting significant endpoints; pointwise
+intervals are not sold as multiple-testing-adjusted conclusions. The expanded
+scenario-tuning analysis is disclosed as exploratory, addressing forking-path
+risk. The controlled algorithm intervention supports comparisons within the
+simulator; it does not establish a real-world causal claim or reverse-causal
+mechanism. The dominant remaining limitations are model/sensor realism and
+baseline-design freedom, not unreported p-values.
+
+\section{Validation, artifacts and reproduction}
+Verification status: \textbf{VERIFIED} for deterministic replay and executed
+checks; statistical interpretation remains conditional on the protocol above.
+The final MATLAB regression run passes \textbf{101/101 tests} across eight
+classes: baseline reproduction, fairness interventions, online runtime,
+direct velocity, structured high gain, cascade certificate, yaw observer and
+gain synthesis. Exact replay of the stored straight-oncoming seed reproduces
+the measurements, truth, target states and ego yaw bit-for-bit for all six
+methods, excluding wall-clock timing. Independent Python recomputation
+confirms all global and per-scenario selections from the training CSV and
+confirms that training and test seed sets are disjoint.
+
+MATLAB Code Analyzer checked twelve comparison/test files. It reported only
+the host's missing custom-settings-file advisory and used factory defaults;
+no source diagnostic was reported. Python compilation and Git whitespace
+checks passed. The report was compiled and its tables/readability inspected.
+The runtime sources matched the snapshot through experiment completion.
+The three comparator algorithms were then moved into the required flat
+	exttt{estimator/} layout with path-only updates; their equations and gains
+were retained, and the baseline/audit tests and exact replay were rechecked.
+Early development failures and the corrected test expectation are retained
+in the raw logs; the final test run is wholly successful.
+
+The baseline project revision was
+\path{e2813a5f0d6be6ba7f8a25de4c3850bf28e9a7a6} plus the disclosed uncommitted
+comparison files. MATLAB is R2026a Update 3. Solver dependencies are the
+existing YALMIP revision \path{a30979f7e883c9042766d9e71f4c384d3971fef6}
+and SeDuMi revision \path{daef0b7ee87c727a6d97bc1ca892f48b599166d7}; neither
+dependency tree is included in the project change. NumPy/Python versions,
+source/PDF identities, options and measured completion counts are recorded
+in the machine-readable manifests.
+
+Compact evidence is under
+\path{report/SHARMA_ESTIMATOR_AUDIT_20260930/}: the protocol, all seed-level
+training/test/oracle metrics, both selection tables, summary tables, paired
+intervals, numerical checks, test outcomes and source manifest. Full nominal
+trajectories remain in the local operational output
+\path{simulation_output/sharma_fairness_audit_20260930/traces.mat}.
+Standalone plots and the derived report PDF are exported outside the
+repository; generated binaries, figures, the literature PDF and unrelated
+working-tree changes are not part of the source commit.
+
+From the repository root, with the existing solver dependencies available:
+\begin{verbatim}
+matlab -singleCompThread -batch "addpath('scripts'); ...
+  runSharmaFairnessAudit(OutputDirectory='simulation_output/audit');"
+matlab -singleCompThread -batch "addpath('scripts'); ...
+  runSharmaScenarioTunedAudit('simulation_output/audit'); ...
+  validateSharmaFairnessAudit('simulation_output/audit');"
+python3 scripts/analyzeSharmaFairnessAudit.py simulation_output/audit
+\end{verbatim}
+The ellipses above indicate MATLAB line continuation for readability; the
+actual batch commands use the function calls on one line. The plots are
+optional via \texttt{--figure-directory} pointing outside the repository.
+\end{document}

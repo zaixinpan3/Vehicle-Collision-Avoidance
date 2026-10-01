@@ -1,0 +1,87 @@
+{
+  "kind": "Compact synthetic experiment metrics copied from operational outputs",
+  "sources": [
+    {
+      "path": "analysis.json",
+      "sha256": "c277d3d1b758011c42b94cbbb13a3ec54f4bbb5d69e9e30b741e737ed6372bc5"
+    },
+    {
+      "path": "completion.json",
+      "sha256": "dbf6fe4d40e9251976642f1c43a311a755d4d68ad645476788a862f052c4a047"
+    },
+    {
+      "path": "noisefree-supplement.csv",
+      "sha256": "051f2c29f2e1eaed6762222247a8d8da258baced93ddc437f417f182012504de"
+    },
+    {
+      "path": "numerical.csv",
+      "sha256": "edaa9721066f2e5ff767845b3c678ee9e5e1788e454fa9377f3111a39ca8209b"
+    },
+    {
+      "path": "numerical_check.csv",
+      "sha256": "41d1429d9cde11e094e2cf80aac47851b457a52e7dfd4d135ba35783136a2c87"
+    },
+    {
+      "path": "oracle.csv",
+      "sha256": "ad0c2f834a3082b81696e4488078c4ef4ad379a704e1d3b3a1478b211fe55b20"
+    },
+    {
+      "path": "oracle_summary.csv",
+      "sha256": "74f21db5ace3ea87cdc349eb4c1260589365a95ae94950afd22a317c486c3a2c"
+    },
+    {
+      "path": "paired_intervals.csv",
+      "sha256": "65b159a5db78c54ba4a502af8d7c42d109498f407905980b8df6ca3784e5a036"
+    },
+    {
+      "path": "protocol.json",
+      "sha256": "3157229d1257bf076f617695356b6f809d7611fa5c725816d53ac73afa890bf5"
+    },
+    {
+      "path": "relocation-validation.json",
+      "sha256": "45fb729db532822d545973f5afafefa900c4651550a0aabf59f576ce42371f78"
+    },
+    {
+      "path": "scenario-selection.csv",
+      "sha256": "9a5913e6973047edf3528f88b79262f37e06f1e9fe5de20385c5d2a28166b99b"
+    },
+    {
+      "path": "scenario-tuned.csv",
+      "sha256": "57f1fd656399727d387083648c3ff69a7a4683752fc79b989c214f314f46042e"
+    },
+    {
+      "path": "selection.csv",
+      "sha256": "54ad2f780de75bcd78d6103a710c15e692a1d505d5101c713e43f712dab21b48"
+    },
+    {
+      "path": "source-manifest.json",
+      "sha256": "e9261010aa6f5b8f53af625cc87526450b64209796af1b5ead171a20c1e83de4"
+    },
+    {
+      "path": "summary.csv",
+      "sha256": "2bf1c7339b3338976de7da75f15a0f51f0b34b160f648616f973d3c6308db43e"
+    },
+    {
+      "path": "tests.csv",
+      "sha256": "fcb45c89f8042b130bbc8bdf1a734863ff3b11aced49c56ae75dbe3b07d80936"
+    },
+    {
+      "path": "training.csv",
+      "sha256": "fe14bba34bed6fc878c1361e4a194490accb4b4e3c1440ee22490b05c91feb47"
+    },
+    {
+      "path": "trials.csv",
+      "sha256": "cf7883950803ac98e61829f6ebc7725958629543ceced8cb17d5d8b7e015aabb"
+    },
+    {
+      "path": "validation.json",
+      "sha256": "4a36c9f5cd4b43e9a259b243b6bd9e3d5326456ea5ae474503cd40d1f32fd324"
+    }
+  ],
+  "rawDirectory": "simulation_output/sharma_fairness_audit_20260930",
+  "rawTrajectories": {
+    "path": "simulation_output/sharma_fairness_audit_20260930/traces.mat",
+    "sha256": "af817950216e2c80bd5e5e4b8cb6bd791bd9b9e48edffce55790a455bbcc839c"
+  },
+  "newlineNormalization": "CSV exports use LF; original operational outputs may use CRLF. Numerical values are unchanged."
+}

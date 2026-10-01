@@ -1,0 +1,42 @@
+{
+  "testTrials": 1410,
+  "oracleTrials": 320,
+  "seedsDisjoint": true,
+  "trainingSelectionsIndependentlyVerified": true,
+  "pythonVersion": "3.14.7",
+  "numpyVersion": "2.5.3",
+  "trialAndFailureCounts": {
+    "structured": [
+      306,
+      0
+    ],
+    "sharmaMatchedPredictor": [
+      126,
+      0
+    ],
+    "sharmaCertifiedHold": [
+      120,
+      0
+    ],
+    "sharmaCertifiedPredictor": [
+      120,
+      77
+    ],
+    "sharmaTunedPredictor": [
+      306,
+      0
+    ],
+    "sharmaTunedCorrectedPredictor": [
+      306,
+      0
+    ],
+    "sharmaScenarioTunedPredictor": [
+      126,
+      0
+    ]
+  },
+  "numericalFailureStatusAgrees": true,
+  "inferenceUnit": "One complete noise seed within a fixed scenario",
+  "bootstrap": "10000 paired seed draws; RNG 9302026; pointwise percentile 95% intervals",
+  "scope": "Noise variability only: not road-population uncertainty or real-vehicle replication"
+}

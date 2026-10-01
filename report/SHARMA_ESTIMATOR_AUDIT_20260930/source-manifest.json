@@ -1,0 +1,212 @@
+{
+  "baselineCommit": "e2813a5f0d6be6ba7f8a25de4c3850bf28e9a7a6",
+  "recordedAt": "2026-09-30T20:03:40.231522-05:00",
+  "sources": [
+    {
+      "path": "estimator/nrmmTargetTrackerDerivative.m",
+      "sha256": "6e38b0cbb14d316af51f841d6d0c9a5faf2047a898868d9171df912094a5f088",
+      "finalPath": "estimator/nrmmTargetTrackerDerivative.m",
+      "finalSha256": "6e38b0cbb14d316af51f841d6d0c9a5faf2047a898868d9171df912094a5f088"
+    },
+    {
+      "path": "estimator/nrmmObserverVectorField.m",
+      "sha256": "df803b56eb8c3584f9903d271b15f0168d1881ba0bdcf4cba2688c6d48ee5686",
+      "finalPath": "estimator/nrmmObserverVectorField.m",
+      "finalSha256": "df803b56eb8c3584f9903d271b15f0168d1881ba0bdcf4cba2688c6d48ee5686"
+    },
+    {
+      "path": "estimator/nrmmObserverCertificate.m",
+      "sha256": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308",
+      "finalPath": "estimator/nrmmObserverCertificate.m",
+      "finalSha256": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308"
+    },
+    {
+      "path": "estimator/synthesizeTargetTrackerCertificate.m",
+      "sha256": "74a00654062d3f17fedf497b296c67b9cde02fb8db4cf3a8b63e0f41220eefbe",
+      "finalPath": "estimator/synthesizeTargetTrackerCertificate.m",
+      "finalSha256": "74a00654062d3f17fedf497b296c67b9cde02fb8db4cf3a8b63e0f41220eefbe"
+    },
+    {
+      "path": "estimator/certifiedKinematicCourseCorrespondence.m",
+      "sha256": "e969fc6c2aee79fd4eb9976d6a7342609499c7a6e40b2ad1f8516fb1a3288e5b",
+      "finalPath": "estimator/certifiedKinematicCourseCorrespondence.m",
+      "finalSha256": "e969fc6c2aee79fd4eb9976d6a7342609499c7a6e40b2ad1f8516fb1a3288e5b"
+    },
+    {
+      "path": "estimator/certifiedRotationCorrespondence.m",
+      "sha256": "fe3848a3e72ba4da39b800f2f374e85d37c457aad7df8e24c5f5dc250309b37e",
+      "finalPath": "estimator/certifiedRotationCorrespondence.m",
+      "finalSha256": "fe3848a3e72ba4da39b800f2f374e85d37c457aad7df8e24c5f5dc250309b37e"
+    },
+    {
+      "path": "estimator/onlineNrmmTrackingRuntime.m",
+      "sha256": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05",
+      "finalPath": "estimator/onlineNrmmTrackingRuntime.m",
+      "finalSha256": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05"
+    },
+    {
+      "path": "estimator/synthesizeNrmmObserverGains.m",
+      "sha256": "8697b7b460b7ea2c9c434ae3542d5cbaf3ac11cd2fe7d4669012f93ab20b103a",
+      "finalPath": "estimator/synthesizeNrmmObserverGains.m",
+      "finalSha256": "8697b7b460b7ea2c9c434ae3542d5cbaf3ac11cd2fe7d4669012f93ab20b103a"
+    },
+    {
+      "path": "estimator/nrmmTargetLipschitzCertificate.m",
+      "sha256": "d1f561ad3c3de0868d73b5f45589b30af2b574136316faaca80bfa8100f9c8ba",
+      "finalPath": "estimator/nrmmTargetLipschitzCertificate.m",
+      "finalSha256": "d1f561ad3c3de0868d73b5f45589b30af2b574136316faaca80bfa8100f9c8ba"
+    },
+    {
+      "path": "estimator/nrmmPositionErrorBound.m",
+      "sha256": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5",
+      "finalPath": "estimator/nrmmPositionErrorBound.m",
+      "finalSha256": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5"
+    },
+    {
+      "path": "estimator/nrmmKinematicVelocityMeasurement.m",
+      "sha256": "0f075c3dafeb4b11a8cda324f39c88e370c29c35ba9755a4412f20a83f5edfae",
+      "finalPath": "estimator/nrmmKinematicVelocityMeasurement.m",
+      "finalSha256": "0f075c3dafeb4b11a8cda324f39c88e370c29c35ba9755a4412f20a83f5edfae"
+    },
+    {
+      "path": "estimator/nrmmVelocityDisturbanceBound.m",
+      "sha256": "84c4c6e9e4c1b47c395df29f5c71043854522d563c7222922aeeb2be9160951a",
+      "finalPath": "estimator/nrmmVelocityDisturbanceBound.m",
+      "finalSha256": "84c4c6e9e4c1b47c395df29f5c71043854522d563c7222922aeeb2be9160951a"
+    },
+    {
+      "path": "estimator/nrmmYawSet.m",
+      "sha256": "cc30d09659426872322c8c28d373144680a1dcf23a1ec5354f35f30b1079c295",
+      "finalPath": "estimator/nrmmYawSet.m",
+      "finalSha256": "cc30d09659426872322c8c28d373144680a1dcf23a1ec5354f35f30b1079c295"
+    },
+    {
+      "path": "estimator/nrmmYawObserverDerivative.m",
+      "sha256": "732496acba9d6c793d443d53c5fd424912016755cdc3178fe8160e23e46dc70d",
+      "finalPath": "estimator/nrmmYawObserverDerivative.m",
+      "finalSha256": "732496acba9d6c793d443d53c5fd424912016755cdc3178fe8160e23e46dc70d"
+    },
+    {
+      "path": "estimator/nrmmTargetHistory.m",
+      "sha256": "7d42d50c49d6217738a9b0247d2ad1faa8563b8066d03e9556e0185e4984522e",
+      "finalPath": "estimator/nrmmTargetHistory.m",
+      "finalSha256": "7d42d50c49d6217738a9b0247d2ad1faa8563b8066d03e9556e0185e4984522e"
+    },
+    {
+      "path": "estimator/nrmmObserverRk4Interval.m",
+      "sha256": "33c395fb3f5905853a19dfd1e6502b80d1a50ffcb281934e98a00b459f6dd795",
+      "finalPath": "estimator/nrmmObserverRk4Interval.m",
+      "finalSha256": "33c395fb3f5905853a19dfd1e6502b80d1a50ffcb281934e98a00b459f6dd795"
+    },
+    {
+      "path": "estimator/nrmmTargetParameterErrorBounds.m",
+      "sha256": "6d1104488dc5b9b2d8dda8c3274a6f24294fef0e5d767df6008cb8a473d8d850",
+      "finalPath": "estimator/nrmmTargetParameterErrorBounds.m",
+      "finalSha256": "6d1104488dc5b9b2d8dda8c3274a6f24294fef0e5d767df6008cb8a473d8d850"
+    },
+    {
+      "path": "estimator/nrmmControllerErrorBounds.m",
+      "sha256": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc",
+      "finalPath": "estimator/nrmmControllerErrorBounds.m",
+      "finalSha256": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc"
+    },
+    {
+      "path": "estimator/sharma2026/sharmaNrmmCompanionDerivative.m",
+      "sha256": "01ca12dbaa5ea3e8fa335ad139b34de5a6e3ca556a50f884a11cab48ab7e4a41",
+      "finalPath": "estimator/sharmaNrmmCompanionDerivative.m",
+      "finalSha256": "01ca12dbaa5ea3e8fa335ad139b34de5a6e3ca556a50f884a11cab48ab7e4a41"
+    },
+    {
+      "path": "estimator/sharma2026/sharmaMultistageObserverRuntime.m",
+      "sha256": "807a2a0e97d91639f4864791274dcd3c5d70554e996a0e675a408251c4f56fd0",
+      "finalPath": "estimator/sharmaMultistageObserverRuntime.m",
+      "finalSha256": "807a2a0e97d91639f4864791274dcd3c5d70554e996a0e675a408251c4f56fd0"
+    },
+    {
+      "path": "estimator/sharma2026/sharmaMultistageObserverDesign.m",
+      "sha256": "39eedbfc131c622b241965c577e4cac599972ec2900090c1714179da99c96d03",
+      "finalPath": "estimator/sharmaMultistageObserverDesign.m",
+      "finalSha256": "d11057981c43415fa7678513e205cc7d2365c0f237df0c2c07fc116171cb32c5"
+    },
+    {
+      "path": "config/nrmmTrackingConfig.m",
+      "sha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47",
+      "finalPath": "config/nrmmTrackingConfig.m",
+      "finalSha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47"
+    },
+    {
+      "path": "scripts/runSharmaFairnessAudit.m",
+      "sha256": "7fb0de363ee6ddadd2247dc2426c5368ddf7ebc9368c7c08549499741b1d5ae8",
+      "finalPath": "scripts/runSharmaFairnessAudit.m",
+      "finalSha256": "5d3a735e5f88c99f61f892b974fd1cd9151ed768b935751ca5667e6c01235a2c"
+    },
+    {
+      "path": "scripts/runObserverComparisonScenario.m",
+      "sha256": "5992d70b1407359006fa2aeb0dc009ee7046c3fda978e1974a4149e71e9879ec",
+      "finalPath": "scripts/runObserverComparisonScenario.m",
+      "finalSha256": "6b52db3461b32ea370912bf95f6b571d02dca8c0ba0dc69704e52b014c3bc855"
+    },
+    {
+      "path": "scripts/prepareObserverComparisonEstimators.m",
+      "sha256": "c781f637d558d70ca5be87212e7ac37f047258baaff428c997ec5a038bf56646",
+      "finalPath": "scripts/prepareObserverComparisonEstimators.m",
+      "finalSha256": "c781f637d558d70ca5be87212e7ac37f047258baaff428c997ec5a038bf56646"
+    },
+    {
+      "path": "scripts/prepareSharmaGainCandidates.m",
+      "sha256": "87ea41191294b1c4982a9c387cb27415d3475d6f34ddc39d899e4a88a6a259bd",
+      "finalPath": "scripts/prepareSharmaGainCandidates.m",
+      "finalSha256": "87ea41191294b1c4982a9c387cb27415d3475d6f34ddc39d899e4a88a6a259bd"
+    },
+    {
+      "path": "scripts/runNrmmOracleTargetComparison.m",
+      "sha256": "e74b1515ec639792b3522dfa73160081f9ad99d3bbdcf2afa036a521f176c30a",
+      "finalPath": "scripts/runNrmmOracleTargetComparison.m",
+      "finalSha256": "e74b1515ec639792b3522dfa73160081f9ad99d3bbdcf2afa036a521f176c30a"
+    }
+  ],
+  "paper": {
+    "path": "reference/Sharma et al. - 2026 - Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using a multistage high ga.pdf",
+    "sha256": "f8414de25dd6bfa1d65ed4c4681d57b692bf5837622a5e2fbee7bafff4f03621"
+  },
+  "notes": "Snapshot during execution; recheck before commit. Existing uncommitted comparator sources are explicitly included; production estimator unchanged.",
+  "runtimeSourcesUnchangedThroughCompletion": true,
+  "dependencies": {
+    "YALMIP": "a30979f7e883c9042766d9e71f4c384d3971fef6",
+    "SeDuMi": "daef0b7ee87c727a6d97bc1ca892f48b599166d7"
+  },
+  "additionalFinalSources": [
+    {
+      "path": "scripts/runSharmaScenarioTunedAudit.m",
+      "sha256": "a7f51d3157a8017a9d5e251a7e7234fbfc84a862001e2c7171f3681a9acb91de"
+    },
+    {
+      "path": "scripts/validateSharmaFairnessAudit.m",
+      "sha256": "8a46079496c3f2806b64fc9514b4559fdf817aeb70e9d62c5bb3aa2b5c5caa09"
+    },
+    {
+      "path": "scripts/analyzeSharmaFairnessAudit.py",
+      "sha256": "bd4145cb93abcb020f61094d66323a97fbb38426f42ed968d2a4b49d34265a68"
+    },
+    {
+      "path": "scripts/plotObserverComparison.m",
+      "sha256": "d11fd9336cfbd21abaaecbda79c1998814c38b0c917363f46b2c134ce2155b18"
+    },
+    {
+      "path": "tests/sharmaBaselineObserverTest.m",
+      "sha256": "640bf17175f94d4e413d3237a43bdc34a3a5e7a1a5f0a8694e77eff769dd95a2"
+    },
+    {
+      "path": "tests/sharmaFairnessAuditTest.m",
+      "sha256": "5b6b56ff747c81c61b3e648a961bc879e372b144ff86d90f9c79ae93538711e4"
+    }
+  ],
+  "commands": [
+    "matlab -singleCompThread -batch \"addpath('scripts'); runSharmaFairnessAudit(OutputDirectory='simulation_output/sharma_fairness_audit_20260930');\"",
+    "matlab -singleCompThread -batch \"addpath('scripts'); runSharmaScenarioTunedAudit('simulation_output/sharma_fairness_audit_20260930'); validateSharmaFairnessAudit('simulation_output/sharma_fairness_audit_20260930');\"",
+    "matlab -singleCompThread -batch \"addpath('scripts'); validateSharmaFairnessAudit('simulation_output/sharma_fairness_audit_20260930');\"",
+    "python3 scripts/analyzeSharmaFairnessAudit.py simulation_output/sharma_fairness_audit_20260930 --figure-directory /home/zai/.cache/collisionAvoidance/sharma-audit-20260930",
+    "python3 -m py_compile scripts/analyzeSharmaFairnessAudit.py"
+  ],
+  "postExperimentChanges": "Moved the three comparator algorithms from estimator/sharma2026/ to the required flat estimator/ layout. Updated solver-root lookup and removed obsolete path additions only; no observer equation or gain change. Repeated 12 baseline/audit tests and all six exact paired replays successfully."
+}

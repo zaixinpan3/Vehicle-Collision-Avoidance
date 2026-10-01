@@ -1,0 +1,11 @@
+{
+  "baselineTestsPassed": 6,
+  "fairnessTestsPassed": 6,
+  "exactReplayMeasurements": true,
+  "exactReplayTruth": true,
+  "exactReplayTargetAndYawAllSixMethods": true,
+  "outputMarker": "FLAT_LAYOUT_TESTS_AND_EXACT_REPLAY_PASS",
+  "rawLog": "simulation_output/sharma_fairness_audit_20260930/flat-layout-validation.log",
+  "rawLogSha256": "b6b11a512af0860a5f68b489550e47a52bdc2567838378e663b7b3f71f2bffb4",
+  "scope": "Path-only flattening after the completed numerical campaign; no dynamics or gains changed."
+}

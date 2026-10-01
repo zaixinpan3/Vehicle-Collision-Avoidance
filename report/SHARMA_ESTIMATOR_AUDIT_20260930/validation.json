@@ -1,0 +1,96 @@
+{
+  "passed": 101,
+  "failed": 0,
+  "incomplete": 0,
+  "exactReplayMeasurements": true,
+  "exactReplayTruth": true,
+  "exactReplayTargetAndYaw": true,
+  "analyzer": [
+    {
+      "source": "scripts/runSharmaFairnessAudit.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "scripts/runNrmmOracleTargetComparison.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "scripts/prepareSharmaGainCandidates.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "scripts/runObserverComparisonScenario.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "scripts/prepareObserverComparisonEstimators.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "scripts/validateSharmaFairnessAudit.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "scripts/runSharmaScenarioTunedAudit.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "estimator/sharma2026/sharmaMultistageObserverRuntime.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "estimator/sharma2026/sharmaMultistageObserverDesign.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "estimator/sharma2026/sharmaNrmmCompanionDerivative.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "tests/sharmaBaselineObserverTest.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    },
+    {
+      "source": "tests/sharmaFairnessAuditTest.m",
+      "line": 0,
+      "id": "CFERR",
+      "message": "Cannot open or read the Code Analyzer settings from file '/home/zai/.matlab/R2025b/MLintDefaultSettings.txt'. Using default settings instead."
+    }
+  ],
+  "analyzedFiles": [
+    "scripts/runSharmaFairnessAudit.m",
+    "scripts/runNrmmOracleTargetComparison.m",
+    "scripts/prepareSharmaGainCandidates.m",
+    "scripts/runObserverComparisonScenario.m",
+    "scripts/prepareObserverComparisonEstimators.m",
+    "scripts/validateSharmaFairnessAudit.m",
+    "scripts/runSharmaScenarioTunedAudit.m",
+    "estimator/sharma2026/sharmaMultistageObserverRuntime.m",
+    "estimator/sharma2026/sharmaMultistageObserverDesign.m",
+    "estimator/sharma2026/sharmaNrmmCompanionDerivative.m",
+    "tests/sharmaBaselineObserverTest.m",
+    "tests/sharmaFairnessAuditTest.m"
+  ]
+}
