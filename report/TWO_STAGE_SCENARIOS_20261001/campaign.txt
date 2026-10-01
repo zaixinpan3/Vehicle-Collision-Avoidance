@@ -1,0 +1,144 @@
+MATLAB 26.1.0.3276743 (R2026a) Update 3
+WARMUP speed=8 repeat=1 seconds=1.308470
+WARMUP speed=8 repeat=2 seconds=0.077108
+CASE-START speed=8 scenario=headOn
+headOn: 4/1600 holds, last 0.077 s, source twoStageConvexOptimization
+headOn: 8/1600 holds, last 0.075 s, source twoStageConvexOptimization
+headOn: 12/1600 holds, last 0.070 s, source twoStageConvexOptimization
+headOn: 16/1600 holds, last 0.078 s, source twoStageConvexOptimization
+headOn: 20/1600 holds, last 0.104 s, source twoStageConvexOptimization
+headOn: 24/1600 holds, last 0.079 s, source twoStageConvexOptimization
+headOn: 28/1600 holds, last 0.087 s, source twoStageConvexOptimization
+headOn: 29/1600 frames, max 0.139 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=8 scenario=headOn frames=29 wall=3.592 recovered=0 max=0.139384 failedCall=0.185726 gap=2.064379951 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=8 scenario=acceleratingHeadOn
+acceleratingHeadOn: 4/1600 holds, last 0.075 s, source twoStageConvexOptimization
+acceleratingHeadOn: 8/1600 holds, last 0.076 s, source twoStageConvexOptimization
+acceleratingHeadOn: 8/1600 frames, max 0.107 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=8 scenario=acceleratingHeadOn frames=8 wall=1.238 recovered=0 max=0.107156 failedCall=0.085835 gap=12.792002304 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=8 scenario=brakingLead
+brakingLead: 2/1600 frames, max 0.079 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=8 scenario=brakingLead frames=2 wall=0.845 recovered=0 max=0.079003 failedCall=0.345323 gap=1.442293063 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=8 scenario=crossing
+crossing: 4/1600 holds, last 0.090 s, source twoStageConvexOptimization
+crossing: 8/1600 holds, last 0.096 s, source twoStageConvexOptimization
+crossing: 12/1600 holds, last 0.078 s, source twoStageConvexOptimization
+crossing: 16/1600 holds, last 0.072 s, source twoStageConvexOptimization
+crossing: 20/1600 holds, last 0.076 s, source twoStageConvexOptimization
+crossing: 24/1600 holds, last 0.076 s, source twoStageConvexOptimization
+crossing: 28/1600 holds, last 0.089 s, source twoStageConvexOptimization
+crossing: 28/1600 frames, max 0.126 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+CASE-END speed=8 scenario=crossing frames=28 wall=3.033 recovered=0 max=0.125873 failedCall=0.068041 gap=2.320467262 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+CASE-START speed=8 scenario=turningCrossing
+turningCrossing: 4/1600 holds, last 0.085 s, source twoStageConvexOptimization
+turningCrossing: 6/1600 frames, max 0.101 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=8 scenario=turningCrossing frames=6 wall=1.361 recovered=0 max=0.101234 failedCall=0.285719 gap=12.459713343 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=8 scenario=curvedHeadOn
+curvedHeadOn: 4/1600 holds, last 0.071 s, source twoStageConvexOptimization
+curvedHeadOn: 8/1600 holds, last 0.079 s, source twoStageConvexOptimization
+curvedHeadOn: 12/1600 holds, last 0.069 s, source twoStageConvexOptimization
+curvedHeadOn: 16/1600 holds, last 0.070 s, source twoStageConvexOptimization
+curvedHeadOn: 20/1600 holds, last 0.122 s, source twoStageConvexOptimization
+curvedHeadOn: 24/1600 holds, last 0.078 s, source twoStageConvexOptimization
+curvedHeadOn: 27/1600 frames, max 0.122 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+CASE-END speed=8 scenario=curvedHeadOn frames=27 wall=3.026 recovered=0 max=0.121542 failedCall=0.081043 gap=2.855437483 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+CASE-START speed=8 scenario=curvedCrossing
+curvedCrossing: 4/1600 holds, last 0.083 s, source twoStageConvexOptimization
+curvedCrossing: 5/1600 frames, max 0.112 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=8 scenario=curvedCrossing frames=5 wall=1.477 recovered=0 max=0.112470 failedCall=0.402225 gap=13.132343955 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+WARMUP speed=15 repeat=1 seconds=0.216526
+WARMUP speed=15 repeat=2 seconds=0.058677
+CASE-START speed=15 scenario=headOn
+headOn: 4/1600 holds, last 0.090 s, source twoStageConvexOptimization
+headOn: 8/1600 holds, last 0.099 s, source twoStageConvexOptimization
+headOn: 12/1600 holds, last 0.094 s, source twoStageConvexOptimization
+headOn: 16/1600 holds, last 0.110 s, source twoStageConvexOptimization
+headOn: 20/1600 holds, last 0.102 s, source twoStageConvexOptimization
+headOn: 24/1600 holds, last 0.088 s, source twoStageConvexOptimization
+headOn: 28/1600 holds, last 0.099 s, source twoStageConvexOptimization
+headOn: 32/1600 holds, last 0.085 s, source twoStageConvexOptimization
+headOn: 33/1600 frames, max 0.127 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=15 scenario=headOn frames=33 wall=3.796 recovered=0 max=0.126905 failedCall=0.129304 gap=0.000000000 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=15 scenario=acceleratingHeadOn
+acceleratingHeadOn: 4/1600 holds, last 0.087 s, source twoStageConvexOptimization
+acceleratingHeadOn: 8/1600 holds, last 0.116 s, source twoStageConvexOptimization
+acceleratingHeadOn: 12/1600 holds, last 0.087 s, source twoStageConvexOptimization
+acceleratingHeadOn: 16/1600 holds, last 0.110 s, source twoStageConvexOptimization
+acceleratingHeadOn: 20/1600 holds, last 0.115 s, source twoStageConvexOptimization
+acceleratingHeadOn: 24/1600 holds, last 0.085 s, source twoStageConvexOptimization
+acceleratingHeadOn: 28/1600 holds, last 0.070 s, source twoStageConvexOptimization
+acceleratingHeadOn: 32/1600 holds, last 0.099 s, source twoStageConvexOptimization
+acceleratingHeadOn: 36/1600 holds, last 0.094 s, source twoStageConvexOptimization
+acceleratingHeadOn: 40/1600 holds, last 0.088 s, source twoStageConvexOptimization
+acceleratingHeadOn: 43/1600 frames, max 0.165 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=15 scenario=acceleratingHeadOn frames=43 wall=4.784 recovered=0 max=0.165287 failedCall=0.104668 gap=0.000000000 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=15 scenario=brakingLead
+brakingLead: 4/1600 holds, last 0.096 s, source twoStageConvexOptimization
+brakingLead: 4/1600 frames, max 0.114 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=15 scenario=brakingLead frames=4 wall=0.948 recovered=0 max=0.114301 failedCall=0.214165 gap=1.417897221 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=15 scenario=crossing
+crossing: 4/1600 holds, last 0.084 s, source twoStageConvexOptimization
+crossing: 8/1600 holds, last 0.076 s, source twoStageConvexOptimization
+crossing: 12/1600 holds, last 0.079 s, source twoStageConvexOptimization
+crossing: 16/1600 holds, last 0.125 s, source twoStageConvexOptimization
+crossing: 20/1600 holds, last 0.090 s, source twoStageConvexOptimization
+crossing: 24/1600 holds, last 0.130 s, source twoStageConvexOptimization
+crossing: 28/1600 holds, last 0.090 s, source twoStageConvexOptimization
+crossing: 32/1600 holds, last 0.098 s, source twoStageConvexOptimization
+crossing: 36/1600 holds, last 0.104 s, source twoStageConvexOptimization
+crossing: 40/1600 holds, last 0.084 s, source twoStageConvexOptimization
+crossing: 44/1600 holds, last 0.086 s, source twoStageConvexOptimization
+crossing: 48/1600 holds, last 0.106 s, source twoStageConvexOptimization
+crossing: 52/1600 holds, last 0.081 s, source twoStageConvexOptimization
+crossing: 56/1600 holds, last 0.081 s, source twoStageConvexOptimization
+crossing: 60/1600 holds, last 0.087 s, source twoStageConvexOptimization
+crossing: 64/1600 holds, last 0.083 s, source twoStageConvexOptimization
+crossing: 68/1600 holds, last 0.116 s, source twoStageConvexOptimization
+crossing: 72/1600 holds, last 0.095 s, source twoStageConvexOptimization
+crossing: 76/1600 holds, last 0.096 s, source twoStageConvexOptimization
+crossing: 80/1600 holds, last 0.093 s, source twoStageConvexOptimization
+crossing: 84/1600 holds, last 0.094 s, source twoStageConvexOptimization
+crossing: 88/1600 holds, last 0.116 s, source twoStageConvexOptimization
+crossing: 92/1600 holds, last 0.124 s, source twoStageConvexOptimization
+crossing: 96/1600 holds, last 0.090 s, source twoStageConvexOptimization
+crossing: 100/1600 holds, last 0.110 s, source twoStageConvexOptimization
+Recovery at 5.00 s: e = [-25.9273 -1.49788 -3.23564 0.242602 0.700799], W = 60708.7
+crossing: 104/1600 holds, last 0.110 s, source twoStageConvexOptimization
+crossing: 108/1600 holds, last 0.084 s, source twoStageConvexOptimization
+crossing: 112/1600 holds, last 0.086 s, source twoStageConvexOptimization
+crossing: 116/1600 holds, last 0.113 s, source twoStageConvexOptimization
+crossing: 120/1600 holds, last 0.123 s, source twoStageConvexOptimization
+crossing: 124/1600 holds, last 0.103 s, source twoStageConvexOptimization
+crossing: 128/1600 holds, last 0.113 s, source twoStageConvexOptimization
+crossing: 132/1600 holds, last 0.114 s, source twoStageConvexOptimization
+crossing: 136/1600 holds, last 0.086 s, source twoStageConvexOptimization
+crossing: 140/1600 holds, last 0.119 s, source twoStageConvexOptimization
+crossing: 144/1600 holds, last 0.084 s, source twoStageConvexOptimization
+crossing: 148/1600 holds, last 0.085 s, source twoStageConvexOptimization
+crossing: 152/1600 holds, last 0.106 s, source twoStageConvexOptimization
+crossing: 152/1600 frames, max 0.133 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=15 scenario=crossing frames=152 wall=16.026 recovered=0 max=0.133421 failedCall=0.192355 gap=0.477490554 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=15 scenario=turningCrossing
+turningCrossing: 4/1600 holds, last 0.102 s, source twoStageConvexOptimization
+turningCrossing: 8/1600 holds, last 0.090 s, source twoStageConvexOptimization
+turningCrossing: 12/1600 holds, last 0.090 s, source twoStageConvexOptimization
+turningCrossing: 16/1600 holds, last 0.084 s, source twoStageConvexOptimization
+turningCrossing: 20/1600 holds, last 0.088 s, source twoStageConvexOptimization
+turningCrossing: 24/1600 holds, last 0.097 s, source twoStageConvexOptimization
+turningCrossing: 28/1600 holds, last 0.117 s, source twoStageConvexOptimization
+turningCrossing: 32/1600 holds, last 0.092 s, source twoStageConvexOptimization
+turningCrossing: 36/1600 holds, last 0.100 s, source twoStageConvexOptimization
+turningCrossing: 40/1600 holds, last 0.087 s, source twoStageConvexOptimization
+turningCrossing: 44/1600 holds, last 0.093 s, source twoStageConvexOptimization
+turningCrossing: 48/1600 holds, last 0.085 s, source twoStageConvexOptimization
+turningCrossing: 52/1600 holds, last 0.088 s, source twoStageConvexOptimization
+turningCrossing: 56/1600 holds, last 0.081 s, source twoStageConvexOptimization
+turningCrossing: 59/1600 frames, max 0.130 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=15 scenario=turningCrossing frames=59 wall=6.405 recovered=0 max=0.129706 failedCall=0.185699 gap=0.047053379 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-START speed=15 scenario=curvedHeadOn
+curvedHeadOn: 2/1600 frames, max 0.057 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+CASE-END speed=15 scenario=curvedHeadOn frames=2 wall=0.749 recovered=0 max=0.056721 failedCall=0.064268 gap=29.506364450 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+CASE-START speed=15 scenario=curvedCrossing
+curvedCrossing: 2/1600 frames, max 0.104 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CASE-END speed=15 scenario=curvedCrossing frames=2 wall=0.959 recovered=0 max=0.104093 failedCall=0.183066 gap=23.172715212 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+CAMPAIGN-COMPLETE

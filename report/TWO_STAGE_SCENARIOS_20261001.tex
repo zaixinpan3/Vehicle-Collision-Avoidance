@@ -1,0 +1,141 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\title{Fourteen-Scenario Test of the Two-Stage Affine Controller}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Result}
+All fourteen specified cases were attempted. None completed the requested
+avoidance-and-recovery run: all stopped on an unsuccessful optimization stage.
+Two cases had strict geometric vehicle overlap before stopping, and twelve
+stopped while still separated. An interrupted separated prefix is not a
+successful avoidance result. No case reached the nominal-recovery criterion.
+
+Eleven calls stopped in the CLF stage; three stopped in the PCBF stage.
+The current version therefore does not pass the scenario experiment. The
+previously passing unit checks tested a narrower affine implementation
+contract and did not establish these closed-loop outcomes.
+
+\section{Unchanged configuration and measurement}
+The frozen controller commit is
+\path{905c8bdb9cf4e790e9229133f091d6a05ae13538}. No controller, objective,
+constraint or tolerance was changed for this experiment. Seven existing
+threat fixtures were run at both 8 and 15 m/s, with exact state observations,
+no road-boundary constraints, a 6-mm configured buffer, a 50-ms hold and a
+50-ms RK4 prediction step. Primary horizons were 8 and 16 holds, with the
+fixed completion allowance producing total lengths of 68 and 76 holds.
+The shared soft solve budget remained 5 s.
+
+Every fixture starts with separated rectangles and produces strict overlap
+if the ego follows the given path at constant speed. The original known target
+motion continues throughout the simulated plant and audit. The plant uses
+independent ODE45 integration with relative tolerance $10^{-11}$ and absolute
+tolerance $10^{-12}$. An independent Python rectangle implementation checks
+31 samples per hold; an additional separating-axis overlap calculation
+confirms the two collision cases are strict overlap, not mere touching.
+This is sampled geometry, not a continuous-time physical-vehicle certificate.
+
+Each case allowed 1600 holds (80 s), stopping early after five seconds within
+all five nominal-recovery tolerances, beginning no earlier than 8 s. In fact,
+all cases failed before 8 s, so extending the requested observation cap would
+not continue them without addressing the optimizer failure. The recovery
+thresholds are 0.1 m lateral error, one degree heading error, 0.1 m/s speed
+error, 0.05 m/s lateral velocity error and 0.01 rad/s yaw-rate error.
+
+Two discarded no-target controller calls at each speed warm MATLAB and the
+optimizer. Their durations are recorded separately in \path{warmup.json}.
+Campaign timings include the entire controller call, including initialization,
+assembly and both solves. They exclude plant integration, offline geometry,
+file export, MATLAB startup and the separate diagnostic calls. No profiler
+was enabled. MATLAB R2026a Update 3 ran with \texttt{-singleCompThread}.
+
+\section{Per-case results}
+\begin{center}\small
+\begin{tabular}{rlrrrrl}\toprule
+Speed & Scenario & Holds & Stop (s) & Min gap (m) & Max call (ms) & Stop stage \\\midrule
+8 & headOn & 29 & 1.45 & 2.06438 & 185.7 & CLF \\
+8 & acceleratingHeadOn & 8 & 0.40 & 12.79200 & 107.2 & CLF \\
+8 & brakingLead & 2 & 0.10 & 1.44229 & 345.3 & CLF \\
+8 & crossing & 28 & 1.40 & 2.32047 & 125.9 & PCBF \\
+8 & turningCrossing & 6 & 0.30 & 12.45971 & 285.7 & CLF \\
+8 & curvedHeadOn & 27 & 1.35 & 2.85544 & 121.5 & PCBF \\
+8 & curvedCrossing & 5 & 0.25 & 13.13234 & 402.2 & CLF \\\midrule
+15 & headOn & 33 & 1.65 & 0 (overlap) & 129.3 & CLF \\
+15 & acceleratingHeadOn & 43 & 2.15 & 0 (overlap) & 165.3 & CLF \\
+15 & brakingLead & 4 & 0.20 & 1.41790 & 214.2 & CLF \\
+15 & crossing & 152 & 7.60 & 0.47749 & 192.4 & CLF \\
+15 & turningCrossing & 59 & 2.95 & 0.04705 & 185.7 & CLF \\
+15 & curvedHeadOn & 2 & 0.10 & 29.50636 & 64.3 & PCBF \\
+15 & curvedCrossing & 2 & 0.10 & 23.17272 & 183.1 & CLF \\\bottomrule
+\end{tabular}
+\end{center}
+Max call includes the failed controller invocation as well as returned holds.
+No plant hold is executed after the failure. The two overlapping simulations
+continue kinematically until optimization failure; impact forces are not
+modeled. Their prefixes are already failures at first overlap.
+
+\section{Runtime}
+There are 400 returned holds and 14 failed calls. Every returned hold invokes
+exactly two optimizations. The returned-hold median is 90.107 ms and maximum
+is 165.287 ms. Of those 400 holds, 114 exceed 100 ms; excluding each scenario's
+first hold still leaves 107 such overruns. Ten failed calls also exceed 100 ms.
+Thus 124 of 414 attempted campaign controller calls exceed 100 ms.
+
+The maximum across successful and failed calls is 402.225 ms, at the
+8-m/s curvedCrossing failure at simulation time 0.25 s. This is a warmed
+runtime call, not MATLAB startup. No campaign call consumes the five-second
+budget, but the requested 100-ms maximum is still unmet.
+
+The longest returned call is 15-m/s acceleratingHeadOn frame 21 at 1.00 s:
+50.122 ms PCBF solve, 106.644 ms CLF solve, and 8.521 ms remaining controller
+work, totaling 165.287 ms. These are the stage timers recorded in the actual
+campaign, without a profiling rerun.
+
+\section{Failure diagnostics and collision evidence}
+The fourteen saved failure states were replayed once using cache-only renamed
+copies that expose the failed search result. All fourteen reproduced their
+original stage failures. The eleven CLF cases first returned PCBF exit flag 1,
+then CLF flag $-7$; the three PCBF cases returned flag $-2$. No additional
+optimization, acceptance logic or controller change was introduced. Diagnostic
+timings are separate from campaign runtime results.
+
+Two representative failures were then replayed with the optimizer output
+structure captured. In the 8-m/s crossing case, the primary solver reports
+``Problem is infeasible.'' This is a verdict on the current affine subproblem,
+not proof of physically unavoidable collision.
+
+In 8-m/s curvedCrossing, the primary solve completes in 9 iterations with
+PCBF optimum $6.472333\times10^{-9}$. The secondary cap is
+$1.006472333\times10^{-6}$. After 77 iterations the CLF solver reports a small
+search direction without satisfying its constraint and/or optimality tolerance.
+Its primal feasibility measure is $4.888257\times10^{-14}$, dual feasibility
+measure 0.146013 and duality gap $6.958170\times10^{-17}$. The evidence in this
+representative case identifies failed optimality convergence despite small
+primal residual; it must not be described as lack of a feasible trajectory.
+The causal source of that numerical conditioning, and which hard rows cause
+the three primary infeasibilities, have not been isolated by this experiment.
+
+The first strict overlap samples occur at 1.098333 s in 15-m/s headOn and
+1.050000 s in 15-m/s acceleratingHeadOn. The controls covering those samples
+have PCBF slack sums 0.0234122 and 0.00658919, respectively, well above the
+$10^{-5}$ zero-slack reporting tolerance. Their reported raw affine hard
+residuals are $2.695\times10^{-7}$ and $4.729\times10^{-8}$. Therefore these
+are executed relaxed affine solutions, not zero-slack safety witnesses.
+Observed maximum overlap depths are 0.079246 and 0.069688 m. The measurements
+do not isolate the separate contributions of positive slack, linearization
+error and prediction/plant integration mismatch.
+
+\section{Artifacts and limits}
+\path{report/TWO_STAGE_SCENARIOS_20261001/} contains all fourteen summaries,
+all 400 compact frame records, independent audit results, failure-stage and
+solver-output diagnostics, actual logs, warm-up records and a reproduction
+helper. The manifest records the unchanged source/native hashes and hashes of
+the original JSON/MAT exports retained outside the repository. Generated
+native binaries are excluded from the commit. No algorithm fixes or claims of
+successful recovery accompany this experiment.
+\end{document}

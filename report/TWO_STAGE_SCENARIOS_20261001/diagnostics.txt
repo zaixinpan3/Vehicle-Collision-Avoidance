@@ -1,0 +1,15 @@
+FAILURE-CHECK speed=8 scenario=headOn flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=8 scenario=acceleratingHeadOn flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=8 scenario=brakingLead flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=8 scenario=crossing flags=[-2] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+FAILURE-CHECK speed=8 scenario=turningCrossing flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=8 scenario=curvedHeadOn flags=[-2] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+FAILURE-CHECK speed=8 scenario=curvedCrossing flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=15 scenario=headOn flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=15 scenario=acceleratingHeadOn flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=15 scenario=brakingLead flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=15 scenario=crossing flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=15 scenario=turningCrossing flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+FAILURE-CHECK speed=15 scenario=curvedHeadOn flags=[-2] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfSolveFailed).
+FAILURE-CHECK speed=15 scenario=curvedCrossing flags=[1 -7] collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (clfSolveFailed).
+SOLVER /opt/MATLAB/R2026a/toolbox/optim/optim/coneprog.m

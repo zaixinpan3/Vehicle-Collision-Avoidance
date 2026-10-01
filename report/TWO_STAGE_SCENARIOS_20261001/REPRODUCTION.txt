@@ -1,0 +1,46 @@
+Fourteen-scene test of commit 905c8bdb9cf4e790e9229133f091d6a05ae13538
+
+Actual commands (repository and generated native dependencies were frozen):
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/campaign.m')"
+  python3 /home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/collect.py
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/diagnoseFailures.m')"
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001/captureSolverMessages.m')"
+
+The first command uses the unchanged current controller with independent
+ODE45 plant transitions and 31 samples per 50-ms hold. It ran all seven
+existing collisionThreatScenario fixtures at both 8 and 15 m/s. No observer,
+noise, random draw or road constraint was added. The existing 6-mm margin,
+30-m encounter range, five-second soft budget, and all solver tolerances were
+unchanged. Each case permitted 80 s, with the established five-second nominal
+recovery dwell after at least 8 s; all cases stopped earlier on solver failure.
+Four discarded no-target warm-up calls are recorded separately in warmup.json.
+All 400 returned holds invoked exactly two optimizations.
+
+Outcome: 0/14 complete; 11 CLF-stage failures and 3 PCBF-stage failures.
+Two 15-m/s cases geometrically collided: headOn and acceleratingHeadOn.
+Twelve runs stopped while still separated and are not counted as successes.
+Runtime measurements include full controller calls and exclude offline plant
+integration/auditing. Returned median/max: 90.107/165.287 ms. Including the
+14 failed calls, maximum: 402.225 ms. Of 414 calls, 124 exceed 100 ms.
+The fourteen additional failed-frame diagnostic replays and two representative
+solver-message replays are excluded from those timings.
+
+The diagnostic copies only rename the entry/solve functions, expose failed
+search/model records, and (in the final two calls) request coneprog output.
+They retain both objectives and all constraints. All fourteen original failure
+stages and flags reproduced. Representative output messages and feasibility
+metrics are in solver-output-diagnostics.json. No nonlinear check, restoration,
+fallback or algorithm fix was introduced for the main campaign or diagnostics.
+
+runCampaign.m exports the campaign with portable root and temporary output
+paths; only directory setup differs from the executed cache copy. It was
+inspected, not run a second time. Existing optional MEX binaries were used;
+manifest.json records their hashes, but binaries are not committed. The source
+build helper is scripts/buildControllerKernels.m if a clean machine needs them.
+The independent existing audit may be run with, for example:
+  python3 scripts/auditJointPredictiveSafety.py <output>/campaign/speed8 --output <audit.json> --files headOn.json acceleratingHeadOn.json brakingLead.json crossing.json turningCrossing.json curvedHeadOn.json curvedCrossing.json
+It is expected to report failure for this version. No unit suite was repeated
+because the controller and tests were unchanged; actual closed-loop scenarios
+are the new validation in this task. Raw JSON/MAT and logs remain in the cache
+directory above, with hashes in manifest.json. They are not replaced by the
+compact committed tables. The English technical report is the adjacent .tex.
