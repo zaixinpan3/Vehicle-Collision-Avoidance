@@ -1,0 +1,54 @@
+Saved-frame failure diagnosis, October 1, 2026
+
+This bundle records offline experiments on the fourteen failed calls from
+report/TWO_STAGE_SCENARIOS_20261001. The production algorithm was not edited.
+MATLAB R2026a Update 3, single computational thread; no random draws.
+See the preceding campaign for full scenario, plant and sampling settings.
+Diagnostic solve times are not new closed-loop runtime measurements.
+
+Original local experiment root:
+/home/zai/.cache/collisionAvoidance/two-stage-cause-20261001
+Input source/continuation root:
+/home/zai/.cache/collisionAvoidance/two-stage-scenarios-20261001
+
+methods/ contains copies of the executed instrumentation and diagnostic scripts.
+They retain their actual local paths. To move them, update the root/source paths.
+The full original frozen sources and fourteen saved continuation MAT files are
+cache inputs, not bundled controller snapshots. Their hashes are recorded in
+this and the preceding campaign manifest. Original source commit:
+905c8bdb9cf4e790e9229133f091d6a05ae13538.
+
+Order used:
+1. python3 prepare.py generates cache-only renamed entry/formulation functions.
+   It adds row labels and captures the original matrices before the solve.
+2. matlab -singleCompThread -batch "run('<diagnostic root>/capture.m')"
+3. matlab -singleCompThread -batch "run('<diagnostic root>/baseline.m')"
+4. Run secondaryAblation.m, primaryAblation.m, equivalentSolves.m with the
+   same MATLAB invocation. The probes report original-constraint residuals.
+5. Run linearCertificate.m and clfLowerBound.m (combined certificates.log).
+6. Run lateralDirectionProbe.m. Its initial sparse fprintf attempt failed;
+   full() was added only to diagnostic printing, then the run completed.
+   Both the initial log and corrected final log are retained as .txt exports. Sparse cond()
+   calls in the lower-bound diagnostic emitted CONDEST warnings, not failures.
+
+runProbe uses MaxIterations=400, ConstraintTolerance=1e-8,
+OptimalityTolerance=1e-7 and MaxTime=5 s per diagnostic solve; original campaign
+has the shared five-second soft controller budget. All original failure flags
+were reproduced. Trials are diagnostic modifications, not controller changes.
+
+The two-input CLF relaxation drops all future constraints, retains first-step
+linear dynamics and input boxes, and minimizes the resulting convex quadratic
+on that box. It evaluates the stationary point and edge optima. Its minimum is
+a lower bound on the complete CLF problem. Returned candidates are checked
+against every original cone, equality, inequality and bound.
+
+Farkas witnesses satisfy A' mu + E' nu approximately zero, mu nonnegative,
+sum(mu)=1 and b' mu + rhs' nu negative. The saved JSON lists positive supports;
+full matrices and multipliers are in cache linear-certificates.mat.
+
+Raw MAT files, generated renamed controller copies and report PDF stay outside
+the repository. manifest.json hashes the included artifacts, methods and local
+raw inputs. Weekly archive records are never included in these hashes.
+
+Console .txt exports remove backspace display controls and trailing whitespace.
+Original unmodified .log files remain in cache and are separately hashed.

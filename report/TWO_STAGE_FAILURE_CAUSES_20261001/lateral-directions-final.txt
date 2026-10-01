@@ -1,0 +1,4 @@
+PLANE stage=28 absoluteTime=1.450000 normal=[-0.991035415 -0.133599427] rows=[3.51653475 -1.27158278 -1.40519077  3.38292676]
+PLANE stage=34 absoluteTime=1.750000 normal=[0.997996595 0.0632676625] rows=[-1.40972523  3.39027477  3.39027477 -1.40972523]
+LATERAL side=-1 flag=-2 slack=NaN residual=NaN
+LATERAL side=1 flag=-2 slack=NaN residual=NaN

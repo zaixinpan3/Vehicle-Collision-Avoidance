@@ -1,0 +1,10 @@
+{Error using fprintf
+Function is not defined for sparse inputs.
+
+Error in lateralDirectionProbe (line 6)
+    fprintf('PLANE stage=%d absoluteTime=%.6f normal=[%.9g %.9g] rows=[%s]\n',stage, ...
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in run (line 100)
+evalin('caller', strcat(scriptStem, ';'));
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+}

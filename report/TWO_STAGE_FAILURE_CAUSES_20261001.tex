@@ -1,0 +1,214 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{3em}
+\title{Causes of the Two-Stage Controller's Scenario Failures}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Finding and scope}
+The fourteen interruptions have three distinct immediate causes. Eleven CLF
+calls return numerically feasible, essentially optimal affine solutions but
+are discarded because \texttt{coneprog} returns exit flag $-7$. Two PCBF
+problems are inconsistent because the shifted affine reference, dynamics and
+fixed local correction bounds cannot be satisfied together. The remaining
+PCBF problem is blocked by hard collision rows in the completion tail.
+These findings do not establish that the physical avoidance task is infeasible.
+
+Two cases also overlap geometrically before their CLF interruption. Those
+holds execute positive-PCBF-slack solutions; solving the relaxed affine
+problem does not establish collision avoidance. An interruption and a physical
+collision must not be counted as the same failure mechanism.
+
+This is an offline diagnosis of the failed states in
+\path{report/TWO_STAGE_SCENARIOS_20261001}, not another closed-loop campaign.
+All fourteen failure flags were reproduced. The seventeen source/native files
+remain identical to controller commit
+\path{905c8bdb9cf4e790e9229133f091d6a05ae13538}. No production code,
+configuration, admission rule or optimization architecture was changed.
+The preceding campaign used exact observations, no road boundaries, a 6-mm
+buffer, 50-ms holds, and 68/76 total stages at 8/15 m/s.
+
+\section{Eleven CLF failures: numerical termination and result rejection}
+The primary solve succeeds in all eleven cases. The secondary returns a
+finite point with exit $-7$: a small search direction without passing the
+solver's full feasibility/optimality termination test. The production code
+rejects every nonpositive exit before inspecting the returned point.
+
+Independent evaluation of every original cone, equality, linear inequality
+and bound gives a maximum raw residual of $1.458\times10^{-12}$ over the
+rejected points. Thus they satisfy their original affine constraints to very
+high numerical accuracy. This is not a nonlinear safety check.
+
+An independent objective lower bound also tests whether useful CLF progress
+remained. Eliminate the first predicted state using the first dynamics
+identity and measured initial state. The scaled next-step CLF error becomes
+$G\Delta u_0+c$. Drop all subsequent constraints and retain only the first
+input's original box $[\ell,h]$. Then
+\[
+ \underline\rho=\max\!\left(0,
+ s\min_{\ell\le\Delta u_0\le h}\|G\Delta u_0+c\|_2^2
+ -(1-\alpha)V_0\right)
+ \le \rho^*.
+\]
+Here $s=\max(V_0,1)$ and $\alpha=0.01$. The two-variable box quadratic is
+solved by its stationary point and edge minima. The eleven candidate CLF
+slacks exceed this lower bound by at most $2.008\times10^{-7}$ in unscaled
+CLF units; one difference is $-9.3\times10^{-15}$ from roundoff. Subject to
+the measured residuals, the candidates are essentially globally optimal for
+the saved convex problems, not merely feasible. This is floating-point
+numerical evidence, not an interval-certified proof.
+
+\begin{center}\small
+\begin{tabular}{r l r r}
+\toprule
+Speed & Scenario & Returned CLF slack & Slack minus lower bound\\
+\midrule
+8 & headOn & 213.394021 & $8.94\times10^{-11}$\\
+8 & acceleratingHeadOn & 25.799220 & $6.72\times10^{-11}$\\
+8 & brakingLead & 2.691435 & $4.93\times10^{-14}$\\
+8 & turningCrossing & 6.529016 & $2.43\times10^{-13}$\\
+8 & curvedCrossing & 5.365320 & $1.58\times10^{-11}$\\
+15 & headOn & 89.232021 & $1.26\times10^{-9}$\\
+15 & acceleratingHeadOn & 91.894877 & $1.54\times10^{-8}$\\
+15 & brakingLead & 7.037407 & $4.14\times10^{-12}$\\
+15 & crossing & 4884.362715 & $1.43\times10^{-8}$\\
+15 & turningCrossing & 867.063639 & $2.01\times10^{-7}$\\
+15 & curvedCrossing & 2.311033 & $-9.33\times10^{-15}$\\
+\bottomrule
+\end{tabular}\end{center}
+
+The full conic representation has disparate scales: the primary optimum is
+preserved through a cap with a $10^{-6}$ additive tolerance, and the endpoint
+core radii are $0.000244140625$ and $0.0009765625$ in the core's weighted
+coordinates, not meters. For 8-m/s curvedCrossing, the rejected point has
+solver primal measure $4.89\times10^{-14}$, dual measure $0.146013$, and
+duality gap $6.96\times10^{-17}$. The dual test, not primal infeasibility,
+prevents successful termination in this example.
+
+Equivalent normalization of the cap row and endpoint cone changes eight of
+the eleven exits to success. Switching the internal linear solver to normal
+equations changes four to success. The original feasible set is unchanged
+in those tests, and residuals were recomputed in original units. Successful
+normalized cases have maximum original residual $2.77\times10^{-7}$.
+Not every case is repaired by scaling; the 8-m/s brakingLead case remains
+$-7$ across the representative rescaling probes. Relaxing the cap alone is
+also not a general remedy. The evidence identifies numerical representation
+and an overly exclusive success rule; it does not justify accepting arbitrary
+failed solver outputs or declaring one scaling change sufficient.
+
+Positive optimal CLF slack is allowed by the formulation. These failures are
+not caused by a requirement that CLF slack equal zero. The second solve is
+performed, and its objective reaches the independent lower bound.
+
+\section{Three PCBF failures: genuinely inconsistent local constraints}
+Removing both cones still leaves the linear problems infeasible. Numerical
+Farkas witnesses were computed for $Az\le b$, $Ez=r$, including finite bounds:
+\[
+ \mu\ge0,\quad\boldsymbol{1}^{\mathsf T}\mu=1,\quad
+ A^{\mathsf T}\mu+E^{\mathsf T}\nu\simeq0,\quad
+ b^{\mathsf T}\mu+r^{\mathsf T}\nu<0.
+\]
+The three negative values are $-0.00885471$, $-0.00296672$ and $-0.774859$;
+maximum witness equality residual is $4.86\times10^{-16}$. This localizes a
+real incompatibility of the formulated rows, rather than relying only on the
+solver's infeasibility message. It does not prove physical unavoidability.
+
+\subsection{8 m/s crossing and curvedHeadOn: old affine states and fixed boxes}
+The reference is made by shifting the previous \emph{affine} state trajectory,
+not by rolling its inputs forward from the current state. Reuse only tests
+finite values and basic speed/input domain conditions. The next problem has
+both an initial mismatch and dynamics defects:
+\[
+ \Delta x_0=x_{\rm measured}-\bar x_0,\qquad
+ \Delta x_{i+1}=A_i\Delta x_i+B_i\Delta u_i+
+ \bigl(f_h(\bar x_i,\bar u_i)-\bar x_{i+1}\bigr).
+\]
+Meanwhile the fixed trust boxes require
+\[
+ |\Delta x_i|\le(2.5,2.5,0.25,2.5,1.5,0.75),\qquad
+ |\Delta u_i|\le(0.075,0.125).
+\]
+The input coordinates are steering angle in radians and dimensionless braking
+ratio. These are additional changes relative to the reference, not physical
+actuator limits. The state coordinates have their respective physical units.
+
+For both cases, removing every collision row, the terminal cone, or the
+terminal geometry does not resolve infeasibility. Removing either the state
+trust bounds or input trust bounds, while keeping physical limits, gives a
+successful primary solve with near-zero safety slack. This demonstrates the
+role of the local reference neighborhood.
+
+For crossing, dynamics and trust boxes alone are already inconsistent. The
+certificate uses first-five-stage input bounds and the yaw-rate bound at
+state node 6; no collision or terminal row is needed. Maximum initial mismatch
+is 0.145587 in the mixed state coordinates; maximum dynamics defect is
+0.065833 rad/s in yaw rate at stage 4. Diagnostic removal of either the initial
+mismatch or the dynamics-defect right-hand side makes the linear problem
+feasible. Erasing these terms would change the model and is not a proposed fix.
+
+For curvedHeadOn, physical limits also participate: the certificate includes
+later steering trust bounds, yaw-rate bounds and the 1.0001-m/s positive-speed
+floor at state node 25. Maximum dynamics defect is 0.210308 rad/s at stage 18.
+Zeroing only the initial mismatch does not help; zeroing the dynamics-defect
+terms does. This is a consistency defect in the reused affine tail combined
+with local bounds and the model domain, not observation noise.
+
+\subsection{15 m/s curvedHeadOn: hard tail collision geometry}
+Removing terminal constraints or either/all trust boxes does not make this
+problem feasible. Removing hard tail collision rows does. Its mismatch and
+largest dynamics defect are only $1.37\times10^{-5}$ and $2.38\times10^{-5}$
+in the mixed coordinates, so the large reference defects above are not the
+mechanism in this frame.
+
+The linear infeasibility witness includes hard collision-start rows at
+stages 28 and 34, corresponding to absolute times 1.45 and 1.75 s. Their
+separating normals are approximately $(-0.9910,-0.1336)$ and
+$(0.9980,0.0633)$. Around the predicted encounter, the frozen reference
+geometry changes from one almost longitudinal separation direction to the
+opposite direction. These rows, dynamics and physical bounds form an
+inconsistent local avoidance problem. PCBF slack cannot repair the conflict
+because the completion tail has no safety slack.
+
+This implicates the frozen hard collision approximation and reference
+trajectory. It does not establish that choosing any lateral direction will
+solve the case: two additional probes replacing all tail normals with one
+consistent lane-lateral side both remain infeasible. No successful replacement
+initialization or controller correction is demonstrated in this diagnosis.
+
+\section{Collisions are a separate relaxed-execution issue}
+The preceding independent plant/rectangle audit found first strict overlap at
+1.098333 s in 15-m/s headOn and 1.050000 s in acceleratingHeadOn. The covering
+controls have PCBF slack sums 0.0234122 and 0.00658919, respectively; their
+unrelaxed affine collision margins are negative. They were accepted relaxed
+solutions before the later solver interruption.
+
+Minimizing safety violation does not require its minimum to be zero. The
+implementation issues the solution after successful two-stage exits even
+when the PCBF slack remains positive. Therefore those successful exits do not
+mean the configured clearance was satisfied. Nonlinear prediction errors and
+intersample motion can contribute as well; this diagnosis does not isolate
+their share of the overlap. It makes no new continuous-time safety claim.
+
+\section{Design implications and validation limits}
+The two-stage objective ordering can be retained. The findings motivate
+numerically suitable CLF representation and explicit numerical result
+criteria, a reference trajectory consistent with the measured state and
+prediction dynamics, and local collision constraints that do not trap the
+hard tail around an unsuitable passage. None of these directions has been
+implemented or validated here. Returning the recorded CLF points alone does
+not establish success of any complete scenario or repair positive-slack
+collisions.
+
+Artifacts in \path{report/TWO_STAGE_FAILURE_CAUSES_20261001/} include original
+residuals, analytic lower bounds, all ablations, witness supports, logs,
+instrumentation scripts and hashes. Raw matrices and generated controller
+copies remain in the documented local cache. All fourteen original exits,
+all three negative certificates, the eleven lower-bound comparisons and
+seventeen unchanged source/native hashes were checked. The technical report
+was compiled and its text checked. No production unit suite or complete
+scenario campaign was repeated because the task was diagnosis only.
+\end{document}

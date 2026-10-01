@@ -1,0 +1,14 @@
+BASE 8 headOn primary=1 secondary=-7 rho=213.394021 normalized=0.0763577783 safety=8.33179473e-07 residual=1.02591546e-14 dual=1.29242094e-05
+BASE 8 acceleratingHeadOn primary=1 secondary=-7 rho=25.79922 normalized=0.487801063 safety=1.20676992e-06 residual=1.02606812e-12 dual=1.50624907e-07
+BASE 8 brakingLead primary=1 secondary=-7 rho=2.69143459 normalized=2.69143459 safety=1.21173509e-06 residual=2.70894418e-14 dual=0.0330938452
+BASE 8 crossing primary=-2
+BASE 8 turningCrossing primary=1 secondary=-7 rho=6.52901553 normalized=0.484244849 safety=8.9493263e-07 residual=7.99360578e-15 dual=0.00114432507
+BASE 8 curvedHeadOn primary=-2
+BASE 8 curvedCrossing primary=1 secondary=-7 rho=5.36531966 normalized=0.572540826 safety=8.94608624e-07 residual=8.02913291e-13 dual=0.146012866
+BASE 15 headOn primary=1 secondary=-7 rho=89.2320207 normalized=0.0319425918 safety=9.48897443e-07 residual=2.9697368e-14 dual=0.0241474879
+BASE 15 acceleratingHeadOn primary=1 secondary=-7 rho=91.8948767 normalized=0.0307164345 safety=1.14865365e-06 residual=1.45788142e-12 dual=0.01896565
+BASE 15 brakingLead primary=1 secondary=-7 rho=7.03740731 normalized=1.09454617 safety=1.1141472e-06 residual=2.24211065e-14 dual=0.000534753379
+BASE 15 crossing primary=1 secondary=-7 rho=4884.36272 normalized=0.0252364932 safety=9.63010949e-07 residual=2.26583257e-14 dual=5.26595716e-05
+BASE 15 turningCrossing primary=1 secondary=-7 rho=867.063639 normalized=0.120647301 safety=9.86373935e-07 residual=2.53295648e-14 dual=0.00289244676
+BASE 15 curvedHeadOn primary=-2
+BASE 15 curvedCrossing primary=1 secondary=-7 rho=2.31103349 normalized=1.97700965 safety=1.80903831e-06 residual=2.304823e-13 dual=0.000351525141

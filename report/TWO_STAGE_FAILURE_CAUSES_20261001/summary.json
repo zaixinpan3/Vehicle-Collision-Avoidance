@@ -1,0 +1,25 @@
+{
+  "controllerCommit": "905c8bdb9cf4e790e9229133f091d6a05ae13538",
+  "priorCampaignReportCommit": "cdb569a57f0b61ac95ecb255cfe191bb73c632fa",
+  "failedFramesReproduced": 14,
+  "clfFailures": 11,
+  "primaryInfeasibilities": 3,
+  "maximumOriginalClfCandidateConstraintResidual": 1.457881419035144e-12,
+  "maximumClfSlackMinusRelaxationLowerBound": 2.0074423900950933e-07,
+  "minimumClfSlackMinusRelaxationLowerBound": -9.325873406851315e-15,
+  "equivalentReformulationPositiveExitCounts": {
+    "normalLinearSolver": 4,
+    "capAndEndpointNormalized": 8
+  },
+  "equivalentReformulationCaseCount": 11,
+  "sourceAndNativeFilesVerifiedUnchanged": 17,
+  "productionChanges": false,
+  "newFullCampaign": false,
+  "limitations": [
+    "All candidate assessments concern the saved affine problems, not nonlinear safety.",
+    "Relaxation lower bounds and Farkas witnesses are floating-point numerical diagnostics, not interval-certified proofs.",
+    "Constraint removal probes change feasible sets and are not proposed control laws.",
+    "Equivalent scaling did not resolve all numerical exits.",
+    "Neither uniform lateral-normal probe resolved the 15 m/s curvedHeadOn primary infeasibility."
+  ]
+}

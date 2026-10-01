@@ -1,0 +1,14 @@
+CAPTURE 8 headOn variables=559 rows=936 terminalRadius=0.000244140625 mismatch=0.00761125015
+CAPTURE 8 acceleratingHeadOn variables=559 rows=936 terminalRadius=0.000244140625 mismatch=0.0300680794
+CAPTURE 8 brakingLead variables=559 rows=957 terminalRadius=0.000244140625 mismatch=0.0216686667
+CAPTURE 8 crossing variables=559 rows=957 terminalRadius=0.000244140625 mismatch=0.14558723
+CAPTURE 8 turningCrossing variables=559 rows=960 terminalRadius=0.000244140625 mismatch=0.00346635168
+CAPTURE 8 curvedHeadOn variables=559 rows=960 terminalRadius=0.000244140625 mismatch=0.023315109
+CAPTURE 8 curvedCrossing variables=559 rows=960 terminalRadius=0.000244140625 mismatch=0.0119190545
+CAPTURE 15 headOn variables=631 rows=672 terminalRadius=0.0009765625 mismatch=0.0324468494
+CAPTURE 15 acceleratingHeadOn variables=631 rows=544 terminalRadius=0.0009765625 mismatch=0.0309227214
+CAPTURE 15 brakingLead variables=631 rows=1069 terminalRadius=0.0009765625 mismatch=0.0327563844
+CAPTURE 15 crossing variables=631 rows=1069 terminalRadius=0.0009765625 mismatch=0.0194016487
+CAPTURE 15 turningCrossing variables=631 rows=1072 terminalRadius=0.0009765625 mismatch=0.0195232241
+CAPTURE 15 curvedHeadOn variables=631 rows=944 terminalRadius=0.0009765625 mismatch=1.36854755e-05
+CAPTURE 15 curvedCrossing variables=631 rows=1040 terminalRadius=0.0009765625 mismatch=0.0454315718

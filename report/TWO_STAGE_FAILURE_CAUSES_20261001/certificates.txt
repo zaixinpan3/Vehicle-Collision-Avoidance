@@ -1,0 +1,70 @@
+LINEAR 8 crossing original flag=-2
+LINEAR 8 crossing zeroDynamicsDefect flag=1
+LINEAR 8 crossing zeroInitialMismatch flag=1
+LINEAR 8 crossing onlyDynamicsAndTrust flag=-2
+CERTIFICATE 8 crossing value=-0.00885471098 residual=3.33e-16 support=11 maxDefect=0.0658326 coordinate=6 stage=4
+LINEAR 8 curvedHeadOn original flag=-2
+LINEAR 8 curvedHeadOn zeroDynamicsDefect flag=1
+LINEAR 8 curvedHeadOn zeroInitialMismatch flag=-2
+LINEAR 8 curvedHeadOn onlyDynamicsAndTrust flag=1
+CERTIFICATE 8 curvedHeadOn value=-0.00296671571 residual=1.11e-16 support=57 maxDefect=0.210308 coordinate=6 stage=18
+LINEAR 15 curvedHeadOn original flag=-2
+LINEAR 15 curvedHeadOn zeroDynamicsDefect flag=-2
+LINEAR 15 curvedHeadOn zeroInitialMismatch flag=-2
+LINEAR 15 curvedHeadOn onlyDynamicsAndTrust flag=1
+CERTIFICATE 15 curvedHeadOn value=-0.774858745 residual=4.86e-16 support=48 maxDefect=2.37557e-05 coordinate=6 stage=1
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 headOn rho=213.3940211 returned=213.3940211 gap=8.94147e-11
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 acceleratingHeadOn rho=25.79921999 returned=25.79921999 gap=6.71641e-11
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 brakingLead rho=2.691434585 returned=2.691434585 gap=4.92939e-14
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 turningCrossing rho=6.52901553 returned=6.52901553 gap=2.43361e-13
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 8 curvedCrossing rho=5.365319655 returned=5.365319655 gap=1.58211e-11
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 headOn rho=89.23202075 returned=89.23202075 gap=1.26393e-09
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 acceleratingHeadOn rho=91.89487671 returned=91.89487672 gap=1.54007e-08
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 brakingLead rho=7.037407308 returned=7.037407308 gap=4.14335e-12
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 crossing rho=4884.362715 returned=4884.362715 gap=1.43109e-08
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 turningCrossing rho=867.0636392 returned=867.0636394 gap=2.00744e-07
+[Warning: Using CONDEST instead of COND for sparse matrix.]
+[> In cond (line 25)
+In clfLowerBound (line 20)
+In run (line 100)]
+LOWERBOUND 15 curvedCrossing rho=2.311033494 returned=2.311033494 gap=-9.32587e-15
