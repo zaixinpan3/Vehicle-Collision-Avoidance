@@ -1,0 +1,140 @@
+{
+  "baseCommit": "b9b4f234079950d14e30582499fdf3f13a20e910",
+  "scope": "Non-invasive runtime diagnosis; instrumented replay has reconstructed, not historical, warm trajectory. No weekly/monthly report hashes.",
+  "maximumVerified": {
+    "seconds": 5.539001,
+    "speed": 8,
+    "scenario": "turningCrossing",
+    "frame": 5,
+    "time": 0.2
+  },
+  "sources": {
+    "controller/collisionAvoidanceController.m": "d11ee84165e883784bb6bb141d61829367f56cafbb88fcc786fb215dfb20635c",
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+    "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+    "controller/predictiveSafetyGeometry.m": "a005f337ae1ae4ac75ddf212e0a15f09ffd6765cce99a12b241725342e7e1567",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "aeb41b0f8c8d8d9fec724c53be9fbb75fa3993c2b5457d564cf1314dd7c27ea1",
+    "controller/terminalContinuation.m": "cea3e6ea542a179a67c81bd4b87c7804b3706f8dd7c41419a8ee9d733b5a5be2",
+    "config/collisionAvoidanceControllerConfig.m": "f3d977cb3aa0197fa56628f46b01198ec83877888cff1701c07019a39b1a2746",
+    "config/estimatorControllerIntegrationConfig.m": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "config/nrmmTrackingConfig.m": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47"
+  },
+  "originalRaw": {
+    "path": "/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/turningCrossing.json",
+    "sha256": "e054d358e04819c78060d3e56d8b8aec45368c53548f8fa07d6c18a1b0e2c25a"
+  },
+  "raw": {
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/CLF_SLOW_FRAME_20261001.log": {
+      "bytes": 14009,
+      "sha256": "c29630c7f4089b2e43634850af67251b5f85e89ea0459b9eea86ff0e6862dcec"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/captured-frame.mat": {
+      "bytes": 583811,
+      "sha256": "1d85b9d4de835e417b335a12d417654cb36a148f97c8a7971a2c37bc8a78beb7"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/code-analysis.json": {
+      "bytes": 6202,
+      "sha256": "765af9d721a9335f6bb1b3ded9291d0f2d5caf74b1dfa13c6f8cf34dd4fff6f1"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/configuration-import-failure.log": {
+      "bytes": 613,
+      "sha256": "419215d67624d5cf92fae2f38ff4179e4281bacfec1469c3356e5d0ff9695bd7"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrument.py": {
+      "bytes": 3008,
+      "sha256": "8ab70fb884f49bfbb376b63e6068ad1551d34bce8e5361bdc9e7d15ff7a1b668"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumentation.json": {
+      "bytes": 820,
+      "sha256": "b0c2c518e25b812be3390589b2a3f7adde31bab3de69821b0f9c7e54f1329e58"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumentation.patch": {
+      "bytes": 9949,
+      "sha256": "ea249d6a9682238ddb88066ed00cf0ccc923e7356dcfec0f28d7e0f7cd47e195"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/config/collisionAvoidanceControllerConfig.m": {
+      "bytes": 7054,
+      "sha256": "f3d977cb3aa0197fa56628f46b01198ec83877888cff1701c07019a39b1a2746"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/config/estimatorControllerIntegrationConfig.m": {
+      "bytes": 5604,
+      "sha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/config/nrmmTrackingConfig.m": {
+      "bytes": 4158,
+      "sha256": "5238ba4282ef015a4e532d67ca93cb478759eda3cb679de150df0e1e39863e47"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/clfFrameTimer.m": {
+      "bytes": 1219,
+      "sha256": "b11941ac5cc7d5c5af215aa006767648cd8f66c67be3acc41a2347ed7b911b2a"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/collisionAvoidanceController.m": {
+      "bytes": 9335,
+      "sha256": "d11ee84165e883784bb6bb141d61829367f56cafbb88fcc786fb215dfb20635c"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/laneGeometry.m": {
+      "bytes": 5788,
+      "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/modifiedFialaTire.m": {
+      "bytes": 6420,
+      "sha256": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/nonlinearBicycleModel.m": {
+      "bytes": 10897,
+      "sha256": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/predictiveSafetyGeometry.m": {
+      "bytes": 10908,
+      "sha256": "a005f337ae1ae4ac75ddf212e0a15f09ffd6765cce99a12b241725342e7e1567"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/readControllerInputs.m": {
+      "bytes": 19229,
+      "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/solvePredictiveControl.m": {
+      "bytes": 67140,
+      "sha256": "6a07f7b3475717fe19b1c7e0b8435d723d113ff15885659c7e05492f4e8554b8"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrumented/controller/terminalContinuation.m": {
+      "bytes": 24779,
+      "sha256": "cea3e6ea542a179a67c81bd4b87c7804b3706f8dd7c41419a8ee9d733b5a5be2"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/original-frames.json": {
+      "bytes": 22073,
+      "sha256": "d8b5f532c8e8d72a6e36551bffd94f59276a3680a76c1a6a62b053f278f823f9"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/replay-results.json": {
+      "bytes": 69244,
+      "sha256": "510c6c254720f43922f4cdb4d9f5f784fea67c882bbf110180abfc603c97cf4a"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/replay-results.mat": {
+      "bytes": 823464,
+      "sha256": "fbc0ce02348252633562010bda74a50d9101e5c14d8c64495de4565e19f2a11a"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/report-compile-1.log": {
+      "bytes": 4189,
+      "sha256": "6796c505fa9a2e83427c45c2bafd28697e26c3a24a0b7a0985cd31c398f69119"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/report-compile-2.log": {
+      "bytes": 4211,
+      "sha256": "da0fb2dc4b07e491db574284cff4f85ff4a45822e344a82f58543c585ca3c6f1"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/runSlowFrame.log": {
+      "bytes": 572,
+      "sha256": "c2cd275a4a216415ee56fff275222c8d19351dcde0642c34e1755ddbcd2eee2e"
+    },
+    "/home/zai/.cache/collisionAvoidance/slow-frame-20261001/runSlowFrame.m": {
+      "bytes": 4521,
+      "sha256": "535c8ccbdb9684f72c187068e56a88112cf1c4193ccb429a5158ff30f1a69f65"
+    }
+  },
+  "compactEvidence": {
+    "report/CLF_SLOW_FRAME_20261001/REPRODUCTION.txt": "7beaefcc96c5a11846a1f0078e42e8218cfe8cc6731a310058711d3ee58e056b",
+    "report/CLF_SLOW_FRAME_20261001/phase-breakdown.csv": "47a29fd70d61cece5bfb62883cf5e74e65f32485ae9b2865197f6c7ceb0d153c",
+    "report/CLF_SLOW_FRAME_20261001/summary.json": "67855ee5ae1c4211bb21db276429bfb66fb4d8ba16047464007fd38715b65376",
+    "report/CLF_SLOW_FRAME_20261001/timing-events.csv": "2e8b3c1dfb2e80b08b0a03214386f7664a136373a1642febf169e72fa41533c4"
+  }
+}

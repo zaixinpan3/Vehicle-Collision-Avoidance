@@ -1,0 +1,7 @@
+component,seconds,percent,calls
+Conic numerical solves,2.337185,46.42927168628613,5
+Affine problem construction,0.804729,15.986317460891353,2
+Nonlinear rollout and safety evaluation,0.8602500000000006,17.089268058851857,14
+Nonlinear dynamic-defect retraction,0.7964260000000003,15.821374487694442,2
+Endpoint correction excluding nested evaluations,0.20708699999999963,4.1138799819859875,5
+First-step CLF correction and remaining orchestration,0.028183999999999543,0.5598883242902325,

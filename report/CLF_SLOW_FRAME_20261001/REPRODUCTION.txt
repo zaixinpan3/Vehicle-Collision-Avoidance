@@ -1,0 +1,52 @@
+Longest-frame composition diagnostic -- October 1, 2026
+
+Base source: b9b4f234079950d14e30582499fdf3f13a20e910
+Raw directory: /home/zai/.cache/collisionAvoidance/slow-frame-20261001
+Original experiment:
+  /home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable/speed8/turningCrossing.json
+Original frame: one-based 5, simulation time 0.20 s, 5.539001 s controller call.
+
+Executed preparation and replay:
+  python /home/zai/.cache/collisionAvoidance/slow-frame-20261001/instrument.py
+  matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/slow-frame-20261001/runSlowFrame.m')"
+The instrumenter copies production code into raw/instrumented and adds only
+nested timers/cleanup callbacks to eleven major solver functions, plus exact
+pass-through coneprog and quadprog wrappers. The source patch and hashes are
+retained. No production controller or configuration file was modified.
+
+runSlowFrame.m replays the first four recorded measured states and previous
+issued inputs with the unmodified controller to reconstruct a warm plan.
+That plan is saved to captured-frame.mat and used unchanged for three
+production and three instrumented calls at the original fifth physical state.
+The original complete warm plan was not saved, and the reconstructed commands
+differ from the historical commands. These phase measurements are explanatory
+replay evidence, not an exact phase split of the original 5.539001 s call.
+The original trace records three conic plus four correction-QP calls; the
+replay records five conic calls and no correction QPs. Both have 212 holds.
+
+The configuration is instantiated from the current defaults with the original
+speed 8 m/s and prefix 8; its JSON-normalized representation is asserted equal
+to the original export. JSON cannot preserve infinite bounds directly. An
+initial direct-import attempt failed validation before any controller experiment;
+configuration-import-failure.log preserves that preparation failure. The
+corrected replay leaves physical bounds and the five-second budget unchanged.
+
+Validation performed:
+- Original maximum verified over all fourteen source results.
+- All six replay calls return the same issued input with zero hard residual,
+  zero safety slack and the expected 212-hold horizon.
+- All three timer traces have balanced scope stacks and nonnegative exclusive
+  times; their exclusive sum equals root inclusive time within 1e-9 seconds.
+- Timed solver counts equal each returned search.solverCalls (five).
+- Factory MATLAB Code Analyzer run on the instrumented source; findings retained.
+- Production source and raw artifact hashes verified; unrelated edits preserved.
+- English LaTeX report compiled and inspected.
+No full controller test suite was rerun because production code is unchanged.
+
+phase-breakdown.csv describes the third, warmed instrumented replay only.
+timing-events.csv includes all three traces. summary.json includes the original
+frame, reconstruction differences and all production replay outcomes. Nested
+exclusive accounting prevents counting evaluation cost twice inside correction.
+Full solver dimensions/exit flags and event order remain in replay-results.json.
+The ordinary MATLAB Profiler was not enabled: only coarse nested wall timers
+were used to limit perturbation of the budget-dependent control flow.

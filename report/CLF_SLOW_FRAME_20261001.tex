@@ -1,0 +1,130 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\title{Runtime Composition of the Longest CLF-Recovery Frame}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Original measured frame}
+The longest complete controller call in the fourteen-case campaign is
+\textbf{5.539001 seconds}, in the 8-m/s \texttt{turningCrossing} scenario,
+one-based frame 5, at simulation time 0.20 seconds. The driver starts its
+clock immediately before calling the controller and stops it immediately
+after return. This value includes input processing, formulation, all solver
+calls and nonlinear admission; it excludes subsequent ODE45 integration,
+offline geometry audit, plotting and export.
+
+The saved trace establishes the following facts without reconstruction:
+\begin{itemize}
+\item The prediction has 212 holds at 50 ms: a total of 10.6 seconds.
+Only eight holds (0.4 seconds) are the PCBF prefix; the remaining 204 holds
+(10.2 seconds) are the optimized safety-completion tail.
+\item The controller starts by restoring the shifted trajectory from the
+changed measured ego state. Its exact RK4 successor does not equal the
+independent ODE45 measurement, so the exact shifted-cache branch is unavailable.
+\item Seven numerical optimizer calls are recorded. The one recorded SCvx
+step uses three: a zero-CLF-slack SOCP, a relaxed-CLF SOCP, and a predictive-cost
+SOCP fixing the minimizing first input. Its zero-slack solve reports infeasible
+in the local model; the latter two solves return positive exit flags. The
+remaining four calls must be correction QPs: those are the only counted
+optimizer calls outside the recorded SCvx step in this source.
+\item The primary safety solve is skipped because a zero-safety witness
+already exists. Initial CLF slack is 8.166963; after the initial corrections,
+the SCvx baseline slack is 6.006301. The admitted returned slack is 4.555671,
+with zero hard residual and zero safety slack. CLF optimization is explicitly
+incomplete and termination is \texttt{timeLimit}.
+\end{itemize}
+The five-second setting is a soft improvement budget. An in-flight solver,
+rollout or correction is allowed to finish; the controller checks the clock
+at selected boundaries. This explains how a call can exceed five seconds.
+The original trace does not identify which operation accounts for its final
+0.539001-second excess.
+
+\section{Measured decomposition and its limit}
+The original campaign did not save phase timers or the complete warm trajectory
+before frame 5. Therefore its exact historical phase split cannot be recovered.
+A diagnostic replay uses the recorded ego state, target epoch, previous issued
+input and unchanged physical configuration. The first four controller calls
+reconstruct a warm trajectory, always using the recorded physical states.
+Budget-limited decisions differ from the original run: their largest input
+component differences are 0.125000, 0.068771, 0.065142 and 0.107980. This is
+\emph{not} a replay of the exact original optimizer state.
+
+The resulting frame-5 input problem is frozen for three production replays
+and three instrumented replays, using one single-thread MATLAB R2026a process.
+Production calls take 5.040144, 5.494397 and 5.499686 seconds. Instrumented calls
+take 5.029124, 5.013569 and 5.033861 seconds. All six have 212 holds, the same
+issued input, zero hard residual and zero safety slack. Their issued input is
+$[-0.010233318,-0.533951716]^T$, whereas the original is
+$[-0.004935372,-0.469335934]^T$. Their final CLF slack is 5.27826.
+The replay executes five SOCP calls over two SCvx steps and no correction QP
+calls. This differs from the original seven-call path and precludes labeling
+the following numbers as the exact decomposition of 5.539001 seconds.
+
+The last warmed instrumented replay provides this additive breakdown:
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Component & Seconds & Share \\
+\midrule
+SOCP numerical solves (five calls) & 2.337185 & 46.43\% \\
+Affine problem construction and setup & 0.804729 & 15.99\% \\
+Nonlinear rollout and safety evaluation & 0.860250 & 17.09\% \\
+Nonlinear dynamic-defect retraction & 0.796426 & 15.82\% \\
+Endpoint correction, excluding nested evaluations & 0.207087 & 4.11\% \\
+First-step CLF correction and remaining orchestration & 0.028184 & 0.56\% \\
+\midrule
+Total & 5.033861 & 100.00\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+The numerical-solve total consists of 0.695355 seconds for two infeasible
+zero-slack attempts, 1.249449 seconds for two relaxed-CLF solves, and 0.392381
+seconds for one fixed-first-input cost solve. The replay performs fourteen
+nonlinear evaluations, two dynamic-defect retractions and five endpoint
+correction invocations. The latter can return immediately; invocation count
+is not a count of successful correction iterations.
+
+Nested timers record inclusive and exclusive time, so a rollout called by an
+endpoint correction is counted under rollout rather than counted twice.
+Exclusive times sum to the root solve time within $10^{-9}$ seconds in all
+three instrumented runs. The remaining outer controller time is assigned to
+orchestration. Only an isolated source copy contains the timers and pass-through
+solver wrappers. Production controller files are unchanged.
+
+\section{Interpretation}
+The expensive work is a long, repeatedly processed prediction. At this horizon,
+the basic conic program has 1,918 variables and 1,278 dynamics equality rows;
+the predictive-cost version has 2,130 variables and 214 cones. Measured replay
+linear-inequality counts are approximately 2,975--2,980. The model includes
+nonlinear combined-slip tires, yaw-dependent rectangle geometry, adaptive
+interval separation and a terminal continuation. A single full rollout spans
+2,120 RK4 integration intervals, before counting repeated evaluations and
+variational dynamics.
+
+In the measured replay, numerical optimization accounts for about 46\% of the
+call. Formulation, nonlinear evaluation and correction account for almost all
+of the rest. Improving only the SOCP engine would leave substantial cost in
+repeated full-horizon work. The original frame additionally spends four QP
+calls repairing trajectory feasibility, whose historical durations are unknown.
+A zero PCBF slack does not imply that CLF work has finished: the original
+returned CLF slack remains positive. Continuing to improve it is consistent
+with the current objective hierarchy; the computational burden comes from the
+size and repeated processing of the coupled continuation.
+
+A local infeasible zero-slack SOCP is not a proof of globally impossible
+nonlinear CLF dissipation. Neither the profile nor the original five-second
+budget establishes a hard real-time deadline. Concurrent campaign load, the
+reconstructed warm start and timer overhead all limit comparison of absolute
+times. No algorithm change, new controller mode or road constraint was introduced
+for this diagnostic.
+
+The compact bundle \path{CLF_SLOW_FRAME_20261001/} contains the original frame,
+reconstruction differences, replay checks, additive timings, individual events,
+reproduction commands and source/raw hashes. Full MAT snapshots, generated
+instrumentation and the derived PDF remain in the external research cache.
+\end{document}
