@@ -1,0 +1,27 @@
+{
+  "time": "2026-10-01T12:12:57.408776-05:00",
+  "reason": "User requested stopping experiments and diagnosis of five-second safety-search failures against a desired 0.1-second latency.",
+  "action": "Sent SIGTERM only to MATLAB PID 1297465 running this campaign.",
+  "savedCases": [
+    "campaign/speed8/brakingLead.json",
+    "campaign/speed8/crossing.json",
+    "campaign/speed8/headOn.json",
+    "campaign/speed8/turningCrossing.json"
+  ],
+  "interruptedCase": "speed8/acceleratingHeadOn; final trace/continuation not exported",
+  "lastLogLines": [
+    "headOn: 252/1600 holds, last 0.002 s, source feasibleInitialization",
+    "headOn: 256/1600 holds, last 0.002 s, source feasibleInitialization",
+    "headOn: 260/1600 holds, last 0.002 s, source feasibleInitialization",
+    "headOn: 261/1600 frames, max 5.015 s, failure ",
+    "CASE-END speed=8 scenario=headOn wall=154.876 recovered=1 failure=",
+    "CASE-START speed=8 scenario=acceleratingHeadOn",
+    "acceleratingHeadOn: 4/1600 holds, last 4.327 s, source sequentialConvexification",
+    "acceleratingHeadOn: 8/1600 holds, last 5.013 s, source sequentialConvexification",
+    "acceleratingHeadOn: 12/1600 holds, last 5.003 s, source sequentialConvexification",
+    "acceleratingHeadOn: 16/1600 holds, last 5.006 s, source sequentialConvexification",
+    "acceleratingHeadOn: 20/1600 holds, last 5.005 s, source sequentialConvexification",
+    "acceleratingHeadOn: 24/1600 holds, last 5.004 s, source sequentialConvexification"
+  ],
+  "remainingCampaign": "Not executed after user stop; no completion or recovery claim for interrupted/unrun cases."
+}

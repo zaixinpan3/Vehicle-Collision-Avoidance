@@ -1,0 +1,9 @@
+Name,Passed,Failed,Incomplete,Duration
+"controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.005,fraction=1)",1,0,0,0.928218
+"controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.005,fraction=0.5)",1,0,0,0.137814
+"controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.025,fraction=1)",1,0,0,0.115607
+"controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.025,fraction=0.5)",1,0,0,0.106991
+"controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.05,fraction=1)",1,0,0,0.112006
+"controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.05,fraction=0.5)",1,0,0,0.105128
+controllerKernelTest/geometryKernelsReproduceTheInterpretedDistanceAndDual,1,0,0,0.566721
+controllerKernelTest/kernelKeepsTheModelDomainErrors,1,0,0,0.288347

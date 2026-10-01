@@ -1,0 +1,61 @@
+Current controller rerun -- October 1, 2026
+
+This is a partial campaign stopped at the user's explicit request.
+Four saved runs: turningCrossing, brakingLead, crossing, headOn at 8 m/s.
+Only headOn completes recovery. AcceleratingHeadOn at 8 m/s was interrupted;
+the remaining two 8-m/s cases and all seven 15-m/s cases were not started.
+The in-flight run did not export a final trace and is excluded from statistics.
+
+Raw root: /home/zai/.cache/collisionAvoidance/controller-rerun-20261001
+Frozen source root: <raw>/source
+Source baseline: 29d3e41 plus the then-current uncommitted controller changes.
+Exact source and native-binary hashes: manifest.json / source-manifest.json.
+The campaign snapshot and current worktree were checked byte-identical in all
+115 captured source/document/kernel files before closure. No algorithm edited.
+
+Executed:
+  matlab -singleCompThread -batch "run('<raw>/campaign.m')"
+The script first runs tests/controllerKernelTest.m (8 pass), then calls
+runNonlinearPredictiveSafetyValidation(Scenarios=NAME,Frames=1600,
+  ControllerConfiguration=struct('referenceSpeed',SPEED,
+    'controller',struct('horizonSteps',PREFIX)),
+  RequireCollisionThreat=true,RecoveryDwellSeconds=5,
+  OutputFile=JSON,ContinuationFile=MAT).
+The actual completed/failed cases use SPEED=8 and PREFIX=8. The planned 15/16
+cases were not executed. One campaign process ran at a time. The timer brackets
+the full controller call and excludes subsequent ODE45 and audit/export.
+MATLAB R2026a; AMD Ryzen 7 7800X3D. No MATLAB MCP available, so CLI was used.
+
+Defaults under test: 50-ms hold and one 50-ms RK4 step, 6-mm configured margin,
+30-m encounter range, 3-s minimum completion allowance, five-second soft
+improvement budget. No road constraint, observation error, noise or random
+simulation draw. The known target trajectory remains active in the independent
+plant/audit even outside the controller's range. ODE45 uses 1e-11 relative and
+1e-12 absolute tolerance and 31 saved audit samples per hold.
+Recovery tolerances are [0.1 m, 1 degree, 0.1 m/s, 0.05 m/s, 0.01 rad/s] over a
+five-second dwell beginning no earlier than 8 s. The 80-s cap is not a demanded
+settling time. The user stopped this campaign before it could finish.
+
+Stop:
+  kill -TERM 1297465
+The campaign process was confirmed gone. interruption.json preserves the actual
+stop time, saved files and last log lines; no completed result is invented.
+
+Read-only work after stop:
+  matlab -singleCompThread -batch "run('<raw>/inspectSavedFrames.m')"
+This script only loads stored MAT structures and exports values; it runs no
+controller, optimizer, plant, diagnostic rollout or new simulation.
+  python <raw>/collect.py
+This audits the four saved traces using the frozen auditJointPredictiveSafety.py
+and produces summary.json, results.csv and sampled-traces.csv. Strict positive
+distance and full 6-mm buffer are separate flags; aborted prefixes are not
+successful full scenarios. Slow-safe-frame details come from brakingLead hold90.
+The specific active obstruction in the failed hold at 5.20 s was not logged.
+
+Not executed: tests.m (thirteen-file controller suite), diagnoseFailures.m
+(controller replay and coarse/fine trajectory comparison), remaining cases.
+Do not interpret these prepared scripts as validation results.
+
+The English technical report was compiled twice and extracted for content
+inspection. Project changes are limited to report artifacts; pre-existing
+controller/configuration/test and observer changes remain outside this commit.

@@ -1,0 +1,149 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\title{Interrupted Controller Rerun and the 100-ms Latency Gap}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Scope and interruption}
+The current worktree was frozen before execution, including the existing
+compiled model and geometry kernels. Its base commit is
+\path{29d3e41}, with the uncommitted controller changes identified in the
+source manifest. The principal differences from the preceding encounter-range
+campaign are a 50-ms default RK4 step instead of 5 ms, consistent interpolated
+midpoints, and optional compiled numeric kernels. The 30-m encounter range,
+6-mm configured safety margin, 50-ms hold, and five-second soft improvement
+budget remain. No algorithm or configuration was edited for this rerun.
+
+Fourteen original threat cases were scheduled, seven at each of 8 and 15 m/s.
+The user stopped the campaign during its fifth case and requested analysis of
+five-second calls against an intended 0.1-s latency. The campaign process was
+terminated on October 1 at approximately 12:12:57 America/Chicago. Four runs
+had exported traces; one was interrupted and nine were not started. Only one
+of the four exported runs completed its recovery criterion. This is not a
+completed fourteen-case validation.
+
+After the stop, work was limited to source inspection and analysis of saved
+data. A MATLAB script only loads MAT snapshots and exports stored quantities;
+it executes no controller, optimizer or plant simulation. The prepared
+failure-replay and broader regression scripts were not executed.
+
+\section{Saved results}
+The plant uses independent tight ODE45 integration, with 31 audit samples per
+hold. A separate Python rectangle implementation checks the saved samples.
+No road constraints, observer errors, noise, delay or random draws are added.
+The scenario target continues its original known trajectory in the plant
+and audit; it is not removed at the controller's encounter-range threshold.
+
+\begin{center}\small
+\begin{tabular}{lrrrrl}
+\toprule
+8-m/s scenario & Holds & End (s) & Gap (mm) & Max call (s) & Outcome \\
+\midrule
+turningCrossing & 23 & 1.15 & 1955.794 & 5.017589 & Domain error \\
+brakingLead & 104 & 5.20 & 3.835 & 5.045531 & No feasible continuation \\
+crossing & 19 & 0.95 & 3237.293 & 5.028670 & Domain error \\
+headOn & 261 & 13.05 & 7.072 & 5.015045 & Recovery confirmed \\
+\bottomrule
+\end{tabular}\end{center}
+All 407 returned holds have zero reported hard residual and zero PCBF safety
+slack. All recorded executed prefixes have strictly positive sampled distance;
+this does not establish that the three interrupted-by-error scenarios would
+remain collision-free. The braking-lead prefix violates the configured 6-mm
+physical replay buffer despite its nominal admission. The two domain errors
+occur after about 3.6 and 3.3 ms, respectively; they are not five-second
+optimization timeouts. BrakingLead's next call fails after 5.011932 s.
+
+Recovery requires all five errors below
+$[0.1\,\mathrm m,1^\circ,0.1\,\mathrm{m/s},0.05\,\mathrm{m/s},0.01\,\mathrm{rad/s}]$
+for five seconds beginning no earlier than eight seconds. The head-on run
+meets this at 13.05 s; its subsequent-call median is 2.511 ms, but its maximum
+is 5.015045 s. Fast nominal holds therefore coexist with slow avoidance holds.
+An early failure must not be counted as a speedup over a completed prior run.
+
+\section{A slow safe call is different from a failed feasibility search}
+The longest saved call is brakingLead frame 90 at simulation time 4.45 s.
+It takes 5.045531 s with 101 prediction holds, including 93 completion holds,
+and invokes numerical solvers 30 times across eight recorded sequential steps
+and additional correction work. Every recorded step skips the primary safety
+solve because a nominally feasible incumbent already exists. All evaluated
+step candidates have zero hard and safety residuals.
+
+The first seven steps attempt zero CLF relaxation and receive local
+infeasibility flags, then solve for positive relaxation and attempt predictive
+cost refinement. Nonlinear admission/correction accompanies these proposals.
+The CLF relaxation improves from 31.984157 to 23.492844, but the call reaches
+the five-second budget before satisfying its CLF completion rule. This is
+repeated improvement of an already safe candidate, not five seconds without
+any safe input.
+
+The brakingLead call at 5.20 s is different: it returns
+\texttt{noFeasibleContinuation} with \texttt{timeLimit}. Its previous saved
+plan has 91 holds, zero hard/safety residuals and minimum predicted speed
+4.907092 m/s. The measured next state differs from its predicted successor;
+in particular lateral velocity differs by $7.43984\,10^{-4}$ m/s and yaw
+rate by $-1.45098\,10^{-3}$ rad/s. Hence exact shifted-witness reuse is
+unavailable and the complete nonlinear continuation requires readmission or
+restoration. The saved error alone does not establish which constraint
+prevented restoration. No per-stage trace from that failed call was exported,
+and the exact active obstruction is therefore unresolved without further
+diagnosis. Failure of the local search is not a proof of physical infeasibility.
+
+\section{Why the current organization misses 0.1 s}
+The default \texttt{timeLimitSeconds=5} permits the complete improvement loop
+to use fifty times the requested 0.1 s. It is a soft deadline: an in-flight
+factorization or another operation can overrun it. A faster kernel allows
+more search within this budget and does not itself shorten a budget-limited
+call.
+
+Each sequential step can solve a zero-CLF conic problem, a positive-CLF
+conic problem and a predictive-cost conic problem, followed by nonlinear
+rollouts, endpoint corrections and correction QPs. The outer loop permits
+24 sequential steps; a correction helper permits five QPs, with backtracking
+and full trajectory reevaluation. These bounds are not a 100-ms computational
+design. Changing early controls can require repairing every later input and
+the small terminal core. The braking-lead first plan still contains 193 holds
+(9.65 s) despite the encounter-range change.
+
+There is also sensitivity of the feasible prediction. Before the domain
+errors, turningCrossing's saved minimum predicted speed is 1.001618 m/s and
+crossing's is 1.038516 m/s, close to the 1-m/s model floor. Their measured
+speeds at failure are 4.705472 and 6.171439 m/s, respectively, so the measured
+initial state itself is not below the floor. The stored prediction and actual
+successor differ even with exact state observation, because the one-step RK4
+prediction is not the ODE45 plant map. These observations identify fragile
+nominal continuation and numerical-model mismatch as concerns, but do not
+alone prove that the larger RK4 step caused every failure. No paired
+integration-step campaign was run.
+
+The design objective should remain safety followed by CLF improvement.
+Returning at zero PCBF slack while ignoring a positive CLF slack would violate
+that objective. Instead, a 100-ms design needs substantially less repeated
+convex work and trajectory repair, a reliably transferable numerical
+prediction, and a bounded improvement policy whose safety and dissipation
+properties are established together. Directly minimizing CLF slack can avoid
+the preliminary zero-slack feasibility attempt in the same local problem;
+tail parameterization and correction coupling also deserve redesign. These
+are proposed directions, not implemented changes or measured latency promises.
+Simply replacing the five-second timeout with 0.1 s would cut search short
+without establishing an admissible result by that deadline.
+
+\section{Validation and reproducibility}
+Eight compiled-kernel consistency tests passed before the campaign; their
+random test streams use seeds 7 and 11. This verifies numeric consistency at
+the tested points, not integration accuracy relative to the physical replay.
+The larger controller suite was prepared but not run after the user stopped
+experiments. The four saved traces were independently audited in Python;
+the source snapshot and compiled binary hashes were checked unchanged.
+
+Raw files, commands and the interruption record are under
+\path{/home/zai/.cache/collisionAvoidance/controller-rerun-20261001}.
+The repository bundle contains the compact partial summary, per-case and
+sampled results, the slow safe-call trace, saved-state inspection and manifest.
+No simulation was resumed after the stop, and no result is claimed for the
+interrupted acceleratingHeadOn run or the nine unstarted cases.
+\end{document}

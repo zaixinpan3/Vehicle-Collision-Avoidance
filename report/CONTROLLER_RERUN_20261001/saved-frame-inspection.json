@@ -1,0 +1,198 @@
+[
+  {
+    "scenario": "brakingLead",
+    "speed": 8,
+    "failure": "collisionAvoidanceController:noFeasibleContinuation: No feasible nonlinear prefix and indefinite continuation were obtained (timeLimit).",
+    "failureTime": 5.2,
+    "measuredSuccessor": [
+      36.183092312239779,
+      0.794751331275934,
+      0.12689862679052091,
+      5.12382832170199,
+      0.40736168954454449,
+      0.29770690500213431
+    ],
+    "predictedSuccessor": [
+      36.183089148825623,
+      0.794771327684579,
+      0.12686487311793854,
+      5.123816844533,
+      0.40661770592859836,
+      0.29915788098501384
+    ],
+    "difference": [
+      3.1634141564040874E-6,
+      -1.9996408645028829E-5,
+      3.375367258237616E-5,
+      1.147716899030371E-5,
+      0.000743983615946131,
+      -0.001450975982879521
+    ],
+    "savedHorizonSteps": 91,
+    "savedMinimumPredictedSpeed": 4.907092058147299,
+    "savedFinalState": [
+      72.33739314876037,
+      0.14664830281772098,
+      -0.031276478271582163,
+      7.9999999343571409,
+      -2.3038587695115602E-8,
+      -7.2693852187473314E-9
+    ],
+    "savedMaximumAbsInput": [
+      0.698130579675038,
+      0.99999999996470312
+    ],
+    "terminalRadius": 0.000244140625,
+    "savedHard": 0,
+    "savedSafety": 0,
+    "savedClfSlack": 57.96774772246809,
+    "savedEncounterExit": null
+  },
+  {
+    "scenario": "crossing",
+    "speed": 8,
+    "failure": "collisionAvoidanceController:nonlinearDomain: Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.",
+    "failureTime": 0.95000000000000007,
+    "measuredSuccessor": [
+      6.7198560173668,
+      0.090350291163499977,
+      0.024139402789529127,
+      6.1714392144851136,
+      0.12739949230719835,
+      0.12741790719653118
+    ],
+    "predictedSuccessor": [
+      6.71985775807109,
+      0.090284945279360929,
+      0.024257642833908175,
+      6.171548700623708,
+      0.1269305631080628,
+      0.12486874446767594
+    ],
+    "difference": [
+      -1.740704290043027E-6,
+      6.5345884139048072E-5,
+      -0.00011824004437904767,
+      -0.0001094861385944057,
+      0.0004689291991355482,
+      0.0025491627288552338
+    ],
+    "savedHorizonSteps": 72,
+    "savedMinimumPredictedSpeed": 1.0385159414585039,
+    "savedFinalState": [
+      24.207550321068883,
+      -8.2506916001325337,
+      -0.77381765428085236,
+      8.0000012238405223,
+      6.6314867623380705E-7,
+      -2.8253627536875222E-7
+    ],
+    "savedMaximumAbsInput": [
+      0.68654360674744475,
+      0.99958186279189465
+    ],
+    "terminalRadius": 0.000244140625,
+    "savedHard": 0,
+    "savedSafety": 0,
+    "savedClfSlack": 23.326765550581626,
+    "savedEncounterExit": null
+  },
+  {
+    "scenario": "headOn",
+    "speed": 8,
+    "failure": "",
+    "failureTime": null,
+    "measuredSuccessor": [
+      102.53140475818012,
+      -0.0045221016878705953,
+      8.2207323301038048E-5,
+      8.0000000007636043,
+      -4.7444870129598178E-20,
+      -7.6291178572380558E-20
+    ],
+    "predictedSuccessor": [
+      102.53140475818014,
+      -0.0045221016878705953,
+      8.2207323301038048E-5,
+      8.0000000007636078,
+      -3.6767283207809941E-20,
+      -4.6664399627705876E-20
+    ],
+    "difference": [
+      -2.8421709430404007E-14,
+      0,
+      0,
+      -3.5527136788005009E-15,
+      -1.0677586921788237E-20,
+      -2.9626778944674682E-20
+    ],
+    "savedHorizonSteps": 68,
+    "savedMinimumPredictedSpeed": 7.9999999999999991,
+    "savedFinalState": [
+      129.33140466774086,
+      -0.0023189454258745541,
+      8.2207323301038035E-5,
+      8.0000000000000018,
+      -3.537243168593798E-31,
+      -3.6617384279344167E-31
+    ],
+    "savedMaximumAbsInput": [
+      1.6470932467430219E-19,
+      0.013645140013196437
+    ],
+    "terminalRadius": 0.000244140625,
+    "savedHard": 0,
+    "savedSafety": 0,
+    "savedClfSlack": 0,
+    "savedEncounterExit": 0
+  },
+  {
+    "scenario": "turningCrossing",
+    "speed": 8,
+    "failure": "collisionAvoidanceController:nonlinearDomain: Positive-speed Fiala dynamics require vx above the declared domain floor and |b|<=1.",
+    "failureTime": 1.1500000000000001,
+    "measuredSuccessor": [
+      7.9239401572139005,
+      -0.069897787282149321,
+      -0.029791383256375908,
+      4.7054721375155317,
+      0.07020571740913735,
+      0.047165981542741271
+    ],
+    "predictedSuccessor": [
+      7.9239402058623449,
+      -0.069895808389077135,
+      -0.029794876042382363,
+      4.7054719678138675,
+      0.07003294402368844,
+      0.047465462855062965
+    ],
+    "difference": [
+      -4.8648444384014056E-8,
+      -1.9788930721853504E-6,
+      3.4927860064551397E-6,
+      1.6970166427654476E-7,
+      0.00017277338544890997,
+      -0.00029948131232169356
+    ],
+    "savedHorizonSteps": 69,
+    "savedMinimumPredictedSpeed": 1.0016184604724296,
+    "savedFinalState": [
+      19.817976022883848,
+      -18.480332199425924,
+      -1.2982587889583619,
+      8.00001859205559,
+      -1.0703860586025928E-6,
+      4.4333788502556065E-7
+    ],
+    "savedMaximumAbsInput": [
+      0.59609630884646547,
+      0.999991721397093
+    ],
+    "terminalRadius": 0.000244140625,
+    "savedHard": 0,
+    "savedSafety": 0,
+    "savedClfSlack": 54.611776168168035,
+    "savedEncounterExit": null
+  }
+]
