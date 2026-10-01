@@ -67,6 +67,21 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             expected=initial+t.'*(after(1:2)-before(1:2)-qNext(1:2)+q(1:2));
             testCase.verifyEqual(later,expected,AbsTol=1e-11);
         end
+        function departureFollowsTheEndpointPolicyUntilTheTargetIsOutOfRange(testCase)
+            [seed,cfg]=localSeed(0);t=[cos(.2);sin(.2)];n=[-t(2);t(1)];
+            index=seed.epochIndex;time=index*cfg.controller.sampleTime;origin=seed.epochState(1:2);
+            receding=predictiveSafetyGeometry.targetFlow([origin-15*t;.2+pi;8;0;0;1.6;2.4;.95;0;0],-time);
+            blocking=predictiveSafetyGeometry.targetFlow([origin+20*t;.2;0;0;0;1.6;2.4;.95;0;0],-time);
+            alongside=predictiveSafetyGeometry.targetFlow([origin+5*n;.2;8;0;0;1.6;2.4;.95;0;0],-time);
+            [margin,value]=terminalContinuation.departure(seed,receding,index,cfg);
+            testCase.verifyGreaterThan(margin,10);
+            testCase.verifyLessThan(margin,15-4.8);
+            testCase.verifyEqual(min(value),margin,AbsTol=1e-12);
+            testCase.verifyLessThan(terminalContinuation.departure(seed,blocking,index,cfg),0);
+            testCase.verifyEqual(terminalContinuation.departure(seed,alongside,index,cfg),-Inf);
+            cfg.collision.encounterRangeMeters=Inf;
+            testCase.verifyEqual(terminalContinuation.departure(seed,receding,index,cfg),-Inf);
+        end
         function aLongitudinalDelayCanTranslateTheTerminalCore(testCase)
             [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=10;
             [~,~,~,first]=collisionAvoidanceController(ego,[],road,cfg,[]);

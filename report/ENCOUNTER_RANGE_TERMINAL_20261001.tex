@@ -1,0 +1,191 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\title{Encounter Range and a Terminal Departure Certificate}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Summary}
+The target motion model (constant speed rate and constant sideslip) is now
+assumed only during an encounter. An encounter ends when the ego and target
+bodies are more than \path{cfg.collision.encounterRangeMeters} apart; the
+default is 30 m, a declared modeling threshold. The controller no longer
+requires separation from the complete future target motion as its ordinary
+terminal condition. An endpoint that is still inside the range must instead
+show that its own terminal policy leaves the range while separated from the
+target at matching times.
+
+At 8 m/s the first-frame prediction of \texttt{turningCrossing} falls from 216
+to 93 holds and that of \texttt{curvedCrossing} from 254 to 90. All fourteen
+closed-loop runs (seven scenarios at 8 and 15 m/s) complete collision-free
+with zero hard residual and zero safety slack and are confirmed recovered.
+Nominal recovery is faster in three runs, unchanged in seven and slower in
+four. One of the four, \texttt{curvedCrossing} at 15 m/s, is markedly worse
+and is diagnosed in Section~\ref{sec:regression}. The longest controller frame
+is unchanged at 5.1--5.4 s: it is set by the five-second improvement budget,
+not by the prediction length.
+
+\section{Design}
+\subsection{Encounter exit inside the prediction}
+Let $d_j$ be the rectangle distance between the ego body at prediction node
+$j$ and the target body at the same absolute time, and $R$ the range. The
+exit is the first node with $d_j>R$. Holds up to the exit keep every collision
+row, interior node and interval certificate; later holds carry no target
+constraint. A target that is out of range at the initial node imposes no
+constraint in that call; every call examines its own initial node again, and
+moving-flow seeds are screened at the first engaged sample. A retained
+prediction shifts its exit with it.
+
+\subsection{Departure of the endpoint policy}
+When the prediction is still inside the range at its endpoint, the horizon is
+not lengthened. The reference pose of the fitted terminal core is followed at
+matching absolute times until the rectangle distance, less the enclosed core
+deviation $\epsilon$, exceeds $R$. With $\delta=d_{\min}+2\epsilon$ the
+certificate requires $d_j>\delta$ at every visited node. Nodes are visited in
+strides: over a time $s$ the distance changes by at most
+$(v_g+(|V_T|+|A_T|s)(1+|\kappa_T|r_T))s$, and a stride is the largest whole
+number of holds for which this stays below $d_j-\delta$, so the reference
+remains separated by $\delta$ between visited nodes. A node closer than one
+such hold uses the existing interval certificate. The closest visited node
+supplies four polygon-dual rows for the conic and correction programs. A
+retained pose reuses its certified exit node and margin; a refitted pose is
+followed again.
+
+If the range is never exceeded (a target travelling alongside), the earlier
+sufficient all-future separation remains the terminal requirement. It is
+also accepted whenever it holds. \texttt{encounterRangeMeters=Inf} never ends
+an encounter and recovers the previous requirement.
+
+\subsection{A discarded first variant}
+The first implementation required the exit to occur inside the inherited
+prediction. Because the prediction length is inherited and only shortens, the
+optimizer was forced to be 30 m from the target by a fixed absolute time. In
+\texttt{turningCrossing} at 8 m/s this produced a 10-m lateral detour with
+acceleration to 12 m/s, a maximum CLF slack of 474 (49 before) and a
+17.35-s recovery (16.0 s before). Its seven 8-m/s results are retained in
+\path{closed-loop.csv} as \texttt{exitInsideHorizon}; it was replaced by the
+departure certificate above.
+
+\section{First-frame prediction length}
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+ & \multicolumn{2}{c}{8 m/s} & \multicolumn{2}{c}{15 m/s} \\
+Scenario & $R=\infty$ & $R=30$ m & $R=\infty$ & $R=30$ m \\
+\midrule
+headOn & 92 & 92 & 96 & 96 \\
+acceleratingHeadOn & 92 & 92 & 95 & 95 \\
+brakingLead & 195 & 195 & 196 & 196 \\
+crossing & 93 & 93 & 96 & 96 \\
+turningCrossing & 216 & 93 & 136 & 93 \\
+curvedHeadOn & 123 & 92 & 98 & 90 \\
+curvedCrossing & 254 & 90 & 156 & 96 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Holds are 50 ms. \texttt{brakingLead} is unchanged: its length comes from the
+moving-flow guidance staying active beside the lead vehicle, not from the
+terminal target requirement. In \texttt{curvedHeadOn} at 15 m/s the target
+starts beyond 30 m and imposes no constraint in the first frame.
+
+\section{Closed-loop campaign}
+Each run uses \texttt{runNonlinearPredictiveSafetyValidation} with the original
+fixtures, a tight ODE45 plant replay, no road constraints, observer, noise or
+random draw, and stops after a five-second confirmed nominal recovery.
+``Before'' is the campaign of \path{CLF_NOMINAL_RECOVERY_20261001.tex}.
+\begin{center}
+\small
+\begin{tabular}{llrrrrrr}
+\toprule
+ & & \multicolumn{2}{c}{Recovery (s)} & \multicolumn{2}{c}{Controller (s)} & \multicolumn{2}{c}{Max CLF slack} \\
+Speed & Scenario & before & after & before & after & before & after \\
+\midrule
+8 & headOn & 13.05 & 13.05 & 171.9 & 181.1 & 107.8 & 171.5 \\
+8 & acceleratingHeadOn & 13.05 & 13.05 & 182.5 & 175.6 & 175.5 & 180.1 \\
+8 & brakingLead & 14.80 & 15.10 & 466.8 & 426.4 & 66.0 & 71.1 \\
+8 & crossing & 13.05 & 13.05 & 176.7 & 177.4 & 66.3 & 34.4 \\
+8 & turningCrossing & 16.00 & 13.05 & 213.1 & 203.9 & 49.4 & 51.8 \\
+8 & curvedHeadOn & 19.60 & 13.05 & 304.7 & 207.9 & 188.1 & 181.2 \\
+8 & curvedCrossing & 17.90 & 19.00 & 326.9 & 368.0 & 34.5 & 64.0 \\
+15 & headOn & 13.05 & 13.05 & 140.4 & 112.9 & 81.2 & 172.9 \\
+15 & acceleratingHeadOn & 14.75 & 15.55 & 146.0 & 139.1 & 166.1 & 141.1 \\
+15 & brakingLead & 16.15 & 16.15 & 505.9 & 505.3 & 49.0 & 49.0 \\
+15 & crossing & 13.05 & 13.05 & 197.4 & 172.4 & 73.6 & 104.6 \\
+15 & turningCrossing & 15.60 & 13.05 & 226.7 & 206.4 & 74.4 & 108.5 \\
+15 & curvedHeadOn & 13.05 & 13.05 & 200.3 & 167.3 & 74.4 & 86.2 \\
+15 & curvedCrossing & 16.45 & 18.45 & 238.7 & 655.4 & 71.7 & 1711.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+13.05 s is the earliest possible confirmation (eight-second minimum plus the
+five-second dwell). Every run has zero maximum hard residual and zero maximum
+safety slack. The minimum replay clearance over the fourteen after-runs is
+0.0060 m against the required 0.006 m (\texttt{brakingLead} at both speeds and
+\texttt{curvedCrossing} at 15 m/s sit at the margin); before, it was 0.0060 m.
+Controller time is a sum over frames. The before-campaign ran overlapping
+processes and the after-campaign ran one process at a time; frames that reach
+the five-second budget depend on machine load, so these times are functional
+measurements, not an isolated benchmark.
+
+\section{The slower curved crossing}\label{sec:regression}
+In \texttt{curvedCrossing} at 15 m/s the ego brakes to 2.4 m/s, turns after
+the target and returns later; it stays collision-free, but the maximum CLF
+slack is 1711 and 129 frames take at least one second (42 before). Three
+additional runs of the same scenario isolate the cause (recovery in s, speed in m/s):
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+Run & Recovery & CLF slack & Min speed & Slow frames & Min holds \\
+\midrule
+before & 16.45 & 71.7 & 10.5 & 42 & 76 \\
+this change, $R=30$ m & 18.45 & 1711.0 & 2.4 & 129 & 76 \\
+this change, $R=\infty$ & 16.55 & 75.2 & 9.7 & 48 & 76 \\
+this change, $R=30$ m, 6-s completion & 14.15 & 57.5 & 10.1 & 37 & 136 \\
+\bottomrule
+\end{tabular}
+\end{center}
+With $R=\infty$ the new code reproduces the earlier behavior, so the
+difference is caused by the range, not by the other edits. With the range and
+a six-second completion allowance (\texttt{recoveryHorizonSeconds=6}) the run
+is better than before in every listed measure. The earlier conservative
+certificate had an unintended side effect: its long seed (156 holds, 7.8 s)
+gave the optimizer a long look-ahead during the encounter. With the departure
+certificate the prediction is at its configured minimum of 76 holds (3.8 s)
+after 1.2 s, and the endpoint must already be inside the small straight-cruise
+core at 15 m/s by then. That is too short for this maneuver. The same
+mechanism plausibly explains the 1.1-s slower recovery of the 8-m/s curved
+crossing, which was not separately tested.
+
+The default \texttt{recoveryHorizonSeconds} is left at 3 s in this change. A
+longer minimum prediction raises the cost of every frame, and only one
+scenario was run with 6 s; the default should be chosen from a full campaign.
+
+\section{Validation}
+Thirteen controller test files, 313 cases, pass on the final source
+(\path{tests.csv}). New cases cover: a target beyond the range imposes no
+constraint; a target entering the range is avoided from that sample using a
+moving-flow seed; an in-horizon exit shifts with a retained prediction; an
+unbounded range keeps the all-future requirement; the departure margin for a
+receding, a blocking and an alongside target; and, for the turning crossing,
+an independent ODE45 rollout of the terminal policy from the endpoint that
+stays separated until the range is exceeded. The 8-m/s campaign ran on a
+source differing from the final one by one guard on a missing witness field;
+the saved traces show that branch is not reached in any campaign frame. The
+15-m/s campaign and the diagnostic runs used the final source.
+
+\section{Limits}
+The range is an assumption about when a target matters, not a derived bound.
+After an exit the certificate says nothing about the target; safety against a
+target that returns rests on the later call in which it is again within
+range, and the shift argument does not cover the first sample of a new
+encounter. The exit is detected on the hold grid and at visited departure
+nodes. The departure margin is the closest visited distance and is not a
+smooth function of the endpoint when the visited nodes change. All results
+are nominal-model predictions with a sampled ODE45 replay; they are not a
+continuous-plant certificate. Estimator-in-the-loop scenarios and the
+PassVeh14DOF scenarios were not run.
+\end{document}

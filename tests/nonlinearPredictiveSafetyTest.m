@@ -187,7 +187,7 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem,state]=collisionAvoidanceController(ego,[],road,cfg,prior);
             testCase.verifyEmpty(problem.model.target);
             testCase.verifyEqual(problem.metadata.search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(state.version,59);
+            testCase.verifyEqual(state.version,60);
         end
         function everyCallAppliesTheReturnedFeasibleFirstControl(testCase)
             [ego,road,cfg]=localFixture();
@@ -434,6 +434,94 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             [~,~,problem]=collisionAvoidanceController(ego,[],road,cfg,[]);
             testCase.verifyTrue(problem.metadata.zeroSlack);
             testCase.verifyLessThanOrEqual(problem.solution.hard,cfg.solver.feasibilityTolerance);
+        end
+        function aTargetBeyondTheEncounterRangeImposesNoConstraint(testCase)
+            [ego,road,cfg]=localFixture();
+            target=localTarget([40;0;pi;8;0;0;1.6;2.4;.95;0;0]);
+            [command,plan,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            [expected,free]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            testCase.verifyEqual(problem.metadata.encounterRangeMeters,30);
+            testCase.verifyEqual(problem.metadata.encounterExitStep,0);
+            testCase.verifyEqual(problem.metadata.solverCallCount,0);
+            testCase.verifyEqual(problem.solution.terminalSeparationMargin,Inf);
+            testCase.verifyEqual(plan,free);
+            testCase.verifyEqual(command.actuatorInput,expected.actuatorInput);
+        end
+        function aTargetEnteringTheEncounterRangeIsAvoidedFromThatSample(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
+            epoch=[35.5;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            [~,~,outside,prior]=collisionAvoidanceController(ego,localTarget(epoch),road,cfg,[]);
+            ego=localSuccessor(ego,prior);
+            target=localTarget(predictiveSafetyGeometry.targetFlow(epoch,cfg.controller.sampleTime));
+            [~,~,inside]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            testCase.verifyEqual(outside.metadata.encounterExitStep,0);
+            testCase.verifyGreaterThan(inside.metadata.encounterExitStep,0);
+            testCase.verifyEqual(inside.metadata.search.initialization,"movingTargetFlow");
+            testCase.verifyEqual(inside.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(inside.solution.safety,0,AbsTol=0);
+        end
+        function aPredictionLeavingTheRangeNeedsNoIndefiniteSeparation(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;h=cfg.controller.sampleTime;
+            epoch=[24;0;pi;8;0;0;1.6;2.4;.95;0;0];
+            [~,plan,problem,prior]=collisionAvoidanceController(ego,localTarget(epoch),road,cfg,[]);
+            step=problem.metadata.encounterExitStep;
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            distance=zeros(1,step+1);
+            for node=0:step
+                q=predictiveSafetyGeometry.targetFlow(epoch,node*h);
+                distance(node+1)=predictiveSafetyGeometry.rectangle(problem.solution.states(1:3,node+1),shape,q(1:3),q(8:11));
+            end
+            testCase.verifyGreaterThan(step,0);
+            testCase.verifyLessThanOrEqual(step,size(plan,2));
+            testCase.verifyLessThanOrEqual(distance(1:end-1),repmat(cfg.collision.encounterRangeMeters,1,step));
+            testCase.verifyGreaterThan(distance(end),cfg.collision.encounterRangeMeters);
+            testCase.verifyEqual(problem.solution.terminalSeparationMargin,Inf);
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
+            ego=localSuccessor(ego,prior);cfg.solver.timeLimitSeconds=1e-12;
+            [~,~,shifted]=collisionAvoidanceController(ego,localTarget(predictiveSafetyGeometry.targetFlow(epoch,h)),road,cfg,prior);
+            testCase.verifyEqual(shifted.metadata.encounterExitStep,step-1);
+            testCase.verifyEqual(shifted.metadata.controlSource,"retainedContinuation");
+            testCase.verifyEqual(shifted.solution.hard,0,AbsTol=0);
+        end
+        function aReturningTargetOrbitDoesNotProlongTheCompletion(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;h=cfg.controller.sampleTime;
+            epoch=predictiveSafetyGeometry.targetFlow([8*1.6;0;-pi/2-.05;10;1;.05;1.6;2.4;.95;0;0],-1.6);
+            [~,plan,problem,prior]=collisionAvoidanceController(ego,localTarget(epoch),road,cfg,[]);
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            y=[problem.solution.states(:,end);plan(:,end)];index=size(plan,2);closest=Inf;distance=0;
+            while distance<=cfg.collision.encounterRangeMeters && index<cfg.controller.maximumHorizonSteps
+                u=terminalContinuation.control(y,index,problem.model.terminal);
+                [~,states]=ode45(@(~,x)nonlinearBicycleModel.derivative(x,u,cfg),linspace(0,h,11),y(1:6), ...
+                    odeset('RelTol',1e-10,'AbsTol',1e-11));
+                for sample=1:size(states,1)
+                    q=predictiveSafetyGeometry.targetFlow(epoch,index*h+(sample-1)*h/10);
+                    distance=predictiveSafetyGeometry.rectangle(states(sample,1:3).',shape,q(1:3),q(8:11));
+                    closest=min(closest,distance);
+                end
+                y=[nonlinearBicycleModel.sample(y(1:6),u,cfg);u];index=index+1;
+            end
+            testCase.verifyLessThan(size(plan,2),120);
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(problem.solution.safety,0,AbsTol=0);
+            testCase.verifyGreaterThan(problem.solution.terminalSeparationMargin,0);
+            testCase.verifyGreaterThan(distance,cfg.collision.encounterRangeMeters);
+            testCase.verifyGreaterThan(closest,cfg.collision.safetyMarginMeters);
+            ego=localSuccessor(ego,prior);cfg.solver.timeLimitSeconds=1e-12;
+            [~,~,shifted]=collisionAvoidanceController(ego,localTarget(predictiveSafetyGeometry.targetFlow(epoch,h)),road,cfg,prior);
+            testCase.verifyEqual(shifted.metadata.controlSource,"retainedContinuation");
+            testCase.verifyEqual(shifted.solution.hard,0,AbsTol=0);
+            testCase.verifyEqual(shifted.solution.terminalSeparationMargin,problem.solution.terminalSeparationMargin);
+        end
+        function anUnboundedRangeRetainsTheIndefiniteSeparationRequirement(testCase)
+            [ego,road,cfg]=localFixture();cfg.solver.timeLimitSeconds=30;
+            cfg.collision.encounterRangeMeters=Inf;
+            target=localTarget([24;0;pi;8;0;0;1.6;2.4;.95;0;0]);
+            [~,~,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(problem.metadata.encounterExitStep,Inf);
+            testCase.verifyGreaterThanOrEqual(problem.solution.terminalSeparationMargin,0);
+            testCase.verifyLessThan(problem.solution.terminalSeparationMargin,Inf);
+            testCase.verifyEqual(problem.solution.hard,0,AbsTol=0);
         end
         function returningTargetOrbitMustBeSeparatedAtTheEndpointSeed(testCase)
             [~,~,cfg]=localFixture();frame=[0;0;0;0;4;4];seed=localSeedAtOrigin(cfg,0);

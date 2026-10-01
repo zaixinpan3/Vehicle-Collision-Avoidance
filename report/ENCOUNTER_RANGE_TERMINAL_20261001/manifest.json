@@ -1,0 +1,210 @@
+{
+  "kind": "Source and experiment artifact hashes; no weekly or monthly report hashes",
+  "baseCommit": "379158bafbd72ad369074dac6d7f2fab7d41c4c0",
+  "sources": [
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "681f49ef50bf9e04077942e899a7d373cfc59cbf9482bedd3cfd0de9663aeec6"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "184ab7d8dd4ca4ef6b454819dff6d21f09bf1f594d6564d825621c92b1f6f6f7"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "03c2926d8fa94645d72e0385e16cbd4f11df939465c174f6fffeb1238b1ce0b9"
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "aa5d9125f6340762bb0540c482d505aa7658ef988150e056eb82957be52e1c5f"
+    },
+    {
+      "path": "controller/PCBF_CLF_ARCHITECTURE.md",
+      "sha256": "af7e4545eb9c7619f87a73ce5c47f2b27ad60bef7d2a5638f1a60c907604a186"
+    },
+    {
+      "path": "controller/CONTROLLER_FILES.md",
+      "sha256": "daafbfa9f6fa91d84c3dfcc305191f1bae46f1c4d2ac66441ad5d3d8b020b4b9"
+    },
+    {
+      "path": "tests/nonlinearPredictiveSafetyTest.m",
+      "sha256": "2b0fee5697cd1bad8de64d8104e3eb664a537fb68e63d2f698e60b403de0e1d4"
+    },
+    {
+      "path": "tests/terminalContinuationTest.m",
+      "sha256": "1f606f4bdd49107e26951a5bfa5f738de6bdbff39d99486b50c4aec072a88193"
+    },
+    {
+      "path": "tests/collisionAvoidanceControllerConfigTest.m",
+      "sha256": "2eaede6b0609675e0d16d4916cbd6e154caaf4e4c8678e0aa206a9d16931919f"
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "c5be082dfaf7891ba46a148506e18d89278d4aee7ab24a8b9796fd1bd2abd69b"
+    },
+    {
+      "path": "scripts/collisionThreatScenario.m",
+      "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310"
+    }
+  ],
+  "bundle": [
+    {
+      "path": "report/ENCOUNTER_RANGE_TERMINAL_20261001/closed-loop.csv",
+      "sha256": "439bd9b5ac4ef92bb151276cbeefbc53fcfd3d6d10e516a4cf97fbb9e4e35478"
+    },
+    {
+      "path": "report/ENCOUNTER_RANGE_TERMINAL_20261001/first-frame.csv",
+      "sha256": "8594cc066095cb5554ffcafcd469284798021210b6f58030e4f0789a3d7b3269"
+    },
+    {
+      "path": "report/ENCOUNTER_RANGE_TERMINAL_20261001/tests.csv",
+      "sha256": "da74dfd107837b20a0461dc3603a9a1d5a774681ffee1abd2fe5166fdf0b17cc"
+    },
+    {
+      "path": "report/ENCOUNTER_RANGE_TERMINAL_20261001/curved-crossing-15-diagnostic.csv",
+      "sha256": "f7602790cfe1b836ff08346f78ceece48002a76dedb877a8c22a8dd0e46194c8"
+    }
+  ],
+  "externalArtifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign8.m",
+      "sha256": "93fc54135ee475d93796a2751c2a56bfa45eb0aaa9e3e426f02a0db8e9ad67ae"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign15.m",
+      "sha256": "b1d6557f081e0ba37f137e0c31456cdba91a5ee40c64ee89f9554fd40c4689bd"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/diagnostic.m",
+      "sha256": "861fd3f2bbeeeeb491bd69b9bc157e3b318be7f4ff5905e0e94c3995ba0e92c0"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/tests.m",
+      "sha256": "8a1e4d50ae9c3739592b9a84d3446f09851747e87c9817ca984c89889ea50e91"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/firstFrame.m",
+      "sha256": "fc0bc202f9dd8545f3aa7899cf64654de1f98ba2ed1ca23555cfe1322d4e65f1"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/summarize.py",
+      "sha256": "41d161dbc741fa42c282714ebf3683b821b17fe2cd457c8bc32fbbd5281557e8"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign8.log",
+      "sha256": "da7b1efb2e567191bfb4fd2df643b901925772b5dd3a769af11d90cf243e782d"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign15.log",
+      "sha256": "f02623f78a22ed17051c4358bb79a87f9b9ac39df963324ea4c4148f5c5655b0"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/diagnostic.log",
+      "sha256": "da512f25978897227243659677b33e564505b4dfb6d2e9502c8e86ca4107a82e"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/tests.log",
+      "sha256": "cdf85be561dae9b90d9d6db61b301262766fac1180c78c47481c62512cd7b2eb"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-solvePredictiveControl.m",
+      "sha256": "013322dab42cc3862af5e8202aa916e161644fe0c18122edad308c072090a626"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign8-inhorizon-exit.log",
+      "sha256": "1dd154c4646b6f85630c62c9fe1ba235681bfb665b5aff52cbe1f5270b3801fc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed8/headOn.json",
+      "sha256": "ef0d230c7a0794eb25feabc47929cb44d0b21588b694ddbb719a62464eed9cb2"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed8/acceleratingHeadOn.json",
+      "sha256": "b4f1464972ed5d03e9cb7dec8d63be9b960ca8994876488bff31db44d684f08c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed8/brakingLead.json",
+      "sha256": "70f9a5d2a35876c67e7088560639d02be8a89316f761f2c19bf90dc6560b5605"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed8/crossing.json",
+      "sha256": "ca990f914169ca30e90ab8bc63b7870746c84c80bfdf585cfc92ba034e3f905a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed8/turningCrossing.json",
+      "sha256": "562564bbebef98744b37885f7f0f128afc4f297c948456d411c79f03d4d57e53"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed8/curvedHeadOn.json",
+      "sha256": "35932998ec1ce3d22226428cd1b13b576a19dfbf6bcb954ead6b3368333ac891"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed8/curvedCrossing.json",
+      "sha256": "6315b61792dbb300a391a2cfc7cf4c9a523d7814334ed9028eb5bb832bc87fe7"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed15/headOn.json",
+      "sha256": "26f5dc3955f2903a9d50812581638c8ebe333d7aa7f22dd97a018013266ab76b"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed15/acceleratingHeadOn.json",
+      "sha256": "11c1bd7bef00d8e1c4e84e649e4614d17f1cea8ab15ceb0785cf0a622fcb09fa"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed15/brakingLead.json",
+      "sha256": "3f404fc04922c63e76ee2731e8b0d53c2cef4649aef2f7fc9187fde908fb07f5"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed15/crossing.json",
+      "sha256": "fcf9b8399a513f64d7a81057eb087f43b1c2d60bea71a2f5989155d05ac88557"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed15/turningCrossing.json",
+      "sha256": "b113a24232a3071bb49f590f6f76bdaf170adae624d49275f3d34ad48a48cda4"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed15/curvedHeadOn.json",
+      "sha256": "539c1e783ed580f011e24d97f2f22c4dc0b56fe848d1ab02c60efdc9e7681237"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign/speed15/curvedCrossing.json",
+      "sha256": "8535f0b04e52319d1d1d634e082bbd9f2e24031ddbfc1ac4c287f18bfadff5fc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/diagnostic/rangeInf.json",
+      "sha256": "fbf5a9fdd20f372590ece0bb3c295c54e7a1d839bd1b9329ee29b2972e406c47"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/diagnostic/recovery6.json",
+      "sha256": "837aee380c7dc9b67c5f15dc536e5bd6e41797be38c43b6b2cced1626aa6e318"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-inhorizon-exit/speed8/headOn.json",
+      "sha256": "0120f603f459b56721ba726e338106cf1b8999b4cf54650a04046dd0e3e9037f"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-inhorizon-exit/speed8/acceleratingHeadOn.json",
+      "sha256": "a445f25cabd147c75b55cae4c4396cc317effa2480a7e61c2c7acf07942bc1cc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-inhorizon-exit/speed8/brakingLead.json",
+      "sha256": "c913981236e4ad7f9ef442a6c8031b34bf8ceb9e2aff895df8d16eb20dcc23e9"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-inhorizon-exit/speed8/crossing.json",
+      "sha256": "ab9c8e0277bd15f6033ca82f9567bfe4fa9d99205885fe1ad41ee13b6b1c345b"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-inhorizon-exit/speed8/turningCrossing.json",
+      "sha256": "4cfc0a04bbbbdc2c3c9fd46adaee0e625d69a429e7e10d9fe18f217685f93673"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-inhorizon-exit/speed8/curvedHeadOn.json",
+      "sha256": "4b6bdcae4707d13c1399bd7c23d54cf94b30b30c78fd324e5d9f0dcee15962eb"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/encounter-range-20261001/campaign-inhorizon-exit/speed8/curvedCrossing.json",
+      "sha256": "9ca82a903135bf42e537906df9d0fbbe6a214991f71de3ca98853fd61a253406"
+    }
+  ]
+}

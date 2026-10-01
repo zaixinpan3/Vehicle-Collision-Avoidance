@@ -8,8 +8,8 @@ The current formulation and its guarantee scope are in
 | --- | --- |
 | `collisionAvoidanceController.m` | Fixed target epoch, absolute clock, input memory and first control output |
 | `readControllerInputs.m` | Ego, one target and road input normalization |
-| `solvePredictiveControl.m` | PCBF safety restoration followed by CLF-slack optimization, moving-target flow initialization and nonlinear admission |
-| `terminalContinuation.m` | Rigidly placed augmented terminal core, Schur pose elimination, RK4 contraction bounds and indefinite target separation |
+| `solvePredictiveControl.m` | PCBF safety restoration followed by CLF-slack optimization, moving-target flow initialization, encounter-range exit and nonlinear admission |
+| `terminalContinuation.m` | Rigidly placed augmented terminal core, Schur pose elimination, RK4 contraction bounds, encounter departure under the endpoint policy and indefinite target separation |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim and lane CLF |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
 | `predictiveSafetyGeometry.m` | Target prediction, transported flow guidance, polygon duals and adaptive interval separation |
@@ -37,8 +37,11 @@ the admitted endpoint policy rather than counting that allowance down to zero.
 The terminal core is built at straight cruise and may be translated and
 rotated independently of the nominal given path. Completing the square in its
 eight-dimensional metric eliminates the three pose coordinates exactly for
-membership. Every reconstructed pose must still pass indefinite target
-separation. An accepted pose stays fixed when shifting/appending the MPC
+membership. A target constrains a prediction only up to its first node
+farther than `cfg.collision.encounterRangeMeters`. An endpoint still inside
+that range must show that its policy leaves it while separated at matching
+times; indefinite target separation is the alternative for a persistent
+encounter. An accepted pose stays fixed when shifting/appending the MPC
 solution for the recursive-feasibility argument. There is no separate runtime
 backup or nominal-versus-backup selector.
 Positive-slack trajectories are search candidates only. Execution requires

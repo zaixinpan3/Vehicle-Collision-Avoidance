@@ -25,7 +25,10 @@ function cfg=localDefaults()
     cfg.nonlinear=struct('integrationStep',.005,'terminalRadius',.25, ...
         'maximumIterations',24,'trustRadius',.5, ...
         'recoveryHorizonSeconds',3,'clfDecay',.01);
-    cfg.collision=struct('safetyMarginMeters',0.006);
+    % A target farther than encounterRangeMeters (body to body) carries no
+    % collision risk. Its constant speed-rate and sideslip motion is assumed
+    % only until a prediction first exceeds that range. Inf never ends it.
+    cfg.collision=struct('safetyMarginMeters',0.006,'encounterRangeMeters',30);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -78,6 +81,10 @@ function localValidate(cfg)
     end
     if cfg.nonlinear.clfDecay>=1,localInvalid('CLF decay must lie in (0,1).');end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
+    validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','nonnan','positive'});
+    if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
+        localInvalid('The encounter range must exceed the collision safety margin.');
+    end
     for name=["m","Iz","lf","lr","wheelbase","length","width","gravity"]
         validateattributes(cfg.vehicle.(name),{'double'},{'scalar','real','finite','positive'});
     end

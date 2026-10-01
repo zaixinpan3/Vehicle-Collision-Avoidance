@@ -1,0 +1,52 @@
+Encounter range and terminal departure certificate -- October 1, 2026
+
+Base commit: 379158bafbd72ad369074dac6d7f2fab7d41c4c0 plus the changes of this commit.
+Raw directory: /home/zai/.cache/collisionAvoidance/encounter-range-20261001
+MATLAB R2026a, -singleCompThread, Optimization and Control System Toolboxes.
+
+Closed-loop campaign (one MATLAB process at a time):
+  matlab -singleCompThread -batch "run('<raw>/campaign8.m')"
+  matlab -singleCompThread -batch "run('<raw>/campaign15.m')"
+Each scenario calls, from the repository root with scripts on the path,
+  runNonlinearPredictiveSafetyValidation(Scenarios=NAME,Frames=1600, ...
+      ControllerConfiguration=struct('referenceSpeed',SPEED, ...
+          'controller',struct('horizonSteps',PREFIX)), ...
+      RequireCollisionThreat=true,RecoveryDwellSeconds=5, ...
+      OutputFile=JSON,ContinuationFile=MAT);
+SPEED/PREFIX are 8/8 and 15/16; NAME takes headOn, acceleratingHeadOn,
+brakingLead, crossing, turningCrossing, curvedHeadOn, curvedCrossing.
+Results: <raw>/campaign/speedSPEED/NAME.json. "before" rows come from
+/home/zai/.cache/collisionAvoidance/clf-recovery-20261001/campaign-stable.
+"exitInsideHorizon" rows (8 m/s only) come from the discarded first variant,
+<raw>/campaign-inhorizon-exit; its source was not retained beyond the log.
+
+Diagnostic runs of curvedCrossing at 15 m/s: <raw>/diagnostic.m adds
+collision.encounterRangeMeters=Inf, or nonlinear.recoveryHorizonSeconds=6,
+to the same call. Results: <raw>/diagnostic/*.json.
+
+First-frame table: <raw>/firstFrame.m (30-s improvement budget is not used;
+the default five-second budget applies), output first-frame.csv.
+
+Tests: <raw>/tests.m runs thirteen controller test files; 313 of 313 pass on
+the final source (tests.csv). The first complete run on the campaign source
+had one error, cachedContinuationMatchesAFreshNonlinearEvaluation, caused by
+a dropped isfield guard; the guard was restored and the suite rerun.
+
+Source consistency: the 8-m/s campaign ran on a solvePredictiveControl.m that
+lacks that one guard (<raw>/campaign-solvePredictiveControl.m; diff is one
+line). The guard is on the exact-successor branch; every campaign frame
+after the first reports initialization restorationFromChangedEgoState and
+shiftAvailable=false, verified from the traces. The 15-m/s campaign, the
+diagnostic runs, the first-frame table and the final tests used the final
+source; hashes were checked before and after each run.
+
+closed-loop.csv is produced by <raw>/summarize.py. Controller seconds are
+sums of per-frame controller call times. The before-campaign processes
+overlapped; these runs did not, except that a single-thread model-timing
+measurement ran during part of the 15-m/s campaign. Frames at the five-second
+budget are load dependent; exact trajectory equality across machines or
+schedules is not promised.
+
+Not run: estimator-in-the-loop scenarios, PassVeh14DOF scenarios, the full
+repository test suite outside the thirteen controller files, and a full
+campaign with recoveryHorizonSeconds=6.

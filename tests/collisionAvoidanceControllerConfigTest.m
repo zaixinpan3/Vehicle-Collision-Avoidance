@@ -73,6 +73,22 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             end
         end
 
+        function encounterRangeDefaultsToThirtyMetersAndMayBeUnbounded(testCase)
+            cfg = collisionAvoidanceControllerConfig();
+            testCase.verifyEqual(cfg.collision.encounterRangeMeters, 30);
+            cfg = collisionAvoidanceControllerConfig( ...
+                struct('collision', struct('encounterRangeMeters', Inf)));
+            testCase.verifyEqual(cfg.collision.encounterRangeMeters, Inf);
+        end
+
+        function encounterRangeMustExceedTheCollisionBuffer(testCase)
+            for range = [-1, 0, NaN, 0.006]
+                testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
+                    struct('collision', struct('encounterRangeMeters', range))), ...
+                    'collisionAvoidanceController:invalidConfiguration');
+            end
+        end
+
         function solverPrecisionAndIterationLimitsAreValidated(testCase)
             invalid = {struct("constraintTolerance", 0.0), ...
                 struct("optimalityTolerance", -1.0), ...

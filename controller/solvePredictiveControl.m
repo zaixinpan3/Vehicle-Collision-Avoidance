@@ -2,6 +2,8 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 %solvePredictiveControl Solve safety first, then CLF under the attained safety level.
 % Zero safety slack does not terminate a still-positive CLF problem.
 % The endpoint family supplies every newly appended input.
+% A target constrains a prediction only until its first node farther than
+% cfg.collision.encounterRangeMeters; no target motion is assumed afterwards.
     if nargin<3,timer=tic;end
     cfg=model.cfg;solution=[];baseline=[];model.slackCap=Inf;
     search=struct('solverCalls',0,'source',"sequentialConvexification", ...
@@ -31,8 +33,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         search.initialization="shiftedContinuation";
         if sameState
             model.slackCap=sum(previousState.witness.stageSlacks(2:end));
-            if isfield(previousState.witness,'stageCost')
-                shifted=previousState.witness;
+            % The node that ended the encounter moves with the shift. A target that was out of
+            % range must be examined again at the new initial node.
+            if isfield(previousState.witness,'stageCost') && (isempty(model.target) || previousState.witness.encounterExit>1)
+                shifted=previousState.witness;shifted.encounterExit=shifted.encounterExit-1;
                 shifted.inputs=shifted.inputs(:,2:end);shifted.states=shifted.states(:,2:end);
                 for name=["stageSafety","stageHard","stageCost","stageCollision","interiorViolation","collisionNodes","collisionTimes","intervalCertified"]
                     shifted.(name)=shifted.(name)(2:end);
@@ -75,8 +79,9 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     % Screen bounded target-aware rollouts only when no transferable witness
     % exists. Tiny replay differences still repair the retained trajectory.
     fresh=~isstruct(previousState);
-    if ~fresh,fresh=norm(model.initialState-expected,inf)>1e-4;end
-    if isempty(solution) && ~isempty(model.target) && fresh
+    % A target that only now enters the encounter range has no transferable witness either.
+    if ~fresh,fresh=norm(model.initialState-expected,inf)>1e-4 || previousState.witness.encounterExit<=1;end
+    if isempty(solution) && baseline.encounterExit>0 && fresh
         for side=[-1,1]
             if toc(timer)>=cfg.solver.timeLimitSeconds,break;end
             trialModel=model;seedTimer=tic;
@@ -367,30 +372,32 @@ end
 
 function [a,b,equal,rhs]=localCorrectionProblem(candidate,model)
     cfg=model.cfg;count=size(candidate.inputs,2);nv=2*(count-1);h=cfg.controller.sampleTime;
-    sensitivity=zeros(6,nv);x=model.initialState;rows=cell(1,4*count+2);bounds=rows;n=0;
-    reserve=cfg.solver.feasibilityTolerance;
+    sensitivity=zeros(6,nv);x=model.initialState;rows=cell(1,4*count+3);bounds=rows;n=0;
+    reserve=cfg.solver.feasibilityTolerance;departure=candidate.encounterExit;
     rate=h*[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum];
     for index=1:count
         % Starts, midpoint and any previously violated interior audit nodes.
-        [r,v]=localCorrectionRows(x,sensitivity,(index-1)*h,model,reserve);
+        engaged=index<=departure;
+        [r,v]=localCorrectionRows(x,sensitivity,(index-1)*h,model,reserve,engaged);
         n=n+1;rows{n}=r;bounds{n}=v;
         [middle,am,bm]=nonlinearBicycleModel.sample(x,candidate.inputs(:,index),cfg,[],h/2);
         sm=am*sensitivity;
         if index>1,columns=2*(index-2)+(1:2);sm(:,columns)=sm(:,columns)+bm;end
-        [r,v]=localCorrectionRows(middle,sm,(index-.5)*h,model,reserve);
+        [r,v]=localCorrectionRows(middle,sm,(index-.5)*h,model,reserve,engaged);
         n=n+1;rows{n}=r;bounds{n}=v;
-        if candidate.interiorViolation(index)>0
+        if engaged && candidate.interiorViolation(index)>0
             for half=0:1
                 start=x;map=sensitivity;if half==1,start=middle;map=sm;end
                 for duration=localInteriorTimes(cfg)
                     [interior,ai,bi]=nonlinearBicycleModel.sample(start,candidate.inputs(:,index),cfg,[],duration);
                     si=ai*map;if index>1,si(:,columns)=si(:,columns)+bi;end
-                    [r,v]=localCorrectionRows(interior,si,(index-1+half/2)*h+duration,model,reserve);
+                    [r,v]=localCorrectionRows(interior,si,(index-1+half/2)*h+duration,model,reserve,true);
                     n=n+1;rows{n}=r;bounds{n}=v;
                 end
             end
         end
         for duration=reshape(candidate.collisionTimes{index},1,[])
+            if ~engaged,break;end
             [interior,ai,bi]=localCollisionInterpolation(x,candidate.inputs(:,index),duration,cfg);
             si=ai*sensitivity;if index>1,si(:,columns)=si(:,columns)+bi;end
             [g,j]=localSafetyRows(interior,(index-1)*h+duration,model);
@@ -406,21 +413,22 @@ function [a,b,equal,rhs]=localCorrectionProblem(candidate,model)
             n=n+1;rows{n}=[r(finite,:);-r(finite,:)];bounds{n}=[rate(finite)-change(finite);rate(finite)+change(finite)];
         end
     end
-    [r,v]=localCorrectionRows(x,sensitivity,count*h,model,reserve);
+    [r,v]=localCorrectionRows(x,sensitivity,count*h,model,reserve,departure>count);
     n=n+1;rows{n}=r;bounds{n}=v;
     memory=sparse(2,nv);memory(:,end-1:end)=eye(2);map=[sensitivity;memory];
     seed=model.terminal;deviation=[x(4:6);candidate.inputs(:,end)]-[seed.base(4:6);seed.reference.input];
     equal=seed.quotientFactor*map(4:8,:);rhs=-seed.quotientFactor*deviation;
-    if ~isempty(model.target)
+    if departure>count
         [seed,poseJacobian]=terminalContinuation.fit(seed,[x;candidate.inputs(:,end)],model.sampleIndex+count);
-        [separation,~,gradient]=terminalContinuation.separation(seed,localTargetAt(model,count*h),model.frame,cfg,model.sampleIndex+count);
-        n=n+1;rows{n}=-gradient*poseJacobian*map;bounds{n}=separation-reserve;
+        [~,value,gradient]=localTerminalClearance(seed,count,model);
+        n=n+1;rows{n}=-gradient*poseJacobian*map;bounds{n}=value-reserve;
     end
     a=vertcat(rows{1:n});b=vertcat(bounds{1:n});
 end
 
-function [rows,bounds]=localCorrectionRows(x,sensitivity,time,model,reserve)
-    [g,j]=localSafetyRows(x,time,model);[lo,hi]=localStateLimits(model.cfg);
+function [rows,bounds]=localCorrectionRows(x,sensitivity,time,model,reserve,engaged)
+    g=zeros(0,1);j=zeros(0,6);[lo,hi]=localStateLimits(model.cfg);
+    if engaged,[g,j]=localSafetyRows(x,time,model);end
     rows=[-j*sensitivity;sensitivity(4:6,:);-sensitivity(4:6,:)];
     % A numerical interior avoids approaching a hard contact only from its
     % infeasible side. The original declared collision margin is unchanged.
@@ -480,6 +488,7 @@ function [inputs,seed]=localSeed(model)
     cfg=model.cfg;seed=model.terminal;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
     required=cfg.controller.horizonSteps+ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime);
     required=min(required,cfg.controller.maximumHorizonSteps);inputs=zeros(2,cfg.controller.maximumHorizonSteps);
+    exited=localBeyondRange(x,0,model);
     for index=1:size(inputs,2)
         if index<=required
             deviation=nonlinearBicycleModel.error(x,model.lane,reference);
@@ -491,11 +500,11 @@ function [inputs,seed]=localSeed(model)
         end
         u=localClip(u,previous,cfg);inputs(:,index)=u;
         x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;
+        exited=exited || localBeyondRange(x,index*cfg.controller.sampleTime,model);
         if index<required,continue;end
         seed=terminalContinuation.fit(seed,[x;u],model.sampleIndex+index);
         value=terminalContinuation.membership([x;u],seed.epochIndex,seed);
-        q=localTargetAt(model,index*cfg.controller.sampleTime);
-        if value<0 && terminalContinuation.separation(seed,q,model.frame,cfg)>0
+        if value<0 && (exited || localTerminalClearance(seed,index,model)>0)
             inputs=inputs(:,1:index);return;
         end
     end
@@ -514,7 +523,7 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
     inputs=zeros(2,count);
     egoRadius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
     radius=egoRadius+norm(model.target(8:9))+norm(model.target(10:11))+cfg.collision.safetyMarginMeters;
-    station=[];completionStarted=false;
+    station=[];completionStarted=false;exited=localBeyondRange(x,0,model);
     for index=1:count
         if mod(index-1,16)==0 && toc(timer)>=cfg.solver.timeLimitSeconds,inputs=[];return;end
         time=(model.sampleIndex+index-1)*h;
@@ -524,6 +533,7 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
         deviation=nonlinearBicycleModel.error(x,model.lane,reference);
         active=false;
         for preview=[0,.5,1,1.5,2,3]
+            if exited,break;end
             future=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time+preview);
             if isfield(model.lane,'referenceCurve')
                 position=laneGeometry.referencePose(station+cfg.referenceSpeed*preview,0,model.lane.referenceCurve);
@@ -563,12 +573,11 @@ function [inputs,seed]=localFlowSeed(model,side,timer)
         u(1)=min(zeroSlip+slipLimit,max(zeroSlip-slipLimit,u(1)));
         u=localClip(u,previous,cfg);inputs(:,index)=u;
         x=nonlinearBicycleModel.sample(x,u,cfg);previous=u;
+        exited=exited || localBeyondRange(x,index*h,model);
         if index<required,continue;end
         seed=terminalContinuation.fit(seed,[x;u],model.sampleIndex+index);
         membership=terminalContinuation.membership([x;u],seed.epochIndex,seed);
-        future=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time+h);
-        separation=terminalContinuation.separation(seed,future,model.frame,cfg);
-        if membership<0 && separation>0,break;end
+        if membership<0 && (exited || localTerminalClearance(seed,index,model)>0),break;end
     end
     inputs=inputs(:,1:index);
 end
@@ -601,7 +610,7 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
     is=iu(end)+(1:count);ic=is(end)+1;it=ic+1;ie=it+(1:2);nv=ie(end);
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
-    rows=cell(1,4*count+6);bounds=cell(1,4*count+6);rowCount=0;
+    rows=cell(1,4*count+7);bounds=cell(1,4*count+7);rowCount=0;
     costMatrix=sparse(7*count,nv);costOffset=zeros(7*count,1);
     lower=-Inf(nv,1);upper=Inf(nv,1);
     stateTrust=radius*[5;5;.5;5;3;1.5];inputTrust=radius*[.15;.25];
@@ -613,6 +622,7 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     rate=[cfg.model.frontWheelSteeringRateMaximum;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     x=model.initialState;initialError=nonlinearBicycleModel.error(x,model.lane,reference);halfDuration=cfg.controller.sampleTime/2;
+    departure=baseline.encounterExit;
     for index=1:count
         if mod(index-1,8)==0 && toc(timer)>=cfg.solver.timeLimitSeconds
             info.status="timeLimit";return;
@@ -627,17 +637,22 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
         if index>1,r(:,iu(:,index-1))=-eye(2);previous=anchor(:,index-1);end
         finite=isfinite(rate);difference=anchor(:,index)-previous;
         rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
+        engaged=index<=departure;
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
-        [g,j]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
-        r=-j*map;r(:,is(index))=-1;
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+        if engaged
+            [g,j]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
+            r=-j*map;r(:,is(index))=-1;
+            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+        end
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
-        [g,j]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
-        r=-j*map;r(:,is(index))=-1;
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+        if engaged
+            [g,j]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
+            r=-j*map;r(:,is(index))=-1;
+            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+        end
         rowCount=rowCount+1;rows{rowCount}=[map(4:6,:);-map(4:6,:)];
         bounds{rowCount}=[physicalUpper-middle(4:6);middle(4:6)-physicalLower];
-        if model.collisionRefinement(index)
+        if engaged && model.collisionRefinement(index)
             for half=0:1
                 base=x;if half==1,base=middle;end
                 for duration=localInteriorTimes(cfg)
@@ -650,7 +665,7 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
                 end
             end
         end
-        if isfield(model,'collisionTimes')
+        if engaged && isfield(model,'collisionTimes')
             for duration=reshape(model.collisionTimes{index},1,[])
                 [interior,ai,bi]=localCollisionInterpolation(x,anchor(:,index),duration,cfg);
                 map=sparse(6,nv);map(:,ix(:,index))=ai;map(:,iu(:,index))=bi;
@@ -685,14 +700,15 @@ function [candidate,info]=localSequentialStep(baseline,model,radius,timer)
     clfAxis=sparse(1,nv);clfAxis(ic)=1;
     clfCone=secondordercone([2*clfMap;clfAxis],[-2*clfOffset;1-clfConstant],clfAxis.',-1-clfConstant);
     endpoint=[endpoint,clfCone];
-    if ~isempty(model.target)
-        q=localTargetAt(model,count*cfg.controller.sampleTime);
-        [separation,~,poseGradient]=terminalContinuation.separation(seed,q,model.frame,cfg,endIndex);
-        r=-poseGradient*poseJacobian*map;r(ie(2))=-1;
-        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=separation;
+    if departure>count
+        % The encounter outlasts the horizon: the endpoint policy must
+        % complete it.
+        [~,value,poseGradient]=localTerminalClearance(seed,count,model);
+        r=-poseGradient*poseJacobian*map;r(:,ie(2))=-1;
+        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=value;
+        [g,j]=localSafetyRows(x,count*cfg.controller.sampleTime,model);
+        r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;r(:,ie(2))=-1;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     end
-    [g,j]=localSafetyRows(x,count*cfg.controller.sampleTime,model);
-    r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;r(:,ie(2))=-1;rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
     objective=zeros(nv,1);objective(is(1:prefix))=1;
     if isfinite(model.slackCap)
         rowCount=rowCount+1;rows{rowCount}=sparse(objective.');bounds{rowCount}=model.slackCap;
@@ -941,6 +957,29 @@ function [values,jacobian]=localSafetyRows(x,time,model)
     end
 end
 
+function beyond=localBeyondRange(x,time,model)
+    % A target farther than the encounter range carries no collision risk.
+    beyond=isempty(model.target);
+    if ~beyond,beyond=min(localSafetyRows(x,time,model))>localExitGap(model.cfg);end
+end
+
+function [margin,value,gradient,last]=localTerminalClearance(seed,count,model)
+    % Target requirement of an endpoint still inside the encounter range:
+    % its policy either leaves the range while separated at matching times, or
+    % stays separated from the complete assumed target motion.
+    cfg=model.cfg;index=model.sampleIndex+count;last=NaN;
+    [margin,~,gradient]=terminalContinuation.separation(seed, ...
+        localTargetAt(model,count*cfg.controller.sampleTime),model.frame,cfg,index);
+    value=margin;if margin>0,return;end
+    [leaving,rows,jacobian,node]=terminalContinuation.departure(seed,model.targetEpoch,index,cfg);
+    if leaving>margin,margin=leaving;value=rows;gradient=jacobian;last=node;end
+end
+
+function gap=localExitGap(cfg)
+    % Safety rows already subtract the collision margin from the distance.
+    gap=cfg.collision.encounterRangeMeters-cfg.collision.safetyMarginMeters;
+end
+
 function evaluation=localNominalEvaluation(inputs,model,cached,first,refit)
     % Reuse only an exactly unchanged input/state prefix in the same problem.
     % A shifted cache is supplied only after the nominal successor check.
@@ -952,6 +991,9 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,refit)
     stageSafety=zeros(1,count);stageHard=stageSafety;stageCost=stageSafety;
     stageCollision=Inf(1,count);collisionNodes=cell(1,count);collisionTimes=cell(1,count);
     intervalCertified=repmat(isempty(model.target),1,count);
+    % departure is the first node beyond the encounter range. Holds after it carry
+    % no target claim, and a later return of the extrapolated target is ignored.
+    departure=Inf;if isempty(model.target),departure=0;end
     if nargin<3 || isempty(cached),first=1;
     else
         assert(isequal(inputs(:,1:first-1),cached.inputs(:,1:first-1)) ...
@@ -965,17 +1007,20 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,refit)
         collisionNodes(1:first-1)=cached.collisionNodes(1:first-1);
         collisionTimes(1:first-1)=cached.collisionTimes(1:first-1);
         intervalCertified(1:first-1)=cached.intervalCertified(1:first-1);
+        if cached.encounterExit<first,departure=max(0,cached.encounterExit);end
     end
     x=states(:,first);
     for index=first:count
-        values=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
+        values=zeros(0,1);middleValues=values;
+        if index-1<departure
+            values=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
+            if min(values)>localExitGap(cfg),departure=index-1;values=zeros(0,1);end
+        end
         nodes=localCollisionNodes(x,inputs(:,index),cfg);collisionNodes{index}=nodes;
         middle=nodes(:,(size(nodes,2)+1)/2);
-        middleValues=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
+        if index<=departure,middleValues=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);end
         stageSafety(index)=max([0;-values;-middleValues]);
-        if ~isempty(model.target)
-            stageCollision(index)=min([values(1:4);middleValues(1:4)]);
-        end
+        stageCollision(index)=min([Inf;values;middleValues]);
         x=nodes(:,end);states(:,index+1)=x;
         stageHard(index)=max([0;low-x(4:6);x(4:6)-high;low-middle(4:6);middle(4:6)-high]);
         deviation=nonlinearBicycleModel.error(x,model.lane,model.nominalReference);
@@ -989,9 +1034,22 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,refit)
     endIndex=model.sampleIndex+count;
     if refit,seed=terminalContinuation.fit(seed,[x;inputs(:,end)],endIndex);end
     [~,~,deviation]=terminalContinuation.membership([x;inputs(:,end)],endIndex,seed);
-    separation=terminalContinuation.separation(seed,localTargetAt(model,count*cfg.controller.sampleTime),model.frame,cfg,endIndex);
     terminalViolation=max(0,norm(seed.factor*deviation)-seed.radius);
-    terminalGeometry=max([0;-separation;-localSafetyRows(x,count*cfg.controller.sampleTime,model)]);
+    separation=Inf;terminalGeometry=0;
+    if departure>count
+        % The encounter is not over inside the horizon. Either the endpoint
+        % is itself beyond the range, or its policy must complete the encounter.
+        values=localSafetyRows(x,count*cfg.controller.sampleTime,model);
+        if min(values)>localExitGap(cfg),departure=count;
+        elseif ~refit && isfield(seed,'departure') && seed.departure(1)>=endIndex
+            % The retained reference was already followed to its exit.
+            separation=seed.departure(2);terminalGeometry=max([0;-separation;-values]);
+        else
+            [separation,~,~,last]=localTerminalClearance(seed,count,model);
+            seed.departure=[last;separation];
+            terminalGeometry=max([0;-separation;-values]);
+        end
+    end
     physical=max([0;low-model.initialState(4:6);model.initialState(4:6)-high;stageHard.'; ...
         reshape(lo-inputs,[],1);reshape(inputs-hi,[],1); ...
         reshape(abs(diff([model.previousInput,inputs],1,2))-rate,[],1)]);
@@ -1005,7 +1063,7 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,refit)
     checkWitness=hard==0 && sum(stageSafety(1:prefix))<=model.slackCap;
     shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     for index=1:count
-        if isempty(model.target),continue;end
+        if index>departure,intervalCertified(index)=true;continue;end
         if index<first && intervalCertified(index),continue;end
         time=(index-1)*cfg.controller.sampleTime;nodes=collisionNodes{index};
         if ~(refinement(index) || checkWitness),continue;end
@@ -1052,7 +1110,7 @@ function evaluation=localNominalEvaluation(inputs,model,cached,first,refit)
     evaluation=struct('inputs',inputs,'states',states,'safety',sum(slacks),'stageSlacks',slacks, ...
         'hard',hard,'clfSlack',clf,'clfInitialValue',v0,'clfNextValue',v1, ...
         'minimumCollisionMargin',min(stageCollision),'terminalPhaseMeters',seed.phaseMeters,'terminal',seed, ...
-        'terminalSeparationMargin',separation, ...
+        'terminalSeparationMargin',separation,'encounterExit',departure, ...
         'terminalViolation',terminalViolation,'restorationMerit',restorationMerit,'interiorViolation',interiorViolation, ...
         'cost',sum(stageCost)/count, ...
         'stageSafety',stageSafety,'stageHard',stageHard,'stageCost',stageCost, ...

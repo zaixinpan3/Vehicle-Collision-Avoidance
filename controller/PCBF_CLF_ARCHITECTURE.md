@@ -20,6 +20,14 @@ initializations and solver iterates alike. Finding a safe continuation alone
 does not complete the CLF stage.
 There is no separate runtime backup controller or nominal-versus-backup selector.
 
+The target's constant speed-rate and constant-sideslip motion is assumed only
+during an encounter. A target whose body is farther than
+`cfg.collision.encounterRangeMeters` (30 m by default) from the ego body is
+treated as carrying no collision risk. Along a prediction, the first node
+beyond that range ends the encounter and later nodes carry no target
+constraint. An endpoint reached before that node must show that its own
+policy completes the encounter. See "Encounter range" below.
+
 Road boundaries are currently excluded from the controller problem, including
 the finite prediction and indefinite endpoint admission. The given path still
 defines the nominal lane/CLF reference. The terminal core has a free world pose
@@ -142,8 +150,10 @@ exact-real arithmetic validation.
 A whole-hold travel bound from the actual mesh pose increments screens distant
 encounters. Prefix stages use one shared nonnegative search slack per stage;
 the completion tail has zero slack. Input limits, slew limits and velocity
-bounds at nodes and midpoints remain hard. The endpoint has hard safety
-constraints and its indefinite certificate. Only a complete original
+bounds at nodes and midpoints remain hard. Collision rows, interior nodes and
+interval certificates apply up to the encounter exit. An endpoint whose
+prediction is still inside the encounter range has hard safety constraints
+and its departure or indefinite certificate. Only a complete original
 nonlinear evaluation with every required interval established can authorize
 execution. Newly introduced cuts use interpolated variational derivatives;
 no off-mesh target time is rounded to a coarser integration node.
@@ -273,10 +283,74 @@ pose penalty, separate maneuver mode or additional controller is introduced.
 After a new solution is accepted its pose is fixed when shifting and appending
 that solution, rather than silently refitted during the invariance argument.
 
+### Encounter range
+
+Let `d_j` be the rectangle distance between the ego body at prediction node
+`j` and the target body at the same absolute time, and let `R` be
+`encounterRangeMeters`. The encounter exit of a prediction is
+
+\[
+j_e=\min\{j\in\{0,\ldots,H_k\}: d_j>R\},
+\]
+
+or infinity when no node qualifies. Stages `1,...,j_e` keep every collision
+row, interior node and interval certificate. Stages after `j_e` have none:
+the target motion model is not extrapolated past the encounter, so a later
+return of that extrapolated motion into range is not examined in the same
+prediction. `j_e=0` means that the target is out of range now and imposes no
+constraint in this call. Every call examines its own initial node again, so a
+target that later comes within range is constrained from that sample, and
+moving-flow seeds are screened at that first engaged sample.
+
+When `j_e` is finite the endpoint only needs membership in its terminal core.
+When the prediction is still inside the range at its endpoint, the horizon is
+not lengthened to reach the exit. The endpoint policy is followed instead:
+its reference pose `g_j` and the target are compared at matching absolute
+times `j=H_k,H_k+1,...` until the rectangle distance, less the enclosed
+endpoint deviation, exceeds `R`. Writing `d_j` for the distance at a visited
+node, `epsilon` for the enclosed position and heading deviation of the core,
+and `delta=d_min+2*epsilon`, the certificate is
+
+\[
+d_j>\delta\ \text{at every visited node up to the first one with}\ d_j-\epsilon>R .
+\]
+
+Nodes are visited in strides. With ego reference speed `v_g`, target speed
+`|V_T|`, speed rate `|A_T|`, curvature `kappa_T` and target circumscribed
+radius `r_T`, the distance changes by at most
+`(v_g+(|V_T|+|A_T|s)(1+|kappa_T|r_T))s` over a time `s`. A stride is the largest
+whole number of holds for which this bound stays below `d_j-delta`, so the
+reference remains separated by `delta` between visited nodes. A node closer
+than one such hold uses the interval certificate of the finite prediction.
+The closest visited node supplies four polygon-dual rows; its lever arm about
+the endpoint and the fit derivative give their dependence on the endpoint
+state for the SCvx and correction programs.
+
+The departure uses the assumed target motion only until the exit; it replaces
+neither the finite prediction nor nonlinear admission. Its length is not part
+of the optimized horizon. If the range is never exceeded within
+`maximumHorizonSteps` further holds, the encounter is persistent (a target
+travelling alongside, for example) and the endpoint needs the sufficient
+indefinite separation of the next subsection. Initialization rollouts stop at
+the first core endpoint that is beyond the range, departs, or has that
+indefinite separation. In a convex subproblem the constrained stage set is
+fixed by the incumbent's exit; nonlinear admission recomputes the exit and
+the departure of every candidate. Setting the range to `Inf` never ends an
+encounter and recovers the purely indefinite requirement.
+
+The exit is detected on the hold grid of the prediction and at the visited
+nodes of the departure, and the range is a declared modeling threshold, not a
+derived bound. The certificate makes no statement about the target after the
+exit; safety against a returning target rests on the later call in which it
+is again within range. The departure margin is the closest visited distance,
+which is not a smooth function of the endpoint when the visited nodes change.
+
 ### Indefinite target separation
 
-The chosen core must also satisfy a sufficient all-future target-separation
-bound. No assumption says that the target departs after a single encounter.
+When an encounter is persistent, the chosen core must satisfy a
+sufficient all-future target-separation bound for the assumed target motion.
+It is also accepted for any endpoint inside the range, since it implies
+separation throughout the encounter.
 Straight target motion uses extrema of same-time relative quadratic progress,
 including acceleration, signed reversal and arbitrary ego heading. For a
 turning target, its whole spatial orbit is enclosed by a disk of center `c_T`
@@ -651,9 +725,20 @@ The old first completion input enters the new prefix with zero slack. The
 remaining completion reaches the same endpoint with the same stored pose.
 Once `H_k=H_min`, append `kappa_(B,k+H_min)(.;g)` at the **old** absolute terminal
 time and state, retaining that pose. Fixed-pose endpoint invariance puts its
-successor in `B_(k+H_min+1)(g)` and supplies zero appended slack. The already
-certified all-future separation also covers this later suffix; its future set
-is a subset of the one previously checked. The implemented sufficient
+successor in `B_(k+H_min+1)(g)` and supplies zero appended slack. If the
+retained prediction left the encounter range at node `j_e>=1`, the shifted
+one leaves it at `j_e-1` with the same absolute checks before it, and an
+appended stage lies after the exit. A certified departure covers the appended
+stage because the retained reference pose is the one that was followed to its
+exit, and the stride bound separates the reference between visited nodes. The
+terminal record stores that exit node and margin, and a retained pose reuses
+them instead of visiting a different set of nodes from the appended endpoint;
+any refitted pose is followed again. Otherwise
+the already certified all-future separation also covers this later suffix; its
+future set is a subset of the one previously checked. A target that was out of range in
+the retained prediction's own initial node (`j_e=0`) and is within range at
+the next sample starts a new encounter; the shift argument does not cover
+that sample, and a new admitted trajectory must be found. The implemented sufficient
 straight-progress and ego-ray/target-orbit bounds preserve this suffix property in the
 nominal real-arithmetic construction.
 Input memory makes the appended slew constraint part of the same result.

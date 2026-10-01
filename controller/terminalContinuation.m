@@ -104,6 +104,7 @@ classdef terminalContinuation
             heading=y(3)-poseError(3);rotation=localRotation(heading);
             seed.epochState=[y(1:2)-rotation*poseError(1:2);heading;seed.base(4:6)];
             seed.epochIndex=sampleIndex;seed.phaseMeters=0;
+            seed.departure=[NaN;-Inf]; % a new pose has no certified departure
             if nargout>1
                 select=[zeros(5,3),eye(5)];
                 angle=[0,0,1,zeros(1,5)]-seed.poseGain(3,:)*select;
@@ -153,9 +154,55 @@ classdef terminalContinuation
             u=seed.reference.input+seed.gain*deviation;
         end
 
+        function [margin,value,gradient,last] = departure(seed,epoch,index,cfg)
+            % Follow the endpoint reference at matching absolute times until the
+            % target body is beyond the encounter range; the assumed target
+            % motion is not used afterwards. A stride never exceeds the gap
+            % divided by a relative-speed bound, so the reference also stays
+            % separated between visited nodes; a hold too close for a stride
+            % uses the interval certificate. margin>0 certifies the departure
+            % and is -Inf when the range is never exceeded. value+gradient*dPose
+            % linearizes the closest visited node in the reference pose at index.
+            % last is the absolute index of the node that left the range.
+            h=cfg.controller.sampleTime;
+            shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+            reach=norm(shape(1:2)+abs(shape(3:4)));
+            padding=norm(seed.samplePositionBound)+seed.interpolationPadding+reach*seed.sampleHeadingBound;
+            clearance=cfg.collision.safetyMarginMeters+2*padding;
+            egoRate=(norm(seed.increment(1:2))+reach*abs(seed.increment(3)))/h;
+            start=terminalContinuation.referenceAt(seed,index);pose=start;
+            margin=-Inf;value=-Inf(4,1);gradient=zeros(4,3);closest=Inf;step=0;last=NaN;
+            while step<=cfg.controller.maximumHorizonSteps
+                q=predictiveSafetyGeometry.targetFlow(epoch,(index+step)*h);
+                rows=predictiveSafetyGeometry.dualLinearization(pose(1:3),shape,q(1:3),q(8:11),[-sin(pose(3));cos(pose(3))]);
+                distance=rows.signedDistance;
+                if distance<closest
+                    closest=distance;lever=[0,-1;1,0]*(pose(1:2)-start(1:2));
+                    value=rows.value-clearance;
+                    gradient=[rows.jacobian(:,1:2),rows.jacobian(:,3)+rows.jacobian(:,1:2)*lever];
+                end
+                if distance<=clearance,margin=min(-eps,distance-clearance);return;end
+                if distance-padding>cfg.collision.encounterRangeMeters
+                    margin=closest-clearance;last=index+step;return;
+                end
+                turning=1+abs(sin(q(6))/q(7))*(norm(q(8:9))+norm(q(10:11)));
+                a=abs(q(5))*turning;b=egoRate+abs(q(4))*turning;gap=distance-clearance;
+                if a>0,span=(sqrt(b^2+4*a*gap)-b)/(2*a);else,span=gap/b;end
+                stride=floor(span/h);
+                if stride<1
+                    stride=1;next=terminalContinuation.referenceAt(seed,index+step+1);
+                    check=predictiveSafetyGeometry.intervalClearance(pose(1:3),next(1:3),shape,epoch,(index+step)*h,h,clearance);
+                    if ~check.certified,margin=min(-eps,check.minimumSampledClearance-clearance);return;end
+                end
+                step=step+stride;pose=terminalContinuation.referenceAt(seed,index+step);
+            end
+        end
+
         function [margin,phaseDerivative,poseGradient] = separation(seed,q,frame,cfg,index)
             % Sufficient all-future geometry for the endpoint only. The finite
             % completion tail compares vehicles at matching absolute times.
+            % It is the alternative to departure for an encounter that never
+            % leaves the range, such as a target travelling alongside.
             % Road-frame axes only parameterize a sufficient separation test.
             % poseGradient differentiates the straight reference pose at index.
             phaseDerivative=0;poseGradient=zeros(1,3);if isempty(q),margin=Inf;return;end

@@ -1,0 +1,5 @@
+run,frames,recovered,recoveryConfirmationSeconds,firstHorizonSteps,minimumHorizonSteps,totalControllerSeconds,framesAtLeastOneSecond,solverCalls,minimumReplayClearanceMeters,maximumClfSlack,minimumSpeed,failure
+"before, commit 2a49daf..b9b4f23 campaign",329,True,16.45,156,76,238.7,42,403,0.0075,71.7,10.48,
+"this change, range 30 m, recovery horizon 3 s",369,True,18.45,96,76,655.4,129,1413,0.006,1711.0,2.44,
+"this change, range Inf, recovery horizon 3 s",331,True,16.55,156,76,262.6,48,487,0.0237,75.2,9.74,
+"this change, range 30 m, recovery horizon 6 s",283,True,14.15,150,136,193.9,37,320,0.006,57.5,10.14,
