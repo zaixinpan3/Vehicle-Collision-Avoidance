@@ -1,0 +1,18 @@
+{
+  "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+  "controller/modifiedFialaTire.m": "ae67dc8240c69a05d6968220cfc418b7aa886ecbd42d84cc028ff235de6403bd",
+  "controller/collisionAvoidanceController.m": "dc187b605081b71329054448e7a1015b8f799690bab7f6d3dd6a5234ef8f9400",
+  "controller/nonlinearBicycleModel.m": "bf8c0235c32185d0636b25dc4a04da31865ef8822237e9f823945a04021374a1",
+  "controller/predictiveSafetyGeometry.m": "e1b97c6edb3815887ead0460b74e580ac1472bb859ffc7579eb95af5b959b312",
+  "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+  "controller/solvePredictiveControl.m": "9072f328ff86f903f5e98a41ce18908ca132f6003136bff8c708089f07068092",
+  "controller/terminalContinuation.m": "e00f1e91b78f0ffc2c63d8cb45271118dc4d799631d4b096f9d7fe2365ab45f3",
+  "config/collisionAvoidanceControllerConfig.m": "e3529546f96890c49a04f3838d3a3d38286efbc14c976323d781eff0965c8ee5",
+  "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+  "scripts/givenPathCollisionBaseline.m": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+  "scripts/runNonlinearPredictiveSafetyValidation.m": "c5be082dfaf7891ba46a148506e18d89278d4aee7ab24a8b9796fd1bd2abd69b",
+  "scripts/runCollisionThreatValidation.m": "27ab0661010ece7c0090ebbea1c1e66fd00fbc0383b93d00ec8f4d52f2f50b93",
+  "scripts/auditJointPredictiveSafety.py": "92e7a073736b637971d90e9fc65588d597d59069e20f2b9ad1ff39d4fbabc804",
+  "tests/nominalRecoveryValidationTest.m": "45bee412371e159b4f323103ab34bcd8870e1e421c7c4e241316f8457d4097ac",
+  "tests/auditJointPredictiveSafetyTest.py": "f3c6291312fa806f6541a41e711b39a9472f3be23cf3725be57e0781fdf25c90"
+}

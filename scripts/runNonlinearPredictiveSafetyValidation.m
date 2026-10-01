@@ -2,6 +2,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
 %runNonlinearPredictiveSafetyValidation Deterministic nonlinear closed-loop audit.
 % A tight ode45 replay checks each issued hold independently of the RK4 proposal.
 % The audit is offline evidence; it is not an execution admission layer.
+% A positive RecoveryDwellSeconds enables sampled nominal-recovery stopping.
+% Frames is a cumulative observation cap, including when resuming a saved
+% continuation. A completed duration is distinct from confirmed recovery.
     arguments
         options.Frames (1,1) double {mustBeInteger,mustBePositive} = 8
         options.Scenarios (1,:) string = ["recovery","oncoming","circular","turningTarget"]
@@ -11,7 +14,14 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         options.StateTransition (1,1) string {mustBeMember(options.StateTransition,["ode45","nominalRk4"])} = "ode45"
         options.ImproveAfterInitialization (1,1) logical = true
         options.RequireCollisionThreat (1,1) logical = false
+        options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
+        options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 8
+        options.RecoveryTolerances (5,1) double {mustBePositive,mustBeFinite} = [.1;pi/180;.1;.05;.01]
+        options.ContinuationFile (1,1) string = ""
+        options.ResumeFrom (1,1) string = ""
     end
+    assert((strlength(options.ContinuationFile)==0 && strlength(options.ResumeFrom)==0) ...
+        || isscalar(options.Scenarios),'Continuation files require exactly one scenario.');
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'controller'),fullfile(root,'config'));
     results=cell(1,numel(options.Scenarios));
     for index=1:numel(options.Scenarios)
@@ -25,7 +35,30 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         frames=0;minimumClearance=Inf;minimumRoadMargin=Inf;maximumSeconds=0;failure="";
         firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;warmStartedFrames=0;finalError=[];
         trace=struct([]);failedFrameSeconds=NaN;failureTime=NaN;passedTarget=false;
-        for frame=1:options.Frames
+        recovery=struct('enabled',options.RecoveryDwellSeconds>0,'recovered',false, ...
+            'tolerances',options.RecoveryTolerances,'errorOrder', ...
+            ["lateralMeters","headingRadians","speedMetersPerSecond","lateralVelocityMetersPerSecond","yawRateRadiansPerSecond"], ...
+            'dwellSeconds',options.RecoveryDwellSeconds,'minimumTimeSeconds',options.RecoveryMinimumSeconds, ...
+            'entryTimeSeconds',NaN,'confirmationTimeSeconds',NaN);
+        recoveryStart=NaN;
+        if strlength(options.ResumeFrom)>0
+            saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;r=saved.result;
+            assert(isequaln(r.configuration,cfg) && r.scenario==name ...
+                && saved.stateTransition==options.StateTransition ...
+                && saved.improveAfterInitialization==options.ImproveAfterInitialization, ...
+                'Continuation scenario, configuration and transition must match.');
+            assert(isequaln(saved.recoveryOptions,recovery),'Recovery settings must match.');
+            assert(strlength(r.failure)==0 && ~r.recovery.recovered && r.executedFrames<options.Frames, ...
+                'Only an unfinished, successful duration can be extended.');
+            ego=saved.ego;target=saved.target;prior=saved.prior;frames=r.executedFrames;
+            minimumClearance=r.minimumReplayClearanceMeters;minimumRoadMargin=r.minimumReplayRoadMarginMeters;
+            maximumSeconds=r.maximumFrameSeconds;firstClf=r.initialClfValue;lastClf=r.finalClfValue;
+            maximumSlack=r.maximumClfSlack;maxHorizon=r.maximumHorizonSteps;finalError=r.finalTransverseError;
+            warmStartedFrames=r.warmStartedFrames;trace=r.trace;passedTarget=r.passedTarget;
+            recoveryStart=saved.recoveryStart;
+        end
+        recoveryOptions=recovery;
+        for frame=frames+1:options.Frames
             frameTimer=tic;
             try
                 solveCfg=cfg;
@@ -84,8 +117,23 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     passedTarget=passedTarget || next(1)-q(1)>cfg.vehicle.length/2+q(8);
                 end
                 frames=frames+1;
+                if recovery.enabled
+                    inside=all(abs(finalError)<=options.RecoveryTolerances) ...
+                        && ego.stateTime>=options.RecoveryMinimumSeconds;
+                    if ~inside,recoveryStart=NaN;
+                    elseif isnan(recoveryStart),recoveryStart=ego.stateTime;
+                    end
+                    if inside && ego.stateTime-recoveryStart>=options.RecoveryDwellSeconds-1e-10
+                        recovery.recovered=true;recovery.entryTimeSeconds=recoveryStart;
+                        recovery.confirmationTimeSeconds=ego.stateTime;break;
+                    end
+                end
                 if mod(frame,4)==0,fprintf('%s: %d/%d holds, last %.3f s, source %s\n', ...
                     name,frame,options.Frames,frameSeconds,search.source);end
+                if recovery.enabled && mod(frame,100)==0
+                    fprintf('Recovery at %.2f s: e = [%s], W = %.6g\n', ...
+                        ego.stateTime,num2str(finalError.',' %.6g'),lastClf);
+                end
             catch exception
                 failedFrameSeconds=toc(frameTimer);failureTime=(frame-1)*cfg.controller.sampleTime;
                 failure=string(exception.identifier)+": "+string(exception.message);break;
@@ -98,7 +146,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         medianLater=NaN;p95Later=NaN;
         if ~isempty(later),medianLater=median(later);p95Later=prctile(later,95);end
         results{index}=struct('scenario',name,'requestedFrames',options.Frames,'executedFrames',frames, ...
-            'completed',frames==options.Frames,'failure',failure,'minimumReplayClearanceMeters',minimumClearance, ...
+            'completed',frames==options.Frames || recovery.recovered,'recovery',recovery, ...
+            'failure',failure,'minimumReplayClearanceMeters',minimumClearance, ...
             'minimumReplayRoadMarginMeters',minimumRoadMargin,'maximumFrameSeconds',maximumSeconds, ...
             'maximumHorizonSteps',maxHorizon,'initialClfValue',firstClf,'finalClfValue',lastClf, ...
             'maximumClfSlack',maximumSlack,'sampleTimeSeconds',cfg.controller.sampleTime,'randomSeed',[], ...
@@ -110,6 +159,12 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             'failedFrameSeconds',failedFrameSeconds,'failureTime',failureTime,'passedTarget',passedTarget, ...
             'totalSolverCalls',solverCalls,'targetInitialState',initialTarget,'configuration',cfg, ...
             'baselineCruise',baseline,'trace',trace);
+        if strlength(options.ContinuationFile)>0
+            continuation=struct('ego',ego,'target',target,'prior',prior,'result',results{index}, ...
+                'stateTransition',options.StateTransition,'improveAfterInitialization',options.ImproveAfterInitialization, ...
+                'recoveryOptions',recoveryOptions,'recoveryStart',recoveryStart);
+            save(options.ContinuationFile,'continuation','-v7.3');
+        end
         fprintf('%s: %d/%d frames, max %.3f s, failure %s\n',name,frames,options.Frames,maximumSeconds,failure);
     end
     report=struct('model',"nonlinear combined-slip Fiala; one constant-acceleration/constant-sideslip target", ...

@@ -1,0 +1,79 @@
+Nominal recovery extension, 2026-09-30
+
+Controller baseline: 03f9b33ba47598cb1cdffa2a81167b2596f90f6e.
+Controller, configuration and original collision fixtures are unchanged.
+Run from /home/zai/Downloads/ResearchProjects/collisionAvoidance.
+MATLAB R2026a, -singleCompThread. No random draws.
+Raw directory: /home/zai/.cache/collisionAvoidance/nominal-recovery-20260930.
+
+Initial fourteen cases:
+  addpath('scripts');
+  runCollisionThreatValidation(Frames=6000,RecoveryDwellSeconds=5,
+      OutputDirectory='<output-directory>');
+The recorded experiment uses four cache launch scripts worker0.m through
+worker3.m, each calling runNonlinearPredictiveSafetyValidation separately
+for disjoint members of the same 7 x 2 fixture grid. Per-case calls also set
+ContinuationFile. They use 8 prefix steps at 8 m/s and 16 at 15 m/s, the
+same configuration as the previous eight-second campaign. Independent
+parallel cases do not interact. Concurrent wall times are not an isolated
+controller runtime benchmark.
+
+Per-case example with an explicit continuation:
+  cfg=struct('referenceSpeed',8,'controller',struct('horizonSteps',8));
+  runNonlinearPredictiveSafetyValidation(Scenarios='headOn',Frames=6000,
+      ControllerConfiguration=cfg,RequireCollisionThreat=true,
+      RecoveryDwellSeconds=5,OutputFile='<output>/headOn.json',
+      ContinuationFile='<output>/headOn.mat');
+
+The five low-speed straight-road cases had not recovered after 300 s.
+The actual extend_<scenario>.m launch scripts resume each saved MAT state:
+  runNonlinearPredictiveSafetyValidation(Scenarios='headOn',Frames=24000,
+      ControllerConfiguration=cfg,RequireCollisionThreat=true,
+      RecoveryDwellSeconds=5,ResumeFrom='<output>/headOn.mat',
+      OutputFile='<extension>/headOn.json',
+      ContinuationFile='<extension>/headOn.mat');
+Frames is cumulative, not an additional frame count. Recovery is a sampled
+five-second dwell in the declared five-dimensional error box. It is not
+an imposed settling-time constraint or an infinite-time stability proof.
+The MAT snapshot contains the measured plant state and full MPC state;
+do not resume it after changing the controller implementation.
+
+Additional controls:
+  runNonlinearPredictiveSafetyValidation(Scenarios='curvedHeadOn',Frames=1200,
+      ControllerConfiguration=struct('referenceSpeed',15,'controller',
+      struct('horizonSteps',16)),RequireCollisionThreat=true,OutputFile='<pilot>');
+  runNonlinearPredictiveSafetyValidation(Scenarios='circular',Frames=1200,
+      ControllerConfiguration=struct('referenceSpeed',8,'controller',
+      struct('horizonSteps',8)),OutputFile='<no-target-control>');
+Repeat the last control at 15 m/s with 16 prefix steps. These target-free
+circular controls are outside the fourteen collision-threat cases.
+
+Checks actually executed:
+  MATLAB runtests on tests/nominalRecoveryValidationTest.m and
+  tests/collisionThreatScenarioTest.m; assertSuccess; 35/35 passed.
+  checkcode(...,'-config=factory','-id') on the two modified MATLAB drivers
+  and the new MATLAB test class; no findings.
+  python -m unittest discover -s tests -p 'audit*Test.py'; 14/14 passed.
+  The cache analyze.py invokes scripts/auditJointPredictiveSafety.py:audit
+  on each complete replay and independently checks its recovery dwell.
+  It verifies configurations, target initial states and reference curves
+  against restore-clf-stage-20260930/campaign3, then exports summary.json,
+  sampled-traces.csv, raw-manifest.json, tests.csv and code-analysis.json.
+  Asynchronous checks are cached by the full raw-file SHA-256.
+  recurring-conflict.json records independent closed-form center checks.
+  source-manifest.json verifies unchanged controller/configuration files
+  against the stated baseline commit.
+
+Compact sampled-traces.csv retains the first, each one-second and final
+hold. Full-resolution data remain in raw JSON files. Geometry is audited
+at all 31 points of every executed hold, not just the compact CSV rows.
+Initial 300-second traces and resumed traces are both preserved in the
+raw manifest. No generated MAT, JSON replay stream, PDF or figure binary
+is added to the repository.
+
+Report build from repository root:
+  pdflatex -interaction=nonstopmode -halt-on-error
+      -output-directory=<raw-directory> report/NOMINAL_RECOVERY_EXTENSION_20260930.tex
+Run twice and inspect the matching PDF. Plot and report-build helpers are
+retained in the raw directory; the summary and compact traces contain the
+measurements needed to reproduce the displayed figures and tables.

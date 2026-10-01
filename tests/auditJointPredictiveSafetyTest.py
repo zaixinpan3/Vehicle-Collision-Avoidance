@@ -6,10 +6,24 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state, feasible_hold, audit
+from auditJointPredictiveSafety import clearance_passes, distance, rectangle, target_state, feasible_hold, audit, recovery_completed
 
 
 class CollisionAuditTest(unittest.TestCase):
+    def test_recovery_needs_sustained_small_errors_in_every_coordinate(self):
+        result = dict(sampleTimeSeconds=.05, recovery=dict(enabled=True, recovered=True,
+                      dwellSeconds=.1, minimumTimeSeconds=0, tolerances=[.1]*5),
+                      trace=[dict(time=t, transverseError=[.01]*5) for t in (0, .05, .1)])
+        self.assertTrue(recovery_completed(result))
+        result['trace'][1]['transverseError'][2] = .2
+        self.assertFalse(recovery_completed(result))
+
+    def test_recovery_does_not_count_time_before_the_declared_minimum(self):
+        result = dict(sampleTimeSeconds=.05, recovery=dict(enabled=True, recovered=True,
+                      dwellSeconds=.1, minimumTimeSeconds=.1, tolerances=[.1]*5),
+                      trace=[dict(time=t, transverseError=[.01]*5) for t in (0, .05, .1)])
+        self.assertFalse(recovery_completed(result))
+
     def test_initialization_failure_is_a_failed_audit_without_geometry_claims(self):
         result = dict(scenario='oncoming', targetInitialState=[], trace=[], completed=False,
                       executedFrames=0, requestedFrames=2, minimumReplayClearanceMeters=None,

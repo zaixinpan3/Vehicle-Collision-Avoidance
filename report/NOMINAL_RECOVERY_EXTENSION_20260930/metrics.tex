@@ -1,0 +1,29 @@
+Of fourteen cases, 10 satisfy the sampled recovery dwell, 14 complete their declared observation, and all executed portions in 14 cases remain collision-free in the independent sampled geometry audit. The full per-case outcomes, including any failure, are retained in \path{summary.json}.
+
+\begin{longtable}{rlrrr}
+\toprule Speed & Scenario & Observed (s) & Entry / confirmation (s) & Final $e_y$ (m)\\\midrule
+8 & headOn & 670.05 & 665.05 / 670.05 & 0.0028 \\
+8 & acceleratingHeadOn & 725.90 & 720.90 / 725.90 & 0.0038 \\
+8 & brakingLead & 793.10 & 788.10 / 793.10 & 0.0109 \\
+8 & crossing & 559.75 & 554.75 / 559.75 & -0.0046 \\
+8 & turningCrossing & 556.45 & 551.45 / 556.45 & -0.0047 \\
+8 & curvedHeadOn & 300.00 & Not observed & -1835.5419 \\
+8 & curvedCrossing & 300.00 & Not observed & -1809.5078 \\
+15 & headOn & 20.80 & 15.80 / 20.80 & 0.0001 \\
+15 & acceleratingHeadOn & 19.55 & 14.55 / 19.55 & 0.0016 \\
+15 & brakingLead & 36.10 & 31.10 / 36.10 & -0.0012 \\
+15 & crossing & 47.35 & 42.35 / 47.35 & 0.0000 \\
+15 & turningCrossing & 60.05 & 55.05 / 60.05 & -0.0034 \\
+15 & curvedHeadOn & 300.00 & Not observed & -182.0832 \\
+15 & curvedCrossing & 300.00 & Not observed & -178.8838 \\
+\bottomrule\end{longtable}
+Entry is the start of the successful dwell; confirmation is five seconds later. \emph{Not observed} means the criterion was not reached within that recorded duration, without an inference about the infinite-time limit.
+
+The isolated 60-second curved head-on pilot reproduced the earlier 8-second lateral error exactly. Its signed error was $-24.739862$ m at 8 s, $-110.816309$ m at 20 s, $-222.241535$ m at 40 s, and $-248.545940$ m at 60 s. Its CLF value rose from $4.1592\times10^4$ at 8 s to $3.5821\times10^6$ at 60 s. This transient cannot be described as established steady recovery.
+\subsection{Isolated circular cruising without a target}
+Two additional controls start exactly on the same nominal circular trim, with the target removed. These are isolation experiments, not members of the fourteen collision-threat fixtures.
+At 15 m/s the 60-second final lateral error is -190.160992 m, heading error -0.065201 rad, and yaw-rate error -0.024367 rad/s; initial CLF is 0 and final CLF is 2.10738e+06.
+At 8 m/s the 60-second final lateral error is -255.905605 m, heading error -0.924779 rad, and yaw-rate error -0.034084 rad/s; initial CLF is 0 and final CLF is 5.05521e+06.
+At 8 m/s the first 3.4 seconds follow the nominal trim. The initial plan has 78 holds, including a straight continuation after the first 68 nominal holds. At 3.5 seconds only nine holds remain and actual yaw rate has fallen to 0.003049 rad/s, compared with the nominal 0.04 rad/s. After the plan reaches the minimum eight holds, yaw rate stays near 0.007 rad/s while lateral error grows. This isolates a controller departure from nominal behavior independently of obstacle recurrence.
+
+Code inspection locates the straight terminal construction in \texttt{collisionAvoidanceController} as \texttt{terminalContinuation.build(cfg,0)}. The seed initially tracks the curved nominal reference, then closes with straight intrinsic dynamics. The shifted plan shortens to the configured prefix; subsequent admitted local CLF updates do not preserve the curved trim. This trace identifies the onset and mechanism; it does not prove that every possible optimizer with a straight terminal family must fail, or that an arbitrary finite observation establishes the infinite-time limit.

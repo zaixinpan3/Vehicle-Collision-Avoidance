@@ -69,6 +69,29 @@ def feasible_hold(hold):
                                        'retainedContinuation', 'feasibleInitialization'))
 
 
+def recovery_completed(result):
+    """Independently verify a sampled recovery dwell, not asymptotic stability."""
+    recovery = result.get('recovery', {})
+    if not recovery.get('enabled') or not recovery.get('recovered'):
+        return False
+    trace = result['trace']
+    h = result['sampleTimeSeconds']
+    tolerances = recovery['tolerances']
+    start = None
+    for hold in trace:
+        time = hold['time'] + h
+        error = hold['transverseError']
+        inside = (len(error) == len(tolerances) == 5
+                  and time >= recovery['minimumTimeSeconds'] - 1e-10
+                  and all(abs(e) <= t for e, t in zip(error, tolerances)))
+        if not inside:
+            start = None
+        elif start is None:
+            start = time
+    return (start is not None and recovery['dwellSeconds'] > 0
+            and trace[-1]['time'] + h - start >= recovery['dwellSeconds'] - 1e-10)
+
+
 def audit(result):
     name = result['scenario']
     if name not in ('oncoming', 'recovery', 'circular', 'turningTarget',
@@ -96,7 +119,8 @@ def audit(result):
                 time = hold['time'] + relative_time
                 target = rectangle(*target_state(initial, time)[:3], shape=initial[7:11])
                 minimum = min(minimum, distance(body, target))
-    complete = result['completed'] and result['executedFrames'] == result['requestedFrames']
+    recovered = recovery_completed(result)
+    complete = result['completed'] and (result['executedFrames'] == result['requestedFrames'] or recovered)
     reported = result['minimumReplayClearanceMeters']
     clearance_match = samples > 0 and (reported is None or abs(minimum - reported) < 1e-9)
     zero_slack = bool(result['trace']) and all(hold.get('predictiveBarrierValue') == 0 for hold in result['trace'])
@@ -112,7 +136,7 @@ def audit(result):
     passed = (feasible and zero_slack and complete and samples > 0 and clearance_match
               and (not road_enforced or road_satisfied)
               and clearance_satisfied)
-    return dict(scenario=name, passed=passed, samples=samples,
+    return dict(scenario=name, passed=passed, samples=samples, sampledRecoveryConfirmed=recovered,
                 minimumClearanceMeters=minimum if math.isfinite(minimum) else None,
                 minimumRoadMarginMeters=road_margin if math.isfinite(road_margin) else None,
                 roadConstraintsEnforced=road_enforced, roadBoundarySatisfied=road_satisfied,

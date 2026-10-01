@@ -1,0 +1,134 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,longtable,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlength{\emergencystretch}{2em}
+\title{Extended Closed-Loop Observation of Nominal Recovery}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{September 30, 2026}
+\begin{document}
+\maketitle
+
+\section{Question and experimental scope}
+The preceding fourteen-case experiment stopped after eight seconds. Its largest
+final lateral error, 24.739862 m in the 15 m/s curved head-on case, was the
+observed plant error at that simulation time, not the MPC terminal error.
+That finite endpoint alone could not establish eventual recovery or failure
+to recover. The requested behavior is collision avoidance followed by return
+to constant-speed motion along the given path, with no prescribed recovery
+speed or settling-time requirement.
+
+This experiment extends the same controller and fixtures from commit
+\path{03f9b33ba47598cb1cdffa2a81167b2596f90f6e}.
+No controller objective, constraint, stopping rule, input bound, target flow,
+or road definition was changed. The seven original collision threats are
+tested at 8 and 15 m/s. The control hold remains 50 ms, the prediction collision
+margin is 6 mm, observations are exact, and road constraints remain disabled.
+ODE45 with relative tolerance $10^{-11}$ and absolute tolerance $10^{-12}$
+provides the actual successor. Each hold retains 31 independent geometry
+samples. The controller uses its unchanged RK4 prediction. No random draws
+are made.
+
+\section{Observed recovery criterion and reproducible continuation}
+The five transverse errors are lateral position, heading relative to the
+nominal trim, longitudinal speed, lateral velocity and yaw rate relative to
+the nominal trim. The observation box is
+\[
+|e|\le
+\begin{bmatrix}
+0.10\ \mathrm{m}&1\ \mathrm{degree}&0.10\ \mathrm{m/s}&
+0.05\ \mathrm{m/s}&0.01\ \mathrm{rad/s}
+\end{bmatrix}^{\!T}.
+\]
+All five sampled errors must remain inside this box for five seconds, starting
+no earlier than simulation time eight seconds. These thresholds define a
+reported experimental observation, not new control constraints or a proof
+of asymptotic stability. Merely crossing the path does not satisfy the test.
+There is no imposed maximum settling time in the controller.
+
+The initial extension allows up to 300 simulated seconds per case and stops
+early only on confirmed sampled recovery or an actual execution failure.
+Low-speed straight-road cases with continuing recovery transients are then
+resumed from their saved state, with an observation cap of 1200 seconds.
+Reaching the observation cap without recovery is explicitly inconclusive
+about the infinite-time limit; it is not labeled physical infeasibility or
+proof of divergence. A MAT continuation file preserves the measured ego
+state, target, complete controller state, trace and dwell counter. Extending
+the cumulative frame count resumes that state instead of cold-starting the
+controller. Scenario, configuration, transition and recovery settings must
+match. Continuations must use the same controller implementation.
+
+Four independent single-thread MATLAB processes evaluate the initial cases;
+additional processes resume completed low-speed cases while other cases run.
+Wall-clock solve times are recorded, but this run is not an isolated runtime
+benchmark. The initial single-case 60-second pilot was run separately.
+
+\section{Measured results}
+\input{report/NOMINAL_RECOVERY_EXTENSION_20260930/metrics.tex}
+
+\section{Why completing the CLF stage does not prove recovery}
+The evaluated relaxed CLF condition is
+\[
+W_{k+1}-W_k\le-\alpha W_k+\rho_k,\qquad
+\alpha=0.01,\quad \rho_k\ge0.
+\]
+Positive slack can offset or exceed the dissipative term. The acceptance rule
+compares a new candidate's slack with an incumbent candidate at the same
+current state. It does not require the slack sequence across successive
+states to vanish, nor does it require actual $W_k$ to decrease.
+One accepted local secondary update therefore establishes the declared
+numerical stopping contract, not eventual nominal recovery.
+
+For comparison, if the displayed inequality holds and $\rho_k\to0$, then
+\[
+W_k\le(1-\alpha)^k W_0+
+\sum_{j=0}^{k-1}(1-\alpha)^{k-1-j}\rho_j\to0.
+\]
+This conditional implication is elementary; its premise is not established
+by the current acceptance rule. Requiring a particular fast recovery time is
+unnecessary for this distinction. The experiment does not replace the
+controller or impose a stronger online rule.
+
+\section{A long-time inconsistency in the curved head-on fixture}
+The analytic given path continues the radius-200 m circle indefinitely;
+\texttt{curve.length} only describes the displayed arc. The curved head-on
+target also follows that same circle forever in the opposite direction.
+Its center computed from the declared target flow is $(0,200)$ m.
+For the ideal given-path constant-speed baseline, center encounters repeat at
+\[
+t_n=1.6+n\frac{2\pi\,200}{v_E+8},\qquad n=0,1,\ldots.
+\]
+At $v_E=15$ m/s these include 1.6, 56.236394, 110.872788 and 165.509182 s;
+the period is 54.636394 s. At 8 m/s the period is 78.539816 s.
+The independently evaluated target and ideal ego centers coincide to
+floating-point accuracy at these times. A different ego phase shifts the
+encounter times without eliminating repeated encounters between opposing
+vehicles sharing a closed circle.
+
+The obstruction also applies to asymptotic recovery, rather than only exact
+cruising after a finite time. If all nominal errors tend to zero, the ego
+radius tends to 200 m and the relative angular speed tends to a strictly
+positive value. The unwrapped relative phase must therefore cross multiples
+of $2\pi$ infinitely often. At these crossings the center separation tends
+to zero; the fixed positive vehicle widths then force overlap. Vanishing
+recovery error and collision avoidance for all future time cannot both hold
+under this particular target contract.
+
+Consequently, perpetual collision-free nominal cruising after a last
+avoidance maneuver is incompatible with these two original fixture
+definitions. This is a scenario-contract issue, separate from the observed
+large recovery errors and relaxed CLF limitation. A finite recovery dwell
+would still not certify permanent nominal behavior in this fixture. No
+unannounced single-encounter assumption, target departure, straight exit,
+or scenario modification was used to obtain the reported results.
+
+\section{Validation and evidence}
+\input{report/NOMINAL_RECOVERY_EXTENSION_20260930/validation.tex}
+The compact evidence bundle contains the case summaries, one-second sampled
+traces, raw-file hashes, source manifest, tests and reproduction instructions.
+Full JSON replays and MAT continuation files remain in the external research
+cache identified by the raw manifest. Generated binaries are excluded from
+the project commit. The sampled geometry audit does not establish
+continuous-time or uncertain-plant safety.
+\end{document}
