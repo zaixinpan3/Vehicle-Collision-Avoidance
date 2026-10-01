@@ -1,0 +1,589 @@
+{
+  "kind": "Source, bundle and raw-artifact hashes; no weekly or monthly report hashes",
+  "baseCommit": "88ed3c2b8a975eb8705b959228b0735530bf9cf1",
+  "frozenSource": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/source",
+  "sources": [
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "8f2a656cccc0d4b78df462f7476c8968c1de13964b4673e4ca348d12752381b1",
+      "recordedSha256": "8f2a656cccc0d4b78df462f7476c8968c1de13964b4673e4ca348d12752381b1",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+      "recordedSha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+      "recordedSha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/nonlinearBicycleModel.m",
+      "sha256": "7ea8e251b8b15d9f714e5bba91da7558a6cb6806e76717c78410c48fe56a7882",
+      "recordedSha256": "7ea8e251b8b15d9f714e5bba91da7558a6cb6806e76717c78410c48fe56a7882",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+      "recordedSha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/readControllerInputs.m",
+      "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+      "recordedSha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "7c85307ed34fc750ad703333fd9168467acb42bf68b143576e442b1f21e450e2",
+      "recordedSha256": "7c85307ed34fc750ad703333fd9168467acb42bf68b143576e442b1f21e450e2",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+      "recordedSha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "d4eb4493b67a8478f843f7117562a6608d45bb120d7a0fdf9a238d1554d5ad43",
+      "recordedSha256": "d4eb4493b67a8478f843f7117562a6608d45bb120d7a0fdf9a238d1554d5ad43",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "config/estimatorControllerIntegrationConfig.m",
+      "sha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+      "recordedSha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "config/mncavVehicleConfig.m",
+      "sha256": "27ddaaf5b081757594d78d8290c76a1513e686e783ede95b6f1fb2689e44a80a",
+      "recordedSha256": "27ddaaf5b081757594d78d8290c76a1513e686e783ede95b6f1fb2689e44a80a",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "config/nrmmTrackingConfig.m",
+      "sha256": "50c79c001f29c499023f974f85d1a06103ebbd9e47923ad986b7bf3d63072248",
+      "recordedSha256": "50c79c001f29c499023f974f85d1a06103ebbd9e47923ad986b7bf3d63072248",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "611692320c748777e9dfdb0d13def74657282f427e8cba3731ac7137ce78ca39",
+      "recordedSha256": "611692320c748777e9dfdb0d13def74657282f427e8cba3731ac7137ce78ca39",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "scripts/collisionThreatScenario.m",
+      "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+      "recordedSha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "scripts/givenPathCollisionBaseline.m",
+      "sha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+      "recordedSha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "solver/controller/bicycleSampleKernelMex.mexa64",
+      "sha256": "dfd4ef44acf72bb3e22128dd394d2c7c583097cc8a9a81d8feb2d16a4fcc54e9",
+      "recordedSha256": "dfd4ef44acf72bb3e22128dd394d2c7c583097cc8a9a81d8feb2d16a4fcc54e9",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "solver/controller/dualKernelMex.mexa64",
+      "sha256": "d6a96de418c2c981f441db1f66fec423c634cf303a730ec6603944c85c146f0a",
+      "recordedSha256": "d6a96de418c2c981f441db1f66fec423c634cf303a730ec6603944c85c146f0a",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "solver/controller/rectangleKernelMex.mexa64",
+      "sha256": "82d5b2189584d3228aaed9272f31f0c83c7c561973d245c2a42abca3f75e0599",
+      "recordedSha256": "82d5b2189584d3228aaed9272f31f0c83c7c561973d245c2a42abca3f75e0599",
+      "identicalToWorkingTree": true
+    }
+  ],
+  "bundle": [
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/REPRODUCTION.txt",
+      "sha256": "d2537297f3dd73108f811b72634a8bf31fd41f5184e5306a27d56197b5e2e089"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/cancellation.csv",
+      "sha256": "532b41b6430edea9a118fcd3ac4ead63851734c95443ec3ee8e884cba587abbe"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/clf-feasibility-map.csv",
+      "sha256": "4c3daac5c400ee0161370b90938af1646ecf67a627fd214d1c516c000cd6ffec"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/greedy-summary.csv",
+      "sha256": "6b288193bf9d692cf8bf102b23d7b545ffa0bf99068755af59fa7bd6011fcad0"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/brakingDrift.log",
+      "sha256": "a44de48559d61713da3d00fc9067d33febc69053f43b97076666b8a9e52807e4"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/cancellation.log",
+      "sha256": "af236ab45916c8ed72178a8f5e2cd16b826f94327b5b83873c3e74452822d173"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/crossTerms.log",
+      "sha256": "6b4e83f0d0804676e8c56afd10add796119a0b46ec668ec028b0a07c2af1652c"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/curvedDeparture.log",
+      "sha256": "3a6545d83bae01cbb083a8f0cbef667c64461d7123671147937b408f599b9d6f"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/feasibility.log",
+      "sha256": "bbd6dfce364a0023dcbb68ba3d607b0c0d72053ff7dca1ed6a901084135d5525"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/greedyNearCheck.log",
+      "sha256": "8a5a158e7e4e3b0fbb529e0fb660c63e4192164b5778732a71ddd5d2e2869708"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/greedySummary.log",
+      "sha256": "a87d12e8d7aa26a3ebee5da70a2065bb003c4a6b90f7431980d08fde41263c50"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/localDecay.log",
+      "sha256": "de692c5790b0e112885169a719052699ede3fb5f692fe2763f97d9e96b00f653"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/planDecay.log",
+      "sha256": "450e533862978f06fa93ba8733273a8ceab3f85e016abf3fdeb940090fba31d7"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/policies-run-a.log",
+      "sha256": "2e82aa9b57838c5dd43deaf16903c2279b349161a25139d329735ab19aac6250"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/policies-run-b.log",
+      "sha256": "3a9a340a67dc6dec26dc733470dd3e097dd9fbbb53cd7207aa3860fe49fb9986"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/policies-run-c.log",
+      "sha256": "61346940bf5608b88b1ee09c6116b957840086977fa7b089513bdadb56cc91f4"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/policies-run-d.log",
+      "sha256": "69bde8b24c87f045012c757ac04bfe8a3f38d82f99c7f2f0160fa7d93b446962"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/recoveryTiming.log",
+      "sha256": "01ca60b991a106bd16b71571030b92b3fcf134a37a888e03160294f1dc577288"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/regimes.log",
+      "sha256": "ec77fa44c089cfb6914994129d36d28879b7593416a7300d91f41a1ed8c11d09"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/replays-full-a.log",
+      "sha256": "d315063313aff240c649f4cfc64c971bc8d8a57d15bfb888ca3c81155e8ff2e3"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/replays-full-b.log",
+      "sha256": "a3926a661b11e56faf61d88a94d7250a737729e1e32c9a3ed6d268468654755b"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/replays-full-c.log",
+      "sha256": "c7065424dcc246f24d0c66e35fcfaa588f1537b472eb29657cb49b2dbd36d459"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/replays-full-d.log",
+      "sha256": "977cda6b4918da444725f06a0fefe14d6413b2b86c3cfc06e957f928edf7996e"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/speedCycle.log",
+      "sha256": "85f4cf9597d316392990441e17cca21151e327d90764424800d8c58b5177a143"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/brakingDrift.m",
+      "sha256": "f7e69646de239955ac31e1fdb39d10824387240a748b2a9d6a0af86d4c4b0ce9"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/cancellation.m",
+      "sha256": "33451e08869f394e90eccd080ad98eee8f6aec5e876f888acd4e8c0cc7729e7b"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/clfFeasibilityMap.m",
+      "sha256": "528135c5e769f7460e0953d5d06c48004b133222d11cc72bd13a0599ac5d9e51"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/crossTerms.m",
+      "sha256": "81a2ac7dc3d92585713d3c1a9808931035740464d567a0c5aea4af43d635a5d5"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/curvedDeparture.m",
+      "sha256": "299f57be68284f1d2fbe5d945d8f01852aa93d70fba009d6054f163facb9a559"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/greedyClf.m",
+      "sha256": "4bd33aedd5c2158ccec5763f784760751a84efd96af946f9f993d0b38ab3129a"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/greedyNearCheck.m",
+      "sha256": "3f9ae6eaaa1a857a0f18a9cd0660ff76b03b0ece6c2623860bc7c2179b991efd"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/greedySummary.m",
+      "sha256": "bd103d48a8a510d613bf1fc2f0b3263a2a6442661393b241470751f568a26752"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/localDecay.m",
+      "sha256": "67058b0f24ef7b3adf76ff6f9e600f71db1125a050fea7231a65b813a1d5059e"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/planDecay.m",
+      "sha256": "2679169d155530cccb86249e7a006ad6eda994a0cb7795a2b4cf9178056af7b6"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/recoveryTiming.m",
+      "sha256": "1b849426018a68e7cfb91a17522fc4642af461f71fad742d5de6cf405791adba"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/regimes.m",
+      "sha256": "968a7be52ea526feb190362b7746842e1ed30b78c938c0f6a79f3258cf35e4fa"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/replayCase.m",
+      "sha256": "607d7a2cecb5900b47d09df1f025d0aafa4cb35524f849649352ea6a22da6453"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/rerunAnalyses.m",
+      "sha256": "e8eeab51cee2e54ee3a848280f1fa2669f191a3931b0b4cc018cac1eacf5bf5c"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/runGreedyFromCases.m",
+      "sha256": "f52b7ed4a4a51c994b0c3328470b9670f56f4efdb06148e5cd3a467d08582917"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/runReplays.m",
+      "sha256": "55c5abba52ef85075976a27391f6c78962ca852fe975c606111f6648d5bd08d3"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/speedCycle.m",
+      "sha256": "9e57cefb71500c897ab9979078f07b3725c771dc87072ccd0b2175f28789255f"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/no-risk-regimes.csv",
+      "sha256": "728efcdbeeca870ce3e11c94b21bdb1881ccd0fe0cc207a505498ec1f8a2c6ac"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/no-risk-trajectories.csv",
+      "sha256": "494075d1848f69ee7893a3309b2cd73f73bdd5c80c45cd14a93e6abb2b3b6b7f"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/plan-decay.csv",
+      "sha256": "1890ace17189c74a6b937c0f7970b21e57ba73c09d3d3818bb2c9494a1b9d4e4"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001.tex",
+      "sha256": "c4fa3138bfdf38651a1130e3ab59a8f0b267ce96ae3ac8c154222e0693fb0045"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/acceleratingHeadOn-15-full.mat",
+      "sha256": "dca5462cd127073fd8468a0be151cfdcb7ba155f6da4ff723f3628214808ab21",
+      "bytes": 37045626
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/acceleratingHeadOn-8-full.mat",
+      "sha256": "3ecd0880e490608e967bef71573c836f245f31805b969005982005800e7f0fd5",
+      "bytes": 35304026
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/brakingLead-15-full.mat",
+      "sha256": "d693cca5017447006ea12408c844536d78952f1e44d97a2c1607a39b17967fcf",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/brakingLead-8-full.mat",
+      "sha256": "684eeabca655b9707356f099ca59a574ae9cca9861af8f2f86a596f3f76b4ccf",
+      "bytes": 35304026
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/crossing-15-full.mat",
+      "sha256": "6c7f3378aefca1e464b92af94100dd83dc5b803224a30ac158bdcaaae75c1113",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/crossing-8-full.mat",
+      "sha256": "56d434a9354aad9c638c296b8a58d9dfe3777328fa92da3f1461bdf821b53edf",
+      "bytes": 35304025
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/curvedCrossing-15-full.mat",
+      "sha256": "62f2b340ed4ac9208067cc6b14eee9e42a387240903648169206098db20bdd5d",
+      "bytes": 37047735
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/curvedCrossing-8-full.mat",
+      "sha256": "5909759cb853ea3ab022606d84338ded8eb768e049c6f70619da4cbbc4963211",
+      "bytes": 35306098
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/curvedHeadOn-15-full.mat",
+      "sha256": "0827677cfcc24dee8f08b772914eb6cc305f20b31007db248f1fe4a83643752e",
+      "bytes": 37047780
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/curvedHeadOn-8-full.mat",
+      "sha256": "9d7fedf5d69392c5704866ba1311481bfba2bbeb43608a8733055e5ea66f0629",
+      "bytes": 35306098
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/headOn-15-full.mat",
+      "sha256": "6ac766c884253e5bec3836e12ca007d1bfba4f352004864ae9b94ad3fd520d95",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/headOn-8-full.mat",
+      "sha256": "d8d29e90116c800e93c8c4a72a408a9dd909f7ab5d40a8413c11113c69b7560d",
+      "bytes": 35304025
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/turningCrossing-15-full.mat",
+      "sha256": "d739a02ea7d2927b9c0e260aff70b2c0427d428aba3061446f9d054dced6e8a1",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay/turningCrossing-8-full.mat",
+      "sha256": "4ade574a971b341d335d1cf0faeb2fe46de0b3871951c48ec109259eb6c0d56a",
+      "bytes": 35304025
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-acceleratingHeadOn-15.mat",
+      "sha256": "0c80f2b3eb60cec603a9dde34fc220f6be5e09475e67bed9bc26d366abd89f7d",
+      "bytes": 150952
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-brakingLead-15.mat",
+      "sha256": "84da7442783dc4103f30692f63666bf2ee4b704ed3096a2fae2ea3079fad5ef8",
+      "bytes": 151760
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-crossing-15.mat",
+      "sha256": "e927c97ec3ab94050f322a7d419baa107289442651a0c3be1e46a93978bbd9cd",
+      "bytes": 3312
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-crossing-8.mat",
+      "sha256": "0e31bcb80a167b3741a22f5d28c50583d567bd3e7289978b0d540d496c1f5f23",
+      "bytes": 3493
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-curvedCrossing-15.mat",
+      "sha256": "d5dca166c261dc8570b67216cfbbd33edbf6194ea3d58be73a2b03484b4162c5",
+      "bytes": 35719
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-curvedCrossing-8.mat",
+      "sha256": "57db58d8a0c37f469e832e7ae23b88eaba027404b37161c8c6e4066a8d6333a7",
+      "bytes": 3712
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-curvedHeadOn-15.mat",
+      "sha256": "e574443f5c698e14dae9050be3d3097fef0a93c59669c3312f2eee92507fe7d3",
+      "bytes": 15956
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-curvedHeadOn-8.mat",
+      "sha256": "3863680ed5fac91fdc94909874ce414fd7ebb087f84080a32f8e750765d2159a",
+      "bytes": 20387
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-headOn-15.mat",
+      "sha256": "e13ef0d751d8f45fd0140d9429734fbf1e8946ea0fc9644ee8f5c4e2dd7b776d",
+      "bytes": 28777
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-turningCrossing-15.mat",
+      "sha256": "7bf5f19151dee0ceb6f112f74951c79465e92d10996cff04133dfeb45b088401",
+      "bytes": 3040
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedy-turningCrossing-8.mat",
+      "sha256": "8045442d1473dddf60c6a1ae64a63733533f6f91c510c256fdfe4b2ea7a59b62",
+      "bytes": 29177
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-acceleratingHeadOn-15.mat",
+      "sha256": "4dd122d5ee63b5b5717ac877ca18a5ed93a01f5754cb4a21b52aa145f8b00845",
+      "bytes": 16100
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-brakingLead-15.mat",
+      "sha256": "72d608c9f27d7d5499edbf215b7472d6ded6f9b259963ed440227c257f06f50c",
+      "bytes": 16502
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-crossing-15.mat",
+      "sha256": "1a68fee09e145e4fac810d2f26ec98abf33e1fa47b6c042c883aa4a44f30ebc9",
+      "bytes": 2938
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-crossing-8.mat",
+      "sha256": "940b3db5991f54fe220d77d1f0ed7004f079aeee97f4130fd3a1004411cd2a04",
+      "bytes": 5418
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-curvedCrossing-15.mat",
+      "sha256": "3a7fe6b8f1520edd3a5ec4cd1694e1e33acca6a440622fc32b2786869d334a59",
+      "bytes": 36198
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-curvedCrossing-8.mat",
+      "sha256": "161bbe0e867b7f18d28f15455a0169aa4b4e937813ec833cab0c35c8a28f1f01",
+      "bytes": 3906
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-curvedHeadOn-15.mat",
+      "sha256": "51908a1155fad0549f51a9f78707796c62205deaf479a6a9e6cf184a2dc581fb",
+      "bytes": 16089
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-curvedHeadOn-8.mat",
+      "sha256": "a16773e76db4d441f60249270bf443fc4094ab7924a26c344d6c30b9366f53ae",
+      "bytes": 20760
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-headOn-15.mat",
+      "sha256": "e59b556e5321dafb85a101638606a04e56dac32d9df20a925928b5b037265383",
+      "bytes": 16359
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-turningCrossing-15.mat",
+      "sha256": "331b2d4d74c151249cb64588015d5d6c7be57a34f9df84b16ee92c28cf0e8110",
+      "bytes": 2512
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/greedySlew-turningCrossing-8.mat",
+      "sha256": "586890769262320fb4071fcd82bfc87c27b65bac4f1516c53079ac38fda811e4",
+      "bytes": 16488
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-acceleratingHeadOn-15.mat",
+      "sha256": "67025d784e4fc2aef4f1536f932831a52d47a84aefc5642dd13bf34bed038c80",
+      "bytes": 36456
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-brakingLead-15.mat",
+      "sha256": "dccd4f06952543e6e70d2d8594b29cd84749484c58c5db0390df1ab8c7f8ea36",
+      "bytes": 151023
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-crossing-15.mat",
+      "sha256": "0352c9aab442ee1bcc516bc1365ccda6a975c12dbb23d194d7cab46646586f26",
+      "bytes": 3325
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-crossing-8.mat",
+      "sha256": "9cdfd6cd2c76bcd72d991cc62f0a75e3e7ba7b9b4f85dcf84ad4786d36bf4165",
+      "bytes": 3506
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-curvedCrossing-15.mat",
+      "sha256": "d59b1a913794211d30f6a4a74b236458155239a6182d4a1241b2ba084cc3e6c9",
+      "bytes": 8931
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-curvedCrossing-8.mat",
+      "sha256": "bc164fd824b2de9c3c89b3e05499fec9c38871a53f374259ad8b5226a4df85c4",
+      "bytes": 3715
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-curvedHeadOn-15.mat",
+      "sha256": "664a1c92dbf5c8261ce1ebebe19c23cec8e5dffe24af5b2b47585127f750f97e",
+      "bytes": 30955
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-curvedHeadOn-8.mat",
+      "sha256": "804a89f044d107004f2d243d87d1cd15e1aaaf7e4db891e4b5acde6a83a69e0a",
+      "bytes": 41298
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-headOn-15.mat",
+      "sha256": "797ffae320ebc8a0e4ff7224818ceebeb96a7b51b7e5d0a2a57e0b58aba7aea7",
+      "bytes": 51446
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-turningCrossing-15.mat",
+      "sha256": "0cf3dc64a9666981bd24df3621e1cf38fff65e1b2fd509280ae76eaa25a8defa",
+      "bytes": 3042
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferent-turningCrossing-8.mat",
+      "sha256": "29bddb982458267e9398f72ff595faf85960d009674a4a4c7e096824024ab13c",
+      "bytes": 49288
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-acceleratingHeadOn-15.mat",
+      "sha256": "a8657c2f6854cb5c6ef21cd0110a5fc563e7b55ba0d6509e72df788d697fb961",
+      "bytes": 35869
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-brakingLead-15.mat",
+      "sha256": "17f5bd651ca57b25619fe806f05a82b7335fd0c26cdedd98f11a712b92a1f56f",
+      "bytes": 43666
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-crossing-15.mat",
+      "sha256": "528b2a7d2bc5ed2dfcbad5066b4c9943c87e7cc3b121f8f502ca5d4ab1a2baed",
+      "bytes": 2943
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-crossing-8.mat",
+      "sha256": "1be034410bed3175b792161432a2de7add1feeab3851a360eba94229e65661e4",
+      "bytes": 5244
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-curvedCrossing-15.mat",
+      "sha256": "5c2275b7c81e62a1de06a3e1cd8218f50f663948ce74395f043d18a45e015f5e",
+      "bytes": 8301
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-curvedCrossing-8.mat",
+      "sha256": "a7c6f7786fcfaf22f1cafe95be47e6a8ae7de59ae0c8739a7c96ee6d9ef29b7a",
+      "bytes": 3896
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-curvedHeadOn-15.mat",
+      "sha256": "2d3bb152494e8df18bba48ca320e9137d0b724e01874dc6b87649cc2af2731dc",
+      "bytes": 44205
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-curvedHeadOn-8.mat",
+      "sha256": "040ba3ce16dd1ec53fe848972ddd22ccfc44f7bc2f567e2ddbb875d6723c237b",
+      "bytes": 6606
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-headOn-15.mat",
+      "sha256": "990adb2f95a0ce3e36d8d694d6ad53411f1c8998fd5870bbbb1bdbf299d9e4ee",
+      "bytes": 43406
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-turningCrossing-15.mat",
+      "sha256": "5d24e7be58befb8a2ad87bdd2b7f30842908198476dbb636623155cdedd0b7f5",
+      "bytes": 2482
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/greedy/indifferentSlew-turningCrossing-8.mat",
+      "sha256": "e8735a38bfae9535212b28d5c11a6aec225e1284ef698b1aacfc30f0d9c9d143",
+      "bytes": 13317
+    }
+  ]
+}

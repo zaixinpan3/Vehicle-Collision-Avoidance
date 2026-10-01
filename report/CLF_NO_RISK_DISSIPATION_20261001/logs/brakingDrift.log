@@ -1,0 +1,18 @@
+=== brakingDrift (01-Oct-2026 18:38:39)
+trim braking 0.0184
+first late frame with anchor braking < trim-0.1: t=41.85
+t= 41.25 V0=  0.00326 rho= 6.25e-09 anchor b: first -0.0307 mean +0.0185 last +0.0184 | issued +0.0203 | plan b: first +0.0203 second -0.0284 mean +0.0185 last +0.0183 | corrections sum -0.0001 max|.| 0.0510
+t= 41.35 V0=  0.00216 rho= 2.57e-09 anchor b: first -0.0226 mean +0.0184 last +0.0184 | issued +0.0210 | plan b: first +0.0210 second -0.0294 mean +0.0184 last +0.0183 | corrections sum -0.0002 max|.| 0.0436
+t= 41.45 V0=   0.0014 rho= 1.26e-10 anchor b: first -0.0298 mean +0.0183 last +0.0184 | issued +0.0202 | plan b: first +0.0202 second -0.0309 mean +0.0183 last +0.0183 | corrections sum -0.0005 max|.| 0.0499
+t= 41.55 V0= 0.000459 rho= 7.65e-11 anchor b: first -0.0380 mean +0.0182 last +0.0184 | issued +0.0204 | plan b: first +0.0204 second -0.0423 mean +0.0182 last +0.0183 | corrections sum -0.0011 max|.| 0.0585
+t= 41.65 V0= 0.000432 rho= 5.03e-08 anchor b: first -0.0455 mean +0.0182 last +0.0184 | issued +0.0251 | plan b: first +0.0251 second -0.0575 mean +0.0181 last +0.0184 | corrections sum -0.0017 max|.| 0.0706
+t= 41.75 V0= 0.000141 rho= 8.96e-10 anchor b: first -0.0699 mean +0.0180 last +0.0184 | issued +0.0179 | plan b: first +0.0179 second -0.0800 mean +0.0180 last +0.0184 | corrections sum -0.0019 max|.| 0.0878
+t= 41.85 V0= 0.000146 rho= 8.02e-09 anchor b: first -0.0941 mean +0.0180 last +0.0184 | issued +0.0192 | plan b: first +0.0192 second -0.1061 mean +0.0179 last +0.0184 | corrections sum -0.0021 max|.| 0.1133
+t= 41.95 V0= 0.000177 rho= 0.000179 anchor b: first -0.1138 mean +0.0179 last +0.0184 | issued +0.0112 | plan b: first +0.0112 second -0.1129 mean +0.0179 last +0.0184 | corrections sum -0.0011 max|.| 0.1250
+t= 42.05 V0=  0.00093 rho= 0.000681 anchor b: first -0.1128 mean +0.0181 last +0.0184 | issued +0.0122 | plan b: first +0.0122 second -0.1099 mean +0.0180 last +0.0184 | corrections sum -0.0010 max|.| 0.1250
+t= 42.15 V0=  0.00225 rho=    5e-10 anchor b: first -0.1022 mean +0.0182 last +0.0184 | issued +0.0212 | plan b: first +0.0212 second -0.0921 mean +0.0181 last +0.0184 | corrections sum -0.0012 max|.| 0.1234
+braking anchor profile at t=41.65 (every 5th stage): -0.046 -0.061 -0.022 -0.025 -0.024 -0.013 -0.003 +0.009 +0.023 +0.044 +0.069 +0.095 +0.104 +0.083 +0.033 +0.018
+braking plan profile   at t=41.65 (every 5th stage): +0.025 -0.069 -0.029 -0.031 -0.029 -0.016 -0.006 +0.006 +0.021 +0.042 +0.067 +0.094 +0.107 +0.092 +0.046 +0.018
+speed anchor profile   at t=41.65 (every 5th node): -0.003 -0.166 -0.310 -0.396 -0.488 -0.567 -0.623 -0.657 -0.664 -0.636 -0.562 -0.434 -0.262 -0.093 -0.001 -0.000
+speed plan profile     at t=41.65 (every 5th node): -0.003 -0.144 -0.305 -0.405 -0.507 -0.595 -0.657 -0.696 -0.709 -0.685 -0.614 -0.488 -0.314 -0.135 -0.019 +0.000
+=== brakingDrift done in 0.9 s

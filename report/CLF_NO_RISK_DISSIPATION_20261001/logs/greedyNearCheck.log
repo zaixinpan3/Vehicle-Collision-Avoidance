@@ -1,0 +1,11 @@
+=== greedyNearCheck (01-Oct-2026 18:38:40)
+greedy-acceleratingHeadOn-15: steps 1600, final e=[0.00258 0.000332 -0.00395 -1.05e-12 -1.19e-13 ]
+  last 20 s: max|e| = [0.0114 0.000556 0.00416 0.00587 0.0105 ]; fraction of steps each tolerance violated = [0.00 0.00 0.00 0.00 0.01 ]
+  last 20 s: steering range [-0.004 0.004], mean|dsteer| 0.000, braking range [0.000 0.020], mean|dbrake| 0.003, V range [0.000167 0.00988]
+greedy-brakingLead-15: steps 1600, final e=[0.00412 0.000474 0.00357 -1.74e-11 -1.97e-12 ]
+  last 20 s: max|e| = [0.0108 0.000479 0.00415 0.00587 0.0105 ]; fraction of steps each tolerance violated = [0.00 0.00 0.00 0.00 0.01 ]
+  last 20 s: steering range [-0.004 0.004], mean|dsteer| 0.000, braking range [0.000 0.020], mean|dbrake| 0.003, V range [0.000242 0.00937]
+indifferent-brakingLead-15: steps 1600, final e=[0.00605 0.000502 -0.000642 -4.27e-12 -4.86e-13 ]
+  last 20 s: max|e| = [0.011 0.000508 0.0113 0.00587 0.0105 ]; fraction of steps each tolerance violated = [0.00 0.00 0.00 0.00 0.01 ]
+  last 20 s: steering range [-0.004 0.004], mean|dsteer| 0.000, braking range [0.000 0.020], mean|dbrake| 0.003, V range [0.00021 0.00952]
+=== greedyNearCheck done in 0.0 s

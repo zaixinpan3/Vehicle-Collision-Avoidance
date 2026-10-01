@@ -1,0 +1,74 @@
+=== planDecay (01-Oct-2026 18:38:18)
+          scenario          speed    freeFrames    trappedFrames    rhoZeroFramesV0AtLeast1    maxRelativeVCheck    trappedMedianActualRatio
+    ____________________    _____    __________    _____________    _______________________    _________________    ________________________
+
+    "acceleratingHeadOn"      8         1518            585                   484                 2.8654e-15                 1.0026         
+    "brakingLead"             8         1179              2                   336                 3.0211e-15                0.98944         
+    "crossing"                8            0              0                     0                          0                    NaN         
+    "curvedCrossing"          8         1004            915                    89                 2.9486e-15                 1.0011         
+    "curvedHeadOn"            8         1499           1351                   148                  3.972e-15                 1.0025         
+    "headOn"                  8         1503            496                   447                 3.2655e-15                 1.0027         
+    "turningCrossing"         8         1272           1272                     0                 1.6153e-15                 1.0011         
+    "acceleratingHeadOn"     15         1546            407                   524                 2.1151e-15                 1.1078         
+    "brakingLead"            15          933            223                   405                 2.2418e-15                 1.1029         
+    "crossing"               15            0              0                     0                          0                    NaN         
+    "curvedCrossing"         15         1086           1086                     0                 1.3963e-15                 1.0014         
+    "curvedHeadOn"           15         1453           1355                    96                 8.6678e-15                  1.003         
+    "headOn"                 15         1541            416                   537                 2.0436e-15                 1.1088         
+    "turningCrossing"        15         1325           1254                     0                 2.7047e-15                 1.0035         
+
+          scenario          speed    trappedMedianLaterDecreaseShare    trappedMedianEndRatio    trappedShareEndBelowV0    trappedMedianAnchorRatio    trappedShareAnchorMeetsDecay
+    ____________________    _____    _______________________________    _____________________    ______________________    ________________________    ____________________________
+
+    "acceleratingHeadOn"      8                        0                        1.5145                   0.21538                    1.0048                           0             
+    "brakingLead"             8                        0                        1.2499                         0                   0.99477                           0             
+    "crossing"                8                      NaN                           NaN                       NaN                       NaN                         NaN             
+    "curvedCrossing"          8                        0                       0.81437                   0.64918                    1.0013                           0             
+    "curvedHeadOn"            8                        0                        1.3814                  0.027387                    1.0033                           0             
+    "headOn"                  8                        0                        1.5396                   0.20766                    1.0049                           0             
+    "turningCrossing"         8                        0                        1.1189                   0.31604                    1.0013                           0             
+    "acceleratingHeadOn"     15                  0.30667                        32.132                         0                    1.7734                           0             
+    "brakingLead"            15                     0.36                        18.056                         0                      1.75                           0             
+    "crossing"               15                      NaN                           NaN                       NaN                       NaN                         NaN             
+    "curvedCrossing"         15                        0                          1.25                   0.12707                    1.0019                           0             
+    "curvedHeadOn"           15                        0                        2.3585                         0                    1.0057                           0             
+    "headOn"                 15                      0.3                        31.725                         0                     1.767                           0             
+    "turningCrossing"        15                        0                        1.3328                  0.044657                    1.0036                           0             
+
+          scenario          speed    rhoZeroMedianLaterDecreaseShare    rhoZeroMedianEndRatio    rhoZeroMedianAnchorRatio    rhoZeroShareAnchorMeetsDecay
+    ____________________    _____    _______________________________    _____________________    ________________________    ____________________________
+
+    "acceleratingHeadOn"      8                  0.48507                       0.50473                   0.98846                       0.59711           
+    "brakingLead"             8                   0.3806                       0.55298                   0.98871                       0.55357           
+    "crossing"                8                      NaN                           NaN                       NaN                           NaN           
+    "curvedCrossing"          8                        1                       0.23051                   0.98519                       0.94382           
+    "curvedHeadOn"            8                  0.79104                       0.30719                   0.98043                       0.79054           
+    "headOn"                  8                  0.20896                       0.91348                   0.99005                       0.48993           
+    "turningCrossing"         8                      NaN                           NaN                       NaN                           NaN           
+    "acceleratingHeadOn"     15                        0                        5.4843                    1.0007                             0           
+    "brakingLead"            15                        0                        2.0193                   0.99542                        0.1358           
+    "crossing"               15                      NaN                           NaN                       NaN                           NaN           
+    "curvedCrossing"         15                      NaN                           NaN                       NaN                           NaN           
+    "curvedHeadOn"           15                      0.1                        3.4982                   0.97838                       0.58333           
+    "headOn"                 15                        0                        5.2209                    1.0003                             0           
+    "turningCrossing"        15                      NaN                           NaN                       NaN                           NaN           
+
+          scenario          speed    noRiskStart    startLateral    startHeading    startSpeedError    closestLateral    closestTime    finalLateral    finalHeading    finalSpeedError    recoveredAt
+    ____________________    _____    ___________    ____________    ____________    _______________    ______________    ___________    ____________    ____________    _______________    ___________
+
+    "acceleratingHeadOn"      8           4.1          7.9282          0.34063         -0.78345         -1.2946e-06          61.8       -0.00093676     -1.9996e-05       -0.00057791         62.65   
+    "brakingLead"             8         21.05         -7.3349         0.011757         -0.21414          -8.863e-07          78.8         0.0040029      -0.0016661        -0.0031397         43.85   
+    "crossing"                8           NaN             NaN              NaN              NaN                 NaN           NaN           -621.03         -1.5712         0.0067441           NaN   
+    "curvedCrossing"          8          29.8          38.928           2.6808           1.4486              25.436            80            25.436         -2.2987          -0.38819           NaN   
+    "curvedHeadOn"            8          5.05          7.6771          0.23505         -0.68603             0.01603         20.05           -72.256        0.015292          -0.85661           NaN   
+    "headOn"                  8          4.85          7.9957          0.29781         -0.75071          5.3502e-09         69.55       -1.9863e-05      2.4663e-05        -1.981e-05          57.1   
+    "turningCrossing"         8          16.1         -17.517          -1.4317          0.82263             -17.947         16.15           -97.537         0.85341           0.45543           NaN   
+    "acceleratingHeadOn"     15           2.7          4.0845        -0.036941          -3.0708         -1.4925e-05         62.75         -0.006683     -0.00045422          -0.24243           NaN   
+    "brakingLead"            15         33.35         -4.8297        -0.047394           -1.974         -1.9152e-05         73.45         0.0053244      0.00039461          -0.22591           NaN   
+    "crossing"               15           NaN             NaN              NaN              NaN                 NaN           NaN           -629.01         -1.6567           -7.2984           NaN   
+    "curvedCrossing"         15          25.7         -40.497         -0.48909          -0.6152             -40.837         25.75           -139.65          0.3492           -1.5179           NaN   
+    "curvedHeadOn"           15           3.9           4.023        -0.016163          -3.9366            0.006588          7.05           -26.951       -0.077544           -1.7871           NaN   
+    "headOn"                 15          2.95          4.2283        -0.036129          -3.4551          1.0065e-05         51.35         -0.010391       0.0005884          -0.33858           NaN   
+    "turningCrossing"        15         13.75          37.903           2.7639          -1.6062              38.157          13.8            521.89        -0.29841            -1.773           NaN   
+
+=== planDecay done in 18.4 s

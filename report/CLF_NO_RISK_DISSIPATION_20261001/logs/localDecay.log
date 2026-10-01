@@ -1,0 +1,12 @@
+=== localDecay (01-Oct-2026 18:38:36)
+v=8 m/s: best one-step ratio over u, worst direction: 0.95904 (decrease 4.096%), best direction -0.00000
+   LQR policy one-step ratio range [0.00000, 0.95905]
+   share of P-sphere directions where the 1% one-step decrease is unattainable: 0.000; where no decrease at all: 0.000
+   worst direction (unit, e=[ey epsi ev vy r]): [0.987  0.154 -0.000  0.035  0.008]
+   eigen-ratios: 0.95904  0.89706  0.19192  0.00000 -0.00000
+v=15 m/s: best one-step ratio over u, worst direction: 0.96631 (decrease 3.369%), best direction -0.00000
+   LQR policy one-step ratio range [0.00000, 0.96632]
+   share of P-sphere directions where the 1% one-step decrease is unattainable: 0.000; where no decrease at all: 0.000
+   worst direction (unit, e=[ey epsi ev vy r]): [0.958  0.275 -0.000  0.084  0.010]
+   eigen-ratios: 0.96631  0.85396  0.45603  0.00000 -0.00000
+=== localDecay done in 0.1 s

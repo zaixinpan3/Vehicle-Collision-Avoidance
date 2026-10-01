@@ -1,0 +1,8 @@
+=== recoveryTiming (01-Oct-2026 18:38:36)
+headOn: encounter ends 4.85 s, recovery confirmed 57.10 s (band entered 52.10 s); trapped (steering edge, rho>0) frames before recovery 496 (last at 42.90 s, e_y=-1.03 m, V0=78)
+   after the last trapped frame: 283 frames with rho=0; actual V ratio median 0.9756 (p10 0.8763, p90 0.9875); predicted ratio median 0.9755; V from 76.77 to 1.111e-06
+acceleratingHeadOn: encounter ends 4.10 s, recovery confirmed 62.65 s (band entered 57.65 s); trapped (steering edge, rho>0) frames before recovery 585 (last at 46.35 s, e_y=-1.69 m, V0=207.6)
+   after the last trapped frame: 325 frames with rho=0; actual V ratio median 0.9798 (p10 0.9133, p90 0.9882); predicted ratio median 0.9782; V from 204.7 to 8.842e-05
+brakingLead: encounter ends 21.05 s, recovery confirmed 43.85 s (band entered 38.85 s); trapped (steering edge, rho>0) frames before recovery 2 (last at 21.10 s, e_y=-7.32 m, V0=4010)
+   after the last trapped frame: 454 frames with rho=0; actual V ratio median 0.9824 (p10 0.9279, p90 0.9897); predicted ratio median 0.9803; V from 3966 to 0.003971
+=== recoveryTiming done in 2.3 s

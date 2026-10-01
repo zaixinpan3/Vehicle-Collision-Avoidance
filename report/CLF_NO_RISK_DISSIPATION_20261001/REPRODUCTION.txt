@@ -1,0 +1,53 @@
+Why the CLF does not return the ego to nominal cruise after the encounter -- October 1, 2026
+
+Controller: commit 88ed3c2b8a975eb8705b959228b0735530bf9cf1 (5-cm sampled margin). The
+frozen copy used by every method is
+/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/source; its 18 hashed files
+(source.sha256 there) were rechecked after the analysis, and its controller/,
+config/ and scripts/ directories are identical to the working tree at that commit.
+No production file was changed.
+
+Raw directory: <raw> = /home/zai/.cache/collisionAvoidance/clf-dissipation-20261001
+All commands below were run from <frozen source>, MATLAB R2026a.
+
+1. Instrumented replays (methods/replayCase.m, methods/runReplays.m), four concurrent
+   single-thread processes, 1600 frames (80 s) per case, same fixtures, target
+   conversion and ODE45 plant step (31 samples per hold, RelTol 1e-11, AbsTol 1e-12)
+   as runNonlinearPredictiveSafetyValidation; horizonSteps 8 (8 m/s) or 16 (15 m/s):
+     matlab -singleCompThread -batch "cases={{8,"crossing"},{15,"crossing"},{8,"headOn"},{15,"headOn"}};run('<raw>/methods/runReplays.m')"
+     matlab -singleCompThread -batch "cases={{8,"turningCrossing"},{15,"turningCrossing"},{8,"acceleratingHeadOn"},{15,"acceleratingHeadOn"}};run(...)"
+     matlab -singleCompThread -batch "cases={{8,"curvedHeadOn"},{15,"curvedHeadOn"},{8,"brakingLead"}};run(...)"
+     matlab -singleCompThread -batch "cases={{8,"curvedCrossing"},{15,"curvedCrossing"},{15,"brakingLead"}};run(...)"
+   Output <raw>/replay/<scenario>-<speed>-full.mat; logs/replays-full-*.log.
+   The replays reproduce the campaign recovery times (57.10, 62.65, 43.85 s).
+
+2. One-step feasibility map (methods/clfFeasibilityMap.m):
+     matlab -singleCompThread -batch "run('<raw>/methods/clfFeasibilityMap.m')"
+   Straight lane, states [0, e_y, e_psi, v_ref, 0, 0], e_y in {-100..-0.2} m, 72
+   headings (5-degree grid), inputs on a 141 x 41 grid (steering +-0.7 rad, braking
+   +-0.999), one hold of nonlinearBicycleModel.sample, controller V.
+   Output clf-feasibility-map.csv; logs/feasibility.log.
+
+3. Idealized one-step CLF policies (methods/greedyClf.m, methods/runGreedyFromCases.m),
+   four concurrent single-thread processes, with
+   P='policies=["greedy","greedySlew","indifferent","indifferentSlew"];'
+     matlab -singleCompThread -batch "$P cases={{8,"turningCrossing"},{8,"crossing"},{15,"headOn"}};run('<raw>/methods/runGreedyFromCases.m')"
+     matlab -singleCompThread -batch "$P cases={{8,"curvedHeadOn"},{15,"crossing"},{15,"acceleratingHeadOn"}};run(...)"
+     matlab -singleCompThread -batch "$P cases={{8,"curvedCrossing"},{15,"turningCrossing"}};run(...)"
+     matlab -singleCompThread -batch "$P cases={{15,"curvedHeadOn"},{15,"curvedCrossing"},{15,"brakingLead"}};run(...)"
+   Start: the first free frame at or after 2 s of each replay (crossing: 10 s, target
+   ignored); 1600 holds at most; plant RK4 with a 5-ms mesh; recovery = campaign
+   tolerances held for 5 s. Output <raw>/greedy/<policy>-<scenario>-<speed>.mat;
+   logs/policies-run-*.log.
+
+4. Tables and checks, all offline and deterministic, in one process:
+     matlab -batch "run('<raw>/methods/rerunAnalyses.m')"
+   It runs regimes, planDecay, localDecay, recoveryTiming, brakingDrift,
+   greedySummary, greedyNearCheck, crossTerms, speedCycle, cancellation and
+   curvedDeparture, each with its log in logs/. It writes no-risk-regimes.csv,
+   plan-decay.csv, no-risk-trajectories.csv, cancellation.csv and greedy-summary.csv.
+
+Definitions: a frame is free when its encounter-exit index is 0. rho = 0 means
+clfSlack <= 1e-6*max(1,V0). Steering edge: rho > 0 and |delta0 - anchor| > 0.0749.
+Braking edge: rho > 0, steering interior, |b0 - anchor| > 0.1249. Near/far split at
+|e_y| = 10 m. manifest.json hashes the source, this bundle and the raw artifacts.

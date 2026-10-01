@@ -1,0 +1,8 @@
+=== speedCycle (01-Oct-2026 18:38:40)
+headOn 15 m/s: lateral errors inside tolerance from 19.20 s to 80 s; speed error in [-0.402, 0.004] m/s, 55% of that time below -0.1 m/s;
+   braking at its box edge in 34% of those frames; excursions below -0.1 m/s start at 19.2 22.7 27.5 32.4 37.4 42.6 47.6 52.0 57.3 62.5 67.8 74.0 78.5 s
+acceleratingHeadOn 15 m/s: lateral errors inside tolerance from 18.60 s to 80 s; speed error in [-0.367, 0.002] m/s, 53% of that time below -0.1 m/s;
+   braking at its box edge in 33% of those frames; excursions below -0.1 m/s start at 18.6 22.0 27.0 31.9 36.9 42.1 47.2 52.5 57.8 63.2 68.6 73.8 79.3 s
+brakingLead 15 m/s: lateral errors inside tolerance from 50.95 s to 80 s; speed error in [-0.331, 0.000] m/s, 51% of that time below -0.1 m/s;
+   braking at its box edge in 33% of those frames; excursions below -0.1 m/s start at 51.0 54.2 59.4 64.7 69.7 74.6 79.5 s
+=== speedCycle done in 2.3 s

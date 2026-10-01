@@ -1,0 +1,478 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\setlength{\tabcolsep}{4pt}
+\title{Why the CLF Does Not Return the Ego to Nominal Cruise\\After the Encounter}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Question and answer}
+Once the target is beyond the 30-m encounter range, the controller has no
+collision rows. Its only link to the nominal behaviour, the given path at the
+reference speed, is the CLF stage. In the 5-cm campaign
+(\path{COLLISION_MARGIN_5CM_20261001.tex}), 12 of the 14 cases reach this phase.
+Three return to nominal cruise within 80~s, at 43.85--62.65~s; nine do not. This
+report asks why the CLF does not dissipate the ego state in this phase.
+
+\paragraph{Answer.} The CLF is a decrease condition for one 50-ms hold, at a
+fixed 1\% rate, on the LQR quadratic of the cruise trim, and it is the only
+term in the problem that refers to the path. Nothing gives the remaining 67--75
+planned inputs a recovery purpose, and the real-time iteration (RTI) centers
+the next frame's trust region on that unpurposed plan. Four measured
+mechanisms follow:
+\begin{enumerate}
+\item \emph{Trust-region trap.} It governs the closed loop in all nine failures
+and by itself explains the five near the path. The later planned
+inputs cancel a median 78--83\% of each first-step steering correction. The
+shifted plan then becomes the next anchor, which leaves a net steering
+authority of 0.011--0.016~rad about the straight trim. A 200-m fixture curve
+alone needs 0.016--0.017~rad. Both curved head-on runs therefore reach the path
+and leave it again. Far from the path, this authority cannot turn the vehicle
+around, and there the one-step condition also fails (item 3). In the braking channel the same loop produces a speed cycle with a
+period of about 5~s, which keeps all three 15-m/s straight cases from
+confirming recovery.
+\item \emph{No recursive decrease.} In the laterally trapped frames, no later
+hold of the plan decreases $V$ by 1\%; in the braking traps, 30--36\% do. In 10
+of 11 trapped cases the median planned endpoint has a larger $V$ than the
+current state. In trapped frames the shifted plan never meets the next frame's
+decrease condition.
+\item \emph{The one-step condition is not a valid CLF condition outside a
+neighbourhood of the path.} The 1\% one-step decrease is unattainable for
+headings that point away from the path by $10^\circ$ or more. At zero heading
+error it is unattainable beyond 5--7~m of lateral offset, and at every heading beyond about
+$2v/\lambda$ (80~m at 8~m/s). Where it is unattainable, the slack turns the
+stage into a greedy minimizer of the next-hold value. Far from the path that
+minimizer brakes, slides and leaves the tire model's domain: all four idealized
+one-step policies, which run without RTI, fail in 4 of 6 far starts.
+\item \emph{Slow rate where it works.} Where the decrease is attainable, the
+solver treats every input that achieves 1\% as equally good. The realized
+1.2--2.4\% per hold costs 14--23~s even without the trap.
+\end{enumerate}
+The two crossing cases never reach this phase. In both, the ego escorts the
+target, so the encounter never ends.
+
+\section{What the controller asks of the CLF in this phase}
+The CLF is $V=\|Fe\|^2=e^TPe$ with
+$e=[e_y,\,e_\psi,\,e_v,\,v_y-v_y^*,\,r-r^*]$ in the path frame. $P$ is the
+discrete LQR matrix of the cruise trim of the path's curvature, and $e_\psi$ is
+wrapped to $(-\pi,\pi]$. Each frame solves two conic programs on one affine
+model of the plan, which has 68 holds (3.4~s) at 8~m/s and 76 holds (3.8~s) at
+15~m/s.
+\begin{itemize}
+\item \emph{Stage 1} minimizes the collision slacks. Beyond the encounter range
+there are no collision rows, so this optimum is 0.
+\item \emph{Stage 2} minimizes $\rho$ subject to
+$V(x_1)\le0.99\,V(x_0)+\rho$, where $x_1$ is the predicted state after the
+\emph{first} hold.
+\end{itemize}
+The remaining constraints are the same in both stages:
+\begin{itemize}
+\item the affine dynamics;
+\item the trust boxes $|u_i-\bar u_i|\le(0.075,\,0.125)$ and
+$|x_i-\bar x_i|\le(2.5,2.5,0.25,2.5,1.5,0.75)$;
+\item the braking rate rows;
+\item the physical state limits;
+\item a second-order-cone endpoint condition on the intrinsic state
+$(v_x,v_y,r)$ and the last input.
+\end{itemize}
+The endpoint core is pose-free and is built for the \emph{straight} trim
+(\texttt{terminalContinuation.build(cfg,0)}), on curved roads too. The anchor
+$(\bar x,\bar u)$ is the previous plan shifted by one hold, with the straight
+trim input appended, rolled out from the measured state. The lane-feedback flow
+seed is used only at the first frame or when the warm start fails. Thus, without a target,
+every term that refers to the path acts on one hold.
+
+\paragraph{Data.} Instrumented 80-s replays of all 14 cases use a frozen copy of
+the controller at commit \path{88ed3c2}. They use the same fixtures, ODE45 plant
+and exact state as the campaign. Each frame stores the issued input, the
+returned plan and affine states, the anchor, and the CLF values. The replays
+reproduce the campaign's recovery times. All analyses are offline, and no
+production file changed.
+
+\section{Where the no-risk phase goes}
+A frame is \emph{free} when its encounter-exit index is 0, that is, the target
+is beyond range at the current state. Free frames are classified as
+\begin{itemize}
+\item $\rho=0$: the 1\% decrease is met;
+\item steering edge: $\rho>0$ and the issued steering is on its box edge;
+\item braking edge: $\rho>0$, steering interior, braking on its edge.
+\end{itemize}
+\begin{center}\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{rlrrrrrrrrr}
+\toprule
+ & & Start & $e_y$ at & Closest & Final & Final & \multicolumn{3}{c}{Free frames} & Recovered\\
+Speed & Scenario & (s) & start (m) & $|e_y|$ (m) & $e_y$ (m) & $e_v$ (m/s) & $\rho=0$ & steer edge & brake edge & (s)\\
+\midrule
+8 & headOn & 4.85 & 8.00 & 0.000 & 0.000 & 0.000 & 1007 & 496 & 0 & 57.10\\
+8 & acceleratingHeadOn & 4.10 & 7.93 & 0.000 & $-0.001$ & $-0.001$ & 933 & 585 & 0 & 62.65\\
+8 & brakingLead & 21.05 & $-7.33$ & 0.000 & 0.004 & $-0.003$ & 1177 & 2 & 0 & 43.85\\
+8 & turningCrossing & 16.10 & $-17.52$ & 17.95 & $-97.54$ & 0.455 & 0 & 1272 & 0 & ---\\
+8 & curvedHeadOn & 5.05 & 7.68 & 0.016 & $-72.26$ & $-0.857$ & 148 & 1351 & 0 & ---\\
+8 & curvedCrossing & 29.80 & 38.93 & 25.44 & 25.44 & $-0.388$ & 89 & 915 & 0 & ---\\
+15 & headOn & 2.95 & 4.23 & 0.000 & $-0.010$ & $-0.339$ & 1125 & 0 & 416 & ---\\
+15 & acceleratingHeadOn & 2.70 & 4.08 & 0.000 & $-0.007$ & $-0.242$ & 1139 & 0 & 407 & ---\\
+15 & brakingLead & 33.35 & $-4.83$ & 0.000 & 0.005 & $-0.226$ & 710 & 33 & 190 & ---\\
+15 & turningCrossing & 13.75 & 37.90 & 38.16 & 521.89 & $-1.773$ & 0 & 1254 & 0 & ---\\
+15 & curvedHeadOn & 3.90 & 4.02 & 0.007 & $-26.95$ & $-1.787$ & 98 & 1355 & 0 & ---\\
+15 & curvedCrossing & 25.70 & $-40.50$ & 40.84 & $-139.65$ & $-1.518$ & 0 & 1086 & 0 & ---\\
+\bottomrule
+\end{tabular}\end{center}
+``Start'' is the first free frame at or after 2~s. The counts cover the whole
+replay. 15-m/s turningCrossing also has 71 interior frames.
+Final errors are at recovery or at 80~s. The crossing cases at both speeds have
+no free frames, and their final $e_y$ is $-621.0$ and $-629.0$~m. In the six
+cases that fail laterally, the issued steering is on its box edge in 90--100\%
+of free frames, and $V$ grows by a median 0.11--0.35\% per hold in those frames.
+In the three 15-m/s straight cases, braking alone is on its edge in 20--27\% of
+free frames.
+
+\section{Mechanism 1: the trust-region trap}
+\subsection{The plan cancels the correction, and the shift keeps it}
+In each steering-edge frame, the first correction
+$\delta_0-\bar\delta_0$ is $\pm0.075$~rad. The table compares it with the
+corrections of all later inputs, and reports the \emph{residual}. The residual
+is the issued steering minus the straight trim, signed by the first correction.
+The straight trim is the input that every shifted plan appends at its tail.
+\begin{center}\footnotesize
+\begin{tabular}{rlrrrrr}
+\toprule
+ & & Edge & Later sum & Median share & Residual (rad) & Median $V$ ratio\\
+Speed & Scenario & frames & opposite & cancelled & median [p10, p90] & per hold\\
+\midrule
+8 & headOn & 496 & 100\% & 82\% & 0.0131 [0.0109, 0.0154] & 1.0027\\
+8 & acceleratingHeadOn & 585 & 100\% & 82\% & 0.0139 [0.0111, 0.0155] & 1.0026\\
+8 & turningCrossing & 1272 & 99.9\% & 80\% & 0.0147 [0.0133, 0.0161] & 1.0011\\
+8 & curvedHeadOn & 1351 & 100\% & 81\% & 0.0144 [0.0118, 0.0159] & 1.0025\\
+8 & curvedCrossing & 915 & 100\% & 80\% & 0.0148 [0.0135, 0.0166] & 1.0011\\
+15 & brakingLead & 33 & 100\% & 78\% & 0.0112 [0.0074, 0.0158] & 1.0011\\
+15 & turningCrossing & 1254 & 100\% & 83\% & 0.0131 [0.0123, 0.0137] & 1.0035\\
+15 & curvedHeadOn & 1355 & 100\% & 79\% & 0.0158 [0.0140, 0.0177] & 1.0030\\
+15 & curvedCrossing & 1086 & 100\% & 82\% & 0.0134 [0.0120, 0.0154] & 1.0014\\
+\bottomrule
+\end{tabular}\end{center}
+The 2 edge frames of 8-m/s brakingLead are omitted. In 99.8--100\% of the edge
+frames, the second planned correction also opposes the first; its median size
+is only 0.003--0.006~rad. The cancellation is spread over about a dozen later
+inputs.
+
+This repeats every frame:
+\begin{enumerate}
+\item The CLF pushes the first input to the edge that turns the vehicle back.
+\item Only the first input enters $\rho$, so the later inputs have no objective.
+\item The interior-point solution keeps the later state deviations near the
+anchor. In \path{RTI_FAILURE_ROOT_CAUSES_20261001.tex}, fixing every later
+input at its anchor changed the minimized slack by at most 0.35\%. Removing the
+state box removed most of the cancellation, although that box was only 15\%
+used at the solution.
+\item The shift makes the counter-corrected second input the next anchor's
+first input, so the next box again excludes the turning action.
+\end{enumerate}
+
+In this stationary regime, each input enters the plan as the straight trim,
+collects about $-0.06$~rad of cancellation while it moves to the head, and then receives the $+0.075$~rad edge
+correction. The issued steering is therefore pinned about 0.014~rad from the
+straight trim, on the side that turns back. The CLF stage still minimizes
+$\rho$, but its effective feedback is now a nearly constant offset of about
+0.014~rad.
+
+\subsection{What the residual does in each failing case}
+\paragraph{Curved head-on: the ego reaches the path and leaves it.} The fixture
+curve has radius 200~m. Its trim steering is 0.0157~rad at 8~m/s and 0.0169~rad
+at 15~m/s, and the residual is 0.0144 and 0.0158~rad. From 20 to 80~s, the issued
+steering is a median 0.0011~rad \emph{below} the curved trim in both cases. The
+anchor's first steering sits 0.076~rad below the curved trim. All the
+remaining authority is therefore spent on following the curve, and none is
+left for correcting the heading.
+\begin{itemize}
+\item At 8~m/s, the ego crosses the path at 20~s with $e_\psi=-0.32$~rad. The
+heading error stays between $-0.20$ and $-0.28$~rad until 50~s, the ego drifts
+outward at a mean 1.2~m/s, and $e_y$ reaches $-72.3$~m at 80~s.
+\item At 15~m/s, the ego is on the path at 7~s. It drifts to $-29$~m at 40~s
+and then wanders between $-12$ and $-29$~m.
+\end{itemize}
+The closest approaches were 16 and 7~mm.
+
+\paragraph{Far from the path: no turnaround.} In turningCrossing and
+curvedCrossing at both speeds, the residual corresponds to a turn of radius
+roughly 200--260~m. The heading errors are 0.5--2.8~rad and the lateral errors
+17--41~m, so recovery needs a turnaround within a few seconds. Three of these
+runs end farther from the path than they started: turningCrossing at
+$-97.5$~m (8~m/s) and 521.9~m (15~m/s), and 15-m/s curvedCrossing at
+$-139.6$~m. 8-m/s curvedCrossing closes only from 38.9 to 25.4~m in 50~s.
+
+\paragraph{Straight 8~m/s: slow recovery.} On a straight path, the 0.013~rad
+residual corrects slowly. Recovery takes 496 (headOn) and 585
+(acceleratingHeadOn) trapped frames before the error falls into the region where
+$\rho=0$ (Section~\ref{sec:rate}).
+
+\paragraph{Straight 15~m/s: a speed cycle.} The lateral errors are inside their
+tolerances from 19.2~s (headOn), 18.6~s (acceleratingHeadOn) and 51.0~s
+(brakingLead) on. The speed error then cycles between 0 and $-0.33$ to
+$-0.40$~m/s. It is below $-0.1$~m/s in 51--55\% of that time, and excursions
+recur about every 5~s (intervals of 3.2--6.2~s). In headOn, from 41.25 to 41.85~s, $V_0$ falls from
+0.0033 to 0.00015 with $\rho\approx0$. Meanwhile the anchor's first braking ratio
+drifts from $-0.031$ to $-0.094$, while the cruise trim is $+0.018$.
+
+At 41.95~s the anchor reaches $-0.114$. The box then admits at most $+0.011$,
+below the trim, so $\rho>0$ and the vehicle slows. The anchor at 41.65~s shows
+the shape responsible:
+\begin{itemize}
+\item the braking ratio is about $-0.05$ near the head, rises to $+0.10$ near
+hold 60, and returns to the trim at the end;
+\item the planned speed dips by 0.71~m/s mid-horizon and returns to the
+reference at the endpoint.
+\end{itemize}
+Nothing in the problem prefers this plan to a flat one. Every time this shape
+reaches the head, the issued braking is pinned at the box edge.
+
+\section{Mechanism 2: the plan is not a decrease certificate}
+For each free frame, $V$ was evaluated along the returned affine plan and at
+the first node of the anchor. The anchor's first node is the shifted previous
+plan, applied without correction.
+\begin{center}\footnotesize
+\begin{tabular}{rlrrrrrr}
+\toprule
+ & & \multicolumn{3}{c}{Trapped frames} & \multicolumn{3}{c}{$\rho=0$ frames with $V_0\ge1$}\\
+ & & Later holds & Plan-end & Anchor & Later holds & Plan-end & Anchor meets\\
+Speed & Scenario & with 1\% & $V/V_0$ & $V_1/V_0$ & with 1\% & $V/V_0$ & 1\% decrease\\
+\midrule
+8 & headOn & 0\% & 1.54 & 1.0049 & 21\% & 0.91 & 49\%\\
+8 & acceleratingHeadOn & 0\% & 1.51 & 1.0048 & 49\% & 0.50 & 60\%\\
+8 & brakingLead & \multicolumn{3}{c}{2 frames} & 38\% & 0.55 & 55\%\\
+8 & turningCrossing & 0\% & 1.12 & 1.0013 & --- & --- & ---\\
+8 & curvedHeadOn & 0\% & 1.38 & 1.0033 & 79\% & 0.31 & 79\%\\
+8 & curvedCrossing & 0\% & 0.81 & 1.0013 & 100\% & 0.23 & 94\%\\
+15 & headOn & 30\% & 31.7 & 1.77 & 0\% & 5.22 & 0\%\\
+15 & acceleratingHeadOn & 31\% & 32.1 & 1.77 & 0\% & 5.48 & 0\%\\
+15 & brakingLead & 36\% & 18.1 & 1.75 & 0\% & 2.02 & 14\%\\
+15 & turningCrossing & 0\% & 1.33 & 1.0036 & --- & --- & ---\\
+15 & curvedHeadOn & 0\% & 2.36 & 1.0057 & 10\% & 3.50 & 58\%\\
+15 & curvedCrossing & 0\% & 1.25 & 1.0019 & --- & --- & ---\\
+\bottomrule
+\end{tabular}\end{center}
+The columns are medians, except ``anchor meets'', which is a share of frames.
+``Trapped'' means steering edge or braking edge. In every case, the shifted
+plan meets the next frame's 1\% condition in \emph{none} of the trapped frames.
+Even in $\rho=0$ frames, it meets the condition in only 49--60\% of frames in
+the straight 8-m/s cases and 0--14\% in the straight 15-m/s cases.
+The decrease is therefore produced anew by the first correction each frame. It
+is never carried by the plan.
+
+In predictive control, Lyapunov decrease normally comes from a horizon value:
+the shifted plan plus a terminal law is a feasible candidate whose cost is lower
+by the stage cost. Here the shifted plan neither carries the decrease nor ends
+in a set that encodes the path, so decrease at one frame implies nothing about
+the next.
+
+\section{Mechanism 3: the one-step condition does not reach}
+\subsection{Where the 1\% decrease is attainable}
+For straight-lane states $(e_y,e_\psi)$ at the reference speed with $v_y=r=0$,
+every input on a $141\times41$ grid was propagated one hold with the
+controller's own model (one RK4 step). Steering spans $\pm0.7$~rad and braking
+$\pm0.999$. Each result was scored with the controller's $V$. Headings use a
+$5^\circ$ grid. Positive headings point toward the path for $e_y<0$.
+\begin{center}\footnotesize
+\begin{tabular}{rrrrr}
+\toprule
+ & \multicolumn{2}{c}{8 m/s} & \multicolumn{2}{c}{15 m/s}\\
+$|e_y|$ (m) & 1\% attainable for $e_\psi$ & best ratio at $e_\psi=0$ & 1\% attainable for $e_\psi$ & best ratio at $e_\psi=0$\\
+\midrule
+0.5 & $0^\circ$--$20^\circ$ & 0.951 & $0^\circ$--$10^\circ$ & 0.933\\
+2 & $0^\circ$--$60^\circ$ & 0.973 & $0^\circ$--$30^\circ$ & 0.960\\
+5 & $0^\circ$--$135^\circ$ & 0.988 & $0^\circ$--$70^\circ$ & 0.982\\
+10 & $5^\circ$--$165^\circ$ & 0.994 & $5^\circ$--$145^\circ$ & 0.990\\
+20 & $10^\circ$--$160^\circ$ & 0.997 & $5^\circ$--$170^\circ$ & 0.995\\
+40 & $25^\circ$--$150^\circ$ & 0.998 & $15^\circ$--$165^\circ$ & 0.998\\
+60 & $45^\circ$--$135^\circ$ & 0.999 & $20^\circ$--$160^\circ$ & 0.998\\
+100 & none & 0.999 & $40^\circ$--$145^\circ$ & 0.999\\
+\bottomrule
+\end{tabular}\end{center}
+For headings pointing away from the path by $10^\circ$ to $160^\circ$, no
+admissible input lowers $V$ at all, at either speed or any tested offset. Every
+row also shows an apparent decrease at exactly $180^\circ$. That is the
+wrapped heading crossing $\pm\pi$: $V$ drops by
+$4\pi P_{12}|e_y|$ without any progress. Three properties of the vehicle
+explain the pattern; the quadratic $V$ does not account for them.
+\begin{itemize}
+\item \emph{Relative degree.} Steering acts on $e_y$ only through
+$r\rightarrow\psi\rightarrow e_y$. Within one 50-ms hold, it changes mainly
+$v_y$ and $r$, and friction bounds the yaw acceleration. When the heading is
+wrong, the decrease over that hold is set by the drift, not by the input. A
+parallel offset already fails beyond 5~m (8~m/s) or 7~m (15~m/s).
+\item \emph{Bounded approach speed.} Where $V\approx P_{11}e_y^2$, the relative
+decrease rate is at most $2v|\sin e_\psi|/|e_y|$. A fixed 1\% per hold requires
+$\lambda=-\ln(0.99)/0.05=0.201~\mathrm{s^{-1}}$, so the condition fails beyond
+$|e_y|\approx2v|\sin e_\psi|/\lambda$, which is 79.6~m at 8~m/s and 149~m at
+15~m/s for $e_\psi=90^\circ$. The map agrees: at 100~m, nothing works at 8~m/s,
+and only $40^\circ$--$145^\circ$ works at 15~m/s. A quadratic with a fixed
+exponential rate cannot be a global CLF for a vehicle whose approach speed is
+bounded.
+\item \emph{The quadratic's valley is linear-model geometry.} For fixed $e_y$,
+$V$ is minimized at $e_\psi=-(P_{12}/P_{22})e_y$, which is $-0.095\,e_y$ at
+8~m/s and $-0.096\,e_y$ at 15~m/s. This preferred heading passes $90^\circ$ at
+$|e_y|\approx16.4$~m and $\pi$ at about 33~m. It encodes $\dot e_y=v\,e_\psi$, whereas the vehicle obeys
+$\dot e_y=v\sin e_\psi$.
+\end{itemize}
+The quadratic is fine \emph{locally}. For the hold-discretized linear model with
+unconstrained input, the best one-step ratio in the worst direction is 0.959
+(8~m/s) and 0.966 (15~m/s), so the 1\% decrease is attainable in every
+direction. The failures above come from friction saturation, $\sin e_\psi$ and
+the heading wrap, not from the LQR weights.
+
+\subsection{What a one-step CLF does without the trap}
+To separate mechanism 3 from mechanism 1, four idealized one-step policies were
+run from each case's first free state. They have no RTI, no anchor and no
+target.
+\begin{itemize}
+\item Each hold searches the inputs on a grid. \emph{Full} policies use
+$71\times21$ inputs over $\pm0.7$~rad and $\pm0.999$. \emph{Slew} variants use
+$31\times21$ inputs within $\pm(0.075,0.125)$ of the previously applied input,
+with no steering magnitude bound, as in the controller. An $11\times11$ local
+refinement follows.
+\item The candidates are scored with the controller's model and $V$.
+\item \emph{Greedy} applies $\arg\min V(x_1)$. \emph{Indifferent} applies, among
+the inputs with the least slack $\rho$, the one closest to the previous input.
+\item The plant is the same model with a 5-ms RK4 mesh. Recovery uses the
+campaign tolerances and a 5-s dwell.
+\end{itemize}
+The crossing cases start at 10~s, with the target ignored.
+\begin{center}\footnotesize
+\begin{tabular}{rlrrrrrl}
+\toprule
+ & & $e_y,\,e_\psi$ & \multicolumn{4}{c}{Recovered after (s) or outcome} & \\
+Speed & Scenario & at start & greedy & greedy slew & indiff. & indiff. slew & Controller\\
+\midrule
+15 & headOn & 4.2, $-0.04$ & 14.45 & 7.55 & 27.60 & 22.15 & speed cycle\\
+15 & acceleratingHeadOn & 4.1, $-0.04$ & conv.$^a$ & 7.50 & 19.55 & 18.20 & speed cycle\\
+15 & brakingLead & $-4.8$, $-0.05$ & conv.$^a$ & 7.70 & conv.$^a$ & 22.25 & speed cycle\\
+15 & curvedHeadOn & 4.0, $-0.02$ & 7.55 & 7.55 & 15.75 & 22.60 & $-27.0$~m\\
+8 & curvedHeadOn & 7.7, 0.24 & 9.75 & 9.80 & 20.90 & tire$^b$ & $-72.3$~m\\
+\midrule
+8 & turningCrossing & $-17.5$, $-1.43$ & 14.20 & tire & 25.30 & no input$^c$ & $-97.5$~m\\
+15 & curvedCrossing & $-40.5$, $-0.49$ & 17.30 & 16.95 & no input & no input & $-139.6$~m\\
+8 & curvedCrossing & 38.9, 2.68 & no input & tire & no input & tire & 25.4~m\\
+15 & turningCrossing & 37.9, 2.76 & no input & no input & no input & no input & 521.9~m\\
+8 & crossing & $-61.0$, $-1.56$ & no input & no input & no input & no input & escort\\
+15 & crossing & $-69.4$, $-1.62$ & no input & no input & no input & no input & escort\\
+\bottomrule
+\end{tabular}\end{center}
+$^a$The errors are inside the tolerances from 2.55--12.55~s on. Input
+chattering at the grid resolution drives yaw-rate excursions to 0.0105~rad/s,
+against the 0.01~rad/s tolerance. These reset the dwell in 1\% of holds; the
+lateral error stays within 12~mm.
+$^b$The plant left the tire model's operating domain.
+$^c$Every candidate input left the model's domain.
+
+\paragraph{Near the path, the CLF works when it is not trapped.} The one-step
+CLF brings all five near-path starts inside the tolerances, under three of the
+four policies; the fourth fails once. The errors are inside within 2.5--5~s
+(greedy) or 10--17~s (indifferent). The controller recovers none of these five.
+Its failures are mechanism 1, the steering trap on the curves and the braking
+trap on the straight 15-m/s cases.
+
+\paragraph{Far from the path, even the untrapped CLF fails.} 4 of 6 far starts
+fail under every policy. The two successes slide sideways, with $|v_y|$ up to
+5.4--9.4~m/s and speed down to 1.9--8.5~m/s.
+
+Decomposing the change in $V$ shows why. In 8-m/s crossing, the start has
+$e_y=-61$~m and the heading points away from the path. Greedy applies full lock
+and braking ratio $-0.999$ for holds 2--9, yet $V$ still rises by 0.3--1.1\% per
+hold:
+\begin{itemize}
+\item the $e_y$ term adds +2500 to +3800 per hold;
+\item turning removes only 350 to 1700 per hold through the heading term.
+\end{itemize}
+The speed weight $P_{33}=20.5$ is small, so trading speed for slower lateral
+divergence is the cheapest one-step reduction. Greedy therefore brakes from
+7.95 to 4.85~m/s in 0.4~s. The speed then falls to 1.4~m/s, near the model's
+1-m/s floor, where every candidate input leaves the domain. In 15-m/s
+turningCrossing, full lock builds $v_y$ to 4.8~m/s within 0.6~s, and the
+$v_y$ term rises to +480 per hold.
+
+A myopic minimizer of a quadratic far from its centre is not a stabilizing
+policy. The slack therefore cannot rescue the infeasible region.
+
+\section{Mechanism 4: when the decrease is met, it is only 1--2\%}\label{sec:rate}
+In $\rho=0$ frames, every input that reaches $0.99\,V_0$ is optimal, and the
+interior-point method returns a point inside that set. The realized median
+ratio per hold is 0.977--0.988 for $V_0>10$, and 0.90--0.95 for $V_0\le10$.
+The three recovered 8-m/s cases split as follows:
+\begin{center}\footnotesize
+\begin{tabular}{lrrrrr}
+\toprule
+ & Encounter & Trapped frames & Last trapped frame & $\rho=0$ frames after it & Recovered\\
+Scenario & ends (s) & before recovery & (s, $e_y$) & (median ratio) & (s)\\
+\midrule
+headOn & 4.85 & 496 & 42.90, $-1.03$~m & 283 (0.976) & 57.10\\
+acceleratingHeadOn & 4.10 & 585 & 46.35, $-1.69$~m & 325 (0.980) & 62.65\\
+brakingLead & 21.05 & 2 & 21.10, $-7.32$~m & 454 (0.982) & 43.85\\
+\bottomrule
+\end{tabular}\end{center}
+The trap accounts for 25--29~s of the two head-on recoveries. The final
+$\rho=0$ descent takes another 14--23~s. In the idealized runs, indifferent
+policies are two to three times slower than greedy ones from the same starts.
+
+\section{Root cause}
+The controller has a Lyapunov \emph{condition}, but no Lyapunov
+\emph{mechanism}. The decrease is required of one hold, at a fixed rate, on a
+function that is valid only near the path. Nothing in the plan, the terminal
+set or the frame-to-frame update carries the decrease forward.
+\begin{itemize}
+\item Near the path the condition is attainable. However, the RTI trust region
+is centered on a plan with no recovery objective, and the solver's centering
+turns that plan into a counter-correction. The result is a steering authority
+about the size of a 200-m curve's trim, plus a braking wave.
+\item Far from the path, the condition itself cannot be met. Its slack-minimizing
+surrogate is a destructive greedy policy.
+\item The pose-free, straight terminal set does not encode the path, so the end
+of the plan exerts no pull back toward it.
+\end{itemize}
+
+\paragraph{Implications (not implemented or validated here).}
+\begin{enumerate}
+\item The whole plan needs a recovery objective consistent with the CLF, such as
+a horizon sum of $V$ or a tracking cost, or a multi-hold decrease along the
+plan. With such an objective the shifted plan becomes the decrease candidate. A
+diagnostic third stage of this kind recovered 9 of 10 runs in the RTI report
+(6-mm margin).
+In five of those nine runs it touched the target, so it must be paired with
+inter-sample safety.
+\item The decrease condition must be attainable everywhere. Options are a
+guidance-type function with a saturated preferred heading, a decrease bound
+that grows sublinearly with the error, and a heading treatment without the
+$\pm\pi$ jump.
+\item In the no-risk phase, the trust region could be centered on a
+recovery-consistent rollout. The existing lane-feedback seed is one example.
+\item On curves, the terminal set and the appended tail input should use the
+curved trim, not the straight one.
+\end{enumerate}
+
+\section{Limits}
+\begin{itemize}
+\item All closed loops are nominal, with exact state and a known target.
+\item The feasibility map covers steady states ($v_y=r=0$, reference speed) on a
+grid; intermediate states may differ.
+\item The idealized policies use input grids and a 5-ms RK4 plant instead of
+ODE45. They are diagnostics of the one-step condition, not proposed
+controllers.
+\item The near/far split is at $|e_y|=10$~m.
+\item The cancellation share and residual are medians over trapped frames.
+\item ``Not recovered'' means not within 80~s.
+\end{itemize}
+
+\section{Artifacts}
+\path{report/CLF_NO_RISK_DISSIPATION_20261001/} contains:
+\begin{itemize}
+\item the regime, cancellation, plan-decay, trajectory, feasibility-map and
+idealized-policy tables;
+\item every analysis method and log;
+\item reproduction notes;
+\item a manifest of source and raw-artifact hashes.
+\end{itemize}
+The replays (MAT, about 500~MB) and the policy traces remain in
+\path{/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/}.
+\end{document}
