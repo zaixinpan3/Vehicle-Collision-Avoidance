@@ -1,0 +1,2 @@
+POST-DONE trackingThirdStage turningCrossing 8 frames=1600 wall=512.5 minClearance=0.0000 recoveredAt=15.80 final e=[1.651e-08  1.818e-17  -2.84e-06 -1.166e-15 -1.418e-15] failure=
+POST-DONE trackingThirdStage turningCrossing 15 frames=1600 wall=550.1 minClearance=0.0000 recoveredAt=13.25 final e=[-1.547e-06  2.933e-08  8.825e-08 -2.759e-07  6.061e-07] failure=

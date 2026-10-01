@@ -1,0 +1,43 @@
+--- source/controller/solvePredictiveControl.m
++++ variants/trackingThirdStage/solvePredictiveControl.m
+@@ -1,5 +1,5 @@
+ function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
+-%solvePredictiveControl One RTI step, with one fresh initialization on failure.
++%solvePredictiveControl DIAGNOSTIC VARIANT (trackingThirdStage). One RTI step, with one fresh initialization on failure.
+ % Returned states belong to the affine prediction, not a nonlinear replay.
+ % Solver exit flags are recorded, not used to admit or reject returned vectors.
+ % There is no post-solve constraint audit or convergence loop.
+@@ -76,6 +76,33 @@
+     if isempty(second) || any(~isfinite(second))
+         search.terminationReason="clfNoNumericalResult";search.elapsedSeconds=toc(timer);return;
+     end
++    % DIAGNOSTIC third stage: give the future plan an objective. Minimize the
++    % horizon tracking cost subject to both achieved slack levels.
++    count=size(anchor.inputs,2);nv=numel(objective);reference=model.nominalReference;
++    trackRows=sparse(5*count,nv);trackOffset=zeros(5*count,1);
++    for k=1:count
++        [e,jacobian]=nonlinearBicycleModel.errorLinearization(anchor.states(:,k+1),model.lane,reference);
++        r=5*(k-1)+(1:5);trackRows(r,problem.stateIndices(:,k+1))=reference.factor*jacobian;trackOffset(r)=reference.factor*e;
++    end
++    trackScale=sqrt(count*max(1,norm(trackOffset)^2/count));trackRows=trackRows/trackScale;trackOffset=trackOffset/trackScale;
++    upper3=[problem.upper;Inf];upper3(problem.clfIndex)=max(0,second(problem.clfIndex))*(1+1e-9)+1e-12;
++    lower3=[problem.lower;0];
++    cones3=problem.cones;
++    for k=1:numel(cones3)
++        cones3(k)=secondordercone([cones3(k).A,sparse(size(cones3(k).A,1),1)],cones3(k).b,[cones3(k).d;0],cones3(k).gamma);
++    end
++    axis=sparse(1,nv+1);axis(end)=1;
++    cones3(end+1)=secondordercone([2*trackRows,sparse(5*count,1);-axis],[-2*trackOffset;-1],axis.',-1);
++    objective3=zeros(nv+1,1);objective3(end)=1;
++    remaining=cfg.solver.timeLimitSeconds-toc(timer);
++    if remaining>0
++        options.MaxTime=remaining;
++        [third,~,flag3]=coneprog(objective3,cones3,[problem.a,sparse(size(problem.a,1),1)],problem.b, ...
++            [problem.equal,sparse(size(problem.equal,1),1)],problem.rhs,lower3,upper3,options);
++        search.solverCalls=3;
++        search.stages(3)=struct('objective',"trackingCost",'exitFlag',flag3,'seconds',NaN,'value',NaN);
++        if ~isempty(third) && all(isfinite(third)),second=third(1:nv);end
++    end
+     inputs=anchor.inputs+reshape(second(problem.inputIndices),size(anchor.inputs));
+     states=anchor.states+reshape(second(problem.stateIndices),size(anchor.states));
+     slacks=max(0,second(problem.slackIndices));rho=problem.clfScale*max(0,second(problem.clfIndex));

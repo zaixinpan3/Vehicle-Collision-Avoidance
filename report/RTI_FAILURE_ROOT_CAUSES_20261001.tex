@@ -1,0 +1,380 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\setlength{\tabcolsep}{4pt}
+\title{Root Causes of the Real-Time-Iteration Controller's Scenario Failures}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Summary}
+The fourteen collision-threat scenarios were rerun on the real-time-iteration
+(RTI) controller of commit \path{5f7497718d4774a2515330650ee8815ccfa67b20}.
+Three cases recover, two collide, and nine end the 80-s window far from the
+given path. No control call was aborted. In all 20{,}684 frames the
+safety (PCBF) stage reported an optimum of at most $3.9\times10^{-6}$, so the
+optimizer never stated that a safety relaxation was needed. The failures
+therefore do not come from the solver being unable to return a result. They
+come from what the returned result is allowed to mean:
+\begin{enumerate}
+\item \textbf{Collisions: separation is enforced only at sample times.}
+Collision rows exist at the start and the interpolated midpoint of each 50-ms
+hold, with a 6-mm margin. In both collisions every sampled clearance is at
+least 9.7~mm and the one-step model error is below 10~$\mu$m, yet the
+continuous motion overlaps the target between samples for 15.4 and 2.7~ms
+(depth 29.4 and 4.8~mm) at about 20~m/s relative speed.
+\item \textbf{Non-recovery: the RTI trust region is centered on a plan that the
+objectives do not determine.} The second stage minimizes a one-step CLF
+slack, which depends only on the first input. The later inputs are set by
+the interior-point solution inside the trust region around the previous plan,
+and they cancel the first-step correction. Shifting that plan re-centers the
+next frame's $\pm0.075$-rad steering box near the old input, so the issued
+steering stays at a box edge in 82--99\% of late frames and the vehicle cannot
+turn back. The same mechanism in the braking channel produces a speed limit
+cycle in the two 15-m/s head-on cases. Far from the path, no admissible input can satisfy the one-step
+CLF decrease, so the CLF stage cannot break the cycle by itself.
+\item \textbf{Warm-start infeasibility: affine plans re-rolled through the
+nonlinear model violate hard tail or terminal rows.} This happened three
+times and was repaired each time by the flow restart.
+\end{enumerate}
+Diagnostic counterfactuals confirm each mechanism. Six extra collision samples
+per hold, or a 5-cm margin, remove both contacts. A third stage that gives the
+whole plan a tracking objective recovers nine of ten unrecovered runs, but five
+of the nine then touch the target between samples or through relaxation. The
+counterfactuals are not validated controller changes, and no production file was
+modified.
+
+\section{Campaign}
+Each case uses \texttt{runNonlinearPredictiveSafetyValidation} with the
+original fixture, 8 or 15~m/s with prefix 8 or 16, \texttt{Frames=1600},
+\texttt{RequireCollisionThreat=true} and a five-second recovery dwell. Ego
+measurements are exact; the target motion is known; there are no road
+constraints, observer, noise or random draws. The plant is ODE45 (relative and
+absolute tolerances $10^{-11}$ and $10^{-12}$), and clearance is sampled at 31
+nodes per hold. The campaign ran on a frozen copy whose controller,
+configuration, driver and native kernels are byte-identical to
+\path{5f74977}. Its issued inputs agree bitwise, frame by frame, with the
+independent run reported in \path{RTI_FLOW_REINITIALIZATION_20261001.tex}.
+\begin{center}\footnotesize
+\begin{tabular}{rlrrrrrl}
+\toprule
+Speed & Scenario & Time (s) & Min gap (m) & Final $e_y$ (m) & CLF $-7$ & Restarts & Outcome\\
+\midrule
+8 & headOn & 49.00 & 0.583 & 0.0 & 130 & 0 & recovered\\
+8 & acceleratingHeadOn & 52.30 & 0.368 & 0.0 & 122 & 0 & recovered\\
+8 & brakingLead & 52.90 & 1.060 & 0.0 & 111 & 0 & recovered\\
+8 & crossing & 80.00 & 0.699 & $-621.1$ & 40 & 0 & not recovered\\
+8 & turningCrossing & 80.00 & 0.411 & $-124.4$ & 13 & 0 & not recovered\\
+8 & curvedHeadOn & 80.00 & 0.664 & $-72.6$ & 143 & 0 & not recovered\\
+8 & curvedCrossing & 80.00 & 0.545 & 25.5 & 12 & 0 & not recovered\\
+15 & headOn & 80.00 & 0.000 & 0.0 & 30 & 0 & collision; speed cycle\\
+15 & acceleratingHeadOn & 80.00 & 0.000 & 0.0 & 41 & 0 & collision; speed cycle\\
+15 & brakingLead & 80.00 & 0.655 & $-232.5$ & 95 & 0 & not recovered\\
+15 & crossing & 80.00 & 0.381 & $-627.4$ & 166 & 0 & not recovered\\
+15 & turningCrossing & 80.00 & 0.081 & 471.6 & 131 & 0 & not recovered\\
+15 & curvedHeadOn & 80.00 & 0.780 & $-26.2$ & 307 & 1 & not recovered\\
+15 & curvedCrossing & 80.00 & 0.153 & $-139.9$ & 152 & 2 & not recovered\\
+\bottomrule
+\end{tabular}\end{center}
+``CLF $-7$'' counts frames whose second stage returned coneprog exit $-7$; the
+finite point is still used, as the controller's output contract specifies.
+The PCBF stage never returned $-7$. Across the campaign, 1{,}493 of 20{,}684
+frames (7.2\%) have this exit. The two collision cases end on the given path
+but never satisfy the five-second dwell because of a speed limit cycle
+(Section~\ref{sec:speed}).
+
+\section{Collisions occur between constrained samples}
+Both collisions were reproduced by an instrumented replay whose issued inputs
+match the campaign exactly. The table measures the colliding hold with a
+5{,}001-point ODE45 solution of the issued input.
+\begin{center}\footnotesize
+\begin{tabular}{lrr}
+\toprule
+ & headOn & acceleratingHeadOn\\
+\midrule
+Hold start (s) & 1.10 & 1.05\\
+PCBF optimum at this call / maximum up to it & $4.2\times10^{-8}$ / $3.2\times10^{-7}$ & $9.8\times10^{-8}$ / $3.6\times10^{-7}$\\
+Clearance at start / true midpoint / end (mm) & 9.72 / 34.21 / 166.41 & 49.05 / 29.41 / 168.40\\
+Clearance at the controller's interpolated midpoint (mm) & 34.53 & 29.15\\
+One-step RK4 position error (m) & $4.0\times10^{-6}$ & $9.7\times10^{-7}$\\
+Strict overlap (ms after hold start) & 3.12--18.51 & 17.05--19.71\\
+Maximum penetration depth (mm) & 29.35 & 4.76\\
+Offline interval certificate & rejected & rejected\\
+Distance Lipschitz bound (m/s) & 20.69 & 23.20\\
+\bottomrule
+\end{tabular}\end{center}
+Every sample the controller constrains clears the 6-mm margin, the solver
+reports two positive exits, and the prediction of the issued hold is accurate
+to micrometres. The vehicles' corners pass each other in a few milliseconds
+while the distance is sampled every 25~ms. With the measured Lipschitz bounds,
+clearance can fall by up to 0.26--0.29~m below the sampled values within
+that spacing, which is far more than the 6-mm margin. The existing offline
+function \texttt{predictiveSafetyGeometry.intervalClearance}, applied to each
+hold's node-to-node pose interpolant, rejects both holds. Its online use was
+removed in commit \path{905c8bd}; the current formulation has no
+inter-sample constraint.
+
+Counterfactual runs over the first 4~s of both encounters, with everything
+else unchanged:
+\begin{center}\footnotesize
+\begin{tabular}{lrr}
+\toprule
+Variant & headOn min gap (m) & acceleratingHeadOn min gap (m)\\
+\midrule
+Original (6-mm margin, 2 samples per hold) & 0 (overlap) & 0 (overlap)\\
+Six extra interpolated collision samples per hold & 0.114 & 0.054\\
+Margin 0.05~m & 0.035 & 0.031\\
+Margin 0.10~m & 0.095 & 0.086\\
+Margin 0.30~m & 0.286 & aborted at 0.15~s (no PCBF result)\\
+\bottomrule
+\end{tabular}\end{center}
+Denser sampling or a few centimetres of margin remove these two contacts. The
+largest margin also makes one encounter unsolvable from its warm start. These
+runs identify the mechanism; they do not certify a margin or sampling density.
+
+\section{Non-recovery: the trust region is centered on an undetermined plan}
+\subsection{What the issued inputs look like}
+Instrumented replays store each frame's linearization anchor, which is the
+previous plan's inputs shifted by one hold and rolled out from the measured
+state. The input correction box is $|u_i-\bar u_i|\le(0.075,\,0.125)$ around
+that anchor. After 10~s (1{,}400 frames per case):
+\begin{center}\footnotesize
+\begin{tabular}{rlrrrrr}
+\toprule
+Speed & Scenario & Steering at box edge & Next input counter-corrected & In encounter & Median $e_v$ (m/s)\\
+\midrule
+8 & crossing & 1367 & 1400 & 1400 & 0.00\\
+8 & turningCrossing & 1335 & 1342 & 122 & $-1.22$\\
+8 & curvedHeadOn & 1252 & 1400 & 0 & $-1.08$\\
+8 & curvedCrossing & 1151 & 1285 & 396 & 0.42\\
+15 & brakingLead & 1333 & 1228 & 349 & $-3.00$\\
+15 & crossing & 1379 & 1392 & 1400 & $-7.01$\\
+15 & turningCrossing & 1324 & 1340 & 85 & $-3.01$\\
+15 & curvedHeadOn & 1336 & 1373 & 69 & $-1.50$\\
+15 & curvedCrossing & 1289 & 1340 & 310 & $-2.64$\\
+\bottomrule
+\end{tabular}\end{center}
+In the nine unrecovered cases the issued steering lies on a box edge in
+82--99\% of these frames. In 97--100\% of those edge frames it is the edge that
+reduces the CLF's heading term, that is, the side that would turn the vehicle
+back. The second planned input is corrected in the opposite direction in
+88--100\% of frames. In 8-m/s crossing, for example, the issued steering is
+within 1~mrad of the top of its box in all 1{,}520 frames after 4~s, while the
+anchor steering stays between $-0.144$ and $-0.056$~rad. The issued steering
+therefore never exceeds 0.019~rad, and the heading error stays between
+$-1.58$ and $-1.54$~rad from 8~s to 80~s.
+
+\subsection{Why the anchor never moves}
+Single calls were rebuilt from captured controller inputs with a copy of the
+controller's local functions. All rebuilt calls reproduce the issued input
+exactly. Modified copies of each call isolate the mechanism:
+\begin{center}\footnotesize
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{CLF slack} & \multicolumn{2}{c}{$\sum$ later corr.} & \multicolumn{2}{c}{Free $\delta_0$}\\
+Case, time & original & future fixed & original & no state box & $\delta_0$ & actual $\Delta V$\\
+\midrule
+8 crossing, 4~s & 1140 & 1144 & $-0.080$ & $+0.685$ & 0.435 & $+827$\\
+8 crossing, 8~s & 4829 & 4840 & $-0.085$ & $+0.750$ & 0.411 & $+2797$\\
+15 crossing, 20~s & 21160 & 21180 & $-0.076$ & $+0.592$ & 0.379 & $+6562$\\
+8 turningCrossing, 30~s & 13320 & 13340 & $-0.059$ & $-0.010$ & 0.451 & $+3964$\\
+8 curvedHeadOn, 30~s & 606.5 & 606.6 & $-0.062$ & $-0.013$ & 0.443 & $+200$\\
+\bottomrule
+\end{tabular}\end{center}
+Steering values are in radians; ``later corr.'' is the sum of the steering
+corrections of all inputs after the first. ``Future fixed'' holds every input
+after the first at its anchor value. ``No state box'' removes the state
+correction bounds. ``Free $\delta_0$'' removes only the steering bound on the
+issued input and reports the steering chosen.
+Four facts follow:
+\begin{itemize}
+\item \emph{The objectives do not determine the future plan.} Fixing every
+later input at its anchor changes the minimized CLF slack by at most 0.35\%.
+The returned later inputs are one point of a large optimal set.
+\item \emph{The returned future cancels the first-step correction.} The first
+steering moves $+0.075$~rad, and the later corrections sum to $-0.059$ to
+$-0.085$~rad. The planned endpoint heading stays within 4~mrad of the anchor's.
+The first counter-steer is $-0.0185$~rad at 8~s in 8-m/s crossing, and the
+counter-steer decays over about 13 stages.
+\item \emph{The state trust box is the main contributor in these calls.}
+Without it, the crossing cases' later corrections become $+0.59$ to $+0.75$~rad
+and the plans turn toward the path; in the other two calls the cancellation
+shrinks to $-0.010$ and $-0.013$~rad. In the original problem the state box is
+only 15\% used at the solution, so the effect is interior-point centering, not
+an active constraint. In a closed loop without state boxes a smaller
+cancellation remains ($-0.081$~rad at 30~s in 8-m/s crossing).
+\item \emph{The issued input wants to turn back.} With only $\delta_0$ freed,
+the optimizer chooses 0.38--0.45~rad toward the path. The later plan again
+cancels it, by $-0.39$ to $-0.48$~rad.
+\end{itemize}
+The next frame's anchor is this plan shifted by one hold. Its first input is
+the counter-corrected second input, so the new box again excludes the turning
+action. The loop is self-sustaining.
+
+\subsection{The CLF cannot be decreased far from the path}
+The CLF is the LQR quadratic $V=e^TPe$ of the nominal trim. At 8~m/s,
+$P_{11}=76.0$, $P_{12}=148.7$ and $P_{22}=1564$ in lateral metres and heading
+radians. At 8~s in 8-m/s crossing ($e_y=-44.8$~m, $e_\psi=-1.54$~rad), the
+vehicle moves 0.40~m further from the path in each hold whatever it steers.
+This alone raises $V$ by $2(P_{11}e_y+P_{12}e_\psi)\,\Delta e_y\approx+2906$. The
+required 1\% decrease is $-1768$. Freeing the first input gives predicted
+changes of $+2398$ to $+2474$ and actual changes of $+2797$ to $+3059$. Only removing every trust
+bound gives a predicted decrease, and it does so with steering of 2.1--3.4~rad,
+outside the Fiala slip domain; ODE45 cannot integrate it. The CLF's preferred
+heading at this lateral error, $-(P_{12}/P_{22})e_y=4.3$~rad, is not a valid
+heading. The second stage can supply only a greedy one-step direction. It cannot
+certify or plan the multi-second turnaround these states need, so the slack
+stays positive and the trust-region loop decides the outcome.
+
+\subsection{Two scenario-specific consequences}
+\paragraph{Escort capture in the crossing cases.} Both crossing avoidances turn
+the ego into the target's direction of travel. Because the ego cannot turn back,
+from 8~s to 80~s it drives beside the target at the target's speed and heading.
+The center distance is 7.2--7.4~m at 8~m/s and 5.2--6.2~m at 15~m/s. At
+15~m/s the ego is held near the target's 8~m/s from 16~s on, a speed error of
+$-7$~m/s. The 30-m encounter never ends (all 1{,}400 late
+frames), so every collision and terminal-encounter row stays active for the
+rest of the run.
+
+\paragraph{Speed limit cycle.}\label{sec:speed} In the two 15-m/s head-on cases
+the lateral errors vanish, but the speed error cycles between 0 and about
+$-0.37$~m/s with a period of about 10~s. At 68.35~s in head-on, the braking
+anchor has drifted to $-0.124$ while cruise needs about $+0.02$ to $+0.04$. The
+issued braking ratio is pinned at the box edge, $0.0006$, so the vehicle
+coasts. Removing only the first-input box gives braking $0.039$ and an actual
+CLF decrease. Fixing the future at the drifted anchor makes the result worse
+(CLF slack 0.083, exit $-7$). The braking channel has the same trap.
+
+\subsection{Causal tests in closed loop}
+Diagnostic copies of \texttt{solvePredictiveControl.m} were placed ahead of the
+frozen controller on the MATLAB path:
+\begin{center}\footnotesize
+\begin{tabular}{p{0.42\linewidth}p{0.5\linewidth}}
+\toprule
+Variant & Result\\
+\midrule
+No steering bound on the issued input, activated at 0~s, at 4~s, or when the
+encounter ends &
+Solved steering leaves the Fiala slip domain within 0--0.9~s of activation
+(1.58~rad in the plant at 0.50~s in 8-m/s crossing); 7 of 7 activated runs abort\\
+First-input box centered on the previously applied input, same activations &
+No PCBF result within 0.5--8~s of activation; 7 of 7 activated runs abort\\
+No state trust box, from 0~s &
+Both crossing cases still escort the target to 80~s; 8-m/s turningCrossing
+recovers laterally but ends with a $+0.99$~m/s speed error\\
+Third stage minimizing horizon tracking cost subject to both achieved slack levels &
+9 of 10 runs recover by 18.05~s; 5 of those 9 touch the target (table below)\\
+\bottomrule
+\end{tabular}\end{center}
+Removing the box fails because the affine model is then used far outside its
+validity; this is consistent with \path{UNBOUNDED_STEERING_20261001.tex}.
+Moving only the first input's box makes it inconsistent with the rest of the
+plan's anchor. Neither result argues for the current center: the box is needed,
+but around a plan that heads back.
+
+The third stage gives every planned input an objective without changing either
+achieved slack level. It was run on the nine laterally unrecovered cases and on
+15-m/s head-on:
+\begin{center}\footnotesize
+\begin{tabular}{rlrrl}
+\toprule
+Speed & Scenario & Recovered at (s) & Min gap (m) & Contact\\
+\midrule
+8 & crossing & 13.00 & 0 & between samples, 1.85-s hold\\
+8 & turningCrossing & 15.80 & 0 & positive PCBF relaxation 0.0106, 1.80-s hold\\
+8 & curvedHeadOn & 13.00 & 0.031 & none\\
+8 & curvedCrossing & 18.05 & 0 & between samples, 1.80- and 12.45-s holds\\
+15 & headOn & 13.00 & 0.0056 & none\\
+15 & brakingLead & --- & 0.753 & aborted at 4.00~s, no PCBF result\\
+15 & crossing & 13.00 & 0.079 & none\\
+15 & turningCrossing & 13.25 & 0 & between samples, 1.70-s hold\\
+15 & curvedHeadOn & 13.00 & 0.0061 & none\\
+15 & curvedCrossing & 13.00 & 0 & between samples, 1.80-s hold\\
+\bottomrule
+\end{tabular}\end{center}
+Thirteen seconds is the earliest possible confirmation. Nine of the ten runs
+recover; the original controller recovers none of them, and the 15-m/s head-on
+speed cycle disappears. This confirms that the undetermined future plan is the
+cause of the non-recovery. It also shows why a recovery objective alone is not
+a fix. Five of the nine recovering runs touch the target, because the plans now
+try to return to the path while the target is still present. Four contacts occur between samples with PCBF optima below
+$1.1\times10^{-7}$, the mechanism of the two campaign collisions. One plan accepts
+a positive PCBF relaxation. The 8-m/s curvedHeadOn run later meets the same target
+on the curve again, 6.6~m away at 80~s, and deviates to avoid it. This
+diagnostic stage reached the 5-s call budget in 0--25 calls per run and used those
+finite points, so its details can depend on machine load.
+
+\section{Warm-start infeasibility}
+The three flow restarts occurred when the warm PCBF problem returned exit $-2$.
+Rebuilt calls identify the conflicting rows:
+\begin{center}\footnotesize
+\begin{tabular}{lll}
+\toprule
+Call & Feasible after removing & Geometry of the shifted rollout\\
+\midrule
+15 curvedHeadOn, 0.10~s & hard tail collision rows, or all trust boxes & overlaps the target at tail stage 26\\
+15 curvedCrossing, 19.80~s & terminal endpoint cone, or all trust boxes & endpoint far outside the core; 4.5-m drift\\
+15 curvedCrossing, 21.60~s & endpoint cone, state boxes, or all trust boxes & endpoint outside the core; 0.8-m drift\\
+\bottomrule
+\end{tabular}\end{center}
+Removing only input boxes, only tail rows, only terminal clearance rows or only
+midpoint state rows does not restore feasibility, except as listed. At 0.00 and 0.05~s
+the target is 31.8 and 30.6~m away, beyond the 30-m range, so those problems
+contain no collision rows; both returned plans pass through the target at the
+same tail time (exact rectangle distance zero). At 0.10~s the target is 29.5~m
+away, the shifted plan meets hard tail rows that it violates, and the trust
+boxes cannot remove the overlap in one step. At 19.80~s the previous plan's endpoint
+was inside the core in the affine model, but its nonlinear re-rollout drifts
+4.5~m and ends with core membership 1196 against a squared radius of
+$9.5\times10^{-7}$. Hard tail and terminal rows combined with fixed trust boxes
+cannot absorb this one-step mismatch. The flow restart repaired all three
+calls.
+
+\section{Root causes and implications}
+\begin{enumerate}
+\item \emph{Safety is sampled, not continuous.} Two collision samples per hold
+with a 6-mm margin cannot bound inter-sample contact at 20~m/s relative speed.
+An inter-sample certificate, or a margin tied to the distance Lipschitz bound
+and the sample spacing, is needed. More sampling alone narrows but does not
+close the gap.
+\item \emph{The future plan has no objective, but it defines the next trust
+region.} The two-stage objectives determine the prefix slacks and the first
+input only. The interior-point solution returns later inputs that undo the
+first-step correction, and shifting them pins the next issued input. Any fix
+must give the whole plan a recovery-consistent objective, or center the local
+model on such a plan. Deleting or enlarging the boxes alone leaves the model
+invalid.
+\item \emph{The local one-step CLF does not reach.} Far from the path the 1\%
+decrease is unattainable for any admissible input, so the CLF cannot drive the
+turnaround without a multi-step mechanism.
+\item \emph{Long affine plans are brittle at the hard tail and tiny terminal
+core.} One-step model mismatch accumulates over 3.8~s, and the core radius is
+$9.8\times10^{-4}$. This produces the warm infeasibilities that the flow
+restart currently absorbs.
+\end{enumerate}
+The diagnostic third stage also shows that fixing the second cause makes the
+first more visible: plans that return during an encounter press against the
+sampled collision rows. The causes should be addressed together.
+
+\section{Limits}
+All results are nominal-model closed loops with exact state and a known
+target. The 30-m range, the recovery criterion and the 80-s window are declared
+conventions. Single-call ablations change one condition at a time from
+reproduced controller inputs. They are not alternative closed-loop
+trajectories. Counterfactual controllers are diagnostic copies run outside the
+repository; none is proposed as a validated algorithm, and no production file
+was changed. Several analyses ran concurrently with unrelated jobs, so wall
+times are not benchmarks; the controller's 5-s budget was not reached in any
+reported call. ``Not recovered'' means not within 80~s, not proved divergent.
+
+\section{Artifacts}
+\path{report/RTI_FAILURE_ROOT_CAUSES_20261001/} contains the outcome, collision,
+trust-box, ablation and counterfactual tables; the diagnostic methods; patches
+for every diagnostic controller copy; reproduction notes; and a manifest of
+source and raw-artifact hashes. Full campaign JSON/MAT, replays, captured calls
+and counterfactual records remain in
+\path{/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/}.
+\end{document}

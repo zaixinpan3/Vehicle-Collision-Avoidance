@@ -1,0 +1,913 @@
+{
+  "kind": "Source, bundle and raw-artifact hashes; no weekly or monthly report hashes",
+  "controllerCommit": "5f7497718d4774a2515330650ee8815ccfa67b20",
+  "sources": [
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256AtCommit": "8f2a656cccc0d4b78df462f7476c8968c1de13964b4673e4ca348d12752381b1",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256AtCommit": "7c85307ed34fc750ad703333fd9168467acb42bf68b143576e442b1f21e450e2",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256AtCommit": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "controller/nonlinearBicycleModel.m",
+      "sha256AtCommit": "7ea8e251b8b15d9f714e5bba91da7558a6cb6806e76717c78410c48fe56a7882",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256AtCommit": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256AtCommit": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "controller/readControllerInputs.m",
+      "sha256AtCommit": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256AtCommit": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256AtCommit": "3ebbe546147d1234caa168e548ead70cbcf8ab86469b37bd2e8a61653cccc9e4",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256AtCommit": "611692320c748777e9dfdb0d13def74657282f427e8cba3731ac7137ce78ca39",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "scripts/collisionThreatScenario.m",
+      "sha256AtCommit": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+      "snapshotIdentical": true
+    },
+    {
+      "path": "scripts/givenPathCollisionBaseline.m",
+      "sha256AtCommit": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+      "snapshotIdentical": true
+    }
+  ],
+  "nativeKernels": [
+    {
+      "path": "solver/controller/bicycleSampleKernelMex.mexa64",
+      "sha256": "dfd4ef44acf72bb3e22128dd394d2c7c583097cc8a9a81d8feb2d16a4fcc54e9"
+    },
+    {
+      "path": "solver/controller/dualKernelMex.mexa64",
+      "sha256": "d6a96de418c2c981f441db1f66fec423c634cf303a730ec6603944c85c146f0a"
+    },
+    {
+      "path": "solver/controller/rectangleKernelMex.mexa64",
+      "sha256": "82d5b2189584d3228aaed9272f31f0c83c7c561973d245c2a42abca3f75e0599"
+    }
+  ],
+  "bundle": [
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/REPRODUCTION.txt",
+      "sha256": "2caa0a8a64e2a740ce39427bc6aeae41e466cb1512ff3d630e3e21561883a00d"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/campaign-outcomes.csv",
+      "sha256": "434cfae18c1fc728cdfa4a319f7c86be1acdb2fc6e42fdea5a5d21875526fbdc"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/collision-holds.csv",
+      "sha256": "b1b94565bdfc8dc69ae93760248f2e2476d9081f1498448d50d5e02bab2bd4db"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/counterfactuals.csv",
+      "sha256": "18cdf8a06a8d084e377eb3e0d18654ce7d2c8de116431f690b15d91eb6ba9a79"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/campaign-0.log",
+      "sha256": "fc577f76e07d571f58372e5b05d6fc41a896d7c315c9611e7687958df3cebabf"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/campaign-1.log",
+      "sha256": "b6790e1acd9c86df2a7f91f992fbc3568ec45c565d18ac23d1d9919743247d9e"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/campaign-2.log",
+      "sha256": "16a31c202f292dfe9675d45058888f7829fb47977b4658e5d5bd012359ee07d9"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/campaign-3.log",
+      "sha256": "4368d49073838d4d1169e449a543a00e72ce8bf072ce38ebc9cc3d1b9010fd53"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-late-lateAppliedCenteredFirst.log",
+      "sha256": "130e7524199a95dc8687ad7767f975cd22f75fe9184130ca39fea56b9f6f4724"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-late-lateFreeFirstSteering.log",
+      "sha256": "b8068d15c4297b64a207cd93c0fdee6eb915665063f69d2f99d64eea49ef251f"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-post-postAppliedCenteredFirst.log",
+      "sha256": "140b1fa35ec815e568f22602a2ae5a877fb31c32bcd95fcb4e0134a077f4d146"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-post-postFreeFirstSteering.log",
+      "sha256": "1651f7db5c8d24afce66e23ef3429e856e4930c69ba4bbe093ab08ad6635bbc0"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-post-postNoStateTrust.log",
+      "sha256": "1b892b7a39a702a0a48f035c0ad6d6a0934e96c2bb33631fb0dfb3c671d27250"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-run-appliedCenteredFirst.log",
+      "sha256": "b51994ee9809221b0663bdb72a9b9758d442b49a2f68a928e545e089a085f82f"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-run-freeFirstSteering.log",
+      "sha256": "471659ebb58ee121f523ddac447de6f43efeda67f43f452dd60384a4eb2d6866"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-run-noStateTrust.log",
+      "sha256": "db6719cd328636a8940df7b5594f45663c053e3876b725e248f49e3fd3d2abe8"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-track-a.log",
+      "sha256": "bb5e4889fca8b0540220a21fbf16aeccf98ba75031641aaa709690d0dfe8cb09"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-track-b.log",
+      "sha256": "f95323d260e95cb87c16b595c9153baf0336697774743512509d494fef7045d0"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/logs/cf-track-c.log",
+      "sha256": "9819508c0eda0f6684626c99d8f3c7df2b3590b9fd4c29133da3c321120203a9"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/ablateFrame.m",
+      "sha256": "be804b28781c9db847cdb8634577aa94168da6cd5a503c18c5a980deaf3d7be4"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/campaign.m",
+      "sha256": "cf970062c0649dbe8986c14625e59b211c4296edaa8dbb30e9638c5282bc67ee"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/cfCollision.m",
+      "sha256": "d8a22ad3258f8cc26c7960e68637c4bc7df8985c7c5a0b41ce3b21b7d0f1ae12"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/collisionDetail.m",
+      "sha256": "aea3fb2f4959af9f9b644db4260930f13115a7dc4eb21ad71eb38cd8e8e4c4f0"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/collisionHold.m",
+      "sha256": "e6f55e5b7c5fa21e1670db6fa3594d5e6f96e93e7f2a6047cccc8fd181b6b086"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/collisionTable.m",
+      "sha256": "31063b0ad61d5407cd5f41c3a56bd7c35f2ab6580c6367c5ff10399adc2e55c8"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/correctionProfile.m",
+      "sha256": "1c232312675befa574d7ce856688bcfac2efdca31fa0359ce7587086e1eb22f6"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/exportCounterfactuals.m",
+      "sha256": "3a371b300ad21708a302aac259a4128710d0d963bcb0a6d0d3bc1411228035dd"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/exportRestart.m",
+      "sha256": "741f72df54b8e549f0b7248c685de223b160cd6e1dd48e4b2954b2087e4fc3d9"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/exportTables.m",
+      "sha256": "0034c55da81fb3f1858b01e2ab71796ba2d4ec7def6f3e57e92365bff57d7b9f"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/makeInternals.py",
+      "sha256": "cb041e337cb787c26087214c442c6b19dee6fba49d6b2a03f5deeba6cbff4e34"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/manifest.py",
+      "sha256": "983e408c0e32357682b94f0ff84fff32b7e6e966bbf7ff99f0f10a309dcbc109"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/replayCase.m",
+      "sha256": "95972b5c5bb7f95f7ed8e43dfe0742032cf20c928f9dfd83a7d419b4ac1830bf"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/replayCaseCF.m",
+      "sha256": "8ac2da398d3354cbbffbfb94e1c81a80b37b324333d960b7dbdd029646d759c9"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/replayCaseCF2.m",
+      "sha256": "cf2b65d0fc7d3decf214144144c4c87287ff66105683c7d94df31e23431281f4"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/restartDetail.m",
+      "sha256": "7bb0843b1640f022dbdedfda5147af1f0a56eeccc50a2e6b5bd358608c1f6185"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/runAblation.m",
+      "sha256": "75dcd1d00f778609f533cda2daf216a62e716add72f026d2629edf79c86c5343"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/runCollisionCounterfactual.m",
+      "sha256": "411978f86a7a333fd8992166c6a6f5c52a2773846bb27025e561db2997a29701"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/runCounterfactual.m",
+      "sha256": "0edaf1a31dd1ba4874c0513814c6bab7b3ecef64996ee52a462a08b92b2081d3"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/runPostCounterfactual.m",
+      "sha256": "a8fcde23b39b5024ea6845284089147ef8e06c829a5ac79bf10ca687a2e3fb76"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/runReplay.m",
+      "sha256": "2a0c321f2355d0cbb1df02fefce8be5cfe5ff62ff7d027f1e566b6c34f8f5917"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/runReplays.m",
+      "sha256": "fa60befbe6d4863d1daaaae5c53bd2644b77df341c9607fc9014b922ee9fe607"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/speedCycle.m",
+      "sha256": "c88224ea6e570092f0dbac3ead1d64b8f3242d3d6727e118941617fb149673a6"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/summarize.py",
+      "sha256": "c57591768233a5202b3434855168c9f3e9c5a536113c112bc50ce974ed83cee1"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/trapOne.m",
+      "sha256": "324f86918d008cbc20ef3c59271e0c54cb2e5a7330787bd5af599cfc870469ee"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/trapProfile.m",
+      "sha256": "f7319a89321dbce179049d6550f3ecab47f930b483fe5f3ca9277588b34a6124"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/trapSummary.m",
+      "sha256": "66557d60c27c55b21cf1f22798f9a6a36c28401455c00dc0353b08a5125d8a00"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/trapSummary2.m",
+      "sha256": "6bc3ba68704e9e7d0735a7ac0e9498486a8de9ec01dee8c2af3b23f1c564dc75"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/methods/verifyClaims.m",
+      "sha256": "f90e8bf5c0031eb43bd3f942e9bda046601499fcac0f762885a7d468d2f82e1c"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/restart-geometry.csv",
+      "sha256": "6ff398a4e041b42ebe5cebf3e0afc1d248d9c04caa989e055a679aef0dd9e8a9"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/single-call-ablations.csv",
+      "sha256": "c24f5d6540cd571c2904e04dedf35a1884095227b468ad7cd8e4b0de004fa003"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/trust-box-statistics.csv",
+      "sha256": "66215431c23cdfbea3e90f7d2ec95b4bc7b30b6255945094f91a29391fdc8968"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/appliedCenteredFirst.patch",
+      "sha256": "67e2c00328e6372c189ce651f9f3775f73c5d41292b55406374be58e1c30c9bf"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/denseCollisionSamples.patch",
+      "sha256": "3893d5acfe7d486288b41ea361329634b015cf7115f501b18a0f152f06c4e112"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/freeFirstSteering.patch",
+      "sha256": "d4267952c53266489aaaf77053841062ff82b3f852448da75aa92f0b1a961df3"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/lateAppliedCenteredFirst.patch",
+      "sha256": "454f3e0d787f335600ca4d102282f09d93fd53cbafe4b01aa08ce76de1500645"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/lateFreeFirstSteering.patch",
+      "sha256": "0e7c72fa117a6673a625b87d6eb9f30a2221ad1dc843c2a15e9dc687d76a8255"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/noStateTrust.patch",
+      "sha256": "e26d5d99dce10e2c8b1ff299ede762401cd1b0504c2f2fd1533b27feadb0e62e"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/postAppliedCenteredFirst.patch",
+      "sha256": "dd97a757169bba8aa6a214daf6888b5559bff870a36716c086a36266c7950c28"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/postFreeFirstSteering.patch",
+      "sha256": "4e1758dc61b3586fd98c76275a3aeceb6ed70a20741d264a28e1a4f69e3f2e8d"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/postNoStateTrust.patch",
+      "sha256": "468448161c10a58a618818da6572c25700cdcdc6027ea8eec0a7ba0949b77549"
+    },
+    {
+      "path": "report/RTI_FAILURE_ROOT_CAUSES_20261001/variants/trackingThirdStage.patch",
+      "sha256": "486d4cc1f4fa55571da2bb3e348720d249a5e86b707ccd2db15b01f5ab515277"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/acceleratingHeadOn.json",
+      "sha256": "86242a11021ccf2e8dbc15690aac23cd4b67a7c4a87cad69863c2ca865868d89",
+      "bytes": 15208040
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/brakingLead.json",
+      "sha256": "f2c61b38d0dceb8ff35f712ab2ba893379a7a024d93d09c08dfd0f671a8bedca",
+      "bytes": 12896608
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/crossing.json",
+      "sha256": "b9de6b87956a848a8c2989391f795f1a9b67a49a1cb89f0ded52b2b235725b34",
+      "bytes": 14525310
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/curvedCrossing.json",
+      "sha256": "2c1bb1427013ce7c5748e60853f162d3effd46676392e1c8ab50fe845ee96d2e",
+      "bytes": 16130774
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/curvedHeadOn.json",
+      "sha256": "7b97b2c608dc48cb1a628c69dd139635068eb4ae74196da4db29e66cf7335bb6",
+      "bytes": 16217521
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/headOn.json",
+      "sha256": "69ef8809f15dc42beee48f0f62fc1a37c71341435e968b8f89825f2cc500b26a",
+      "bytes": 15131198
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/turningCrossing.json",
+      "sha256": "040767d120bd4bfc1af5f90410d473421b5ccc1942cb630641a0c818c445e61d",
+      "bytes": 14590584
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/acceleratingHeadOn.json",
+      "sha256": "474460f38595733879b3e63cb6058d48061afcaa25d5aec25585dd6360e8f3cc",
+      "bytes": 11537711
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/brakingLead.json",
+      "sha256": "0bc60fb19d7e769bec2613d2f82079ab8840f48141cea0636f10658b97a609f0",
+      "bytes": 9773765
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/crossing.json",
+      "sha256": "9a0e82863a065cfc92675e0f2e56c57ae448bb27559cd0ddfc3d7b82b9a5b9f3",
+      "bytes": 14821066
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/curvedCrossing.json",
+      "sha256": "5ba76b00fbe2b7f956ad3470d2493dba11c0dbfa68eedc56c316ebf946d6ea25",
+      "bytes": 16345803
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/curvedHeadOn.json",
+      "sha256": "925dd4c3b0d2b76730a55e46bb772fcaaa5ffa6d6efc9d912aa8ddde258f4f0c",
+      "bytes": 16356934
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/headOn.json",
+      "sha256": "26f95763f4fa7878e1277ad3c891b0fd20b7969da50bd31939b6901fe953baaa",
+      "bytes": 11036038
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/turningCrossing.json",
+      "sha256": "84dcf7e003d58fce6c419245a882262c3e742375ea1608dcc62327dfb13f98bd",
+      "bytes": 14682217
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/acceleratingHeadOn.mat",
+      "sha256": "6e8485fb2b082a554ec0f6ba17d301cd7e1722dfba5be9aa17ade90aca7f3ac3",
+      "bytes": 58865650
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/brakingLead.mat",
+      "sha256": "7f89b8663d9661185b432482a8f82ea0acce9d7e80e19a4720e3fbbbb807370d",
+      "bytes": 58507855
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/crossing.mat",
+      "sha256": "ff4462a6cd162962da8f6d3fdbb54946a9d893f8b163020c9f1ba6f8b9fc9fbd",
+      "bytes": 58343386
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/curvedCrossing.mat",
+      "sha256": "f9c8ec29e105ca7dbe0fece986d763320fb4aaf0b80b4c52d46e1039add1943c",
+      "bytes": 60140607
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/curvedHeadOn.mat",
+      "sha256": "5deebfd1cf10e9b85d1cf75a6d450f7a69d2f10b55c3479c084fcd85b7107727",
+      "bytes": 60068706
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/headOn.mat",
+      "sha256": "554e9596f9cc6e7f877343a96c9dc6f5d1429dc8d838faf30bea7bc35553ffd3",
+      "bytes": 58694024
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed15/turningCrossing.mat",
+      "sha256": "870acf2c7392521da3a578aa810db38c7d26b8acbf63f1b82612143e0cc0289b",
+      "bytes": 59283311
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/acceleratingHeadOn.mat",
+      "sha256": "16f534db245871ef770ed35e92f5bb703551ad0bd06f4251cd24861228a5a441",
+      "bytes": 38675999
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/brakingLead.mat",
+      "sha256": "f922b5850aa7bf4e294f5484fedc67207fab71ed937322d6f5a2b78359a250ee",
+      "bytes": 38665089
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/crossing.mat",
+      "sha256": "86628359d45639e4a1ab460a413e4866ea2d4b1ad6c628353952906931c9014b",
+      "bytes": 58370718
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/curvedCrossing.mat",
+      "sha256": "8ce353d7ea4b5f4e789ef85f1cd7be503598a35b88704614f9a1b53e3eb2e8fa",
+      "bytes": 60117150
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/curvedHeadOn.mat",
+      "sha256": "d1b74ecfd0ce28e406e266378b66d823271baf8074c2d293de8e506f663c26bc",
+      "bytes": 60042873
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/headOn.mat",
+      "sha256": "730dbc341484f67d1c99b1b52909fea1a79b101d9bbe7707510528c84b648034",
+      "bytes": 36155345
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign/speed8/turningCrossing.mat",
+      "sha256": "babf3e4f3a168492c0b5490d873b6b7037ec521ba737fabf1ce68796672fcd38",
+      "bytes": 59311897
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/acceleratingHeadOn-15-full.mat",
+      "sha256": "29c7465a118854b97dcc6501c11c9360b430bd30e8e60e44df38acda3ae837fe",
+      "bytes": 37045626
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/acceleratingHeadOn-15.mat",
+      "sha256": "174a0bf3b3a49b4d4ffd56f35bf67cd8d4cfac7466a03c2d0cbc078a6c8d19be",
+      "bytes": 849128
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/acceleratingHeadOn-8-full.mat",
+      "sha256": "63195eb56a6b99a2e8cfcf31a0458cfad7c00c2e0cd07d8ad802295fb8de905a",
+      "bytes": 35304026
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/brakingLead-15-full.mat",
+      "sha256": "fa982d7e0939303b8cc89f8473e686471fbbcb039de981dbda2ed69addc7c743",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/brakingLead-8-full.mat",
+      "sha256": "8af64d55c7f943a7e497866caf8d2cbd3e5b26309e57b89eb1f6d2a0d71e5f93",
+      "bytes": 35304026
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/crossing-15-full.mat",
+      "sha256": "33004982006b4457a6b23f7c63e188058276fe12a747b381b2cbf0b9c3ee37b5",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/crossing-8-full.mat",
+      "sha256": "ad9672320f42f5cbe70e17fe826a1eed916ddd5c5c2da5bc478268706bd9f9c6",
+      "bytes": 35304025
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/crossing-8.mat",
+      "sha256": "12e5d6fc24b78c38c3748949784cdca2e3f2bd08b4845c4e38b066b903e93cb6",
+      "bytes": 4367060
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedCrossing-15-full.mat",
+      "sha256": "07287eb54cce5e18992cd359bdc5e047d0269d107657cfec12ac31675e30db87",
+      "bytes": 37047756
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedCrossing-8-full.mat",
+      "sha256": "2ad9bc1637f099971c38ad4475a774986a4439dd849e39640e3bf704f1fcee81",
+      "bytes": 35306098
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedHeadOn-15-full.mat",
+      "sha256": "7eaa6d44f61dc29756047b643bd53a811bcbf7b674bcacf800b077dde7dcd447",
+      "bytes": 37047780
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedHeadOn-8-full.mat",
+      "sha256": "4df237b3f6b87f6210032ce2412556e449ddde5a7304803f564bb3d2ada38bb4",
+      "bytes": 35306098
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/headOn-15-full.mat",
+      "sha256": "aca22fefab1e0b851af17c15c65ba9aabc79525120248b9570e845856bd5ebc6",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/headOn-15.mat",
+      "sha256": "29ac19fe8768b21d419ba86d0061c24aed303d1c00cbf1952c159579d696eab9",
+      "bytes": 993920
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/headOn-8-full.mat",
+      "sha256": "8cb8fe3968741120b161ccfc92849b1274710d3ce3b7b50c8762604852cdb3ed",
+      "bytes": 35304025
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/turningCrossing-15-full.mat",
+      "sha256": "846a31ca580cf7dd8edab5d4b731114e84b52f62df68ec2fd6faf31405bb39ee",
+      "bytes": 37045625
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/turningCrossing-8-full.mat",
+      "sha256": "c2cbf440afba856ad1fee76f2141cec49c7eaccd0d30f9080afeb4289d671a65",
+      "bytes": 35304025
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/ablation/crossing-15.mat",
+      "sha256": "9f1de8e1d0b45aae899e9fb840fa473c7604f866b4de5663fa0c6b623580d71e",
+      "bytes": 9296717
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/ablation/crossing-8.mat",
+      "sha256": "0b42a66f1b80b05da67ed1f3bc14f0893b20701fd8cbcef5dc9706e1f422e199",
+      "bytes": 4060916
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/ablation/curvedCrossing-15.mat",
+      "sha256": "8a9cbc4bb502a8ef2a15aab7d91dc13ac840bda0e067cc2dded41faf85d7bfd6",
+      "bytes": 10238844
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/ablation/curvedHeadOn-15.mat",
+      "sha256": "91e218659d2725e4c70df4e09fcbbe51682befa5bc2f68537dffef7791bff323",
+      "bytes": 388800
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/ablation/curvedHeadOn-8.mat",
+      "sha256": "35dbf7e7398124c6d3b5ad6d1fb6421876efed3d45fc37363fee3b8bab64cb55",
+      "bytes": 13324238
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/ablation/headOn-15.mat",
+      "sha256": "c7248ae9353124e9d1b6f5570af4811a982ac4a79924c8dcfbcbf81003219cec",
+      "bytes": 31458797
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/ablation/turningCrossing-8.mat",
+      "sha256": "cddd4d74d6cec1c34667608e0028b6301832709b575f246cbbf75bc9ea027583",
+      "bytes": 13302862
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/appliedCenteredFirst-crossing-15.mat",
+      "sha256": "3bcb4d7a9169dc3e5cd82bc3ed3543f865ba18243208a8e798f2fba0cd940a0d",
+      "bytes": 354656
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/appliedCenteredFirst-crossing-8.mat",
+      "sha256": "25637a57b86f682c90e230c306a1bea9768b7405dff7bda2b7d49f37ac233a59",
+      "bytes": 301776
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/appliedCenteredFirst-turningCrossing-8.mat",
+      "sha256": "fabb13489c0994d5c76b76a4623b3cfdcf97f2ad962f98735bfbac7908593fd3",
+      "bytes": 301792
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/denseCollisionSamples-acceleratingHeadOn-15.mat",
+      "sha256": "110a3de459c14a98efbb606596226eddba214cce87e459b59dab54887ac804bf",
+      "bytes": 1911592
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/denseCollisionSamples-headOn-15.mat",
+      "sha256": "5b46f5f3cd142b994b96a628302eca8294fbeb0b5f485fe0bdd25808185699e8",
+      "bytes": 1911568
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/freeFirstSteering-crossing-15.mat",
+      "sha256": "3f3e5be87e3d7f81a8c4d97af9f80b01c1ffe1094d5732f13ac64f2f6777d2c3",
+      "bytes": 177112
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/freeFirstSteering-crossing-8.mat",
+      "sha256": "bd86e2c668e998e680cf09cd92ca2eda569bc5f7d68d2afe173cba3c4dbb2d2e",
+      "bytes": 284984
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/freeFirstSteering-turningCrossing-8.mat",
+      "sha256": "41f9b0ad71f3d6fbf67ab8f0954bd5117ecf41c7c508a466c4d2b98a4ef21627",
+      "bytes": 457688
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateAppliedCenteredFirst-brakingLead-15.mat",
+      "sha256": "d777c82b338849b6ed36c4237ba3c44254ace644c4b4397223776cf3d1624a94",
+      "bytes": 2161280
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateAppliedCenteredFirst-crossing-15.mat",
+      "sha256": "38c4dab20ef72070b2f97d73ad48052800317bf91ae8ef904b3e76d3bf711fb1",
+      "bytes": 5485525
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateAppliedCenteredFirst-crossing-8.mat",
+      "sha256": "618da8d61fb6b16f474b156063ef91ac8f07164af75d3a53af0fbb83f714fd5c",
+      "bytes": 3140592
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateFreeFirstSteering-brakingLead-15.mat",
+      "sha256": "da902a7d8dacd574ad4424b3faf97117c0960ed9778d945f0021e908e5e0683f",
+      "bytes": 1911800
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateFreeFirstSteering-crossing-15.mat",
+      "sha256": "d696b551ab76818fed2de02579d7aadec5d9725f02fda6666ddfd6f715f944f0",
+      "bytes": 1933128
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateFreeFirstSteering-crossing-8.mat",
+      "sha256": "7caf41a4e93e6a3b0c5fabec5b28da4e3cf273580ee4449053ee8e1002b92cc7",
+      "bytes": 1867240
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/margin005-acceleratingHeadOn-15.mat",
+      "sha256": "7b301200632a7d42bc87954bbdac0ddcc62d171a68938382e8d6fa86a73e1835",
+      "bytes": 1911592
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/margin005-headOn-15.mat",
+      "sha256": "41ffe1bcce9df49829885cb0ebd4abcbbc7a6ea3c8f9bb1a8c2d3d2e58dbf786",
+      "bytes": 1911568
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/margin010-acceleratingHeadOn-15.mat",
+      "sha256": "5c25b714673ec78014b918dfd7648b147eac0839c1e25a0ea61c82508a4172ec",
+      "bytes": 1911592
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/margin010-headOn-15.mat",
+      "sha256": "7b9eecd9c674fbca51602c5df13b3bc6b6d25a20c5ddd505d3a6f4c48d21a316",
+      "bytes": 1911568
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/margin030-acceleratingHeadOn-15.mat",
+      "sha256": "8ec1d54e8ee37399faa2d9120c1265357cadf26e8a18153d1d5a6841990c697f",
+      "bytes": 130904
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/margin030-headOn-15.mat",
+      "sha256": "fcdc91109d097e7f175c703bd7ede7aa82d577f6c9d063da054e59e660056155",
+      "bytes": 1911568
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/noStateTrust-crossing-15.mat",
+      "sha256": "af42e7fe42965589e2d6d3971bdab0dc1061a08ba119b779f978ed67f694e72b",
+      "bytes": 37046963
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/noStateTrust-crossing-8.mat",
+      "sha256": "37ecf1a761394e1d6418821a535e4ee993e503cf6f24c520bbea3e4e6355fbf7",
+      "bytes": 35305364
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/noStateTrust-turningCrossing-8.mat",
+      "sha256": "a5588302a69e176766fbd8ee2552943ce077652c7abcb1a92cf785fe5d8a96f3",
+      "bytes": 35305378
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postAppliedCenteredFirst-crossing-15.mat",
+      "sha256": "5d2020728d62424ab93ab5de1d5493f501d1e00158e7ad3185e986e796991521",
+      "bytes": 37046963
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postAppliedCenteredFirst-crossing-8.mat",
+      "sha256": "2dd9c2f348f3163fde9bb3217e37b1c3e7e5c7453804c9e8c2307665269daad9",
+      "bytes": 35305364
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postAppliedCenteredFirst-turningCrossing-8.mat",
+      "sha256": "7567ac8131e0894c78407c3421d85fd718a8fec30d86e96b033868f9b8c5f38d",
+      "bytes": 8817010
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postFreeFirstSteering-crossing-15.mat",
+      "sha256": "ff009962977e67e3a48f70e7e15e0a5f6ff06cd0ede15ea6195b1b2f2752286c",
+      "bytes": 37046963
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postFreeFirstSteering-crossing-8.mat",
+      "sha256": "137fd58e099eb5d1dadc9f60a2a7796af5ffb4b3a005d999ea239f4fe670ac08",
+      "bytes": 35305364
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postFreeFirstSteering-turningCrossing-8.mat",
+      "sha256": "4d927f965daea0b159bb60f080e5641e360a15a83e94f85f549234c8298df36f",
+      "bytes": 7003322
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postNoStateTrust-crossing-15.mat",
+      "sha256": "4e4da44fe772e54b935f66002c5ee9ecded76b5a43bd9e31057927c84bc107f2",
+      "bytes": 37046963
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postNoStateTrust-crossing-8.mat",
+      "sha256": "b2862aa9918489268a1af61915d3283a5843d2f855d5118cda646a8b3b2e5f1b",
+      "bytes": 35305364
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postNoStateTrust-turningCrossing-8.mat",
+      "sha256": "457a33312a0b5dc90c1648d60812dcf339a4ed87a1e47333ba7c420f5e514e6a",
+      "bytes": 35305378
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-brakingLead-15.mat",
+      "sha256": "2c003206a621f897797984d7cc1eab15794f7bc0b09364400dcb5f08dfbacd9b",
+      "bytes": 1913328
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-crossing-15.mat",
+      "sha256": "e58383aa021e70e5a12da0f3dbb2860a2e8a6d57dec2cf75b3e96cb7ce64d462",
+      "bytes": 37072935
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-crossing-8.mat",
+      "sha256": "229c375dad5a990fe330810377c0797298662f6ee058bad53c753b7ae94df5f8",
+      "bytes": 35331430
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedCrossing-15.mat",
+      "sha256": "ae6df9ece2d8bca64420d1f23e5d857c42dc708e0c98c6a8ab5a6a2c4731db49",
+      "bytes": 37075199
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedCrossing-8.mat",
+      "sha256": "2b64fb5bc00092424fd98f515ea59f0961f543416ebabf7947ab8476b4b5556e",
+      "bytes": 35333434
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedHeadOn-15.mat",
+      "sha256": "9432619522a4240c64f8bba5fbf792d299dbce78d3afee78a8f7dfaa7e252c47",
+      "bytes": 37075205
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedHeadOn-8.mat",
+      "sha256": "3eeec824e490efb7334d1760947b86fb778a2891a01c032e56791c1a6bbc11e1",
+      "bytes": 35333587
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-headOn-15.mat",
+      "sha256": "1eb69c3dff4b3c9431cf97422e65629aa0bb81b638def942daf215c72adfcaf3",
+      "bytes": 37072852
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-turningCrossing-15.mat",
+      "sha256": "002715650d308b0c09a49def50e53fee1e4a9b0775d7c4aba7ae59c2c14c4d62",
+      "bytes": 37073149
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-turningCrossing-8.mat",
+      "sha256": "086ef2c667291718e561cb44210f8db532a4cb0012d62e7c83bf882dbb55b525",
+      "bytes": 35331693
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/appliedCenteredFirst/solvePredictiveControl.m",
+      "sha256": "547ad5a3976acd3b86afcf4491de08e65297f9cf84c70b806ebfb5723315f1bd",
+      "bytes": 19135
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/denseCollisionSamples/solvePredictiveControl.m",
+      "sha256": "c2137a3dfa43b8b471175445fedfc143b8c65542174e2280a149c990513539fe",
+      "bytes": 19462
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/freeFirstSteering/solvePredictiveControl.m",
+      "sha256": "f5721a799a045296888f2f8a63e3909367b14764682da9139635ff3c578ca7bf",
+      "bytes": 19027
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateAppliedCenteredFirst/solvePredictiveControl.m",
+      "sha256": "61dce0075a779ddbb2ffd67a5ea91299e7334539dff261d7f4bcb83502a86352",
+      "bytes": 19195
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/lateFreeFirstSteering/solvePredictiveControl.m",
+      "sha256": "b0528ba3c88806fd4b9420a5a23713e93404e5223aca3dcc96714dd918dcf847",
+      "bytes": 19089
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/noStateTrust/solvePredictiveControl.m",
+      "sha256": "a6627ad228747ff54647c07f17d018a5f2ccb99296072887499b55a3572e350c",
+      "bytes": 18939
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postAppliedCenteredFirst/solvePredictiveControl.m",
+      "sha256": "87b7947e45b41dded141c701a7f2ec45e237f28c859c2aea42c0f5d52a2d4231",
+      "bytes": 19221
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postFreeFirstSteering/solvePredictiveControl.m",
+      "sha256": "f8509fb6cbb46b8666df6ecb5c05207d4362ee0857161e6827e755a89e559f2b",
+      "bytes": 19115
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/postNoStateTrust/solvePredictiveControl.m",
+      "sha256": "b0bfba69dcda74a5bfb0575cb1898ba5f3aeaf7e777f439a4dc8ec98db0ddf78",
+      "bytes": 19106
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage/solvePredictiveControl.m",
+      "sha256": "4f21e64ded18714bfd70a7fbc178964ac7b5b5f0e3280be79a585bad226644ed",
+      "bytes": 20638
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/methods/rtiInternals.m",
+      "sha256": "707612917d101c53b5793c6c0f6582a945df05bc9bbfe9125bea5e777439aeeb",
+      "bytes": 18402
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/source.sha256",
+      "sha256": "0eb6c99541b160dcf095ffbe176a55908018fda486f268127d381f1237eea112",
+      "bytes": 1973
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/working-tree.diff",
+      "sha256": "93336aea4773901a2843d51b2761b4faa9f97e3e59439bd11b55a2be7c6634e8",
+      "bytes": 34084
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign-0.log",
+      "sha256": "0ed3b7f631e94f477cec53aa1cf7a5bbc94b1966a468397df440dfddcd312d4b",
+      "bytes": 120032
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign-1.log",
+      "sha256": "41f6f036a36c14a9ec99e6cf403408f082fdeace18a136a6803934bf2f17ff35",
+      "bytes": 121180
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign-2.log",
+      "sha256": "9560e646330d199bddcdff5649fb1a0b7818e123ca5261e685db4ac8638a7523",
+      "bytes": 85683
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign-3.log",
+      "sha256": "a31456783219bf1dfbacbdd86b770c2b4917d98b7881247fd7143863809ebbbd",
+      "bytes": 95358
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/bundle/campaign-outcomes.csv",
+      "sha256": "0953d08ccb0802d8f0beccf6546ebc92b18499cf12a6fb430215b1bc74fe6e88",
+      "bytes": 3209
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/bundle/collision-holds.csv",
+      "sha256": "b1b94565bdfc8dc69ae93760248f2e2476d9081f1498448d50d5e02bab2bd4db",
+      "bytes": 796
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/bundle/counterfactuals.csv",
+      "sha256": "18cdf8a06a8d084e377eb3e0d18654ce7d2c8de116431f690b15d91eb6ba9a79",
+      "bytes": 8027
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/bundle/restart-geometry.csv",
+      "sha256": "6ff398a4e041b42ebe5cebf3e0afc1d248d9c04caa989e055a679aef0dd9e8a9",
+      "bytes": 604
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/bundle/single-call-ablations.csv",
+      "sha256": "c24f5d6540cd571c2904e04dedf35a1884095227b468ad7cd8e4b0de004fa003",
+      "bytes": 19702
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/bundle/trust-box-statistics.csv",
+      "sha256": "66215431c23cdfbea3e90f7d2ec95b4bc7b30b6255945094f91a29391fdc8968",
+      "bytes": 1367
+    }
+  ]
+}

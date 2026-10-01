@@ -1,0 +1,22 @@
+{Error using modifiedFialaTire.evaluate (line 84)
+Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+
+Error in nonlinearBicycleModel.derivative (line 13)
+            fy=modifiedFialaTire.evaluate(slip,u(2),cfg);
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in replayCaseCF>@(~,s)nonlinearBicycleModel.derivative(s,u,cfg) (line 35)
+        [times,states]=ode45(@(~,s)nonlinearBicycleModel.derivative(s,u,cfg),linspace(0,h,31),x, ...
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in ode45 (line 244)
+        f4 = ode(t4, y4, odeArgs{:});
+             ^^^^^^^^^^^^^^^^^^^^^^^
+Error in replayCaseCF (line 35)
+        [times,states]=ode45(@(~,s)nonlinearBicycleModel.derivative(s,u,cfg),linspace(0,h,31),x, ...
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in runCounterfactual (line 6)
+    t=tic;record=replayCaseCF(speed,name,frames,out,[],"/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/"+variant);
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in run (line 100)
+evalin('caller', strcat(scriptStem, ';'));
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+}

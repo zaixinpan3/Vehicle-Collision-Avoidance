@@ -1,0 +1,4 @@
+scenario,speed,time,initialization,exitFlagsIncludingRestart,tailMinimumDistance,tailMinimumStage,rolloutMinimumDistance,endpointCoreMembership,coreRadiusSquared,previousPlanToRolloutMaxPositionGap
+curvedHeadOn,15,0.1,shiftedInputRollout,[-2 1 1],0,26,0,-7.63438445404947e-07,9.5367431640625e-07,0.000199725574688495
+curvedCrossing,15,19.8,shiftedInputRollout,[-2 1 1],3.36930254335506,34,3.36930254335506,1196.03057645702,9.5367431640625e-07,4.51319485415593
+curvedCrossing,15,21.6,shiftedInputRollout,[-2 1 1],5.50649192521141,17,4.71248710456995,111.033617539554,9.5367431640625e-07,0.799370057408201

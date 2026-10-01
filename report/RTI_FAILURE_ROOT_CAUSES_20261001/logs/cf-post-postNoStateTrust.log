@@ -1,0 +1,3 @@
+POST-DONE postNoStateTrust crossing 8 frames=1600 wall=169.0 minClearance=0.6989 recoveredAt=NaN final e=[-621.1     -1.571 -0.0001154   0.004099    0.00401] failure=
+POST-DONE postNoStateTrust crossing 15 frames=1600 wall=260.2 minClearance=0.3811 recoveredAt=NaN final e=[-627.4  -1.553  -6.986 0.02068 0.01356] failure=
+POST-DONE postNoStateTrust turningCrossing 8 frames=1600 wall=316.0 minClearance=0.4114 recoveredAt=NaN final e=[1.561e-06 -1.923e-09      1.024  6.919e-08  8.407e-08] failure=

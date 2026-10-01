@@ -1,0 +1,6 @@
+CONTROLLER-FAILURE t=4.10 collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+POST-DONE lateFreeFirstSteering crossing 8 frames=82 wall=13.6 minClearance=0.6989 recoveredAt=NaN final e=[-12.72  -1.366 -0.4252 0.06721 0.08115] failure=collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+CONTROLLER-FAILURE t=4.05 collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+POST-DONE lateFreeFirstSteering crossing 15 frames=81 wall=14.8 minClearance=0.3811 recoveredAt=NaN final e=[-14.95 -1.454 -3.779  0.143 0.2051] failure=collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+CONTROLLER-FAILURE t=4.00 collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+POST-DONE lateFreeFirstSteering brakingLead 15 frames=80 wall=15.4 minClearance=0.8964 recoveredAt=NaN final e=[1.29   0.1324  -0.3411 -0.06066   0.4092] failure=collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.

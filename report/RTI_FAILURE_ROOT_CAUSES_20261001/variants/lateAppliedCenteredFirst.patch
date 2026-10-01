@@ -1,0 +1,18 @@
+--- source/controller/solvePredictiveControl.m
++++ variants/lateAppliedCenteredFirst/solvePredictiveControl.m
+@@ -1,5 +1,5 @@
+ function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
+-%solvePredictiveControl One RTI step, with one fresh initialization on failure.
++%solvePredictiveControl DIAGNOSTIC VARIANT (lateAppliedCenteredFirst). One RTI step, with one fresh initialization on failure.
+ % Returned states belong to the affine prediction, not a nonlinear replay.
+ % Solver exit flags are recorded, not used to admit or reject returned vectors.
+ % There is no post-solve constraint audit or convergence loop.
+@@ -198,6 +198,8 @@
+     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
+     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
+     lower(iu(:))=-repmat(radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
++    lateSwitch=model.stateTime>=4-1e-9; % DIAGNOSTIC switch after the avoidance phase
++    if lateSwitch,lower(iu(:,1))=model.previousInput-anchor.inputs(:,1)-radius*[.15;.25];upper(iu(:,1))=model.previousInput-anchor.inputs(:,1)+radius*[.15;.25];end % DIAGNOSTIC
+     % Numerical RTI corrections are local to the new anchor at every sample.
+     % Steering still has no actuator magnitude or slew constraint.
+     inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];

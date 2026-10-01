@@ -1,0 +1,4 @@
+POST-DONE postAppliedCenteredFirst crossing 8 frames=1600 wall=168.6 minClearance=0.6989 recoveredAt=NaN final e=[-621.1     -1.571 -0.0001154   0.004099    0.00401] failure=
+POST-DONE postAppliedCenteredFirst crossing 15 frames=1600 wall=258.2 minClearance=0.3811 recoveredAt=NaN final e=[-627.4  -1.553  -6.986 0.02068 0.01356] failure=
+CONTROLLER-FAILURE t=20.45 collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+POST-DONE postAppliedCenteredFirst turningCrossing 8 frames=409 wall=49.6 minClearance=0.4114 recoveredAt=NaN final e=[-19.69  2.934  -2.92 0.6905  3.226] failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).

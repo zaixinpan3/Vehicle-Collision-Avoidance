@@ -1,0 +1,2 @@
+POST-DONE trackingThirdStage crossing 8 frames=1600 wall=461.1 minClearance=0.0000 recoveredAt=13.00 final e=[1.651e-08  -4.41e-17  -2.84e-06 -1.493e-15 -1.544e-15] failure=
+POST-DONE trackingThirdStage crossing 15 frames=1600 wall=551.7 minClearance=0.0789 recoveredAt=13.00 final e=[1.751e-06  2.078e-08 -9.132e-05 -1.633e-05 -2.612e-05] failure=

@@ -1,0 +1,43 @@
+variant,scenario,speed,safetyMarginMeters,frames,failure,failureTime,minimumClearance,minimumClearanceHold,recoveryConfirmation,finalLateralError,finalSpeedError,maximumPcbfOptimum,maximumCallSeconds
+appliedCenteredFirst,crossing,15,0.006,13,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,0.65,11.8722220808789,0.6,NaN,-0.147943505995457,-0.283230191968462,9.71411047228629e-07,0.333243
+appliedCenteredFirst,crossing,8,0.006,11,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,0.55,7.22308481113842,0.5,NaN,-0.0402606935777273,-0.219376133026606,2.21314163190718e-07,1.625764
+appliedCenteredFirst,turningCrossing,8,0.006,11,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,0.55,9.13669494569026,0.5,NaN,-0.0606734640139218,-0.243261901598934,5.19814092306213e-07,0.330597
+denseCollisionSamples,acceleratingHeadOn,15,0.006,80,,NaN,0.0540328944973505,1.05,NaN,6.87554788901222,-2.06533502572625,1.29723608635309e-05,0.254951
+denseCollisionSamples,headOn,15,0.006,80,,NaN,0.113763473071187,1.1,NaN,6.55590068088804,-5.04244033318431,1.07802052016038e-05,1.729038
+freeFirstSteering,crossing,15,0.006,5,collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0.25,18.6360789122735,0.2,NaN,-0.126352849500328,-0.974296642002082,1.28199382225961e-06,0.363978
+freeFirstSteering,crossing,8,0.006,10,plant: collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1. (input [1.57507 -0.547063]),0.5,8.45435703094635,0.45,NaN,-0.312764575137559,-2.40459934697763,5.77671914146258e-07,1.534003
+freeFirstSteering,turningCrossing,8,0.006,18,collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,0.9,6.1717443735801,0.85,NaN,-0.485959392689053,-4.87820270592622,3.29879169133838e-07,0.292684
+lateAppliedCenteredFirst,brakingLead,15,0.006,90,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,4.5,0.0963922963543385,4.45,NaN,1.85264703991319,-0.280908975485879,0.398744230785144,0.80002
+lateAppliedCenteredFirst,crossing,15,0.006,240,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,12,0.381137928795825,1.9,NaN,-74.0133165938555,-8.17416023001173,2.00276766403408e-06,0.519697
+lateAppliedCenteredFirst,crossing,8,0.006,142,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,7.1,0.698885177099766,2.2,NaN,-15.4508592864875,-2.36434991724216,1.79193232837093e-06,2.097181
+lateFreeFirstSteering,brakingLead,15,0.006,80,collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,4,0.896409014360309,3.95,NaN,1.28977909655968,-0.341132879378568,6.23493045121608e-07,0.844671
+lateFreeFirstSteering,crossing,15,0.006,81,collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,4.05,0.381137928795825,1.9,NaN,-14.9451145501129,-3.77928103854432,9.46633745970074e-07,0.60778
+lateFreeFirstSteering,crossing,8,0.006,82,collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,4.1,0.698885177099766,2.2,NaN,-12.7235634442613,-0.425210501408873,9.72867947775512e-07,2.156469
+margin005,acceleratingHeadOn,15,0.05,80,,NaN,0.0314054104136109,1.05,NaN,3.72419456399912,-1.30749639964344,1.61677159866988e-06,0.169342
+margin005,headOn,15,0.05,80,,NaN,0.0354555769727971,1.1,NaN,4.02662708752437,-1.37899516434405,0.00202142699909861,0.143452
+margin010,acceleratingHeadOn,15,0.1,80,,NaN,0.0855652459410711,1.05,NaN,3.80460941011423,-1.29152595783077,0.00125894989984251,0.227519
+margin010,headOn,15,0.1,80,,NaN,0.0951799977593323,1.1,NaN,4.08037367440517,-1.31281721417086,0.00112456564997155,0.154875
+margin030,acceleratingHeadOn,15,0.3,3,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,0.15,15.7477023025486,0.1,NaN,0.0203203437327209,-0.335111186972826,4.76906369682622e-07,0.203186
+margin030,headOn,15,0.3,80,,NaN,0.285899347485288,1.05,NaN,3.61510301513533,-0.815005191912682,0.0212577802979884,0.171827
+noStateTrust,crossing,15,0.006,1600,,NaN,1.53380754252931,1.8,NaN,-615.77877667289,-7.06545469108354,8.53676376777118e-07,0.718336
+noStateTrust,crossing,8,0.006,1600,,NaN,0.363888291872695,1.8,NaN,-621.650701122322,-2.23060076374182e-05,2.75802312757268e-06,1.770704
+noStateTrust,turningCrossing,8,0.006,1600,,NaN,0.237922152682632,1.85,NaN,1.74109330820863e-06,0.991707654838349,1.94501128762962e-05,0.750408
+postAppliedCenteredFirst,crossing,15,0.006,1600,,NaN,0.381137928795825,1.9,NaN,-627.356357116193,-6.98566879875816,9.46633745970074e-07,0.395137
+postAppliedCenteredFirst,crossing,8,0.006,1600,,NaN,0.698885177099766,2.2,NaN,-621.055010462909,-0.000115355854472199,9.72867947775512e-07,1.657389
+postAppliedCenteredFirst,turningCrossing,8,0.006,409,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,20.45,0.411387099003265,2.05,NaN,-19.6900536027994,-2.91990461400181,1.69346854798615e-06,0.449541
+postFreeFirstSteering,crossing,15,0.006,1600,,NaN,0.381137928795825,1.9,NaN,-627.356357116193,-6.98566879875816,9.46633745970074e-07,0.417247
+postFreeFirstSteering,crossing,8,0.006,1600,,NaN,0.698885177099766,2.2,NaN,-621.055010462909,-0.000115355854472199,9.72867947775512e-07,1.73422
+postFreeFirstSteering,turningCrossing,8,0.006,322,collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.,16.1,0.411387099003265,2.05,NaN,-17.3175131648409,0.809274951013494,1.69346854798615e-06,0.460205
+postNoStateTrust,crossing,15,0.006,1600,,NaN,0.381137928795825,1.9,NaN,-627.356357116193,-6.98566879875816,9.46633745970074e-07,0.413212
+postNoStateTrust,crossing,8,0.006,1600,,NaN,0.698885177099766,2.2,NaN,-621.055010462909,-0.000115355854472199,9.72867947775512e-07,1.668517
+postNoStateTrust,turningCrossing,8,0.006,1600,,NaN,0.411387099003265,2.05,NaN,1.56088395205531e-06,1.02398323864001,1.69346854798615e-06,0.531935
+trackingThirdStage,brakingLead,15,0.006,80,collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).,4,0.752787285778219,3.95,NaN,0.245216666787775,-1.57966925734884,8.45033838553823e-07,5.063257
+trackingThirdStage,crossing,15,0.006,1600,,NaN,0.0789306836822173,1.7,13,1.75130059104361e-06,-9.13223547751585e-05,1.57636828118688e-06,3.945621
+trackingThirdStage,crossing,8,0.006,1600,,NaN,0,1.85,13,1.65125302129657e-08,-2.83959280356072e-06,0.00175803002698511,5.103336
+trackingThirdStage,curvedCrossing,15,0.006,1600,,NaN,0,1.8,13,-1.07142600419342e-06,1.49303840402126e-08,1.31944583502144e-06,4.668433
+trackingThirdStage,curvedCrossing,8,0.006,1600,,NaN,0,1.8,18.05,-2.73484541278231e-07,-5.80084329016017e-07,200372.936421533,5.054721
+trackingThirdStage,curvedHeadOn,15,0.006,1600,,NaN,0.00611718956243517,56.15,13,-1.3592244729592e-07,5.27789012494395e-09,1.47981961505012e-06,5.037821
+trackingThirdStage,curvedHeadOn,8,0.006,1600,,NaN,0.0312221612059223,1.9,13,0.793702262359961,-2.7921727130547,1.9290246210054e-06,5.083033
+trackingThirdStage,headOn,15,0.006,1600,,NaN,0.00558948002043584,1.05,13,-1.34883406283606e-06,9.57187982209007e-08,7.0337140864713e-05,2.354844
+trackingThirdStage,turningCrossing,15,0.006,1600,,NaN,0,1.7,13.25,-1.54680490290758e-06,8.8252498642305e-08,3.50346664795645e-06,5.0711
+trackingThirdStage,turningCrossing,8,0.006,1600,,NaN,0,1.8,15.8,1.65125306741397e-08,-2.83957462698936e-06,0.0105799726993142,5.096365

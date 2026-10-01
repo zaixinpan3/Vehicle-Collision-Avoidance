@@ -1,0 +1,18 @@
+--- source/controller/solvePredictiveControl.m
++++ variants/postNoStateTrust/solvePredictiveControl.m
+@@ -1,5 +1,5 @@
+ function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
+-%solvePredictiveControl One RTI step, with one fresh initialization on failure.
++%solvePredictiveControl DIAGNOSTIC VARIANT (postNoStateTrust). One RTI step, with one fresh initialization on failure.
+ % Returned states belong to the affine prediction, not a nonlinear replay.
+ % Solver exit flags are recorded, not used to admit or reject returned vectors.
+ % There is no post-solve constraint audit or convergence loop.
+@@ -197,6 +197,8 @@
+     rows=cell(1,5*count+3);bounds=cell(size(rows));rowCount=0;
+     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
+     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
++    postEncounter=isempty(model.target) || localBeyondRange(anchor.states(:,1),0,model); % DIAGNOSTIC switch
++    if postEncounter,lower(ix(:))=-Inf;upper(ix(:))=Inf;end % DIAGNOSTIC
+     lower(iu(:))=-repmat(radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
+     % Numerical RTI corrections are local to the new anchor at every sample.
+     % Steering still has no actuator magnitude or slew constraint.

@@ -1,0 +1,4 @@
+POST-DONE postFreeFirstSteering crossing 8 frames=1600 wall=168.1 minClearance=0.6989 recoveredAt=NaN final e=[-621.1     -1.571 -0.0001154   0.004099    0.00401] failure=
+POST-DONE postFreeFirstSteering crossing 15 frames=1600 wall=256.7 minClearance=0.3811 recoveredAt=NaN final e=[-627.4  -1.553  -6.986 0.02068 0.01356] failure=
+CONTROLLER-FAILURE t=16.10 collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.
+POST-DONE postFreeFirstSteering turningCrossing 8 frames=322 wall=43.3 minClearance=0.4114 recoveredAt=NaN final e=[-17.32 -1.481 0.8093 0.5206 0.6487] failure=collisionAvoidanceController:invalidTireOperatingPoint: Fiala force requires abs(alpha)<pi/2 and abs(beta)<=1.

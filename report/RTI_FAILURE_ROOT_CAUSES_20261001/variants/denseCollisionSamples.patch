@@ -1,0 +1,24 @@
+--- source/controller/solvePredictiveControl.m
++++ variants/denseCollisionSamples/solvePredictiveControl.m
+@@ -1,5 +1,5 @@
+ function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
+-%solvePredictiveControl One RTI step, with one fresh initialization on failure.
++%solvePredictiveControl DIAGNOSTIC VARIANT (denseCollisionSamples). One RTI step, with one fresh initialization on failure.
+ % Returned states belong to the affine prediction, not a nonlinear replay.
+ % Solver exit flags are recorded, not used to admit or reject returned vectors.
+ % There is no post-solve constraint audit or convergence loop.
+@@ -231,6 +231,14 @@
+             r=-j*map;if index<=prefix,r(:,is(index))=-1;end
+             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
+         end
++        if index<=departure
++            for tau=[.125,.25,.375,.625,.75,.875] % DIAGNOSTIC: six extra interpolated collision samples per hold
++                pose=(1-tau)*x+tau*next;mapTau=sparse(6,nv);mapTau(:,ix(:,index))=(1-tau)*eye(6)+tau*a;mapTau(:,iu(:,index))=tau*b;
++                [g,j]=localSafetyRows(pose,(index-1+tau)*cfg.controller.sampleTime,model);
++                r=-j*mapTau;if index<=prefix,r(:,is(index))=-1;end
++                rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
++            end
++        end
+         rowCount=rowCount+1;rows{rowCount}=[map(4:6,:);-map(4:6,:)];
+         bounds{rowCount}=[physicalUpper-middle(4:6);middle(4:6)-physicalLower];
+         jx=ix(:,index+1);

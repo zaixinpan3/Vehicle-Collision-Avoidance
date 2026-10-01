@@ -1,0 +1,6 @@
+CONTROLLER-FAILURE t=0.55 collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+CF-DONE appliedCenteredFirst crossing 8 frames=11 wall=3.3 minClearance=7.2231 final e=[-0.04026  0.01084  -0.2194   0.1904    0.166] failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+CONTROLLER-FAILURE t=0.65 collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+CF-DONE appliedCenteredFirst crossing 15 frames=13 wall=2.0 minClearance=11.8722 final e=[-0.1479  0.03452  -0.2832 -0.04751   0.3446] failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+CONTROLLER-FAILURE t=0.55 collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+CF-DONE appliedCenteredFirst turningCrossing 8 frames=11 wall=1.7 minClearance=9.1367 final e=[-0.06067  0.00538  -0.2433   0.1905   0.1651] failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
