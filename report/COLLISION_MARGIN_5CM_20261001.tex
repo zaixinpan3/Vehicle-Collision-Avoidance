@@ -1,0 +1,107 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\setlength{\tabcolsep}{4pt}
+\title{A 5-cm Sampled Collision Margin}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Change}
+The default \texttt{collision.safetyMarginMeters} is raised from 0.006 to
+0.05~m. This follows the diagnosis in
+\path{RTI_FAILURE_ROOT_CAUSES_20261001.tex}: the two 15-m/s head-on collisions
+occurred between the two constrained sample times of a 50-ms hold, and a 5-cm
+margin removed both contacts over the first 4~s of those encounters. Nothing
+else changes. The margin enters the same places as before: the sampled affine
+separation rows at each hold start and interpolated midpoint, the flow-seed
+radius, the terminal clearance, and the encounter-range test, which subtracts
+the margin from the 30-m range. The configuration comment and
+\path{controller/PCBF_CLF_ARCHITECTURE.md} now state that the margin applies
+at sampled rows and is not a continuous-time clearance bound. The configuration
+test now expects the new default.
+
+\section{Validation}
+The nine controller test classes used for the RTI change pass, 200 of 200,
+and the 20 Python audit tests pass. The fourteen collision-threat cases were
+rerun with the unchanged driver, fixtures and 80-s window as in
+\path{RTI_FAILURE_ROOT_CAUSES_20261001.tex}: exact state, known target motion,
+no road constraints, an ODE45 plant and 31 clearance samples per hold. The
+6-mm column is that report's campaign, whose source differs from this one only
+in the margin.
+\begin{center}\footnotesize
+\begin{tabular}{rlrrrrrrrr}
+\toprule
+ & & \multicolumn{2}{c}{Min gap (m)} & \multicolumn{2}{c}{Recovered at (s)} & \multicolumn{2}{c}{Final $e_y$ (m)} & \multicolumn{2}{c}{5~cm}\\
+Speed & Scenario & 6~mm & 5~cm & 6~mm & 5~cm & 6~mm & 5~cm & relaxed & restarts\\
+\midrule
+8 & headOn & 0.583 & 0.603 & 49.00 & 57.10 & 0.0 & 0.0 & 0 & 0\\
+8 & acceleratingHeadOn & 0.368 & 0.430 & 52.30 & 62.65 & 0.0 & 0.0 & 0 & 0\\
+8 & brakingLead & 1.060 & 1.062 & 52.90 & 43.85 & 0.0 & 0.0 & 0 & 0\\
+8 & crossing & 0.699 & 0.742 & --- & --- & $-621.1$ & $-621.0$ & 0 & 0\\
+8 & turningCrossing & 0.411 & 0.440 & --- & --- & $-124.4$ & $-97.5$ & 0 & 0\\
+8 & curvedHeadOn & 0.664 & 0.707 & --- & --- & $-72.6$ & $-72.3$ & 0 & 0\\
+8 & curvedCrossing & 0.545 & 0.589 & --- & --- & 25.5 & 25.4 & 0 & 0\\
+15 & headOn & \textbf{0.000} & 0.035 & --- & --- & 0.0 & 0.0 & 5 & 0\\
+15 & acceleratingHeadOn & \textbf{0.000} & 0.031 & --- & --- & 0.0 & 0.0 & 0 & 0\\
+15 & brakingLead & 0.655 & 0.710 & --- & --- & $-232.5$ & 0.0 & 0 & 0\\
+15 & crossing & 0.381 & 0.409 & --- & --- & $-627.4$ & $-629.0$ & 0 & 0\\
+15 & turningCrossing & 0.081 & 0.128 & --- & --- & 471.6 & 521.9 & 0 & 0\\
+15 & curvedHeadOn & 0.780 & 0.854 & --- & --- & $-26.2$ & $-27.0$ & 0 & 1\\
+15 & curvedCrossing & 0.153 & 0.151 & --- & --- & $-139.9$ & $-139.6$ & 0 & 1\\
+\bottomrule
+\end{tabular}\end{center}
+``Relaxed'' counts frames whose PCBF optimum exceeds $10^{-5}$. No control
+call was aborted in either campaign.
+
+\section{Findings}
+\paragraph{Both collisions are gone in this campaign.} Every case keeps
+positive clearance for the full 80~s or until recovery. The smallest gaps are
+the two 15-m/s head-on cases, 35.5 and 31.4~mm.
+
+\paragraph{The margin is absorbing inter-sample dips, not removing them.} The
+closest approaches still fall between sample times:
+\begin{center}\footnotesize
+\begin{tabular}{lrrr}
+\toprule
+15~m/s & Minimum at hold start/midpoint (mm) & Continuous minimum (mm) & Time (s)\\
+\midrule
+headOn & 48.0 & 35.5 & 1.105\\
+acceleratingHeadOn & 77.5 & 31.4 & 1.067\\
+\bottomrule
+\end{tabular}\end{center}
+In accelerating head-on, clearance falls 46~mm below the smallest sampled
+value. The distance Lipschitz bounds measured in the root-cause report allow
+up to 0.26--0.29~m between samples, so 5~cm is an empirical margin for these
+fixtures, not a guarantee. A faster or more rotational encounter can still
+produce contact. A continuous-time or interval constraint remains the
+structural fix.
+
+\paragraph{The larger margin occasionally requires relaxation.} In 15-m/s
+head-on, five calls from 0.85 to 1.10~s return a PCBF optimum up to 0.0020.
+These plans accept up to about 2~mm less than the 5-cm buffer at constrained
+samples; the minimum sampled clearance is 48.0~mm. In the earlier probe, a
+0.30-m margin made 15-m/s accelerating head-on unsolvable at 0.15~s, so the
+margin cannot be raised freely.
+
+\paragraph{Recovery is not fixed, as expected.} The non-recovery mechanism (a
+trust region centered on an undetermined shifted plan) does not depend on the
+margin. The same three 8-m/s cases recover. Their times change from 49.00,
+52.30 and 52.90~s to 57.10, 62.65 and 43.85~s. 15-m/s brakingLead now ends on
+the path laterally, but its speed error of $-0.23$~m/s still fails the
+recovery tolerance. The 15-m/s head-on speed cycle remains. The other cases end
+within a few metres of their 6-mm final lateral errors, except 8-m/s
+turningCrossing and 15-m/s turningCrossing, which differ by tens of metres.
+Neither is near the path.
+
+\section{Limits and artifacts}
+Results are nominal closed loops with exact observations and a known target.
+The campaign partitions ran concurrently; no call approached the 5-s budget
+(maximum 1.06~s), so the outcomes are load independent. The bundle
+\path{report/COLLISION_MARGIN_5CM_20261001/} holds the comparison and
+closest-approach tables, test results, methods, logs and a manifest. Full
+traces remain in \path{/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/}.
+\end{document}

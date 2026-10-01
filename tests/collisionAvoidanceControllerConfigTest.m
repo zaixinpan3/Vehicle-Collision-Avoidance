@@ -60,9 +60,9 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             testCase.verifyError(@()collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',0))), ...
                 'collisionAvoidanceController:invalidConfiguration');
         end
-        function smallDefaultCollisionBufferCanBeExplicitlyDisabled(testCase)
+        function defaultCollisionBufferCanBeExplicitlyDisabled(testCase)
             cfg = collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0.006);
+            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0.05);
             cfg = collisionAvoidanceControllerConfig( ...
                 struct('collision', struct('safetyMarginMeters', 0)));
             testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0);
@@ -85,7 +85,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
         end
 
         function encounterRangeMustExceedTheCollisionBuffer(testCase)
-            for range = [-1, 0, NaN, 0.006]
+            for range = [-1, 0, NaN, 0.05]
                 testCase.verifyError(@() collisionAvoidanceControllerConfig( ...
                     struct('collision', struct('encounterRangeMeters', range))), ...
                     'collisionAvoidanceController:invalidConfiguration');

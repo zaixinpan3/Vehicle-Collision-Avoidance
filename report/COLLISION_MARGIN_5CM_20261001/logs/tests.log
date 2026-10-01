@@ -1,0 +1,48 @@
+Running twoStagePredictiveControlTest
+.......... .
+Done twoStagePredictiveControlTest
+__________
+
+Running clfNominalRecoveryTest
+........
+Done clfNominalRecoveryTest
+__________
+
+Running nonlinearPredictiveSafetyTest
+.......... .......... .......... .......... ..........
+.......... ..
+Done nonlinearPredictiveSafetyTest
+__________
+
+Running terminalContinuationTest
+.......... .......... ........
+Done terminalContinuationTest
+__________
+
+Running freePoseTerminalTest
+.......... .
+Done freePoseTerminalTest
+__________
+
+Running collisionAvoidanceControllerConfigTest
+.......... .......... .......... .......... ..........
+.......... ...
+Done collisionAvoidanceControllerConfigTest
+__________
+
+Running controllerSourceBudgetTest
+.
+Done controllerSourceBudgetTest
+__________
+
+Running movingTargetFlowTest
+........
+Done movingTargetFlowTest
+__________
+
+Running controllerKernelTest
+........
+Done controllerKernelTest
+__________
+
+TESTS passed=200 failed=0 incomplete=0 total=200

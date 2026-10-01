@@ -60,8 +60,10 @@ and a relaxed first-step CLF constraint. Road boundaries are excluded.
 
 There is one nonnegative collision slack $\xi_i$ per primary-horizon stage.
 It relaxes that stage's start and midpoint separation rows. Completion-tail
-collision rows are hard. The configured 6-mm geometric buffer is retained
-in the affine separation rows. A positive slack relaxes that buffer.
+collision rows are hard. The configured 5-cm geometric buffer is retained
+in the affine separation rows. A positive slack relaxes that buffer. The
+buffer applies at the sampled rows only; it is not a continuous-time
+clearance bound between them.
 
 The nominal CLF remains referenced to the given path and desired cruise speed,
 independently of terminal placement. With $V_k=e(x_k)^T P e(x_k)$ and the

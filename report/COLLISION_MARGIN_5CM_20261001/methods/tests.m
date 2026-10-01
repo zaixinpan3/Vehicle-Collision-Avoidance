@@ -1,0 +1,9 @@
+cd('/home/zai/Downloads/ResearchProjects/collisionAvoidance');
+files={'tests/twoStagePredictiveControlTest.m','tests/clfNominalRecoveryTest.m', ...
+    'tests/nonlinearPredictiveSafetyTest.m','tests/terminalContinuationTest.m', ...
+    'tests/freePoseTerminalTest.m','tests/collisionAvoidanceControllerConfigTest.m', ...
+    'tests/controllerSourceBudgetTest.m','tests/movingTargetFlowTest.m','tests/controllerKernelTest.m'};
+results=runtests(files);
+T=table(results);writetable(T(:,1:5),'/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/tests.csv');
+fprintf('TESTS passed=%d failed=%d incomplete=%d total=%d\n',nnz([results.Passed]),nnz([results.Failed]),nnz([results.Incomplete]),numel(results));
+for k=find([results.Failed]|[results.Incomplete]),fprintf('NOTPASSED %s\n',results(k).Name);end

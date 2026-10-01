@@ -1,0 +1,31 @@
+A 5-cm sampled collision margin -- October 1, 2026
+
+Change: config/collisionAvoidanceControllerConfig.m default
+collision.safetyMarginMeters 0.006 -> 0.05 m (plus a comment), the matching
+configuration test, and one paragraph of controller/PCBF_CLF_ARCHITECTURE.md.
+Base: commit 9fab3c4781499b49f3e387e3d722ebc37d2b2cee (controller of 5f74977).
+
+Raw directory: /home/zai/.cache/collisionAvoidance/margin-5cm-20261001
+Frozen source: <raw>/source (source.sha256 checked after the campaign: all OK).
+
+Tests: methods/tests.m runs the nine controller test classes of the RTI change
+(200 passed, 0 failed); python3 -m pytest -q tests/auditJointPredictiveSafetyTest.py
+(20 passed).
+
+Campaign: methods/campaign.m in four concurrent single-thread MATLAB R2026a
+processes, matlab -singleCompThread -batch "part=P;parts=4;run('<raw>/campaign.m')",
+P = 0..3. Each case calls runNonlinearPredictiveSafetyValidation(Scenarios=NAME,
+Frames=1600, ControllerConfiguration=struct('referenceSpeed',S,'controller',
+struct('horizonSteps',N)), RequireCollisionThreat=true, RecoveryDwellSeconds=5)
+for S/N = 8/8 and 15/16 and the seven collisionThreatScenario fixtures. The margin
+comes from the new default. Exact state, known target motion, no road constraints,
+no noise or random draws, ODE45 plant with 31 clearance samples per hold.
+
+comparison.csv: methods/compare.py against the 6-mm campaign stored under
+/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/campaign
+(report/RTI_FAILURE_ROOT_CAUSES_20261001). closest-approach.csv:
+methods/closest.m, minimum rectangle distance over all 31 audit samples per hold
+and over the hold-start and midpoint samples only.
+
+Maximum controller call 1.06 s, so no call reached the 5-s budget. Full JSON/MAT
+traces stay in the raw directory; manifest.json hashes them.

@@ -1,0 +1,312 @@
+{
+  "kind": "Source, bundle and raw-artifact hashes; no weekly or monthly report hashes",
+  "baseCommit": "9fab3c4781499b49f3e387e3d722ebc37d2b2cee",
+  "sources": [
+    {
+      "path": "config/collisionAvoidanceControllerConfig.m",
+      "sha256": "d4eb4493b67a8478f843f7117562a6608d45bb120d7a0fdf9a238d1554d5ad43",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "7c85307ed34fc750ad703333fd9168467acb42bf68b143576e442b1f21e450e2",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "8f2a656cccc0d4b78df462f7476c8968c1de13964b4673e4ca348d12752381b1",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/nonlinearBicycleModel.m",
+      "sha256": "7ea8e251b8b15d9f714e5bba91da7558a6cb6806e76717c78410c48fe56a7882",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/modifiedFialaTire.m",
+      "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/readControllerInputs.m",
+      "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "controller/laneGeometry.m",
+      "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "611692320c748777e9dfdb0d13def74657282f427e8cba3731ac7137ce78ca39",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "scripts/collisionThreatScenario.m",
+      "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+      "identicalToWorkingTree": true
+    },
+    {
+      "path": "tests/collisionAvoidanceControllerConfigTest.m",
+      "sha256": "0f6c8f60d4f4df88b9225aa882c60d980ef2955bed3a5327233542e27cc67013",
+      "identicalToWorkingTree": true
+    }
+  ],
+  "bundle": [
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/REPRODUCTION.txt",
+      "sha256": "4c732962add0e567664d2cfc521245d5112c5a89429c6578d79d1458a8e4a047"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/closest-approach.csv",
+      "sha256": "e66d81b41fac2d186b1f601be09c39d9042010782907000de40577194fbaeff3"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/comparison.csv",
+      "sha256": "b7090dcf2b2250bfdde08756479d3d0abe72fd48ecd1465c7770cad7c44c3a17"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/logs/campaign-0.log",
+      "sha256": "65f196313df36a04423f4be85cdcb7997a770c09feff0bdd70a6956f330b621d"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/logs/campaign-1.log",
+      "sha256": "526bd686e2869ca9c6257255a0fe98958111cfde5a4049ff192ce3069ff8e940"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/logs/campaign-2.log",
+      "sha256": "a2657e0cb469473586030439645d216127221652c1b59191f8df5ff2d80c8300"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/logs/campaign-3.log",
+      "sha256": "01bd90ce3e89534233ccc7c62b7ef38ddffb02786094571dc138c2c73a6b4926"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/logs/tests.log",
+      "sha256": "c1d835b000bb936049e06ba9b4ecd6bcd58a0a62ddab7f44a10fb4cb14a2c698"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/methods/campaign.m",
+      "sha256": "d500d43cfd82df992817e4f377538ff074b665fddb51e1392d2208708cec55cb"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/methods/closest.m",
+      "sha256": "52721e7471d71fc3f6253c8cdb97965ba430054bb18d67a5380d393bcfd2c347"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/methods/compare.py",
+      "sha256": "50d846639b498fd0d8b5c26f59e5c4727097ef54d51dbbd5155717f1e1140731"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/methods/tests.m",
+      "sha256": "36de32b79cde5a44ce24dd509a50167990d06dad1bcc9b71b89e9f70135305c3"
+    },
+    {
+      "path": "report/COLLISION_MARGIN_5CM_20261001/tests.csv",
+      "sha256": "9f5b8cc663cfb23be496ef183522d128af4c3798f925647cd91a710f9a27417b"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/acceleratingHeadOn.json",
+      "sha256": "47d6f3dce99cd1c129765e2467aaa16d386b0b5d7e869077043ee5f08a90e66d",
+      "bytes": 15209167
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/brakingLead.json",
+      "sha256": "740450fa59cd1153d75564f93e6f4699f539f9c1b3759febe1b1d58e968fdc4d",
+      "bytes": 13140347
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/crossing.json",
+      "sha256": "4d9b404caa6c188af34f9aa4fce299b872b46e01226be09106e0b5378e6cf157",
+      "bytes": 14516723
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/curvedCrossing.json",
+      "sha256": "2376edb2920ffb1d0f0fa5786f6e8e48fe32db204db1e5132bb06eaada35e898",
+      "bytes": 16129379
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/curvedHeadOn.json",
+      "sha256": "6c0f2ecf37a3736356c82f8fce63f96e83fddbe515dfa5baf3d222afa98e83a6",
+      "bytes": 16217227
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/headOn.json",
+      "sha256": "5a53bf0f3cbbdacb8d32b632406a249a6af9493cab11caea90d89bced09a9294",
+      "bytes": 15128294
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/turningCrossing.json",
+      "sha256": "69f2861f4d7a9244d2b62480a1e3d531ccc431b45f7e119d39274ef3acfd20eb",
+      "bytes": 14590411
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/acceleratingHeadOn.json",
+      "sha256": "0a586a1ed38a05294979db3dc8b0944ac01555a98d50da7ddcbe601196f89007",
+      "bytes": 12852164
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/brakingLead.json",
+      "sha256": "2c28019e6d06cf5c0787ae19a5fb320697f20748a084fc3128653b15f1f42373",
+      "bytes": 8628101
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/crossing.json",
+      "sha256": "7ba8c4e0699924529eb3a052896bdb46df4634cf08d600b1b9901589debd0b79",
+      "bytes": 14822070
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/curvedCrossing.json",
+      "sha256": "ab1175fa68479bccf4909777424df86ea3bcc4db5ee3a289310fb9fafb3e1ffa",
+      "bytes": 16346800
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/curvedHeadOn.json",
+      "sha256": "6e1dee6e927c7cce8a786c8e7db0b8ede58913775baf8ebfbd2401e4f1986c2b",
+      "bytes": 16356134
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/headOn.json",
+      "sha256": "723aeb6c9688d69b182f297ed0a42c37905dc0ef2d89ce333106024c34e7097d",
+      "bytes": 12072871
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/turningCrossing.json",
+      "sha256": "717e9c0f49d82ef059de9aac1069cdfcec9ded848210bc390e9570a6e4905cb8",
+      "bytes": 14681627
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/acceleratingHeadOn.mat",
+      "sha256": "5144327e5d10d6d60130d8653b0574f62f99302a8137e060cb01cb8116bbde94",
+      "bytes": 58865650
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/brakingLead.mat",
+      "sha256": "b08e2359187ff1e66a52244b13040619cc0b1dcb8d547e69b901153d509ccd34",
+      "bytes": 58507855
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/crossing.mat",
+      "sha256": "ba8b91915daff38ab8b4dcc6115cd429d26540f723476a2c10f6f61287348778",
+      "bytes": 58343386
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/curvedCrossing.mat",
+      "sha256": "3fb79b2b287e0f55b06d96c70a987ce8d37efe9dbe12863ed583e5adb79594cd",
+      "bytes": 60137945
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/curvedHeadOn.mat",
+      "sha256": "d2e3cdc4d6bf0036b6a09a5720a3532f61810f77cdbc1fa4e1a6180bb0835958",
+      "bytes": 60068706
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/headOn.mat",
+      "sha256": "2237e524b130f6cac714859076d6bdb50544a849b7ed6e66257f98b86fc12dba",
+      "bytes": 58694024
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed15/turningCrossing.mat",
+      "sha256": "413e3f8b232bab74ed3899f6f876794e17008caf94ba00cef1594b3a6eb42df3",
+      "bytes": 59283311
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/acceleratingHeadOn.mat",
+      "sha256": "702dbf18238876da5c0a1dac0ae1b2576faec2803abbd34ee66ec688be5d8811",
+      "bytes": 46106269
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/brakingLead.mat",
+      "sha256": "1dcd8e37df23bfc46756a8e5d3727818eab92ab980a810cb049e17ae15bdf84e",
+      "bytes": 31916659
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/crossing.mat",
+      "sha256": "40349d243f89be06d15267d837bfc6ab4c94589d42d15ed453377de74a178f53",
+      "bytes": 58370718
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/curvedCrossing.mat",
+      "sha256": "42d670c2a0aecd5d243bb670437adfae23acb4cd9ae2120f0092a50097cafd0b",
+      "bytes": 60117150
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/curvedHeadOn.mat",
+      "sha256": "d5f66f604df311db1a5dd1776b676b2d5378e43e28fc0e133223fbc251dac444",
+      "bytes": 60042873
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/headOn.mat",
+      "sha256": "9291d4d97f961b802c0d864e16ea33e3e0a35e81df22a72d63a081224f53d36e",
+      "bytes": 41436421
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign/speed8/turningCrossing.mat",
+      "sha256": "c16feb0a844ea6a999082673db20fb99e5ff06f639eeb6d0d08502cc3e716912",
+      "bytes": 59311897
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/source.sha256",
+      "sha256": "340f6ca1cba3abcad4d21a0f0e277ddeee74bbb7af6795a8f6fbbd44cfe3ff54",
+      "bytes": 1861
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/change.diff",
+      "sha256": "cf64f624c172cadf443e89fa2d1ee46a6812419faf145ebdda140acd5218817b",
+      "bytes": 3695
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign-0.log",
+      "sha256": "c8be4b329b020a4cfd8263a9dd6e4608e1e7c43ef4da80d8e9b391a00b60367c",
+      "bytes": 123147
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign-1.log",
+      "sha256": "276e9adae0a86403c53b67891759d82eea90ce12e705fdc2fbeb5e681a05105e",
+      "bytes": 125795
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign-2.log",
+      "sha256": "c3b49698b975ab3bd9df6d7b24dafdd6bc0302f1f6b80e39fe0f55bcd2f9a701",
+      "bytes": 82046
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/campaign-3.log",
+      "sha256": "195e9e089fe144b2f7eb39c262677d88db95fbd34b40bf7385447a5bfbb02ce4",
+      "bytes": 95337
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/tests.log",
+      "sha256": "c1d835b000bb936049e06ba9b4ecd6bcd58a0a62ddab7f44a10fb4cb14a2c698",
+      "bytes": 973
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/closest-approach.csv",
+      "sha256": "e66d81b41fac2d186b1f601be09c39d9042010782907000de40577194fbaeff3",
+      "bytes": 1299
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/comparison.csv",
+      "sha256": "08a99281415e1d09c5de7b67c6e73ca691b0f1cf0c0a897226f5cc87ed68252f",
+      "bytes": 4530
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-5cm-20261001/tests.csv",
+      "sha256": "9f5b8cc663cfb23be496ef183522d128af4c3798f925647cd91a710f9a27417b",
+      "bytes": 22462
+    }
+  ]
+}
