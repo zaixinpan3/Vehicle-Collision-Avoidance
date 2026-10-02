@@ -1,0 +1,291 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,longtable,microtype,xurl,hyperref}
+\setlength{\emergencystretch}{3em}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Worst-Frame Runtime: Diagnosis and a Measured Route Toward Fast PCBF/CLF Control}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}\maketitle
+
+\section{Finding and scope}
+The longest recorded call is the 15 m/s braking-lead encounter at 5.90 s:
+2.952268 s. Its first completed PCBF/CLF pair already meets the implemented
+prediction-accuracy thresholds and predicts a collision-free frozen-input
+continuation in a subsequent dense numerical audit. Seven additional pairs
+are not needed to obtain that first observed collision-free candidate. They
+are triggered by positive CLF slack at the numerical first-input correction
+boundary. Expensive repeated convex solves, rather than flow construction
+or nonlinear prediction evaluation, dominate the call.
+
+The investigation exactly replays all 119 calls through that hold, with zero
+maximum applied-input difference from the original campaign. It captures the
+16 convex subproblems, profiles the complete call, and benchmarks isolated
+solver and iteration changes. Production controller source is unchanged.
+These are diagnostic experiments and design recommendations, not an
+announcement that the online controller now meets 0.1 s or that all scenarios
+are safe. The original crossing intersample collision remains unresolved.
+
+\section{Measured cost and structure}
+The original unprofiled call has these disjoint components:
+\begin{center}\begin{tabular}{lr}\toprule Component & Seconds\\\midrule
+PCBF solves & 0.589896\\
+CLF solves & 2.149130\\
+Formulation excluding CLF construction & 0.096662\\
+CLF construction & 0.092109\\
+Nonlinear prediction agreement & 0.015625\\
+Initialization & 0.000699\\
+Other bookkeeping & 0.008147\\\bottomrule\end{tabular}\end{center}
+CLF solves account for approximately 72.8\% of the call; the two solver
+stages together account for 92.8\%. Removing prediction evaluation would
+save only about 0.5\%, while removing the mechanism that controls model error.
+The source already uses compiled bicycle and nominal-value kernels.
+
+The horizon contains 76 holds: 16 prefix holds and 60 completion holds,
+covering 3.8 s. Each primary has 630 decision variables, 462 dynamic
+initial-condition/equality rows, and 1069 linear inequality rows before
+variable bounds. The secondary has 632 variables, 1070 such inequalities,
+and second-order cones of dimensions 6, 6 and 154. The large cone represents
+the squared input-increment regularizer. Both phases start fresh numerical
+solves; shifting a nonlinear reference trajectory is not reuse of an
+interior-point iterate or factorization.
+
+The exact replay reports 137 primary and 242 secondary interior-point
+iterations, 379 in total. The observed linear-system method is
+\texttt{augmented} in MATLAB R2026a Update 3. Profiling attributes 2.867 s
+of its instrumented call to \texttt{coneprog}/\texttt{interiorPointMethod};
+profile overhead means this number must not replace the original runtime.
+The nominal CLF kernel is called 88 times and takes approximately 0.101 s
+under the profiler. It is a secondary optimization target, not the main cause
+of the multi-second call.
+
+The CLF successor value depends on only the first two inputs, but those inputs
+must admit a constrained future trajectory. It is consequently not valid to
+discard the completion variables and solve an unconstrained two-variable QP.
+The endpoint ellipsoid and CLF epigraph are quadratic constraints; the whole
+second stage is not a linearly constrained QP merely because its local value
+model is quadratic.
+
+\section{Why the eight rounds are repeated}
+The first round's maximum body-pose prediction discrepancy is 1.693 mm,
+below the configured 10 mm threshold. Every later round also meets the
+threshold. The inherited input trust scale is 0.138209, so its steering
+correction is limited to about $\pm0.010366$ rad around the current anchor.
+The same small radius is retained within the frame even after agreement is
+excellent; its growth rule applies only after a frame has been accepted.
+
+\begin{center}\small\begin{tabular}{rrrrr}\toprule
+Round & PCBF optimum & Modeled CLF slack & Body error (mm) & Solve time (s)\\\midrule
+1 & $1.02\,10^{-8}$ & 68.8788 & 1.693 & 0.3538\\
+2 & $8.08\,10^{-9}$ & 68.2901 & 0.918 & 0.3282\\
+3 & $4.62\,10^{-9}$ & 67.9730 & 0.456 & 0.3135\\
+4 & $7.80\,10^{-10}$ & 67.7911 & 0.074 & 0.3374\\
+5 & $7.07\,10^{-10}$ & 67.6795 & 0.046 & 0.3421\\
+6 & $8.76\,10^{-9}$ & 67.6058 & 0.158 & 0.3420\\
+7 & $4.72\,10^{-9}$ & 67.5541 & 0.278 & 0.3174\\
+8 & $1.50\,10^{-7}$ & 67.5540 & 0.011 & 0.4047\\\bottomrule\end{tabular}\end{center}
+The retained candidate is round seven. The total modeled CLF-slack
+improvement over round one is about 1.325, or 1.92\%. Round eight no longer
+hits the first-input correction boundary and does not improve the retained
+nonlinear result. Positive slack alone does not establish that a further
+iteration can achieve zero slack or is necessary for safety.
+
+An independent ODE45 rollout of each complete frozen input sequence uses
+relative tolerance $10^{-11}$, absolute tolerance $10^{-12}$, and 31 output
+samples per 50 ms hold. Round one's minimum observed clearance over all
+76 holds is 0.099685 m; round seven's is 0.099241 m. Their first-hold minima
+are 0.099843 and 0.099771 m. These observed clearances do not constitute a
+continuous-time certificate or prove recovery after switching the entire
+closed-loop implementation to one round.
+
+\section{Exact primary optimality without a numerical solve}
+Let the primary objective be $J_s=\sum_i\xi_i$, with $\xi_i\ge0$. If the current
+anchor satisfies every constraint with $d=0$ and $\xi=0$, then
+\[
+ 0\le J_s^\star\le J_s(0,0)=0.
+\]
+The primary optimum is known exactly in the mathematical model. A new
+interior-point solve provides no additional optimality information. The
+secondary CLF problem still has to be solved.
+
+In captured rounds two through seven, the zero correction satisfies all
+linear inequalities, equality defects, bounds and the endpoint cone. Thus
+six of the eight primary optimizations admit this certificate. Round one's
+anchor violates the terminal cone by approximately $9.81\,10^{-4}$, so it
+cannot use this shortcut. Round eight has a positive linear residual of
+approximately $1.26\,10^{-6}$ and also lacks this zero-anchor certificate.
+The certificate concerns the complete convex primary, not just the collision
+rows, and is not a nonlinear safety certificate.
+
+An isolated implementation of this exact test reduces numerical conic calls
+from 16 to 10. It continues to solve the CLF stage in every round. This is
+algebraic completion of the primary optimization, not a backup policy or
+omission of the second objective.
+
+\section{Equivalent convex expressions and solver measurements}
+The current secondary objective is
+\[
+ \min\ \bar\rho+\varepsilon\sigma,\qquad
+ \|W\Delta U\|_2^2\le\sigma\le1.
+\]
+Its input boxes imply $\|W\Delta U\|_2^2\le1$, with the normalization already
+used by the controller. Therefore the epigraph variable and its 154-dimensional
+cone can be eliminated exactly in the projected feasible set:
+\[
+ \min\ \bar\rho+\varepsilon\Delta U^T W^T W\Delta U.
+\]
+The remaining endpoint and CLF cones stay. A solver supporting quadratic
+objectives can represent this expression directly; the PCBF priority and
+penalty relative to the linearization inputs are unchanged.
+
+All 16 captured problems were solved five times per representation through
+the compiled Clarabel 0.11.1 Python binding, using one thread. Each repetition
+creates a fresh solver and includes matrix conversion, construction and solve
+time. No warm-start benefit is assumed.
+\begin{center}\small\begin{tabular}{lrr}\toprule
+Representation & Sum of per-problem medians (s) & Solve only (s)\\\midrule
+Same conic epigraphs & 0.367088 & 0.307370\\
+Native quadratic regularizer & 0.307435 & 0.251810\\\bottomrule\end{tabular}\end{center}
+Every solve in these two comparisons returns \texttt{Solved}. The largest
+residual after reconstructing the original constraints is
+$1.23\,10^{-11}$. The largest absolute objective difference from the captured
+MATLAB points is $1.18\,10^{-6}$ in their original scaled convex objectives.
+These are numerical agreement results, not bitwise-identical optimizer
+trajectories.
+
+The original solver sum was 2.739026 s. The 0.307435 s alternative is a
+sum of medians for fixed captured problems, not an end-to-end new controller
+measurement. Even adding the original non-solver time optimistically would
+leave roughly 0.52 s. Solver replacement alone cannot establish a 0.1 s
+controller deadline.
+
+Other measured alternatives were unfavorable. Selecting MATLAB
+\texttt{normal} or \texttt{schur}, or converting the small dense cone data
+to sparse storage, did not provide a comparable speedup; some final
+secondary solves returned a stalled status. Full state elimination reduced
+variables but densified long-horizon constraints and increased representative
+solves to approximately 1.03--1.14 s. Blindly reducing the number of variables
+is not the same as exploiting the dynamic block structure.
+
+A further diagnostic fixed all prefix slacks to zero. This is justified only
+when zero primary optimality has been established. The final captured model
+instead returns \texttt{PrimalInfeasible}; its finite numerical certificate
+must not be treated as a control trajectory. Thus the observed near-zero
+primary values do not justify universally dropping all safety slack variables.
+For the certified zero cases, eliminating them expresses the exact
+lexicographic optimum, but differs from the existing $10^{-6}$ tie allowance.
+
+\section{Measured full-frame counterfactuals}
+Each cached prototype was evaluated three times at the identical measured
+state and previous-plan fixture. These timings include the controller call;
+offline audits are excluded.
+\begin{center}\small\begin{tabular}{lrrrr}\toprule
+Prototype & Median (s) & Rounds & Conic calls & CLF slack\\\midrule
+Original & 3.052923 & 8 & 16 & 67.5541\\
+Certified primary shortcut & 2.548748 & 8 & 10 & 67.5542\\
+Shortcut and adaptive radius & 1.658542 & 5 & 8 & 67.4694\\
+Stop at first accurate complete pair & 0.408166 & 1 & 2 & 68.8788\\\bottomrule\end{tabular}\end{center}
+The adaptive-radius diagnostic expands the input correction scale within the
+frame when the prediction-error ratio is at most 0.25 and the first-input
+box is active, using $\min(2,0.8/\sqrt r)$ and a maximum nominal scale of one.
+It retains ordinary accuracy checks and contracts inaccurate steps as before.
+It produces slightly lower CLF slack in five rounds; its frozen-input minimum
+observed clearance is 0.098142 m. This is evidence of an avoidable small-step
+obstruction in this frame, not a uniform iteration bound.
+
+The one-round diagnostic is deliberately not adopted. Earlier closed-loop
+experiments showed that stopping at an accurate but bound-limited CLF step
+can repeatedly shift to an unhelpful future-input reference and prevent
+nominal recovery. A fast safe first hold does not establish successful
+long-term recovery. Each local convex CLF problem must still be optimized;
+what needs redesign is when to rebuild and solve the entire problem again.
+
+\section{Recommended mathematical design}
+The evidence supports one lexicographic controller with the following changes,
+in this order:
+\begin{enumerate}
+\item Preserve both objectives and exploit known lower bounds. Use a feasible
+zero-slack primal point to complete the PCBF minimization analytically. If that
+certificate is unavailable, solve the primary normally. Never infer optimality
+or safety from a finite failed-solver array.
+\item Use the native quadratic regularizer and a compiled sparse conic solver.
+Preserve the dynamic block structure. Reuse fixed-size matrix storage and
+symbolic structure when possible; do not conflate this with an unsupported
+primal/dual warm-start interface. A C/MEX integration needs its own complete
+controller benchmarks.
+\item Adapt the trust radius during the frame using actual versus predicted
+model agreement. Positive CLF slack and contact with an artificial box are not
+sufficient reasons to repeat up to eight small identical steps. Examine
+constraint activity and useful predicted improvement. After an accurate
+completed pair, spend further work only on repairing a material model defect
+or obtaining meaningful additional dissipation. A stopping rule must be
+validated specifically against the earlier loss-of-recovery regressions.
+\item Couple optimization accuracy to control accuracy. Keep feasibility
+accuracy distinct from objective optimality. Near nominal behavior, the
+allowed CLF/model error must shrink relative to the required Lyapunov decrease;
+a fixed loose slack tolerance would only support practical convergence.
+The current CLF model permits a 0.01 scaled prediction discrepancy while its
+convex solver targets an approximately $10^{-8}$ optimality tolerance. This
+mismatch motivates a derived inexact-solve criterion, not arbitrary loosening
+of collision feasibility.
+\item Close the temporal safety gap with interval-aware geometry. Faster
+node optimization cannot repair the separately observed crossing collision.
+For an available bound $L$ on distance variation over a constraint interval,
+\[
+ d(t)\ge\min\{d(t_j),d(t_{j+1})\}-L\Delta t/2.
+\]
+Model error and safety slack must also be covered by the available margin.
+Conservative bounds or local temporal refinement are needed where this reserve
+is insufficient. Critical-interval rows can be refined without uniformly
+multiplying the entire horizon's state and input variables. The bound must be
+valid over the trial region; sampled velocities alone are not such a proof.
+\end{enumerate}
+
+For the first captured pair, the native-quadratic convex calls cost about
+0.038 s including setup, compared with approximately 0.354 s of original
+solver time. Combined with roughly 0.025 s of formulation and other work,
+this suggests that a useful complete pair within 0.1 s is plausible in this
+frame. It is an estimate from separately measured components, not a measured
+integrated latency, and it does not cover repeated restoration or cold starts.
+A uniformly successful two-round policy has not been demonstrated.
+
+The next implementation experiment should first integrate the two equivalent
+changes and measure all fourteen closed-loop cases with the existing nonlinear
+accuracy rules. Then evaluate the stopping/trust update jointly with recovery
+and interval clearance. Acceptance requires collision avoidance, eventual
+nominal recovery, and measured full-call latency, including difficult frames
+and initialization. The 50 ms nominal sampling period and any actual computation
+delay must also be represented consistently. No backup controller or second
+CLF is required by the proposed changes. A fixed iteration cap alone proves
+neither existence of a safe returned solution nor a wall-clock deadline.
+
+\section{Reproducibility and references}
+The baseline is project commit
+\path{660a4cdd0875c8650665609ff48bb8cc746e1409}. The adjacent evidence directory
+contains round diagnostics, all benchmark repetitions, offline audits, and
+source/input hashes. The exact fixture, captured matrices, profiler data,
+helper source and cached experimental solver copies are retained in the
+external experiment export. The isolated Python environment and solver
+vendor tree are excluded. No production implementation change or new full
+closed-loop campaign is included in this analysis. No MATLAB unit-test rerun
+was needed for an unchanged controller.
+
+Complete recorded validation includes 119 exact replay calls, 108 MATLAB and
+240 Clarabel frozen-problem benchmark calls, twelve timed prototype controller
+calls, and frozen-input ODE45 audits. Solver failures and the infeasible
+zero-slack experiment are retained rather than counted as successful controls.
+All measurements use a desktop AMD Ryzen 7 7800X3D host; MATLAB uses
+\texttt{-singleCompThread}. The host is not an isolated real-time target.
+
+The official \href{https://www.mathworks.com/help/optim/ug/coneprog.html}{MATLAB
+coneprog documentation} describes the conic interface and linear-system
+choices. Its live page currently describes R2026b; this study's actual
+solver choices and outputs come from the installed R2026a implementation.
+The official \href{https://clarabel.org/}{Clarabel documentation} describes
+quadratic-objective conic problems. Its
+\href{https://clarabel.org/stable/user_guide_data_updating/}{data-update guide}
+requires fixed dimensions and sparsity, unchanged cone definitions, and
+compatible preprocessing settings. Such data updates are not evidence that
+an arbitrary previous primal/dual iterate is accepted as a warm start.
+\end{document}
