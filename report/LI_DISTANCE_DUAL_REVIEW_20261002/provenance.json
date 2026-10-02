@@ -1,0 +1,21 @@
+{
+  "reviewedCommit": "a073453f293ff7f47bcef4b9e92e096a9e13bbc9",
+  "paper": {
+    "path": "reference/Li et al. - 2023 - Real-Time Optimal Trajectory Planning for Autonomous Driving with Collision Avoidance Using Convex O.pdf",
+    "sha256": "29fd61ce9d0f60abf71c2af0a27a25b842efc16849e7e5b16d7e3824d21a5050",
+    "doi": "10.1007/s42154-023-00222-7",
+    "examined": "Section 3.1-3.2, equations (9)-(13), PDF pages 5-6; equation page visually inspected."
+  },
+  "historicalProbe": {
+    "path": "/home/zai/.cache/collisionAvoidance/collision-diagnosis-20261002/primary-18.mat",
+    "sha256": "263ebb34fc1690f9f670587509d694a4bb5bd2f5d4546c69e74a0e3ecfc2b51e",
+    "scope": "Old turning-crossing flow seed, planning time 0.85 s, future node 1.65 s; geometry evaluated with current code. This is not a current closed-loop campaign."
+  },
+  "existingValidation": "report/ORDINARY_DISTANCE_DUAL_20261002.json",
+  "checks": [
+    "Independent rerun of ordinaryDistanceDualTest: 16/16 passed",
+    "Ordinary distance dual and derivative evaluated on strictly overlapping historical anchor",
+    "Coordinate-box upper bound computed independently of dynamics and all other constraints"
+  ],
+  "implementation": "No production code or configuration changed during review."
+}
