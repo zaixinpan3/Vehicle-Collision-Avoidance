@@ -47,6 +47,18 @@ All commands below were run from <frozen source>, MATLAB R2026a.
    curvedDeparture, each with its log in logs/. It writes no-risk-regimes.csv,
    plan-decay.csv, no-risk-trajectories.csv, cancellation.csv and greedy-summary.csv.
 
+5. Follow-up carry-over check (methods/carryForward.m), offline and deterministic:
+     matlab -batch "diary('logs/carryForward.log'); run('<follow-up raw>/methods/carryForward.m'); diary off"
+   with <follow-up raw> = /home/zai/.cache/collisionAvoidance/predictive-clf-20261001.
+   Inputs: the baseline replays <rti>/replay/<scenario>-<speed>-full.mat and the
+   diagnostic third-stage records <rti>/cf/trackingThirdStage-<scenario>-<speed>.mat,
+   <rti> = /home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001 (frozen
+   source of commit 5f74977, 6-mm margin), for the ten runs of that report's third-stage
+   table. All 20 files match the SHA-256 values in
+   report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json. Frames: t >= 2 s, V0 >= 1,
+   zero first-stage optimum; scope "all" and the no-risk subset "noRisk".
+   Output carry-forward.csv; logs/carryForward.log.
+
 Definitions: a frame is free when its encounter-exit index is 0. rho = 0 means
 clfSlack <= 1e-6*max(1,V0). Steering edge: rho > 0 and |delta0 - anchor| > 0.0749.
 Braking edge: rho > 0, steering interior, |b0 - anchor| > 0.1249. Near/far split at

@@ -451,6 +451,127 @@ recovery-consistent rollout. The existing lane-feedback seed is one example.
 curved trim, not the straight one.
 \end{enumerate}
 
+\section{Follow-up: does a predictive CLF carry the decrease forward?}
+The PCBF carries over between frames because of three ingredients:
+\begin{itemize}
+\item every plan node has collision rows;
+\item the plan ends in the cruise core, where cruising continues safely;
+\item each frame starts from the shifted plan with the terminal input appended.
+\end{itemize}
+In the nominal affine model, the shifted plan is therefore again a feasible
+candidate one frame later. Even this is nominal only: the metadata declare
+\texttt{notCertifiedForNonlinearPlant}, and warm problems needed flow restarts
+in both campaigns.
+
+\paragraph{Measurement.} The diagnostic third stage of
+\path{RTI_FAILURE_ROOT_CAUSES_20261001.tex} minimizes $\sum_{j=1}^{M}V(x_j)$ over
+every plan node, subject to both achieved slack levels. It is a predictive CLF
+used as a cost. Its closed loops and the baseline replays come from the same
+source (commit \path{5f74977}, 6-mm margin), with the third stage active from
+0~s. All 20 input records match the hashes in that report's manifest. That
+stage reached the 5-s call budget in 0--25 calls per run and used those finite
+points, so its details can depend on machine load. The
+selected frames have $t\ge2$~s, $V_0\ge1$ and a zero PCBF optimum, so that the
+CLF stages are not overridden by safety; the target may still be within range.
+For each selected frame:
+\begin{itemize}
+\item ``shift meets 1\%'' means the shifted previous plan, rolled out from the
+measured state with zero correction, already meets this frame's one-step
+condition;
+\item $J$ is $\sum_jV$ over the returned plan's nodes, compared with the
+previous frame's value;
+\item ``$V$ falls'' refers to the actual closed-loop hold.
+\end{itemize}
+\begin{center}\footnotesize
+\begin{tabular}{rlrrrrrrrrr}
+\toprule
+ & & \multicolumn{3}{c}{Baseline (one-step CLF)} & \multicolumn{6}{c}{Third stage $\min\sum_jV(x_j)$}\\
+ & & Shift & $J$ & $V$ & & Shift & $J$ & $V$ & Median & Recovered\\
+Speed & Scenario & meets 1\% & falls & falls & Frames & meets 1\% & falls & falls & $V_1/V_0$ & (s)\\
+\midrule
+8 & turningCrossing & 5.8\% & 37\% & 35\% & 22 & 100\% & 100\% & 100\% & 0.852 & 15.80\\
+8 & curvedHeadOn & 7.6\% & 18\% & 17\% & 77 & 69\% & 96\% & 77\% & 0.897 & 13.00\\
+8 & curvedCrossing & 16.7\% & 50\% & 44\% & 56 & 38\% & 80\% & 39\% & 1.008 & 18.05\\
+8 & crossing & 0.0\% & 0\% & 0\% & 24 & 100\% & 100\% & 100\% & 0.855 & 13.00\\
+15 & headOn & 0.0\% & 96\% & 79\% & 17 & 100\% & 100\% & 100\% & 0.768 & 13.00\\
+15 & turningCrossing & 3.1\% & 20\% & 18\% & 24 & 100\% & 100\% & 100\% & 0.826 & 13.25\\
+15 & curvedHeadOn & 6.4\% & 38\% & 41\% & 81 & 74\% & 92\% & 78\% & 0.862 & 13.00\\
+15 & curvedCrossing & 7.6\% & 34\% & 32\% & 27 & 96\% & 80\% & 100\% & 0.790 & 13.00\\
+15 & crossing & 0.0\% & 0\% & 0\% & 32 & 100\% & 100\% & 100\% & 0.814 & 13.00\\
+15 & brakingLead & 4.6\% & 29\% & 33\% & 40 & 18\% & 41\% & 45\% & 1.013 & aborted 4.00\\
+\bottomrule
+\end{tabular}\end{center}
+Baseline columns use 719--1560 frames per run. The baseline median $V_1/V_0$ is
+1.0012--1.0030, except 15-m/s headOn at 0.988. In the third stage, 65--100\% of
+the selected frames are still inside the encounter range: this predictive CLF
+recovers \emph{during} the encounter.
+
+\paragraph{Findings.}
+\begin{itemize}
+\item \emph{With a horizon objective, the decrease does carry over.} In 6 of 10
+runs, the shifted plan alone meets the next frame's 1\% condition in 96--100\% of
+frames. Its median first-hold ratio is 0.77--0.86, against 1.002--1.003 in the
+baseline. $J$ falls in 80--100\% of frames in nine runs, and in eight runs $V$
+falls by a median 10--23\% per hold. Steering-edge frames drop from 83--99\% of
+the selected frames in nine baseline runs to 0--28\%.
+\item \emph{What carries over is the horizon value, not $V$.} In 8-m/s
+curvedCrossing, $J$ falls in 80\% of frames, by a median 4.9\% per frame, while
+$V$ rises in 61\% of frames, by a median 0.8\% per hold. These frames, 2.05 to
+12.70~s, lie inside the encounter while the ego is still manoeuvring, and the
+run recovers at 18.05~s. $V$ need not fall at every hold; that freedom is what a
+turnaround (Section~6) requires.
+\item \emph{The price is paid in safety.} With this stage, 5 of the 9 recovering
+runs touch the target at 1.70--1.85~s, and 8-m/s curvedCrossing again at
+12.45~s. Four contacts fall between samples and one accepts a relaxed PCBF
+row. 15-m/s brakingLead aborts at 4.00~s with no PCBF
+result. These runs used the 6-mm margin and were not repeated with 5~cm.
+\end{itemize}
+
+\paragraph{Why the PCBF form cannot simply be copied.} Requiring
+$V(x_{j+1})\le0.99\,V(x_j)$ at every node fails for four reasons:
+\begin{enumerate}
+\item \emph{It is at least as infeasible as today's condition.} The first of
+these rows is today's condition, so the far-field and wrong-heading
+infeasibility of Section~6 is inherited at every node. A turnaround needs $V$ to
+rise for seconds; the CBF condition, by contrast, is met by simply continuing to
+cruise once the target is clear.
+\item \emph{It is not convex.} For $j\ge1$ both sides depend on decision
+variables, so each row is a difference of convex quadratics. It enters an SOCP
+only through a conservative restriction, for example by linearizing the
+right-hand side at the anchor; since $V$ is convex, that linearization is a
+lower bound.
+\item \emph{The obvious convex envelope is not recursive.} The envelope
+$V(x_j)\le0.99^jV(x_0)$ is convex, but it is not recursively feasible. If the
+first hold decreases $V$ by more than 1\%, the next frame's envelope is tighter
+than the shifted plan's. The envelope must instead be fixed to the previous
+certificate, as a time-indexed funnel or a ``no worse than the shifted
+candidate'' bound.
+\item \emph{Softening removes the recursion.} Slackened rows lose recursive
+feasibility, which is the situation today.
+\end{enumerate}
+
+\paragraph{A form that carries over.} Let stage~2, under the stage-1 cap,
+minimize $J=\sum_{j=0}^{M-1}\ell(x_j,u_j)+V_f(x_M)$, with $V_f$ a CLF for a
+terminal law $\kappa$:
+\[
+V_f(f(x,\kappa(x)))-V_f(x)\le-\ell(x,\kappa(x))
+\quad\text{wherever the plan can end.}
+\]
+\begin{itemize}
+\item If the shifted plan keeps zero PCBF slack, it satisfies the next frame's
+cap and is admissible in stage~2. Then $J^*_{k+1}\le J^*_k-\ell(x_k,u_k)$ in the
+nominal model, and the CLF value decrease composes with the PCBF
+recursion.
+\item Unlike the pose-free cruise core, $V_f$ must refer to the path. From tens
+of metres away, the 3.4--3.8-s plan cannot reach a neighbourhood of the path, so
+$V_f$ must be a cost rather than a constraint, and it must be a valid CLF where
+the plan actually ends. The LQR quadratic is not (Section~6), so this needs a
+guidance-type function with a saturated preferred heading or a longer horizon.
+The third stage above had no such terminal condition, so its decrease is
+empirical.
+\item Model mismatch still applies, as it does to the PCBF.
+\end{itemize}
+
 \section{Limits}
 \begin{itemize}
 \item All closed loops are nominal, with exact state and a known target.
@@ -467,12 +588,14 @@ controllers.
 \section{Artifacts}
 \path{report/CLF_NO_RISK_DISSIPATION_20261001/} contains:
 \begin{itemize}
-\item the regime, cancellation, plan-decay, trajectory, feasibility-map and
-idealized-policy tables;
+\item the regime, cancellation, plan-decay, trajectory, feasibility-map,
+idealized-policy and carry-over (\path{carry-forward.csv}) tables;
 \item every analysis method and log;
 \item reproduction notes;
 \item a manifest of source and raw-artifact hashes.
 \end{itemize}
 The replays (MAT, about 500~MB) and the policy traces remain in
-\path{/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/}.
+\path{/home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/}. The
+carry-over check reads the baseline replays and third-stage records of
+\path{/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/}.
 \end{document}

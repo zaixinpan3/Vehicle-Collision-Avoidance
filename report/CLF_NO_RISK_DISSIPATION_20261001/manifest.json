@@ -115,11 +115,15 @@
   "bundle": [
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/REPRODUCTION.txt",
-      "sha256": "d2537297f3dd73108f811b72634a8bf31fd41f5184e5306a27d56197b5e2e089"
+      "sha256": "309c6dbd0673901087cd154578384a117b79403bedbac6aa2cee561deab9e4f7"
     },
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/cancellation.csv",
       "sha256": "532b41b6430edea9a118fcd3ac4ead63851734c95443ec3ee8e884cba587abbe"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/carry-forward.csv",
+      "sha256": "2937aa2c640049dd5e027b6acd998cea6eb3575f0be59d8cc4a8a4f0f889156c"
     },
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/clf-feasibility-map.csv",
@@ -136,6 +140,10 @@
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/cancellation.log",
       "sha256": "af236ab45916c8ed72178a8f5e2cd16b826f94327b5b83873c3e74452822d173"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/carryForward.log",
+      "sha256": "9a2d546fe5537f3b94f8ca4cb736e98ceb33ff1ea3fddfa704f40b56dbe3d8c9"
     },
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/crossTerms.log",
@@ -218,6 +226,10 @@
       "sha256": "33451e08869f394e90eccd080ad98eee8f6aec5e876f888acd4e8c0cc7729e7b"
     },
     {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/carryForward.m",
+      "sha256": "2ff8959bb57fa8ef5ce05ea9f5522527878fa2296115ab9b2e3f88c1743072b3"
+    },
+    {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/clfFeasibilityMap.m",
       "sha256": "528135c5e769f7460e0953d5d06c48004b133222d11cc72bd13a0599ac5d9e51"
     },
@@ -291,7 +303,7 @@
     },
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001.tex",
-      "sha256": "c4fa3138bfdf38651a1130e3ab59a8f0b267ce96ae3ac8c154222e0693fb0045"
+      "sha256": "599ee960468a25f630fb39c16e9235da3550d803de16548ba1a9128a37a0e42e"
     }
   ],
   "rawArtifacts": [
@@ -585,5 +597,128 @@
       "sha256": "e8735a38bfae9535212b28d5c11a6aec225e1284ef698b1aacfc30f0d9c9d143",
       "bytes": 13317
     }
-  ]
+  ],
+  "followUpInputs": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/turningCrossing-8-full.mat",
+      "sha256": "c2cbf440afba856ad1fee76f2141cec49c7eaccd0d30f9080afeb4289d671a65",
+      "bytes": 35304025,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-turningCrossing-8.mat",
+      "sha256": "086ef2c667291718e561cb44210f8db532a4cb0012d62e7c83bf882dbb55b525",
+      "bytes": 35331693,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedHeadOn-8-full.mat",
+      "sha256": "4df237b3f6b87f6210032ce2412556e449ddde5a7304803f564bb3d2ada38bb4",
+      "bytes": 35306098,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedHeadOn-8.mat",
+      "sha256": "3eeec824e490efb7334d1760947b86fb778a2891a01c032e56791c1a6bbc11e1",
+      "bytes": 35333587,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedCrossing-8-full.mat",
+      "sha256": "2ad9bc1637f099971c38ad4475a774986a4439dd849e39640e3bf704f1fcee81",
+      "bytes": 35306098,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedCrossing-8.mat",
+      "sha256": "2b64fb5bc00092424fd98f515ea59f0961f543416ebabf7947ab8476b4b5556e",
+      "bytes": 35333434,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/crossing-8-full.mat",
+      "sha256": "ad9672320f42f5cbe70e17fe826a1eed916ddd5c5c2da5bc478268706bd9f9c6",
+      "bytes": 35304025,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-crossing-8.mat",
+      "sha256": "229c375dad5a990fe330810377c0797298662f6ee058bad53c753b7ae94df5f8",
+      "bytes": 35331430,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/headOn-15-full.mat",
+      "sha256": "aca22fefab1e0b851af17c15c65ba9aabc79525120248b9570e845856bd5ebc6",
+      "bytes": 37045625,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-headOn-15.mat",
+      "sha256": "1eb69c3dff4b3c9431cf97422e65629aa0bb81b638def942daf215c72adfcaf3",
+      "bytes": 37072852,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/turningCrossing-15-full.mat",
+      "sha256": "846a31ca580cf7dd8edab5d4b731114e84b52f62df68ec2fd6faf31405bb39ee",
+      "bytes": 37045625,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-turningCrossing-15.mat",
+      "sha256": "002715650d308b0c09a49def50e53fee1e4a9b0775d7c4aba7ae59c2c14c4d62",
+      "bytes": 37073149,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedHeadOn-15-full.mat",
+      "sha256": "7eaa6d44f61dc29756047b643bd53a811bcbf7b674bcacf800b077dde7dcd447",
+      "bytes": 37047780,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedHeadOn-15.mat",
+      "sha256": "9432619522a4240c64f8bba5fbf792d299dbce78d3afee78a8f7dfaa7e252c47",
+      "bytes": 37075205,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/curvedCrossing-15-full.mat",
+      "sha256": "07287eb54cce5e18992cd359bdc5e047d0269d107657cfec12ac31675e30db87",
+      "bytes": 37047756,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-curvedCrossing-15.mat",
+      "sha256": "ae6df9ece2d8bca64420d1f23e5d857c42dc708e0c98c6a8ab5a6a2c4731db49",
+      "bytes": 37075199,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/crossing-15-full.mat",
+      "sha256": "33004982006b4457a6b23f7c63e188058276fe12a747b381b2cbf0b9c3ee37b5",
+      "bytes": 37045625,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-crossing-15.mat",
+      "sha256": "e58383aa021e70e5a12da0f3dbb2860a2e8a6d57dec2cf75b3e96cb7ce64d462",
+      "bytes": 37072935,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/replay/brakingLead-15-full.mat",
+      "sha256": "fa982d7e0939303b8cc89f8473e686471fbbcb039de981dbda2ed69addc7c743",
+      "bytes": 37045625,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/rti-failure-analysis-20261001/cf/trackingThirdStage-brakingLead-15.mat",
+      "sha256": "2c003206a621f897797984d7cc1eab15794f7bc0b09364400dcb5f08dfbacd9b",
+      "bytes": 1913328,
+      "recordedIn": "report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
+    }
+  ],
+  "followUpSource": "Frozen source of commit 5f7497718d4774a2515330650ee8815ccfa67b20 (6-mm margin), hashed in report/RTI_FAILURE_ROOT_CAUSES_20261001/manifest.json"
 }
