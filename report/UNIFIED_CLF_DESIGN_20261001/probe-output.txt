@@ -1,0 +1,13 @@
+speed=8 t=0.00 V=0 l=0 K=0 converged=1 nominal dV=0 issued dV=0.52662 eval=0.0008
+speed=8 t=2.00 V=4742.4 l=431.87 K=208 converged=1 nominal dV=-431.87 issued dV=-328.31 eval=0.0095
+speed=8 t=10.00 V=2.3382e+06 l=15112 K=473 converged=1 nominal dV=-15112 issued dV=35411 eval=0.0220
+speed=8 t=30.00 V=5.3377e+07 l=1.9582e+05 K=875 converged=1 nominal dV=-1.9582e+05 issued dV=2.7659e+05 eval=0.0510
+speed=8 t=60.00 V=3.9942e+08 l=8.5047e+05 K=1475 converged=1 nominal dV=-8.5047e+05 issued dV=1.023e+06 eval=0.0606
+speed=8 t=79.95 V=9.276e+08 l=1.541e+06 K=1874 converged=1 nominal dV=-1.541e+06 issued dV=1.7356e+06 eval=0.0724
+speed=15 t=0.00 V=0 l=0 K=0 converged=1 nominal dV=0 issued dV=0.67448 eval=0.0003
+speed=15 t=2.00 V=19943 l=1064.7 K=157 converged=1 nominal dV=-1064.7 issued dV=-510.25 eval=0.0063
+speed=15 t=10.00 V=3.4313e+06 l=20307 K=460 converged=1 nominal dV=-20307 issued dV=27322 eval=0.0163
+speed=15 t=30.00 V=4.4872e+07 l=2.0818e+05 K=673 converged=1 nominal dV=-2.0818e+05 issued dV=1.5566e+05 eval=0.0238
+speed=15 t=60.00 V=2.7963e+08 l=8.7581e+05 K=996 converged=1 nominal dV=-8.7581e+05 issued dV=6.1301e+05 eval=0.0380
+speed=15 t=79.95 V=5.9579e+08 l=1.5818e+06 K=1199 converged=1 nominal dV=-1.5818e+06 issued dV=1.5302e+06 eval=0.0636
+PROBE-COMPLETE

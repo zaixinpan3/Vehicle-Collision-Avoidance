@@ -1,0 +1,32 @@
+Single-CLF design diagnostics, October 1, 2026.
+Production controller was not changed. Working HEAD at analysis: 811633202b9bf6f4c9125c332e88092b85372d6b.
+Controller source: 9de49299a7c4f7d6b05e6a0dea48453fb7877a5a, frozen in:
+/home/zai/.cache/collisionAvoidance/recovery-clf-validation-20261001/source
+Raw task directory:
+/home/zai/.cache/collisionAvoidance/unified-clf-design-20261001
+
+Inputs were extracted from the fresh crossing JSON for both speeds at hold
+indices round(t/0.05)+1 for t=[0,2,10,30,60,79.95] seconds. Each record contains
+the measured state, prior applied input (zero on the first frame) and the actual
+issued input. All are deterministic recorded values; no random seed is used.
+
+Executed:
+matlab -singleCompThread -batch "run('/home/zai/.cache/collisionAvoidance/unified-clf-design-20261001/probe.m')"
+The probe evaluates the existing target-independent recovery value at each
+state and two successors, using the held-input RK4 model. The nominal input
+is NOT collision-screened and no new closed-loop controller is executed.
+Additional 40 signed coordinate perturbations have terminal quadratic 0.0005,
+for speed 8/15 m/s and curvature 0/0.005 per meter. They test the Bellman
+identity separately from the configured half-stage decrease condition.
+Probe completed with exit status 0 and marker PROBE-COMPLETE.
+
+Repeat by copying methods/probe.m and states.json into a new raw directory,
+adjusting source/output in probe.m to a source checkout and output directory,
+and providing the native binaries identified by source-manifest.json.
+Build report: python3 RAW/buildReport.py (its root/raw paths identify this run).
+Report compiled with pdflatex -interaction=nonstopmode -halt-on-error.
+
+Full new-controller regression and performance tests have NOT been run.
+Report contains a proposed design and its explicit proof/implementation gaps.
+The previous 14-case retest supplies observed failure states, not evidence
+that the proposed unified algorithm already resolves them.

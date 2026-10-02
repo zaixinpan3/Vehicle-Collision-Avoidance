@@ -1,0 +1,43 @@
+{
+  "kind": "Design/probe artifact hashes; no weekly or monthly report hashes",
+  "baseCommit": "811633202b9bf6f4c9125c332e88092b85372d6b",
+  "controllerSourceUnchanged": true,
+  "files": [
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001/REPRODUCTION.txt",
+      "sha256": "f3e380726e84a2bff5978e228ef201efcb77bc60cd02e769cfb4856ef2696651"
+    },
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001/methods/buildReport.py",
+      "sha256": "9d93deea0fedfb4bfac38839a306e27b56a4bf4eb593f1b9ea903f057b98965c"
+    },
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001/methods/probe.m",
+      "sha256": "0b360d05f658b6a90870af1309bdf3d268b250490224038e08b2db60135c7c37"
+    },
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001/probe-output.txt",
+      "sha256": "17c21f6064028f2039a2a3c2faf6fbcd24254d0ebb123f765f4e85f104be7bc4"
+    },
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001/probe.json",
+      "sha256": "e45f1f4042479930a4e92e2ab670b3c09880c3c4e0451d680464ac0546a7936b"
+    },
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001/source-manifest.json",
+      "sha256": "f2c77acff4c785fd17053af868be652fb0be80cdd4901bc5c9545f165786589a"
+    },
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001/states.json",
+      "sha256": "01a2b5c925dfe433475060c2cfff5a2ad7b3429bdc7dbff8f60900bcd6a60d7c"
+    },
+    {
+      "path": "report/UNIFIED_CLF_DESIGN_20261001.tex",
+      "sha256": "de76b6dfe46ab65e8d54ae83a57f509e034f03e1bd79c46bb2f3a65a01416dc6"
+    }
+  ],
+  "primarySources": [
+    "https://sites.engineering.ucsb.edu/~jbraw/mpc/MPC-book-2nd-edition-6th-printing.pdf",
+    "https://web.stanford.edu/~boyd/papers/pdf/fast_clf.pdf"
+  ]
+}
