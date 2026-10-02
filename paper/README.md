@@ -3,7 +3,9 @@
 `manuscript.tex` is the IEEE Transactions-style research draft. The October 2,
 2026 update keeps its section order and leaves the introduction's literature
 discussion and the perception section unchanged. The estimator derivations
-receive small clarifications of notation and wording only. The gain selection,
+now specify the nonlinear extension and disturbed target error equation,
+correct the projection step of the Lipschitz proof, and complete the
+exponential ISS estimate in the original core errors. The gain selection,
 the controller, the results, the discussion and the conclusion are synchronized
 with the committed implementation at `5692e15`, and the second half of the
 title now reads "Covariant Ego--Target Estimation and Two-Stage Predictive

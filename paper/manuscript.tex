@@ -895,12 +895,25 @@ The declared operating set is
 \end{equation}
 
 Here \(a\) and \(b\) are the target speed bounds \(V_C|_{\min}\) and
-\(V_C|_{\max}\). Estimates may peak outside \eqref{eq:target_domain}, so the observer
-evaluates the extension \(\Phi_e\) obtained by replacing \(\bm q,\bm s\) in
-\(\Phi\) by their ball projections onto radii \(b,S\), clipping \(A\) and
-\(\Omega\) to their bounds, and using \(\max(\normtwo{\bm q},a)\) in every
-denominator. It agrees with \(\Phi\) on \eqref{eq:target_domain} and is
-defined on \(\R^4\).
+\(V_C|_{\max}\), with $0<a<b$. Estimates may peak outside
+\eqref{eq:target_domain}. Let $\Pi_r$ denote Euclidean projection onto
+the ball of radius $r$ and $\operatorname{clip}_r$ scalar clipping to
+$[-r,r]$. The observer evaluates
+\begin{equation}
+    \begin{gathered}
+    d=\max(\normtwo{\bm q},a),\quad
+    \bm Q=\Pi_b(\bm q),\quad\tilde{\bm s}=\Pi_S(\bm s),\\
+    A_e=\operatorname{clip}_{A_{\max}}
+        (\bm Q^{\trans}\tilde{\bm s}/d),\\
+    \Omega_e=\operatorname{clip}_{\Omega_{\max}}
+        ((J\bm Q)^{\trans}\tilde{\bm s}/d^2),\\
+    \Phi_e(\bm q,\bm s)=-\Omega_e^2\bm Q
+        +3A_e\Omega_e J\bm q/d.
+    \end{gathered}
+    \label{eq:target_extension}
+\end{equation}
+The direction factor uses $\bm q/d$. This extension agrees with $\Phi$
+on \eqref{eq:target_domain} and is defined on $\R^4$.
 
 \begin{lemma}
 \label{lem:lipschitz}
@@ -929,9 +942,9 @@ With
 \end{lemma}
 
 \begin{IEEEproof}
-Projections and clips are nonexpansive, so they only decrease derivative
-bounds, and \(\Phi_e\) is continuous and piecewise differentiable; it
-suffices to bound its almost-everywhere Jacobians and integrate along the
+Projections and clips are nonexpansive, and $a>0$ makes $\Phi_e$ locally
+Lipschitz and piecewise differentiable. It suffices to bound its
+almost-everywhere Jacobians and integrate along the
 segment joining the two arguments. Differentiating in the radial and
 tangential basis at fixed \(\bm s\), with \(r=\normtwo{\bm q}\),
 \(\bm Q\) the projected velocity and \(A_e\), \(\Omega_e\) the clipped
@@ -941,11 +954,14 @@ reconstructions that \(\Phi_e\) evaluates, gives
 \(|D_q\Omega_e|\leq2bS/r^3\) for \(r\geq b\), whose suprema over \(r>0\) are
 \(c_A\) and \(c_\Omega\), while
 \(\normtwo{\bm Q}|D_q\Omega_e|\leq c_{Q\Omega}\).
-Collecting the four terms of \(\Phi_e\) yields \(L_q\). At fixed
-\(\bm q\), the entrywise absolute values of the acceleration Jacobian in the
-basis aligned with \(\bm q\) are dominated by the displayed matrix, and its
-spectral norm dominates the induced norm; the case \(\bm q=0\) follows by
-continuity.
+Using $\|D_q\bm Q\|_2\leq1$, $\normtwo{\bm q/d}\leq1$ and
+$\|D_q(\bm q/d)\|_2\leq1/a$ in \eqref{eq:target_extension} gives $L_q$.
+At fixed $\bm q\ne0$, the Jacobian with respect to $\tilde{\bm s}$,
+in the basis aligned with $\bm q$, is bounded entrywise in absolute value
+by the matrix in \eqref{eq:lipschitz_constants}. Its induced norm is
+therefore at most $L_s$. Composing with $\tilde{\bm s}=\Pi_S(\bm s)$
+preserves this norm bound because $\|D_s\Pi_S\|_2\leq1$ almost
+everywhere; continuity covers $\bm q=0$.
 \end{IEEEproof}
 
 The tracker is the covariant high-gain chain
@@ -961,16 +977,19 @@ The tracker is the covariant high-gain chain
     \label{eq:target_observer}
 \end{equation}
 Let \(A_c\) be the integrator-chain matrix, \(C=\bm e_1^{\trans}\), and
-\(A_l=A_c-\bm lC\). The shape \(\bm l\) and the bandwidth \(\omega\) are
+\(A_l=A_c-\bm lC\). The constant shape $\bm l$ and bandwidth $\omega>0$ are
 selected in Section~\ref{subsec:gainSelection}; the certificate below
 holds for every pair that satisfies its matrix inequality.
-For the estimate-minus-truth target error $\bm e_T$, set
+For $\bm x_T=[\bm\rho^{\trans},\bm q^{\trans},\bm s^{\trans}]^{\trans}$
+and $\bm e_T=\hat{\bm x}_T-\bm x_T$, put
+$D=\diag(1,\omega^{-1},\omega^{-2})$ and set
 \begin{equation}
-    \bm\epsilon=\diag(I_2,\omega^{-1}I_2,\omega^{-2}I_2)\bm e_T,
+    \bm\epsilon=(D\otimes I_2)\bm e_T,
     \qquad
     W_T=\sqrt{\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon}.
     \label{eq:target_metric}
 \end{equation}
+Write $\Delta\Phi_e=\Phi_e(\hat{\bm q},\hat{\bm s})-\Phi_e(\bm q,\bm s)$.
 
 \begin{lemma}
 \label{lem:dissipation}
@@ -984,7 +1003,7 @@ Let $P\succ0$, \(\bm b_P=P\bm e_3\), \(t_q,t_s>0\), and
     \end{aligned}
     \label{eq:dissipation_matrix}
 \end{equation}
-If \(M\succeq2\lambda_TP\) then \(\dot W_T\leq-\lambda_TW_T\) in the
+If \(M\succeq2\lambda_TP\) then \(D^+W_T\leq-\lambda_TW_T\) in the
 absence of exogenous error inputs.
 \end{lemma}
 
@@ -994,7 +1013,7 @@ In the coordinate \(\bm\epsilon\) the injection block becomes
 is skew and contributes zero to
 \(\tfrac{d}{dt}\bm\epsilon^{\trans}(P\otimes I_2)\bm\epsilon\). The injection contributes
 $\omega\bm\epsilon^{\trans}[(A_l^{\trans}P+PA_l)\otimes I_2]\bm\epsilon$.
-Splitting $\Delta\Phi/\omega^2$ into its velocity and acceleration
+Splitting $\Delta\Phi_e/\omega^2$ into its velocity and acceleration
 increments, \eqref{eq:global_lipschitz} gives respective bounds
 $(L_q/\omega)\normtwo{\bm\epsilon_2}$ and
 $L_s\normtwo{\bm\epsilon_3}$. Each enters the derivative through
@@ -1003,13 +1022,37 @@ $2\bm\epsilon^{\trans}(\bm b_P\otimes I_2)$. Applying
 channel gives
 \(\tfrac{d}{dt}W_T^2\leq-\bm\epsilon^{\trans}(M\otimes I_2)\bm\epsilon
 \leq-2\lambda_TW_T^2\).
+Taking the square root gives the comparison, including $W_T=0$ by
+continuity of the homogeneous error dynamics.
 \end{IEEEproof}
 
 \subsection{Cascade ISS}
 \label{subsec:cascade}
 
+Let $\bm\nu_\Phi$ be the model residual in the true last row,
+$\nabla_{\omega_E}\bm s=\Phi(\bm q,\bm s)+\bm\nu_\Phi$, with
+$\normtwo{\bm\nu_\Phi}\leq\bar\nu_\Phi$. For varying motion, write the
+course curvature as $\kappa=\Omega/V$, which equals
+$\sin\beta_C/l_{r,C}$ in the retained constant-sideslip model.
+Differentiating the target velocity gives
+$\bm\nu_\Phi=\dot A\bm q/V+V^2\dot\kappa J\bm q/V$, so declared
+rate bounds imply
+$\bar\nu_\Phi=(\bar{\dot A}^2+b^4\bar{\dot\kappa}^2)^{1/2}$.
+Subtracting the true chain from \eqref{eq:target_observer} gives
+\begin{equation}
+    \begin{aligned}
+    \dot{\bm\epsilon}={}&
+        [\omega A_l\otimes I_2-u_3(I_3\otimes J)]\bm\epsilon\\
+        &+\omega^{-2}(\bm e_3\otimes I_2)
+            (\Delta\Phi_e-\bm\nu_\Phi)\\
+        &-(\bm e_1\otimes I_2)\bm e_v
+            -d_\omega(D\otimes J)\bm x_T\\
+        &+\omega(\bm l\otimes I_2)\bm n_R.
+    \end{aligned}
+    \label{eq:target_error_dynamics}
+\end{equation}
 All core couplings are feedforward. Cauchy--Schwarz in the metric
-\eqref{eq:target_metric} gives
+\eqref{eq:target_metric} bounds the four input channels by
 \begin{equation}
     \begin{gathered}
     g_{Tv}=\sqrt{P_{11}},\qquad
@@ -1020,10 +1063,10 @@ All core couplings are feedforward. Cauchy--Schwarz in the metric
     \end{gathered}
     \label{eq:target_disturbance_coefficients}
 \end{equation}
-where $|P|$ is entrywise. Declared scalar-acceleration and curvature rates
-add a forcing bounded by
-$\bar\nu_\Phi=(\bar{\dot A}^2+b^4\bar{\dot\kappa}^2)^{1/2}$ to the last
-chain equation. Lemmas~\ref{lem:egoRows} and \ref{lem:dissipation} give
+where $|P|$ is entrywise. Thus
+$D^+W_T\leq-\lambda_TW_T+g_{Tv}\normtwo{\bm e_v}
++g_\omega\bar n_g+g_R\bar n_R+g_\Phi\bar\nu_\Phi$.
+Together with Lemma~\ref{lem:egoRows}, this gives
 \begin{equation}
     \begin{gathered}
     \bm\chi=[\normtwo{\bm e_v},\ W_T]^{\trans},\qquad
@@ -1056,6 +1099,18 @@ component bounds are
     \bm c_T=\diag(1,\omega,\omega^2)\sqrt{\diag(P^{-1})}.
     \label{eq:component_extraction}
 \end{equation}
+For the fixed design, the core error
+$\bm e=[\bm e_v^{\trans},\bm e_T^{\trans}]^{\trans}$ satisfies
+\begin{equation}
+    \normtwo{\bm e(t)}\leq C_e e^{-\alpha_e t}\normtwo{\bm e(0)}
+        +\Gamma_e\|\bm\eta\|_{\infty,[0,t]},
+    \label{eq:core_exponential_iss}
+\end{equation}
+with constants $C_e,\alpha_e,\Gamma_e>0$ and disturbance vector
+$\bm\eta=[\bm n_a^{\trans},\bm n_v^{\trans},d_\omega,d_{\rm st},
+\bm n_R^{\trans},\bm\nu_\Phi^{\trans}]^{\trans}$.
+Here $\|\bm\eta\|_{\infty,[0,t]}$
+is the essential supremum of $\normtwo{\bm\eta(\tau)}$ over $0\leq\tau\leq t$.
 \end{theorem}
 
 \begin{IEEEproof}
@@ -1063,7 +1118,19 @@ $H$ is lower triangular with negative diagonal and nonnegative
 off-diagonal entries. Thus $e^{Ht}\geq0$ and $-H^{-1}\geq0$, which give
 \eqref{eq:comparison_solution}, the ultimate bound and $\bm c>0$.
 Since $\bm c^{\trans}H=-\bm1^{\trans}$,
-$D^+V_c\leq-\bm1^{\trans}\bm\chi+\bm c^{\trans}\bm d$.
+$D^+V_c\leq-V_c/c_{\max}+\bm c^{\trans}\bm d$, where
+$c_{\max}=\max_i c_i$. The same comparisons hold with instantaneous
+disturbance magnitudes in place of their uniform bounds. For fixed gains,
+their weighted forcing is at most $K\normtwo{\bm\eta(t)}$ for some
+$K>0$. Since $P\succ0$ and $\omega>0$ is fixed, there are constants
+$m_c,M_c>0$ such that
+$m_c\normtwo{\bm e}\leq V_c\leq M_c\normtwo{\bm e}$.
+Integrating the scalar comparison proves
+\eqref{eq:core_exponential_iss} with
+$C_e=M_c/m_c$, $\alpha_e=1/c_{\max}$ and
+$\Gamma_e=Kc_{\max}/m_c$. The bound also precludes finite-time escape
+under the declared premises. With all disturbances zero, the core error
+converges exponentially to zero.
 Equation~\eqref{eq:component_extraction} is the ellipsoid support in
 $P\otimes I_2$ after undoing the position normalization.
 \end{IEEEproof}
@@ -1181,8 +1248,7 @@ Under the hypotheses of Theorem~\ref{thm:cascadeISS} and any
 \end{equation}
 and \(\limsup_{t\to\infty}B_\rho\leq c_{T,1}(-H^{-1}\bm d)_2\). An initial
 metric bound follows from componentwise initial bounds \(\bm b_{T0}\) as
-\(W_T(0)\leq\bigl((D\bm b_{T0})^{\trans}|P|(D\bm b_{T0})\bigr)^{1/2}\) with
-\(D=\diag(1,\omega^{-1},\omega^{-2})\).
+\(W_T(0)\leq\bigl((D\bm b_{T0})^{\trans}|P|(D\bm b_{T0})\bigr)^{1/2}\).
 \end{corollary}
 
 Inertial reconstruction of the relative vector costs one further yaw term,
