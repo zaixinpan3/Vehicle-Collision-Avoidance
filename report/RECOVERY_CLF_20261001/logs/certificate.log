@@ -1,0 +1,11 @@
+Recovery CLF certificate: 10800 of 10800 starts enter and hold the tolerances (latest entry 30.15 s), 0 domain failures.
+Cost-to-go identity on 1080 starts: max relative error 9.54e-16.
+    speed    curvature    steeringOffset    spectralRadius    lyapunovRelativeResidual    minEigenvalueP    maxEigenvalueP
+    _____    _________    ______________    ______________    ________________________    ______________    ______________
+
+      8            0                 0         0.96823               2.8186e-15               5.2916            2582.9    
+      8        0.005       -1.6794e-05         0.96818               1.0148e-15               5.3481            2572.5    
+     15            0                 0         0.96935               1.4622e-15               6.8756            5645.6    
+     15        0.005       -2.6831e-05         0.96946               2.6351e-15               7.2444              5685    
+
+exit 0

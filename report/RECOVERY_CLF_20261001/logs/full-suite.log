@@ -1,0 +1,236 @@
+Running certifiedKinematicCourseCorrespondenceTest
+......
+Done certifiedKinematicCourseCorrespondenceTest
+__________
+
+Running clfNominalRecoveryTest
+.......... ..
+Done clfNominalRecoveryTest
+__________
+
+Running collisionAvoidanceControllerConfigTest
+.......... .......... .......... .......... ..........
+.......... ...
+Done collisionAvoidanceControllerConfigTest
+__________
+
+Running collisionThreatScenarioTest
+.......... .......... .......... .
+Done collisionThreatScenarioTest
+__________
+
+Running computeLidarRingCurbFeaturesTest
+.......... ......
+Done computeLidarRingCurbFeaturesTest
+__________
+
+Running controllerInputGeometryTest
+.......... .....
+Done controllerInputGeometryTest
+__________
+
+Running controllerKernelTest
+........
+Done controllerKernelTest
+__________
+
+Running controllerSourceBudgetTest
+.
+Done controllerSourceBudgetTest
+__________
+
+Running estimateRoadHeadingFromFeatureSeedsTest
+.....
+Done estimateRoadHeadingFromFeatureSeedsTest
+__________
+
+Running evaluateCurbDetectorDevelopmentRegressionTest
+..
+Done evaluateCurbDetectorDevelopmentRegressionTest
+__________
+
+Running evaluateCurbRingFeatureBackgroundCalibrationTest
+.
+Done evaluateCurbRingFeatureBackgroundCalibrationTest
+__________
+
+Running evaluateExportedCurbMasksAgainstDevelopmentLabelsTest
+.
+Done evaluateExportedCurbMasksAgainstDevelopmentLabelsTest
+__________
+
+Running fitPerceivedRoadBoundariesTest
+...
+Done fitPerceivedRoadBoundariesTest
+__________
+
+Running freePoseTerminalTest
+.......... .
+Done freePoseTerminalTest
+__________
+
+Running fuseLidarRingCurbFeaturesTest
+.......... ........
+Done fuseLidarRingCurbFeaturesTest
+__________
+
+Running groundPointsProcessingTest
+.........
+Done groundPointsProcessingTest
+__________
+
+Running longitudinalRoadLoadTest
+.......... ..........
+Done longitudinalRoadLoadTest
+__________
+
+Running modifiedFialaTireTest
+.......... .......... ...
+Done modifiedFialaTireTest
+__________
+
+Running movingTargetFlowTest
+........
+Done movingTargetFlowTest
+__________
+
+Running nominalRecoveryValidationTest
+recovery: 4/12 holds, last 0.181 s, source twoStageRealTimeIteration
+recovery: 6/12 frames, max 0.680 s, failure 
+.recovery: 2/2 frames, max 0.191 s, failure 
+.recovery: 2/2 frames, max 0.171 s, failure 
+.recovery: 2/2 frames, max 0.148 s, failure 
+recovery: 4/4 holds, last 0.189 s, source twoStageRealTimeIteration
+recovery: 4/4 frames, max 0.189 s, failure 
+recovery: 4/4 holds, last 0.100 s, source twoStageRealTimeIteration
+recovery: 4/4 frames, max 0.170 s, failure 
+.
+Done nominalRecoveryValidationTest
+__________
+
+Running nonlinearPredictiveSafetyTest
+.......... .......... .......... .......... ..........
+.......... ..
+Done nonlinearPredictiveSafetyTest
+__________
+
+Running nrmmCascadeCertificateTest
+..........
+Done nrmmCascadeCertificateTest
+__________
+
+Running nrmmControllerErrorBoundsTest
+.......... ..
+Done nrmmControllerErrorBoundsTest
+__________
+
+Running nrmmDirectVelocityTest
+.......... ..
+Done nrmmDirectVelocityTest
+__________
+
+Running nrmmModelFormulationTest
+.......... ..
+Done nrmmModelFormulationTest
+__________
+
+Running nrmmNativeKernelTest
+...
+Done nrmmNativeKernelTest
+__________
+
+Running nrmmObserverVectorFieldTest
+....
+Done nrmmObserverVectorFieldTest
+__________
+
+Running nrmmPositionErrorBoundTest
+.......... ..........
+Done nrmmPositionErrorBoundTest
+__________
+
+Running nrmmStructuredHighGainTest
+..........
+Done nrmmStructuredHighGainTest
+__________
+
+Running nrmmTargetHistoryTest
+.......
+Done nrmmTargetHistoryTest
+__________
+
+Running nrmmTargetParameterErrorBoundsTest
+..
+Done nrmmTargetParameterErrorBoundsTest
+__________
+
+Running nrmmTruthEnclosureAuditTest
+....
+Done nrmmTruthEnclosureAuditTest
+__________
+
+Running nrmmYawObserverTest
+.........
+Done nrmmYawObserverTest
+__________
+
+Running nrmmYawSetTest
+.......... .
+Done nrmmYawSetTest
+__________
+
+Running observerGainSynthesisTest
+.......... .........
+Done observerGainSynthesisTest
+__________
+
+Running onlineNrmmTrackingRuntimeTest
+.......... .......... .......... .
+Done onlineNrmmTrackingRuntimeTest
+__________
+
+Running recoveryClfTest
+.......... ....
+Done recoveryClfTest
+__________
+
+Running sharmaBaselineObserverTest
+......
+Done sharmaBaselineObserverTest
+__________
+
+Running sharmaFairnessAuditTest
+......
+Done sharmaFairnessAuditTest
+__________
+
+Running sweptCollisionIntervalTest
+.....
+Done sweptCollisionIntervalTest
+__________
+
+Running temporalGroundPointsProcessingTest
+....
+Done temporalGroundPointsProcessingTest
+__________
+
+Running terminalContinuationTest
+.......... .......... ........
+Done terminalContinuationTest
+__________
+
+Running trackCurbQuadraticModelsTest
+........
+Done trackCurbQuadraticModelsTest
+__________
+
+Running twoStagePredictiveControlTest
+.......... ..
+Done twoStagePredictiveControlTest
+__________
+
+    Name    Passed    Failed    Incomplete    Duration    Details
+    ____    ______    ______    __________    ________    _______
+
+
+FULL-SUITE passed 568 failed 0 incomplete 0 total 568 in 315 s

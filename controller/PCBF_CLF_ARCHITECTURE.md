@@ -2,12 +2,16 @@
 
 The online controller normally builds one affine prediction model and solves two convex
 problems in lexicographic order: minimum PCBF slack, then minimum CLF slack
-while retaining the first-stage optimum. There is one controller and one
-initialization trajectory per attempt. A failed warm-start solve can trigger one
-fresh flow initialization and another two-stage attempt within the same soft
-budget. There is no nonlinear candidate admission,
-convergence loop, restoration solve, correction QP, zero-CLF
-trial, predictive-cost third stage, or retained-control fallback.
+while retaining the first-stage optimum. When no target is within the
+encounter range, the CLF is the recovery cost-to-go of
+[RECOVERY_CLF.md](RECOVERY_CLF.md), the anchor is the recovery feedback, and
+a third problem selects the plan closest to that anchor among both achieved
+slack levels. There is one controller and one initialization trajectory per
+attempt. A failed warm-start or recovery-anchored solve can trigger one fresh
+flow initialization and another attempt within the same soft budget. There is
+no nonlinear candidate admission, convergence loop, restoration solve,
+correction QP, zero-CLF trial, predictive-cost stage, or retained-control
+fallback.
 
 ## Prediction and initialization
 
@@ -21,9 +25,13 @@ The finite prediction length is fixed for a call:
 
 $$M=\min\{M_{\max},N+\lceil T_{\rm completion}/h\rceil\}.$$
 
-It is not increased until a candidate passes a safety test. Previous inputs are
-shifted, extended by the nominal terminal input, and rolled out from the new
-measured state. Previous affine states are not reused as dynamics references.
+It is not increased until a candidate passes a safety test. While a target is
+within the encounter range, previous inputs are shifted, extended by the
+nominal terminal input, and rolled out from the new measured state. When the
+measured state is beyond the range, or there is no target, the anchor is
+instead the recovery feedback over the primary horizon followed by the flow
+completion law (`recoveryFeedbackRollout`). Previous affine states are not
+reused as dynamics references.
 If those inputs cannot be evaluated in the bicycle model's domain, or no previous
 plan exists,
 one moving-target flow rollout is constructed, using braking-ratio magnitude and
@@ -48,7 +56,7 @@ iteration bound recentered at every sample, not an actuator steering magnitude
 or slew constraint. It is a numerical starting choice, not a certified universal
 linearization-error bound. The flow initializer selects a tire-informed steering reference.
 The two retired steering-limit configuration fields are rejected as unknown
-options. Continuation state version 63 separates this reference update from older
+options. Continuation state version 64 separates this reference update from older
 plans.
 
 ## Shared constraints and the two objectives
@@ -66,8 +74,9 @@ buffer applies at the sampled rows only; it is not a continuous-time
 clearance bound between them.
 
 The nominal CLF remains referenced to the given path and desired cruise speed,
-independently of terminal placement. With $V_k=e(x_k)^T P e(x_k)$ and the
-first-step affine error $\widehat e_1$, its constraint is
+independently of terminal placement. While a target is within range, with
+$V_k=e(x_k)^T P e(x_k)$ and the first-step affine error $\widehat e_1$, its
+constraint is
 
 $$\widehat e_1^T P\widehat e_1\le(1-\alpha)V_k+\rho,
 \qquad \rho\ge0.$$
@@ -84,8 +93,21 @@ CLF slack is scaled numerically by $\max(V_k,1)$ without changing its
 minimizer. `lexicographicTieTolerance` is the explicit numerical allowance on
 the first objective, not a tunable exchange weight. No tracking or input cost
 can purchase either slack. Even if the initializer has zero slack, both stages
-run. There is no third tie-breaking objective, so multiple minimizing input
-sequences may exist.
+run. During an encounter there is no third tie-breaking objective, so multiple
+minimizing input sequences may exist.
+
+Without collision rows, the CLF constraint uses the recovery cost-to-go
+$V_\kappa$ of [RECOVERY_CLF.md](RECOVERY_CLF.md):
+$V_\kappa(x_1)\le V_\kappa(x_k)-\eta\,l(e_k)+\rho$, with $\eta$ =
+`recovery.decreaseFraction`. Around the anchor's first node, $V_\kappa$ is
+represented by a Gauss-Newton second-order cone.
+
+A third problem then minimizes the weighted input deviation from the anchor,
+subject to both achieved slack levels. Its result is the issued plan, so the
+issued input equals the recovery feedback whenever the other constraints admit
+it, and $V_\kappa$ then decreases by exactly $l(e_k)$ in the hold model.
+`metadata.clfFunction` records which CLF a frame used, and
+`metadata.tertiaryObjective` records whether the third stage ran.
 
 The quadratic CLF sublevel and ellipsoidal endpoint set are represented as
 second-order cones. Thus both calls use `coneprog`; the formulation is not a
@@ -157,7 +179,10 @@ mean collision-free. Tiny positive slack can also occur within the numerical
 lexicographic allowance even when the primary optimum is zero. Removing
 nonlinear admission removes the former nonlinear sampled-safety claim.
 Likewise, zero affine CLF slack establishes dissipation in this call's affine
-error model, not a proof of nonlinear closed-loop asymptotic recovery.
+error model. In a target-free frame that issues the recovery feedback, the
+recovery cost-to-go decreases by the stage cost in the nonlinear hold model.
+Convergence of that feedback is sampled, not proved
+([RECOVERY_CLF.md](RECOVERY_CLF.md)), and the ODE45 plant is measured offline.
 
 Independent ODE replay and rectangle checks remain available in experiment
 scripts. They are offline measurements and do not add online acceptance steps.

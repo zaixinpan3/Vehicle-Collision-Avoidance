@@ -1,0 +1,57 @@
+A control Lyapunov function for recovery without collision risk -- October 1, 2026
+
+Change: the recovery CLF (controller/RECOVERY_CLF.md). It is the cost-to-go of the
+path-guidance feedback nonlinearBicycleModel.recoveryInput, evaluated by
+nonlinearBicycleModel.recoveryValue, with terminal quadratic recoveryTerminal. Without
+a target in the encounter range, solvePredictiveControl anchors on the feedback, uses
+the recovery CLF cone and adds the anchor-deviation stage. Configuration:
+cfg.recovery. Continuation state version 64. Base commit:
+5ba5b4dbbedc2d7477a48596f1f92e3d51fb3969.
+
+Raw directory: <raw> = /home/zai/.cache/collisionAvoidance/recovery-clf-20261001
+Frozen source: <raw>/source, a copy of controller/, config/, scripts/, tests/ and the
+compiled kernels in solver/controller/. source.sha256 there was rechecked after the
+campaign, and every hashed .m file is identical to the committed working tree.
+
+1. Certificate (scripts/certifyRecoveryClf.m, repository version):
+     matlab -singleCompThread -batch "addpath('scripts'); s=certifyRecoveryClf(OutputDirectory='<raw>/certificate');"
+   Outputs recovery-clf-starts.csv (10,800 starts) and recovery-clf-loops.csv
+   (trim offset, spectral radius, Lyapunov residual); logs/certificate.log.
+
+2. Recorded no-risk states (methods/replayStates.m): every 10th target-free frame
+   of the 5-cm baseline replays in
+   /home/zai/.cache/collisionAvoidance/clf-dissipation-20261001/replay (1,592
+   states), feedback rollout up to 150 s with the frozen source.
+   Output: replay-states.csv; logs/replay-states.log.
+
+3. Campaign (methods/campaign.m), four concurrent single-thread MATLAB R2026a
+   processes, run from <raw>/source:
+     matlab -singleCompThread -batch "part=P;parts=4;run('<raw>/campaign.m')"
+   with P = 0..3. Each case calls runNonlinearPredictiveSafetyValidation with
+     Scenarios=NAME, Frames=1600,
+     ControllerConfiguration=struct('referenceSpeed',S,'controller',struct('horizonSteps',N)),
+     RequireCollisionThreat=true, RecoveryDwellSeconds=5,
+   for S/N = 8/8 and 15/16 and the seven collisionThreatScenario fixtures. These are
+   the same settings as report/COLLISION_MARGIN_5CM_20261001.
+   The output folders <raw>/campaign/speed8 and speed15 did not exist when the
+   partitions started. The four 8-m/s cases that finished before the folders were
+   created could not save their result files (DRIVER-FAILURE "Error using save" in
+   logs/campaign-0..2.log): headOn, acceleratingHeadOn, curvedHeadOn and
+   brakingLead. They were rerun unchanged with methods/rerun.m, for example
+     matlab -singleCompThread -batch "cases={{8,\"headOn\"},{8,\"acceleratingHeadOn\"}};run('<raw>/rerun.m')"
+   See logs/campaign-rerun.log and campaign-rerun2.log. The reported results of
+   those four cases are the reruns.
+
+4. Comparison (methods/analyze.py): python3 <raw>/analyze.py reads the new and the
+   5-cm baseline campaign JSON and writes campaign-comparison.csv.
+
+5. Tests:
+     matlab -batch "results=runtests('tests')"
+       568 passed, 0 failed (logs/full-suite.log)
+     the eleven controller test classes
+       223 passed (logs/controller-tests.log)
+     python3 -m pytest -q tests/auditJointPredictiveSafetyTest.py
+       20 passed (logs/python-audit.log)
+
+Controller times were measured with other MATLAB jobs on the machine and are not
+benchmarks. manifest.json hashes the source, this bundle and the raw campaign files.

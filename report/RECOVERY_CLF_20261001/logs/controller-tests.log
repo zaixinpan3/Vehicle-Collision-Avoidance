@@ -1,0 +1,294 @@
+Running recoveryClfTest
+.......... ....
+Done recoveryClfTest
+__________
+
+Running clfNominalRecoveryTest
+.......... ..
+Done clfNominalRecoveryTest
+__________
+
+Running twoStagePredictiveControlTest
+.......... ..
+Done twoStagePredictiveControlTest
+__________
+
+Running nonlinearPredictiveSafetyTest
+.......... .......... .......... .......... ..........
+.......... ..
+Done nonlinearPredictiveSafetyTest
+__________
+
+Running controllerSourceBudgetTest
+.
+Done controllerSourceBudgetTest
+__________
+
+Running collisionAvoidanceControllerConfigTest
+.......... .......... .......... .......... ..........
+.......... ...
+Done collisionAvoidanceControllerConfigTest
+__________
+
+Running terminalContinuationTest
+.......... .......... ........
+Done terminalContinuationTest
+__________
+
+Running freePoseTerminalTest
+.......... .
+Done freePoseTerminalTest
+__________
+
+Running movingTargetFlowTest
+........
+Done movingTargetFlowTest
+__________
+
+Running controllerKernelTest
+........
+Done controllerKernelTest
+__________
+
+Running nominalRecoveryValidationTest
+recovery: 4/12 holds, last 0.243 s, source twoStageRealTimeIteration
+recovery: 6/12 frames, max 0.705 s, failure 
+.recovery: 2/2 frames, max 0.297 s, failure 
+.recovery: 2/2 frames, max 0.203 s, failure 
+.recovery: 2/2 frames, max 0.272 s, failure 
+recovery: 4/4 holds, last 0.208 s, source twoStageRealTimeIteration
+recovery: 4/4 frames, max 0.272 s, failure 
+recovery: 4/4 holds, last 0.193 s, source twoStageRealTimeIteration
+recovery: 4/4 frames, max 0.243 s, failure 
+.
+Done nominalRecoveryValidationTest
+__________
+
+                                                                        Name                                                                        Passed    Failed    Duration
+    ____________________________________________________________________________________________________________________________________________    ______    ______    ________
+
+    {'recoveryClfTest/trimIsAnExactEquilibriumOfTheFeedback(referenceSpeed=8,curvature=0)'                                                     }    true      false       1.5282
+    {'recoveryClfTest/trimIsAnExactEquilibriumOfTheFeedback(referenceSpeed=8,curvature=0.005)'                                                 }    true      false      0.07545
+    {'recoveryClfTest/trimIsAnExactEquilibriumOfTheFeedback(referenceSpeed=15,curvature=0)'                                                    }    true      false     0.062482
+    {'recoveryClfTest/trimIsAnExactEquilibriumOfTheFeedback(referenceSpeed=15,curvature=0.005)'                                                }    true      false      0.02465
+    {'recoveryClfTest/costToGoDecreasesByExactlyTheStageCost(referenceSpeed=8,curvature=0)'                                                    }    true      false      0.39068
+    {'recoveryClfTest/costToGoDecreasesByExactlyTheStageCost(referenceSpeed=8,curvature=0.005)'                                                }    true      false      0.26573
+    {'recoveryClfTest/costToGoDecreasesByExactlyTheStageCost(referenceSpeed=15,curvature=0)'                                                   }    true      false      0.21376
+    {'recoveryClfTest/costToGoDecreasesByExactlyTheStageCost(referenceSpeed=15,curvature=0.005)'                                               }    true      false      0.20097
+    {'recoveryClfTest/feedbackReturnsFromDistantAndReversedStates(referenceSpeed=8,curvature=0)'                                               }    true      false       0.1347
+    {'recoveryClfTest/feedbackReturnsFromDistantAndReversedStates(referenceSpeed=8,curvature=0.005)'                                           }    true      false      0.11407
+    {'recoveryClfTest/feedbackReturnsFromDistantAndReversedStates(referenceSpeed=15,curvature=0)'                                              }    true      false      0.10603
+    {'recoveryClfTest/feedbackReturnsFromDistantAndReversedStates(referenceSpeed=15,curvature=0.005)'                                          }    true      false      0.10561
+    {'recoveryClfTest/targetFreeClosedLoopDecreasesTheClfEveryFrame'                                                                           }    true      false       7.4223
+    {'recoveryClfTest/recoveryFractionsMustLieInsideTheUnitInterval'                                                                           }    true      false      0.15733
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=8,curvature=0,lateralError=0)'                     }    true      false      0.83342
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=8,curvature=0,lateralError=0.1)'                   }    true      false      0.33325
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=8,curvature=0,lateralError=-20)'                   }    true      false      0.31199
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=8,curvature=0.005,lateralError=0)'                 }    true      false      0.31141
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=8,curvature=0.005,lateralError=0.1)'               }    true      false      0.31983
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=8,curvature=0.005,lateralError=-20)'               }    true      false      0.31921
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=15,curvature=0,lateralError=0)'                    }    true      false      0.36111
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=15,curvature=0,lateralError=0.1)'                  }    true      false      0.30842
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=15,curvature=0,lateralError=-20)'                  }    true      false      0.40803
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=15,curvature=0.005,lateralError=0)'                }    true      false      0.27783
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=15,curvature=0.005,lateralError=0.1)'              }    true      false      0.32386
+    {'clfNominalRecoveryTest/targetFreeFrameMeetsTheRecoveryClfWithZeroSlack(referenceSpeed=15,curvature=0.005,lateralError=-20)'              }    true      false      0.52444
+    {'twoStagePredictiveControlTest/targetFreeInitializationAddsTheAnchorDeviationStage'                                                       }    true      false      0.82229
+    {'twoStagePredictiveControlTest/encounterKeepsTwoStagesAndTheLaneQuadratic'                                                                }    true      false      0.26235
+    {'twoStagePredictiveControlTest/shiftedInputsAreRolledOutFromTheNewMeasurement'                                                            }    true      false      0.20909
+    {'twoStagePredictiveControlTest/failedShiftReinitializesFlowAndRebuildsBothStages'                                                         }    true      false      0.25531
+    {'twoStagePredictiveControlTest/failedFreshInitializationDoesNotStartAnotherRetry'                                                         }    true      false      0.34527
+    {'twoStagePredictiveControlTest/unevaluableShiftUsesFreshInitializationBeforeOptimization'                                                 }    true      false       0.4378
+    {'twoStagePredictiveControlTest/exhaustedBudgetDoesNotExecuteThePreviousTrajectory'                                                        }    true      false      0.16679
+    {'twoStagePredictiveControlTest/finiteIterationLimitResultsStillRunEveryStageAndSupplyTheCommand'                                          }    true      false      0.13423
+    {'twoStagePredictiveControlTest/initialOverlapIsReportedAsOptimizedPositiveSlack'                                                          }    true      false      0.25204
+    {'twoStagePredictiveControlTest/brakingSlewAndMagnitudeBoundsConstrainTheReturnedPlan'                                                     }    true      false      0.59472
+    {'twoStagePredictiveControlTest/numericalSteeringCorrectionDoesNotImposeActuatorSlew'                                                      }    true      false      0.55143
+    {'twoStagePredictiveControlTest/steeringMayExceedTheRetiredFortyDegreeLimit'                                                               }    true      false      0.61615
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0,targetAcceleration=0)'                                  }    true      false      0.11162
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0,targetAcceleration=1.2)'                                }    true      false     0.002915
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0,targetAcceleration=-1.2)'                               }    true      false     0.001381
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=1e-12,targetAcceleration=0)'                              }    true      false     0.001497
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=1e-12,targetAcceleration=1.2)'                            }    true      false     0.002157
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=1e-12,targetAcceleration=-1.2)'                           }    true      false     0.001055
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0.08,targetAcceleration=0)'                               }    true      false     0.001182
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0.08,targetAcceleration=1.2)'                             }    true      false     0.001164
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=0.08,targetAcceleration=-1.2)'                            }    true      false     0.001125
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=-0.08,targetAcceleration=0)'                              }    true      false     0.001142
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=-0.08,targetAcceleration=1.2)'                            }    true      false     0.001103
+    {'nonlinearPredictiveSafetyTest/targetFlowHasTheSemigroupProperty(targetSideslip=-0.08,targetAcceleration=-1.2)'                           }    true      false     0.002709
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0,targetAcceleration=0)'                            }    true      false     0.060127
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0,targetAcceleration=1.2)'                          }    true      false     0.011331
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0,targetAcceleration=-1.2)'                         }    true      false     0.004691
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=1e-12,targetAcceleration=0)'                        }    true      false     0.003633
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=1e-12,targetAcceleration=1.2)'                      }    true      false     0.019197
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=1e-12,targetAcceleration=-1.2)'                     }    true      false     0.003089
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0.08,targetAcceleration=0)'                         }    true      false     0.002323
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0.08,targetAcceleration=1.2)'                       }    true      false     0.001848
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=0.08,targetAcceleration=-1.2)'                      }    true      false     0.001972
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=-0.08,targetAcceleration=0)'                        }    true      false     0.003197
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=-0.08,targetAcceleration=1.2)'                      }    true      false     0.001679
+    {'nonlinearPredictiveSafetyTest/targetFlowMatchesIndependentIntegration(targetSideslip=-0.08,targetAcceleration=-1.2)'                     }    true      false     0.001611
+    {'nonlinearPredictiveSafetyTest/accelerationChangesSpeedAndHeadingRate'                                                                    }    true      false     0.006223
+    {'nonlinearPredictiveSafetyTest/brakingRetainsConstantAccelerationThroughZeroVelocity'                                                     }    true      false     0.001757
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=0)'                                              }    true      false     0.002024
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=1e-12)'                                          }    true      false     0.001573
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=0.08)'                                           }    true      false     0.001564
+    {'nonlinearPredictiveSafetyTest/aTurningTargetRetracesItsPathAfterStopping(targetSideslip=-0.08)'                                          }    true      false     0.001656
+    {'nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=0)'                                                               }    true      false      0.08345
+    {'nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=0.5)'                                                             }    true      false     0.002866
+    {'nonlinearPredictiveSafetyTest/rectangleDualMatchesDistance(orientation=2.9)'                                                             }    true      false     0.002557
+    {'nonlinearPredictiveSafetyTest/overlapHasANonzeroRestorationDirection'                                                                    }    true      false     0.005655
+    {'nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=0)'                                              }    true      false     0.040993
+    {'nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=0.005)'                                          }    true      false     0.003939
+    {'nonlinearPredictiveSafetyTest/analyticDynamicsTangentMatchesFiniteDifferences(curvature=-0.005)'                                         }    true      false     0.003112
+    {'nonlinearPredictiveSafetyTest/jointTargetCoordinatesAreUnactuated'                                                                       }    true      false     0.071084
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=0)'                                         }    true      false     0.003574
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=1e-12)'                                     }    true      false     0.004725
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=0.08)'                                      }    true      false     0.004297
+    {'nonlinearPredictiveSafetyTest/jointTargetTangentIncludesSpeedDependentTurning(targetSideslip=-0.08)'                                     }    true      false     0.002355
+    {'nonlinearPredictiveSafetyTest/fullAndHalfHoldsUseTheSamePredictionMap'                                                                   }    true      false     0.005911
+    {'nonlinearPredictiveSafetyTest/aOneStepMeshUsesItsInterpolantAsTheMidpoint'                                                               }    true      false     0.012594
+    {'nonlinearPredictiveSafetyTest/laneFollowingRunsWithNoNativeVerifier'                                                                     }    true      false      0.69474
+    {'nonlinearPredictiveSafetyTest/changedTargetForecastRequiresExplicitReinitialization'                                                     }    true      false      0.25388
+    {'nonlinearPredictiveSafetyTest/headingWrapPreservesTheFixedTargetForecast'                                                                }    true      false      0.64357
+    {'nonlinearPredictiveSafetyTest/targetDropoutUsesOneFixedAbsoluteEpoch'                                                                    }    true      false      0.34245
+    {'nonlinearPredictiveSafetyTest/nonconsecutiveSampleTimesCannotReuseTheTrajectory'                                                         }    true      false      0.26995
+    {'nonlinearPredictiveSafetyTest/retiredStateCannotRestoreTheOldTargetMotion'                                                               }    true      false      0.20208
+    {'nonlinearPredictiveSafetyTest/opposingHeadingPreservesExactlyStraightTargetMotion'                                                       }    true      false     0.001096
+    {'nonlinearPredictiveSafetyTest/tinyPhysicalTransverseAccelerationStillAffectsInfiniteSeparation'                                          }    true      false     0.008202
+    {'nonlinearPredictiveSafetyTest/straightEndpointSeparationIsIndependentOfWorldHeading(orientation=0)'                                      }    true      false     0.003235
+    {'nonlinearPredictiveSafetyTest/straightEndpointSeparationIsIndependentOfWorldHeading(orientation=0.5)'                                    }    true      false      0.00213
+    {'nonlinearPredictiveSafetyTest/straightEndpointSeparationIsIndependentOfWorldHeading(orientation=2.9)'                                    }    true      false     0.002035
+    {'nonlinearPredictiveSafetyTest/returningTargetOrbitMustBeSeparatedAtTheEndpointSeed'                                                      }    true      false     0.004159
+    {'nonlinearPredictiveSafetyTest/acceleratingTargetBehindCannotUseAConstantSpeedSeed'                                                       }    true      false     0.000955
+    {'nonlinearPredictiveSafetyTest/acceleratingTargetAheadAllowsIndefiniteFollowing'                                                          }    true      false      0.00258
+    {'nonlinearPredictiveSafetyTest/deceleratingTargetHasABoundedForwardExcursion'                                                             }    true      false     0.002579
+    {'nonlinearPredictiveSafetyTest/aBrakingTargetCanReturnFromOutsideACircularLane'                                                           }    true      false      0.21652
+    {'nonlinearPredictiveSafetyTest/aStationaryTargetWithSideslipRemainsAFixedRectangle'                                                       }    true      false      0.18525
+    {'nonlinearPredictiveSafetyTest/finiteBrakingSlewUsesAppliedInputMemory'                                                                   }    true      false      0.49121
+    {'controllerSourceBudgetTest/controllerAndConfigurationFitNineSourceFiles'                                                                 }    true      false     0.004877
+    {'collisionAvoidanceControllerConfigTest/targetRearAxleDistanceIsPositiveAndIndependentOfEgoGeometry'                                      }    true      false      0.08242
+    {'collisionAvoidanceControllerConfigTest/defaultCollisionBufferCanBeExplicitlyDisabled'                                                    }    true      false     0.002937
+    {'collisionAvoidanceControllerConfigTest/collisionBufferCannotBeNegativeOrNonfinite'                                                       }    true      false     0.012838
+    {'collisionAvoidanceControllerConfigTest/encounterRangeDefaultsToThirtyMetersAndMayBeUnbounded'                                            }    true      false     0.001845
+    {'collisionAvoidanceControllerConfigTest/encounterRangeMustExceedTheCollisionBuffer'                                                       }    true      false      0.00784
+    {'collisionAvoidanceControllerConfigTest/solverPrecisionAndIterationLimitsAreValidated'                                                    }    true      false     0.022204
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=-0.1)'                               }    true      false      0.00705
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=Inf)'                                }    true      false     0.001623
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=NaN)'                                }    true      false     0.001659
+    {'collisionAvoidanceControllerConfigTest/crossingTimeGapMustBeFiniteAndNonnegative(invalidCrossingGap=1x2_double)'                         }    true      false     0.001913
+    {'collisionAvoidanceControllerConfigTest/theOldAccelerationGainCannotRedefineThePaperRatio'                                                }    true      false      0.00185
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct)'                                         }    true      false     0.001805
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_1)'                                       }    true      false     0.002876
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_2)'                                       }    true      false     0.002047
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_3)'                                       }    true      false     0.001865
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_4)'                                       }    true      false     0.002282
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_5)'                                       }    true      false     0.002134
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_6)'                                       }    true      false     0.001645
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_7)'                                       }    true      false      0.00157
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_8)'                                       }    true      false      0.00126
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_9)'                                       }    true      false     0.001427
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_10)'                                      }    true      false     0.001604
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_11)'                                      }    true      false     0.001579
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_12)'                                      }    true      false     0.001592
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_13)'                                      }    true      false     0.001502
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_14)'                                      }    true      false     0.001541
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_15)'                                      }    true      false     0.001586
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_16)'                                      }    true      false      0.00158
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_17)'                                      }    true      false     0.001766
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_18)'                                      }    true      false     0.001544
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_19)'                                      }    true      false     0.001761
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_20)'                                      }    true      false     0.001666
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_21)'                                      }    true      false     0.001576
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_22)'                                      }    true      false     0.001295
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_23)'                                      }    true      false     0.001426
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_24)'                                      }    true      false     0.001679
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_25)'                                      }    true      false     0.002066
+    {'collisionAvoidanceControllerConfigTest/removedAlgorithmOptionsAreRejected(removedOption=struct_26)'                                      }    true      false     0.003176
+    {'collisionAvoidanceControllerConfigTest/unknownNestedOptionsAreRejected'                                                                  }    true      false      0.00221
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=notANumber)'}    true      false     0.003333
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=infinite)'  }    true      false     0.002758
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=complex)'   }    true      false     0.003364
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=empty)'     }    true      false     0.002851
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=vector)'    }    true      false     0.003433
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=text)'      }    true      false     0.008066
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMinimum,invalidBound=logical)'   }    true      false     0.002933
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=notANumber)'}    true      false     0.002422
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=infinite)'  }    true      false     0.001906
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=complex)'   }    true      false     0.002206
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=empty)'     }    true      false     0.002181
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=vector)'    }    true      false     0.001944
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=text)'      }    true      false     0.003164
+    {'collisionAvoidanceControllerConfigTest/brakingRatioBoundsMustBeFiniteRealScalars(boundField=brakingRatioMaximum,invalidBound=logical)'   }    true      false     0.001813
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=zeroWidth)'                  }    true      false     0.002735
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=reversed)'                   }    true      false     0.002161
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=positiveOnly)'               }    true      false     0.002181
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=negativeOnly)'               }    true      false     0.002118
+    {'collisionAvoidanceControllerConfigTest/brakingRatioIntervalMustContainZeroWithPositiveWidth(invalidInterval=outsideRange)'               }    true      false     0.002861
+    {'collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=0x0_double)'                                     }    true      false      0.00262
+    {'collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=1x1_double_1)'                                   }    true      false     0.002538
+    {'collisionAvoidanceControllerConfigTest/actuationMustBeAScalarStructure(invalidActuation=0x0_struct)'                                     }    true      false     0.002573
+    {'collisionAvoidanceControllerConfigTest/singlePrecisionBoundsAreNormalizedWithoutChangingUnits'                                           }    true      false     0.014356
+    {'collisionAvoidanceControllerConfigTest/zeroMaximumStillAllowsBraking'                                                                    }    true      false     0.055372
+    {'terminalContinuationTest/nonlinearContractionIncludesTheReferenceDefect(curvature=0)'                                                    }    true      false      0.44929
+    {'terminalContinuationTest/nonlinearContractionIncludesTheReferenceDefect(curvature=-0.005)'                                               }    true      false      0.22581
+    {'terminalContinuationTest/nonlinearContractionIncludesTheReferenceDefect(curvature=0.005)'                                                }    true      false       0.2125
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0,phaseMeters=-20)'                                         }    true      false      0.19988
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0,phaseMeters=0)'                                           }    true      false     0.007279
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0,phaseMeters=20)'                                          }    true      false     0.001968
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=-0.005,phaseMeters=-20)'                                    }    true      false      0.21254
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=-0.005,phaseMeters=0)'                                      }    true      false     0.003619
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=-0.005,phaseMeters=20)'                                     }    true      false     0.001672
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0.005,phaseMeters=-20)'                                     }    true      false      0.19538
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0.005,phaseMeters=0)'                                       }    true      false     0.001845
+    {'terminalContinuationTest/endpointControlsReachTheNextAbsoluteSlice(curvature=0.005,phaseMeters=20)'                                      }    true      false     0.001825
+    {'terminalContinuationTest/shiftedReferenceStatesBelongToTheirOwnTerminalFamily(curvature=0)'                                              }    true      false      0.18977
+    {'terminalContinuationTest/shiftedReferenceStatesBelongToTheirOwnTerminalFamily(curvature=-0.005)'                                         }    true      false       0.1937
+    {'terminalContinuationTest/shiftedReferenceStatesBelongToTheirOwnTerminalFamily(curvature=0.005)'                                          }    true      false      0.19522
+    {'terminalContinuationTest/phaseTangentsMatchTheReferenceAndMembership(curvature=0)'                                                       }    true      false      0.20264
+    {'terminalContinuationTest/phaseTangentsMatchTheReferenceAndMembership(curvature=-0.005)'                                                  }    true      false      0.19421
+    {'terminalContinuationTest/phaseTangentsMatchTheReferenceAndMembership(curvature=0.005)'                                                   }    true      false      0.19817
+    {'terminalContinuationTest/aDifferentPhaseMustRecheckFutureTargetSeparation'                                                               }    true      false      0.18549
+    {'terminalContinuationTest/separationUsesTheSameAbsoluteTimeAsTheEndpoint'                                                                 }    true      false     0.004435
+    {'terminalContinuationTest/departureFollowsTheEndpointPolicyUntilTheTargetIsOutOfRange'                                                    }    true      false     0.098667
+    {'terminalContinuationTest/inputMemoryIsPartOfMembership'                                                                                  }    true      false     0.009445
+    {'terminalContinuationTest/aDeadlineCannotAuthorizeAnUnoptimizedInitialization'                                                            }    true      false      0.24244
+    {'terminalContinuationTest/aChangedConstraintSetRequiresReinitialization'                                                                  }    true      false      0.05727
+    {'terminalContinuationTest/changingTheGivenPathStillRequiresReinitialization'                                                              }    true      false     0.044692
+    {'terminalContinuationTest/targetSeparationDoesNotDependOnRoadWidth(curvature=0)'                                                          }    true      false      0.20172
+    {'terminalContinuationTest/targetSeparationDoesNotDependOnRoadWidth(curvature=-0.005)'                                                     }    true      false      0.18988
+    {'terminalContinuationTest/targetSeparationDoesNotDependOnRoadWidth(curvature=0.005)'                                                      }    true      false      0.25256
+    {'freePoseTerminalTest/rigidPlacementPreservesMembershipAndControl(angle=0)'                                                               }    true      false      0.45703
+    {'freePoseTerminalTest/rigidPlacementPreservesMembershipAndControl(angle=0.7)'                                                             }    true      false     0.007611
+    {'freePoseTerminalTest/rigidPlacementPreservesMembershipAndControl(angle=1.9)'                                                             }    true      false     0.006339
+    {'freePoseTerminalTest/fittedPoseMinimizesTheOriginalEllipsoidError'                                                                       }    true      false     0.007524
+    {'freePoseTerminalTest/fittedPoseDerivativeMatchesAugmentedStatePerturbations'                                                             }    true      false     0.007831
+    {'freePoseTerminalTest/separationDerivativeIncludesPoseAndInputMemory(motion=11x1_double)'                                                 }    true      false     0.025688
+    {'freePoseTerminalTest/separationDerivativeIncludesPoseAndInputMemory(motion=11x1_double_1)'                                               }    true      false     0.013569
+    {'freePoseTerminalTest/freePoseDoesNotAuthorizeDrivingIntoAStationaryTarget'                                                               }    true      false     0.001519
+    {'freePoseTerminalTest/retainedCoreClosesTheSuffixWithFiniteBrakingSlew(angle=0)'                                                          }    true      false     0.013842
+    {'freePoseTerminalTest/retainedCoreClosesTheSuffixWithFiniteBrakingSlew(angle=0.7)'                                                        }    true      false     0.006392
+    {'freePoseTerminalTest/retainedCoreClosesTheSuffixWithFiniteBrakingSlew(angle=1.9)'                                                        }    true      false     0.072685
+    {'movingTargetFlowTest/movingEllipseHasNoRelativeNormalPenetration(angle=0)'                                                               }    true      false     0.098514
+    {'movingTargetFlowTest/movingEllipseHasNoRelativeNormalPenetration(angle=0.7)'                                                             }    true      false      0.00181
+    {'movingTargetFlowTest/movingEllipseHasNoRelativeNormalPenetration(angle=1.9)'                                                             }    true      false     0.001065
+    {'movingTargetFlowTest/changingWorldVelocityTransportsTheSameRelativeFlow'                                                                 }    true      false     0.004764
+    {'movingTargetFlowTest/rotatingTheWorldRotatesTheGuidance(angle=0)'                                                                        }    true      false     0.001597
+    {'movingTargetFlowTest/rotatingTheWorldRotatesTheGuidance(angle=0.7)'                                                                      }    true      false     0.002118
+    {'movingTargetFlowTest/rotatingTheWorldRotatesTheGuidance(angle=1.9)'                                                                      }    true      false     0.000951
+    {'movingTargetFlowTest/anInteriorSearchPointDoesNotMakeTheGuidanceSingular'                                                                }    true      false     0.060083
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.005,fraction=1)'                                           }    true      false       0.4184
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.005,fraction=0.5)'                                         }    true      false      0.15405
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.025,fraction=1)'                                           }    true      false      0.15721
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.025,fraction=0.5)'                                         }    true      false      0.14713
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.05,fraction=1)'                                            }    true      false      0.14903
+    {'controllerKernelTest/kernelReproducesTheModelAndItsTangents(integrationStep=0.05,fraction=0.5)'                                          }    true      false      0.14529
+    {'controllerKernelTest/geometryKernelsReproduceTheInterpretedDistanceAndDual'                                                              }    true      false      0.73055
+    {'controllerKernelTest/kernelKeepsTheModelDomainErrors'                                                                                    }    true      false     0.097021
+    {'nominalRecoveryValidationTest/recoveryRequiresMinimumTimeAndSustainedDwell'                                                              }    true      false       2.1128
+    {'nominalRecoveryValidationTest/completedDurationDoesNotMeanRecovered'                                                                     }    true      false      0.57888
+    {'nominalRecoveryValidationTest/defaultFixedDurationDoesNotClaimRecovery'                                                                  }    true      false      0.44259
+    {'nominalRecoveryValidationTest/extendingDurationPreservesTheControllerAndPlantState'                                                      }    true      false       2.0425
+
+CONTROLLER-TESTS passed 223 failed 0 of 223

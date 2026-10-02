@@ -1,0 +1,301 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{2em}
+\setlength{\tabcolsep}{4pt}
+\title{A Control Lyapunov Function for Recovery Without Collision Risk}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+
+\section{Requirement and result}
+The requirement is a control Lyapunov function (CLF) whose decrease condition,
+met at every frame without collision risk, dissipates the ego state to the
+nominal behaviour: the given path at the reference speed. This needs two
+properties.
+\begin{enumerate}
+\item \emph{Existence:} at every state the ego can be in, some admissible input
+satisfies the condition.
+\item \emph{Use:} the controller actually issues such an input.
+\end{enumerate}
+The previous lane quadratic failed the first property outside a small set
+($V\le44$ at 8~m/s, $V\le27$ at 15~m/s;
+\path{CLF_NO_RISK_DISSIPATION_20261001.tex}). The controller also failed the
+second property near the path, through the trust-region trap.
+
+The new CLF is the cost-to-go of a path-guidance feedback $\kappa$. Along
+$\kappa$, $V$ falls by exactly the stage cost in the controller's model, so
+$\kappa(x)$ is the required input wherever $\kappa$ converges.
+\begin{itemize}
+\item $\kappa$ converges from all 10{,}800 sampled starts: offsets up to
+150~m, every heading, speed factors 0.5--1.15, lateral velocities to 1.5~m/s
+and yaw rates to 0.5~rad/s, on straight and 200-m-radius paths at 8 and
+15~m/s.
+\item It also converges from all 1{,}592 recorded no-risk states of the
+previous campaign.
+\item Without a target in range, the controller anchors on $\kappa$ and issues
+it.
+\end{itemize}
+In the fourteen-case campaign, every ego that leaves the encounter range now
+returns to nominal cruise: 12 of 14 cases recover, at 14.15--46.20~s,
+against 3 of 14, at 43.85--62.65~s, before.
+\begin{itemize}
+\item At all 3{,}452 target-free frames the CLF slack is zero.
+\item Between consecutive target-free frames, the CLF measured at the ODE45
+plant fell by at least the required amount every time (3{,}433 of 3{,}433).
+\item The two crossing cases never leave the encounter range, so this CLF never
+applies to them.
+\item Encounter-phase behaviour is unchanged, and so are the minimum gaps,
+except one case whose first two frames start beyond the range.
+\end{itemize}
+
+\section{Construction}
+\subsection{The CLF}
+Let $f$ be the controller's hold model (one RK4 step of the Fiala bicycle per
+50-ms hold) and $\kappa$ the recovery feedback below. Write
+$F(x)=f(x,\kappa(x))$ and $e(x)=[e_y,e_\psi,e_v,v_y-v_y^*,r-r^*]$, the
+existing path-frame error. The stage cost is $l(e)=e^TQe$ with
+$Q=\mathrm{diag}(\mathrm{scales})^{-2}$ from \texttt{cfg.clf}. Define
+\[
+V(x)=\sum_{k=0}^{K(x)-1}l\bigl(e(x_k)\bigr)+V_f\bigl(e(x_{K(x)})\bigr),\qquad x_0=x,\ x_{k+1}=F(x_k),
+\]
+where $K(x)$ is the first step with $V_f\le10^{-3}$, and
+$V_f(e)=e^TP_fe$ solves $A_{\rm cl}^TP_fA_{\rm cl}-P_f+Q=0$ for the closed-loop
+Jacobian $A_{\rm cl}$ at the trim.
+\begin{itemize}
+\item \emph{Decrease.} $F(x)$ lies on the same closed loop one hold later and
+reaches the stop level at the same absolute step, so
+\[
+V(F(x))=V(x)-l(e(x)).
+\]
+At every state from which $\kappa$ converges, $\kappa(x)$ therefore decreases
+$V$ by the full stage cost. That is the CLF existence property, with region
+equal to the region of convergence of $\kappa$.
+\item \emph{Positivity.} $V\ge0$, and $V=0$ only at the trim, which is an
+equilibrium of $\kappa$.
+\item \emph{Dissipation.} If every frame meets
+$V(x_{k+1})\le V(x_k)-\eta\,l(e(x_k))$ with $\eta>0$, summing gives
+$\eta\sum_k l(e(x_k))\le V(x_0)$. Hence $l(e(x_k))\to0$: the ego converges to
+the nominal behaviour, without any fixed exponential rate.
+\end{itemize}
+
+\subsection{The recovery feedback}
+\texttt{nonlinearBicycleModel.recoveryInput} cascades four loops.
+\begin{enumerate}
+\item \emph{Guidance.} The course relative to the path is
+$\chi=\psi+\arctan(v_y/v_x)-\psi_{\rm path}$, and its desired value is
+$\chi_d=-\arctan(e_y/D)$. With exact course tracking,
+$\dot e_y=-Ve_y/\sqrt{e_y^2+D^2}$, so $e_y^2$ decreases at every offset. The
+approach angle never exceeds $90^\circ$, unlike the lane quadratic's preferred
+heading.
+\item \emph{Course loop.} The desired yaw rate is
+$r_d=\kappa_pV\cos\chi/(1-\kappa_pe_y)+\dot\chi_d-k_\chi\,\mathrm{wrap}(\chi-\chi_d)$.
+It is limited to $0.75\mu g/V$, so lateral acceleration stays within
+friction. A reversed course turns at the limit.
+\item \emph{Yaw-rate loop.} The required front lateral force is
+$\bigl(I_zk_r(r_d-r)+l_rF_{yr}\bigr)/l_f$, capped at 90\% of the
+combined-slip capacity. The front slip angle comes from the exact Fiala
+inverse, $|F|/F_{\max}=1-(1-s)^3$ with $\tan|\alpha|=3F_{\max}s/C$, so the tire
+never passes its force peak.
+\item \emph{Speed loop.} The braking ratio is $b=b^*+k_v(v_x^*-v_x)$, limited to
+$\pm0.35$.
+\end{enumerate}
+The inverse neglects the front longitudinal force and $\cos\delta$. A constant
+steering offset, computed once per configuration and curvature, therefore makes
+$\kappa(\text{trim})=u^*$ exactly. The offset is 0 on straight paths, and
+$-1.68\times10^{-5}$~rad (8~m/s) and $-2.68\times10^{-5}$~rad (15~m/s) on the
+200-m curve.
+\begin{center}\footnotesize
+\begin{tabular}{llll}
+\toprule
+Parameter (\texttt{cfg.recovery}) & Value & Parameter & Value\\
+\midrule
+lookahead $D=\max(8,\,1.5\,v_{\rm ref})$ & 12~m / 22.5~m & speedGain $k_v$ & 0.5 per m/s\\
+courseGain $k_\chi$ & 1.5~s$^{-1}$ & brakingRatioLimit & 0.35\\
+yawRateGain $k_r$ & 10~s$^{-1}$ & decreaseFraction $\eta$ & 0.5\\
+lateralAccelerationFraction & 0.75 & stopValue & $10^{-3}$\\
+frontForceFraction & 0.9 & maximumSeconds & 120~s\\
+\bottomrule
+\end{tabular}\end{center}
+
+\section{Sampled certificate}
+\path{scripts/certifyRecoveryClf.m} evaluates $\kappa$ in the controller's
+model.
+\begin{center}\footnotesize
+\begin{tabular}{rrrrrrrrr}
+\toprule
+Speed & Curvature & Starts & Pass & Entry median / max (s) & Max $|a_y|$ & Min $v_x$ & Spectral radius & Lyapunov residual\\
+\midrule
+8 & 0 & 2700 & 2700 & 12.65 / 30.05 & 7.05 & 4.13 & 0.9682 & $2.8\times10^{-15}$\\
+8 & 0.005 & 2700 & 2700 & 12.65 / 30.15 & 7.05 & 4.13 & 0.9682 & $1.0\times10^{-15}$\\
+15 & 0 & 2700 & 2700 & 15.80 / 26.95 & 7.00 & 7.62 & 0.9694 & $1.5\times10^{-15}$\\
+15 & 0.005 & 2700 & 2700 & 15.75 / 27.05 & 7.00 & 7.62 & 0.9695 & $2.6\times10^{-15}$\\
+\bottomrule
+\end{tabular}\end{center}
+\begin{itemize}
+\item \emph{Grid.} The starts cover lateral offsets $\{0,\pm1,\pm5,\pm15,\pm30,\pm60,\pm100,\pm150\}$~m and headings
+every $20^\circ$ relative to the path. Ten combinations of speed factor, lateral
+velocity and yaw rate are crossed with them.
+\item \emph{Pass criterion.} A start passes when all five errors stay inside the recovery
+tolerances (0.1~m, $1^\circ$, 0.1~m/s, 0.05~m/s, 0.01~rad/s) for 5~s. ``Entry''
+is the time the errors first reach them. Acceleration is in m/s$^2$ and speed in m/s.
+\item \emph{Results.} No start leaves the tire or model domain. The peak yaw rate is
+1.17~rad/s and the peak lateral velocity 1.51~m/s.
+\item \emph{Identity check.} On every tenth start (1{,}080 starts),
+$V(F(x))=V(x)-l(e(x))$ holds to a relative error of at most
+$9.5\times10^{-16}$.
+\item \emph{Recorded states.} From every tenth no-risk frame of the 5-cm
+baseline replays (1{,}592 states, $e_y$ from $-177$ to $533$~m), $\kappa$
+enters and holds the tolerances within 45.05~s, with no domain failure.
+\end{itemize}
+
+\section{Use in the controller}
+When the measured state is beyond the 30-m encounter range, or there is no
+target, the solve has no collision rows. Three things change.
+\begin{itemize}
+\item \emph{Anchor.} The linearization anchor is \texttt{recoveryFeedbackRollout}:
+$\kappa$ for the primary horizon, then the existing terminal completion. Its
+first input is $\kappa(x_0)$. The shifted previous plan, which caused the trap,
+is not used.
+\item \emph{CLF stage.} The stage requires
+$V(x_1)\le V(x_0)-\eta\,l(e(x_0))+\rho$.
+\begin{itemize}
+\item $V(x_0)$ comes from one rollout.
+\item Near the anchor's first node, $V$ is the Gauss--Newton cone $c+|a+R\,\Delta x_1|^2$. Its Jacobian comes from six rollouts of equal length started at perturbed states.
+\item At zero correction the cone equals $V(x_0)-l$, so $\rho=0$ is feasible with margin $(1-\eta)\,l$.
+\end{itemize}
+\item \emph{Third stage.} Subject to both achieved slack levels, a third
+problem minimizes the weighted input deviation from the anchor, with weight
+$10^3$ on the first input. The issued input is therefore $\kappa(x_0)$ whenever
+the other constraints admit it, and $V$ falls by exactly $l$ in the hold
+model.
+\end{itemize}
+The cone alone is not trusted for other inputs. For corrections across the
+whole trust box, its error reached twice the stage cost.
+
+While a target is within range, nothing changes: shifted-plan anchor, PCBF
+stage, lane-quadratic CLF stage, and no third stage. The continuation state
+version is now 64.
+
+\section{Validation}
+\paragraph{Tests.} The full MATLAB suite passes, 568 of 568. That includes the eleven
+controller test classes (223 tests) and the new
+\path{tests/recoveryClfTest.m}, which checks:
+\begin{itemize}
+\item the exact trim equilibrium;
+\item the Lyapunov equation;
+\item the cost-to-go identity;
+\item convergence from distant and reversed starts;
+\item a 21-frame target-free closed loop.
+\end{itemize}
+The Python audit tests pass, 20 of 20.
+
+Some expectations changed. Target-free frames now report
+\texttt{recoveryFeedbackRollout}, three solver calls and the
+anchor-deviation stage. The shifted-input, restart and steering-cap tests now
+place a target within range, where the two-stage behaviour is unchanged.
+
+\paragraph{Campaign.} The fourteen collision-threat cases of the 5-cm campaign
+were rerun with the changed controller. Fixtures, driver, ODE45 plant, 80-s
+window and 5-s recovery dwell are unchanged. In the table, ``free'' frames are
+target-free frames, and ``meets'' is the share of consecutive free frames
+whose CLF, measured at the plant states, fell by at least $\eta\,l$.
+\begin{center}\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{rlrrrrrrrr}
+\toprule
+ & & \multicolumn{2}{c}{Recovered at (s)} & \multicolumn{2}{c}{Min gap (m)} & Free & Meets & Max $|\Delta V_{\rm plant}-l|$ & Median free\\
+Speed & Scenario & before & now & before & now & frames & $\eta\,l$ & $/\,l$ & frame (s)\\
+\midrule
+8 & headOn & 57.10 & 18.05 & 0.603 & 0.603 & 264 & 100\% & 0.038 & 0.19\\
+8 & acceleratingHeadOn & 62.65 & 17.40 & 0.430 & 0.430 & 266 & 100\% & 0.048 & 0.20\\
+8 & brakingLead & 43.85 & 33.45 & 1.062 & 1.062 & 248 & 100\% & 0.004 & 0.17\\
+8 & crossing & --- & --- & 0.742 & 0.742 & 0 & --- & --- & ---\\
+8 & turningCrossing & --- & 40.40 & 0.440 & 0.440 & 391 & 100\% & 0.038 & 0.20\\
+8 & curvedHeadOn & --- & 18.00 & 0.707 & 0.707 & 259 & 100\% & 0.031 & 0.19\\
+8 & curvedCrossing & --- & 46.20 & 0.589 & 0.589 & 282 & 100\% & 0.022 & 0.23\\
+15 & headOn & --- & 14.50 & 0.035 & 0.035 & 231 & 100\% & 0.0007 & 0.19\\
+15 & acceleratingHeadOn & --- & 14.15 & 0.031 & 0.031 & 229 & 100\% & 0.0005 & 0.21\\
+15 & brakingLead & --- & 45.25 & 0.710 & 0.710 & 238 & 100\% & 0.0003 & 0.19\\
+15 & crossing & --- & --- & 0.409 & 0.409 & 0 & --- & --- & ---\\
+15 & turningCrossing & --- & 39.20 & 0.128 & 0.128 & 439 & 100\% & 0.0003 & 0.21\\
+15 & curvedHeadOn & --- & 15.45 & 0.854 & 0.844 & 233 & 100\% & 0.0009 & 0.18\\
+15 & curvedCrossing & --- & 44.30 & 0.151 & 0.151 & 372 & 100\% & 0.0004 & 0.20\\
+\bottomrule
+\end{tabular}
+\end{center}
+Notes on the table:
+\begin{itemize}
+\item ``Before'' is the 5-cm campaign (\path{COLLISION_MARGIN_5CM_20261001.tex}).
+\item ``Max $|\Delta V_{\rm plant}-l|/l$'' compares the CLF decrease measured
+between plant states with the hold model's exact decrease $l$.
+\end{itemize}
+
+\paragraph{Every ego that leaves the encounter range recovers.} This holds for
+all twelve such cases.
+\begin{itemize}
+\item The head-on family confirms recovery at 14.15--18.05~s, within 1.2--5.1~s
+of the earliest possible confirmation at 13~s.
+\item Braking lead recovers at 33.45 and 45.25~s.
+\item The turning and curved crossing cases recover at 39.20--46.20~s.
+\end{itemize}
+Nine of these cases never recovered before. The three that did now recover
+10--45~s sooner.
+
+\paragraph{The CLF condition held at every target-free frame.} The CLF slack
+is zero at all 3{,}452 such frames. Between consecutive target-free frames,
+$V$ fell by at least $\eta\,l$ in all 3{,}433 cases, measured at the ODE45 plant
+states. The plant decrease differs from the hold model's exact decrease $l$ by at most
+4.8\% of $l$ at 8~m/s and 0.09\% at 15~m/s, so the 50\% margin is never
+approached. Summed over a run, this is the dissipation argument of Section~2
+realized in the plant.
+
+\paragraph{The encounter phase is unchanged.} Minimum gaps equal the
+baseline's, except in 15-m/s curvedHeadOn (0.844 against 0.854~m). There the
+target is 31.8 and 30.6~m away in the first two frames, which are therefore
+target-free and now use the recovery anchor. The flow restarts are also
+unchanged: one in each 15-m/s curved case.
+
+\paragraph{The crossing cases are not reached.} Both crossing egos still escort
+the target inside the 30-m range for the whole 80~s. They end at $-621.0$ and
+$-629.0$~m, so the recovery CLF never applies. That trap is in the encounter
+phase, which this change leaves as it was.
+
+\paragraph{Cost.} A target-free frame needs seven feedback rollouts and three
+cone solves. Its median controller time is 0.17--0.23~s and its maximum
+0.39~s, measured with other MATLAB jobs running.
+
+\section{Limits}
+\begin{itemize}
+\item The existence property rests on the convergence of $\kappa$, which is
+sampled, not proved, on the stated grid and recorded states. Starting speeds
+below about 4~m/s and curvature charts with $1-\kappa_pe_y<0.1$ are outside
+it.
+\item The exact decrease holds in the hold model for frames that issue
+$\kappa(x_0)$. The ODE45 plant is measured, not covered by the claim.
+\item The anchor-deviation stage keeps the first input on $\kappa$ unless other
+constraints prevent it, and such frames are not covered by the identity.
+\item Nothing is claimed while a target is within range. Safety keeps priority,
+and an ego that never leaves the range never reaches this CLF.
+\item Controller timings were measured with other MATLAB jobs on the machine;
+they are not benchmarks.
+\end{itemize}
+
+\section{Artifacts}
+The controller changes are in \path{controller/nonlinearBicycleModel.m},
+\path{controller/solvePredictiveControl.m},
+\path{controller/collisionAvoidanceController.m} and
+\path{config/collisionAvoidanceControllerConfig.m}. The derivation is in
+\path{controller/RECOVERY_CLF.md}.
+\path{report/RECOVERY_CLF_20261001/} holds:
+\begin{itemize}
+\item the certificate tables;
+\item the recorded-state check;
+\item the campaign comparison;
+\item methods, logs and a manifest.
+\end{itemize}
+The campaign JSON/MAT files remain in
+\path{/home/zai/.cache/collisionAvoidance/recovery-clf-20261001/}.
+\end{document}

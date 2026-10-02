@@ -198,7 +198,99 @@ classdef nonlinearBicycleModel
                 cos(x(3)-projection.heading-reference.state(3)));
             error=[projection.lateralPosition;angle;x(4:6)-reference.state(4:6)];
         end
+
+        function u = recoveryInput(x,previous,lane,reference,cfg,terminal)
+            % Path-guidance feedback that defines the recovery CLF (RECOVERY_CLF.md).
+            % Course guidance chi_d=-atan(e_y/D) toward the path, a course loop to a
+            % yaw-rate demand within the lateral-friction limit, the front slip angle
+            % from the inverse Fiala curve below its force peak, and a speed loop on
+            % the braking ratio. terminal.steeringOffset makes the trim an exact
+            % equilibrium (the inverse neglects the front longitudinal force).
+            p=cfg.recovery;projection=laneGeometry.project(x(1:2),lane);
+            lateral=projection.lateralPosition;curvature=reference.curvature;
+            speed=hypot(x(4),x(5));course=localWrap(x(3)+atan2(x(5),x(4))-projection.heading);
+            lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*hypot(reference.state(4),reference.state(5)));
+            desired=-atan(lateral/lookahead);desiredRate=-lookahead/(lookahead^2+lateral^2)*speed*sin(course);
+            yawRate=curvature*speed*cos(course)/max(1-curvature*lateral,.1)+desiredRate ...
+                -p.courseGain*localWrap(course-desired);
+            tire=modifiedFialaTire.parameters(cfg);
+            limit=p.lateralAccelerationFraction*min(tire.frictionCoefficient)*cfg.vehicle.gravity/max(speed,1);
+            yawRate=min(limit,max(-limit,yawRate));
+            b=reference.input(2)+p.speedGain*(reference.state(4)-x(4));
+            b=min(p.brakingRatioLimit,max(-p.brakingRatioLimit,b));
+            rate=cfg.model.brakingRatioRateMaximum*cfg.controller.sampleTime;
+            if isfinite(rate),b=min(previous(2)+rate,max(previous(2)-rate,b));end
+            b=min(min(1-1e-8,cfg.actuation.brakingRatioMaximum),max(max(-1+1e-8,cfg.actuation.brakingRatioMinimum),b));
+            rear=modifiedFialaTire.evaluate([0;atan2(x(5)-cfg.vehicle.lr*x(6),x(4))],b,cfg);
+            front=(cfg.vehicle.Iz*p.yawRateGain*(yawRate-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;
+            capacity=tire.longitudinalForceScale(1)*sqrt(1-b^2);
+            fraction=min(abs(front)/capacity,p.frontForceFraction);
+            slip=-sign(front)*atan(3*capacity*(1-(1-fraction)^(1/3))/tire.corneringStiffness(1));
+            u=[atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-slip+terminal.steeringOffset;b];
+        end
+
+        function terminal = recoveryTerminal(cfg,curvature)
+            % Linearized recovery loop at the trim and its exact quadratic
+            % cost-to-go, P = dlyap(A',Q) for the stage cost l(e) = e'Qe.
+            persistent savedKey saved
+            key={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.actuation,cfg.referenceSpeed, ...
+                cfg.controller.sampleTime,cfg.nonlinear.integrationStep,cfg.clf,cfg.recovery,curvature};
+            if isequaln(key,savedKey),terminal=saved;return;end
+            reference=nonlinearBicycleModel.cruise(cfg,curvature);
+            lane=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
+            trim=[0;0;reference.state(3:6)];
+            raw=nonlinearBicycleModel.recoveryInput(trim,reference.input,lane,reference,cfg,struct('steeringOffset',0));
+            terminal=struct('steeringOffset',reference.input(1)-raw(1));
+            scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
+                cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
+            closedLoop=zeros(5);step=1e-6*scales;
+            for index=1:5
+                e=zeros(5,1);e(index)=step(index);
+                closedLoop(:,index)=(localRecoveryStep(e,lane,reference,cfg,terminal) ...
+                    -localRecoveryStep(-e,lane,reference,cfg,terminal))/(2*step(index));
+            end
+            radius=max(abs(eig(closedLoop)));
+            if radius>=1
+                error('collisionAvoidanceController:unstableRecoveryFeedback', ...
+                    'The recovery feedback is not locally stable at the trim (spectral radius %.4f).',radius);
+            end
+            P=dlyap(closedLoop.',diag(1./scales.^2));P=(P+P.')/2;
+            terminal=struct('steeringOffset',terminal.steeringOffset,'closedLoop',closedLoop,'matrix',P, ...
+                'factor',chol(P),'stageFactor',diag(1./scales),'spectralRadius',radius);
+            savedKey=key;saved=terminal;
+        end
+
+        function [value,residual,steps,converged] = recoveryValue(x,previous,lane,reference,terminal,cfg,steps)
+            % Recovery CLF: the cost-to-go of recoveryInput from (x, previous input),
+            % the sum of l(e_k) until the terminal quadratic is at most stopValue,
+            % plus that quadratic. value = |residual|^2. A given steps fixes the
+            % rollout length; converged is false if maximumSeconds is reached.
+            fixed=nargin>6;maximum=round(cfg.recovery.maximumSeconds/cfg.controller.sampleTime);
+            if fixed,maximum=steps;end
+            blocks=zeros(5,maximum);u=previous;converged=false;steps=0;
+            while true
+                e=nonlinearBicycleModel.error(x,lane,reference);
+                if fixed && steps==maximum,converged=true;break;end
+                if ~fixed && sum((terminal.factor*e).^2)<=cfg.recovery.stopValue,converged=true;break;end
+                if steps==maximum,break;end
+                steps=steps+1;blocks(:,steps)=terminal.stageFactor*e;
+                u=nonlinearBicycleModel.recoveryInput(x,u,lane,reference,cfg,terminal);
+                x=nonlinearBicycleModel.sample(x,u,cfg);
+            end
+            residual=[reshape(blocks(:,1:steps),[],1);terminal.factor*e];value=sum(residual.^2);
+        end
     end
+end
+
+function a=localWrap(a)
+    a=atan2(sin(a),cos(a));
+end
+
+function next=localRecoveryStep(e,lane,reference,cfg,terminal)
+    [position,heading]=laneGeometry.referencePose(0,e(1),lane.referenceCurve);
+    x=[position;heading+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
+    u=nonlinearBicycleModel.recoveryInput(x,reference.input,lane,reference,cfg,terminal);
+    next=nonlinearBicycleModel.error(nonlinearBicycleModel.sample(x,u,cfg),lane,reference);
 end
 
 function y=localIntegrate(x,u,cfg,curvature,duration,variational)

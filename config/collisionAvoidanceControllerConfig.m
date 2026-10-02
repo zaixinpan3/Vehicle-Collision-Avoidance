@@ -44,6 +44,19 @@ function cfg=localDefaults()
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
         'frontWheelSteeringAngleWeight',1,'brakingRatioWeight',1);
+    % Recovery CLF used when no target is within the encounter range: the
+    % cost-to-go of a path-guidance feedback (nonlinearBicycleModel.recoveryInput).
+    % Course guidance chi_d=-atan(e_y/D), D=max(minimumLookaheadMeters,
+    % lookaheadSeconds*referenceSpeed) [s, m]; courseGain [1/s]; yawRateGain [1/s];
+    % yaw-rate demand within lateralAccelerationFraction of mu*g; front lateral
+    % force within frontForceFraction of its capacity; speedGain [1/(m/s)] on the
+    % braking ratio, limited to +/-brakingRatioLimit. The CLF stage requires a
+    % decrease of decreaseFraction times the stage cost. A rollout ends once the
+    % terminal quadratic is at most stopValue, or after maximumSeconds [s].
+    cfg.recovery=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
+        'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
+        'speedGain',.5,'brakingRatioLimit',.35,'decreaseFraction',.5,'stopValue',1e-3, ...
+        'maximumSeconds',120,'firstInputWeight',1e3);
     % The two convex solves share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
@@ -113,6 +126,12 @@ function localValidate(cfg)
     validateattributes(cfg.model.brakingRatioRateMaximum,{'double'},{'scalar','real','positive'});
     for name=string(fieldnames(cfg.clf)).'
         validateattributes(cfg.clf.(name),{'double'},{'scalar','real','finite','positive'});
+    end
+    for name=string(fieldnames(cfg.recovery)).'
+        validateattributes(cfg.recovery.(name),{'double'},{'scalar','real','finite','positive'});
+    end
+    for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit","decreaseFraction"]
+        if cfg.recovery.(name)>=1,localInvalid('recovery.%s must lie in (0,1).',name);end
     end
     validateattributes(cfg.solver.maxIterations,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','positive'});

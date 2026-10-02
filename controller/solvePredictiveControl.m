@@ -10,7 +10,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     [solution,search,model]=localStep(anchor,model,initialization,timer);
     search.initializationSeconds=initializationSeconds;
     attempts=localAttempt(search);firstStages=search.stages;
-    restart=isempty(solution) && initialization=="shiftedInputRollout" ...
+    restart=isempty(solution) && any(initialization==["shiftedInputRollout","recoveryFeedbackRollout"]) ...
         && any(search.terminationReason==["pcbfNoNumericalResult","clfNoNumericalResult"]) ...
         && toc(timer)<model.cfg.solver.timeLimitSeconds;
     if restart
@@ -76,22 +76,49 @@ function [solution,search,model]=localStep(anchor,model,initialization,timer)
     if isempty(second) || any(~isfinite(second))
         search.terminationReason="clfNoNumericalResult";search.elapsedSeconds=toc(timer);return;
     end
+    remaining=cfg.solver.timeLimitSeconds-toc(timer);
+    if problem.recovery.active && remaining>0
+        % Third stage without collision rows: among both achieved slack levels,
+        % the plan closest to the anchor, so the issued input stays on the
+        % recovery feedback whenever it is admissible (RECOVERY_CLF.md).
+        nv=numel(objective);iu=problem.inputIndices;weights=ones(size(iu));
+        weights(:,1)=cfg.recovery.firstInputWeight;
+        deviation=sparse(1:numel(iu),iu(:),weights(:),numel(iu),nv+1);
+        axis=sparse(1,nv+1);axis(end)=1;cones=problem.cones;
+        for index=1:numel(cones)
+            cones(index)=secondordercone([cones(index).A,sparse(size(cones(index).A,1),1)], ...
+                cones(index).b,[cones(index).d;0],cones(index).gamma);
+        end
+        cones(end+1)=secondordercone(deviation,zeros(numel(iu),1),axis.',0);
+        lower=[problem.lower;0];upper=[problem.upper;Inf];
+        upper(problem.clfIndex)=max(0,second(problem.clfIndex))+cfg.solver.lexicographicTieTolerance;
+        options.MaxTime=remaining;wall=tic;
+        [third,~,flag]=coneprog(axis.',cones,[problem.a,sparse(size(problem.a,1),1)],problem.b, ...
+            [problem.equal,sparse(size(problem.equal,1),1)],problem.rhs,lower,upper,options);
+        search.solverCalls=3;
+        search.stages(3)=struct('objective',"anchorDeviation",'exitFlag',flag,'seconds',toc(wall),'value',NaN);
+        if ~isempty(third) && all(isfinite(third))
+            second=third(1:nv);search.stages(3).value=third(end);
+        end
+    end
     inputs=anchor.inputs+reshape(second(problem.inputIndices),size(anchor.inputs));
     states=anchor.states+reshape(second(problem.stateIndices),size(anchor.states));
     slacks=max(0,second(problem.slackIndices));rho=problem.clfScale*max(0,second(problem.clfIndex));
-    nextValue=norm(problem.clfMap*second+problem.clfOffset)^2*problem.clfScale;
+    nextValue=(norm(problem.clfMap*second+problem.clfOffset)^2+problem.clfModelConstant)*problem.clfScale;
     % Fitting the free pose only packages the endpoint; it is not an admission test.
     model.terminal=terminalContinuation.fit(model.terminal,[states(:,end);inputs(:,end)], ...
         model.sampleIndex+size(inputs,2));
     solution=struct('inputs',inputs,'states',states,'stageSlacks',slacks.', ...
         'safety',sum(slacks),'hard',NaN,'clfSlack',rho, ...
         'clfInitialValue',problem.initialClfValue,'clfNextValue',nextValue, ...
+        'clfFunction',problem.recovery.function,'clfRequiredDecrease',problem.recovery.requiredDecrease, ...
+        'recoveryRolloutSteps',problem.recovery.rolloutSteps,'recoveryRolloutConverged',problem.recovery.converged, ...
         'minimumCollisionMargin',NaN,'terminalSeparationMargin',NaN, ...
         'encounterExit',problem.encounterExit,'affineValidationPerformed',false,'nonlinearValidationPerformed',false);
     model.linearization=anchor;
     search.stages(2).value=rho;search.clfStageCompleted=true;search.returned=true;
     search.converged=all([search.stages.exitFlag]>0);
-    search.clfLowerBound=rho<=cfg.solver.feasibilityTolerance;
+    search.clfLowerBound=rho<=cfg.solver.feasibilityTolerance*problem.clfScale;
     search.terminationReason="twoStagesReturned";search.elapsedSeconds=toc(timer);
 end
 
@@ -101,6 +128,19 @@ function [anchor,source,failure]=localInitialization(model,previous)
         +ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime));
     source="movingTargetFlow";failure="";
     if isempty(model.target),source="laneFeedbackRollout";end
+    domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
+        "collisionAvoidanceController:invalidTireOperatingPoint", ...
+        "collisionAvoidanceController:singularTireLinearization"];
+    if localBeyondRange(model.initialState,0,model)
+        % No target within the encounter range: anchor every frame on the
+        % recovery feedback instead of the shifted plan (RECOVERY_CLF.md).
+        try
+            anchor=localRecoverySeed(model,count);source="recoveryFeedbackRollout";return;
+        catch exception
+            if ~any(string(exception.identifier)==domainErrors),rethrow(exception);end
+            failure=string(exception.identifier);anchor=localFlowSeed(model,count);return;
+        end
+    end
     if isstruct(previous)
         inputs=previous.inputTrajectory(:,2:end);
         usable=~isempty(inputs) && all(isfinite(inputs(:))) && all(abs(inputs(2,:))<1);
@@ -116,9 +156,6 @@ function [anchor,source,failure]=localInitialization(model,previous)
                 end
                 anchor=struct('inputs',inputs,'states',states);source="shiftedInputRollout";return;
             catch exception
-                domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
-                    "collisionAvoidanceController:invalidTireOperatingPoint", ...
-                    "collisionAvoidanceController:singularTireLinearization"];
                 if ~any(string(exception.identifier)==domainErrors),rethrow(exception);end
                 % This is reference construction, never a candidate admission test.
                 failure=string(exception.identifier);
@@ -176,16 +213,39 @@ function anchor=localFlowSeed(model,count)
             u=seed.reference.input+seed.gain*deviation;
         else,u=reference.input+reference.gain*deviation;
         end
-        u(2)=min(.35,max(-.35,u(2)));u=localClip(u,previous,cfg);
-        % Tire-informed seed shaping does not bound the optimized steering.
-        slipLimit=atan(3*tire.longitudinalForceScale(1)*sqrt(1-u(2)^2) ...
-            /tire.corneringStiffness(1)*(1-(1-.8)^(1/3)));
-        zeroSlip=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
-        u(1)=min(zeroSlip+slipLimit,max(zeroSlip-slipLimit,u(1)));u=localClip(u,previous,cfg);
+        u=localShape(u,x,previous,cfg,tire);
         inputs(:,index)=u;x=nonlinearBicycleModel.sample(x,u,cfg);states(:,index+1)=x;previous=u;
         exited=exited || localBeyondRange(x,index*h,model);
     end
     anchor=struct('inputs',inputs,'states',states);
+end
+
+function anchor=localRecoverySeed(model,count)
+    % Recovery feedback over the primary horizon, then the terminal completion
+    % law of the flow initialization. The first input is recoveryInput itself.
+    cfg=model.cfg;x=model.initialState;previous=model.previousInput;
+    terminal=nonlinearBicycleModel.recoveryTerminal(cfg,model.nominalReference.curvature);
+    tire=modifiedFialaTire.parameters(cfg);inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=x;
+    for index=1:count
+        if index<=cfg.controller.horizonSteps
+            u=nonlinearBicycleModel.recoveryInput(x,previous,model.lane,model.nominalReference,cfg,terminal);
+        else
+            seed=terminalContinuation.fit(model.terminal,[x;previous],model.sampleIndex+index-1);
+            [~,~,deviation]=terminalContinuation.membership([x;previous],seed.epochIndex,seed);
+            u=localShape(seed.reference.input+seed.gain*deviation,x,previous,cfg,tire);
+        end
+        inputs(:,index)=u;x=nonlinearBicycleModel.sample(x,u,cfg);states(:,index+1)=x;previous=u;
+    end
+    anchor=struct('inputs',inputs,'states',states);
+end
+
+function u=localShape(u,x,previous,cfg,tire)
+    u(2)=min(.35,max(-.35,u(2)));u=localClip(u,previous,cfg);
+    % Tire-informed seed shaping does not bound the optimized steering.
+    slipLimit=atan(3*tire.longitudinalForceScale(1)*sqrt(1-u(2)^2) ...
+        /tire.corneringStiffness(1)*(1-(1-.8)^(1/3)));
+    zeroSlip=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
+    u(1)=min(zeroSlip+slipLimit,max(zeroSlip-slipLimit,u(1)));u=localClip(u,previous,cfg);
 end
 
 function [problem,model]=localFormulate(anchor,model)
@@ -247,7 +307,14 @@ function [problem,model]=localFormulate(anchor,model)
     deviation=y(4:8)-[seed.base(4:6);seed.reference.input];
     map=sparse(8,nv);map(1:6,ix(:,end))=eye(6);map(7:8,iu(:,end))=eye(2);
     endpoint=secondordercone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius);
-    clfConstant=(1-cfg.nonlinear.clfDecay)*v0/clfScale;clfAxis=sparse(1,nv);clfAxis(ic)=1;
+    clfAxis=sparse(1,nv);clfAxis(ic)=1;clfModelConstant=0;
+    recovery=struct('active',false,'function',"laneQuadratic",'requiredDecrease',NaN,'rolloutSteps',NaN,'converged',false);
+    if departure==0
+        % No collision rows: the recovery CLF replaces the lane quadratic.
+        [clfMap,clfOffset,clfConstant,v0,clfScale,clfModelConstant,recovery]=localRecoveryClf(anchor,model,ix(:,2),nv);
+    else
+        clfConstant=(1-cfg.nonlinear.clfDecay)*v0/clfScale;
+    end
     clfCone=secondordercone([2*clfMap;clfAxis],[-2*clfOffset;1-clfConstant],clfAxis.',-1-clfConstant);
     terminalA=zeros(0,nv);terminalB=zeros(0,1);
     if departure>count
@@ -266,8 +333,39 @@ function [problem,model]=localFormulate(anchor,model)
         'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',[endpoint,clfCone], ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'clfScale',clfScale,'clfMap',clfMap,'clfOffset',clfOffset, ...
+        'clfModelConstant',clfModelConstant,'recovery',recovery, ...
         'initialClfValue',v0,'initialClfSlack',max(0,(norm(clfOffset)^2-clfConstant)*clfScale), ...
         'terminalA',terminalA,'terminalB',terminalB,'encounterExit',departure);
+end
+
+function [map,offset,constant,value,scale,modelConstant,recovery]=localRecoveryClf(anchor,model,next,nv)
+    % Recovery CLF (RECOVERY_CLF.md): V(x0) from one rollout of the recovery
+    % feedback. At the anchor's first node V is modelled as c + |a + R dx1|^2
+    % (Gauss-Newton), with the residual Jacobian from rollouts of the same length
+    % started at perturbed states. The required decrease is a fraction of l(x0).
+    cfg=model.cfg;reference=model.nominalReference;lane=model.lane;
+    terminal=nonlinearBicycleModel.recoveryTerminal(cfg,reference.curvature);
+    x0=model.initialState;u0=anchor.inputs(:,1);x1=anchor.states(:,2);
+    [value,residual0,steps0,converged]=nonlinearBicycleModel.recoveryValue(x0,model.previousInput,lane,reference,terminal,cfg);
+    stage=sum((terminal.stageFactor*nonlinearBicycleModel.error(x0,lane,reference)).^2);
+    if steps0>0 && isequal(u0,nonlinearBicycleModel.recoveryInput(x0,model.previousInput,lane,reference,cfg,terminal))
+        residual1=residual0(6:end);steps1=steps0-1; % the same closed loop, one hold later
+    else
+        [~,residual1,steps1]=nonlinearBicycleModel.recoveryValue(x1,u0,lane,reference,terminal,cfg);
+    end
+    delta=[1e-4;1e-4;1e-6;1e-5;1e-5;1e-6];jacobian=zeros(numel(residual1),6);
+    for index=1:6
+        x=x1;x(index)=x(index)+delta(index);
+        [~,perturbed]=nonlinearBicycleModel.recoveryValue(x,u0,lane,reference,terminal,cfg,steps1);
+        jacobian(:,index)=(perturbed-residual1)/delta(index);
+    end
+    [basis,factor]=qr(jacobian,0);projected=basis.'*residual1;
+    orthogonal=max(0,sum(residual1.^2)-sum(projected.^2));scale=max(value,1);
+    map=sparse(size(factor,1),nv);map(:,next)=factor/sqrt(scale);offset=projected/sqrt(scale);
+    required=cfg.recovery.decreaseFraction*stage;
+    constant=(value-required-orthogonal)/scale;modelConstant=orthogonal/scale;
+    recovery=struct('active',true,'function',"recoveryCostToGo",'requiredDecrease',required, ...
+        'rolloutSteps',steps0,'converged',converged);
 end
 
 function u=localClip(u,previous,cfg)
