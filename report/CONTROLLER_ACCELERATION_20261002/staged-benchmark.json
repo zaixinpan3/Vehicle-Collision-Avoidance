@@ -1,0 +1,3053 @@
+[
+  {
+    "label": "step0-final",
+    "source": "/home/zai/.cache/collisionAvoidance/fast-controller-20261002/step0/solvePredictiveControl.m",
+    "seconds": [
+      4.298835,
+      2.967069,
+      2.94878,
+      2.946684
+    ],
+    "warmMedianSeconds": 2.94878,
+    "search": {
+      "solverCalls": 16,
+      "source": "twoStageRealTimeIteration",
+      "initialization": "sameFrameRollout",
+      "returned": true,
+      "converged": true,
+      "terminationReason": "twoStagesModelAgreement",
+      "formulationSeconds": 0.022659,
+      "clfConstructionSeconds": 0.011401,
+      "inputTrustScale": 0.1382091446150776,
+      "primaryOptimum": 4.718592568223421e-09,
+      "primaryLowerBound": 0,
+      "slackCap": 1.0047185925682234e-06,
+      "clfInitialSlack": 67.60188709934106,
+      "clfStageAttempted": true,
+      "clfStageCompleted": true,
+      "clfLowerBound": false,
+      "stages": [
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.073517,
+          "value": 1.0166856153312629e-08
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.282873,
+          "value": 68.87883130979615
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.068523,
+          "value": 8.080674928905554e-09
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.26028,
+          "value": 68.29011023019406
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.071969,
+          "value": 4.619970117133182e-09
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.24124,
+          "value": 67.97302659007387
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.075038,
+          "value": 7.798183213668678e-10
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.262701,
+          "value": 67.79114310922328
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.071954,
+          "value": 7.065958794457365e-10
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.269335,
+          "value": 67.67946313837642
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.078042,
+          "value": 8.757281539722628e-09
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.26143,
+          "value": 67.60576653888101
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.078673,
+          "value": 4.718592568223421e-09
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.239134,
+          "value": 67.55412903932671
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.073183,
+          "value": 1.5005535764354406e-07
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.330241,
+          "value": 67.55401346533587
+        }
+      ],
+      "initializationSeconds": 3e-06,
+      "selectedAttempt": 7,
+      "attempts": [
+        {
+          "initialization": "shiftedInputRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.073517,
+              "value": 1.0166856153312629e-08
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.282873,
+              "value": 68.87883130979615
+            }
+          ],
+          "primaryOptimum": 1.0166856153312629e-08,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 0.000741,
+          "formulationSeconds": 0.022548,
+          "clfConstructionSeconds": 0.011504
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.068523,
+              "value": 8.080674928905554e-09
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.26028,
+              "value": 68.29011023019406
+            }
+          ],
+          "primaryOptimum": 8.080674928905554e-09,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.022702,
+          "clfConstructionSeconds": 0.011579
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.071969,
+              "value": 4.619970117133182e-09
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.24124,
+              "value": 67.97302659007387
+            }
+          ],
+          "primaryOptimum": 4.619970117133182e-09,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022668,
+          "clfConstructionSeconds": 0.011472
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.075038,
+              "value": 7.798183213668678e-10
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.262701,
+              "value": 67.79114310922328
+            }
+          ],
+          "primaryOptimum": 7.798183213668678e-10,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 4e-06,
+          "formulationSeconds": 0.023178999999999998,
+          "clfConstructionSeconds": 0.011747
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.071954,
+              "value": 7.065958794457365e-10
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.269335,
+              "value": 67.67946313837642
+            }
+          ],
+          "primaryOptimum": 7.065958794457365e-10,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.023009,
+          "clfConstructionSeconds": 0.01149
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.078042,
+              "value": 8.757281539722628e-09
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.26143,
+              "value": 67.60576653888101
+            }
+          ],
+          "primaryOptimum": 8.757281539722628e-09,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.02245,
+          "clfConstructionSeconds": 0.011416
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.078673,
+              "value": 4.718592568223421e-09
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.239134,
+              "value": 67.55412903932671
+            }
+          ],
+          "primaryOptimum": 4.718592568223421e-09,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.022659,
+          "clfConstructionSeconds": 0.011401
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.073183,
+              "value": 1.5005535764354406e-07
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.330241,
+              "value": 67.55401346533587
+            }
+          ],
+          "primaryOptimum": 1.5005535764354406e-07,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.02256,
+          "clfConstructionSeconds": 0.011499
+        }
+      ],
+      "linearizationCount": 8,
+      "flowRestarted": false,
+      "initializationFailure": "",
+      "elapsedSeconds": 2.945119,
+      "refinementCount": 8,
+      "selectedRefinement": 7,
+      "modelAgreementHistory": [
+        {
+          "poseErrorMeters": 0.0016926934626122412,
+          "fullPoseErrorMeters": 0.0016926934626122412,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.00024937245672470204,
+          "scaledClfError": 6.282524370559986e-05,
+          "ratio": 0.1692693462612241,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.85405159980603,
+          "firstInputTrustActivity": 0.999897034117991,
+          "seconds": 0.001892,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0009183406797939647,
+          "fullPoseErrorMeters": 0.0009183406797939647,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.0001785252657631927,
+          "scaledClfError": 2.619651159244297e-05,
+          "ratio": 0.09183406797939647,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.2797763626035,
+          "firstInputTrustActivity": 0.9998851042310545,
+          "seconds": 0.001855,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.00045552394701372845,
+          "fullPoseErrorMeters": 0.00045552394701372845,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.00011399584609724418,
+          "scaledClfError": 1.550833055966701e-05,
+          "ratio": 0.045552394701372845,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.96690916689714,
+          "firstInputTrustActivity": 0.9999172406557076,
+          "seconds": 0.001993,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 7.38695179656871e-05,
+          "fullPoseErrorMeters": 7.38695179656871e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 1.1863023572774209e-05,
+          "scaledClfError": 1.1864587191166265e-05,
+          "ratio": 0.0073869517965687095,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.78646213280034,
+          "firstInputTrustActivity": 0.9998466152349031,
+          "seconds": 0.001841,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 4.647281912654905e-05,
+          "fullPoseErrorMeters": 4.647281912654905e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 7.292612751489773e-06,
+          "scaledClfError": 1.0443652312394951e-05,
+          "ratio": 0.004647281912654905,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.67534263910879,
+          "firstInputTrustActivity": 0.9998560483982404,
+          "seconds": 0.001833,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.00015791897498073997,
+          "fullPoseErrorMeters": 0.00015791897498073997,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 5.9527281344728955e-05,
+          "scaledClfError": 9.832690591623729e-06,
+          "ratio": 0.015791897498073998,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.60188709934111,
+          "firstInputTrustActivity": 0.9998321621674082,
+          "seconds": 0.001888,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.00027841898460270905,
+          "fullPoseErrorMeters": 0.00027841898460270905,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 3.07227609751178e-05,
+          "scaledClfError": 9.559160138263628e-06,
+          "ratio": 0.027841898460270905,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.55035772631474,
+          "firstInputTrustActivity": 0.9998362304511196,
+          "seconds": 0.001853,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 1.0969430060460975e-05,
+          "fullPoseErrorMeters": 1.0969430060460975e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 2.282919821257797e-06,
+          "scaledClfError": 7.146032340612383e-08,
+          "ratio": 0.0010969430060460976,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.55397915558869,
+          "firstInputTrustActivity": 0.08681711730193216,
+          "seconds": 0.001838,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": false
+        }
+      ],
+      "modelAgreementSatisfied": true
+    },
+    "pcbfSlack": 1.0760968364896108e-06,
+    "clfSlack": 67.55412903932671,
+    "actualClfSlack": 67.55035772631474,
+    "firstInput": [
+      0.09540181874687066,
+      0.12500577222673742
+    ]
+  },
+  {
+    "label": "step1-final",
+    "source": "/home/zai/.cache/collisionAvoidance/fast-controller-20261002/step1/solvePredictiveControl.m",
+    "seconds": [
+      2.566006,
+      2.452415,
+      2.450923,
+      2.447445
+    ],
+    "warmMedianSeconds": 2.450923,
+    "search": {
+      "solverCalls": 10,
+      "source": "twoStageRealTimeIteration",
+      "initialization": "sameFrameRollout",
+      "returned": true,
+      "converged": true,
+      "terminationReason": "twoStagesModelAgreement",
+      "formulationSeconds": 0.02286,
+      "clfConstructionSeconds": 0.011523,
+      "inputTrustScale": 0.1382091446150776,
+      "primaryOptimum": 0,
+      "primaryLowerBound": 0,
+      "slackCap": 1e-06,
+      "clfInitialSlack": 67.60213567063255,
+      "clfStageAttempted": true,
+      "clfStageCompleted": true,
+      "clfLowerBound": false,
+      "stages": [
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.073544,
+          "value": 1.0166856153312629e-08,
+          "numericalSolve": true
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.285975,
+          "value": 68.87883130979615,
+          "numericalSolve": true
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 1.8e-05,
+          "value": 0,
+          "numericalSolve": false
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.293175,
+          "value": 68.2901406561279,
+          "numericalSolve": true
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 1.5e-05,
+          "value": 0,
+          "numericalSolve": false
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.290694,
+          "value": 67.97300305471722,
+          "numericalSolve": true
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 1.4e-05,
+          "value": 0,
+          "numericalSolve": false
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.240769,
+          "value": 67.7912904596833,
+          "numericalSolve": true
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 1e-05,
+          "value": 0,
+          "numericalSolve": false
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.241333,
+          "value": 67.6796747725543,
+          "numericalSolve": true
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 9e-06,
+          "value": 0,
+          "numericalSolve": false
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.23631,
+          "value": 67.60601487721205,
+          "numericalSolve": true
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 1.2e-05,
+          "value": 0,
+          "numericalSolve": false
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.243369,
+          "value": 67.5542355715028,
+          "numericalSolve": true
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.072721,
+          "value": 1.3737851647774773e-07,
+          "numericalSolve": true
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.256566,
+          "value": 67.55285344874841,
+          "numericalSolve": true
+        }
+      ],
+      "initializationSeconds": 3e-06,
+      "selectedAttempt": 7,
+      "attempts": [
+        {
+          "initialization": "shiftedInputRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.073544,
+              "value": 1.0166856153312629e-08,
+              "numericalSolve": true
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.285975,
+              "value": 68.87883130979615,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 1.0166856153312629e-08,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 0.000844,
+          "formulationSeconds": 0.024348,
+          "clfConstructionSeconds": 0.011882
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 1,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 1.8e-05,
+              "value": 0,
+              "numericalSolve": false
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.293175,
+              "value": 68.2901406561279,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 5e-06,
+          "formulationSeconds": 0.023489000000000003,
+          "clfConstructionSeconds": 0.011813
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 1,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 1.5e-05,
+              "value": 0,
+              "numericalSolve": false
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.290694,
+              "value": 67.97300305471722,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 7e-06,
+          "formulationSeconds": 0.023967,
+          "clfConstructionSeconds": 0.01172
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 1,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 1.4e-05,
+              "value": 0,
+              "numericalSolve": false
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.240769,
+              "value": 67.7912904596833,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 4e-06,
+          "formulationSeconds": 0.023073999999999997,
+          "clfConstructionSeconds": 0.011507
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 1,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 1e-05,
+              "value": 0,
+              "numericalSolve": false
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.241333,
+              "value": 67.6796747725543,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 4e-06,
+          "formulationSeconds": 0.022704000000000002,
+          "clfConstructionSeconds": 0.011519
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 1,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 9e-06,
+              "value": 0,
+              "numericalSolve": false
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.23631,
+              "value": 67.60601487721205,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022608,
+          "clfConstructionSeconds": 0.011432
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 1,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 1.2e-05,
+              "value": 0,
+              "numericalSolve": false
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.243369,
+              "value": 67.5542355715028,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.02286,
+          "clfConstructionSeconds": 0.011523
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.072721,
+              "value": 1.3737851647774773e-07,
+              "numericalSolve": true
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.256566,
+              "value": 67.55285344874841,
+              "numericalSolve": true
+            }
+          ],
+          "primaryOptimum": 1.3737851647774773e-07,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.022921999999999998,
+          "clfConstructionSeconds": 0.01158
+        }
+      ],
+      "linearizationCount": 8,
+      "flowRestarted": false,
+      "initializationFailure": "",
+      "elapsedSeconds": 2.446896,
+      "refinementCount": 8,
+      "selectedRefinement": 7,
+      "modelAgreementHistory": [
+        {
+          "poseErrorMeters": 0.0016926934626122412,
+          "fullPoseErrorMeters": 0.0016926934626122412,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.00024937245672470204,
+          "scaledClfError": 6.282524370559986e-05,
+          "ratio": 0.1692693462612241,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.85405159980603,
+          "firstInputTrustActivity": 0.999897034117991,
+          "seconds": 0.002029,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.000455931398471355,
+          "fullPoseErrorMeters": 0.000455931398471355,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.00015171585335579016,
+          "scaledClfError": 2.6194770425362175e-05,
+          "ratio": 0.0455931398471355,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.27980746998894,
+          "firstInputTrustActivity": 0.9998723168582889,
+          "seconds": 0.002152,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0007577413298841208,
+          "fullPoseErrorMeters": 0.0007577413298841208,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 8.695586267074933e-05,
+          "scaledClfError": 1.5508138596048884e-05,
+          "ratio": 0.07577413298841208,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.96688443165571,
+          "firstInputTrustActivity": 0.999835029423165,
+          "seconds": 0.002024,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.00018157921129380547,
+          "fullPoseErrorMeters": 0.00018157921129380547,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 2.8319278970623252e-05,
+          "scaledClfError": 1.186317379735746e-05,
+          "ratio": 0.018157921129380545,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.78661105842097,
+          "firstInputTrustActivity": 0.9999443965046706,
+          "seconds": 0.001899,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 8.571542465778931e-05,
+          "fullPoseErrorMeters": 8.571542465778931e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 2.1214565431286008e-05,
+          "scaledClfError": 1.0444606021783802e-05,
+          "ratio": 0.00857154246577893,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.67555493244878,
+          "firstInputTrustActivity": 0.9999499744093341,
+          "seconds": 0.001883,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0002301269064349576,
+          "fullPoseErrorMeters": 0.0002301269064349576,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 4.705430114733863e-05,
+          "scaledClfError": 9.833820334501675e-06,
+          "ratio": 0.02301269064349576,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.60213567063253,
+          "firstInputTrustActivity": 0.9999096311387495,
+          "seconds": 0.001955,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 8.622350530167193e-05,
+          "fullPoseErrorMeters": 8.622350530167193e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 1.400915531762914e-05,
+          "scaledClfError": 9.559028111381244e-06,
+          "ratio": 0.008622350530167192,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.55046402161308,
+          "firstInputTrustActivity": 0.9997529295058124,
+          "seconds": 0.001977,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0003224209501148598,
+          "fullPoseErrorMeters": 0.0003224209501148598,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 4.44691969878989e-05,
+          "scaledClfError": 3.216720072048035e-08,
+          "ratio": 0.03224209501148598,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.5528187403646,
+          "firstInputTrustActivity": 0.05828056059904705,
+          "seconds": 0.002052,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": false
+        }
+      ],
+      "modelAgreementSatisfied": true
+    },
+    "pcbfSlack": 1.0902308492103667e-06,
+    "clfSlack": 67.5542355715028,
+    "actualClfSlack": 67.55046402161308,
+    "firstInput": [
+      0.09540202167223262,
+      0.1250073422256364
+    ]
+  },
+  {
+    "label": "step2-final",
+    "source": "/home/zai/.cache/collisionAvoidance/fast-controller-20261002/step2/solvePredictiveControl.m",
+    "seconds": [
+      0.526554,
+      0.434417,
+      0.431002,
+      0.433825
+    ],
+    "warmMedianSeconds": 0.433825,
+    "search": {
+      "solverCalls": 16,
+      "source": "twoStageRealTimeIteration",
+      "initialization": "sameFrameRollout",
+      "returned": true,
+      "converged": true,
+      "terminationReason": "twoStagesModelAgreement",
+      "formulationSeconds": 0.022554,
+      "clfConstructionSeconds": 0.011612,
+      "inputTrustScale": 0.1382091446150776,
+      "primaryOptimum": 0,
+      "primaryLowerBound": 0,
+      "slackCap": 1e-06,
+      "clfInitialSlack": 67.60234951132809,
+      "clfStageAttempted": true,
+      "clfStageCompleted": true,
+      "clfLowerBound": false,
+      "stages": [
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010761,
+          "value": 9.380507606432953e-12,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010551695,
+            "primalResidual": 1.2801090617908608e-12,
+            "dualResidual": 1.0207253578448868e-11,
+            "objective": -4.2768721453722224e-11
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.017935,
+          "value": 68.87909755221236,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.017746215,
+            "primalResidual": 1.273853034700583e-10,
+            "dualResidual": 3.4395500295207333e-13,
+            "objective": 0.1746450216567922
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.009458,
+          "value": 1.4837868602260662e-12,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 16,
+            "solveSeconds": 0.009282541,
+            "primalResidual": 4.742398466824003e-12,
+            "dualResidual": 3.8815892913823046e-11,
+            "objective": -1.9722111038979777e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.018378,
+          "value": 68.29051835004367,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.018189513,
+            "primalResidual": 1.714215366778503e-10,
+            "dualResidual": 7.200741293600195e-13,
+            "objective": 0.17315260981192568
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010775,
+          "value": 5.991550645737077e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010584765,
+            "primalResidual": 6.55936221454821e-12,
+            "dualResidual": 5.3766866472700005e-11,
+            "objective": -1.8057480223239148e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.01823,
+          "value": 67.97339440880744,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.018047024,
+            "primalResidual": 2.6445325659673085e-10,
+            "dualResidual": 3.6890784106909477e-13,
+            "objective": 0.1723484967375776
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010738,
+          "value": 4.385878503423635e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010574245,
+            "primalResidual": 4.9372038157180846e-12,
+            "dualResidual": 4.0892336778066155e-11,
+            "objective": -1.4181238832030192e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.016704,
+          "value": 67.79157067300895,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 25,
+            "solveSeconds": 0.01651726,
+            "primalResidual": 2.765080834767706e-09,
+            "dualResidual": 1.1433899035459207e-12,
+            "objective": 0.17188746577624456
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.011056,
+          "value": 5.784991776113895e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.010895304,
+            "primalResidual": 1.2402204704886434e-12,
+            "dualResidual": 1.0337162665845238e-11,
+            "objective": 9.295396157111491e-12
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.016304,
+          "value": 67.67988512387518,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 24,
+            "solveSeconds": 0.016146203,
+            "primalResidual": 4.833628358865996e-10,
+            "dualResidual": 9.938097861427552e-13,
+            "objective": 0.17160427977124998
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.011036,
+          "value": 8.065612748979051e-13,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.010879564,
+            "primalResidual": 5.550280830368282e-13,
+            "dualResidual": 4.637193706248286e-12,
+            "objective": -2.2697333939677956e-11
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.016195,
+          "value": 67.60622861792501,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 24,
+            "solveSeconds": 0.016027372,
+            "primalResidual": 3.099229961067903e-09,
+            "dualResidual": 7.52467096855943e-13,
+            "objective": 0.17141752013540024
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.011249,
+          "value": 0,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.011102504,
+            "primalResidual": 5.704412388011344e-12,
+            "dualResidual": 4.80279243143342e-11,
+            "objective": -2.3814390107998466e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.016627,
+          "value": 67.55456758572828,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 24,
+            "solveSeconds": 0.016444141,
+            "primalResidual": 3.0808319621503214e-09,
+            "dualResidual": 6.27010733921124e-13,
+            "objective": 0.17128653162382954
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.01131,
+          "value": 9.129413565484894e-08,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.011113043,
+            "primalResidual": 3.179025958608723e-12,
+            "dualResidual": 2.600133921239452e-11,
+            "objective": 9.116949639935565e-08
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.018265,
+          "value": 67.55514058410324,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 30,
+            "solveSeconds": 0.018076594,
+            "primalResidual": 2.1109763773773558e-14,
+            "dualResidual": 4.15940426987437e-14,
+            "objective": 0.17128731910930528
+          }
+        }
+      ],
+      "initializationSeconds": 2e-06,
+      "selectedAttempt": 7,
+      "attempts": [
+        {
+          "initialization": "shiftedInputRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010761,
+              "value": 9.380507606432953e-12,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010551695,
+                "primalResidual": 1.2801090617908608e-12,
+                "dualResidual": 1.0207253578448868e-11,
+                "objective": -4.2768721453722224e-11
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.017935,
+              "value": 68.87909755221236,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.017746215,
+                "primalResidual": 1.273853034700583e-10,
+                "dualResidual": 3.4395500295207333e-13,
+                "objective": 0.1746450216567922
+              }
+            }
+          ],
+          "primaryOptimum": 9.380507606432953e-12,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 0.000815,
+          "formulationSeconds": 0.023809,
+          "clfConstructionSeconds": 0.011731
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.009458,
+              "value": 1.4837868602260662e-12,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 16,
+                "solveSeconds": 0.009282541,
+                "primalResidual": 4.742398466824003e-12,
+                "dualResidual": 3.8815892913823046e-11,
+                "objective": -1.9722111038979777e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.018378,
+              "value": 68.29051835004367,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.018189513,
+                "primalResidual": 1.714215366778503e-10,
+                "dualResidual": 7.200741293600195e-13,
+                "objective": 0.17315260981192568
+              }
+            }
+          ],
+          "primaryOptimum": 1.4837868602260662e-12,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 5e-06,
+          "formulationSeconds": 0.024406,
+          "clfConstructionSeconds": 0.012024
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010775,
+              "value": 5.991550645737077e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010584765,
+                "primalResidual": 6.55936221454821e-12,
+                "dualResidual": 5.3766866472700005e-11,
+                "objective": -1.8057480223239148e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.01823,
+              "value": 67.97339440880744,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.018047024,
+                "primalResidual": 2.6445325659673085e-10,
+                "dualResidual": 3.6890784106909477e-13,
+                "objective": 0.1723484967375776
+              }
+            }
+          ],
+          "primaryOptimum": 5.991550645737077e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 5e-06,
+          "formulationSeconds": 0.024246999999999998,
+          "clfConstructionSeconds": 0.011777
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010738,
+              "value": 4.385878503423635e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010574245,
+                "primalResidual": 4.9372038157180846e-12,
+                "dualResidual": 4.0892336778066155e-11,
+                "objective": -1.4181238832030192e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.016704,
+              "value": 67.79157067300895,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 25,
+                "solveSeconds": 0.01651726,
+                "primalResidual": 2.765080834767706e-09,
+                "dualResidual": 1.1433899035459207e-12,
+                "objective": 0.17188746577624456
+              }
+            }
+          ],
+          "primaryOptimum": 4.385878503423635e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 4e-06,
+          "formulationSeconds": 0.023098,
+          "clfConstructionSeconds": 0.011729
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.011056,
+              "value": 5.784991776113895e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.010895304,
+                "primalResidual": 1.2402204704886434e-12,
+                "dualResidual": 1.0337162665845238e-11,
+                "objective": 9.295396157111491e-12
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.016304,
+              "value": 67.67988512387518,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 24,
+                "solveSeconds": 0.016146203,
+                "primalResidual": 4.833628358865996e-10,
+                "dualResidual": 9.938097861427552e-13,
+                "objective": 0.17160427977124998
+              }
+            }
+          ],
+          "primaryOptimum": 5.784991776113895e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 4e-06,
+          "formulationSeconds": 0.022557,
+          "clfConstructionSeconds": 0.011444
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.011036,
+              "value": 8.065612748979051e-13,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.010879564,
+                "primalResidual": 5.550280830368282e-13,
+                "dualResidual": 4.637193706248286e-12,
+                "objective": -2.2697333939677956e-11
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.016195,
+              "value": 67.60622861792501,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 24,
+                "solveSeconds": 0.016027372,
+                "primalResidual": 3.099229961067903e-09,
+                "dualResidual": 7.52467096855943e-13,
+                "objective": 0.17141752013540024
+              }
+            }
+          ],
+          "primaryOptimum": 8.065612748979051e-13,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.022669,
+          "clfConstructionSeconds": 0.011441
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.011249,
+              "value": 0,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.011102504,
+                "primalResidual": 5.704412388011344e-12,
+                "dualResidual": 4.80279243143342e-11,
+                "objective": -2.3814390107998466e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.016627,
+              "value": 67.55456758572828,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 24,
+                "solveSeconds": 0.016444141,
+                "primalResidual": 3.0808319621503214e-09,
+                "dualResidual": 6.27010733921124e-13,
+                "objective": 0.17128653162382954
+              }
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022554,
+          "clfConstructionSeconds": 0.011612
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.01131,
+              "value": 9.129413565484894e-08,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.011113043,
+                "primalResidual": 3.179025958608723e-12,
+                "dualResidual": 2.600133921239452e-11,
+                "objective": 9.116949639935565e-08
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.018265,
+              "value": 67.55514058410324,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 30,
+                "solveSeconds": 0.018076594,
+                "primalResidual": 2.1109763773773558e-14,
+                "dualResidual": 4.15940426987437e-14,
+                "objective": 0.17128731910930528
+              }
+            }
+          ],
+          "primaryOptimum": 9.129413565484894e-08,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 5e-06,
+          "formulationSeconds": 0.024662,
+          "clfConstructionSeconds": 0.011745
+        }
+      ],
+      "linearizationCount": 8,
+      "flowRestarted": false,
+      "initializationFailure": "",
+      "elapsedSeconds": 0.43331,
+      "refinementCount": 8,
+      "selectedRefinement": 7,
+      "modelAgreementHistory": [
+        {
+          "poseErrorMeters": 0.0006989050114692147,
+          "fullPoseErrorMeters": 0.0006989050114692147,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 7.782127932731697e-05,
+          "scaledClfError": 6.280656084644079e-05,
+          "ratio": 0.06989050114692147,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.85432685534145,
+          "firstInputTrustActivity": 0.999999994485271,
+          "seconds": 0.002103,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0003279238731577224,
+          "fullPoseErrorMeters": 0.0003279238731577224,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 4.233392128035381e-05,
+          "scaledClfError": 2.619352456425587e-05,
+          "ratio": 0.032792387315772234,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.28018771158916,
+          "firstInputTrustActivity": 0.9999999878982527,
+          "seconds": 0.001919,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.00015520348318038616,
+          "fullPoseErrorMeters": 0.00015520348318038616,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 1.8910365703043535e-05,
+          "scaledClfError": 1.5511581519686972e-05,
+          "ratio": 0.015520348318038616,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.96727669293618,
+          "firstInputTrustActivity": 0.9999999920952944,
+          "seconds": 0.001883,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 9.731236049644226e-05,
+          "fullPoseErrorMeters": 9.731236049644226e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 1.0874292354542034e-05,
+          "scaledClfError": 1.1866612419509036e-05,
+          "ratio": 0.009731236049644225,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.78689052025503,
+          "firstInputTrustActivity": 0.9999999726399619,
+          "seconds": 0.001883,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 7.544430805181608e-05,
+          "fullPoseErrorMeters": 7.544430805181608e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 7.81238718468765e-06,
+          "scaledClfError": 1.0446653464937095e-05,
+          "ratio": 0.0075444308051816076,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.67576499822069,
+          "firstInputTrustActivity": 0.9999999730875117,
+          "seconds": 0.001816,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 6.680448301860808e-05,
+          "fullPoseErrorMeters": 6.680448301860808e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 6.8571665259309356e-06,
+          "scaledClfError": 9.835545566841359e-06,
+          "ratio": 0.006680448301860808,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.60234951132803,
+          "firstInputTrustActivity": 0.999999973617624,
+          "seconds": 0.001868,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 6.309615627933438e-05,
+          "fullPoseErrorMeters": 6.309615627933438e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 6.658313924231181e-06,
+          "scaledClfError": 9.562632649556678e-06,
+          "ratio": 0.006309615627933438,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.55079611513445,
+          "firstInputTrustActivity": 0.9999999743915076,
+          "seconds": 0.002002,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 1.7677387731164155e-06,
+          "fullPoseErrorMeters": 1.7677387731164155e-06,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 2.0189855887142727e-07,
+          "scaledClfError": 1.0073264157783088e-07,
+          "ratio": 0.00017677387731164154,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.55510085252847,
+          "firstInputTrustActivity": 0.10307289879415216,
+          "seconds": 0.001913,
+          "stepFraction": 1,
+          "trustBoundaryRefinement": false
+        }
+      ],
+      "modelAgreementSatisfied": true
+    },
+    "pcbfSlack": 1.0000019489243845e-06,
+    "clfSlack": 67.55456758572828,
+    "actualClfSlack": 67.55079611513445,
+    "firstInput": [
+      0.09540259457481363,
+      0.12502182924351746
+    ]
+  },
+  {
+    "label": "step3-final",
+    "source": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solvePredictiveControl.m",
+    "seconds": [
+      0.463754,
+      0.342173,
+      0.315747,
+      0.312324
+    ],
+    "warmMedianSeconds": 0.315747,
+    "search": {
+      "solverCalls": 12,
+      "source": "twoStageRealTimeIteration",
+      "initialization": "sameFrameRollout",
+      "returned": true,
+      "converged": true,
+      "terminationReason": "twoStagesModelAgreement",
+      "formulationSeconds": 0.022511999999999997,
+      "clfConstructionSeconds": 0.011508,
+      "inputTrustScale": 1,
+      "primaryOptimum": 2.4954748767905082e-11,
+      "primaryLowerBound": 0,
+      "slackCap": 1.0000249547487679e-06,
+      "clfInitialSlack": 67.69532783681422,
+      "clfStageAttempted": true,
+      "clfStageCompleted": true,
+      "clfLowerBound": false,
+      "stages": [
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.01063,
+          "value": 9.380507606432953e-12,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010486456,
+            "primalResidual": 1.2801090617908608e-12,
+            "dualResidual": 1.0207253578448868e-11,
+            "objective": -4.2768721453722224e-11
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.017945,
+          "value": 68.87909755221236,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.017786055,
+            "primalResidual": 1.273853034700583e-10,
+            "dualResidual": 3.4395500295207333e-13,
+            "objective": 0.1746450216567922
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010347,
+          "value": 2.8527635605710496e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010197667,
+            "primalResidual": 5.361905896375201e-12,
+            "dualResidual": 4.018209100607923e-11,
+            "objective": -1.4971522765637792e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.018522,
+          "value": 68.2254663946672,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.018370723,
+            "primalResidual": 3.0373403495580894e-10,
+            "dualResidual": 3.010977686095484e-13,
+            "objective": 0.1729876293433271
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 2,
+          "seconds": 0.010433,
+          "value": 8.106938110524522e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 4,
+            "iterations": 19,
+            "solveSeconds": 0.010280937,
+            "primalResidual": 1.642885095730311e-11,
+            "dualResidual": 1.0148654214304372e-10,
+            "objective": -5.738652045009238e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.016265,
+          "value": 67.76336140437563,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 24,
+            "solveSeconds": 0.016111202,
+            "primalResidual": 3.3804970488211117e-09,
+            "dualResidual": 7.340276620627967e-12,
+            "objective": 0.17181593593170616
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010357,
+          "value": 2.4954748767905082e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010214097,
+            "primalResidual": 3.267280962539837e-12,
+            "dualResidual": 1.594096598562332e-11,
+            "objective": -1.0324179539966007e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.018009,
+          "value": 67.47438630699367,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.017852965,
+            "primalResidual": 1.8496177931026173e-09,
+            "dualResidual": 1.35889294886587e-11,
+            "objective": 0.17108323097468228
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.01076,
+          "value": 1.4893197384842604e-05,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.010610476,
+            "primalResidual": 3.072724221787681e-13,
+            "dualResidual": 1.4616060376882405e-12,
+            "objective": 1.4893187151768347e-05
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": -2,
+          "seconds": 0.007156,
+          "value": null,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 2,
+            "iterations": 11,
+            "solveSeconds": 0.00701325,
+            "primalResidual": 5.639712979196739e-12,
+            "dualResidual": 4.932555744093107e-14,
+            "objective": null
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": -2,
+          "seconds": 0.007148,
+          "value": null,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 2,
+            "iterations": 11,
+            "solveSeconds": 0.006997211,
+            "primalResidual": 5.460861540648574e-12,
+            "dualResidual": 4.551021692270912e-14,
+            "objective": null
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.021883,
+          "value": 67.36878455339203,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 33,
+            "solveSeconds": 0.021647279,
+            "primalResidual": 1.5679108437708318e-12,
+            "dualResidual": 4.711702589335216e-12,
+            "objective": 0.1708153244527344
+          }
+        }
+      ],
+      "initializationSeconds": 2e-06,
+      "selectedAttempt": 4,
+      "attempts": [
+        {
+          "initialization": "shiftedInputRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.01063,
+              "value": 9.380507606432953e-12,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010486456,
+                "primalResidual": 1.2801090617908608e-12,
+                "dualResidual": 1.0207253578448868e-11,
+                "objective": -4.2768721453722224e-11
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.017945,
+              "value": 68.87909755221236,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.017786055,
+                "primalResidual": 1.273853034700583e-10,
+                "dualResidual": 3.4395500295207333e-13,
+                "objective": 0.1746450216567922
+              }
+            }
+          ],
+          "primaryOptimum": 9.380507606432953e-12,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 0.000739,
+          "formulationSeconds": 0.022438,
+          "clfConstructionSeconds": 0.011441
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010347,
+              "value": 2.8527635605710496e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010197667,
+                "primalResidual": 5.361905896375201e-12,
+                "dualResidual": 4.018209100607923e-11,
+                "objective": -1.4971522765637792e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.018522,
+              "value": 68.2254663946672,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.018370723,
+                "primalResidual": 3.0373403495580894e-10,
+                "dualResidual": 3.010977686095484e-13,
+                "objective": 0.1729876293433271
+              }
+            }
+          ],
+          "primaryOptimum": 2.8527635605710496e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.2764182892301552,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022417,
+          "clfConstructionSeconds": 0.011452
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 2,
+              "seconds": 0.010433,
+              "value": 8.106938110524522e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 4,
+                "iterations": 19,
+                "solveSeconds": 0.010280937,
+                "primalResidual": 1.642885095730311e-11,
+                "dualResidual": 1.0148654214304372e-10,
+                "objective": -5.738652045009238e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.016265,
+              "value": 67.76336140437563,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 24,
+                "solveSeconds": 0.016111202,
+                "primalResidual": 3.3804970488211117e-09,
+                "dualResidual": 7.340276620627967e-12,
+                "objective": 0.17181593593170616
+              }
+            }
+          ],
+          "primaryOptimum": 8.106938110524522e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.5528365784603104,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.022458,
+          "clfConstructionSeconds": 0.011484
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010357,
+              "value": 2.4954748767905082e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010214097,
+                "primalResidual": 3.267280962539837e-12,
+                "dualResidual": 1.594096598562332e-11,
+                "objective": -1.0324179539966007e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.018009,
+              "value": 67.47438630699367,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.017852965,
+                "primalResidual": 1.8496177931026173e-09,
+                "dualResidual": 1.35889294886587e-11,
+                "objective": 0.17108323097468228
+              }
+            }
+          ],
+          "primaryOptimum": 2.4954748767905082e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 1,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022511999999999997,
+          "clfConstructionSeconds": 0.011508
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.01076,
+              "value": 1.4893197384842604e-05,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.010610476,
+                "primalResidual": 3.072724221787681e-13,
+                "dualResidual": 1.4616060376882405e-12,
+                "objective": 1.4893187151768347e-05
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.021883,
+              "value": 67.36878455339203,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 33,
+                "solveSeconds": 0.021647279,
+                "primalResidual": 1.5679108437708318e-12,
+                "dualResidual": 4.711702589335216e-12,
+                "objective": 0.1708153244527344
+              }
+            }
+          ],
+          "primaryOptimum": 1.4893197384842604e-05,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 1,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022845999999999998,
+          "clfConstructionSeconds": 0.011922
+        },
+        {
+          "initialization": "movingTargetFlow",
+          "terminationReason": "pcbfNoNumericalResult",
+          "solverCalls": 1,
+          "stages": {
+            "objective": "pcbfSlack",
+            "exitFlag": -2,
+            "seconds": 0.007156,
+            "value": null,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 2,
+              "iterations": 11,
+              "solveSeconds": 0.00701325,
+              "primalResidual": 5.639712979196739e-12,
+              "dualResidual": 4.932555744093107e-14,
+              "objective": null
+            }
+          },
+          "primaryOptimum": null,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 1,
+          "initializationSeconds": 0.004242,
+          "formulationSeconds": 0.010916,
+          "clfConstructionSeconds": 0
+        },
+        {
+          "initialization": "movingTargetFlow",
+          "terminationReason": "pcbfNoNumericalResult",
+          "solverCalls": 1,
+          "stages": {
+            "objective": "pcbfSlack",
+            "exitFlag": -2,
+            "seconds": 0.007148,
+            "value": null,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 2,
+              "iterations": 11,
+              "solveSeconds": 0.006997211,
+              "primalResidual": 5.460861540648574e-12,
+              "dualResidual": 4.551021692270912e-14,
+              "objective": null
+            }
+          },
+          "primaryOptimum": null,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 2,
+          "initializationSeconds": 0,
+          "formulationSeconds": 0.010878,
+          "clfConstructionSeconds": 0
+        }
+      ],
+      "linearizationCount": 7,
+      "flowRestarted": true,
+      "initializationFailure": "positiveRestorablePcbfSlack",
+      "elapsedSeconds": 0.311664,
+      "refinementCount": 5,
+      "selectedRefinement": 4,
+      "modelAgreementHistory": [
+        {
+          "poseErrorMeters": 0.0006989050114692147,
+          "fullPoseErrorMeters": 0.0006989050114692147,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 7.782127932731697e-05,
+          "scaledClfError": 6.280656084644079e-05,
+          "ratio": 0.06989050114692147,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.85432685534145,
+          "firstInputTrustActivity": 0.999999994485271,
+          "seconds": 0.001825,
+          "stepFraction": 1,
+          "predictedClfReduction": 1.0808670368598854,
+          "actualClfReduction": 1.1056377337307879,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0006323324076707497,
+          "fullPoseErrorMeters": 0.0006323324076707497,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 7.473560598999136e-05,
+          "scaledClfError": 6.598460319403477e-05,
+          "ratio": 0.06323324076707497,
+          "inputTrustScale": 0.2764182892301552,
+          "actualClfSlack": 68.19944228857013,
+          "firstInputTrustActivity": 0.9999999969239031,
+          "seconds": 0.001814,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.6288604606742751,
+          "actualClfReduction": 0.6548845667713437,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0012392791807894796,
+          "fullPoseErrorMeters": 0.0012392791807894796,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.00013024542442926132,
+          "scaledClfError": 0.00017250037112275454,
+          "ratio": 0.12392791807894796,
+          "inputTrustScale": 0.5528365784603104,
+          "actualClfSlack": 67.69532783681431,
+          "firstInputTrustActivity": 0.9999999945607867,
+          "seconds": 0.001811,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.4360808841945243,
+          "actualClfReduction": 0.5041144517558394,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0033984673963943428,
+          "fullPoseErrorMeters": 0.0033984673963943428,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.00035687290690317175,
+          "scaledClfError": 0.0005121134258811511,
+          "ratio": 0.3398467396394343,
+          "inputTrustScale": 1,
+          "actualClfSlack": 67.27241049116633,
+          "firstInputTrustActivity": 0.9999999848472059,
+          "seconds": 0.001818,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.22094152982054993,
+          "actualClfReduction": 0.42291734564788896,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0027779464959619606,
+          "fullPoseErrorMeters": 0.0027779464959619606,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 0.0002819950350978854,
+          "scaledClfError": 0.0004058462727843459,
+          "ratio": 0.27779464959619604,
+          "inputTrustScale": 1,
+          "actualClfSlack": 67.20872014517265,
+          "firstInputTrustActivity": 0.8845532341664131,
+          "seconds": 0.002229,
+          "stepFraction": 1,
+          "predictedClfReduction": -0.09637406222569211,
+          "actualClfReduction": 0.06369034599369172,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": false
+        }
+      ],
+      "modelAgreementSatisfied": true
+    },
+    "pcbfSlack": 1.0000264205955561e-06,
+    "clfSlack": 67.47438630699367,
+    "actualClfSlack": 67.27241049116633,
+    "firstInput": [
+      0.09421061599219954,
+      0.25002182904871345
+    ]
+  },
+  {
+    "label": "retained-final",
+    "source": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solvePredictiveControl.m",
+    "seconds": [
+      0.619929,
+      0.437852,
+      0.427211,
+      0.424163
+    ],
+    "warmMedianSeconds": 0.427211,
+    "search": {
+      "solverCalls": 16,
+      "source": "twoStageRealTimeIteration",
+      "initialization": "sameFrameRollout",
+      "returned": true,
+      "converged": true,
+      "terminationReason": "twoStagesModelAgreement",
+      "formulationSeconds": 0.022759,
+      "clfConstructionSeconds": 0.01144,
+      "inputTrustScale": 0.1382091446150776,
+      "primaryOptimum": 0,
+      "primaryLowerBound": 0,
+      "slackCap": 1e-06,
+      "clfInitialSlack": 67.60234951132809,
+      "clfStageAttempted": true,
+      "clfStageCompleted": true,
+      "clfLowerBound": false,
+      "stages": [
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010526,
+          "value": 9.380507606432953e-12,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010379227,
+            "primalResidual": 1.2801090617908608e-12,
+            "dualResidual": 1.0207253578448868e-11,
+            "objective": -4.2768721453722224e-11
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.017796,
+          "value": 68.87909755221236,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.017644581,
+            "primalResidual": 1.273853034700583e-10,
+            "dualResidual": 3.4395500295207333e-13,
+            "objective": 0.1746450216567922
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.009407,
+          "value": 1.4837868602260662e-12,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 16,
+            "solveSeconds": 0.009257373,
+            "primalResidual": 4.742398466824003e-12,
+            "dualResidual": 3.8815892913823046e-11,
+            "objective": -1.9722111038979777e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.017914,
+          "value": 68.29051835004367,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.01776266,
+            "primalResidual": 1.714215366778503e-10,
+            "dualResidual": 7.200741293600195e-13,
+            "objective": 0.17315260981192568
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010589,
+          "value": 5.991550645737077e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010436058,
+            "primalResidual": 6.55936221454821e-12,
+            "dualResidual": 5.3766866472700005e-11,
+            "objective": -1.8057480223239148e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.017856,
+          "value": 67.97339440880744,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 27,
+            "solveSeconds": 0.01770623,
+            "primalResidual": 2.6445325659673085e-10,
+            "dualResidual": 3.6890784106909477e-13,
+            "objective": 0.1723484967375776
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.010639,
+          "value": 4.385878503423635e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 18,
+            "solveSeconds": 0.010488067,
+            "primalResidual": 4.9372038157180846e-12,
+            "dualResidual": 4.0892336778066155e-11,
+            "objective": -1.4181238832030192e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.01666,
+          "value": 67.79157067300895,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 25,
+            "solveSeconds": 0.016508947,
+            "primalResidual": 2.765080834767706e-09,
+            "dualResidual": 1.1433899035459207e-12,
+            "objective": 0.17188746577624456
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.011013,
+          "value": 5.784991776113895e-11,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.010850785,
+            "primalResidual": 1.2402204704886434e-12,
+            "dualResidual": 1.0337162665845238e-11,
+            "objective": 9.295396157111491e-12
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.016012,
+          "value": 67.67988512387518,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 24,
+            "solveSeconds": 0.01584553,
+            "primalResidual": 4.833628358865996e-10,
+            "dualResidual": 9.938097861427552e-13,
+            "objective": 0.17160427977124998
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.0109,
+          "value": 8.065612748979051e-13,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.010749005,
+            "primalResidual": 5.550280830368282e-13,
+            "dualResidual": 4.637193706248286e-12,
+            "objective": -2.2697333939677956e-11
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.015941,
+          "value": 67.60622861792501,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 24,
+            "solveSeconds": 0.01578543,
+            "primalResidual": 3.099229961067903e-09,
+            "dualResidual": 7.52467096855943e-13,
+            "objective": 0.17141752013540024
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.011171,
+          "value": 0,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.011021404,
+            "primalResidual": 5.704412388011344e-12,
+            "dualResidual": 4.80279243143342e-11,
+            "objective": -2.3814390107998466e-10
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.016363,
+          "value": 67.55456758572828,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 24,
+            "solveSeconds": 0.016213888,
+            "primalResidual": 3.0808319621503214e-09,
+            "dualResidual": 6.27010733921124e-13,
+            "objective": 0.17128653162382954
+          }
+        },
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.011199,
+          "value": 9.129413565484894e-08,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 19,
+            "solveSeconds": 0.011034234,
+            "primalResidual": 3.179025958608723e-12,
+            "dualResidual": 2.600133921239452e-11,
+            "objective": 9.116949639935565e-08
+          }
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.018063,
+          "value": 67.55514058410324,
+          "numericalSolve": true,
+          "solverInfo": {
+            "nativeStatus": 1,
+            "iterations": 30,
+            "solveSeconds": 0.01789671,
+            "primalResidual": 2.1109763773773558e-14,
+            "dualResidual": 4.15940426987437e-14,
+            "objective": 0.17128731910930528
+          }
+        }
+      ],
+      "initializationSeconds": 3e-06,
+      "selectedAttempt": 7,
+      "attempts": [
+        {
+          "initialization": "shiftedInputRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010526,
+              "value": 9.380507606432953e-12,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010379227,
+                "primalResidual": 1.2801090617908608e-12,
+                "dualResidual": 1.0207253578448868e-11,
+                "objective": -4.2768721453722224e-11
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.017796,
+              "value": 68.87909755221236,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.017644581,
+                "primalResidual": 1.273853034700583e-10,
+                "dualResidual": 3.4395500295207333e-13,
+                "objective": 0.1746450216567922
+              }
+            }
+          ],
+          "primaryOptimum": 9.380507606432953e-12,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 0.000781,
+          "formulationSeconds": 0.022685,
+          "clfConstructionSeconds": 0.011388
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.009407,
+              "value": 1.4837868602260662e-12,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 16,
+                "solveSeconds": 0.009257373,
+                "primalResidual": 4.742398466824003e-12,
+                "dualResidual": 3.8815892913823046e-11,
+                "objective": -1.9722111038979777e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.017914,
+              "value": 68.29051835004367,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.01776266,
+                "primalResidual": 1.714215366778503e-10,
+                "dualResidual": 7.200741293600195e-13,
+                "objective": 0.17315260981192568
+              }
+            }
+          ],
+          "primaryOptimum": 1.4837868602260662e-12,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.022849,
+          "clfConstructionSeconds": 0.011473
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010589,
+              "value": 5.991550645737077e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010436058,
+                "primalResidual": 6.55936221454821e-12,
+                "dualResidual": 5.3766866472700005e-11,
+                "objective": -1.8057480223239148e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.017856,
+              "value": 67.97339440880744,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 27,
+                "solveSeconds": 0.01770623,
+                "primalResidual": 2.6445325659673085e-10,
+                "dualResidual": 3.6890784106909477e-13,
+                "objective": 0.1723484967375776
+              }
+            }
+          ],
+          "primaryOptimum": 5.991550645737077e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022788,
+          "clfConstructionSeconds": 0.011385
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.010639,
+              "value": 4.385878503423635e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 18,
+                "solveSeconds": 0.010488067,
+                "primalResidual": 4.9372038157180846e-12,
+                "dualResidual": 4.0892336778066155e-11,
+                "objective": -1.4181238832030192e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.01666,
+              "value": 67.79157067300895,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 25,
+                "solveSeconds": 0.016508947,
+                "primalResidual": 2.765080834767706e-09,
+                "dualResidual": 1.1433899035459207e-12,
+                "objective": 0.17188746577624456
+              }
+            }
+          ],
+          "primaryOptimum": 4.385878503423635e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022611,
+          "clfConstructionSeconds": 0.011367
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.011013,
+              "value": 5.784991776113895e-11,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.010850785,
+                "primalResidual": 1.2402204704886434e-12,
+                "dualResidual": 1.0337162665845238e-11,
+                "objective": 9.295396157111491e-12
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.016012,
+              "value": 67.67988512387518,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 24,
+                "solveSeconds": 0.01584553,
+                "primalResidual": 4.833628358865996e-10,
+                "dualResidual": 9.938097861427552e-13,
+                "objective": 0.17160427977124998
+              }
+            }
+          ],
+          "primaryOptimum": 5.784991776113895e-11,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.022876,
+          "clfConstructionSeconds": 0.011546
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.0109,
+              "value": 8.065612748979051e-13,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.010749005,
+                "primalResidual": 5.550280830368282e-13,
+                "dualResidual": 4.637193706248286e-12,
+                "objective": -2.2697333939677956e-11
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.015941,
+              "value": 67.60622861792501,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 24,
+                "solveSeconds": 0.01578543,
+                "primalResidual": 3.099229961067903e-09,
+                "dualResidual": 7.52467096855943e-13,
+                "objective": 0.17141752013540024
+              }
+            }
+          ],
+          "primaryOptimum": 8.065612748979051e-13,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 4e-06,
+          "formulationSeconds": 0.022896,
+          "clfConstructionSeconds": 0.01141
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.011171,
+              "value": 0,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.011021404,
+                "primalResidual": 5.704412388011344e-12,
+                "dualResidual": 4.80279243143342e-11,
+                "objective": -2.3814390107998466e-10
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.016363,
+              "value": 67.55456758572828,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 24,
+                "solveSeconds": 0.016213888,
+                "primalResidual": 3.0808319621503214e-09,
+                "dualResidual": 6.27010733921124e-13,
+                "objective": 0.17128653162382954
+              }
+            }
+          ],
+          "primaryOptimum": 0,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 3e-06,
+          "formulationSeconds": 0.022759,
+          "clfConstructionSeconds": 0.01144
+        },
+        {
+          "initialization": "sameFrameRollout",
+          "terminationReason": "twoStagesReturned",
+          "solverCalls": 2,
+          "stages": [
+            {
+              "objective": "pcbfSlack",
+              "exitFlag": 1,
+              "seconds": 0.011199,
+              "value": 9.129413565484894e-08,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 19,
+                "solveSeconds": 0.011034234,
+                "primalResidual": 3.179025958608723e-12,
+                "dualResidual": 2.600133921239452e-11,
+                "objective": 9.116949639935565e-08
+              }
+            },
+            {
+              "objective": "clfSlack",
+              "exitFlag": 1,
+              "seconds": 0.018063,
+              "value": 67.55514058410324,
+              "numericalSolve": true,
+              "solverInfo": {
+                "nativeStatus": 1,
+                "iterations": 30,
+                "solveSeconds": 0.01789671,
+                "primalResidual": 2.1109763773773558e-14,
+                "dualResidual": 4.15940426987437e-14,
+                "objective": 0.17128731910930528
+              }
+            }
+          ],
+          "primaryOptimum": 9.129413565484894e-08,
+          "primaryLowerBound": 0,
+          "inputTrustScale": 0.1382091446150776,
+          "initializationSeconds": 2e-06,
+          "formulationSeconds": 0.023266000000000002,
+          "clfConstructionSeconds": 0.011477
+        }
+      ],
+      "linearizationCount": 8,
+      "flowRestarted": false,
+      "initializationFailure": "",
+      "elapsedSeconds": 0.423584,
+      "refinementCount": 8,
+      "selectedRefinement": 7,
+      "modelAgreementHistory": [
+        {
+          "poseErrorMeters": 0.0006989050114692147,
+          "fullPoseErrorMeters": 0.0006989050114692147,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 7.782127932731697e-05,
+          "scaledClfError": 6.280656084644079e-05,
+          "ratio": 0.06989050114692147,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.85432685534145,
+          "firstInputTrustActivity": 0.999999994485271,
+          "seconds": 0.001848,
+          "stepFraction": 1,
+          "predictedClfReduction": 1.0808670368598854,
+          "actualClfReduction": 1.1056377337307879,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.0003279238731577224,
+          "fullPoseErrorMeters": 0.0003279238731577224,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 4.233392128035381e-05,
+          "scaledClfError": 2.619352456425587e-05,
+          "ratio": 0.032792387315772234,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 68.28018771158916,
+          "firstInputTrustActivity": 0.9999999878982527,
+          "seconds": 0.001839,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.5638085052977999,
+          "actualClfReduction": 0.5741391437523049,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 0.00015520348318038616,
+          "fullPoseErrorMeters": 0.00015520348318038616,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 1.8910365703043535e-05,
+          "scaledClfError": 1.5511581519686972e-05,
+          "ratio": 0.015520348318038616,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.96727669293618,
+          "firstInputTrustActivity": 0.9999999920952944,
+          "seconds": 0.001818,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.3067933027817418,
+          "actualClfReduction": 0.3129110186529971,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 9.731236049644226e-05,
+          "fullPoseErrorMeters": 9.731236049644226e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 1.0874292354542034e-05,
+          "scaledClfError": 1.1866612419509036e-05,
+          "ratio": 0.009731236049644225,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.78689052025503,
+          "firstInputTrustActivity": 0.9999999726399619,
+          "seconds": 0.001817,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.17570601992731838,
+          "actualClfReduction": 0.18038617268123858,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 7.544430805181608e-05,
+          "fullPoseErrorMeters": 7.544430805181608e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 7.81238718468765e-06,
+          "scaledClfError": 1.0446653464937095e-05,
+          "ratio": 0.0075444308051816076,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.67576499822069,
+          "firstInputTrustActivity": 0.9999999730875117,
+          "seconds": 0.001876,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.10700539637980455,
+          "actualClfReduction": 0.1111255220342997,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 6.680448301860808e-05,
+          "fullPoseErrorMeters": 6.680448301860808e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 6.8571665259309356e-06,
+          "scaledClfError": 9.835545566841359e-06,
+          "ratio": 0.006680448301860808,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.60234951132803,
+          "firstInputTrustActivity": 0.999999973617624,
+          "seconds": 0.00185,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.06953638029565923,
+          "actualClfReduction": 0.07341548689264243,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 6.309615627933438e-05,
+          "fullPoseErrorMeters": 6.309615627933438e-05,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 6.658313924231181e-06,
+          "scaledClfError": 9.562632649556678e-06,
+          "ratio": 0.006309615627933438,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.55079611513445,
+          "firstInputTrustActivity": 0.9999999743915076,
+          "seconds": 0.001835,
+          "stepFraction": 1,
+          "predictedClfReduction": 0.047781925599807096,
+          "actualClfReduction": 0.051553396193639855,
+          "clfReductionResolved": true,
+          "trustBoundaryRefinement": true
+        },
+        {
+          "poseErrorMeters": 1.7677387731164155e-06,
+          "fullPoseErrorMeters": 1.7677387731164155e-06,
+          "poseConstraintNodeCount": 77,
+          "scaledStateError": 2.0189855887142727e-07,
+          "scaledClfError": 1.0073264157783088e-07,
+          "ratio": 0.00017677387731164154,
+          "inputTrustScale": 0.1382091446150776,
+          "actualClfSlack": 67.55510085252847,
+          "firstInputTrustActivity": 0.10307289879415216,
+          "seconds": 0.001857,
+          "stepFraction": 1,
+          "predictedClfReduction": -0.004344468968795923,
+          "actualClfReduction": -0.004304737394022595,
+          "clfReductionResolved": false,
+          "trustBoundaryRefinement": false
+        }
+      ],
+      "modelAgreementSatisfied": true
+    },
+    "pcbfSlack": 1.0000019489243845e-06,
+    "clfSlack": 67.55456758572828,
+    "actualClfSlack": 67.55079611513445,
+    "firstInput": [
+      0.09540259457481363,
+      0.12502182924351746
+    ]
+  }
+]

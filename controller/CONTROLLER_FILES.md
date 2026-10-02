@@ -20,7 +20,8 @@ Each completed PCBF/CLF pair is rolled through the nonlinear model to measure
 prediction agreement. Its full evaluable rollout becomes the next search
 anchor; the entire local model is rebuilt before another pair of solves.
 An accurate iterate with positive CLF slack at the input correction boundary
-also refines, so that an artificial local box does not prevent recovery.
+also refines while its predicted or actual slack change exceeds the objective
+resolution, so that an artificial local box does not prevent recovery.
 Only an accurate completed second-stage result can supply the input. The
 best such iterate from the current frame survives later search failure. There
 is no stored executable witness or alternate controller. Flow is an initializer,
@@ -28,13 +29,20 @@ not a safety certificate. Positive PCBF slack still denotes relaxation.
 Road boundaries remain excluded, and the original given path defines the
 single CLF. Terminal feedback is used only for construction.
 
-MATLAB Optimization Toolbox and Control System Toolbox are required.
+MATLAB Control System Toolbox and the compiled Clarabel 0.11.1 adapter are required.
+Optimization Toolbox is used by independent comparison tests.
 Optional MATLAB Coder kernels are built outside the core by
 `../scripts/buildControllerKernels.m`; interpreted MATLAB remains available.
 Generated native binaries and `solver/` dependencies are not source artifacts
 of this change. Kernel equivalence has dedicated tests. The retired signed
 collision-direction kernel is not used. Ordinary-distance dual multipliers
-come from the exact closest-feature normal; trajectory problems use `coneprog`.
+come from the exact closest-feature normal. Trajectory problems use one sparse
+conic quadratic solver through `../scripts/native/predictiveConicSolverMex.cpp`.
+Build its external Clarabel dependency under `solver/clarabel`, then run
+`../scripts/buildPredictiveConicSolver.m`. The adapter contains numerical
+interface code, not another controller or alternate objective.
+`predictiveConicSolverTest` checks quadratic/epigraph equivalence, second-order
+cones, equalities and the exclusion of infeasibility certificates.
 Rebuild kernels after changing the configuration structure passed to the
 nominal-value MEX.
 

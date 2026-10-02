@@ -36,7 +36,8 @@ classdef clfNominalRecoveryTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(nextValue,value-.5*metadata.clfRequiredDecrease+tol);
             testCase.verifyTrue(metadata.clfTailReached);
             testCase.verifyGreaterThanOrEqual(metadata.clfNextValue,0);
-            testCase.verifyEqual(metadata.solverCallCount,2);
+            testCase.verifyTrue(metadata.search.clfStageCompleted);
+            testCase.verifyEqual(metadata.solverCallCount,sum([metadata.search.stages.numericalSolve]));
             testCase.verifyEqual(metadata.tertiaryObjective,"none");
         end
     end

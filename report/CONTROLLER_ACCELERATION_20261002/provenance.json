@@ -1,0 +1,42 @@
+{
+  "recordedAt": "2026-10-02T18:55:40.022841-05:00",
+  "baselineControllerCommit": "660a4cdd0875c8650665609ff48bb8cc746e1409",
+  "diagnosisCommit": "ddee00968e929cb78cd491e0364212a543401d87",
+  "matlab": "R2026a Update 3, -singleCompThread",
+  "clarabelVersion": "0.11.1",
+  "clarabelCppCommit": "0de6259a3edfd5cc041ec42b2148599ce63e73cb",
+  "sourceHashes": {
+    "controller/solvePredictiveControl.m": "7e46db75b4b1649d49c904223bcae0321845d28c7ef255bf8bbe5c823f30f834",
+    "controller/collisionAvoidanceController.m": "c69b9d0d22f9e1f025b5e3f4896ac4f7bd251a3f93410e2d6af2ef0c832595b1",
+    "controller/nonlinearBicycleModel.m": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608",
+    "controller/predictiveSafetyGeometry.m": "83be66e5ec0aa5522418de1ca5eb853818110f24df9c8a9c0ff6b3d246184c5a",
+    "config/collisionAvoidanceControllerConfig.m": "9dcebea9f29178545e7bfedd60eb7c3cffa35155d71fb4592d172bcb8670b0eb",
+    "scripts/buildControllerKernels.m": "e5db1b3f13789f3b6386e168ff3d976be1be74f8cdabd7bf53a7acd62aa90c8e",
+    "scripts/buildPredictiveConicSolver.m": "89c71114b87084938b644e84057e8941b02685a0f6807b05a18bf7d5e69f63fb",
+    "scripts/native/predictiveConicSolverMex.cpp": "860b460bfbda64aa9623ed6a32a7f500039863cb8a348085620deb99f63e5850",
+    "tests/predictiveConicSolverTest.m": "e32772be7992181355da1d9737c05716edab0cce6cfe36e93bdf8e5e22df27f7",
+    "tests/twoStagePredictiveControlTest.m": "6683e2b4dfe9303d1137244e79727c275144c7e18a79af6ab548c11032c5f48d",
+    "tests/clfNominalRecoveryTest.m": "48c0db3380fd6aed19019c4993ec4a3cf3465e7625ad9411a5fb35064945891b",
+    "tests/nominalClfTest.m": "dbf57f8d0e7803e0568f695c89c43a143d8b9bfecad843a5ecdc6fcc7ede8f22"
+  },
+  "kernelHashes": {
+    "bicycleSampleKernelMex.mexa64": "601cfd98fadb9bc000f7cf352e66af9ff32f98cd42d7764af84df1994c0fb216",
+    "rectangleKernelMex.mexa64": "981b03f4c32e59ca54810bf47c8602698976106f6e373f00b5a2ddd0e36aeaee",
+    "nominalClfKernelMex.mexa64": "8e2e6b2832a17e3c42b1cd08fca614f6d7680a345437d4fb74d135e423b50584",
+    "predictiveConicSolverMex.mexa64": "4f165b3efc8044d8d0c1610ee25357d5fc976a4b2b39e30bbb95465214bf6756"
+  },
+  "artifactHashes": {
+    "equivalent-programs.json": "14031796bf2c337d6155ffb6477a5728b3b12b47766ffa16b5c4ab1a89f6aa5f",
+    "tests.json": "db896527a02ee726cbd6d31852abb2ebf73eb0f618af5711d0aa5b8791851365",
+    "staged-benchmark.json": "a5a8ce809632929e7d7265ed12957f99371831d9e9a517820e13deee1928edb0",
+    "growth-trial-analysis.json": "3652dbc6c99f32545ae750130de58d3e31b05daeecb6e519919b081e6766285a",
+    "growth-crossing-contacts.json": "4aee68e54233c28fadd4cfc94e6fd2409b194ac1b8c3928aa6b925b398089fd5",
+    "growth-curvedCrossing-contacts.json": "83ff1c1c7ffaf1fbb8e4ea35477a53fe8b03e904d8e4abfc46c0a02fb5c2676b",
+    "campaign-analysis.json": "b2e3cd58c4d5af5f42e7378302e575da9ea689a82f7d3caaba763362accc2589",
+    "retained-contacts.json": "2ce2bc4cfebf793351306b3b53164f3bbd19bc1a4c2474bf0c23fc55ea9e9f9e",
+    "code-analysis.json": "372a8b62e2f8dd7ce4e498c55c24a727792a74de1c6b44fafc97f60b0fc53c24",
+    "ablation-summary.json": "d46275412f63b5623487bfd1b3b0da1f56b094b424b3f2cbd39d009a68bd5c47"
+  },
+  "cache": "/home/zai/.cache/collisionAvoidance/fast-controller-20261002",
+  "scope": "Final retained campaign has no added accurate-step trust growth; all source snapshots and rejected trials are distinct. Full controller-call time; latency not imposed on plant."
+}

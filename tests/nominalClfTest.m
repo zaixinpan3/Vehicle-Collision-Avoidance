@@ -101,7 +101,8 @@ classdef nominalClfTest < matlab.unittest.TestCase
                 [command,~,problem,prior]=collisionAvoidanceController(ego,[],road,cfg,prior);
                 metadata=problem.metadata;values(frame)=metadata.clfInitialValue;
                 testCase.verifyEqual(metadata.clfFunction,"nominalCostToGo");
-                testCase.verifyEqual(metadata.solverCallCount,2);
+                testCase.verifyTrue(metadata.search.clfStageCompleted);
+                testCase.verifyEqual(metadata.solverCallCount,sum([metadata.search.stages.numericalSolve]));
                 if frame>1
                     testCase.verifyLessThanOrEqual(values(frame),values(frame-1)-.5*required+1e-6*values(frame-1));
                 end

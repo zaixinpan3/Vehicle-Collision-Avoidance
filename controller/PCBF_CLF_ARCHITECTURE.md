@@ -128,9 +128,12 @@ it relaxes the start and midpoint separation rows. Completion-tail rows are
 hard. The node buffer is 0.10 m, whereas the experiment's physical pass criterion
 is positive rectangle clearance. No road-boundary constraint is imposed.
 
-The first problem minimizes the sum of PCBF slacks. An unbounded CLF slack and
-the redundant increment epigraph can be eliminated from this problem without
-changing its feasible projection. The primary therefore contains only the
+The first problem minimizes the sum of PCBF slacks. The unbounded CLF slack
+and its cone are eliminated from this problem without changing its feasible
+projection. If the zero correction with zero slacks satisfies every linear
+row, equality, bound and endpoint cone, it attains the global lower bound zero.
+The primary stage is then completed analytically; the CLF stage still runs.
+`numericalSolve` distinguishes analytic completion from an actual solver call. The primary therefore contains only the
 shared dynamics, state/input limits, collision rows and endpoint cone.
 
 A finite positive primary value need not be a useful safety result. The fixed
@@ -158,17 +161,27 @@ part of the omitted residual curvature. It is a convex quadratic represented
 as a second-order cone, not a certified global upper bound. The secondary
 problem minimizes
 
-    rho / max(V_K(z),1) + epsilon * sigma,
-    sum(xi) <= achievedPrimary + lexicographicTieTolerance,
-    R(dU) <= sigma <= 1.
+    rho / max(V_K(z),1) + epsilon * R(dU),
+    sum(xi) <= achievedPrimary + lexicographicTieTolerance.
 
 `R` is the normalized squared input increment about the linearization inputs.
 At an exact optimum its effect on minimum scaled CLF slack is bounded by
 `epsilon = clfTieTolerance = 1e-4`. It penalizes neither absolute zero input
 nor deviation from the construction feedback. PCBF priority is retained;
 CLF minimization has this explicit bounded tie allowance. A zero primary
-result still runs the CLF stage. All conic calls use `coneprog` because the
-endpoint and CLF constraints are quadratic cones, not linear QP constraints.
+result still runs the CLF stage. The componentwise input boxes imply `R <= 1`,
+so the former epigraph `R <= sigma <= 1` is eliminated exactly. Clarabel solves
+the native sparse quadratic objective with the endpoint and CLF cones retained;
+these are conic QPs rather than linearly constrained QPs. State variables remain
+explicit to preserve dynamic sparsity.
+
+The compiled adapter seeks the configured constraint/optimality precision.
+Its reduced-accuracy termination uses the existing `feasibilityTolerance`
+(default 1e-5) for primal/dual residuals and absolute/relative objective gap.
+Flags 1 and 2 distinguish full and reduced-accuracy convergence. Numerical
+acceptance error is additional to the analytic lexicographic tie bounds.
+Infeasibility rays, time-limit iterates and unresolved numerical failures return
+no point. `solverInfo` records native status, iterations and residuals.
 
 ## Nonlinear model agreement and relinearization
 
@@ -204,7 +217,11 @@ remains a relaxed result and is not interpreted as collision freedom.
 
 Accuracy is not the only stopping condition. If CLF slack is positive and
 the normalized first-input correction reaches the local box boundary (within
-1e-3), the controller rebuilds and solves both stages again. Otherwise a
+1e-3), the controller rebuilds and solves both stages again while the current
+predicted or actual slack reduction exceeds `clfTieTolerance*max(1,V)`.
+Reductions smaller than that existing objective resolution end optional
+polishing. This is a local numerical stopping rule, not a proof of global
+nonlinear optimality. Otherwise a
 small, accurate correction can repeatedly stop short of a descent input,
 while the shifted second input restores the same bad trust center next frame.
 This condition depends on the existing CLF and numerical box, not target

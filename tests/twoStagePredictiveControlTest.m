@@ -14,7 +14,10 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem,state]=collisionAvoidanceController(ego,[],road,cfg,[]);
             search=problem.metadata.search;
             testCase.verifyEqual(search.initialization,"laneFeedbackRollout");
-            testCase.verifyEqual(search.solverCalls,2);
+            testCase.verifyFalse(search.stages(1).numericalSolve);
+            testCase.verifyEqual(search.stages(1).value,0);
+            testCase.verifyTrue(search.stages(2).numericalSolve);
+            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
             testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlack"]);
             testCase.verifyEqual(problem.metadata.clfFunction,"nominalCostToGo");
             testCase.verifyGreaterThan([search.stages.exitFlag],0);
@@ -34,7 +37,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,localNearTarget(),road,cfg,[]);
             search=problem.metadata.search;
             testCase.verifyGreaterThan(problem.metadata.encounterExitStep,0);
-            testCase.verifyEqual(search.solverCalls,2);
+            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
             testCase.verifyEqual([search.stages.objective],["pcbfSlack","clfSlack"]);
             testCase.verifyEqual(problem.metadata.clfFunction,"nominalCostToGo");
             testCase.verifyEqual(problem.metadata.tertiaryObjective,"none");
@@ -53,7 +56,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
                 repmat(absent.metadata.clfRequiredDecrease,1,3),AbsTol=1e-12);
             testCase.verifyEqual([absent.metadata.clfFunction,near.metadata.clfFunction,distant.metadata.clfFunction], ...
                 repmat("nominalCostToGo",1,3));
-            testCase.verifyEqual([absent.metadata.solverCallCount,near.metadata.solverCallCount,distant.metadata.solverCallCount],[2,2,2]);
+            testCase.verifyTrue(all([absent.metadata.search.clfStageCompleted,near.metadata.search.clfStageCompleted,distant.metadata.search.clfStageCompleted]));
         end
         function shiftedInputsAreRolledOutFromTheNewMeasurement(testCase)
             [ego,road,cfg]=localFixture();ego.position(2)=.1;
@@ -66,7 +69,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyNotEqual(anchor.states(:,1),prior.stateTrajectory(:,2));
             testCase.verifyEqual(anchor.inputs(:,1:end-1),prior.inputTrajectory(:,2:end),AbsTol=0);
             testCase.verifyEqual(problem.predictedState(:,1),problem.model.initialState,AbsTol=1e-7);
-            testCase.verifyEqual(problem.metadata.solverCallCount,2);
+            testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
             testCase.verifyEqual(command.actuatorInput,inputs(:,1),AbsTol=0);
             localVerifyAffinePrediction(testCase,problem,cfg);
             localVerifyAnchorRollout(testCase,anchor,cfg);
@@ -78,7 +81,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             [command,inputs,problem]=collisionAvoidanceController(ego,[],road,cfg,prior);
             search=problem.metadata.search;
             testCase.verifyTrue(search.flowRestarted);
-            testCase.verifyEqual(search.solverCalls,3);
+            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
             testCase.verifyEqual(search.linearizationCount,2);
             testCase.verifyEqual([search.attempts.initialization],["shiftedInputRollout","movingTargetFlow"]);
             testCase.verifyEqual(search.initializationFailure,"pcbfNoNumericalResult");
@@ -96,7 +99,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEmpty(solution);
             testCase.verifyTrue(search.flowRestarted);
             testCase.verifyEqual(search.linearizationCount,3);
-            testCase.verifyEqual(search.solverCalls,3);
+            testCase.verifyEqual(search.solverCalls,sum([search.stages.numericalSolve]));
             testCase.verifyEqual([search.attempts.inputTrustScale],[1,1,2]);
             testCase.verifyFalse(search.clfStageAttempted);
             testCase.verifyEqual(search.terminationReason,"pcbfNoNumericalResult");
@@ -121,7 +124,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.search.initializationFailure, ...
                 "collisionAvoidanceController:invalidTireOperatingPoint");
             testCase.verifyFalse(problem.metadata.search.flowRestarted);
-            testCase.verifyEqual(problem.metadata.search.solverCalls,2);
+            testCase.verifyEqual(problem.metadata.search.solverCalls,sum([problem.metadata.search.stages.numericalSolve]));
         end
         function exhaustedBudgetDoesNotExecuteThePreviousTrajectory(testCase)
             [ego,road,cfg]=localFixture();
@@ -144,6 +147,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyEqual(problem.metadata.search.primaryLowerBound, ...
                 cfg.collision.safetyMarginMeters,AbsTol=1e-6);
             testCase.verifyGreaterThan(problem.metadata.search.primaryOptimum,0);
+            testCase.verifyTrue(problem.metadata.search.stages(1).numericalSolve);
             testCase.verifyGreaterThan(problem.solution.safety,0);
             testCase.verifyFalse(problem.metadata.zeroSlack);
             testCase.verifyTrue(problem.metadata.search.clfStageCompleted);
@@ -174,7 +178,7 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(abs(steering-problem.model.linearization.inputs(1,1)), ...
                 cfg.nonlinear.trustRadius*.15+cfg.solver.feasibilityTolerance);
             testCase.verifyGreaterThan(abs(steering-ego.heldActuatorInput(1)),.5);
-            testCase.verifyEqual(problem.metadata.solverCallCount,2);
+            testCase.verifyEqual(problem.metadata.solverCallCount,sum([problem.metadata.search.stages.numericalSolve]));
             localVerifyAffinePrediction(testCase,problem,cfg);
         end
         function nonlinearDisagreementRebuildsBothStagesInTheSameFrame(testCase)

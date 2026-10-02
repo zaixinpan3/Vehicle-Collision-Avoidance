@@ -1,7 +1,7 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl Refine one PCBF/CLF controller within the current hold.
 % Each issued iterate completes both objectives and meets model accuracy.
-% A positive CLF slack at the numerical input boundary triggers another round.
+% Resolved CLF progress at the numerical input boundary triggers another round.
     if nargin<3,timer=tic;end
     cfg=model.cfg;solution=[];allAttempts=struct([]);allStages=struct([]);history=struct([]);
     restarted=false;selected=0;initialFailure="";selectedRound=0;
@@ -19,7 +19,12 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         if isempty(candidate),break;end
         wall=tic;[agreement,rollout,valid]=localPredictionAgreement(candidate,trialModel);
         agreement.seconds=toc(wall);agreement.stepFraction=1;
-        agreement.trustBoundaryRefinement=agreement.ratio<=1 ...
+        scale=max(1,candidate.clfInitialValue);
+        agreement.predictedClfReduction=search.clfInitialSlack-candidate.clfSlack;
+        agreement.actualClfReduction=search.clfInitialSlack-agreement.actualClfSlack;
+        agreement.clfReductionResolved=max(abs([agreement.predictedClfReduction, ...
+            agreement.actualClfReduction]))>cfg.solver.clfTieTolerance*scale;
+        agreement.trustBoundaryRefinement=agreement.ratio<=1 && agreement.clfReductionResolved ...
             && candidate.clfSlack>cfg.solver.feasibilityTolerance*max(1,candidate.clfInitialValue) ...
             && agreement.firstInputTrustActivity>=1-1e-3;
         history=[history,agreement]; %#ok<AGROW>
@@ -69,7 +74,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         search.terminationReason="linearizationAccuracyNotReached";
     end
     search.attempts=allAttempts;search.stages=allStages;search.selectedAttempt=selected;
-    search.linearizationCount=numel(allAttempts);search.solverCalls=numel(allStages);
+    search.linearizationCount=numel(allAttempts);search.solverCalls=sum([allStages.numericalSolve]);
     search.flowRestarted=restarted;search.initializationFailure=initialFailure;
     search.refinementCount=numel(history);search.selectedRefinement=selectedRound;search.modelAgreementHistory=history;
     search.modelAgreementSatisfied=~isempty(solution);search.elapsedSeconds=toc(timer);
@@ -187,7 +192,7 @@ function [solution,search,model] = localRound(model,previousState,timer)
         stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);restarted=true;
     end
     search.selectedAttempt=selected;search.stages=stages;search.attempts=attempts;
-    search.linearizationCount=numel(attempts);search.solverCalls=numel(stages);search.flowRestarted=restarted;
+    search.linearizationCount=numel(attempts);search.solverCalls=sum([stages.numericalSolve]);search.flowRestarted=restarted;
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
 end
 
@@ -225,16 +230,27 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
         'formulationSeconds',toc(wall),'clfConstructionSeconds',0, ...
         'inputTrustScale',model.inputTrustScale,'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
         'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
-        'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{}));
+        'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}));
     remaining=cfg.solver.timeLimitSeconds-toc(timer);if remaining<=0,return;end
-    options=localOptions(cfg,remaining);primaryCount=problem.clfIndex-1;endpoint=problem.cones(1);
-    primaryCone=secondordercone(endpoint.A(:,1:primaryCount),endpoint.b,endpoint.d(1:primaryCount),endpoint.gamma);
+    primaryCount=problem.clfIndex-1;endpoint=problem.cones(1);wall=tic;
+    % A feasible zero correction with zero nonnegative slacks attains the
+    % global lower bound. Include every primary constraint, not just safety.
+    if all(problem.b>=0) && all(problem.rhs==0) ...
+            && all(problem.lower(1:primaryCount)<=0) && all(problem.upper(1:primaryCount)>=0) ...
+            && norm(endpoint.b)<=-endpoint.gamma
+        point=zeros(primaryCount,1);search.primaryOptimum=0;
+        search.slackCap=cfg.solver.lexicographicTieTolerance;
+        search.stages(1)=struct('objective',"pcbfSlack",'exitFlag',1, ...
+            'seconds',toc(wall),'value',0,'numericalSolve',false,'solverInfo',struct());
+        search.terminationReason="primaryReturned";return;
+    end
+    primaryCone=endpoint;primaryCone.A=endpoint.A(:,1:primaryCount);primaryCone.d=endpoint.d(1:primaryCount);
     wall=tic;
-    [point,~,flag]=coneprog(problem.safetyObjective(1:primaryCount),primaryCone, ...
+    [point,flag,solverInfo]=localConicSolve(sparse(primaryCount,primaryCount),problem.safetyObjective(1:primaryCount),primaryCone, ...
         problem.a(:,1:primaryCount),problem.b,problem.equal(:,1:primaryCount),problem.rhs, ...
-        problem.lower(1:primaryCount),problem.upper(1:primaryCount),options);
+        problem.lower(1:primaryCount),problem.upper(1:primaryCount),cfg,remaining,cfg.solver.optimalityTolerance);
     search.solverCalls=1;
-    search.stages(1)=struct('objective',"pcbfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN);
+    search.stages(1)=struct('objective',"pcbfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
     if isempty(point) || any(~isfinite(point)) || flag<=0
         point=[];search.terminationReason="pcbfNoNumericalResult";return;
     end
@@ -252,17 +268,17 @@ function [solution,search,model]=localSecondary(point,problem,anchor,model,searc
     problem.a=[problem.a;problem.safetyObjective.'];problem.b=[problem.b;search.slackCap];
     remaining=cfg.solver.timeLimitSeconds-toc(timer);
     if remaining<=0,search.terminationReason="timeLimit";return;end
-    options=localOptions(cfg,remaining);
-    options.OptimalityTolerance=min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance);
-    % With 0<=sigma<=1 this tie-break can change the optimal scaled CLF
-    % slack by at most clfTieTolerance. It penalizes dU, not absolute input.
-    objective=zeros(size(problem.safetyObjective));objective(problem.clfIndex)=1;objective(end)=cfg.solver.clfTieTolerance;
+    % The input box implies ||R*dU||^2<=1. The native quadratic is exactly
+    % the former epigraph penalty; it changes scaled CLF slack by at most
+    % clfTieTolerance and penalizes departure from the anchor, not zero.
+    objective=zeros(size(problem.safetyObjective));objective(problem.clfIndex)=1;
     search.clfStageAttempted=true;wall=tic;
-    [second,~,flag]=coneprog(objective,problem.cones,problem.a,problem.b, ...
-        problem.equal,problem.rhs,problem.lower,problem.upper,options);
-    search.solverCalls=2;
-    search.stages(2)=struct('objective',"clfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN);
-    if isempty(second) || any(~isfinite(second)) || flag==-2,search.terminationReason="clfNoNumericalResult";return;end
+    [second,flag,solverInfo]=localConicSolve(problem.quadratic,objective,problem.cones,problem.a,problem.b, ...
+        problem.equal,problem.rhs,problem.lower,problem.upper,cfg,remaining, ...
+        min(cfg.solver.optimalityTolerance,cfg.solver.constraintTolerance));
+    search.solverCalls=search.solverCalls+1;
+    search.stages(2)=struct('objective',"clfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN,'numericalSolve',true,'solverInfo',solverInfo);
+    if isempty(second) || any(~isfinite(second)) || flag<=0,search.terminationReason="clfNoNumericalResult";return;end
     inputs=anchor.inputs+reshape(second(problem.inputIndices),size(anchor.inputs));
     states=anchor.states+reshape(second(problem.stateIndices),size(anchor.states));
     slacks=max(0,second(problem.slackIndices));rho=problem.clfScale*max(0,second(problem.clfIndex));
@@ -282,10 +298,32 @@ function [solution,search,model]=localSecondary(point,problem,anchor,model,searc
     search.terminationReason="twoStagesReturned";
 end
 
-function options=localOptions(cfg,remaining)
-    options=optimoptions('coneprog','Display','none','MaxIterations',cfg.solver.maxIterations, ...
-        'ConstraintTolerance',cfg.solver.constraintTolerance,'OptimalityTolerance',cfg.solver.optimalityTolerance, ...
-        'MaxTime',remaining);
+function [point,flag,solverInfo]=localConicSolve(quadratic,objective,cones,a,b,equal,rhs,lower,upper,cfg,remaining,gapTolerance)
+    persistent available
+    if isempty(available)
+        directory=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
+        if isfolder(directory),addpath(directory);end
+        assert(exist('predictiveConicSolverMex','file')==3, ...
+            'collisionAvoidanceController:missingConicSolver', ...
+            'Run scripts/buildPredictiveConicSolver to compile the Clarabel adapter.');
+        available=true;
+    end
+    count=numel(objective);identity=speye(count);low=isfinite(lower);high=isfinite(upper);
+    rows=cell(1,numel(cones)+1);bounds=cell(size(rows));
+    rows{1}=[equal;a;-identity(low,:);identity(high,:)];
+    bounds{1}=[rhs;b;-lower(low);upper(high)];
+    dimensions=[size(equal,1),size(a,1)+nnz(low)+nnz(high),zeros(1,numel(cones))];
+    for k=1:numel(cones)
+        cone=cones(k);rows{k+1}=[-cone.d.';-cone.A];bounds{k+1}=[-cone.gamma;-cone.b];
+        dimensions(k+2)=size(cone.A,1)+1;
+    end
+    [point,flag,solverInfo]=predictiveConicSolverMex(quadratic,objective, ...
+        vertcat(rows{:}),vertcat(bounds{:}),dimensions,[0,1,2*ones(1,numel(cones))], ...
+        [cfg.solver.maxIterations;remaining;cfg.solver.constraintTolerance;gapTolerance;cfg.solver.feasibilityTolerance]);
+end
+
+function cone=localCone(a,b,d,gamma)
+    cone=struct('A',sparse(a),'b',full(b),'d',sparse(d),'gamma',gamma);
 end
 
 function [anchor,source,failure]=localInitialization(model,previous)
@@ -386,13 +424,13 @@ end
 function [problem,model]=localFormulate(anchor,model)
     cfg=model.cfg;count=size(anchor.inputs,2);prefix=cfg.controller.horizonSteps;reference=model.nominalReference;
     ix=reshape(1:6*(count+1),6,[]);iu=reshape(ix(end)+(1:2*count),2,[]);
-    is=iu(end)+(1:prefix);ic=is(end)+1;nv=ic+1;
+    is=iu(end)+(1:prefix);ic=is(end)+1;nv=ic;
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
     rhs(1:6)=model.initialState-anchor.states(:,1);
     rows=cell(1,5*count+3);bounds=cell(size(rows));rowCount=0;
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
-    lower(iu(:))=-repmat(model.inputTrustScale*radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic,nv])=0;upper(nv)=1;
+    lower(iu(:))=-repmat(model.inputTrustScale*radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
     % Numerical RTI corrections are local to the new anchor at every sample.
     % Steering still has no actuator magnitude or slew constraint.
     inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
@@ -435,7 +473,7 @@ function [problem,model]=localFormulate(anchor,model)
     [seed,poseJacobian]=terminalContinuation.fit(model.terminal,y,endIndex);model.terminal=seed;
     deviation=y(4:8)-[seed.base(4:6);seed.reference.input];
     map=sparse(8,nv);map(1:6,ix(:,end))=eye(6);map(7:8,iu(:,end))=eye(2);
-    endpoint=secondordercone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius);
+    endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius);
     terminalA=zeros(0,nv);terminalB=zeros(0,1);
     if departure>count
         if localBeyondRange(y(1:6),count*cfg.controller.sampleTime,model),departure=count;
@@ -460,13 +498,11 @@ function problem=localAddClf(problem,anchor,model)
     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
     [map,offset,constant,value,scale,modelConstant,clf]=localNominalClf(anchor,model,iu(:,1),nv);
     axis=sparse(1,nv);axis(ic)=1;
-    cone=secondordercone([2*map;axis],[-2*offset;1-constant],axis.',-1-constant);
+    cone=localCone([2*map;axis],[-2*offset;1-constant],axis.',-1-constant);
     inputScale=repmat(1./(model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25]*sqrt(2*count)),count,1);
     increment=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
-    regularizationAxis=sparse(1,nv);regularizationAxis(end)=1;
-    regularizationCone=secondordercone([2*increment;regularizationAxis], ...
-        [zeros(numel(iu),1);1],regularizationAxis.',-1);
-    problem.cones=[problem.cones,cone,regularizationCone];
+    problem.quadratic=2*model.cfg.solver.clfTieTolerance*(increment.'*increment);
+    problem.cones=[problem.cones,cone];
     problem.clfScale=scale;problem.clfMap=map;problem.clfOffset=offset;
     problem.clfModelConstant=modelConstant;problem.clf=clf;problem.initialClfValue=value;
     problem.initialClfSlack=max(0,(norm(offset)^2-constant)*scale);

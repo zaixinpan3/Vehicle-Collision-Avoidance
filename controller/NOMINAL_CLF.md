@@ -86,7 +86,9 @@ ODE45 replay and evaluation of the same V on consecutive measured states quantif
 that gap. Within-hold relinearization now measures nonlinear prediction and
 first-successor value agreement; it is not a complete nonlinear safety check.
 An accurate result with positive CLF slack at the first-input trust boundary
-also continues the same two-stage iteration. Thus a numerical correction box
+also continues the same two-stage iteration while its predicted or actual
+slack reduction exceeds the existing scaled CLF tie resolution. The previous
+between-frame trust-scale adaptation remains in use. Thus a numerical correction box
 does not become an unintended permanent restriction on nominal recovery.
 The best accurate complete pair from the current frame is retained.
 An exact inequality
@@ -109,11 +111,11 @@ Use the dimensionless squared input increment
 
     R(dU) = (1/(2M)) * sum_i ||diag(r_delta,r_b)^(-1) dU_i||^2.
 
-The existing componentwise trust limits give `0 <= R <= 1`. A conic epigraph
-`sigma >= R`, `0 <= sigma <= 1` adds no restriction beyond those limits. The second
-solve minimizes
+The existing componentwise trust limits give `0 <= R <= 1`. The former conic
+epigraph `sigma >= R`, `0 <= sigma <= 1` is redundant and is eliminated exactly.
+The compiled conic QP directly minimizes
 
-    rho_scaled + epsilon * sigma,
+    rho_scaled + epsilon * R(dU),
 
 with the PCBF optimum retained by its original bound. Inputs are penalized relative
 to their linearization values, **not relative to zero and not relative to kappa**.
@@ -127,8 +129,9 @@ secondary tradeoff; `clfTieBound` reports its unscaled value. It is not an exact
 third lexicographic objective hidden inside the solver. PCBF remains the first
 priority, while CLF minimization is resolved within this stated tolerance.
 Solver termination errors are additional and are recorded separately. In stage
-one, the unbounded CLF slack and the redundant input-norm epigraph are eliminated
-algebraically, together with their cones. This preserves the PCBF feasible
+one, the unbounded CLF slack is eliminated algebraically with its cone.
+A fully feasible zero-slack anchor proves a zero primary optimum without a
+numerical solve; the secondary always remains. This preserves the PCBF feasible
 projection and avoids paying for the secondary objective in the primary solve.
 
 The dynamics/collision linearization still follows the shifted prior inputs,
@@ -145,7 +148,8 @@ its input correction box may be
 enlarged once by a factor of two. This is a nested primary problem; state trust,
 physical braking bounds, safety rows, and endpoint constraints are unchanged.
 The better primary result is retained. An infeasible numerical correction box
-does not justify repeatedly shrinking it. Normal frames use two conic solves;
+does not justify repeatedly shrinking it. Normal frames use one or two numerical solves
+for their two objectives, depending on the analytic zero-primary certificate;
 fresh initialization and this bounded enlargement can add two primary solves.
 These are counts for one local model; within-hold refinement can rebuild
 that model and repeat both stages. The accuracy and stopping rules are in

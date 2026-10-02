@@ -1,0 +1,233 @@
+[
+  {
+    "time": 1.5000000000000007,
+    "contactTimes": [
+      1.5100000000000007,
+      1.5116666666666674,
+      1.513333333333334,
+      1.5150000000000006
+    ],
+    "nodeGaps": [
+      0.09997669144171718,
+      0.09745721447344079,
+      0.3408525681344895
+    ],
+    "predictionAgreement": {
+      "poseErrorMeters": 0.0015895617996334206,
+      "fullPoseErrorMeters": 0.002961030120095605,
+      "poseConstraintNodeCount": 41,
+      "scaledStateError": 0.0003712097937206514,
+      "scaledClfError": 0.00038864220501310537,
+      "ratio": 0.15895617996334205,
+      "inputTrustScale": 1,
+      "actualClfSlack": 1599.1689747076794,
+      "firstInputTrustActivity": 0.9999999992459413,
+      "seconds": 0.002287,
+      "stepFraction": 1,
+      "predictedClfReduction": 24.332713824627263,
+      "actualClfReduction": 27.21171277298413,
+      "clfReductionResolved": true,
+      "trustBoundaryRefinement": true
+    },
+    "primary": 4.2050355044941884e-05,
+    "slack": 4.3050359519361055e-05,
+    "rounds": 6,
+    "stages": [
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 0.006096,
+        "value": 0.00011572217512969116,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 11,
+          "solveSeconds": 0.005952085,
+          "primalResidual": 1.0249617289255803e-11,
+          "dualResidual": 4.514695999144357e-11,
+          "objective": 0.00011572118761050347
+        }
+      },
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 0.006053,
+        "value": 0.00043921070577716945,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 11,
+          "solveSeconds": 0.005920035,
+          "primalResidual": 1.555776674199237e-11,
+          "dualResidual": 6.758568706255705e-11,
+          "objective": 0.0004392091778832064
+        }
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.010707,
+        "value": 1642.1667458331117,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 17,
+          "solveSeconds": 0.010564575,
+          "primalResidual": 2.2686872740719128e-12,
+          "dualResidual": 2.3114699292574978e-14,
+          "objective": 0.2216802570743584
+        }
+      },
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 0.00604,
+        "value": 8.077008707949206e-05,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 11,
+          "solveSeconds": 0.005903756,
+          "primalResidual": 7.839264685118463e-12,
+          "dualResidual": 2.983501619367536e-11,
+          "objective": 8.076938118838359e-05
+        }
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.010665,
+        "value": 1627.2835294939064,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 18,
+          "solveSeconds": 0.010523116,
+          "primalResidual": 2.2357955927446073e-09,
+          "dualResidual": 2.506485791856345e-12,
+          "objective": 0.21967114015125327
+        }
+      },
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 0.006005,
+        "value": 4.2050355044941884e-05,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 11,
+          "solveSeconds": 0.005870855,
+          "primalResidual": 2.9424893126097153e-12,
+          "dualResidual": 9.858044657627467e-12,
+          "objective": 4.20501158135622e-05
+        }
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.010594,
+        "value": 1602.0479736560362,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 18,
+          "solveSeconds": 0.010453946,
+          "primalResidual": 3.336834413425312e-10,
+          "dualResidual": 2.0685105654414145e-11,
+          "objective": 0.21626453935506412
+        }
+      },
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 0.00607,
+        "value": 4.379175686159464e-05,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 11,
+          "solveSeconds": 0.005934256,
+          "primalResidual": 3.8894247836700166e-12,
+          "dualResidual": 1.3057671616008226e-11,
+          "objective": 4.379144439125531e-05
+        }
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.010595,
+        "value": 1576.8273219025332,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 18,
+          "solveSeconds": 0.010454937,
+          "primalResidual": 1.0704753328528956e-09,
+          "dualResidual": 2.027723520595891e-11,
+          "objective": 0.21285995041463174
+        }
+      },
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 0.006107,
+        "value": 7.069178367227256e-05,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 11,
+          "solveSeconds": 0.005969775,
+          "primalResidual": 1.5351088642762814e-12,
+          "dualResidual": 5.1559057930995244e-12,
+          "objective": 7.069164273919155e-05
+        }
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.010663,
+        "value": 1551.8570729368905,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 18,
+          "solveSeconds": 0.010514696,
+          "primalResidual": 1.8309853634015316e-10,
+          "dualResidual": 2.0027223898950202e-11,
+          "objective": 0.20948916459749883
+        }
+      },
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 2,
+        "seconds": 0.006254,
+        "value": 9.821864394537734e-05,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 4,
+          "iterations": 12,
+          "solveSeconds": 0.006116774,
+          "primalResidual": 2.2509707057653924e-11,
+          "dualResidual": 8.011995091864683e-11,
+          "objective": 9.821660810324356e-05
+        }
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.014993,
+        "value": 1567.9985432702003,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 24,
+          "solveSeconds": 0.014849918,
+          "primalResidual": 8.277560205703898e-13,
+          "dualResidual": 6.582665676245371e-13,
+          "objective": 0.21166805654115795
+        }
+      }
+    ]
+  }
+]
