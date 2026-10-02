@@ -1,0 +1,37 @@
+{
+  "repository": "/home/zai/Downloads/ResearchProjects/collisionAvoidance",
+  "operations": [
+    {
+      "purpose": "Existing estimator regression",
+      "command": "matlab -batch \"results = runtests('tests/onlineNrmmTrackingRuntimeTest.m'); resultTable = table(results); writetable(resultTable(:,{'Name','Passed','Failed','Incomplete','Duration'}),'simulation_output/carla_estimator_smoke_20261002/unit-tests.csv'); assertSuccess(results)\"",
+      "exitCode": 0,
+      "passed": 31,
+      "failed": 0,
+      "incomplete": 0
+    },
+    {
+      "purpose": "Start separate temporary instance",
+      "command": "nice -n 10 /home/zai/carla/Build/Package/material_fix_town10_sm6_high_low/Linux/CarlaUnreal/Binaries/Linux/CarlaUnreal CarlaUnreal -nullrhi -nosound -quality-level=Low -world-port=2011",
+      "pid": 2478952,
+      "shutdownExitCode": 139
+    },
+    {
+      "purpose": "Physical two-vehicle capture",
+      "command": "/home/zai/carla-venv/bin/python -u simulation_output/carla_estimator_smoke_20261002/captureSmoke.py --port 2011 --server-pid 2478952",
+      "exitCode": 0
+    },
+    {
+      "purpose": "Unchanged production estimator, continuous and dropout replay",
+      "command": "matlab -singleCompThread -batch \"addpath('simulation_output/carla_estimator_smoke_20261002'); replaySmoke;\"",
+      "exitCode": 0
+    },
+    {
+      "purpose": "Independent input audit",
+      "method": "Python/NumPy read all 400 JSONL records; verify consecutive CARLA IDs, IMU/GNSS same-frame IDs, sample spacing, each noise norm against its configured bound, and true trajectory speed/range/yaw/single-track residual against the declared domain."
+    },
+    {
+      "purpose": "Cleanup",
+      "method": "Verify no vehicles or sensors remain in a separate port-2011 query; check /proc/2478952/cmdline contains CarlaUnreal and -world-port=2011, then send SIGTERM only to that PID; verify it is absent, port 2011 closed, and original shared PID 2454708 still listens on 2000."
+    }
+  ]
+}

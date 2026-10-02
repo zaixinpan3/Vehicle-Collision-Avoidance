@@ -1,0 +1,15 @@
+{
+  "verifiedAt": "2026-10-02T17:54:48.185525-05:00",
+  "ownedServerPid": 2478952,
+  "port": 2011,
+  "remainingVehicles": [],
+  "remainingSensors": [],
+  "snapshotFrame": 151749,
+  "stopSignal": "SIGTERM to verified owned PID only",
+  "ownedServerStopped": true,
+  "launcherExitCode": 139,
+  "shutdownOutcome": "Segmentation fault reported after SIGTERM; capture already complete and actors independently confirmed absent.",
+  "sharedServerPidStillRunning": 2454708,
+  "sharedServerMutationPolicy": "Read-only probes only; no apply_settings, spawn/destroy, load_world or tick calls.",
+  "postStopVerificationAt": "2026-10-02T17:57:42.967672-05:00"
+}

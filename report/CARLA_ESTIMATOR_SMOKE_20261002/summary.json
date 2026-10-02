@@ -1,0 +1,205 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "config": {
+    "runtime": {
+      "samplePeriod": 0.02,
+      "integrationStepMaximum": 0.005,
+      "targetHistoryDuration": 2
+    },
+    "target": {
+      "model": {
+        "scalarAccelerationRateMaximum": 0,
+        "curvatureRateMaximum": 0
+      },
+      "domain": {
+        "speedMinimum": 10,
+        "speedMaximum": 20,
+        "scalarAccelerationMaximum": 2,
+        "sideslipMaximum": 0.015,
+        "rearAxleDistance": 1.6,
+        "relativePositionMaximum": 50
+      }
+    },
+    "ego": {
+      "domain": {
+        "speedMinimum": 5,
+        "speedMaximum": 20,
+        "yawRateMaximum": 0.3,
+        "accelerationNormMaximum": null,
+        "bodyAccelerationRateMaximum": null,
+        "yawAccelerationMaximum": null
+      },
+      "yaw": {
+        "rearAxleDistance": 1.714395,
+        "sideslipDomainMaximum": 0.05,
+        "singleTrackYawRateMismatchMaximum": 0.02
+      }
+    },
+    "measurement": {
+      "gps": {
+        "positionNoiseMaximum": 0.12,
+        "velocityNoiseMaximum": 0.02
+      },
+      "imu": {
+        "noiseMaximum": 0.05
+      },
+      "gyroscope": {
+        "noiseMaximum": 0.002
+      },
+      "radar": {
+        "noiseMaximum": 0.12
+      }
+    }
+  },
+  "initialization": "First noisy sample: GNSS position/course/speed and radar position; target initially assumed co-moving with zero acceleration. No truth initialization.",
+  "timestampPolicy": "Check recorded 20 ms cadence, then canonicalize frame timestamps to the exact integer sample grid.",
+  "transientSeconds": 2,
+  "inputTruthProxies": true,
+  "continuous": {
+    "frames": 400,
+    "simulatedSeconds": 7.98,
+    "allStatesFinite": true,
+    "droppedFrames": 0,
+    "rmseNames": [
+      "egoPositionErrorM",
+      "egoVelocityErrorMps",
+      "egoBodyVelocityErrorMps",
+      "egoYawErrorDeg",
+      "relativePositionErrorM",
+      "targetVelocityErrorMps"
+    ],
+    "rmseAfter2Seconds": [
+      0.01413864455380962,
+      0.14379517879216897,
+      0.24886270093445012,
+      0.689934686595349,
+      0.13540984772239636,
+      1.020628742186577
+    ],
+    "rmseThresholds": [
+      0.5,
+      0.5,
+      0.5,
+      5,
+      0.5,
+      1.5
+    ],
+    "accuracyGates": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "maxErrorsAfter2Seconds": [
+      0.031994383841947756,
+      0.352362875298635,
+      0.53628234516367257,
+      1.2779916484088738,
+      0.26975065384261321,
+      2.3709122444916129
+    ],
+    "estimatedDomainInvalidFrames": 254,
+    "positionBoundUnavailableFrames": 377,
+    "runtimeMedianSeconds": 0.002552,
+    "runtimeMaximumSeconds": 0.429959,
+    "trueEgoSpeedRangeMps": [
+      10.356904872956754,
+      11.204814425192247
+    ],
+    "trueTargetSpeedRangeMps": [
+      6.9990174627846367,
+      11.518532473275018
+    ],
+    "trueRangeM": [
+      16.206164382072341,
+      54.7591496225428
+    ],
+    "trueMaximumEgoYawRateRadps": 0.99351860994885155,
+    "trueMaximumTargetAccelerationMps2": 10.021783942479818,
+    "integrationPass": true,
+    "accuracyPass": true,
+    "integrationSettings": {
+      "requestedStepMaximum": 0.005,
+      "rateLimitedStepMaximum": 0.053387489499990358,
+      "substepCount": 4,
+      "nominalSampledSpectralRadius": 0.9602748641813873,
+      "scope": "Necessary nominal sampling check and gain-aware RK4 resolution; no nonlinear digital certificate"
+    }
+  },
+  "dropout": {
+    "frames": 400,
+    "simulatedSeconds": 7.98,
+    "allStatesFinite": true,
+    "droppedFrames": 15,
+    "rmseNames": [
+      "egoPositionErrorM",
+      "egoVelocityErrorMps",
+      "egoBodyVelocityErrorMps",
+      "egoYawErrorDeg",
+      "relativePositionErrorM",
+      "targetVelocityErrorMps"
+    ],
+    "rmseAfter2Seconds": [
+      0.01413864455380962,
+      0.14379517879216897,
+      0.24886270093445012,
+      0.689934686595349,
+      0.13543340155097924,
+      1.0179573990868276
+    ],
+    "rmseThresholds": [
+      0.5,
+      0.5,
+      0.5,
+      5,
+      0.5,
+      1.5
+    ],
+    "accuracyGates": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "maxErrorsAfter2Seconds": [
+      0.031994383841947756,
+      0.352362875298635,
+      0.53628234516367257,
+      1.2779916484088738,
+      0.26960396238288803,
+      2.3661996106677883
+    ],
+    "estimatedDomainInvalidFrames": 254,
+    "positionBoundUnavailableFrames": 377,
+    "runtimeMedianSeconds": 0.0022985,
+    "runtimeMaximumSeconds": 0.101506,
+    "trueEgoSpeedRangeMps": [
+      10.356904872956754,
+      11.204814425192247
+    ],
+    "trueTargetSpeedRangeMps": [
+      6.9990174627846367,
+      11.518532473275018
+    ],
+    "trueRangeM": [
+      16.206164382072341,
+      54.7591496225428
+    ],
+    "trueMaximumEgoYawRateRadps": 0.99351860994885155,
+    "trueMaximumTargetAccelerationMps2": 10.021783942479818,
+    "integrationPass": true,
+    "accuracyPass": true,
+    "integrationSettings": {
+      "requestedStepMaximum": 0.005,
+      "rateLimitedStepMaximum": 0.053387489499990358,
+      "substepCount": 4,
+      "nominalSampledSpectralRadius": 0.9602748641813873,
+      "scope": "Necessary nominal sampling check and gain-aware RK4 resolution; no nonlinear digital certificate"
+    },
+    "maximumRelativePositionErrorAfterReacquisitionM": 0.26960396238288803
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "pid": 2479824,
+  "map": "Carla/Maps/Town10HD_Opt",
+  "serverPort": 2011,
+  "ownedServerPid": 2478952,
+  "scheduling": "Separate temporary null-RHI instance; shared port 2000 receives no mutations or ticks.",
+  "clientVersion": "0.10.0",
+  "serverVersion": "0.10.0",
+  "fixedDeltaSeconds": 0.02,
+  "durationSeconds": 8.0,
+  "warmupFrames": 200,
+  "seed": 20261002,
+  "originalSettings": {
+    "synchronous_mode": false,
+    "fixed_delta_seconds": null,
+    "no_rendering_mode": false,
+    "substepping": true,
+    "max_substep_delta_time": 0.01,
+    "max_substeps": 10
+  },
+  "vehiclePhysicsEnabled": true,
+  "measurementSource": "Legacy state-derived GNSS position, body acceleration and gyro; augmented state-derived GNSS velocity and target-center position. Seeded bounded uniform disc/scalar noise. Native IMU/GNSS logged separately, not silently substituted for compensated estimator inputs.",
+  "coordinateFrame": "Original CARLA axes in capture; replay reflects world/body Y and negates yaw/yaw rate.",
+  "noiseNormBounds": {
+    "gpsPositionM": 0.12,
+    "gpsVelocityMps": 0.02,
+    "bodyAccelerationMps2": 0.05,
+    "gyroRadps": 0.002,
+    "targetPositionM": 0.12
+  },
+  "legacySource": "simulation/carla_town10_capture.py",
+  "legacySha256": "518f6f70e27ed4c6a81527bf2850c3bca7b291216763cfa26023d7cb69718d4b",
+  "completed": true,
+  "egoBlueprint": "vehicle.lincoln.mkz",
+  "targetBlueprint": "vehicle.dodge.charger",
+  "ownedActorIds": [
+    25,
+    26
+  ],
+  "frames": 400,
+  "restoredSettings": {
+    "synchronous_mode": false,
+    "fixed_delta_seconds": null,
+    "no_rendering_mode": false,
+    "substepping": true,
+    "max_substep_delta_time": 0.01,
+    "max_substeps": 10
+  },
+  "remainingOwnedActors": [
+    25,
+    26,
+    27,
+    28
+  ],
+  "wallSeconds": 1.1823146509705111,
+  "cleanupErrors": []
+}

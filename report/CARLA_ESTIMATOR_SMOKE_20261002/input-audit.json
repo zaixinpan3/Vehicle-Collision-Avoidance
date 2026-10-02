@@ -1,0 +1,36 @@
+{
+  "frames": 400,
+  "consecutiveCarlaFrames": true,
+  "nativeImuGnssFramePairsAligned": true,
+  "maximumSampleSpacingErrorSeconds": 4.470348362317633e-10,
+  "truthChecks": {
+    "egoYawRateExceeds0p3RadpsFrames": 146,
+    "targetSpeedBelow10MpsFrames": 95,
+    "relativeRangeExceeds50MFrames": 12,
+    "maximumEgoSingleTrackYawRateMismatchRadps": 0.349432547708009,
+    "singleTrackMismatchExceeds0p02RadpsFrames": 269
+  },
+  "noiseAudit": {
+    "gnssPositionM": {
+      "maximumNorm": 0.11988381263410312,
+      "declaredBound": 0.12
+    },
+    "gnssVelocityMps": {
+      "maximumNorm": 0.019892043072156772,
+      "declaredBound": 0.02
+    },
+    "bodyAccelerationMps2": {
+      "maximumNorm": 0.04996642106128693,
+      "declaredBound": 0.05
+    },
+    "targetPositionM": {
+      "maximumNorm": 0.11998663598333566,
+      "declaredBound": 0.12
+    },
+    "gyroRadps": {
+      "maximumNorm": 0.0019865605794420205,
+      "declaredBound": 0.002
+    }
+  },
+  "resultScope": "Physical CARLA actor trajectories with bounded state-derived measurement proxies; native IMU/GNSS synchronization checked separately. Truth domain is not certified."
+}

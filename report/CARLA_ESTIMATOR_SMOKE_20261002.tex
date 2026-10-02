@@ -1,0 +1,174 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,booktabs,longtable,amsmath}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\title{CARLA Estimator Smoke Test}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}
+\maketitle
+
+\section{Outcome and scope}
+The unchanged production NRMM estimator completed both 400-frame replays of
+a newly collected physical CARLA two-vehicle trajectory: continuous target
+measurements and a 0.30-second target-measurement dropout. All published
+states remained finite, sample times stayed aligned, and all six descriptive
+RMSE gates passed after a two-second transient. The existing
+\path{tests/onlineNrmmTrackingRuntimeTest.m} suite passed all 31 tests, with
+zero failures or incomplete tests (63.4107 seconds of test execution).
+
+This is an estimator functional smoke test using simulator-state measurement
+proxies. It is not a native-sensor perception integration test, closed-loop
+collision-avoidance test, real-time guarantee, or validation of the theoretical
+error certificate. The trajectory violates several default model assumptions;
+the relative-position bound is unavailable at 377 of 400 frames in each replay.
+No production estimator, controller, gain, or configuration was changed.
+
+\section{Server isolation and capture}
+The shared CARLA server on port 2000 was actively used by another session's
+multi-route experiment. Read-only inspection was followed by a separate
+temporary server on port 2011, using the installed package, null RHI, no sound,
+low quality and a nice level of 10. This test issued no world-setting changes,
+actor mutations, or ticks to port 2000. The original shared server process
+(PID 2454708) was still listening after the temporary server stopped.
+
+The temporary server and Python API both reported CARLA 0.10.0. The map was
+\path{Carla/Maps/Town10HD_Opt}. The existing local
+\path{simulation/carla_town10_capture.py} supplied vehicle spawning,
+waypoint following, sensor synchronization and frame-record helpers. That
+legacy recorder requires RGB/LiDAR and lacks the current estimator's GNSS
+velocity and target-position fields. A local test adapter omitted rendering
+and added these fields without restoring legacy tooling to version control.
+
+The physical ego was \path{vehicle.lincoln.mkz}; the target was
+\path{vehicle.dodge.charger}. The existing follower used nominal speeds of
+11 and 12 m/s, respectively, a 10 m look-ahead, a 25 m initial waypoint gap,
+and spawn index zero. Physics remained enabled. After 200 warm-up frames,
+400 consecutive frames were collected at 0.02 seconds per frame. The recorded
+sample interval is 0--7.98 seconds; 600 world ticks cover warm-up and recording.
+All 400 native IMU/GNSS pairs matched their CARLA frame IDs. The maximum
+sample-spacing discrepancy was $4.48\times10^{-10}$ seconds.
+
+After capture, all owned actors were destroyed and the original settings
+were restored. The immediate actor lookup still returned cached IDs; a separate
+subsequent query confirmed zero vehicles and zero sensors on port 2011.
+The owned process (PID 2478952) received SIGTERM only after this verification.
+Its launcher then reported a segmentation fault / exit code 139 during
+shutdown. Capture and both estimator replays had completed successfully;
+port 2011 was confirmed closed. The shutdown fault remains an environment
+limitation, not a successful clean process exit. An initial short readiness
+probe also timed out during startup; the subsequent capture connection succeeded.
+
+\section{Measurement contract and estimator execution}
+The estimator consumed actor-derived planar GNSS position and velocity,
+body-frame acceleration, yaw rate and target-center relative position, with
+independent bounded noise from NumPy seed 20261002. Two-dimensional noise was
+uniform in a disc; yaw-rate noise was uniform in an interval. Bounds matched
+the unchanged configuration: 0.12 m position, 0.02 m/s velocity, 0.05 m/s$^2$
+acceleration, 0.002 rad/s gyro and 0.12 m target position. An independent
+Python audit confirmed every generated error remained within its bound.
+Native IMU/GNSS samples were recorded and frame-matched, but were not passed
+off as calibrated estimator inputs. No radar detector or YOLO/LiDAR target
+extraction was exercised.
+
+Replay reflected inertial and body $y$ coordinates and negated yaw/yaw rate
+consistently. Recorded spacing was checked before timestamps were mapped to
+the exact integer sample grid. Each call to
+\path{onlineNrmmTrackingRuntime('sample',...)} published the state at the
+current sample and advanced the runtime by 0.02 seconds. Scoring compared
+that publication with same-frame truth, avoiding a one-sample shift.
+
+Initialization used only the first noisy measurement: GNSS position,
+velocity/course with the configured single-track sideslip correction, and
+target relative position. The initial target was assumed co-moving with zero
+acceleration. No ground-truth initialization or future observations were used.
+The default gains and domain parameters were retained, including the MnCAV
+ego rear-axle distance of 1.714395 m despite the CARLA Lincoln vehicle.
+The runtime used four 0.005-second RK4 substeps and the existing compiled
+\path{solver/nrmm/nrmmObserverRk4IntervalMex.mexa64}.
+The necessary nominal sampled spectral-radius check was 0.9602748642.
+The default unbounded ego acceleration-envelope fields serialize as JSON
+\texttt{null}; they mean positive infinity in the MATLAB configuration.
+
+\section{Measured results}
+Both replays used the same physical capture and noisy measurements.
+The dropout run withheld 15 target-position measurements on
+$[3.50,3.80)$ seconds, using the runtime's explicit unavailable-detection
+contract. All RMSE values below use the 300 samples at $t\geq2$ seconds.
+Thresholds were specified in the local replay adapter before execution and
+are smoke-test criteria, not accuracy requirements or theoretical bounds.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+RMSE & Continuous & Dropout & Smoke limit \\
+\midrule
+Ego position (m) & 0.01414 & 0.01414 & 0.50 \\
+Ego inertial velocity (m/s) & 0.14380 & 0.14380 & 0.50 \\
+Ego body velocity (m/s) & 0.24886 & 0.24886 & 0.50 \\
+Ego yaw (degrees) & 0.68993 & 0.68993 & 5.00 \\
+Target relative position (m) & 0.13541 & 0.13543 & 0.50 \\
+Target inertial velocity (m/s) & 1.02063 & 1.01796 & 1.50 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Maximum post-transient relative-position errors were 0.26975 m and 0.26960 m.
+The dropout run's maximum relative-position error after reacquisition was
+0.26960 m. Integration and all six RMSE gates passed for both runs.
+Median estimator-call wall times were 2.552 ms and 2.2985 ms; maxima were
+429.959 ms and 101.506 ms. These are offline, shared-machine measurements
+including cold calls, not a 20 ms deadline guarantee.
+
+\section{Model-domain findings and limits}
+The physical route includes sharp turns and a yaw wrap. Ego speed ranged
+from 10.3569 to 11.2048 m/s, while target speed ranged from 6.9990 to
+11.5185 m/s. Target range was 16.2062--54.7591 m. The following direct
+truth audits explain why this trajectory cannot support a certificate claim:
+\begin{itemize}
+\item Ego yaw rate reached 0.99352 rad/s; 146 frames exceeded the configured
+0.30 rad/s maximum.
+\item Target speed was below the configured 10 m/s minimum for 95 frames.
+\item Target range exceeded the configured 50 m maximum for 12 frames.
+\item The ego single-track residual
+$\omega_E-v_{Ey}/l_{r,E}$ reached 0.34943 rad/s in magnitude;
+269 frames exceeded the configured 0.02 rad/s mismatch allowance.
+\end{itemize}
+Estimated operating-domain audits were invalid for 254 frames in each run;
+relative-position bounds were unavailable for 377 frames. The implementation
+continued returning finite estimates as designed. These observations do not
+justify widening bounds after the fact or treating the available radii on
+other frames as a certification of this CARLA vehicle/route. Native-sensor
+calibration, target perception, initialization uncertainty, appropriate vehicle
+geometry and a domain-compliant validation trajectory remain outside this test.
+
+\section{Reproduction and retained artifacts}
+The local execution directory is
+\path{simulation_output/carla_estimator_smoke_20261002/}. It retains
+\path{captureSmoke.py}, \path{replaySmoke.m}, raw \path{capture/frames.jsonl},
+logs and the original generated summaries. Execution entry points were:
+\begin{quote}\small
+\textbf{Regression:} MATLAB batch invocation of
+\path{runtests('tests/onlineNrmmTrackingRuntimeTest.m')}, CSV export and
+\texttt{assertSuccess(results)}.\par
+\textbf{Capture:} \path{/home/zai/carla-venv/bin/python} invoked
+\path{simulation_output/carla_estimator_smoke_20261002/captureSmoke.py}
+with port 2011 and owned server PID 2478952.\par
+\textbf{Replay:} \texttt{matlab -singleCompThread -batch} added
+\path{simulation_output/carla_estimator_smoke_20261002/} to the MATLAB
+path and invoked \texttt{replaySmoke}.
+\end{quote}
+The owned server PID is run-specific and must not be reused blindly.
+Exact commands, capture metadata, cleanup verification, summary JSON,
+input audit, source hashes, the 31-test table and both error traces are kept
+under \path{report/CARLA_ESTIMATOR_SMOKE_20261002/}.
+Identified export copies of the raw capture and execution adapters are kept
+in the shared external archive at
+\path{05_Project_B_Collision_Avoidance/2026-10-02_CARLA_Estimator_Smoke/}.
+Raw recordings, legacy tools, generated kernels, unrelated working-tree
+changes and dependencies are deliberately excluded from this project commit.
+\end{document}
