@@ -41,8 +41,11 @@ of 11 trapped cases the median planned endpoint has a larger $V$ than the
 current state. In trapped frames the shifted plan never meets the next frame's
 decrease condition.
 \item \emph{The one-step condition is not a valid CLF condition outside a
-neighbourhood of the path.} The 1\% one-step decrease is unattainable for
-headings that point away from the path by $10^\circ$ or more. At zero heading
+neighbourhood of the path.} On the tested slice the condition already fails at
+$V=44$ (8~m/s) and $V=27$ (15~m/s), about half a metre and $5^\circ$ from
+nominal. $V$ is therefore a CLF at most on that small set, and every no-risk
+phase starts 40--5{,}340 times above it. The 1\% one-step decrease is
+unattainable for headings that point away from the path by $10^\circ$ or more. At zero heading
 error it is unattainable beyond 5--7~m of lateral offset, and at every heading beyond about
 $2v/\lambda$ (80~m at 8~m/s). Where it is unattainable, the slack turns the
 stage into a greedy minimizer of the next-hold value. Far from the path that
@@ -322,6 +325,29 @@ unconstrained input, the best one-step ratio in the worst direction is 0.959
 (8~m/s) and 0.966 (15~m/s), so the 1\% decrease is attainable in every
 direction. The failures above come from friction saturation, $\sin e_\psi$ and
 the heading wrap, not from the LQR weights.
+
+\paragraph{How large is the region where $V$ is a CLF?} A CLF on a sublevel set
+$\{V\le c\}$ needs an admissible input with $V(x_1)\le0.99\,V(x_0)$ at every
+state of that set. On the map's slice, exactly reversed headings are excluded
+because of the wrap. The smallest $V_0$ without such an input is then 43.9 at
+8~m/s ($|e_y|=0.5$~m, heading $5^\circ$ away from the path) and 27.3 at 15~m/s
+($|e_y|=0.2$~m, $5^\circ$ away). The slice is part of the state space, so these
+values, $c^*$, are upper bounds: $V$ satisfies the CLF condition at most on
+$\{V\le44\}$ and $\{V\le27\}$, roughly within half a metre and a few degrees
+of nominal cruise.
+
+At the first no-risk frame, every case is far outside this set. $V_0$ is
+40--56 times the bound in the four 15-m/s head-on and brakingLead cases, 92--132
+times in the four 8-m/s ones, and 772--5{,}340 times in turningCrossing and
+curvedCrossing.
+
+The idealized policies agree. In every run that entered the set, every hold with
+$1\le V\le c^*$ found a 1\% input. Every hold with $V\ge1$ that needed slack
+lay above the bound.
+
+The guarantee ``meet the condition at every hold and the state dissipates''
+therefore applies only once the state is inside this small set. Outside it, the
+quadratic is not a CLF.
 
 \subsection{What a one-step CLF does without the trap}
 To separate mechanism 3 from mechanism 1, four idealized one-step policies were

@@ -59,6 +59,14 @@ All commands below were run from <frozen source>, MATLAB R2026a.
    zero first-stage optimum; scope "all" and the no-risk subset "noRisk".
    Output carry-forward.csv; logs/carryForward.log.
 
+6. CLF-region bound (methods/clfRegion.m), offline and deterministic:
+     matlab -batch "diary('logs/clfRegion.log'); run('<region raw>/methods/clfRegion.m'); diary off"
+   with <region raw> = /home/zai/.cache/collisionAvoidance/clf-region-20261001. Inputs:
+   clf-feasibility-map.csv, the 5-cm replays and the idealized-policy results of <raw>.
+   Reports the smallest V0 on the map slice without a 1% input (exactly reversed headings
+   excluded), V0 at each no-risk start relative to it, and positive-slack holds of the
+   idealized policies with V >= 1 inside and above it. Output logs/clfRegion.log.
+
 Definitions: a frame is free when its encounter-exit index is 0. rho = 0 means
 clfSlack <= 1e-6*max(1,V0). Steering edge: rho > 0 and |delta0 - anchor| > 0.0749.
 Braking edge: rho > 0, steering interior, |b0 - anchor| > 0.1249. Near/far split at

@@ -1,0 +1,64 @@
+v= 8 m/s: smallest V0 with no 1% input = 43.9 at e_y=-0.5 m, e_psi=-5 deg (upper bound on a certified level)
+          largest V0 with a 1% input on the slice = 2.61e+05; infeasible points 717 of 994
+v=15 m/s: smallest V0 with no 1% input = 27.3 at e_y=-0.2 m, e_psi=-5 deg (upper bound on a certified level)
+          largest V0 with a 1% input on the slice = 5.43e+05; infeasible points 721 of 994
+
+No-risk phase start (first free frame at or after 2 s), 5-cm replays:
+  acceleratingHeadOn 15 m/s: t= 2.70 s, V0=      1086 =     39.8 x c*
+  acceleratingHeadOn  8 m/s: t= 4.10 s, V0=      5807 =      132 x c*
+  brakingLead        15 m/s: t=33.35 s, V0=      1521 =     55.7 x c*
+  brakingLead         8 m/s: t=21.05 s, V0=      4051 =     92.3 x c*
+  curvedCrossing     15 m/s: t=25.70 s, V0=  1.05e+05 = 3.85e+03 x c*
+  curvedCrossing      8 m/s: t=29.80 s, V0= 1.579e+05 =  3.6e+03 x c*
+  curvedHeadOn       15 m/s: t= 3.90 s, V0=      1232 =     45.1 x c*
+  curvedHeadOn        8 m/s: t= 5.05 s, V0=      5141 =      117 x c*
+  headOn             15 m/s: t= 2.95 s, V0=      1205 =     44.2 x c*
+  headOn              8 m/s: t= 4.85 s, V0=      5744 =      131 x c*
+  turningCrossing    15 m/s: t=13.75 s, V0= 1.457e+05 = 5.34e+03 x c*
+  turningCrossing     8 m/s: t=16.10 s, V0= 3.387e+04 =      772 x c*
+
+Idealized one-step policies: holds with V >= 1 and no 1% input (positive slack)
+  greedy           acceleratingHeadOn 15: V>=1 holds   41, positive slack   0.0%; inside c*:   14 holds, positive   0.0%; above c*:   27 holds, positive   0.0%
+  greedy           brakingLead        15: V>=1 holds   46, positive slack   0.0%; inside c*:   15 holds, positive   0.0%; above c*:   31 holds, positive   0.0%
+  greedy           crossing           15: V>=1 holds   29, positive slack  96.6%; inside c*:    0 holds, positive   NaN%; above c*:   29 holds, positive  96.6%
+  greedy           crossing            8: V>=1 holds   31, positive slack  96.8%; inside c*:    0 holds, positive   NaN%; above c*:   31 holds, positive  96.8%
+  greedy           curvedCrossing     15: V>=1 holds  234, positive slack  34.6%; inside c*:   13 holds, positive   0.0%; above c*:  221 holds, positive  36.7%
+  greedy           curvedCrossing      8: V>=1 holds   26, positive slack  96.2%; inside c*:    0 holds, positive   NaN%; above c*:   26 holds, positive  96.2%
+  greedy           curvedHeadOn       15: V>=1 holds   42, positive slack   0.0%; inside c*:   14 holds, positive   0.0%; above c*:   28 holds, positive   0.0%
+  greedy           curvedHeadOn        8: V>=1 holds   75, positive slack   5.3%; inside c*:   23 holds, positive   0.0%; above c*:   52 holds, positive   7.7%
+  greedy           headOn             15: V>=1 holds   42, positive slack   0.0%; inside c*:   14 holds, positive   0.0%; above c*:   28 holds, positive   0.0%
+  greedy           turningCrossing    15: V>=1 holds   25, positive slack  96.0%; inside c*:    0 holds, positive   NaN%; above c*:   25 holds, positive  96.0%
+  greedy           turningCrossing     8: V>=1 holds  163, positive slack  26.4%; inside c*:   24 holds, positive   0.0%; above c*:  139 holds, positive  30.9%
+  greedySlew       acceleratingHeadOn 15: V>=1 holds   40, positive slack   0.0%; inside c*:   13 holds, positive   0.0%; above c*:   27 holds, positive   0.0%
+  greedySlew       brakingLead        15: V>=1 holds   46, positive slack   2.2%; inside c*:   14 holds, positive   0.0%; above c*:   32 holds, positive   3.1%
+  greedySlew       crossing           15: V>=1 holds   22, positive slack  95.5%; inside c*:    0 holds, positive   NaN%; above c*:   22 holds, positive  95.5%
+  greedySlew       crossing            8: V>=1 holds   50, positive slack  84.0%; inside c*:    0 holds, positive   NaN%; above c*:   50 holds, positive  84.0%
+  greedySlew       curvedCrossing     15: V>=1 holds  225, positive slack  32.4%; inside c*:   16 holds, positive   0.0%; above c*:  209 holds, positive  34.9%
+  greedySlew       curvedCrossing      8: V>=1 holds   25, positive slack 100.0%; inside c*:    0 holds, positive   NaN%; above c*:   25 holds, positive 100.0%
+  greedySlew       curvedHeadOn       15: V>=1 holds   42, positive slack   0.0%; inside c*:   15 holds, positive   0.0%; above c*:   27 holds, positive   0.0%
+  greedySlew       curvedHeadOn        8: V>=1 holds   79, positive slack   7.6%; inside c*:   22 holds, positive   0.0%; above c*:   57 holds, positive  10.5%
+  greedySlew       headOn             15: V>=1 holds   41, positive slack   0.0%; inside c*:   13 holds, positive   0.0%; above c*:   28 holds, positive   0.0%
+  greedySlew       turningCrossing    15: V>=1 holds   19, positive slack  68.4%; inside c*:    0 holds, positive   NaN%; above c*:   19 holds, positive  68.4%
+  greedySlew       turningCrossing     8: V>=1 holds  141, positive slack  41.8%; inside c*:    0 holds, positive   NaN%; above c*:  141 holds, positive  41.8%
+  indifferent      acceleratingHeadOn 15: V>=1 holds  264, positive slack   0.0%; inside c*:  109 holds, positive   0.0%; above c*:  155 holds, positive   0.0%
+  indifferent      brakingLead        15: V>=1 holds  242, positive slack   0.0%; inside c*:  113 holds, positive   0.0%; above c*:  129 holds, positive   0.0%
+  indifferent      crossing           15: V>=1 holds   29, positive slack  96.6%; inside c*:    0 holds, positive   NaN%; above c*:   29 holds, positive  96.6%
+  indifferent      crossing            8: V>=1 holds   31, positive slack  96.8%; inside c*:    0 holds, positive   NaN%; above c*:   31 holds, positive  96.8%
+  indifferent      curvedCrossing     15: V>=1 holds   78, positive slack  33.3%; inside c*:    0 holds, positive   NaN%; above c*:   78 holds, positive  33.3%
+  indifferent      curvedCrossing      8: V>=1 holds   26, positive slack  96.2%; inside c*:    0 holds, positive   NaN%; above c*:   26 holds, positive  96.2%
+  indifferent      curvedHeadOn       15: V>=1 holds  187, positive slack   0.0%; inside c*:  103 holds, positive   0.0%; above c*:   84 holds, positive   0.0%
+  indifferent      curvedHeadOn        8: V>=1 holds  286, positive slack   8.0%; inside c*:   75 holds, positive   0.0%; above c*:  211 holds, positive  10.9%
+  indifferent      headOn             15: V>=1 holds  286, positive slack   0.0%; inside c*:  113 holds, positive   0.0%; above c*:  173 holds, positive   0.0%
+  indifferent      turningCrossing    15: V>=1 holds   25, positive slack  96.0%; inside c*:    0 holds, positive   NaN%; above c*:   25 holds, positive  96.0%
+  indifferent      turningCrossing     8: V>=1 holds  359, positive slack  15.3%; inside c*:   88 holds, positive   0.0%; above c*:  271 holds, positive  20.3%
+  indifferentSlew  acceleratingHeadOn 15: V>=1 holds  212, positive slack   0.0%; inside c*:   97 holds, positive   0.0%; above c*:  115 holds, positive   0.0%
+  indifferentSlew  brakingLead        15: V>=1 holds  172, positive slack   0.6%; inside c*:   70 holds, positive   0.0%; above c*:  102 holds, positive   1.0%
+  indifferentSlew  crossing           15: V>=1 holds   22, positive slack  95.5%; inside c*:    0 holds, positive   NaN%; above c*:   22 holds, positive  95.5%
+  indifferentSlew  crossing            8: V>=1 holds   49, positive slack  85.7%; inside c*:    0 holds, positive   NaN%; above c*:   49 holds, positive  85.7%
+  indifferentSlew  curvedCrossing     15: V>=1 holds   71, positive slack  35.2%; inside c*:    0 holds, positive   NaN%; above c*:   71 holds, positive  35.2%
+  indifferentSlew  curvedCrossing      8: V>=1 holds   25, positive slack 100.0%; inside c*:    0 holds, positive   NaN%; above c*:   25 holds, positive 100.0%
+  indifferentSlew  curvedHeadOn       15: V>=1 holds  306, positive slack   0.0%; inside c*:  151 holds, positive   0.0%; above c*:  155 holds, positive   0.0%
+  indifferentSlew  curvedHeadOn        8: V>=1 holds   54, positive slack  31.5%; inside c*:    0 holds, positive   NaN%; above c*:   54 holds, positive  31.5%
+  indifferentSlew  headOn             15: V>=1 holds  234, positive slack   0.0%; inside c*:   60 holds, positive   0.0%; above c*:  174 holds, positive   0.0%
+  indifferentSlew  turningCrossing    15: V>=1 holds   19, positive slack  68.4%; inside c*:    0 holds, positive   NaN%; above c*:   19 holds, positive  68.4%
+  indifferentSlew  turningCrossing     8: V>=1 holds  120, positive slack  38.3%; inside c*:    0 holds, positive   NaN%; above c*:  120 holds, positive  38.3%

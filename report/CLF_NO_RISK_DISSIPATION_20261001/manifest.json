@@ -115,7 +115,7 @@
   "bundle": [
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/REPRODUCTION.txt",
-      "sha256": "309c6dbd0673901087cd154578384a117b79403bedbac6aa2cee561deab9e4f7"
+      "sha256": "f6b347792f7f9eeca19e9e5303cdeca11da7fb90fc3ccf4612841a84b11f6d63"
     },
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/cancellation.csv",
@@ -144,6 +144,10 @@
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/carryForward.log",
       "sha256": "9a2d546fe5537f3b94f8ca4cb736e98ceb33ff1ea3fddfa704f40b56dbe3d8c9"
+    },
+    {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/clfRegion.log",
+      "sha256": "b469bdb3953903d772a2a5362d3b4891cbbb90277278a2f11b54cca142ff9f09"
     },
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/logs/crossTerms.log",
@@ -234,6 +238,10 @@
       "sha256": "528135c5e769f7460e0953d5d06c48004b133222d11cc72bd13a0599ac5d9e51"
     },
     {
+      "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/clfRegion.m",
+      "sha256": "b651d2face47f15294453113bc00e381dc51703358f0d985e0de142c56e856d0"
+    },
+    {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001/methods/crossTerms.m",
       "sha256": "81a2ac7dc3d92585713d3c1a9808931035740464d567a0c5aea4af43d635a5d5"
     },
@@ -303,7 +311,7 @@
     },
     {
       "path": "report/CLF_NO_RISK_DISSIPATION_20261001.tex",
-      "sha256": "599ee960468a25f630fb39c16e9235da3550d803de16548ba1a9128a37a0e42e"
+      "sha256": "e40365796b2d547902aca4f4d710d441739b8a708fa8bd0e19be802f70297eb3"
     }
   ],
   "rawArtifacts": [
