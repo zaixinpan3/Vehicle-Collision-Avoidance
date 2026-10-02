@@ -1,0 +1,200 @@
+{
+  "counts": {
+    "inside_converged": 251,
+    "outside_converged": 5
+  },
+  "cases": [
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "counts": {}
+    },
+    {
+      "speed": 8,
+      "scenario": "headOn",
+      "counts": {}
+    },
+    {
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "counts": {}
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "counts": {}
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "counts": {}
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "counts": {
+        "inside_converged": 22
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "counts": {
+        "inside_converged": 22
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "counts": {
+        "inside_converged": 35
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "headOn",
+      "counts": {
+        "inside_converged": 40
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "counts": {
+        "inside_converged": 44
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "counts": {
+        "inside_converged": 5
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "counts": {
+        "inside_converged": 2
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "counts": {
+        "outside_converged": 4,
+        "inside_converged": 41
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "counts": {
+        "outside_converged": 1,
+        "inside_converged": 40
+      }
+    }
+  ],
+  "largestIncreases": [
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "time": 13.550000000000058,
+      "value": 0.09048153364679754,
+      "delta": 0.05226207541610306,
+      "required": 0.002688194670278367,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "time": 7.89999999999998,
+      "value": 0.14564340327019065,
+      "delta": 0.045386003222452787,
+      "required": 0.01425019030898464,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "time": 11.800000000000033,
+      "value": 0.0985496208083154,
+      "delta": 0.04531868864309764,
+      "required": 0.00352314367021379,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "time": 10.450000000000014,
+      "value": 0.09129769168177065,
+      "delta": 0.04363767477202013,
+      "required": 0.004572626991626536,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "time": 12.900000000000048,
+      "value": 0.10235128335008432,
+      "delta": 0.04305292612629298,
+      "required": 0.0044043638786423756,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "time": 11.700000000000031,
+      "value": 0.09993114881177838,
+      "delta": 0.04107149581334653,
+      "required": 0.0030640614935738934,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "time": 9.45,
+      "value": 0.07629400310966186,
+      "delta": 0.04046887458474373,
+      "required": 0.00240762947581963,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "time": 12.950000000000049,
+      "value": 0.09897113620911094,
+      "delta": 0.04029587588249964,
+      "required": 0.0038368592551658344,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "time": 13.650000000000059,
+      "value": 0.0992674610616264,
+      "delta": 0.040197414255868674,
+      "required": 0.004028900167759837,
+      "outside": false,
+      "converged": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "time": 10.15000000000001,
+      "value": 0.15078356939773824,
+      "delta": 0.039240007234443985,
+      "required": 0.014714680866971494,
+      "outside": false,
+      "converged": true
+    }
+  ]
+}

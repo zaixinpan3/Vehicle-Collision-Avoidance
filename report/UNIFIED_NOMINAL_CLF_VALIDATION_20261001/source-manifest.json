@@ -1,0 +1,74 @@
+[
+  {
+    "path": "controller/laneGeometry.m",
+    "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc"
+  },
+  {
+    "path": "controller/modifiedFialaTire.m",
+    "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0"
+  },
+  {
+    "path": "controller/collisionAvoidanceController.m",
+    "sha256": "60a994d65579624ea1375a9954e037b2044ef1150fbd590da3162684c1c68594"
+  },
+  {
+    "path": "controller/predictiveSafetyGeometry.m",
+    "sha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92"
+  },
+  {
+    "path": "controller/readControllerInputs.m",
+    "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a"
+  },
+  {
+    "path": "controller/terminalContinuation.m",
+    "sha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e"
+  },
+  {
+    "path": "controller/nonlinearBicycleModel.m",
+    "sha256": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608"
+  },
+  {
+    "path": "controller/solvePredictiveControl.m",
+    "sha256": "63e2dd08afa0521997c21ce7b7d53393cbb4b2f1e086f3afeaf46890c220c5d2"
+  },
+  {
+    "path": "config/collisionAvoidanceControllerConfig.m",
+    "sha256": "4d912d60e31a11c4297008dece412afd7b306bb4e62d9f83e60e919f3465d0b8"
+  },
+  {
+    "path": "scripts/runNonlinearPredictiveSafetyValidation.m",
+    "sha256": "c704f3d5a10544cb45d63e7b0b6d7d5e1386d1ab2d15f776b8e2b2f76b249e5a"
+  },
+  {
+    "path": "scripts/collisionThreatScenario.m",
+    "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310"
+  },
+  {
+    "path": "scripts/givenPathCollisionBaseline.m",
+    "sha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09"
+  },
+  {
+    "path": "scripts/prepareCollisionAvoidanceController.m",
+    "sha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9"
+  },
+  {
+    "path": "scripts/auditJointPredictiveSafety.py",
+    "sha256": "1134e3bfdffa8b478fe19a0a24580196f329fa744529e0b189adf17219b4af55"
+  },
+  {
+    "path": "solver/controller/bicycleSampleKernelMex.mexa64",
+    "sha256": "f7b62d8916c79cf547eb7fc5842fd55d4e051f153cf8970e3f58c91fe1043de5"
+  },
+  {
+    "path": "solver/controller/rectangleKernelMex.mexa64",
+    "sha256": "d60a452fddee38260a91bb12874df2a495f65a2a5166415c2dfa157a715ccfe2"
+  },
+  {
+    "path": "solver/controller/dualKernelMex.mexa64",
+    "sha256": "6148ee631a69477937a35c5a143e3ee698bedaa0337c489fc5a180a718095476"
+  },
+  {
+    "path": "solver/controller/nominalClfKernelMex.mexa64",
+    "sha256": "98fd5ebeb5bcd42306b05882973e03ae963bd7d82655f8d8c2a010f7832d9365"
+  }
+]

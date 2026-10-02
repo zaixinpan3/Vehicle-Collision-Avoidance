@@ -1,0 +1,324 @@
+[
+  {
+    "speed": 15,
+    "scenario": "acceleratingHeadOn",
+    "samples": 8742,
+    "independentMinimumGap": 0.05925498973673317,
+    "matlabMinimumGap": 0.05925498973673479,
+    "difference": 1.6237011735142914e-15,
+    "minimumLocation": {
+      "time": 1.0683333333333336,
+      "holdTime": 1.0500000000000003,
+      "holdElapsed": 0.018333333333333333,
+      "state": [
+        14.371808686434035,
+        2.750578510065157,
+        0.3644943332171735,
+        13.970937847573154,
+        -0.30628320554702604,
+        -0.7169259638179952
+      ]
+    },
+    "recoveryConfirmed": 14.100000000000065,
+    "positiveClearance": true
+  },
+  {
+    "speed": 15,
+    "scenario": "brakingLead",
+    "samples": 10137,
+    "independentMinimumGap": 0.095433590824285,
+    "matlabMinimumGap": 0.09543359082429374,
+    "difference": 8.743006318923108e-15,
+    "minimumLocation": {
+      "time": 2.7683333333333318,
+      "holdTime": 2.7499999999999982,
+      "holdElapsed": 0.018333333333333333,
+      "state": [
+        40.99485871928058,
+        1.9210562509130578,
+        0.027346912338142067,
+        14.777574517138746,
+        0.06655979698282169,
+        0.01694172067320147
+      ]
+    },
+    "recoveryConfirmed": 16.350000000000097,
+    "positiveClearance": true
+  },
+  {
+    "speed": 15,
+    "scenario": "crossing",
+    "samples": 10137,
+    "independentMinimumGap": 0.07122972947038328,
+    "matlabMinimumGap": 0.07122972947037977,
+    "difference": 3.5110803153770576e-15,
+    "minimumLocation": {
+      "time": 1.6300000000000008,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.030000000000000002,
+      "state": [
+        20.420870129792593,
+        2.0372001635520363,
+        0.4427338137175604,
+        10.12216780100861,
+        0.24881002655640486,
+        0.6018016232527277
+      ]
+    },
+    "recoveryConfirmed": 16.350000000000097,
+    "positiveClearance": true
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedCrossing",
+    "samples": 9052,
+    "independentMinimumGap": 0.01772224324436562,
+    "matlabMinimumGap": 0.0177222432443642,
+    "difference": 1.4190038033490282e-15,
+    "minimumLocation": {
+      "time": 1.643333333333334,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.043333333333333335,
+      "state": [
+        20.265555316696847,
+        2.91944427222837,
+        0.5315269960367257,
+        10.39411531291542,
+        0.22582719625808279,
+        0.7358068554495574
+      ]
+    },
+    "recoveryConfirmed": 14.600000000000072,
+    "positiveClearance": true
+  },
+  {
+    "speed": 15,
+    "scenario": "curvedHeadOn",
+    "samples": 8091,
+    "independentMinimumGap": 0.08466900784230717,
+    "matlabMinimumGap": 0.08466900784230963,
+    "difference": 2.456368441983159e-15,
+    "minimumLocation": {
+      "time": 1.643333333333334,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.043333333333333335,
+      "state": [
+        22.83921664488457,
+        4.009327469711276,
+        0.4442027904761152,
+        13.835195000774524,
+        -0.3475926716727605,
+        -0.2650442510322254
+      ]
+    },
+    "recoveryConfirmed": 13.05000000000005,
+    "positiveClearance": true
+  },
+  {
+    "speed": 15,
+    "scenario": "headOn",
+    "samples": 8990,
+    "independentMinimumGap": 0.051765158407038346,
+    "matlabMinimumGap": 0.05176515840704,
+    "difference": 1.6514567491299204e-15,
+    "minimumLocation": {
+      "time": 1.091666666666667,
+      "holdTime": 1.0500000000000003,
+      "holdElapsed": 0.041666666666666664,
+      "state": [
+        14.711991862564107,
+        2.78032482989493,
+        0.38564566773657183,
+        14.128871324211037,
+        -0.4168762047031898,
+        -0.6007511302022379
+      ]
+    },
+    "recoveryConfirmed": 14.500000000000071,
+    "positiveClearance": true
+  },
+  {
+    "speed": 15,
+    "scenario": "turningCrossing",
+    "samples": 9734,
+    "independentMinimumGap": 0.0,
+    "matlabMinimumGap": 0,
+    "difference": 0.0,
+    "minimumLocation": {
+      "time": 1.638333333333334,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.03833333333333334,
+      "state": [
+        20.5575865507116,
+        1.4585457995279307,
+        0.3956705097752804,
+        9.969941573456932,
+        0.2792527301473558,
+        0.7149869110341264
+      ]
+    },
+    "recoveryConfirmed": 15.700000000000088,
+    "positiveClearance": false
+  },
+  {
+    "speed": 8,
+    "scenario": "acceleratingHeadOn",
+    "samples": 12555,
+    "independentMinimumGap": 0.49289260584999056,
+    "matlabMinimumGap": 0.4928926058499931,
+    "difference": 2.55351295663786e-15,
+    "minimumLocation": {
+      "time": 1.4716666666666673,
+      "holdTime": 1.4500000000000006,
+      "holdElapsed": 0.021666666666666667,
+      "state": [
+        9.850129597362514,
+        3.685429984468109,
+        0.6912797740648622,
+        7.435089171029662,
+        0.15850679992020142,
+        0.05624639058562803
+      ]
+    },
+    "recoveryConfirmed": 20.250000000000153,
+    "positiveClearance": true
+  },
+  {
+    "speed": 8,
+    "scenario": "brakingLead",
+    "samples": 10509,
+    "independentMinimumGap": 0.09904675143329665,
+    "matlabMinimumGap": 0.09904675143330641,
+    "difference": 9.756084828893563e-15,
+    "minimumLocation": {
+      "time": 2.5566666666666658,
+      "holdTime": 2.549999999999999,
+      "holdElapsed": 0.006666666666666667,
+      "state": [
+        20.075477718649058,
+        1.620824032125147,
+        0.1295793795299229,
+        7.488137977483845,
+        0.3402444493622703,
+        0.32161884757292913
+      ]
+    },
+    "recoveryConfirmed": 16.950000000000106,
+    "positiveClearance": true
+  },
+  {
+    "speed": 8,
+    "scenario": "crossing",
+    "samples": 11098,
+    "independentMinimumGap": 0.08133593687340256,
+    "matlabMinimumGap": 0.0813359368734009,
+    "difference": 1.6514567491299204e-15,
+    "minimumLocation": {
+      "time": 1.6166666666666674,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.016666666666666666,
+      "state": [
+        9.249885871686454,
+        1.752261299991157,
+        0.5884880066765308,
+        4.950926536772631,
+        1.034069470476447,
+        0.6529298761526741
+      ]
+    },
+    "recoveryConfirmed": 17.90000000000012,
+    "positiveClearance": true
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedCrossing",
+    "samples": 16585,
+    "independentMinimumGap": 0.0447077579239098,
+    "matlabMinimumGap": 0.04470775792390855,
+    "difference": 1.2490009027033011e-15,
+    "minimumLocation": {
+      "time": 1.6416666666666675,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.041666666666666664,
+      "state": [
+        9.21432824855406,
+        1.8578657741944569,
+        0.5762097973607045,
+        4.838814349597993,
+        0.9356937200381561,
+        0.5811877849396717
+      ]
+    },
+    "recoveryConfirmed": 26.750000000000245,
+    "positiveClearance": true
+  },
+  {
+    "speed": 8,
+    "scenario": "curvedHeadOn",
+    "samples": 11656,
+    "independentMinimumGap": 0.657589203446519,
+    "matlabMinimumGap": 0.6575892034465217,
+    "difference": 2.6645352591003757e-15,
+    "minimumLocation": {
+      "time": 1.618333333333334,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.018333333333333333,
+      "state": [
+        11.167575415497067,
+        4.0617604979547535,
+        0.6998768448560858,
+        7.850680749123483,
+        0.06368772445718024,
+        -0.0200984434665602
+      ]
+    },
+    "recoveryConfirmed": 18.800000000000132,
+    "positiveClearance": true
+  },
+  {
+    "speed": 8,
+    "scenario": "headOn",
+    "samples": 11439,
+    "independentMinimumGap": 0.5334396322338042,
+    "matlabMinimumGap": 0.5334396322338069,
+    "difference": 2.6645352591003757e-15,
+    "minimumLocation": {
+      "time": 1.508333333333334,
+      "holdTime": 1.5000000000000007,
+      "holdElapsed": 0.008333333333333333,
+      "state": [
+        10.672350682142016,
+        3.6667064466419044,
+        0.6555678327669456,
+        8.111579623112156,
+        0.0804597266250757,
+        0.0052321265250634096
+      ]
+    },
+    "recoveryConfirmed": 18.450000000000127,
+    "positiveClearance": true
+  },
+  {
+    "speed": 8,
+    "scenario": "turningCrossing",
+    "samples": 13919,
+    "independentMinimumGap": 0.05276036835636631,
+    "matlabMinimumGap": 0.052760368356362705,
+    "difference": 3.608224830031759e-15,
+    "minimumLocation": {
+      "time": 1.618333333333334,
+      "holdTime": 1.6000000000000008,
+      "holdElapsed": 0.018333333333333333,
+      "state": [
+        9.378910536221477,
+        1.7687827438057668,
+        0.5753349335118391,
+        4.8201909405552215,
+        1.2927986611708713,
+        0.8561760583843588
+      ]
+    },
+    "recoveryConfirmed": 22.450000000000184,
+    "positiveClearance": true
+  }
+]

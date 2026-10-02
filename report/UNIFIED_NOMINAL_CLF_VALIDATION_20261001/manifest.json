@@ -1,0 +1,162 @@
+[
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/REPRODUCTION.txt",
+    "sha256": "418a6c009cadd20b79525d5814802ce6bca57445a3460ed149ea5db0130d0216",
+    "bytes": 3560
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/affine-force-diagnostic.csv",
+    "sha256": "c0b2c7c9ea405799b9596320bd903e9f707268f8841ba160270ce0f7a58e83e2",
+    "bytes": 948
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/analyze.py",
+    "sha256": "158673686babaf4a82e3d9dfbb58df6705640c9740c44525b59cb22426cf075e",
+    "bytes": 5573
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/campaign-output.txt",
+    "sha256": "1b76aab73aaaf5722f0151726f208831a998828fbffb8763c36d34ea9b61f7e2",
+    "bytes": 101497
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/campaign.m",
+    "sha256": "fcf2329cc368250658a949209ce5c5576a5c8d3b15f46f971f161efe562524c8",
+    "bytes": 2637
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/descent-diagnostic.json",
+    "sha256": "89a19e8179540376286da8c80d3fc1619ef5f2cca6428ba8a361f13a31bc6756",
+    "bytes": 4302
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/descentDiagnostic.py",
+    "sha256": "8c386411051a540e99ddb2a3fedc484f4379512868a117c58fd9c0995f357c9e",
+    "bytes": 1565
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/diagnoseAffineForces.m",
+    "sha256": "aff7394b57a072c45c92c86aaf52cc18141ec7adc0cdcf718237434f367c5a64",
+    "bytes": 1987
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/diagnoseIntegrationError.m",
+    "sha256": "93fff257d7f9697cb4ef613baadb066b62882630201d90222e174db6ce55d83e",
+    "bytes": 959
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/failed-replay-nodes.csv",
+    "sha256": "b90f67e0f0523b248b528145cbe96ba93d554f43d624ce3c7d83a0e69530e470",
+    "bytes": 1732998
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/final-turning-collision.json",
+    "sha256": "8807dec90a0e5cdefe039e8a4898a54f1e6c2e44b03743da15669843d9691c19",
+    "bytes": 928
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/frame-results.csv",
+    "sha256": "7bdcf088dc14c2bcceabb5bc4a6b7acda0767f05e0d2518aebcc2aa4a1027cc4",
+    "bytes": 2297104
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/friction-cone-trial.txt",
+    "sha256": "8e7b15b0ec23b01d5e2789a5e1896c44c64a454a85f1c4b75b87fedb764c1526",
+    "bytes": 656
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/inspectCollision.py",
+    "sha256": "714aa0b484f1c7f130fe8c34307a0ebf7a8ab2296ee0c4b690fecda29ba4f8eb",
+    "bytes": 1273
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/integration-diagnostic.txt",
+    "sha256": "25294e9f8bd583f5e39cc8ad187b91272c7e10e06fd3cf01443541a2a564ff83",
+    "bytes": 1119
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/intermediate-summary.json",
+    "sha256": "5f0047d94f9c6f6427b55a052d4215a5385fc8b71a2e0eba3cb615104cde55d8",
+    "bytes": 15468
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/prototype-manifest.json",
+    "sha256": "0321d3bb4fcd19ca7611d7f116d316919bbb53bf1167ba481e1adccf8f7c3601",
+    "bytes": 17311
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/raw-manifest.json",
+    "sha256": "144ac4d6ab606c24bb0f6c0ccfbd32fcfcf9986e6abbc68532d4679a7b7507f4",
+    "bytes": 6849
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/relinearization-diagnostic.txt",
+    "sha256": "fd8381380e90db75e73b41ec9004a866e1e71739beeba0db30e33613578893d2",
+    "bytes": 205
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/replay-verification.json",
+    "sha256": "1ec0148bbeb49ae8beab71d3363331a31e5a0bd61e1961dc07e44315139446d7",
+    "bytes": 8738
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/runTests.m",
+    "sha256": "b0ec9a7fcaed32e987fa1b491bffad802627975c6ec9733acebb68246b00a37b",
+    "bytes": 694
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/source-manifest.json",
+    "sha256": "41f51be9175ecce87688737be5dfe65b0f1c87b7726f547bfb0dfccc4bad529f",
+    "bytes": 2593
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/summary.json",
+    "sha256": "443e589bef70b24f4fa0375b5e4b94e453cceea0061d34e84b76c28120a772a4",
+    "bytes": 15896
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/test-source-manifest.json",
+    "sha256": "d76a54e2f2382416480b358dfdbaf97b8e742c60b5750c13d588eb97bb1a847a",
+    "bytes": 6239
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/tests-initial-output.txt",
+    "sha256": "8353282afea456e3d1a843b209c4d9ac656849600e20a5d54033ad912e4dc400",
+    "bytes": 6863
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/tests-initial.csv",
+    "sha256": "4c03b388ab40da87ca260da1329a1d3579ea96b56d8d51098ebcb43a550b73fa",
+    "bytes": 63875
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/tests-output.txt",
+    "sha256": "25cddf5d3efc149c6b550970c0b92f69dde3fd530a34e30b8aca8a5e0aaa67df",
+    "bytes": 5171
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/tests.csv",
+    "sha256": "fa8ee929b199505878db869a9c469bb49af679a9c874e24cdbc83485e4bab4d6",
+    "bytes": 63853
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/turning-collision-diagnostic.json",
+    "sha256": "4a703c3d9348f2fd0fe5533df11ea6e919ccd0cb6c2fa096ed5cb822702a8b15",
+    "bytes": 1206
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/verifyReplay.py",
+    "sha256": "2d1389537d3d06ee3d997d57798d9a5d5f0a96b788cd7f68cea5a3906e9f09ce",
+    "bytes": 2510
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001/warmup.json",
+    "sha256": "b080bb53a9bfa76eb36742fa5faf9e3dd926eb4043a54406a076e3e6bfefe5e4",
+    "bytes": 1072
+  },
+  {
+    "path": "report/UNIFIED_NOMINAL_CLF_VALIDATION_20261001.tex",
+    "sha256": "26dd73742a70c33ccb4164b1cee292aaae6b656ea45ce594d68d4816de315217",
+    "bytes": 14978
+  }
+]

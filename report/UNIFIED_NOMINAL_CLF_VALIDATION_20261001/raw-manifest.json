@@ -1,0 +1,142 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/acceleratingHeadOn.json",
+    "sha256": "994d03e0fbe9186f67b0de71ddcb6895fd6ab9fa69cb63a9897b32c785c93be0",
+    "bytes": 6587939
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/acceleratingHeadOn.mat",
+    "sha256": "f1a034b52f6389554d9dde37913cf6e5eb80aa64a744c9ff90bf4b2ef2736b62",
+    "bytes": 12657479
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/brakingLead.json",
+    "sha256": "5f72c6c5bef8cb74a7e4bec8497b24fbd136bfc36747445695c2ec323ab65b7f",
+    "bytes": 5045099
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/brakingLead.mat",
+    "sha256": "16d7e5727d9e0ca5d16b1ea98f3ac435b10b13c150c7c6bc1c0ff103d9482e7f",
+    "bytes": 14073297
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/crossing.json",
+    "sha256": "5ddc476fa9c259c4bf766abce867566f64689caa7d5db6b678e39e1494548043",
+    "bytes": 6656598
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/crossing.mat",
+    "sha256": "7c8a4659fa09f5fef109243fb7a96a3e66a0f8872aae29b3ef1f199859f460d2",
+    "bytes": 13950698
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/curvedCrossing.json",
+    "sha256": "9d752ae50340bf723e4c5d33338624d1acccfd7a680a3e632fdb16113b0e446d",
+    "bytes": 8113400
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/curvedCrossing.mat",
+    "sha256": "32290a7ff302a62b4b617415fc07f0761160fa00848c84a40d4e12eab901e3f8",
+    "bytes": 14528387
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/curvedHeadOn.json",
+    "sha256": "9d9b72575c0aff742c7d880e7f87dab9b1e95dce4126a7cad1883f093f98d7b8",
+    "bytes": 7936764
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/curvedHeadOn.mat",
+    "sha256": "dc2130f8ec841e0140986d37fa4fca6e0e3a10c4fa45031db5bbe308215cb5fc",
+    "bytes": 12979589
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/headOn.json",
+    "sha256": "4b915bbde73aa6fc4a99b5a89069967609f7ab6330fbc8ba591142d744df3ee2",
+    "bytes": 6566652
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/headOn.mat",
+    "sha256": "fed740f7eee42bd83077f8ba461a9a7b2f203d6f0a5b9dd40c15b5a12bb6c312",
+    "bytes": 13152057
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/turningCrossing.json",
+    "sha256": "785ccd60fcfb6570151a1f619e0625c40f1136031b40bc310198ec7ba55f3bdc",
+    "bytes": 6636546
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed15/turningCrossing.mat",
+    "sha256": "76615e09c025b79ec159854f47d39d924cc772175c5d7d48fa37996281b66daf",
+    "bytes": 14534634
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/acceleratingHeadOn.json",
+    "sha256": "18064dec464c887404f2c7f12e26f3769708ec1139c13ff5e488e2d27044ef0e",
+    "bytes": 7596254
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/acceleratingHeadOn.mat",
+    "sha256": "4082e68f0cafc4cff0486ae71e5d5c6db316aced78164f68ef3e378c3aa91717",
+    "bytes": 17431821
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/brakingLead.json",
+    "sha256": "45d4ff2c15147b7644a05ef4563622d38397b91de0fd3160db6a80b1cb1a2584",
+    "bytes": 5330324
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/brakingLead.mat",
+    "sha256": "d3b2a8798c98c49c28704d61bae1354763858f784cbb21e27bb2269995b4c5a7",
+    "bytes": 14486818
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/crossing.json",
+    "sha256": "8822580c80157299f4fd21fda46430f1bedbf74d4e511ee8b78986c3a4486394",
+    "bytes": 7061071
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/crossing.mat",
+    "sha256": "ef50447596b9a2f66772c8d9f7a464fdc83c7f784b6f4445037f2bb9f70e3632",
+    "bytes": 15035419
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/curvedCrossing.json",
+    "sha256": "9232cbf317533df021fcb8625124c6850b3f29d5a402517a2918bfb07830a532",
+    "bytes": 9870380
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/curvedCrossing.mat",
+    "sha256": "327b87b6454c29e66b0f3d2044dac3c7b7c17d03f313488aa5e42fce361d1e4b",
+    "bytes": 24355244
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/curvedHeadOn.json",
+    "sha256": "a5b39b9e8056bf92838341f1dc7b1d41d70a917bbdafe0f4cf21c4bcea00849d",
+    "bytes": 8853280
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/curvedHeadOn.mat",
+    "sha256": "8e7ebdc97b4e51ade5c04babe7eb0d06864ca84e3af577a4a937369c9f6c2832",
+    "bytes": 17365803
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/headOn.json",
+    "sha256": "565be703d795e7963ee7a884c13fa4689998442891959a404d454b920f7853fd",
+    "bytes": 7278869
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/headOn.mat",
+    "sha256": "13356d394544b217279b3a7cfd7dfc4d7f8806028fc3b73f80e8f82d2080b93a",
+    "bytes": 15780655
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/turningCrossing.json",
+    "sha256": "63796d8d0efe9e2124772c76ce672e3fc76377dc2dfc56dda4c4cf2aed7a476c",
+    "bytes": 7718855
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment/campaign/speed8/turningCrossing.mat",
+    "sha256": "ae098e5daa003e937b9596821dd4d2ff02d549643dfedaeda00a65e7b8a4c228",
+    "bytes": 20321260
+  }
+]

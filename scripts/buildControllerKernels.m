@@ -2,14 +2,15 @@ function information = buildControllerKernels()
 %buildControllerKernels Compile the controller's model and geometry kernels.
 % Each generated entry point calls an unchanged method of the controller, so
 % a kernel has no algorithm source of its own: nonlinearBicycleModel.sample,
-% predictiveSafetyGeometry.rectangleNumeric and .dualNumeric. The controller
+% predictiveSafetyGeometry.rectangleNumeric and .dualNumeric, and
+% nonlinearBicycleModel.nominalResidual. The controller
 % uses a kernel only if it reproduces the interpreted result bitwise at probe
 % points. Generated code and binaries stay outside the controller directory.
     root = fileparts(fileparts(mfilename("fullpath")));
-    addpath(fullfile(root,"controller"));
+    addpath(fullfile(root,"controller"),fullfile(root,"config"));
     output = fullfile(root,"solver","controller");
     if ~isfolder(output),mkdir(output);end
-    clear bicycleSampleKernelMex rectangleKernelMex dualKernelMex;
+    clear bicycleSampleKernelMex rectangleKernelMex dualKernelMex nominalClfKernelMex;
     settings = coder.config("mex");settings.GenerateReport = false;settings.EnableOpenMP = false;
     settings.IntegrityChecks = false;settings.ResponsivenessChecks = false;
     localBuild(output,settings,"bicycleSampleKernel",{zeros(6,1),zeros(2,1),zeros(19,1),0,true},[ ...
@@ -36,9 +37,16 @@ function information = buildControllerKernels()
         "function [values,jacobian,normal,mu,lambda] = dualKernel(poseE,shapeE,poseT,shapeT,preferred) %#codegen", ...
         "    [values,jacobian,normal,mu,lambda] = predictiveSafetyGeometry.dualNumeric(poseE,shapeE,poseT,shapeT,preferred);", ...
         "end"]);
+    cfg=collisionAvoidanceControllerConfig();
+    reference=nonlinearBicycleModel.cruise(cfg,0);
+    terminal=nonlinearBicycleModel.nominalTail(cfg,0);
+    localBuild(output,settings,"nominalClfKernel",{zeros(5,1),zeros(2,1),reference,terminal,cfg,0},[ ...
+        "function [residual,converged] = nominalClfKernel(e,previous,reference,terminal,cfg,steps) %#codegen", ...
+        "    [residual,converged] = nonlinearBicycleModel.nominalResidual(e,previous,reference,terminal,cfg,steps);", ...
+        "end"]);
     clear nonlinearBicycleModel predictiveSafetyGeometry;rehash;
     information = struct("directory",output,"matlabVersion",string(version), ...
-        "binaries",["bicycleSampleKernelMex","rectangleKernelMex","dualKernelMex"]+"."+mexext, ...
+        "binaries",["bicycleSampleKernelMex","rectangleKernelMex","dualKernelMex","nominalClfKernelMex"]+"."+mexext, ...
         "algorithmSources",["controller/nonlinearBicycleModel.m","controller/predictiveSafetyGeometry.m"]);
 end
 

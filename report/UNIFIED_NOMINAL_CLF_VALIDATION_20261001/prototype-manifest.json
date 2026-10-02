@@ -1,0 +1,367 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/diagnostic.json",
+    "sha256": "4a703c3d9348f2fd0fe5533df11ea6e919ccd0cb6c2fa096ed5cb822702a8b15",
+    "bytes": 1206
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/forceProbe.csv",
+    "sha256": "c0b2c7c9ea405799b9596320bd903e9f707268f8841ba160270ce0f7a58e83e2",
+    "bytes": 948
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/forceProbe.log",
+    "sha256": "68daebc2fd985ad17c3fcee6174b08284aec7fc4129274759888fdbad4c4e9e0",
+    "bytes": 1359
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/forceProbe.m",
+    "sha256": "aff7394b57a072c45c92c86aaf52cc18141ec7adc0cdcf718237434f367c5a64",
+    "bytes": 1987
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/mesh025.json",
+    "sha256": "acc0856d4ea0e1eb718e97d3177038cccf4fcc14bddefb271d94554f35363e7e",
+    "bytes": 501370
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/meshProbe.log",
+    "sha256": "f1a680feae320ad5050f36edcb478720dade51bc2e2731a529feddde322df4c4",
+    "bytes": 1120
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/meshProbe.m",
+    "sha256": "93fff257d7f9697cb4ef613baadb066b62882630201d90222e174db6ce55d83e",
+    "bytes": 959
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/model.mat",
+    "sha256": "74665ec93924f84efbe646adcba4d9967f3f19130e6e7aaeeb90b70e76367393",
+    "bytes": 8744
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/pilot.log",
+    "sha256": "e4fab4f887df389ef4e6db862f83cb4839f5df7a20fe7ff12b5e0f517341d200",
+    "bytes": 5729
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/probe.log",
+    "sha256": "fd8381380e90db75e73b41ec9004a866e1e71739beeba0db30e33613578893d2",
+    "bytes": 205
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/probe.m",
+    "sha256": "c2632275c23cd552d1e9b016f57390a548eede627181e8f1ede85ce4dc6a031c",
+    "bytes": 1548
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/probeRestoration.m",
+    "sha256": "b7bb7c598f30d6e65b43c9969ef3ab7f9c5e6f06977c26a7f857422c922f368c",
+    "bytes": 23584
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/relinearization.mat",
+    "sha256": "300761bf0e063d80cd27b6c57d188af397f5ce9498d334b0a9cf029004d24141",
+    "bytes": 290
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/expanded/turningCrossing.json",
+    "sha256": "c79b7b51ca78bd712bab2f29fafc9647975a8348c0b5a179d1d6e588c274e9e6",
+    "bytes": 6381636
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/pilot.log",
+    "sha256": "a7ee0778e6a194dd30b3344fc86308465fbcae927b145c5c301b5bb07b97179c",
+    "bytes": 1021
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/pilot.m",
+    "sha256": "eaa09a7333aaab35ea71d29595a0bfb3f2a2091063d3e19b59ce28eaa8ade623",
+    "bytes": 578
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/turningCrossing.json",
+    "sha256": "3f4037f943b312c66c1e4318e800b9116bc5275adb4ab2dfeb12997aa52b1440",
+    "bytes": 500571
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/config/collisionAvoidanceControllerConfig.m",
+    "sha256": "4d912d60e31a11c4297008dece412afd7b306bb4e62d9f83e60e919f3465d0b8",
+    "bytes": 8509
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/config/estimatorControllerIntegrationConfig.m",
+    "sha256": "d4419181f4b9d3c8b1c8f163f3a32b21240af63713312cf3dcac47a981f5a20b",
+    "bytes": 5604
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/config/mncavVehicleConfig.m",
+    "sha256": "27ddaaf5b081757594d78d8290c76a1513e686e783ede95b6f1fb2689e44a80a",
+    "bytes": 1721
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/config/nrmmTrackingConfig.m",
+    "sha256": "50c79c001f29c499023f974f85d1a06103ebbd9e47923ad986b7bf3d63072248",
+    "bytes": 4277
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/collisionAvoidanceController.m",
+    "sha256": "60a994d65579624ea1375a9954e037b2044ef1150fbd590da3162684c1c68594",
+    "bytes": 9987
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/laneGeometry.m",
+    "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "bytes": 5788
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/modifiedFialaTire.m",
+    "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+    "bytes": 7155
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/nonlinearBicycleModel.m",
+    "sha256": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608",
+    "bytes": 21837
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/predictiveSafetyGeometry.m",
+    "sha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+    "bytes": 13688
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/readControllerInputs.m",
+    "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "bytes": 19229
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/solvePredictiveControl.m",
+    "sha256": "f25ec9aa12717cc1cf84ade8485efdf12e93be97489999ccdd524cac407a0375",
+    "bytes": 27133
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/controller/terminalContinuation.m",
+    "sha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+    "bytes": 27758
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/scripts/collisionThreatScenario.m",
+    "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "bytes": 2460
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/scripts/givenPathCollisionBaseline.m",
+    "sha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+    "bytes": 3633
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/scripts/prepareCollisionAvoidanceController.m",
+    "sha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9",
+    "bytes": 818
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/firstlocal/source/scripts/runNonlinearPredictiveSafetyValidation.m",
+    "sha256": "c704f3d5a10544cb45d63e7b0b6d7d5e1386d1ab2d15f776b8e2b2f76b249e5a",
+    "bytes": 16223
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/pilot.log",
+    "sha256": "8e7b15b0ec23b01d5e2789a5e1896c44c64a454a85f1c4b75b87fedb764c1526",
+    "bytes": 656
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/pilot.m",
+    "sha256": "fa56910f95c51fbcebef52b08c5dbc890afe54540279d8bf8ab33d166822d6a0",
+    "bytes": 563
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/turningCrossing.json",
+    "sha256": "49c0e2ba7ebf3ff2296e371dca68d2ec6e0f6e5ec5341672a7a6b1cbc11ee0bf",
+    "bytes": 268614
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/config/collisionAvoidanceControllerConfig.m",
+    "sha256": "4d912d60e31a11c4297008dece412afd7b306bb4e62d9f83e60e919f3465d0b8",
+    "bytes": 8509
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/collisionAvoidanceController.m",
+    "sha256": "60a994d65579624ea1375a9954e037b2044ef1150fbd590da3162684c1c68594",
+    "bytes": 9987
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/laneGeometry.m",
+    "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "bytes": 5788
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/modifiedFialaTire.m",
+    "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+    "bytes": 7155
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/nonlinearBicycleModel.m",
+    "sha256": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608",
+    "bytes": 21837
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/predictiveSafetyGeometry.m",
+    "sha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+    "bytes": 13688
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/readControllerInputs.m",
+    "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "bytes": 19229
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/solvePredictiveControl.m",
+    "sha256": "a4a8e23333dcd32a2905ea7c63baadcfc03247f45d86ccc7a60f54d89286be44",
+    "bytes": 27727
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/controller/terminalContinuation.m",
+    "sha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+    "bytes": 27758
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/scripts/collisionThreatScenario.m",
+    "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "bytes": 2460
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/scripts/givenPathCollisionBaseline.m",
+    "sha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+    "bytes": 3633
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/scripts/prepareCollisionAvoidanceController.m",
+    "sha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9",
+    "bytes": 818
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/force/source/scripts/runNonlinearPredictiveSafetyValidation.m",
+    "sha256": "c704f3d5a10544cb45d63e7b0b6d7d5e1386d1ab2d15f776b8e2b2f76b249e5a",
+    "bytes": 16223
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/restored/crossing.json",
+    "sha256": "a38a68498f5d2ab3774915623e0b8475b2f309efb9d049560637356d759582d2",
+    "bytes": 6656595
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/restored/curvedCrossing.json",
+    "sha256": "4be54e27241ddf45b928d7310082a78690c6d6c538241a4fd29dcf7cdb8b2d22",
+    "bytes": 8113338
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/restored/pilot.log",
+    "sha256": "ca8955477064216f3231ff31751bca1dbf2d3c713d514e208cec9390a651f50f",
+    "bytes": 18926
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/restored/pilot.m",
+    "sha256": "91bbe5f15d6dc204e7cf70e05bbfb4f90902b651a837eb9c3cd336943936f98b",
+    "bytes": 659
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/restored/turning-diagnostic.json",
+    "sha256": "686d51f80f1a97978def68e9a7a928b0b7263d5c46c20a509833ad6156933895",
+    "bytes": 927
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/restored/turningCrossing.json",
+    "sha256": "c308e72c6d5199e7b57b0fa8dbe03226445c39c2a1c86d0f4ee4f45e7f02aa08",
+    "bytes": 6636252
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/campaign.log",
+    "sha256": "95f96917342d28f23edee9dd6806f2f32170737ad85ce28a7afd88deec8f713f",
+    "bytes": 83112
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/campaign.m",
+    "sha256": "4d8a9ee96954870ded48c43d952f4b00d41c5cfdecd6ca614dad0229bf18d241",
+    "bytes": 2637
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/runTests.m",
+    "sha256": "338124dab64cdba5d98db7fe3f608697a36470d4071089538a99b72a0897fe2f",
+    "bytes": 694
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source-manifest.json",
+    "sha256": "d24a88f33df1002790489f29ea580e23b20f09911eb752bd4bad668cb657a899",
+    "bytes": 2593
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/warmup.mat",
+    "sha256": "d7780c93fab814e9f99b667ed1b6d3eea6bd36bb37a3c324633f85a7d9a634dd",
+    "bytes": 898
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/config/collisionAvoidanceControllerConfig.m",
+    "sha256": "4d912d60e31a11c4297008dece412afd7b306bb4e62d9f83e60e919f3465d0b8",
+    "bytes": 8509
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/collisionAvoidanceController.m",
+    "sha256": "60a994d65579624ea1375a9954e037b2044ef1150fbd590da3162684c1c68594",
+    "bytes": 9987
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/laneGeometry.m",
+    "sha256": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "bytes": 5788
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/modifiedFialaTire.m",
+    "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+    "bytes": 7155
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/nonlinearBicycleModel.m",
+    "sha256": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608",
+    "bytes": 21837
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/predictiveSafetyGeometry.m",
+    "sha256": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+    "bytes": 13688
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/readControllerInputs.m",
+    "sha256": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "bytes": 19229
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/solvePredictiveControl.m",
+    "sha256": "c65a4475eae299edc979e491cdf5b3104b73e38d2917eb2a8fd801c3568e7891",
+    "bytes": 27069
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/controller/terminalContinuation.m",
+    "sha256": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+    "bytes": 27758
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/scripts/collisionThreatScenario.m",
+    "sha256": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "bytes": 2460
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/scripts/givenPathCollisionBaseline.m",
+    "sha256": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+    "bytes": 3633
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/scripts/prepareCollisionAvoidanceController.m",
+    "sha256": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9",
+    "bytes": 818
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/validation/source/scripts/runNonlinearPredictiveSafetyValidation.m",
+    "sha256": "c704f3d5a10544cb45d63e7b0b6d7d5e1386d1ab2d15f776b8e2b2f76b249e5a",
+    "bytes": 16223
+  }
+]

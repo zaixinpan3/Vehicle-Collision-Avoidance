@@ -1,0 +1,269 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{3em}
+\title{One Nominal CLF Throughout Avoidance and Recovery\\Implementation and Fourteen-Scenario Validation}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}\maketitle
+\section{Result and scope}
+The implementation now uses one target-independent CLF at every frame,
+retains PCBF-before-CLF priority, and removes the separate recovery CLF,
+range-selected recovery anchor, and third optimization stage. Every issued
+input comes from the selected secondary optimization. No backup command or
+nonlinear acceptance gate was added.
+
+In the final fourteen-case campaign, 14 cases recovered nominal
+cruise, one case had sampled rectangle overlap, and zero
+cases stopped for a numerical failure. These are separate outcomes: recovery
+after a collision is not successful collision avoidance. Full controller-call
+maximum was 1323.859 ms; the 100-ms objective is not met. This is a research
+implementation and a measured limitation, not a claim of a globally certified
+CLF, nonlinear recursive feasibility, or a deployable safety controller.
+
+The source started from project commit
+\path{c7d5e34485922d5b49b557d17ceb0b7baf6e841a}; the preceding controller
+implementation was \path{9de49299a7c4f7d6b05e6a0dea48453fb7877a5a}.
+The tested working-tree source and four native kernels are identified by
+\path{source-manifest.json}. Nine MATLAB files remain in the controller/config
+core. Native binaries are reproducible build outputs and are not committed.
+
+\section{One value function and its decrease argument}
+The nominal set consists of all phases of given-path motion at the requested
+speed. Set $\ell(z)=e(z)^TQe(z)$, where $e$ contains lateral, heading,
+longitudinal-speed, lateral-speed and yaw-rate error. Include previous-input
+memory in $z$ when slew limits are finite. No longitudinal position error or
+arrival deadline is introduced.
+
+A target-independent path-guidance feedback $\kappa$ defines the single value
+\[
+ V_K(z)=\sum_{j=0}^{K-1}\ell(F_\kappa^j(z))
+        +V_f(F_\kappa^K(z)),\qquad V_f(e)=e^TP_fe.
+\]
+It is a policy cost, not the globally optimal control value. The feedback
+constructs/evaluates this function and supplies nominal portions of a seed;
+it is never substituted for an optimized command. The same fixed $K=2400$
+(120 seconds of 50-ms policy evaluation) is used in all frames. It adds no
+optimization variables and imposes no finite-time recovery constraint.
+Absolute path phase is removed using the straight/circular path symmetry.
+
+At the trim, the local closed-loop Jacobian satisfies
+\[
+ A_\kappa^TP_fA_\kappa-P_f=-2Q.
+\]
+The strict reserve matters. If $F_\kappa(e)=A_\kappa e+r(e)$ with
+$\|r(e)\|\le c\|e\|^2$, then
+\[
+ \Delta V_f\le-2e^TQe+
+ 2\|A_\kappa^TP_f\|c\|e\|^3+\|P_f\|c^2\|e\|^4.
+\]
+A sufficiently small invariant neighborhood therefore has
+$\Delta V_f\le-\ell$. On the domain whose nominal $K$th successor enters
+that neighborhood, telescoping gives
+\[
+ V_K(F_\kappa(z))-V_K(z)
+ =-\ell(z)+\ell(z_K)+\Delta V_f(z_K)\le-\ell(z).
+\]
+The implementation checks local stability and tests signed core directions
+and large starts. It does not compute a rigorous uniform remainder bound
+$c$, certify the entire configured tail ellipsoid, or prove the full
+nonlinear basin of the saturated guidance law. These are explicit conditions
+on the regional theorem, not evidence of global validity.
+
+Every frame requests
+\[
+ V_K(F_h(z,u_0))-V_K(z)\le-\eta\ell(z)+\rho,
+ \qquad \eta=0.5,\quad \rho\ge0.
+\]
+If the exact inequality holds with zero slack on all subsequent frames in
+its domain, nonnegativity gives summability of $\ell$ and convergence to
+nominal behavior. The target does not select a different function. Positive
+slack can also result from numerical trust or terminal constraints, and is
+not by itself evidence of a physical collision threat.
+
+\section{Convex model and well-defined future inputs}
+The successor value depends on only two first-input variables. A centered
+stencil differentiates the complete hold plus fixed nominal rollout. With
+residual vector $r$ and its Jacobian $J$, the quadratic keeps
+$\|r+Jd\|^2$ and adds the positive-semidefinite part of the omitted residual
+curvature. This avoids the negative values produced by projecting only the
+full Taylor Hessian. A compiled copy of the same MATLAB policy-evaluation
+loop removes interpreted rollout overhead.
+
+This is an RTI local model, not a certified upper bound across the trust box.
+Zero modeled slack does not automatically imply the exact nonlinear decrease
+inequality. The final trace contains 3764 consecutive-state pairs with
+modeled zero slack: 473 exceed the requested decrease tolerance and
+256 actually increase the measured value beyond that tolerance.
+Of the latter, 251 start inside the declared nominal-error tolerances and five
+start outside; all have positive selected solver exits. The largest increase
+is approximately 0.0523 from a value of 0.0905, inside the nominal tolerances.
+This is practical recovery, not pointwise monotonicity or exact convergence.
+All evaluated current-state rollouts reached the diagnostic tail level;
+this does not certify the entire core. Numerical errors support practical
+convergence, not an automatic asymptotic proof for the implemented optimizer.
+
+Minimizing only a first-step CLF leaves future inputs nonunique. In an
+unregularized crossing diagnostic, the shifted steering center stayed near
+$-0.07245$ rad and its correction bound allowed only $+0.00255$ rad, even
+though a larger positive input reduced the CLF. The next optimized steering
+recreated the same center. Removing state trust did not repair this.
+
+The secondary solve now minimizes
+\[
+ \rho_s+\epsilon\sigma,\quad R(dU)\le\sigma\le1,
+ \quad \epsilon=10^{-4},
+\]
+where $R$ is the normalized squared increment from the linearization inputs.
+It is neither an absolute-input penalty nor feedback matching. Its effect
+on minimum normalized CLF slack is at most $\epsilon$ at an exact optimum.
+This explicit small tradeoff removes arbitrary future plans without a third
+solve. The primary PCBF bound remains unchanged. CLF and redundant increment
+epigraphs are eliminated algebraically from the primary problem.
+
+\section{Restoration and remaining safety defect}
+A finite relaxed primary result is now distinguished from a prediction with
+zero PCBF slack. The already assembled current-state collision rows give an
+unavoidable lower bound. A shifted solution exceeding that bound receives
+one fresh flow initialization. The lower primary value is retained, and ties
+keep the shift. A fresh problem with no point and an infeasibility exit may enlarge its input correction box once,
+by a factor of two, while keeping state/physical/terminal constraints. Only
+then is the single CLF stage constructed and solved. Normal frames need two
+solves; bounded restoration adds primary solves, not controllers or CLFs.
+
+The node safety buffer increased from 0.05 to 0.10 m. A crossing prototype
+with fresh initialization reduced a 23-cm overlap to a 2.9-cm intersample
+overlap at the smaller buffer; the larger buffer eliminated overlap in that
+prototype. The physical pass criterion remains any positive body clearance,
+not a 10-cm clearance requirement.
+
+The 15-m/s turning-crossing expanded-step diagnostic exposes affine optimism.
+At 0.85 s an optimized plan with PCBF approximately $3.0\times10^{-7}$
+requested a linearized tire-force norm of 1.594 times its friction capacity;
+the 0.90-s plan required 1.440 times capacity. A nonlinear Fiala tire cannot
+produce these forces. The predicted continuation can therefore look feasible
+while the realized system loses maneuvering room. This is diagnostic evidence
+of an invalid local prediction, not a proof that this factor alone explains
+all failure. The final retained implementation still has a negative SAT
+margin of about $-0.224$ m in this scenario at 1.662 s; the issued hold
+has primary slack about 0.219 and both solver exits positive. The relaxed
+convex solve has therefore succeeded numerically while collision avoidance
+has failed.
+
+Checks that did not solve the issue are retained. Successive primary
+relinearizations at 1.0 s gave slacks approximately
+$0.308,1.102,0.571,0.425$ and then infeasibility. Restricting the first-input
+box while expanding future corrections still collided. Finer 25-ms RK4
+integration still collided; the original one-hold position error was below
+0.04 mm. An isolated exact-friction-cone prototype stopped at 0.85 s with
+no primary solution while the observed clearance was still 9.86 m. Expanding the step on positive primary slack also made the straight crossing collide in the subsequent campaign, so that extension was withdrawn. Those
+prototypes were not merged. Simply adding physical force cones did not
+resolve initialization and local feasibility, and expanding search work
+alone did not establish safety.
+
+\section{Scenario protocol and results}
+Seven collision-threat geometries were run at 8 and 15 m/s with exact
+observations, no road constraints, no simulated execution delay, and no noise.
+Every baseline starts separated and overlaps the target under unmodified
+constant-speed given-path cruise. Sampling is 50 ms; primary horizons are
+8 and 16 holds, with 60 completion holds. The target trajectory is known;
+the existing 30-m encounter contract is retained. The run is deterministic: the random-seed field is empty and there are no
+random state or observation perturbations in this campaign.
+
+Each command drives an independent ODE45 plant (relative tolerance
+$10^{-11}$, absolute tolerance $10^{-12}$), sampled at 31 points per hold.
+Recovery requires five seconds of consecutive endpoint samples with error below
+$[0.1\,\mathrm m,1^\circ,0.1\,\mathrm{m/s},0.05\,\mathrm{m/s},
+0.01\,\mathrm{rad/s}]$, with a minimum run of eight seconds and an
+80-second observation cap. Python rectangle geometry and recovery-dwell
+recomputation independently agree with all fourteen result files. This dense
+sampling is evidence, not a continuous-time interval certificate.
+
+\begin{center}\small
+\begin{tabular}{rlrrr}\toprule
+Speed & Scenario & Min. gap (m) & Recovery confirmed (s) & Max. call (ms)\\\midrule
+8 & Crossing & 0.08134 & 17.90 & 546.2 \\
+8 & Head-on & 0.53344 & 18.45 & 701.3 \\
+8 & Accelerating head-on & 0.49289 & 20.25 & 365.4 \\
+8 & Braking lead & 0.09905 & 16.95 & 1323.9 \\
+8 & Turning crossing & 0.05276 & 22.45 & 399.5 \\
+8 & Curved head-on & 0.65759 & 18.80 & 693.6 \\
+8 & Curved crossing & 0.04471 & 26.75 & 986.0 \\
+15 & Crossing & 0.07123 & 16.35 & 1142.2 \\
+15 & Head-on & 0.05177 & 14.50 & 485.5 \\
+15 & Accelerating head-on & 0.05925 & 14.10 & 430.4 \\
+15 & Braking lead & 0.09543 & 16.35 & 1056.4 \\
+15 & Turning crossing & 0.00000 & 15.70 & 965.9 \\
+15 & Curved head-on & 0.08467 & 13.05 & 950.4 \\
+15 & Curved crossing & 0.01772 & 14.60 & 929.7 \\
+\bottomrule\end{tabular}\end{center}
+
+The previous two-CLF campaign had 14 collision-free runs but only 12 recovered
+within 80 s; the two crossing cases ended about 621/629 m from the path.
+The first complete unified-CLF intermediate campaign recovered 13, collided
+in three, and did not recover in the curved-crossing case at 15 m/s.
+The final results above must be assessed against both recovery improvement
+and any safety regression; no all-scenarios success is claimed.
+
+\section{Runtime and verification}
+The campaign ran serially in MATLAB R2026a Update 3 using
+\texttt{-singleCompThread}, with two discarded warm-up calls per speed.
+Other MATLAB workloads were active on the shared workstation. These are
+observed controller-call wall times, not an isolated benchmark or a simulated
+real-time deployment. The clock includes parsing, initialization, terminal
+work, model/CLF construction and all optimizer calls, but excludes offline
+ODE45 and geometry auditing.
+
+Across 4924 executed frames, median/P95/maximum were
+145.840/339.203/1323.859 ms; 4895 exceeded 100 ms.
+The worst call was Braking lead at 3.20 s, speed 8 m/s:
+\begin{center}\begin{tabular}{lr}\toprule
+Component & Milliseconds\\\midrule
+Initialization & 0.968 \\
+Model assembly & 14.408 \\
+CLF construction & 16.306 \\
+PCBF solves & 45.023 \\
+CLF solve & 1244.327 \\
+Other call work & 2.827 \\
+\bottomrule\end{tabular}\end{center}
+The slowest secondary solve returned exit $-7$ and CLF slack 22.4028.
+Across the campaign, 119 frames had a nonpositive selected solver exit.
+Finite returned vectors remained executable under the existing interface;
+zero numerical interruptions therefore does not mean every solve converged.
+
+The first full suite passed 616 of 617 tests. Its new restoration test
+incorrectly expected zero residual slack rather than an improvement: the
+recorded crossing reduces the primary value from 0.0738 to 0.0144. That
+assertion was corrected to test improvement, explicit remaining relaxation
+and the subsequent CLF solve; controller code was unchanged. The final
+complete MATLAB suite then passed 617 of 617 tests, including
+one-CLF behavior at all target ranges, zero-PCBF continuation to the CLF stage,
+nominal nonlinear decrease examples, fixed rollout length, input memory, free path phase,
+strict tail perturbations, native/interpreted equivalence, positive-slack
+restoration and bounded failure. Passing unit tests does not negate a failed
+closed-loop scenario. The larger default grid in
+\path{scripts/validateNominalClf.m} was not run; no new grid certificate is
+claimed. Kernel builds, prior intermediate suites and their outcomes are
+recorded separately from the final suite.
+
+\section{Artifacts and reproducibility}
+The adjacent directory contains the frozen-source manifest, campaign driver,
+case summary, per-frame diagnostics, sampled replay nodes for failed cases, independent
+replay comparison, final test results, and diagnostic methods/results.
+Full raw JSON and continuation MAT files remain at the original paths listed
+in \path{raw-manifest.json}; export copies are retained with the external
+project commit record. The driver uses a frozen source tree and four generated
+kernels; rebuilding uses \path{scripts/buildControllerKernels.m}. No foreign
+estimator, manuscript, dependency or generated native artifact is part of the
+project commit. Detailed mathematics and claim scope are maintained in
+\path{controller/NOMINAL_CLF.md} and
+\path{controller/PCBF_CLF_ARCHITECTURE.md}.
+
+The terminal-decrease construction follows the general reasoning in Rawlings,
+Mayne and Diehl, \emph{Model Predictive Control: Theory, Computation, and
+Design}, 2nd edition, 6th printing (2026), Assumption 2.14 and Appendix B.5
+(\url{https://sites.engineering.ucsb.edu/~jbraw/mpc/MPC-book-2nd-edition-6th-printing.pdf}).
+The general principle does not certify this particular nonlinear vehicle,
+its entire operating domain, the RTI approximation or its runtime.
+\end{document}

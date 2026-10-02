@@ -1,0 +1,15 @@
+ONE-HOLD errors [1.21762695e-05 3.42795204e-05 5.3171395e-05 0.000121336452 0.00193346471 0.00222244717]
+turningCrossing: 4/50 holds, last 0.216 s, source twoStageRealTimeIteration
+turningCrossing: 8/50 holds, last 0.223 s, source twoStageRealTimeIteration
+turningCrossing: 12/50 holds, last 0.256 s, source twoStageRealTimeIteration
+turningCrossing: 16/50 holds, last 0.257 s, source twoStageRealTimeIteration
+turningCrossing: 20/50 holds, last 0.531 s, source twoStageRealTimeIteration
+turningCrossing: 24/50 holds, last 0.373 s, source twoStageRealTimeIteration
+turningCrossing: 28/50 holds, last 0.342 s, source twoStageRealTimeIteration
+turningCrossing: 32/50 holds, last 0.348 s, source twoStageRealTimeIteration
+turningCrossing: 36/50 holds, last 0.169 s, source twoStageRealTimeIteration
+turningCrossing: 40/50 holds, last 0.172 s, source twoStageRealTimeIteration
+turningCrossing: 44/50 holds, last 0.168 s, source twoStageRealTimeIteration
+turningCrossing: 48/50 holds, last 0.155 s, source twoStageRealTimeIteration
+turningCrossing: 50/50 frames, max 1.131 s, failure
+MESH gap=0.000000000 frames=50 failure=

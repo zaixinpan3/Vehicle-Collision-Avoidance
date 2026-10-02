@@ -88,7 +88,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
             testCase.verifyEqual(command.axleNormalLoad, expected, AbsTol=1.0e-10);
         end
 
-        function changingRoadLoadUpdatesTheLaneClf(testCase)
+        function changingRoadLoadUpdatesTheNominalValue(testCase)
             [~, first, cfg] = localProblem(14.8);
             cfg.roadLoad.dragCoefficient = 1.2;
             ego = struct("position", [0; 0], "yawAngle", 0, "speed", 14.8);
@@ -96,7 +96,7 @@ classdef longitudinalRoadLoadTest < matlab.unittest.TestCase
 
             [~, ~, second] = collisionAvoidanceController(ego, [], [0, 0; 2000, 0], cfg, []);
 
-            testCase.verifyGreaterThan(norm(first.metadata.clfMatrix-second.metadata.clfMatrix), 1.0e-10);
+            testCase.verifyGreaterThan(abs(first.metadata.clfInitialValue-second.metadata.clfInitialValue), 1.0e-10);
             testCase.verifyGreaterThan(second.metadata.clfOperatingInput(2), ...
                 first.metadata.clfOperatingInput(2));
         end

@@ -199,14 +199,14 @@ classdef nonlinearBicycleModel
             error=[projection.lateralPosition;angle;x(4:6)-reference.state(4:6)];
         end
 
-        function u = recoveryInput(x,previous,lane,reference,cfg,terminal)
-            % Path-guidance feedback that defines the recovery CLF (RECOVERY_CLF.md).
+        function u = nominalFeedback(x,previous,lane,reference,cfg,terminal)
+            % Path guidance used only to construct the nominal value (NOMINAL_CLF.md).
             % Course guidance chi_d=-atan(e_y/D) toward the path, a course loop to a
             % yaw-rate demand within the lateral-friction limit, the front slip angle
             % from the inverse Fiala curve below its force peak, and a speed loop on
             % the braking ratio. terminal.steeringOffset makes the trim an exact
             % equilibrium (the inverse neglects the front longitudinal force).
-            p=cfg.recovery;projection=laneGeometry.project(x(1:2),lane);
+            p=cfg.nominalClf;projection=laneGeometry.project(x(1:2),lane);
             lateral=projection.lateralPosition;curvature=reference.curvature;
             speed=hypot(x(4),x(5));course=localWrap(x(3)+atan2(x(5),x(4))-projection.heading);
             lookahead=max(p.minimumLookaheadMeters,p.lookaheadSeconds*hypot(reference.state(4),reference.state(5)));
@@ -229,55 +229,65 @@ classdef nonlinearBicycleModel
             u=[atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-slip+terminal.steeringOffset;b];
         end
 
-        function terminal = recoveryTerminal(cfg,curvature)
-            % Linearized recovery loop at the trim and its exact quadratic
-            % cost-to-go, P = dlyap(A',Q) for the stage cost l(e) = e'Qe.
+        function terminal = nominalTail(cfg,curvature)
+            % Local nominal loop and a strict Lyapunov tail: P = dlyap(A',2Q).
             persistent savedKey saved
             key={cfg.vehicle,cfg.tire,cfg.roadLoad,cfg.model,cfg.actuation,cfg.referenceSpeed, ...
-                cfg.controller.sampleTime,cfg.nonlinear.integrationStep,cfg.clf,cfg.recovery,curvature};
+                cfg.controller.sampleTime,cfg.nonlinear.integrationStep,cfg.clf,cfg.nominalClf,curvature};
             if isequaln(key,savedKey),terminal=saved;return;end
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
             lane=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             trim=[0;0;reference.state(3:6)];
-            raw=nonlinearBicycleModel.recoveryInput(trim,reference.input,lane,reference,cfg,struct('steeringOffset',0));
+            raw=nonlinearBicycleModel.nominalFeedback(trim,reference.input,lane,reference,cfg,struct('steeringOffset',0));
             terminal=struct('steeringOffset',reference.input(1)-raw(1));
             scales=[cfg.clf.lateralPositionErrorScale;cfg.clf.headingErrorScale;cfg.clf.speedErrorScale; ...
                 cfg.clf.lateralVelocityErrorScale;cfg.clf.yawRateErrorScale];
             closedLoop=zeros(5);step=1e-6*scales;
             for index=1:5
                 e=zeros(5,1);e(index)=step(index);
-                closedLoop(:,index)=(localRecoveryStep(e,lane,reference,cfg,terminal) ...
-                    -localRecoveryStep(-e,lane,reference,cfg,terminal))/(2*step(index));
+                closedLoop(:,index)=(localNominalStep(e,lane,reference,cfg,terminal) ...
+                    -localNominalStep(-e,lane,reference,cfg,terminal))/(2*step(index));
             end
             radius=max(abs(eig(closedLoop)));
             if radius>=1
-                error('collisionAvoidanceController:unstableRecoveryFeedback', ...
-                    'The recovery feedback is not locally stable at the trim (spectral radius %.4f).',radius);
+                error('collisionAvoidanceController:unstableNominalFeedback', ...
+                    'The nominal construction feedback is not locally stable at the trim (spectral radius %.4f).',radius);
             end
-            P=dlyap(closedLoop.',diag(1./scales.^2));P=(P+P.')/2;
+            P=dlyap(closedLoop.',2*diag(1./scales.^2));P=(P+P.')/2;
             terminal=struct('steeringOffset',terminal.steeringOffset,'closedLoop',closedLoop,'matrix',P, ...
                 'factor',chol(P),'stageFactor',diag(1./scales),'spectralRadius',radius);
             savedKey=key;saved=terminal;
         end
 
-        function [value,residual,steps,converged] = recoveryValue(x,previous,lane,reference,terminal,cfg,steps)
-            % Recovery CLF: the cost-to-go of recoveryInput from (x, previous input),
-            % the sum of l(e_k) until the terminal quadratic is at most stopValue,
-            % plus that quadratic. value = |residual|^2. A given steps fixes the
-            % rollout length; converged is false if maximumSeconds is reached.
-            fixed=nargin>6;maximum=round(cfg.recovery.maximumSeconds/cfg.controller.sampleTime);
-            if fixed,maximum=steps;end
-            blocks=zeros(5,maximum);u=previous;converged=false;steps=0;
-            while true
+        function [value,residual,steps,converged] = nominalValue(x,previous,lane,reference,terminal,cfg,steps)
+            % A fixed policy-evaluation horizon defines one function everywhere.
+            % A strict local Lyapunov tail supplies the nonlinear decrease reserve.
+            if nargin<7,steps=round(cfg.nominalClf.evaluationSeconds/cfg.controller.sampleTime);end
+            e=nonlinearBicycleModel.error(x,lane,reference);
+            kernel=localNominalKernel(cfg,reference,terminal);
+            if isempty(kernel)
+                [residual,converged]=nonlinearBicycleModel.nominalResidual(e,previous,reference,terminal,cfg,steps);
+            else
+                [residual,converged]=kernel(e,previous,reference,terminal,cfg,steps);
+            end
+            value=sum(residual.^2);
+        end
+
+        function [residual,converged] = nominalResidual(e,previous,reference,terminal,cfg,steps)
+            % Canonical pose on the SE(2) quotient of a straight or circular path.
+            lane=struct('referenceCurve',struct('origin',[0;0],'heading',0, ...
+                'curvature',reference.curvature,'length',200));
+            x=[0;e(1);reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
+            residual=zeros(5*(steps+1),1);u=previous;
+            for index=1:steps
                 e=nonlinearBicycleModel.error(x,lane,reference);
-                if fixed && steps==maximum,converged=true;break;end
-                if ~fixed && sum((terminal.factor*e).^2)<=cfg.recovery.stopValue,converged=true;break;end
-                if steps==maximum,break;end
-                steps=steps+1;blocks(:,steps)=terminal.stageFactor*e;
-                u=nonlinearBicycleModel.recoveryInput(x,u,lane,reference,cfg,terminal);
+                residual(5*(index-1)+(1:5))=terminal.stageFactor*e;
+                u=nonlinearBicycleModel.nominalFeedback(x,u,lane,reference,cfg,terminal);
                 x=nonlinearBicycleModel.sample(x,u,cfg);
             end
-            residual=[reshape(blocks(:,1:steps),[],1);terminal.factor*e];value=sum(residual.^2);
+            e=nonlinearBicycleModel.error(x,lane,reference);
+            residual(5*steps+(1:5))=terminal.factor*e;
+            converged=sum((terminal.factor*e).^2)<=cfg.nominalClf.tailLevel;
         end
     end
 end
@@ -286,10 +296,10 @@ function a=localWrap(a)
     a=atan2(sin(a),cos(a));
 end
 
-function next=localRecoveryStep(e,lane,reference,cfg,terminal)
+function next=localNominalStep(e,lane,reference,cfg,terminal)
     [position,heading]=laneGeometry.referencePose(0,e(1),lane.referenceCurve);
     x=[position;heading+reference.state(3)+e(2);reference.state(4:6)+e(3:5)];
-    u=nonlinearBicycleModel.recoveryInput(x,reference.input,lane,reference,cfg,terminal);
+    u=nonlinearBicycleModel.nominalFeedback(x,reference.input,lane,reference,cfg,terminal);
     next=nonlinearBicycleModel.error(nonlinearBicycleModel.sample(x,u,cfg),lane,reference);
 end
 
@@ -358,4 +368,21 @@ function [residual,x,u]=localTrimResidual(point,speed,curvature,cfg)
         if ~startsWith(exception.identifier,'collisionAvoidanceController:'),rethrow(exception);end
         residual=1e3*ones(3,1)+point;
     end
+end
+
+function kernel=localNominalKernel(cfg,reference,terminal)
+    persistent handle checked
+    if isempty(checked)
+        checked=true;handle=[];
+        native=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
+        if isfile(fullfile(native,['nominalClfKernelMex.',mexext]))
+            previousPath=addpath(native);candidate=@nominalClfKernelMex;
+            e=[.3;-.2;.1;.4;-.2];u=reference.input;
+            [r,c]=nonlinearBicycleModel.nominalResidual(e,u,reference,terminal,cfg,5);
+            [rn,cn]=candidate(e,u,reference,terminal,cfg,5);
+            path(previousPath);
+            if isequal(r,rn) && c==cn,handle=candidate;end
+        end
+    end
+    kernel=handle;
 end

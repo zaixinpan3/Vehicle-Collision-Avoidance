@@ -1,0 +1,6 @@
+turningCrossing: 4/50 holds, last 0.385 s, source twoStageRealTimeIteration
+turningCrossing: 8/50 holds, last 0.692 s, source twoStageRealTimeIteration
+turningCrossing: 12/50 holds, last 0.321 s, source twoStageRealTimeIteration
+turningCrossing: 16/50 holds, last 0.368 s, source twoStageRealTimeIteration
+turningCrossing: 17/50 frames, max 1.637 s, failure collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).
+FORCE gap=9.859470246 frames=17 failure=collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).

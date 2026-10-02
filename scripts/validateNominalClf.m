@@ -1,14 +1,14 @@
-function summary = certifyRecoveryClf(options)
-%certifyRecoveryClf Sampled certificate of the recovery CLF (controller/RECOVERY_CLF.md).
+function summary = validateNominalClf(options)
+%validateNominalClf Sampled nominal-feedback and CLF diagnostics (controller/NOMINAL_CLF.md).
 % For each reference speed and path curvature it reports the trim offset, the
 % linear-loop spectral radius and the Lyapunov-equation residual. It then runs
-% the recovery feedback in the controller's own model from a grid of initial
+% the nominal construction feedback in the controller's own model from a grid of initial
 % states: lateral offsets, headings relative to the path (all directions),
 % speed factors, lateral velocities and yaw rates. A start passes when the
 % errors stay inside the recovery tolerances for 5 s within options.Seconds and
 % no model-domain error occurs. On every options.IdentityStride-th start, the
-% cost-to-go identity V(f(x,kappa(x))) = V(x) - l(x) is checked.
-% This is a sampled certificate on the stated grid, not a proof for all states.
+% positive part of V(f(x,kappa(x))) - V(x) + l(x) is checked.
+% This is a sampled diagnostic on the stated grid, not a proof for all states.
     arguments
         options.OutputDirectory (1,1) string = ""
         options.Speeds (1,:) double = [8,15]
@@ -27,11 +27,11 @@ function summary = certifyRecoveryClf(options)
         cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',speed));h=cfg.controller.sampleTime;
         for curvature=options.Curvatures
             reference=nonlinearBicycleModel.cruise(cfg,curvature);
-            terminal=nonlinearBicycleModel.recoveryTerminal(cfg,curvature);
+            terminal=nonlinearBicycleModel.nominalTail(cfg,curvature);
             lane=struct('referenceCurve',struct('origin',[0;0],'heading',0,'curvature',curvature,'length',200));
             A=terminal.closedLoop;P=terminal.matrix;
             terminals(end+1,:)={speed,curvature,terminal.steeringOffset,terminal.spectralRadius, ...
-                norm(A.'*P*A-P+terminal.stageFactor^2)/norm(P),min(eig(P)),max(eig(P))}; %#ok<AGROW>
+                norm(A.'*P*A-P+2*terminal.stageFactor^2)/norm(P),min(eig(P)),max(eig(P))}; %#ok<AGROW>
             for lateral=options.Lateral
                 for heading=options.Headings
                     for extra=options.Extras
@@ -40,17 +40,17 @@ function summary = certifyRecoveryClf(options)
                         x=[position;pathHeading+reference.state(3)+heading;extra(1)*reference.state(4);extra(2);extra(3)];
                         identity=NaN;
                         if mod(count-1,options.IdentityStride)==0
-                            [value,~,~,converged]=nonlinearBicycleModel.recoveryValue(x,reference.input,lane,reference,terminal,cfg);
-                            u=nonlinearBicycleModel.recoveryInput(x,reference.input,lane,reference,cfg,terminal);
+                            [value,~,~,converged]=nonlinearBicycleModel.nominalValue(x,reference.input,lane,reference,terminal,cfg);
+                            u=nonlinearBicycleModel.nominalFeedback(x,reference.input,lane,reference,cfg,terminal);
                             stage=sum((terminal.stageFactor*nonlinearBicycleModel.error(x,lane,reference)).^2);
-                            next=nonlinearBicycleModel.recoveryValue(nonlinearBicycleModel.sample(x,u,cfg),u,lane,reference,terminal,cfg);
-                            identity=abs(next-(value-stage))/max(1,value);
+                            next=nonlinearBicycleModel.nominalValue(nonlinearBicycleModel.sample(x,u,cfg),u,lane,reference,terminal,cfg);
+                            identity=max(0,next-(value-stage))/max(1,value);
                             if ~converged,identity=Inf;end
                         end
                         u=reference.input;inside=0;recovered=NaN;failure="";peak=zeros(1,4);peak(2)=Inf;
                         for step=1:round(options.Seconds/h)
                             try
-                                u=nonlinearBicycleModel.recoveryInput(x,u,lane,reference,cfg,terminal);
+                                u=nonlinearBicycleModel.nominalFeedback(x,u,lane,reference,cfg,terminal);
                                 x=nonlinearBicycleModel.sample(x,u,cfg);
                             catch exception
                                 failure=string(exception.identifier);break;
@@ -71,17 +71,18 @@ function summary = certifyRecoveryClf(options)
         "maxLateralVelocity","maxYawRate","identityRelativeError"]);
     loops=cell2table(terminals,'VariableNames',["speed","curvature","steeringOffset","spectralRadius", ...
         "lyapunovRelativeResidual","minEigenvalueP","maxEigenvalueP"]);
-    passed=isfinite(starts.enteredToleranceAt) & starts.failure=="";checked=isfinite(starts.identityRelativeError);
+    passed=isfinite(starts.enteredToleranceAt) & starts.failure=="";checked=~isnan(starts.identityRelativeError);
     summary=struct('starts',height(starts),'passed',nnz(passed),'failures',nnz(starts.failure~=""), ...
-        'latestEntrySeconds',max(starts.enteredToleranceAt),'identityChecks',nnz(~isnan(starts.identityRelativeError)), ...
+        'latestEntrySeconds',max(starts.enteredToleranceAt),'identityChecks',nnz(checked), ...
+        'unreachedTailChecks',nnz(isinf(starts.identityRelativeError)), ...
         'maxIdentityRelativeError',max(starts.identityRelativeError(checked)),'loops',loops,'startTable',starts);
     if strlength(options.OutputDirectory)>0
         if ~isfolder(options.OutputDirectory),mkdir(options.OutputDirectory);end
-        writetable(starts,fullfile(options.OutputDirectory,'recovery-clf-starts.csv'));
-        writetable(loops,fullfile(options.OutputDirectory,'recovery-clf-loops.csv'));
+        writetable(starts,fullfile(options.OutputDirectory,'nominal-clf-starts.csv'));
+        writetable(loops,fullfile(options.OutputDirectory,'nominal-clf-loops.csv'));
     end
-    fprintf('Recovery CLF certificate: %d of %d starts enter and hold the tolerances (latest entry %.2f s), %d domain failures.\n', ...
+    fprintf('Nominal CLF sampled validation: %d of %d starts enter and hold the tolerances (latest entry %.2f s), %d domain failures.\n', ...
         summary.passed,summary.starts,summary.latestEntrySeconds,summary.failures);
-    fprintf('Cost-to-go identity on %d starts: max relative error %.2e.\n',summary.identityChecks,summary.maxIdentityRelativeError);
+    fprintf('Nominal decrease on %d starts: max relative error %.2e.\n',summary.identityChecks,summary.maxIdentityRelativeError);
     disp(loops);
 end

@@ -1,0 +1,5 @@
+ITERATION 1 slack=0.307776 flag=1 scale=2
+ITERATION 2 slack=1.10159 flag=1 scale=2
+ITERATION 3 slack=0.570774 flag=1 scale=2
+ITERATION 4 slack=0.425356 flag=1 scale=2
+ITERATION 5 slack=NaN flag=-2 scale=2

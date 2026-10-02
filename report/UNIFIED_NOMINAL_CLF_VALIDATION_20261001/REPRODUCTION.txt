@@ -1,0 +1,55 @@
+Unified nominal CLF: methods and artifact provenance
+
+The final campaign is the assessment/ campaign, not an exploratory prototype.
+Original run directory:
+/home/zai/.cache/collisionAvoidance/unified-clf-implementation-20261001/assessment
+
+1. Build optional native kernels from the committed MATLAB sources:
+   matlab -batch "addpath('scripts'); buildControllerKernels();"
+2. The exported campaign.m records the actual serial command sequence and
+   fixed source/output directories. Recreate its source tree using the files
+   in source-manifest.json, or point its source variable at this project commit
+   and select an empty output directory. Do not overwrite original results.
+3. Run campaign.m, then analyze.py, verifyReplay.py RAW_DIRECTORY, and
+   descentDiagnostic.py RAW_DIRECTORY. The original driver includes two
+   discarded warm-up calls per speed and fourteen deterministic scenarios.
+4. Run all tests from the repository root:
+   matlab -batch "results = runtests('tests'); assertSuccess(results)"
+   runTests.m is the exact result-export wrapper used for the final suite.
+5. Build the adjacent standalone LaTeX report with pdflatex. Its derived PDF
+   is exported with the external project commit record, not committed here.
+
+Data interpretation:
+Console-text exports trim trailing whitespace. Original logs remain in the
+cache and external export; numerical values and failure messages are preserved.
+- frame-results.csv exports every frame's state, input, objective, runtime and
+  actual-versus-modeled CLF change. The last frame has no following logged
+  current-state value, so its interframe change is not fabricated.
+- failed-replay-nodes.csv exports all 31 ODE45 samples per hold for the failed
+  scenario. Full fourteen-case result JSON and continuation MAT files remain
+  at the original paths in raw-manifest.json and have external export copies.
+- replay-verification.json independently recomputes all fourteen clearance
+  minima and sampled recovery dwell results using rectangle geometry.
+- initial full testing had one incorrect new test assertion; tests-initial.csv
+  and tests-initial-output.txt preserve that outcome. The corrected complete
+  suite is tests.csv and tests-output.txt: 617 passed, none failed/incomplete.
+- Full controller-call clocks exclude offline replay and do not inject the
+  measured compute delay into the simulated plant. Other workstation workloads
+  were active; the timing is not an isolated benchmark.
+
+Prototype diagnostics:
+prototype-manifest.json identifies actual exploratory files and source
+snapshots. They are preserved in the original cache and as external exports.
+They are not alternate controller modes in the delivered implementation.
+The force and relinearization diagnostics used the expanded-positive-slack
+variant frozen in validation/source; the exact-force-cone trial is force/source.
+The original scripts contain the paths used at execution time. To reproduce
+an exploratory result, use its matching snapshot rather than today's controller
+at the original working-directory path. Restored/ contains an earlier exploratory
+three-case run without a complete frozen snapshot; the final assessment campaign
+is the source-frozen evidence for the delivered controller.
+
+The function V_K is target independent and has a conditional regional decrease
+argument. Its RTI approximation is not a certified upper bound. Dense sampled
+collision checks, practical recovery, conic convergence and a nonlinear safety
+certificate are distinct statements. The report documents the remaining failure.

@@ -25,13 +25,13 @@ function cfg=localDefaults()
     % trustRadius scales RTI state/input corrections about each fresh rollout.
     cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
         'trustRadius',.5, ...
-        'recoveryHorizonSeconds',3,'clfDecay',.01);
+        'recoveryHorizonSeconds',3);
     % A target farther than encounterRangeMeters (body to body) carries no
     % collision risk. Its constant speed-rate and sideslip motion is assumed
     % only until a prediction first exceeds that range. Inf never ends it.
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
-    cfg.collision=struct('safetyMarginMeters',0.05,'encounterRangeMeters',30);
+    cfg.collision=struct('safetyMarginMeters',0.10,'encounterRangeMeters',30);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);
@@ -44,24 +44,22 @@ function cfg=localDefaults()
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
         'frontWheelSteeringAngleWeight',1,'brakingRatioWeight',1);
-    % Recovery CLF used when no target is within the encounter range: the
-    % cost-to-go of a path-guidance feedback (nonlinearBicycleModel.recoveryInput).
-    % Course guidance chi_d=-atan(e_y/D), D=max(minimumLookaheadMeters,
-    % lookaheadSeconds*referenceSpeed) [s, m]; courseGain [1/s]; yawRateGain [1/s];
-    % yaw-rate demand within lateralAccelerationFraction of mu*g; front lateral
-    % force within frontForceFraction of its capacity; speedGain [1/(m/s)] on the
-    % braking ratio, limited to +/-brakingRatioLimit. The CLF stage requires a
-    % decrease of decreaseFraction times the stage cost. A rollout ends once the
-    % terminal quadratic is at most stopValue, or after maximumSeconds [s].
-    cfg.recovery=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
+    % One nominal cost-to-go throughout the encounter and return to cruise.
+    % The feedback below defines the value function; it never supplies a
+    % fallback command. evaluationSeconds is a policy-evaluation horizon,
+    % not an arrival deadline or an additional optimization horizon.
+    % The tail solves A' P A - P = -2 Q, leaving a nonlinear decrease reserve.
+    % tailLevel reports whether a rollout ended near the local trim.
+    cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
-        'speedGain',.5,'brakingRatioLimit',.35,'decreaseFraction',.5,'stopValue',1e-3, ...
-        'maximumSeconds',120,'firstInputWeight',1e3);
+        'speedGain',.5,'brakingRatioLimit',.35,'decreaseFraction',.5,'tailLevel',1e-3, ...
+        'evaluationSeconds',120);
     % The two convex solves share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
         'feasibilityTolerance',1e-5,'constraintTolerance',1e-8, ...
-        'optimalityTolerance',1e-7,'lexicographicTieTolerance',1e-6);
+        'optimalityTolerance',1e-7,'lexicographicTieTolerance',1e-6, ...
+        'clfTieTolerance',1e-4);
     cfg.target=struct('defaultLength',4.8,'defaultWidth',1.9,'rearAxleDistance',1.6);
 end
 
@@ -88,10 +86,9 @@ function localValidate(cfg)
     if cfg.controller.horizonSteps>cfg.controller.maximumHorizonSteps
         localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
     end
-    for name=["integrationStep","terminalRadius","trustRadius","recoveryHorizonSeconds","clfDecay"]
+    for name=["integrationStep","terminalRadius","trustRadius","recoveryHorizonSeconds"]
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    if cfg.nonlinear.clfDecay>=1,localInvalid('CLF decay must lie in (0,1).');end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','nonnan','positive'});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters
@@ -127,15 +124,15 @@ function localValidate(cfg)
     for name=string(fieldnames(cfg.clf)).'
         validateattributes(cfg.clf.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    for name=string(fieldnames(cfg.recovery)).'
-        validateattributes(cfg.recovery.(name),{'double'},{'scalar','real','finite','positive'});
+    for name=string(fieldnames(cfg.nominalClf)).'
+        validateattributes(cfg.nominalClf.(name),{'double'},{'scalar','real','finite','positive'});
     end
     for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit","decreaseFraction"]
-        if cfg.recovery.(name)>=1,localInvalid('recovery.%s must lie in (0,1).',name);end
+        if cfg.nominalClf.(name)>=1,localInvalid('nominalClf.%s must lie in (0,1).',name);end
     end
     validateattributes(cfg.solver.maxIterations,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.solver.timeLimitSeconds,{'double'},{'scalar','real','positive'});
-    for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance"]
+    for name=["feasibilityTolerance","constraintTolerance","optimalityTolerance","clfTieTolerance"]
         validateattributes(cfg.solver.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.solver.lexicographicTieTolerance,{'double'},{'scalar','real','finite','nonnegative'});
