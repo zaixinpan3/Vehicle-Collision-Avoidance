@@ -1,4 +1,6 @@
 function runTimedFlowCampaign(sourceRoot,outputDirectory,frameCount)
+%runTimedFlowCampaign Follow each prescribed encounter through nominal recovery.
+% frameCount is a diagnostic observation cap, never a success deadline.
     cd(sourceRoot);addpath('controller','config','scripts');
     if ~isfolder(outputDirectory),mkdir(outputDirectory);end
     names=["headOn","acceleratingHeadOn","brakingLead","crossing","turningCrossing","curvedHeadOn","curvedCrossing"];
@@ -13,8 +15,8 @@ function runTimedFlowCampaign(sourceRoot,outputDirectory,frameCount)
             r=result.results;r=rmfield(r,{'trace','configuration'});r.speed=speed;
             summaries=[summaries,r]; %#ok<AGROW>
             fid=fopen(fullfile(outputDirectory,'summary.json'),'w');fprintf(fid,'%s\n',jsonencode(summaries));fclose(fid);
-            fprintf('RESULT %g %s holds=%d complete=%d gap=%.6g recovery=%d max=%.6g failure=%s\n', ...
-                speed,name,r.executedFrames,r.completed,r.minimumReplayClearanceMeters,r.recovery.recovered,r.maximumFrameSeconds,r.failure);
+            fprintf('RESULT %g %s holds=%d gap=%.6g recovery=%d max=%.6g failure=%s\n', ...
+                speed,name,r.executedFrames,r.minimumReplayClearanceMeters,r.recovery.recovered,r.maximumFrameSeconds,r.failure);
         end
     end
 end

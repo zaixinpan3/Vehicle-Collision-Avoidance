@@ -83,7 +83,13 @@ remains the algorithm definition.
 on the nonlinear value throughout the trust box.** Consequently zero modeled slack
 is not, by itself, a theorem of nonlinear or continuous-plant decrease. Independent
 ODE45 replay and evaluation of the same V on consecutive measured states quantify
-that gap. There is no nonlinear post-solve acceptance check. An exact inequality
+that gap. Within-hold relinearization now measures nonlinear prediction and
+first-successor value agreement; it is not a complete nonlinear safety check.
+An accurate result with positive CLF slack at the first-input trust boundary
+also continues the same two-stage iteration. Thus a numerical correction box
+does not become an unintended permanent restriction on nominal recovery.
+The best accurate complete pair from the current frame is retained.
+An exact inequality
 with zero slack implies asymptotic dissipation on an appropriate invariant domain;
 fixed numerical errors generally support practical convergence only.
 
@@ -141,8 +147,11 @@ physical braking bounds, safety rows, and endpoint constraints are unchanged.
 The better primary result is retained. An infeasible numerical correction box
 does not justify repeatedly shrinking it. Normal frames use two conic solves;
 fresh initialization and this bounded enlargement can add two primary solves.
+These are counts for one local model; within-hold refinement can rebuild
+that model and repeat both stages. The accuracy and stopping rules are in
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 There is no distance-based recovery anchor, separate recovery controller,
-post-solve nonlinear gate, or nominal-control fallback.
+or nominal-control fallback.
 
 The default optimization-node collision buffer is 0.10 m. The replay success
 criterion remains positive actual rectangle clearance, not a 0.10-m physical

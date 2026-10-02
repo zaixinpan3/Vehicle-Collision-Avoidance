@@ -9,6 +9,13 @@ classdef nominalRecoveryValidationTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function defaultRecoveryHasNoArbitraryMinimumDuration(testCase)
+            report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=12, ...
+                RecoveryDwellSeconds=.1);
+            testCase.verifyEqual(report.results.recovery.minimumTimeSeconds,0);
+            testCase.verifyTrue(report.results.recovery.recovered);
+            testCase.verifyLessThan(report.results.executedFrames,12);
+        end
         function recoveryRequiresMinimumTimeAndSustainedDwell(testCase)
             report=runNonlinearPredictiveSafetyValidation(Scenarios="recovery",Frames=12, ...
                 RecoveryDwellSeconds=.1,RecoveryMinimumSeconds=.2);

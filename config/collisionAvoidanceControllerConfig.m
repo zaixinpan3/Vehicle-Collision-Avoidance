@@ -24,7 +24,8 @@ function cfg=localDefaults()
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
     % trustRadius scales RTI state/input corrections about each fresh rollout.
     cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
-        'trustRadius',.5, ...
+        'trustRadius',.5,'maximumLinearizations',8,'predictionToleranceMeters',.01, ...
+        'statePredictionTolerance',.01,'clfPredictionTolerance',.01, ...
         'recoveryHorizonSeconds',3);
     % A target farther than encounterRangeMeters (body to body) carries no
     % collision risk. Its constant speed-rate and sideslip motion is assumed
@@ -86,9 +87,11 @@ function localValidate(cfg)
     if cfg.controller.horizonSteps>cfg.controller.maximumHorizonSteps
         localInvalid('horizonSteps cannot exceed maximumHorizonSteps.');
     end
-    for name=["integrationStep","terminalRadius","trustRadius","recoveryHorizonSeconds"]
+    for name=["integrationStep","terminalRadius","trustRadius","recoveryHorizonSeconds","predictionToleranceMeters", ...
+            "statePredictionTolerance","clfPredictionTolerance"]
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
     end
+    validateattributes(cfg.nonlinear.maximumLinearizations,{'double'},{'scalar','real','finite','integer','positive'});
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','nonnan','positive'});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters

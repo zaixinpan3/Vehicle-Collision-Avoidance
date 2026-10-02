@@ -1,0 +1,57 @@
+{
+  "baseCommit": "5692e1551241b568bcfb300093814373c674a412",
+  "studyDirectory": "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign",
+  "runtimePlatform": {
+    "Architecture": "x86_64",
+    "CPU(s)": "16",
+    "On-line CPU(s) list": "0-15",
+    "Model name": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "Thread(s) per core": "2",
+    "Core(s) per socket": "8",
+    "Socket(s)": "1",
+    "runtimeMeasurementScope": "MATLAB -singleCompThread; sequential scenario calls; controller timers exclude ODE45 replay and offline audits; host is not an isolated real-time platform."
+  },
+  "rawInputSha256": {
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed8-headOn.json": "a845b6072f8e1ccbe1faf72012c6b8f219fbe82a3deb52a248c0a1819c4d06ad",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed8-acceleratingHeadOn.json": "0edb8f6619f3b70b3305930363e8aa5b5ba82b4ddf8cc490a06c2940cf92a05a",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed8-brakingLead.json": "c3c9b2ad0a7a840fe28e2c28cc5eafdda46c65b483c18cab84a651b32ec737a4",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed8-crossing.json": "7528ee853b3420e5875e0b58839ad3ae6ac6bb8683d241c0b95a918e24af36ce",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed8-turningCrossing.json": "1e591c2312c2e0462b3b90c23ffdebfa775019e131d0310f73c2df6b36b370e8",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed8-curvedHeadOn.json": "965dfac511f5c13a2e40563f5c538b49e6c80f27a01d7abc520832813a99d7fa",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed8-curvedCrossing.json": "15fd525b128e1d040253104d7b755af3840aa47d8408defe09dc2b7548fdb53d",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed15-headOn.json": "e13732a91fd4cc29f2c21fe4dd05bd740bcc12e896a2b1caaf3fd76ebc41a6d4",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed15-acceleratingHeadOn.json": "19ce00d5319642cc03e61bbf8c8b4d9d444d0f4c308da884253420b2bd6a7c0f",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed15-brakingLead.json": "9c69098a32ee0cd684a2449537c98de2f5fea2c03b8203cdeb1b34ebd5db43d1",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed15-crossing.json": "8afbf1bc4907a2f04d836d8c3a29303a879f79867ab8dca7453f6092fa8f29c1",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed15-turningCrossing.json": "9fa584ea7f2dce758b64214a98b0baba7fcfa4345ef2121102759f1383b94f51",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed15-curvedHeadOn.json": "9d0d8a8de03a4f34e6125bab1fba5ff57fc24a77b74f08dfa053ff27b02973f3",
+    "/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign/speed15-curvedCrossing.json": "6f6c21edf7c7b85e253985af1dea808ec2fce698f4af6935da18fb6701342f1d"
+  },
+  "sourceSha256": {
+    "config/collisionAvoidanceControllerConfig.m": "9dcebea9f29178545e7bfedd60eb7c3cffa35155d71fb4592d172bcb8670b0eb",
+    "controller/solvePredictiveControl.m": "8391e2d40a584104f94fbbbeebecf61c8cf1c492b80b8ad31b21481ad054439c",
+    "controller/predictiveSafetyGeometry.m": "83be66e5ec0aa5522418de1ca5eb853818110f24df9c8a9c0ff6b3d246184c5a",
+    "controller/collisionAvoidanceController.m": "c69b9d0d22f9e1f025b5e3f4896ac4f7bd251a3f93410e2d6af2ef0c832595b1",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "dcc621a93972a8a3c160ed89ede714b4b8df70c41e76b8838a8a0548a52da278",
+    "scripts/runTimedFlowCampaign.m": "265f33b7dd33bd054e8d42677bf5fced253e53e999acd1597d50a7db4dd6d8b5",
+    "scripts/auditJointPredictiveSafety.py": "1134e3bfdffa8b478fe19a0a24580196f329fa744529e0b189adf17219b4af55",
+    "tests/twoStagePredictiveControlTest.m": "ca1230141ab6806916236bb50a5b1ebaf3cbd9ff171063902e4b250abc9d665b",
+    "tests/ordinaryDistanceDualTest.m": "42532054aa38ad646c08d7ec9819ef1ef9434ff431825072f3179e25e5d32d00",
+    "tests/nominalRecoveryValidationTest.m": "eed326af5fdcc86f4aa9ed92889f004e7cab435fbc86656b747dae375ee22628"
+  },
+  "testCounts": {
+    "distinct": 262,
+    "passed": 262,
+    "failed": 0
+  },
+  "commands": [
+    "matlab -singleCompThread -batch \"addpath('scripts'); buildControllerKernels;\"",
+    "matlab -singleCompThread -batch \"addpath('scripts'); runTimedFlowCampaign(pwd,'/home/zai/.cache/collisionAvoidance/relinearization-20261002/revised-campaign',1200);\"",
+    "Focused MATLAB runtests classes: clfNominalRecoveryTest, collisionAvoidanceControllerConfigTest, controllerKernelTest, controllerSourceBudgetTest, movingTargetFlowTest, nominalClfTest, nominalRecoveryValidationTest, nonlinearPredictiveSafetyTest, ordinaryDistanceDualTest, twoStagePredictiveControlTest",
+    "Continue speed15-curvedHeadOn from the saved 60 s state to a 75 s observation cap using runNonlinearPredictiveSafetyValidation with unchanged configuration; recovery confirms at 64.05 s. Original 60 s files retained under observed-60s/.",
+    "Replay the original crossing controller calls from 0 to 1.45 s with replayNewCrossing; inspect source with finalDiagnostics.",
+    "python /home/zai/.cache/collisionAvoidance/relinearization-20261002/summarize.py"
+  ],
+  "reproductionNotes": "Deterministic, perfect known target motion, no random disturbances, no road constraints, ODE45 RelTol 1e-11 / AbsTol 1e-12 and 31 samples per hold. The 1200-hold observation cap is not a convergence deadline; speed15-curvedHeadOn continues to 1500 allowed holds and stops at recovery after 1281 holds. It has repeated circular encounters, with baseline contacts near 1.6 and 56.2 s; the first nominal dwell is reported separately. Prototype campaigns in campaign/ and final-campaign/ were interrupted. The subsequent validated-campaign/ completed with ten recovered cases, two interrupted cases and two unrecovered sixty-second traces; it exposed over-damping and stopping at active input correction bounds. Revised-campaign/ contains the final implementation results.",
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3"
+}

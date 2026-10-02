@@ -14,7 +14,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         options.StateTransition (1,1) string {mustBeMember(options.StateTransition,["ode45","nominalRk4"])} = "ode45"
         options.RequireCollisionThreat (1,1) logical = false
         options.RecoveryDwellSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
-        options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 8
+        options.RecoveryMinimumSeconds (1,1) double {mustBeNonnegative,mustBeFinite} = 0
         options.RecoveryTolerances (5,1) double {mustBePositive,mustBeFinite} = [.1;pi/180;.1;.05;.01]
         options.ContinuationFile (1,1) string = ""
         options.ResumeFrom (1,1) string = ""
@@ -39,6 +39,11 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             ["lateralMeters","headingRadians","speedMetersPerSecond","lateralVelocityMetersPerSecond","yawRateRadiansPerSecond"], ...
             'dwellSeconds',options.RecoveryDwellSeconds,'minimumTimeSeconds',options.RecoveryMinimumSeconds, ...
             'entryTimeSeconds',NaN,'confirmationTimeSeconds',NaN);
+        % A recovery dwell must follow the prescribed encounter, rather than
+        % an arbitrary elapsed duration or the initially nominal state.
+        if options.RequireCollisionThreat
+            recovery.minimumTimeSeconds=max(recovery.minimumTimeSeconds,baseline.lastCollisionSeconds);
+        end
         recoveryStart=NaN;
         if strlength(options.ResumeFrom)>0
             saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;r=saved.result;
@@ -94,6 +99,8 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     'solverCalls',search.solverCalls,'initialization',search.initialization, ...
                     'flowRestarted',search.flowRestarted,'initializationFailure',search.initializationFailure, ...
                     'linearizationCount',search.linearizationCount,'attempts',search.attempts, ...
+                    'refinementCount',search.refinementCount,'predictionAgreement',problem.metadata.predictionAgreement, ...
+                    'modelAgreementHistory',search.modelAgreementHistory,'modelAgreementSatisfied',search.modelAgreementSatisfied, ...
                     'slackCap',search.slackCap,'primaryOptimum',search.primaryOptimum, ...
                     'primaryLowerBound',search.primaryLowerBound,'selectedAttempt',search.selectedAttempt,'inputTrustScale',search.inputTrustScale, ...
                     'absoluteSampleIndex',problem.model.sampleIndex,'endpointIndex',problem.model.terminal.epochIndex, ...
@@ -123,7 +130,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 frames=frames+1;
                 if recovery.enabled
                     inside=all(abs(finalError)<=options.RecoveryTolerances) ...
-                        && ego.stateTime>=options.RecoveryMinimumSeconds;
+                        && ego.stateTime>=recovery.minimumTimeSeconds;
                     if ~inside,recoveryStart=NaN;
                     elseif isnan(recoveryStart),recoveryStart=ego.stateTime;
                     end

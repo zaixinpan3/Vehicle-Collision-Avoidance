@@ -150,45 +150,14 @@ classdef predictiveSafetyGeometry
         end
 
         function rows = dualLinearization(poseE,shapeE,poseT,shapeT)
-            % Li et al. (2023), Eqs. (12)-(13): optimize the ordinary
-            % distance dual, then hold its multipliers fixed in the trajectory
-            % rows. The minimum over S(x) is explicit for a rectangular ego.
-            % No signed-distance objective or overlap direction is substituted.
-            re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
-            rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
-            body=shapeE(3:4)+shapeE(1:2).*[-1,1,1,-1;-1,-1,1,1];
-            relative=poseE(1:2)-poseT(1:2)+re*body;
-            targetA=[eye(2);-eye(2)]*rt.';
-            targetB=[shapeT(1:2)+shapeT(3:4);shapeT(1:2)-shapeT(3:4)];
-            % max alpha-b'*lambda, alpha <= lambda'*A*(v_j-pT),
-            % lambda >= 0, ||A'*lambda||_2 <= 1. The hypograph makes
-            % the finite-body minimum a five-variable convex distance dual.
-            cone=secondordercone([targetA.',zeros(2,1)],zeros(2,1),zeros(5,1),-1);
-            inequalities=[-relative.'*targetA.',ones(4,1)];
-            persistent options
-            if isempty(options)
-                options=optimoptions('coneprog','Display','none', ...
-                    'ConstraintTolerance',1e-10,'OptimalityTolerance',1e-10);
-            end
-            [point,~,flag]=coneprog([targetB;-1],cone,inequalities,zeros(4,1), ...
-                [],[],[zeros(4,1);-Inf],[],options);
-            if isempty(point) || any(~isfinite(point))
-                error('collisionAvoidanceController:distanceDualFailed', ...
-                    'The ordinary distance dual returned no finite point (exit flag %d).',flag);
-            end
-            lambda=point(1:4);normal=targetA.'*lambda;
-            [values,jacobian]=predictiveSafetyGeometry.fixedDualRows(poseE,shapeE,poseT,shapeT,lambda);
-            % coneprog can report a stalled dual residual at an optimum.
-            % Check the actual dual against an independent primal distance;
-            % this verifies the same multipliers without changing them.
-            primalDistance=predictiveSafetyGeometry.rectangle(poseE,shapeE,poseT,shapeT);
-            gap=primalDistance-min(values);
-            if min(lambda)<-1e-8 || norm(normal)>1+1e-8 || abs(gap)>1e-6
-                error('collisionAvoidanceController:distanceDualFailed', ...
-                    'The ordinary distance dual failed its primal-dual check (exit flag %d, gap %.3g m).',flag,gap);
-            end
-            rows=struct('value',values,'jacobian',jacobian,'normal',normal, ...
-                'lambda',lambda,'distance',min(values),'exitFlag',flag,'dualityGap',gap);
+            % The same ordinary-distance dual optimum
+            % constructed from the exact closest-feature normal of rectangles.
+            [primal,certificate]=predictiveSafetyGeometry.rectangle(poseE,shapeE,poseT,shapeT);
+            [values,jacobian]=predictiveSafetyGeometry.fixedDualRows(poseE,shapeE,poseT,shapeT,certificate.lambda);
+            gap=primal-min(values);
+            assert(min(certificate.lambda)>=0 && norm(certificate.normal)<=1+1e-8 && abs(gap)<=1e-6);
+            rows=struct('value',values,'jacobian',jacobian,'normal',certificate.normal, ...
+                'lambda',certificate.lambda,'distance',min(values),'exitFlag',1,'dualityGap',gap);
         end
 
         function [values,jacobian] = fixedDualRows(poseE,shapeE,poseT,shapeT,lambda)

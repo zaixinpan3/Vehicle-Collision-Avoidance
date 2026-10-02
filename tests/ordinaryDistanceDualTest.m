@@ -23,6 +23,14 @@ classdef ordinaryDistanceDualTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(norm(rows.normal),1+1e-8);
             testCase.verifyLessThanOrEqual(abs(rows.dualityGap),1e-6);
         end
+        function distantRecoveryGeometryDoesNotDependOnConicPrecision(testCase)
+            shape=[2.4;.95;0;0];pose=[100.2370617530728;-1.0322098338241903;-.05532038315761686];
+            target=[67.769375;0;0];
+            rows=predictiveSafetyGeometry.dualLinearization(pose,shape,target,shape);
+            testCase.verifyEqual(rows.distance,27.633427417605073,AbsTol=1e-11);
+            testCase.verifyLessThanOrEqual(abs(rows.dualityGap),1e-11);
+            testCase.verifyGreaterThanOrEqual(rows.lambda,zeros(4,1));
+        end
         function fixedMultiplierRowsRespectFullEgoSize(testCase)
             shape=[2;1;0;0];target=[10;0;0];lambda=[0;0;1;0];
             values=predictiveSafetyGeometry.fixedDualRows([0;0;0],shape,target,shape,lambda);

@@ -1,8 +1,142 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl PCBF restoration, then one CLF solve on the chosen model.
-% A shifted model whose primary optimum exceeds the fixed stage-zero lower
-% bound gets one fresh flow initialization. No nonlinear acceptance test or
-% executable backup is used. Finite solver vectors remain executable results.
+%solvePredictiveControl Refine one PCBF/CLF controller within the current hold.
+% Each issued iterate completes both objectives and meets model accuracy.
+% A positive CLF slack at the numerical input boundary triggers another round.
+    if nargin<3,timer=tic;end
+    cfg=model.cfg;solution=[];allAttempts=struct([]);allStages=struct([]);history=struct([]);
+    restarted=false;selected=0;initialFailure="";selectedRound=0;
+    model.inputTrustScale=1;
+    if isstruct(previousState) && isfield(previousState,'linearizationTrustScale')
+        model.inputTrustScale=previousState.linearizationTrustScale;
+    end
+    for iteration=1:cfg.nonlinear.maximumLinearizations
+        model.allowFlowRestart=~restarted;
+        [candidate,search,trialModel]=localRound(model,previousState,timer);
+        offset=numel(allAttempts);allAttempts=[allAttempts,search.attempts]; %#ok<AGROW>
+        allStages=[allStages,search.stages]; %#ok<AGROW>
+        restarted=restarted || search.flowRestarted;
+        if strlength(search.initializationFailure)>0,initialFailure=search.initializationFailure;end
+        if isempty(candidate),break;end
+        wall=tic;[agreement,rollout,valid]=localPredictionAgreement(candidate,trialModel);
+        agreement.seconds=toc(wall);agreement.stepFraction=1;
+        agreement.trustBoundaryRefinement=agreement.ratio<=1 ...
+            && candidate.clfSlack>cfg.solver.feasibilityTolerance*max(1,candidate.clfInitialValue) ...
+            && agreement.firstInputTrustActivity>=1-1e-3;
+        history=[history,agreement]; %#ok<AGROW>
+        if agreement.ratio<=1
+            candidate.predictionAgreement=agreement;
+            % Retain the best accurate two-stage iterate from this frame.
+            % This is optimization bookkeeping, not a previous-plan policy.
+            if isempty(solution) || localBetterIterate(candidate,solution,cfg)
+                solution=candidate;acceptedModel=trialModel;acceptedSearch=search;
+                selected=offset+search.selectedAttempt;selectedRound=iteration;
+                acceptedModel.nextTrustScale=min(1,trialModel.inputTrustScale ...
+                    *min(1.5,max(1,.8/sqrt(max(agreement.ratio,eps)))));
+            end
+            if ~agreement.trustBoundaryRefinement,break;end
+        end
+        % The full nonlinear rollout closes the dynamics defect at the new
+        % anchor. Damping an inaccurate but evaluable iterate can keep its
+        % endpoint outside the tiny terminal core and force repeated expansion.
+        model=trialModel;
+        if ~valid
+            anchor=trialModel.linearization;fraction=.5;
+            for backtrack=1:9
+                inputs=anchor.inputs+fraction*(candidate.inputs-anchor.inputs);
+                [rollout,valid]=localRollout(inputs,trialModel);
+                if valid,break;end
+                fraction=fraction/2;
+            end
+            history(end).stepFraction=fraction;
+        end
+        if valid
+            model.iterationAnchor=rollout;
+            model.terminal=terminalContinuation.fit(model.terminal, ...
+                [rollout.states(:,end);rollout.inputs(:,end)],model.sampleIndex+size(rollout.inputs,2));
+        else
+            model.iterationAnchor=trialModel.linearization;
+        end
+        if agreement.ratio>1
+            fraction=min(.8,.8/sqrt(agreement.ratio));
+            if ~isfinite(fraction),fraction=.1;end
+            model.inputTrustScale=max(1/1024,model.inputTrustScale*max(fraction,.1));
+        end
+        if toc(timer)>=cfg.solver.timeLimitSeconds,break;end
+    end
+    if ~isempty(solution)
+        model=acceptedModel;search=acceptedSearch;search.terminationReason="twoStagesModelAgreement";
+    elseif ~isempty(history)
+        search.terminationReason="linearizationAccuracyNotReached";
+    end
+    search.attempts=allAttempts;search.stages=allStages;search.selectedAttempt=selected;
+    search.linearizationCount=numel(allAttempts);search.solverCalls=numel(allStages);
+    search.flowRestarted=restarted;search.initializationFailure=initialFailure;
+    search.refinementCount=numel(history);search.selectedRefinement=selectedRound;search.modelAgreementHistory=history;
+    search.modelAgreementSatisfied=~isempty(solution);search.elapsedSeconds=toc(timer);
+    search.returned=~isempty(solution);
+end
+
+function better=localBetterIterate(candidate,retained,cfg)
+    tie=cfg.solver.lexicographicTieTolerance;
+    better=candidate.safety<retained.safety-tie ...
+        || (candidate.safety<=retained.safety+tie ...
+        && candidate.predictionAgreement.actualClfSlack<retained.predictionAgreement.actualClfSlack);
+end
+
+function [agreement,rollout,valid]=localPredictionAgreement(candidate,model)
+    cfg=model.cfg;[rollout,valid]=localRollout(candidate.inputs,model);
+    poseError=Inf;stateError=Inf;clfError=Inf;fullPoseError=Inf;actualSlack=Inf;
+    poseCount=min(size(candidate.states,2),candidate.encounterExit+1);
+    if valid
+        [poseError,stateError,fullPoseError]=localTrajectoryError(candidate.states,rollout.states,cfg,poseCount);
+        terminal=nonlinearBicycleModel.nominalTail(cfg,model.nominalReference.curvature);
+        actual=nonlinearBicycleModel.nominalValue(rollout.states(:,2),candidate.inputs(:,1), ...
+            model.lane,model.nominalReference,terminal,cfg);
+        clfError=abs(actual-candidate.clfNextValue)/max(1,candidate.clfInitialValue);
+        actualSlack=max(0,actual-candidate.clfInitialValue+candidate.clfRequiredDecrease);
+    end
+    ratio=max([poseError/cfg.nonlinear.predictionToleranceMeters, ...
+        stateError/cfg.nonlinear.statePredictionTolerance,clfError/cfg.nonlinear.clfPredictionTolerance]);
+    agreement=struct('poseErrorMeters',poseError,'fullPoseErrorMeters',fullPoseError, ...
+        'poseConstraintNodeCount',poseCount,'scaledStateError',stateError, ...
+        'scaledClfError',clfError,'ratio',ratio,'inputTrustScale',model.inputTrustScale, ...
+        'actualClfSlack',actualSlack,'firstInputTrustActivity', ...
+        max(abs(candidate.inputs(:,1)-model.linearization.inputs(:,1)) ...
+        ./(model.inputTrustScale*cfg.nonlinear.trustRadius*[.15;.25])), ...
+        'seconds',0,'stepFraction',1);
+end
+
+function [poseError,stateError,fullPoseError]=localTrajectoryError(affine,nonlinear,cfg,poseCount)
+    reach=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset);
+    displacement=vecnorm(affine(1:2,:)-nonlinear(1:2,:));
+    rotation=abs(affine(3,:)-nonlinear(3,:));
+    bodyError=displacement+reach*rotation;fullPoseError=max(bodyError);
+    % Free endpoint pose and post-encounter positions impose no position
+    % constraint. Preserve accuracy where pose enters the actual problem.
+    poseError=max(bodyError(1:poseCount));
+    stateError=max(abs(affine(4:6,:)-nonlinear(4:6,:))./[5;3;1.5],[],'all');
+end
+
+function [rollout,valid]=localRollout(inputs,model)
+    states=zeros(6,size(inputs,2)+1);states(:,1)=model.initialState;valid=true;
+    try
+        for index=1:size(inputs,2)
+            states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),model.cfg);
+        end
+    catch exception
+        domainErrors=["collisionAvoidanceController:nonlinearDomain", ...
+            "collisionAvoidanceController:invalidTireOperatingPoint", ...
+            "collisionAvoidanceController:singularTireLinearization"];
+        if ~any(string(exception.identifier)==domainErrors),rethrow(exception);end
+        valid=false;
+    end
+    valid=valid && all(isfinite(states),'all');
+    rollout=struct('inputs',inputs,'states',states);
+end
+
+function [solution,search,model] = localRound(model,previousState,timer)
+%localRound Restore one affine PCBF problem, then solve its CLF objective.
+% A finite candidate is returned to the outer model-agreement iteration.
     if nargin<3,timer=tic;end
     wall=tic;[anchor,source,failure]=localInitialization(model,previousState);
     initializationSeconds=toc(wall);
@@ -15,7 +149,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         if expanded,selected=numel(attempts);end
     end
     needsRestoration=isempty(point) || search.primaryOptimum>problem.primaryLowerBound+model.cfg.solver.feasibilityTolerance;
-    if source=="shiftedInputRollout" && needsRestoration && toc(timer)<model.cfg.solver.timeLimitSeconds
+    if any(source==["shiftedInputRollout","sameFrameRollout"]) && needsRestoration && model.allowFlowRestart && toc(timer)<model.cfg.solver.timeLimitSeconds
         reason=search.terminationReason;
         if ~isempty(point),reason="positiveRestorablePcbfSlack";end
         wall=tic;freshAnchor=localFlowSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
@@ -38,7 +172,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
     stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
     % A failed CLF solve can still use the one available fresh initialization.
-    if isempty(solution) && search.initialization=="shiftedInputRollout" && ~restarted ...
+    if isempty(solution) && any(search.initialization==["shiftedInputRollout","sameFrameRollout"]) && ~restarted && model.allowFlowRestart ...
             && search.terminationReason=="clfNoNumericalResult" && toc(timer)<model.cfg.solver.timeLimitSeconds
         failure=search.terminationReason;wall=tic;anchor=localFlowSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
         source="movingTargetFlow";if isempty(model.target),source="laneFeedbackRollout";end
@@ -62,7 +196,7 @@ function [point,problem,search,model,extra,expanded]=localExpandPrimary(point,pr
     % correction box. Reuse the fresh flow and allow one bounded enlargement.
     % State trust, actuator bounds, safety rows and terminal constraints stay.
     extra=struct([]);expanded=false;
-    infeasible=isempty(point) && ~isempty(search.stages) && search.stages(end).exitFlag==-2;
+    infeasible=isempty(point) && ~isempty(search.stages) && any(search.stages(end).exitFlag==[-2,-7]);
     if infeasible && model.inputTrustScale<2 && toc(timer)<model.cfg.solver.timeLimitSeconds
         widerModel=model;widerModel.inputTrustScale=2;
         [widerPoint,widerProblem,widerSearch,widerModel]=localPrimary(anchor,widerModel,search.initialization,timer);
@@ -101,7 +235,7 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
         problem.lower(1:primaryCount),problem.upper(1:primaryCount),options);
     search.solverCalls=1;
     search.stages(1)=struct('objective',"pcbfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN);
-    if isempty(point) || any(~isfinite(point))
+    if isempty(point) || any(~isfinite(point)) || flag<=0
         point=[];search.terminationReason="pcbfNoNumericalResult";return;
     end
     search.primaryOptimum=sum(max(0,point(problem.slackIndices)));
@@ -128,7 +262,7 @@ function [solution,search,model]=localSecondary(point,problem,anchor,model,searc
         problem.equal,problem.rhs,problem.lower,problem.upper,options);
     search.solverCalls=2;
     search.stages(2)=struct('objective',"clfSlack",'exitFlag',flag,'seconds',toc(wall),'value',NaN);
-    if isempty(second) || any(~isfinite(second)),search.terminationReason="clfNoNumericalResult";return;end
+    if isempty(second) || any(~isfinite(second)) || flag==-2,search.terminationReason="clfNoNumericalResult";return;end
     inputs=anchor.inputs+reshape(second(problem.inputIndices),size(anchor.inputs));
     states=anchor.states+reshape(second(problem.stateIndices),size(anchor.states));
     slacks=max(0,second(problem.slackIndices));rho=problem.clfScale*max(0,second(problem.clfIndex));
@@ -156,6 +290,9 @@ end
 
 function [anchor,source,failure]=localInitialization(model,previous)
     cfg=model.cfg;
+    if isfield(model,'iterationAnchor')
+        anchor=model.iterationAnchor;source="sameFrameRollout";failure="";return;
+    end
     count=min(cfg.controller.maximumHorizonSteps,cfg.controller.horizonSteps ...
         +ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime));
     source="movingTargetFlow";failure="";

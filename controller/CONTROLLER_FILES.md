@@ -8,28 +8,35 @@ and its affine prediction scope.
 | --- | --- |
 | `collisionAvoidanceController.m` | Fixed target epoch, input memory, solver orchestration, affine-result metadata and first input |
 | `readControllerInputs.m` | Ego, one target and given-path normalization |
-| `solvePredictiveControl.m` | Roll out shifted inputs, restore PCBF feasibility with one flow refresh and bounded numerical expansion, then optimize the single nominal CLF |
+| `solvePredictiveControl.m` | Refine PCBF/CLF pairs within the hold, adapt input trust from nonlinear prediction error, and restore with one flow refresh |
 | `terminalContinuation.m` | Augmented free-pose endpoint core, construction bounds and anchor-based terminal geometry |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single nominal cost-to-go CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target flow, timed Gaussian and transported-flow guidance, ordinary distance-dual optimization and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target flow, timed Gaussian and transported-flow guidance, exact ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
-There is no nonlinear candidate replay or correction in the online solve and
-no stored executable witness. Previous inputs are rolled out from the measured
-state to initialize the next pair of optimizations. The flow retry rebuilds the
-entire local model and shares the frame budget. Positive PCBF slack is reported as relaxation.
-Road boundaries are excluded, while the original given path remains the CLF
-reference. Terminal feedback constructs the initialization/core geometry; it
-is not a separate runtime fallback controller.
+Each completed PCBF/CLF pair is rolled through the nonlinear model to measure
+prediction agreement. Its full evaluable rollout becomes the next search
+anchor; the entire local model is rebuilt before another pair of solves.
+An accurate iterate with positive CLF slack at the input correction boundary
+also refines, so that an artificial local box does not prevent recovery.
+Only an accurate completed second-stage result can supply the input. The
+best such iterate from the current frame survives later search failure. There
+is no stored executable witness or alternate controller. Flow is an initializer,
+not a safety certificate. Positive PCBF slack still denotes relaxation.
+Road boundaries remain excluded, and the original given path defines the
+single CLF. Terminal feedback is used only for construction.
 
 MATLAB Optimization Toolbox and Control System Toolbox are required.
 Optional MATLAB Coder kernels are built outside the core by
 `../scripts/buildControllerKernels.m`; interpreted MATLAB remains available.
 Generated native binaries and `solver/` dependencies are not source artifacts
 of this change. Kernel equivalence has dedicated tests. The retired signed
-collision-direction kernel is not used; distance duals run through `coneprog`.
+collision-direction kernel is not used. Ordinary-distance dual multipliers
+come from the exact closest-feature normal; trajectory problems use `coneprog`.
+Rebuild kernels after changing the configuration structure passed to the
+nominal-value MEX.
 
 `ordinaryDistanceDualTest` compares the optimized ordinary dual with geometric
 rectangle distance, checks full ego size, fixed-multiplier yaw derivatives,
@@ -38,8 +45,9 @@ zero multipliers and translation invariance. Overlap has no imposed direction.
 `twoStagePredictiveControlTest` checks both objectives, the same CLF at all
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
-positive-slack reporting, direct execution of finite solver results, and bounded
-restoration without a backup. `clfNominalRecoveryTest` checks target-free
+positive-slack reporting, same-frame rebuilding of both objectives, nonlinear
+prediction accuracy, further CLF descent after the first accurate iterate,
+and rejection when no accurate pair exists within the budget. `clfNominalRecoveryTest` checks target-free
 nonlinear value decrease without requiring the optimizer to issue the nominal
 construction feedback. `nominalClfTest` checks the trim, strict local Lyapunov
 tail, fixed evaluation horizon, input memory, sampled large-state convergence
