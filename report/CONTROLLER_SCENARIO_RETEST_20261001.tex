@@ -1,0 +1,141 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,xurl,hyperref}
+\usepackage[T1]{fontenc}
+\setlength{\emergencystretch}{3em}
+\title{Independent Scenario Retest of the Current Collision-Avoidance Controller}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 1, 2026}
+\begin{document}
+\maketitle
+\section{Outcome and scope}
+This is a fresh rerun of the committed controller, without algorithm or
+configuration edits. Tested commit: \path{9de49299a7c4f7d6b05e6a0dea48453fb7877a5a}.
+All fourteen ideal given-path cruise baselines collide from initially separated
+states. The current controller produces 0 collision cases and
+0 interrupted cases in 10127 executed holds. Nominal recovery is
+confirmed in 12 of fourteen cases. Recovered cases enter and hold the
+tolerances by 14.15--46.20~s, including a five-second dwell.
+
+\textbf{Design discrepancy.} During this retest the user reiterated that the
+controller must always use one CLF. The tested implementation does not meet
+that requirement: \path{controller/solvePredictiveControl.m}, lines 311--318,
+uses \texttt{laneQuadratic} while collision rows are active and substitutes
+\texttt{recoveryCostToGo} when \texttt{departure==0}. It also changes the anchor
+and adds a third anchor-deviation solve in the latter branch. One active CLF
+constraint per frame is not the same as one unchanged CLF definition. These
+results characterize the committed branch-dependent implementation; they do
+not validate the requested unified-CLF design. No correction of that design
+was included in this test-only task.
+
+\section{Protocol}
+Seven deterministic threat fixtures are run sequentially at 8 and 15~m/s,
+using 50-ms holds and primary horizons of 8 and 16 steps respectively, with
+60 completion steps. The default optimization-node safety buffer is 0.05~m;
+road boundaries are disabled. Target motion is known and observations are
+exact, without noise or delay. Plant advancement uses independent ODE45 with
+relative/absolute tolerances $10^{-11}/10^{-12}$. Rectangle gaps are measured
+at 31 points per hold (1.667~ms spacing). This is sampled simulation evidence,
+not a proof of continuous-time clearance or delayed real-time execution.
+
+Each case runs until recovery or an 80-s observation cap. Recovery requires
+five continuous seconds of sampled errors within 0.1~m lateral error,
+$1^\circ$ heading error, 0.1~m/s longitudinal speed error, 0.05~m/s lateral
+velocity error and 0.01~rad/s yaw-rate error, beginning no earlier than 8~s.
+Completing 80~s alone is not recovery. Positive measured body clearance is the
+collision criterion; the 5-cm node buffer is not imposed as a separate
+intersample pass requirement.
+
+Runtime is wall time around the complete controller call, including input
+handling, initialization, model/constraint construction and every optimization
+stage. Offline ODE replay, geometric audit, serialization and two preparatory
+warm-ups per speed are excluded. Scenario first calls are included. MATLAB
+R2026a ran with \texttt{-singleCompThread} on an AMD Ryzen 7 7800X3D. Another
+project computation was present on the machine; these are measured runtimes
+under shared load, not isolated-hardware benchmarks. Runtime was not inserted
+as a plant actuation delay.
+
+\section{Per-scenario results}
+\begin{center}\small
+\begin{tabular}{rlrrrrr}
+\toprule
+Speed & Scenario & End (s) & Min gap (m) & Recovery (s) & Median (ms) & Max (ms)\\
+\midrule
+8 & headOn & 18.05 & 0.6032 & 18.05 & 118.1 & 187.1 \\
+8 & acceleratingHeadOn & 17.40 & 0.4297 & 17.40 & 118.0 & 175.6 \\
+8 & brakingLead & 33.45 & 1.0618 & 33.45 & 97.8 & 373.1 \\
+8 & crossing & 80.00 & 0.7418 & --- & 89.7 & 314.9 \\
+8 & turningCrossing & 40.40 & 0.4401 & 40.40 & 109.4 & 233.4 \\
+8 & curvedHeadOn & 18.00 & 0.7066 & 18.00 & 125.3 & 200.1 \\
+8 & curvedCrossing & 46.20 & 0.5889 & 46.20 & 95.6 & 284.7 \\
+15 & headOn & 14.50 & 0.0355 & 14.50 & 127.7 & 166.4 \\
+15 & acceleratingHeadOn & 14.15 & 0.0314 & 14.15 & 128.9 & 178.3 \\
+15 & brakingLead & 45.25 & 0.7095 & 45.25 & 96.5 & 571.3 \\
+15 & crossing & 80.00 & 0.4091 & --- & 115.0 & 382.2 \\
+15 & turningCrossing & 39.20 & 0.1281 & 39.20 & 144.9 & 234.2 \\
+15 & curvedHeadOn & 15.45 & 0.8445 & 15.45 & 150.7 & 250.8 \\
+15 & curvedCrossing & 44.30 & 0.1513 & 44.30 & 124.0 & 345.3 \\
+\bottomrule
+\end{tabular}
+\end{center}
+A dash means no confirmed recovery by the observation limit. Every recovery
+time includes the full five-second dwell.
+
+At 8~m/s, crossing ends with lateral error -621.03~m, body clearance 2.42~m and 0 cost-to-go-CLF frames. The observed trajectory does not return to nominal cruise within 80~s.
+
+At 15~m/s, crossing ends with lateral error -629.01~m, body clearance 3.63~m and 0 cost-to-go-CLF frames. The observed trajectory does not return to nominal cruise within 80~s.
+
+\section{Controller runtime and numerical outcomes}
+Across all 10127 holds, the median full-call runtime is 107.575~ms,
+the 95th percentile is 181.124~ms and the maximum is 571.328~ms.
+5909 holds (58.3\%) exceed the user's 100-ms target. Thus the
+current measured implementation does not meet that target.
+The percentile uses linear interpolation between sorted observations.
+
+The slowest frame is brakingLead at 15~m/s and simulation time 0.20~s.
+Its recorded breakdown is:
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Component & Time (ms) & Share (\%)\\
+\midrule
+Initialization & 0.764 & 0.1 \\
+Problem formulation & 12.204 & 2.1 \\
+PCBF solve & 29.467 & 5.2 \\
+CLF solve & 527.032 & 92.2 \\
+Anchor-deviation solve & 0.000 & 0.0 \\
+Other controller work & 1.861 & 0.3 \\
+\bottomrule
+\end{tabular}
+\end{center}
+The slowest frame has solver exit flags [1, -7], in stage order.
+There are 2 flow reinitializations and 362 frames with at
+least one nonpositive solver exit flag. Finite returned vectors are executed
+under the current controller contract; a nonpositive flag is not counted as
+an empty-result interruption. Per-stage exit flags and timings are retained
+in the data bundle. This retest adds no online acceptance checks.
+
+On the cost-to-go branch, 3452 of 3452 frames have CLF slack within the
+scaled numerical tolerance $10^{-5}\max(1,V)$; 3433 of 3433 consecutive
+same-branch ODE-plant pairs meet the prescribed decrease within
+$10^{-6}\max(1,V)$. This branch-specific observation cannot establish one
+common CLF across branch changes.
+
+\section{Verification and reproducibility}
+The independent Python geometry recomputation agrees with the MATLAB minimum
+clearance in every case to within $10^{-8}$~m; recovery dwell was independently
+recomputed from the recorded errors. The campaign shell returned status 143 after the completion marker and all
+fourteen JSON/MAT result pairs plus the warm-up export were written; its
+termination cause was not established. Results and completeness were verified
+from the saved artifacts, without claiming a zero process exit status.
+Frozen MATLAB, scenario and native-kernel
+hashes identify the tested implementation. No new controller changes were
+made, and no historical unit-test count is claimed as a test run in this task.
+
+Data, complete frame summaries, configurations, timing environment and methods:
+\path{report/CONTROLLER_SCENARIO_RETEST_20261001/}.
+The manifest records the original large JSON/MAT traces in the cache and the
+exported report artifacts. Native dependencies, generated report PDFs, raw
+large traces and unrelated working-tree changes are excluded from the project
+commit. The reproduction file gives the exact campaign and analysis commands.
+\end{document}

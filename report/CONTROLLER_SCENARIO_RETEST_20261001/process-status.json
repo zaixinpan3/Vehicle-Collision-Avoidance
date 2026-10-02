@@ -1,0 +1,6 @@
+{
+  "campaignShellExitCode": 143,
+  "completionMarkerPresent": true,
+  "caseCount": 14,
+  "interpretation": "The tool reported exit status 143 after the completion marker and all 14 result files plus warmup.json were written. Cause of process termination was not established; no successful zero exit status is claimed."
+}

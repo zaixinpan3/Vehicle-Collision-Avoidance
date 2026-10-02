@@ -1,0 +1,23 @@
+{
+  "testedCommit": "9de49299a7c4f7d6b05e6a0dea48453fb7877a5a",
+  "createdAt": "2026-10-01T20:38:51.335859-05:00",
+  "files": {
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+    "controller/collisionAvoidanceController.m": "f5ae0f5d9154682350bfa2352345b61498a013afb37cb7060860a4fbc55b73b8",
+    "controller/predictiveSafetyGeometry.m": "45f3bbf8430b04aa2aa01207e0d0be39f85017e79918d051e32c9636ea0d1d92",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/terminalContinuation.m": "4e8c58764b4865c686b98fa85d751c8f2eaf3be4632013916583c3ac97a43b2e",
+    "controller/nonlinearBicycleModel.m": "f5afa71d3c22d5029e1fc74b87d321fc1a69568453ca4016dc35c1582cfb83a6",
+    "controller/solvePredictiveControl.m": "f340c97886898499b058954c0aa2fe949b2ce32a65629746d3d0f1ee6b3630f8",
+    "config/collisionAvoidanceControllerConfig.m": "5cf82f7cd8485bf6daad52b5b664a7d185885c0d49cb696a9870f40f9d919d00",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "0616b770333cdeb1f2c76565d93381bd7cad4d3651f83bb7d6772540ad5f1952",
+    "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "scripts/givenPathCollisionBaseline.m": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+    "scripts/prepareCollisionAvoidanceController.m": "1b585aec7a2b252369e5773b1b2003441a2e9a296203a3949bedba58e0e140e9",
+    "scripts/auditJointPredictiveSafety.py": "1134e3bfdffa8b478fe19a0a24580196f329fa744529e0b189adf17219b4af55",
+    "solver/controller/bicycleSampleKernelMex.mexa64": "dfd4ef44acf72bb3e22128dd394d2c7c583097cc8a9a81d8feb2d16a4fcc54e9",
+    "solver/controller/rectangleKernelMex.mexa64": "82d5b2189584d3228aaed9272f31f0c83c7c561973d245c2a42abca3f75e0599",
+    "solver/controller/dualKernelMex.mexa64": "d6a96de418c2c981f441db1f66fec423c634cf303a730ec6603944c85c146f0a"
+  }
+}
