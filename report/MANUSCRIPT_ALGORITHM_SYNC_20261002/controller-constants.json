@@ -1,0 +1,93 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "speed8": {
+    "terminalRadius": 0.000244140625,
+    "contractionBound": 0.99960289749259834,
+    "defectBound": 6.4806351330903762E-12,
+    "construction": "boundedRk4JacobianContraction",
+    "horizonSteps": 68,
+    "integrationStepsPerHold": 1,
+    "policyEvaluationSteps": 2400,
+    "straight": {
+      "trimState": [
+        0,
+        0,
+        -0,
+        8,
+        0,
+        0
+      ],
+      "trimInput": [
+        0,
+        0.013645140013191524
+      ],
+      "tailSpectralRadius": 0.96822779034291739
+    },
+    "curved": {
+      "trimState": [
+        0,
+        0,
+        -0.005692519429533199,
+        7.9998703812402008,
+        0.045539909483563727,
+        0.04
+      ],
+      "trimInput": [
+        0.015689468071141525,
+        0.013751456143225111
+      ],
+      "tailSpectralRadius": 0.96818474211672934
+    },
+    "staticNormalLoad": [
+      8756.6311475409839,
+      7429.8688524590161
+    ],
+    "egoCircumradius": 2.5811818998280613,
+    "trustRadius": 0.5
+  },
+  "speed15": {
+    "terminalRadius": 0.0009765625,
+    "contractionBound": 0.9987000374381716,
+    "defectBound": 7.7757638343458575E-12,
+    "construction": "boundedRk4JacobianContraction",
+    "horizonSteps": 76,
+    "integrationStepsPerHold": 1,
+    "policyEvaluationSteps": 2400,
+    "straight": {
+      "trimState": [
+        0,
+        0,
+        -0,
+        15,
+        0,
+        0
+      ],
+      "trimInput": [
+        0,
+        0.018375607123583382
+      ],
+      "tailSpectralRadius": 0.96935363809761022
+    },
+    "curved": {
+      "trimState": [
+        0,
+        0,
+        0.0010576500365353575,
+        14.999991610323782,
+        -0.0158647475902498,
+        0.075
+      ],
+      "trimInput": [
+        0.016884748820446376,
+        0.0197492634529832
+      ],
+      "tailSpectralRadius": 0.96946467270964176
+    },
+    "staticNormalLoad": [
+      8756.6311475409839,
+      7429.8688524590161
+    ],
+    "egoCircumradius": 2.5811818998280613,
+    "trustRadius": 0.5
+  }
+}

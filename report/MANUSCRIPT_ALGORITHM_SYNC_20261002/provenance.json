@@ -1,0 +1,98 @@
+{
+ "task": "Synchronize paper/manuscript.tex with the committed estimator and controller",
+ "date": "2026-10-02",
+ "reviewedCommit": "5692e1551241b568bcfb300093814373c674a412",
+ "controllerCampaignCommit": "a29ccb6ff2856fe3df33efff4b1cb8619e523658",
+ "precedingManuscriptCommits": [
+  "e64d5dd9bf6d476470f7c3395d61fa0821fd60d8",
+  "c152323e18a24995b518fb8c7839c9886324ec74"
+ ],
+ "controllerSourceHashesMatchCampaignRecord": true,
+ "sourceSha256AtReviewedCommit": {
+  "controller/collisionAvoidanceController.m": "60a994d65579624ea1375a9954e037b2044ef1150fbd590da3162684c1c68594",
+  "controller/solvePredictiveControl.m": "383c3a92531aff383a408740cb2d837bbda5290d81bb898dec83222ac5cbc002",
+  "controller/predictiveSafetyGeometry.m": "7c4a5ddcf30b581ebfab7598610a69099f36ea3c209babb4f3282c8b1d8257dd",
+  "controller/terminalContinuation.m": "b6011d42c9474787c1062ea2ef32de9913142d2518d024987d6da62548d50e24",
+  "controller/nonlinearBicycleModel.m": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608",
+  "controller/modifiedFialaTire.m": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+  "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+  "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+  "config/collisionAvoidanceControllerConfig.m": "4d912d60e31a11c4297008dece412afd7b306bb4e62d9f83e60e919f3465d0b8",
+  "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+  "scripts/runNonlinearPredictiveSafetyValidation.m": "c704f3d5a10544cb45d63e7b0b6d7d5e1386d1ab2d15f776b8e2b2f76b249e5a",
+  "estimator/synthesizeTargetTrackerCertificate.m": "767da0b6bbcc34f228bc74914d443539a8d94d605ce5121b0221dd6be93d9464",
+  "estimator/synthesizeNrmmObserverGains.m": "ee4365427a46012eb1eecd19b6b919b2a08b3c13687bb84e6d805dfd028f8a0d",
+  "estimator/nrmmTargetLipschitzCertificate.m": "d1f561ad3c3de0868d73b5f45589b30af2b574136316faaca80bfa8100f9c8ba",
+  "config/nrmmTrackingConfig.m": "50c79c001f29c499023f974f85d1a06103ebbd9e47923ad986b7bf3d63072248",
+  "config/mncavVehicleConfig.m": "27ddaaf5b081757594d78d8290c76a1513e686e783ede95b6f1fb2689e44a80a"
+ },
+ "recordSha256": {
+  "report/SHARMA_TIMED_FLOW_20261002.tex": "139498a1824f66fe31d490187ba8ef6e97242ed99a6f86c1607d6e7193a9f67f",
+  "report/SHARMA_TIMED_FLOW_20261002/comparison.json": "fe72dfc689837a18e29a9eb05941976fc2107244aa6b69592c256a9b9ac48815",
+  "report/SHARMA_TIMED_FLOW_20261002/provenance.json": "f8fae4076023682b6aba5e982440eae2dadf3f9559f955cd56366552ad40745c",
+  "report/CONTROLLER_FAILURE_CAUSES_20261002.tex": "8bbc5c033b3e4cea01c2d95103a39c1fd68a1a40da284431fd91d0c35b82e8ec",
+  "report/CONTROLLER_FAILURE_CAUSES_20261002/findings.json": "f373bb3d13f73cdeff100e9987c47d531e0f59e847041eac8065f87492aa4854",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001.tex": "6743de8a849a2288e73bd2f4858926d8cfd42e2b90fa01cb08ebde68d8b2ccf6",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001/design_table.csv": "b69d625975b2eb5b314c8e1aa337771108e0ebd4d0b7d3859b33d08ec7bc059f",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001/benchmark_summary.csv": "9361ac661ee4fcd7da1be62e197f8998ff042c174e23bda38c24adb963251f21",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001/audit/summary.csv": "14f05685839ca68d293f6f540836f3a6eea938aa3e710eaa015d03cbca5321e0",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001/audit/scenario-tuned.csv": "dff864effb73fe0b697395004e77cf790a95fecfba49599274352120c74d45db",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001/audit/trials.csv": "1acdd8a47320946e8bdc5ebb09355256f14650e58a90915257ff5aeeaece66e1",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001/audit/paired_intervals.csv": "58d435c353de9e95f73ff2c9542e0a1caa31f64e119ffd685b4ec9aa87c7e8ee",
+  "report/TARGET_NOISE_SHAPE_GAINS_20261001/audit/oracle_summary.csv": "f826ed499e3250fc325ff1694c240f34e51a5c8cba5489da8d528e4a0a439625",
+  "report/SHARMA_ESTIMATOR_AUDIT_20260930.tex": "4f5270ace55eef796324f78da23374ef96c6127746bb6073272d041637fdfa1d"
+ },
+ "concurrentUncommittedPathsNotDescribedAsImplemented": [
+  "config/collisionAvoidanceControllerConfig.m",
+  "controller/CONTROLLER_FILES.md",
+  "controller/NOMINAL_CLF.md",
+  "controller/PCBF_CLF_ARCHITECTURE.md",
+  "controller/collisionAvoidanceController.m",
+  "controller/predictiveSafetyGeometry.m",
+  "controller/solvePredictiveControl.m",
+  "estimator/OBSERVER_ISS_THEORY.md",
+  "report/NRMM_IMPLEMENTATION_NOTES.md",
+  "report/README.md",
+  "scripts/runNonlinearPredictiveSafetyValidation.m",
+  "scripts/runTimedFlowCampaign.m",
+  "tests/nominalRecoveryValidationTest.m",
+  "tests/ordinaryDistanceDualTest.m",
+  "tests/twoStagePredictiveControlTest.m"
+ ],
+ "tools": {
+  "matlab": "26.1.0.3276743 (R2026a) Update 3",
+  "python": "3.14.7",
+  "pdftex": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux)"
+ },
+ "commands": [
+  "git archive HEAD controller config scripts | tar -x -C <export>",
+  "matlab -singleCompThread -batch \"addpath('report/MANUSCRIPT_ALGORITHM_SYNC_20261002'); evaluateEstimatorDesign(pwd,'<bundle>/estimator-design.json'); evaluateControllerConstants('<export>','<bundle>/controller-constants.json')\"",
+  "python3 report/MANUSCRIPT_ALGORITHM_SYNC_20261002/deriveClosedLoopStatistics.py . <bundle>/closed-loop-statistics.json",
+  "python3 report/MANUSCRIPT_ALGORITHM_SYNC_20261002/checkDualLemma.py 40000",
+  "python3 paper/figures/closed_loop_results_v01.py .",
+  "pdflatex system_architecture_v11.tex (in paper/figures)",
+  "latexmk -pdf -interaction=nonstopmode -halt-on-error manuscript.tex (in paper)",
+  "python3 report/MANUSCRIPT_ALGORITHM_SYNC_20261002/auditManuscript.py . <bundle>/audit.json 5692e1551241b568bcfb300093814373c674a412",
+  "python3 report/MANUSCRIPT_ALGORITHM_SYNC_20261002/writeProvenance.py ."
+ ],
+ "manuscriptSourceSha256": {
+  "paper/manuscript.tex": "cefe2f245a2e88f44022a5d357c2c4536bf4bd31330a06f061b2333348861ab4",
+  "paper/references.bib": "385ba63b4c3203da12586e24e757757400019e46fd54e596e0ff8df485303549"
+ },
+ "localOutputSha256": {
+  "paper/figures/closed_loop_results_v01.pdf": "b94b98e128c4b5a063abe2719e5b7a91bf4ea450150e49b509383a905ec85a0e",
+  "paper/figures/system_architecture_v11.pdf": "17b38e4a135a755b2fdf76cb83f78ac437a83ff20a655e550ac7168cdc8e7fcf",
+  "paper/manuscript.pdf": "f1bca4d56ce024c2787d47bbfe32f1bc56949c6e8f6c2dedbbb8bf80fe3b607d"
+ },
+ "manuscriptPages": 19,
+ "audit": {
+  "checks": 128,
+  "failed": 0
+ },
+ "notRun": [
+  "closed-loop simulation",
+  "estimator trials",
+  "MATLAB unit-test suite"
+ ],
+ "untrackedOutputs": "paper/figures/ and paper/manuscript.pdf are local derived outputs and are not committed"
+}

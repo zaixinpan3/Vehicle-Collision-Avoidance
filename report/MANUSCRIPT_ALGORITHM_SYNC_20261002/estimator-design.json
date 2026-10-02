@@ -1,0 +1,121 @@
+{
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "egoRearAxleDistance": 1.714395,
+  "domainTransitTime": 1.25,
+  "yawGain": 2.3965858188431928,
+  "velocityGain": 2.3965858188431928,
+  "positionGain": 2.3965858188431928,
+  "velocityDisturbanceBound": 0.21209244714652764,
+  "velocityCertificate": {
+    "gyroCoefficient": 15.912017138451116,
+    "separatedGyroCoefficient": 24.113835968634291,
+    "speedCoefficient": 2.3995846748469809,
+    "mismatchCoefficient": 4.11383596863429,
+    "disturbanceBound": 0.21209244714652764,
+    "ultimateBound": 0.088497747703815785
+  },
+  "shapeSlowestRate": 2.13098758591205,
+  "shapeVarianceBound": 113.17547755665323,
+  "shape": [
+    3.4681145792017558,
+    5.9294833945737722,
+    4.3944401833789737
+  ],
+  "bandwidth": 2.1042131192098155,
+  "innovationGains": [
+    7.297652196479163,
+    26.254049826269743,
+    40.942346479191514
+  ],
+  "normalizedPolesReal": [
+    -1.4681145792017578,
+    -0.999999999999999,
+    -0.999999999999999
+  ],
+  "normalizedPolesImaginary": [
+    0,
+    -1.4118265602297833,
+    1.4118265602297833
+  ],
+  "lyapunovMatrix": [
+    [
+      45.27906624169,
+      -23.809491747962234,
+      4.8752248401539324
+    ],
+    [
+      -23.809491747962234,
+      27.665803695888187,
+      -16.052393148885429
+    ],
+    [
+      4.8752248401539324,
+      -16.052393148885429,
+      14.548978567794187
+    ]
+  ],
+  "decayRate": 0.8,
+  "lipschitzVelocity": 0.80105287671403391,
+  "lipschitzAcceleration": 0.8708222481060468,
+  "lipschitzMultipliers": [
+    24.745794895245513,
+    6.9541176669704
+  ],
+  "lipschitzResidualMargin": 1.0000022720407018E-6,
+  "componentConversion": [
+    0.32406167811618758,
+    1.4278216399322849,
+    3.1222926038494663
+  ],
+  "disturbanceCoefficients": {
+    "gyro": 372.96318593991128,
+    "radar": 24.09047052691237,
+    "modelJerk": 0.861463347001016
+  },
+  "targetDisturbanceBound": 3.6367828351093072,
+  "bandwidthSearchBracket": [
+    2.000002,
+    8.000008
+  ],
+  "targetDomain": {
+    "speedMinimum": 10,
+    "speedMaximum": 20,
+    "scalarAccelerationMaximum": 2,
+    "yawRateMaximum": 0.1874929688291011,
+    "accelerationNormBound": 4.2498759210287673,
+    "sideslipMaximum": 0.015,
+    "rearAxleDistance": 1.6,
+    "relativePositionMaximum": 50
+  },
+  "comparisonMatrix": [
+    [
+      -2.3965858188431928,
+      0
+    ],
+    [
+      6.7289721534339852,
+      -0.8
+    ]
+  ],
+  "comparisonInput": [
+    0.21209244714652764,
+    3.6367828351093072
+  ],
+  "ultimateBounds": {
+    "yaw": 3.1415926535897931,
+    "bodyVelocity": 0.088497747703815785,
+    "position": 0.12834520501738333,
+    "targetLyapunov": 5.2903521438123873,
+    "relativePosition": 1.7144003935494128,
+    "targetVelocity": 7.5536792737974823,
+    "targetAcceleration": 16.518027370384583,
+    "yawRate": 0.002,
+    "inertialVelocity": 40.088497747703819,
+    "targetPositionInertial": 101.84274559856679,
+    "targetVelocityInertial": 47.553679273797485,
+    "targetAccelerationInertial": 25.017779212442118,
+    "velocityDifference": 7.6421770215012979,
+    "accelerationDifference": 16.568027370384584,
+    "controllerRelativePosition": 101.71440039354941
+  }
+}

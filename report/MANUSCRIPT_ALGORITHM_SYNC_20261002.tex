@@ -1,0 +1,302 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,longtable,microtype,xurl,hyperref}
+\setlength{\emergencystretch}{3em}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Synchronizing the Manuscript with the Current Estimator and Controller}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}
+\maketitle
+
+\section{Scope}
+This is a manuscript revision. No controller, estimator, configuration or
+test source is changed. \path{paper/manuscript.tex} had last been
+synchronized on September 19, 2026 (commit \path{e64d5dd}, with a
+single-target edit in \path{c152323}) and described the retired
+joint-support controller: one convex program with jointly optimized
+separating angles, a modal terminal set, an exit deadline and a conditional
+recursive-feasibility proposition on a held affine plant. Since then the
+controller was replaced and the estimator gain synthesis changed.
+
+The revision describes the algorithms committed at
+\path{5692e1551241b568bcfb300093814373c674a412}. The controller sources of
+that commit are those of \path{a29ccb6ff2856fe3df33efff4b1cb8619e523658},
+which produced the closed-loop records used here; the hashes of
+\path{controller/solvePredictiveControl.m} and
+\path{controller/predictiveSafetyGeometry.m} at the reviewed commit equal
+the hashes stored in
+\path{report/SHARMA_TIMED_FLOW_20261002/provenance.json}.
+
+When the revision was written, the working tree held uncommitted edits of a
+concurrent session to the controller (within-hold relinearization with a
+nonlinear model-agreement test, and a closed-form distance-dual
+construction), its configuration, tests and documents. Those edits have no
+recorded result. The manuscript does not describe them as implemented; it
+names both as next steps. All controller facts were read from an export of
+the reviewed commit (\texttt{git archive HEAD controller config scripts}),
+not from the working tree. \path{provenance.json} lists the fifteen
+concurrently modified paths that this change leaves untouched.
+
+\section{What changed in the manuscript}
+The section order is kept. The literature discussion of the introduction
+and the perception section are byte-identical to the preceding revision, and
+the audit checks both. The estimator derivations before the target-tracker
+gain statement receive small clarifications only (43 changed lines of 324):
+the definition of the ego-frame acceleration, the link between the
+relative-position measurement and the perception output, the description of
+the reference observer's switched yaw stage, the wording of the
+single-track assumption and of one lemma hypothesis, the target speed
+bounds, the symbols of the Lipschitz proof, the component constants of the
+ISS theorem, the yaw-error comparison and the first-use definition of RK4.
+The word ``radar'' is replaced by ``relative-position measurement''
+because the perception section describes a camera--LiDAR pipeline.
+
+\begin{itemize}
+\item \textbf{Title, abstract, keywords, last introduction paragraph.} The
+second half of the title changes from ``Covariant Ego--Target Estimation and
+Conditional Control Analysis'' to ``Covariant Ego--Target Estimation and
+Two-Stage Predictive Control''. The abstract (250 words) and the closing
+introduction paragraph now state the certified estimator, the two-stage
+controller, the measured outcome (twelve of fourteen runs collision-free
+with recovery, one collision, one numerical interruption, call time above
+the hold), the absence of a controller certificate, and that the two
+components are not evaluated together.
+\item \textbf{System overview.} The longitudinal bias term and the
+regularized tire denominator are removed, in agreement with
+\path{nonlinearBicycleModel.derivative}. The text states that the reference
+is straight or of constant curvature, that the controller is
+certainty-equivalent, and that it imposes no road-boundary constraint. The
+architecture figure is redrawn (\path{system_architecture_v11}).
+\item \textbf{Estimator.} The bounded-real shape program is replaced by the
+noise-variance program of \path{synthesizeTargetTrackerCertificate.m}
+(dissipation inequality, observability-Gramian inequality and variance
+epigraph in one metric), followed by the unchanged free-metric bandwidth
+search. The enclosure subsection states that the controller does not yet
+consume the enclosure.
+\item \textbf{Control design.} Rewritten: RK4 hold map and its tangents,
+closed-form obstacle flow, anchor and trust boxes, shifted-rollout and
+moving-flow initialization, distance-dual rows with fixed multipliers,
+free-pose terminal core, the path-guidance law, the nominal cost-to-go
+function and its local convex model, the two cone programs, restoration and
+execution rules, and an explicit scope of guarantees. Three formal
+statements are given with proofs: the fixed-multiplier lower bound with its
+closed-form multipliers and its degenerate overlap case, the Schur
+reduction of the freely placed core, and the telescoping decrease of the
+cost-to-go under its construction feedback, including the positive
+invariance of its domain.
+\item \textbf{Results.} Current estimator design values; the held-out
+comparison with the reproduced, per-scenario tuned reference observer,
+including the per-scenario synthesis of the estimator gains and the metrics
+that favor the reference; the fourteen-scenario closed-loop campaign with a
+parameter table, an outcome table and a figure; and the failure mechanisms
+of the collision and of the interruption.
+\item \textbf{Discussion and conclusion.} Rewritten to separate the
+continuous-time estimation certificate from the uncertified controller and
+to list the favorable premises of the closed-loop trials.
+\item \textbf{Declarations.} The data-availability statement names the
+external raw traces and diagnostic helpers, and the AI-assistance
+disclosure names the tool and the parts it drafted.
+\end{itemize}
+
+Six references are added: Diehl, Bock and Schl\"oder (real-time iteration),
+Jadbabaie, Yu and Hauser, Rawlings, Mayne and Diehl (terminal decrease),
+Boyd et al.\ (Gramian inequality), L\"ofberg (YALMIP) and Sturm (SeDuMi).
+Five were checked against Crossref metadata by DOI on October 2, 2026, and
+the book of Rawlings, Mayne and Diehl against its publisher record
+(Nob Hill Publishing, second edition, 2017, ISBN 978-0-9759377-3-0). The
+Crossref container title of the YALMIP record is wrong; the entry uses the
+CACSD 2004 proceedings named by the DOI. Two preprint entries are replaced
+by their published versions, both checked against Crossref on the same day:
+Zhang, Liniger and Borrelli, \emph{IEEE Transactions on Control Systems
+Technology} 29(3):972--983, 2021 (DOI \path{10.1109/TCST.2019.2949540}),
+and Zeng, Zhang, Li and Sreenath, 2021 American Control Conference,
+pp.~3856--3863 (DOI \path{10.23919/ACC50511.2021.9482626}). The bibliography
+file holds 44 entries, of which the manuscript cites 35.
+
+\section{Evidence used and work actually run}
+\paragraph{Records read, not rerun.}
+\path{report/SHARMA_TIMED_FLOW_20261002.tex} and its
+\path{comparison.json}; \path{report/CONTROLLER_FAILURE_CAUSES_20261002.tex}
+and its \path{findings.json};
+\path{report/TARGET_NOISE_SHAPE_GAINS_20261001.tex} with its design,
+benchmark and audit tables; \path{report/SHARMA_ESTIMATOR_AUDIT_20260930.tex};
+the free-pose terminal, encounter-range and unified-CLF reports; and the
+controller documents \path{PCBF_CLF_ARCHITECTURE.md} and
+\path{NOMINAL_CLF.md} at the reviewed commit.
+
+\paragraph{Computations run for this revision.}
+\begin{enumerate}
+\item \texttt{evaluateEstimatorDesign}: the committed
+\path{synthesizeNrmmObserverGains} on \path{nrmmTrackingConfig}, MATLAB
+R2026a Update 3, one computational thread, YALMIP and SeDuMi from
+\path{solver/}. Output \path{estimator-design.json}. It reproduces the
+default-domain row of the recorded design table (bandwidth 2.1042, gains
+7.2977, 26.2540, 40.9423, radii 1.7144 m, 7.554 m/s, 16.52 m/s$^2$).
+\item \texttt{evaluateControllerConstants}: terminal-core construction,
+cruise trims and the spectral radius of the nominal feedback at 8 and
+15 m/s, evaluated on the export of the reviewed commit. Output
+\path{controller-constants.json}. The certified core radii are
+$2.4\times10^{-4}$ and $9.8\times10^{-4}$ with contraction bounds 0.9996
+and 0.9987.
+\item \path{deriveClosedLoopStatistics.py}: statistics of the recorded
+campaign. It verifies the SHA-256 of each of the fourteen raw traces against
+\path{comparison.json}, recomputes the body distance with the independent
+Python geometry, and writes \path{closed-loop-statistics.json}. No
+simulation is run. The raw traces remain in
+\path{/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/}.
+\item \path{figure-sources/closed_loop_results_v01.py}: the results figure,
+drawn from the same hash-verified traces.
+\item \path{checkDualLemma.py}: a numerical test of the three parts of the
+fixed-multiplier lemma and of the first-order vertex-rotation remainder on
+40,000 random rectangle pairs (32,756 disjoint, 7,244 overlapping) with
+geometry written independently of the controller. It passes. It tests the
+statement and is not a proof.
+\item \path{auditManuscript.py}: recomputes every quoted number from its
+record and requires the formatted value in the manuscript; checks labels,
+references, citation keys, environment balance, the absence of
+retired-controller vocabulary and the spans that the revision leaves
+unchanged.
+\item \path{writeProvenance.py}: source hashes at the reviewed commit,
+record hashes, tool versions, commands and output hashes, written to
+\path{provenance.json}.
+\end{enumerate}
+
+No closed-loop simulation, estimator trial or unit-test suite was run. The
+closed-loop statistics that do not appear in the earlier reports (call-time
+distribution, lateral excursions, corridor exits, counts of positive-slack
+samples, control-Lyapunov decrease statistics) are derived from the recorded
+traces by item 3.
+
+\section{Derived statistics new to this revision}
+\begin{itemize}
+\item 3,708 controller calls; all exceed the 50 ms hold; median 0.107 s,
+95th percentile 0.360 s, maximum 0.976 s (first call of a resumed process;
+0.902 s otherwise); 2,252 exceed 0.1 s; solver share of call time 0.67.
+\item In seven of the twelve successful runs the smallest sampled distance
+is below the 0.10 m node margin (minimum 0.033 m). Four of these seven
+runs executed at least one plan with a positive primary optimum.
+\item Largest lateral deviation 2.5 to 9.9 m; in twelve of fourteen runs
+the body leaves a corridor of half-width 4 m about the path. Largest
+steering angle 0.59 rad, largest yaw rate 0.91 rad/s, force ratio between
+$-0.68$ and $0.56$.
+\item A positive primary optimum in 22 samples of five runs, between 0.80
+and 1.50 s. A fresh anchor is formulated at 27 samples and restores a zero
+optimum at 7; the 22 samples are the 20 unsuccessful ones and two at which
+the optimum equals its lower bound. 113 executed solutions carry a
+non-convergence exit flag.
+\item Of 3,694 consecutive measured-state pairs, 2,636 have zero modeled
+control-Lyapunov slack; in 154 of them the requested decrease is not
+achieved and in 36 the value increases (at most 0.034).
+\end{itemize}
+
+\section{Review passes and corrections}
+Three independent read-only review passes were run by separate AI reviewer
+agents. Each received the manuscript and the records, not the drafting
+notes, and none edited a file. Their findings were checked against the
+sources before any change was made.
+
+\paragraph{Controller facts against the reviewed commit.} Corrected: the
+restoration stage of the collision (it fails once both the shifted and the
+fresh anchor overlap; the fresh-anchor counts and the 0.90 s sample are now
+stated); the lexicographic tolerance in the stated separation bound; the
+order of the two terminal separation constructions; the feedback that
+completes a fresh anchor; the trim used to complete a shifted plan; the
+description of the turning-crossing scenario; the solver and integration
+tolerances; the statement that the passing side is fixed by the
+initialization; and the mismatch between the closed-loop scenarios and the
+estimator's certified domain. One reviewer count was not adopted: the
+records show four, not three, sub-margin successes with executed
+relaxations, and the manuscript says four.
+
+\paragraph{Estimator facts against the records.} Corrected: the estimator
+gains of the comparison are synthesized anew for each scenario's declared
+domain, which the draft had not disclosed; a rounding slip (0.054 to
+0.053 m/s); the agreement of the covariant and companion chains under
+identical gains (three of four constant-motion scenarios, not all); the
+description of the reference's yaw stage; ``the shape of the gains is
+obtained from'' instead of ``the gains solve''; the sign convention of the
+noise term; and ``4 to 5\%'' for the small position advantages. Added: the
+asymmetries of the comparison (the reference does not use GNSS velocity,
+its selected candidate lies on the grid boundary in five of six scenarios,
+the stress cells have five seeds, and the noise-variance criterion was
+adopted after an earlier comparison on the same test seeds was known) and
+the less favorable metrics (acceleration lower in two of six scenarios,
+whole-run position in none, and the noise-free results).
+
+\paragraph{Internal consistency and prose.} Corrected: clashing symbols in
+the control section; the statement of the fixed-multiplier lemma and the
+strengthened cost-to-go proposition; an explicit guidance-law equation with
+its parameters in the parameter table; descriptions and consistent names of
+the six estimator scenarios; consistent names for the two gain shapes;
+number formats; units of the primary optimum; acronym definitions in the
+rewritten text; one displayed equation layout; and the two published
+reference versions. The guidance-law equation was added after the first
+pass and was afterwards compared line by line with
+\path{nonlinearBicycleModel.nominalFeedback} at the reviewed commit. The
+final proofread renamed three guidance-law symbols that clashed with
+earlier notation.
+
+\section{Review items left open}
+These items were raised and deliberately not changed. They need the
+author's decision.
+\begin{itemize}
+\item The first half of the title, ``Integrated Lane Keeping and Vehicle
+Collision Avoidance'', is kept although the estimator and the controller
+are evaluated separately. The reviewer suggested a title that states the
+separate evaluation.
+\item The estimator comparison table reports means with a mark where the
+paired bootstrap interval contains zero; standard deviations or intervals
+for every cell are not added.
+\item The unchanged introduction and perception text keep acronyms without
+definition (MPC, QP, YOLO, LiDAR) and one British spelling. They are left
+because those spans are kept byte-identical.
+\item The perception section is not used or evaluated by any reported
+experiment, and the error enclosure of the estimator is not consumed by the
+controller. The manuscript states both.
+\item Nine bibliography entries are uncited, the \texttt{multirow} package
+and one macro are unused, and one symbol of the vehicle-dynamics figure is
+not used in the text.
+\end{itemize}
+
+\section{Limits of this revision}
+The manuscript is a research draft. Author, affiliation, funding,
+competing-interest, contribution and repository-release declarations are
+still placeholders. The estimator and the controller are evaluated
+separately and with different vehicle parameter sets; the manuscript says
+so. The enclosure-containment and outage campaigns of earlier estimator
+gains were not repeated and are no longer quoted. The figure assets under
+\path{paper/figures/} are untracked, as before; the sources of the two new
+assets are kept in this bundle. \path{CLAUDE.md} still describes the retired
+controller and was not edited in this task.
+
+\section{Build and checks}
+\begin{itemize}
+\item \texttt{latexmk -pdf -interaction=nonstopmode -halt-on-error
+manuscript.tex} in \path{paper/} exits with status 0 and produces 19 pages.
+The log contains no LaTeX or package warning, no undefined reference or
+citation and no overfull box; nine underfull-box notices remain.
+\item \path{auditManuscript.py} with the preceding revision
+\path{5692e1551241b568bcfb300093814373c674a412}: 128 of 128 checks pass
+(\path{audit.json}). In a negative test on a copy of the manuscript with
+five altered numbers, the five corresponding checks fail and the exit
+status is nonzero.
+\item \path{checkDualLemma.py} with 40,000 samples passes.
+\item \texttt{git diff --check} reports nothing for the committed files.
+\end{itemize}
+
+\section{Files}
+\path{paper/manuscript.tex}, \path{paper/references.bib},
+\path{paper/README.md}, this report and the bundle
+\path{report/MANUSCRIPT_ALGORITHM_SYNC_20261002/}:
+\path{auditManuscript.py}, \path{audit.json},
+\path{deriveClosedLoopStatistics.py}, \path{closed-loop-statistics.json},
+\path{evaluateEstimatorDesign.m}, \path{estimator-design.json},
+\path{evaluateControllerConstants.m}, \path{controller-constants.json},
+\path{checkDualLemma.py}, \path{writeProvenance.py}, \path{provenance.json}
+and \path{figure-sources/}. Concurrent controller, configuration, test,
+estimator-document and report-index edits, agent instruction files, figure
+binaries, the compiled manuscript, literature PDFs and solver dependencies
+are not part of this change.
+\end{document}
