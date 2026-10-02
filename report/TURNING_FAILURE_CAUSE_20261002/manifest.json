@@ -1,0 +1,121 @@
+{
+  "algorithmCommit": "2697350ca383bbbc326f2ca516129c740cc29fd0",
+  "originals": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-diagnosis-20261002/primary-18.mat",
+      "sha256": "263ebb34fc1690f9f670587509d694a4bb5bd2f5d4546c69e74a0e3ecfc2b51e"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/secondary-01.mat",
+      "sha256": "338dce9f06ea0f2dea6d469c1c9c15e5a68e2ff387cb6cb7a0749c567f1b558a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/secondary-02.mat",
+      "sha256": "0176d8cb721bff6166138e0153ad415d7f6d27e5aa0e440ed9e23d8a426d99a8"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/secondary-03.mat",
+      "sha256": "f90c4997577acc49e594f34a855d2162d7ba6f5857f5890d558ecda14ffb16d3"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-01.mat",
+      "sha256": "74da452cb9c1a54bf89f49d548ae499bd85ad6fd4bf435f202dde5ca5295c8db"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-02.mat",
+      "sha256": "8b036fc8a2e96282e4a39c89aa6cc2a9d446995f059dcbcca0271fe3a1167af0"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-03.mat",
+      "sha256": "a607e49b9d848abc22d45f7025ce8888f0508f82f25936091665331117e11212"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-04.mat",
+      "sha256": "e3c734ac67f411b4005d27aa5e5b5fee3d817904c179ce61e91d22f6ce493999"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-05.mat",
+      "sha256": "56912ed8d911566debdd962925947ce86ec7500583303125f188187bcfa1d49a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-06.mat",
+      "sha256": "2d08d484d90b67145682a293c7b487b679468c3c8cecf194f76ebe1e42862205"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-07.mat",
+      "sha256": "e3efb755d3a2144fd97562ae094f9393776ddd7300b01977d23376cf8c6b1744"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-08.mat",
+      "sha256": "6ce8b22fac31dea26e59e9e3006295446bcde28859f3c5cd8d5c33a1cf6920bc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-09.mat",
+      "sha256": "82df1e4b0c506ff5e5ac47826447885cbaa3bbac902c37d4f4adbe7b8336052c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-10.mat",
+      "sha256": "2ee373751eed88607c9650fe3a09874e20c982898915214bc201d33a736c2986"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-11.mat",
+      "sha256": "3420f5af97f2bc73415a9a5feae9b4a2b354b4235d721f529b07e94c75440f2c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/trial-12.mat",
+      "sha256": "570cbc50697fb6d090d0b6a5d471c587841dbdd17c454d8a9c547e649b563642"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/variant-05.mat",
+      "sha256": "338eb8a0d4970440ba8d79a39157fa9f13e0635091edc7f6e31d6ad4cc05073e"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/variant-06.mat",
+      "sha256": "f480025bff4bfe7e1f4ce220d8db8a1b87403fcd45d1d48fbf8d38a0beae8ea3"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/variant-07.mat",
+      "sha256": "61d0c4607a89ca44998415c7a0749646d5026736e3098c64cdea5ed2cefc99de"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/variant-08.mat",
+      "sha256": "ab32fda99aa6769d734a2d8cda581b2a43445cb8b850b78c25058b7485ae5759"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/variant-09.mat",
+      "sha256": "df69fdfb9dd3947bb113a0cb4365ebdd01adb0a925e3eedf498f2d8da59a5520"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/variant-10.mat",
+      "sha256": "dc5c4d29fb757f2842822815d6c5f46a83922e0d9fbce31bf311ef7cf46d95ba"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/variant-11.mat",
+      "sha256": "f7bbbafea1c037822d808e2cb508ce1f7a03534235bfdaa679cff070e416f40c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/probeSecondary.m",
+      "sha256": "67df30d328b14d6340f63fcbc2282adecd894e1ea6bdbcb730cc002eb2e66387"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/analysis.log",
+      "sha256": "dc01e025a97e88b4483d085e4b62a9126eded7b7bde6a9edd08df650c681a6cd"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/secondary.log",
+      "sha256": "4e7f80ca43b38f208f7e95b38d8fd9e1ab39b8bf732fc34abd6c13bcb34a053b"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/turning-root-cause-20261002/comparison.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-repair-bound-20261002/exportBound.m",
+      "sha256": "284350ed72d18324ffc534f52b46ce8ebff3680ad903c3465a7f7b1a84a7806a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/flow-repair-bound-20261002/bound-geometry.json",
+      "sha256": "676bc3e66bf288ce6bbbcbd763c3f6e8a10f8117d3df6584d0ff5a16bac730ff"
+    }
+  ]
+}
