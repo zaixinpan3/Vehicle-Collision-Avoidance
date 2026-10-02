@@ -46,10 +46,14 @@ def main():
                   results=rows)
     (args.experiment / 'comparison.json').write_text(json.dumps(output, indent=2) + '\n')
     for version in ('baseline', 'current'):
-        group = [r for r in rows if r['version'] == version]
-        print(version, 'completed at 8 s', sum(r['eightSeconds']['completed'] for r in group),
-              'collision-free completed at 8 s', sum(r['eightSeconds']['completed'] and r['eightSeconds']['strictlyCollisionFree'] for r in group),
-              'nominal recovery confirmed', sum(r['final']['sampledRecoveryConfirmed'] for r in group))
+        final = [r['final'] for r in rows if r['version'] == version]
+        # Duration completion is observation bookkeeping, not a control goal.
+        # Unconfirmed recovery after an interruption does not prove divergence.
+        print(version, 'collision-free and recovered',
+              sum(r['strictlyCollisionFree'] and r['sampledRecoveryConfirmed'] for r in final),
+              'collision observed', sum(not r['strictlyCollisionFree'] for r in final),
+              'interrupted', sum(bool(r['failure']) for r in final),
+              'recovery unconfirmed', sum(not r['sampledRecoveryConfirmed'] for r in final))
 
 
 def geometry_record(result, audit):

@@ -1,0 +1,88 @@
+{
+  "sourceCommit": "a29ccb6ff2856fe3df33efff4b1cb8619e523658",
+  "reproductionDirectory": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002",
+  "priorExperiment": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002",
+  "files": [
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solvePredictiveControl.m",
+      "sha256": "383c3a92531aff383a408740cb2d837bbda5290d81bb898dec83222ac5cbc002"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/predictiveSafetyGeometry.m",
+      "sha256": "7c4a5ddcf30b581ebfab7598610a69099f36ea3c209babb4f3282c8b1d8257dd"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/nonlinearBicycleModel.m",
+      "sha256": "0db77b05b6608fd6703ca8197f406ad48e84b499d2bc679e2560e693936b8608"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/modifiedFialaTire.m",
+      "sha256": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/config/collisionAvoidanceControllerConfig.m",
+      "sha256": "4d912d60e31a11c4297008dece412afd7b306bb4e62d9f83e60e919f3465d0b8"
+    },
+    {
+      "path": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/scripts/runNonlinearPredictiveSafetyValidation.m",
+      "sha256": "c704f3d5a10544cb45d63e7b0b6d7d5e1386d1ab2d15f776b8e2b2f76b249e5a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/setup.py",
+      "sha256": "c9dafbcac4ec50e491f5c06846f6dd08f077ff260a8f2347c6072848281db207"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/runFailureReplay.m",
+      "sha256": "a573a6cac63afec34a059f53c778bdde8103a51cafc4efb1c569be87fa3b448f"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/analyzeTurning.m",
+      "sha256": "085d41c0bee58a99e410531cf657bda1809a8649e816af24695814e807e0667a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/analyzeCritical.m",
+      "sha256": "24664379d59814a9bb47ed71c22bb906915254c0fe5282b18d5cfff90c500b92"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/continueBraking.m",
+      "sha256": "d7c093f200a096ae812a6ef3e8cc87da0a1255b410995c66a76c88b15751869b"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/probeDynamics.m",
+      "sha256": "ab841235e0315e213a5cf3686b5fcf54dd7f918fe20c49e03fab96abd1c1bab8"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/flowProbe.m",
+      "sha256": "a0500c25c06042e8ac83b68b51ae852d0bbe01f67e8e1dbb5933473c5d0cbf36"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/integrationProbe.m",
+      "sha256": "0d55d7143ee5acf3c0342e825deb47f6c4f82cd7eccb9717c339e50bcd39bd65"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/failure-analysis-20261002/summarize.py",
+      "sha256": "fc53b430edbc3102d7829da41a00ac11d8c2323b7f75a602be2caf510d763038"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-brakingLead-recovery.mat",
+      "sha256": "91d855a0e1610535dd5caf7907059a321676426a52ea498cf358bf335b2bd62a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-turningCrossing.json",
+      "sha256": "cf39a5633ed0fa86d46e26d2149e0f4febf44ebe332f215b4ce6f54d2b765786"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-brakingLead-recovery.json",
+      "sha256": "bb5d3732bbd7611e6b3fdc023512f649b8249ea1f756a588d3b6a84a6c11d32f"
+    }
+  ],
+  "methods": [
+    "Read prior full recovery outcomes, without an 8-second success criterion.",
+    "Replay the failed braking call and all 31 turning calls at recorded measured states; save primary/secondary local problems.",
+    "Roll fixed returned controls through nonlinear RK4 and ODE45; compare common poses, frozen dual rows and tangent tire forces.",
+    "Refine RK4 into four and eight steps at fixed inputs to separate integration error from affine-model error.",
+    "Resume the saved failed braking continuation with the same ordinary-distance dual constructed from exact closest-feature normals; change no MPC/CLF constraints or objectives.",
+    "Verify the resumed geometry and recovery dwell using the independent Python audit; original production result remains failed.",
+    "Run the revised report summarizer against the existing 28 traces in an isolated output directory; no campaign rerun claimed."
+  ]
+}
