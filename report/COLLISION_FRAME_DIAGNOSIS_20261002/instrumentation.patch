@@ -1,0 +1,4 @@
+--- controller/solvePredictiveControl.m
++++ hook/solvePredictiveControl.m
+@@ -114,0 +115 @@
++    save(fullfile('/home/zai/.cache/collisionAvoidance/collision-diagnosis-20261002',sprintf('primary-%02d.mat',model.sampleIndex+1)),'point','problem','anchor','model');

@@ -1,0 +1,40 @@
+Collision frame diagnosis of controller commit 2697350ca383bbbc326f2ca516129c740cc29fd0.
+No production controller, configuration, or online acceptance behavior was changed.
+
+Original source and raw result paths are recorded in summary.json and the MATLAB
+scripts. Diagnostics ran from the source-frozen final campaign, not a prototype.
+Both controller replays reproduced all first 35 issued inputs exactly (difference 0).
+
+1. Run diagnose.m in MATLAB -singleCompThread -batch, using its declared cache
+   output directory. It reconstructs previous plans while feeding recorded states.
+2. Create an external hook/solvePredictiveControl.m by applying instrumentation.patch
+   to the identified source. Run diagnosePrimary.m. The sole inserted save writes
+   the selected primary point before CLF optimization. The repeated controller
+   outputs were identical. No control or constraint was modified.
+3. Run compareStages.m to compare the raw primary and selected secondary plans.
+4. Run analyze.py with its sibling nodes.csv/frames.json. It independently computes
+   rectangle SAT gaps and generates figures outside the repository.
+
+MATLAB source uses explicit original cache paths, which must be adjusted together
+when reproducing elsewhere. Raw MAT snapshots and original logs are preserved in
+cache and exported to the external archive; their hashes are in source-manifest.json.
+No whole campaign or unit suite was rerun; this is a fixed-state diagnostic replay.
+
+nodes.csv columns (1-based):
+1 frameTime, 2 predictionStage (1=current), 3 absoluteTime,
+4 unrelaxed linear separation margin including 0.10 m buffer,
+5 affine-state exact rectangle distance, 6 nonlinear-rollout rectangle distance,
+7 affine/nonlinear position error norm, 8 maximum affine axle force/capacity ratio,
+9 selected stage safety slack, 10:15 affine state, 16:21 nonlinear state,
+22:27 anchor state, 28:29 optimized input, 30:31 anchor input.
+Each frame exports first 24 start nodes; midpoint constraint values are not exported.
+
+stages.csv columns:
+frameTime, optimizationStage (1=PCBF, 2=CLF), affine distance at t=1.65,
+nonlinear distance at t=1.65, position error at t=1.65,
+maximum affine force/capacity ratio through that node,
+first-step affine/nonlinear position error, maximum one-hold RK4/ODE45 position
+integration error along the evaluated sequence, first steering, first signed drive ratio.
+Positive drive ratio accelerates; negative ratio brakes. It is named brakingRatio
+in the implementation. Distances are zero for overlap. Signed SAT gaps are separate.
+Positive SAT gap is not generally Euclidean distance; negative means overlap.
