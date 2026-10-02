@@ -1,0 +1,24 @@
+{
+  "algorithmCommit": "2697350ca383bbbc326f2ca516129c740cc29fd0",
+  "diagnosticCommit": "ace84626e362dc9615d3f4f9cd7dc8d6ea19fbaf",
+  "originalInputs": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-diagnosis-20261002/primary-18.mat",
+      "sha256": "263ebb34fc1690f9f670587509d694a4bb5bd2f5d4546c69e74a0e3ecfc2b51e"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/collision-diagnosis-20261002/frame-18.mat",
+      "sha256": "cd8860b1ff1bcd9026d4c4a504459678ef28261ed4e45bac60719db522a7e1ad"
+    }
+  ],
+  "method": "Exact saved fresh-flow anchor at t=0.85 s; no re-generated or hypothetical path. MATLAB linprog necessary row bound with dynamics and variable boxes, all other inequalities and terminal cone omitted. Independent Python rectangle geometry; static and interactive rendering.",
+  "checks": [
+    "All 77 rectangle distances match MATLAB within 1e-10 m",
+    "Worst sampled seed SAT gap -0.2901614120216358 m at 1.65 s",
+    "Diagnosed hard constraint matches saved formulation row 225",
+    "LP flag 1, equality residual 1.31e-9, box residual 0",
+    "Full scale-one linear inequalities infeasible without terminal cone",
+    "Chromium headless screenshot visually reviewed; xdg-open reported existing browser session"
+  ],
+  "scope": "Offline visualization and feasibility diagnosis only; no production controller changes, no full campaign or controller unit suite rerun."
+}

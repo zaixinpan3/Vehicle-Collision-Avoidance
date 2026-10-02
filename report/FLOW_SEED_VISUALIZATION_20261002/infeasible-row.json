@@ -1,0 +1,1 @@
+{"predictionStage":17,"absoluteTime":1.65,"corner":1,"initialMargin":-0.3901614120216349,"maximumMargin":-0.048075524711598594,"solverFlag":1,"matchingFormulationRows":225,"equalityResidual":1.309150889017352E-9,"boxResidual":0,"interpretation":"Upper bound from affine dynamics and variable boxes only; other inequality rows and terminal cone omitted."}
