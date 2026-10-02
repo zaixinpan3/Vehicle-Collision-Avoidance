@@ -2,7 +2,7 @@ function information = buildControllerKernels()
 %buildControllerKernels Compile the controller's model and geometry kernels.
 % Each generated entry point calls an unchanged method of the controller, so
 % a kernel has no algorithm source of its own: nonlinearBicycleModel.sample,
-% predictiveSafetyGeometry.rectangleNumeric and .dualNumeric, and
+% predictiveSafetyGeometry.rectangleNumeric, and
 % nonlinearBicycleModel.nominalResidual. The controller
 % uses a kernel only if it reproduces the interpreted result bitwise at probe
 % points. Generated code and binaries stay outside the controller directory.
@@ -33,10 +33,6 @@ function information = buildControllerKernels()
         "function [distance,normal] = rectangleKernel(poseE,shapeE,poseT,shapeT) %#codegen", ...
         "    [distance,normal] = predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);", ...
         "end"]);
-    localBuild(output,settings,"dualKernel",{zeros(3,1),zeros(4,1),zeros(3,1),zeros(4,1),zeros(2,1)},[ ...
-        "function [values,jacobian,normal,mu,lambda] = dualKernel(poseE,shapeE,poseT,shapeT,preferred) %#codegen", ...
-        "    [values,jacobian,normal,mu,lambda] = predictiveSafetyGeometry.dualNumeric(poseE,shapeE,poseT,shapeT,preferred);", ...
-        "end"]);
     cfg=collisionAvoidanceControllerConfig();
     reference=nonlinearBicycleModel.cruise(cfg,0);
     terminal=nonlinearBicycleModel.nominalTail(cfg,0);
@@ -46,7 +42,7 @@ function information = buildControllerKernels()
         "end"]);
     clear nonlinearBicycleModel predictiveSafetyGeometry;rehash;
     information = struct("directory",output,"matlabVersion",string(version), ...
-        "binaries",["bicycleSampleKernelMex","rectangleKernelMex","dualKernelMex","nominalClfKernelMex"]+"."+mexext, ...
+        "binaries",["bicycleSampleKernelMex","rectangleKernelMex","nominalClfKernelMex"]+"."+mexext, ...
         "algorithmSources",["controller/nonlinearBicycleModel.m","controller/predictiveSafetyGeometry.m"]);
 end
 

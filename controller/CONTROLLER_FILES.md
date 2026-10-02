@@ -12,7 +12,7 @@ and its affine prediction scope.
 | `terminalContinuation.m` | Augmented free-pose endpoint core, construction bounds and anchor-based terminal geometry |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single nominal cost-to-go CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Known target motion, transported flow guidance and rectangle duals; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Known target motion, transported flow guidance, ordinary distance-dual optimization and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
@@ -28,7 +28,12 @@ MATLAB Optimization Toolbox and Control System Toolbox are required.
 Optional MATLAB Coder kernels are built outside the core by
 `../scripts/buildControllerKernels.m`; interpreted MATLAB remains available.
 Generated native binaries and `solver/` dependencies are not source artifacts
-of this change. Kernel equivalence has dedicated tests.
+of this change. Kernel equivalence has dedicated tests. The retired signed
+collision-direction kernel is not used; distance duals run through `coneprog`.
+
+`ordinaryDistanceDualTest` compares the optimized ordinary dual with geometric
+rectangle distance, checks full ego size, fixed-multiplier yaw derivatives,
+zero multipliers and translation invariance. Overlap has no imposed direction.
 
 `twoStagePredictiveControlTest` checks both objectives, the same CLF at all
 target ranges, primary priority, affine dynamics with consistent anchors,

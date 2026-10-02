@@ -10,7 +10,7 @@ classdef controllerKernelTest < matlab.unittest.TestCase
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'controller')));
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(fullfile(root,'config')));
             native=fullfile(root,'solver','controller');
-            for name=["bicycleSampleKernelMex","rectangleKernelMex","dualKernelMex"]
+            for name=["bicycleSampleKernelMex","rectangleKernelMex"]
                 testCase.assumeTrue(isfile(fullfile(native,name+"."+mexext)),'The optional kernels have not been built.');
             end
             testCase.applyFixture(matlab.unittest.fixtures.PathFixture(native));
@@ -33,21 +33,16 @@ classdef controllerKernelTest < matlab.unittest.TestCase
                 testCase.verifyEqual(nonlinearBicycleModel.sample(x,u,cfg,[],duration),next,AbsTol=0);
             end
         end
-        function geometryKernelsReproduceTheInterpretedDistanceAndDual(testCase)
+        function geometryKernelReproducesTheInterpretedDistance(testCase)
             stream=RandStream('mt19937ar','Seed',11);shape=[2.4;.95;.3;-.1];target=[2.4;.95;0;0];overlaps=0;
             for trial=1:400
                 poseE=[4*randn(stream,2,1);pi*(2*rand(stream)-1)];
-                poseT=[4*randn(stream,2,1);pi*(2*rand(stream)-1)];preferred=randn(stream,2,1);
+                poseT=[4*randn(stream,2,1);pi*(2*rand(stream)-1)];
                 [distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shape,poseT,target);
-                [values,jacobian,dualNormal,mu,lambda]=predictiveSafetyGeometry.dualNumeric(poseE,shape,poseT,target,preferred);
                 [kernelDistance,kernelNormal]=rectangleKernelMex(poseE,shape,poseT,target);
-                [kernelValues,kernelJacobian,kernelDual,kernelMu,kernelLambda]=dualKernelMex(poseE,shape,poseT,target,preferred);
                 testCase.verifyEqual({kernelDistance,kernelNormal},{distance,normal});
-                testCase.verifyEqual({kernelValues,kernelJacobian,kernelDual,kernelMu,kernelLambda},{values,jacobian,dualNormal,mu,lambda});
-                rows=predictiveSafetyGeometry.dualLinearization(poseE,shape,poseT,target,preferred);
                 [wrapped,certificate]=predictiveSafetyGeometry.rectangle(poseE,shape,poseT,target);
-                testCase.verifyEqual({rows.value,rows.jacobian,rows.signedDistance,wrapped,certificate.normal}, ...
-                    {values,jacobian,min(values),distance,normal});
+                testCase.verifyEqual({wrapped,certificate.normal},{distance,normal});
                 overlaps=overlaps+(distance==0);
             end
             testCase.verifyGreaterThan(overlaps,20);

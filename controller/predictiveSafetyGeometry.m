@@ -108,38 +108,59 @@ classdef predictiveSafetyGeometry
             end
         end
 
-        function rows = dualLinearization(poseE,shapeE,poseT,shapeT,preferred)
-            % Li-style fixed-normal distance dual, extended to both bodies.
-            % The four ego vertex rows retain yaw dependence in each SCA step.
-            % At overlap, a signed support certificate supplies a nonzero
-            % restoration direction; it never certifies positive clearance.
-            kernel=localKernel();
-            if isempty(kernel)
-                [values,jacobian,normal,mu,lambda]=predictiveSafetyGeometry.dualNumeric(poseE,shapeE,poseT,shapeT,preferred);
-            else
-                [values,jacobian,normal,mu,lambda]=kernel.dual(poseE(1:3),shapeE(:),poseT(1:3),shapeT(:),preferred(:));
-            end
-            rows=struct('value',values,'jacobian',jacobian, ...
-                'normal',normal,'mu',mu,'lambda',lambda,'signedDistance',min(values));
-        end
-
-        function [values,jacobian,normal,mu,lambda] = dualNumeric(poseE,shapeE,poseT,shapeT,preferred)
+        function rows = dualLinearization(poseE,shapeE,poseT,shapeT)
+            % Li et al. (2023), Eqs. (12)-(13): optimize the ordinary
+            % distance dual, then hold its multipliers fixed in the trajectory
+            % rows. The minimum over S(x) is explicit for a rectangular ego.
+            % No signed-distance objective or overlap direction is substituted.
             re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
             rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
             body=shapeE(3:4)+shapeE(1:2).*[-1,1,1,-1;-1,-1,1,1];
-            ego=poseE(1:2)+re*body;
-            target=poseT(1:2)+rt*(shapeT(3:4)+shapeT(1:2).*[-1,1,1,-1;-1,-1,1,1]);
-            [distance,normal]=predictiveSafetyGeometry.rectangleNumeric(poseE,shapeE,poseT,shapeT);
-            if distance==0
-                directions=[preferred/norm(preferred),-preferred/norm(preferred),re,-re,rt,-rt];
-                gaps=min(directions.'*ego,[],2)-max(directions.'*target,[],2);
-                best=max(gaps);index=find(gaps>=best-1e-10,1);normal=directions(:,index(1));
+            relative=poseE(1:2)-poseT(1:2)+re*body;
+            targetA=[eye(2);-eye(2)]*rt.';
+            targetB=[shapeT(1:2)+shapeT(3:4);shapeT(1:2)-shapeT(3:4)];
+            % max alpha-b'*lambda, alpha <= lambda'*A*(v_j-pT),
+            % lambda >= 0, ||A'*lambda||_2 <= 1. The hypograph makes
+            % the finite-body minimum a five-variable convex distance dual.
+            cone=secondordercone([targetA.',zeros(2,1)],zeros(2,1),zeros(5,1),-1);
+            inequalities=[-relative.'*targetA.',ones(4,1)];
+            persistent options
+            if isempty(options)
+                options=optimoptions('coneprog','Display','none', ...
+                    'ConstraintTolerance',1e-10,'OptimalityTolerance',1e-10);
             end
-            se=-re.'*normal;st=rt.'*normal;
-            mu=[max(se,0);max(-se,0)];lambda=[max(st,0);max(-st,0)];
-            ht=[shapeT(1:2)+shapeT(3:4);shapeT(1:2)-shapeT(3:4)];
-            targetSupport=normal.'*poseT(1:2)+ht.'*lambda;
-            values=(normal.'*ego-targetSupport).';
+            [point,~,flag]=coneprog([targetB;-1],cone,inequalities,zeros(4,1), ...
+                [],[],[zeros(4,1);-Inf],[],options);
+            if isempty(point) || any(~isfinite(point))
+                error('collisionAvoidanceController:distanceDualFailed', ...
+                    'The ordinary distance dual returned no finite point (exit flag %d).',flag);
+            end
+            lambda=point(1:4);normal=targetA.'*lambda;
+            [values,jacobian]=predictiveSafetyGeometry.fixedDualRows(poseE,shapeE,poseT,shapeT,lambda);
+            % coneprog can report a stalled dual residual at an optimum.
+            % Check the actual dual against an independent primal distance;
+            % this verifies the same multipliers without changing them.
+            primalDistance=predictiveSafetyGeometry.rectangle(poseE,shapeE,poseT,shapeT);
+            gap=primalDistance-min(values);
+            if min(lambda)<-1e-8 || norm(normal)>1+1e-8 || abs(gap)>1e-6
+                error('collisionAvoidanceController:distanceDualFailed', ...
+                    'The ordinary distance dual failed its primal-dual check (exit flag %d, gap %.3g m).',flag,gap);
+            end
+            rows=struct('value',values,'jacobian',jacobian,'normal',normal, ...
+                'lambda',lambda,'distance',min(values),'exitFlag',flag,'dualityGap',gap);
+        end
+
+        function [values,jacobian] = fixedDualRows(poseE,shapeE,poseT,shapeT,lambda)
+            % Evaluate Eq. (13) with the supplied multipliers held fixed.
+            % Four rows implement the minimum over the rectangular S(x).
+            re=[cos(poseE(3)),-sin(poseE(3));sin(poseE(3)),cos(poseE(3))];
+            rt=[cos(poseT(3)),-sin(poseT(3));sin(poseT(3)),cos(poseT(3))];
+            body=shapeE(3:4)+shapeE(1:2).*[-1,1,1,-1;-1,-1,1,1];
+            relative=poseE(1:2)-poseT(1:2)+re*body;
+            targetA=[eye(2);-eye(2)]*rt.';
+            targetB=[shapeT(1:2)+shapeT(3:4);shapeT(1:2)-shapeT(3:4)];
+            normal=targetA.'*lambda;
+            values=(normal.'*relative-targetB.'*lambda).';
             yaw=(normal.'*re*[0,-1;1,0]*body).';
             jacobian=[repmat(normal.',4,1),yaw];
         end
@@ -202,23 +223,20 @@ classdef predictiveSafetyGeometry
 end
 
 function kernel=localKernel()
-    % Handles of the optional compiled copies of rectangleNumeric and
-    % dualNumeric, or empty. They are used only if they reproduce this
-    % source bitwise at probe poses, separated and overlapping.
+    % Use only the distance kernel. Collision duals are optimization
+    % problems and never call the retired signed-direction MEX kernel.
     persistent handles checked
     if isempty(checked)
         checked=true;handles=[];
         native=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
-        if isfile(fullfile(native,['rectangleKernelMex.',mexext])) && isfile(fullfile(native,['dualKernelMex.',mexext]))
-            previous=addpath(native);candidate=struct('rectangle',@rectangleKernelMex,'dual',@dualKernelMex);
+        if isfile(fullfile(native,['rectangleKernelMex.',mexext]))
+            previous=addpath(native);candidate=struct('rectangle',@rectangleKernelMex);
             shape=[2.4;.95;.3;-.1];same=true;
             for poseT=[[9;4;2.1],[1.5;.8;.6],[-30;12;-1.3]]
                 poseE=[.4;-.3;.25];
                 [d,n]=predictiveSafetyGeometry.rectangleNumeric(poseE,shape,poseT,shape);
                 [dk,nk]=candidate.rectangle(poseE,shape,poseT,shape);
-                [v,j,m,mu,la]=predictiveSafetyGeometry.dualNumeric(poseE,shape,poseT,shape,[0;1]);
-                [vk,jk,mk,muk,lak]=candidate.dual(poseE,shape,poseT,shape,[0;1]);
-                same=same && isequal({d,n,v,j,m,mu,la},{dk,nk,vk,jk,mk,muk,lak});
+                same=same && isequal({d,n},{dk,nk});
             end
             path(previous);
             if same,handles=candidate;

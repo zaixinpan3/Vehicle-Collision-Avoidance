@@ -392,16 +392,19 @@ end
 
 function [values,jacobian]=localSafetyRows(x,time,model)
     cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
-    q=localTargetAt(model,time);projection=laneGeometry.project(x(1:2),model.lane);
-    preferred=[-sin(projection.heading);cos(projection.heading)];
-    dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(8:11),preferred);
+    q=localTargetAt(model,time);
+    dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(8:11));
     values=dual.value-cfg.collision.safetyMarginMeters;
     jacobian=[dual.jacobian,zeros(4,3)];
 end
 
 function beyond=localBeyondRange(x,time,model)
     beyond=isempty(model.target);
-    if ~beyond,beyond=min(localSafetyRows(x,time,model))>model.cfg.collision.encounterRangeMeters-model.cfg.collision.safetyMarginMeters;end
+    if ~beyond
+        cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
+        q=localTargetAt(model,time);
+        beyond=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3),q(8:11))>cfg.collision.encounterRangeMeters;
+    end
 end
 
 function [margin,value,gradient]=localTerminalClearance(seed,count,model)

@@ -35,6 +35,65 @@ rad and the braking-ratio correction +/-0.125. Steering has no physical
 magnitude or slew bound. Physical braking/model-domain bounds remain. These
 numerical boxes are not certified nonlinear remainder bounds.
 
+## Ordinary distance dual and fixed collision multipliers
+
+Collision rows follow the distance-dual / fixed-multiplier sequence of
+Li et al. (2023), [Section 3, equations (12)--(13)](https://doi.org/10.1007/s42154-023-00222-7).
+Only the collision formulation is adopted; the PCBF/CLF objectives and
+Fiala dynamics remain the project model.
+
+For target body inequalities `A (z-pT) <= b` and the four ego vertices
+`v_j(x)`, the finite-body meaning of the paper's set `S(x)` is made explicit:
+
+    maximize alpha - b' lambda
+    subject to alpha <= lambda' A (v_j(xbar)-pT), j=1,...,4,
+               lambda >= 0, norm(A' lambda,2) <= 1.
+
+This is the ordinary nonnegative set distance dual: the minimum over a
+rectangle is attained at a vertex, and `alpha` is just its hypograph variable.
+It is solved by `coneprog` at each collision anchor. The resulting `lambda`
+is fixed when assembling all four trajectory inequalities
+
+    lambda' [A (v_j(x)-pT) - b] + s_i >= safetyMarginMeters.
+
+The existing affine RTI model retains the first derivative of the rotated
+vertices with respect to ego yaw. Thus the paper's unspecified set notation
+is explicitly represented by both full rectangles, rather than replacing
+the ego by a point or silently freezing its orientation. This representation
+and the yaw tangent are stated here; they are not a claim to reproduce an
+uninspected author implementation. At the anchor, the optimized minimum
+equals the ordinary rectangle distance up to solver tolerance.
+
+There is no signed-distance objective, preferred passing direction, normal
+normalization, or replacement of an overlapping distance dual. Zero
+multipliers stay zero: a relaxed row then needs at least the node buffer in
+slack, while a hard positive-buffer row is infeasible. Contact duals may be
+nonunique. The existing initialization policy is unchanged and receives no
+new repair rule. The retired signed-direction MEX is neither called nor built.
+The exact rectangle-distance routine serves offline geometry, the existing
+encounter-range query, and an independent primal-dual check at each anchor.
+That check requires nonnegative multipliers and a unit-ball normal within
+`1e-8`, and a distance gap within `1e-6 m`. It handles `coneprog` stopping
+with a small search direction at an already optimal point; it never replaces
+or normalizes the returned multipliers. It is not a nonlinear trajectory
+acceptance test.
+
+The reported two trajectory solver calls exclude the small geometric dual
+solves. Geometry work contributes to formulation and full-call elapsed time.
+The trajectory stages receive the remaining soft time budget; as before,
+formulation itself is not interrupted by that budget.
+
+The October 2 replacement is recorded in
+[the validation record](../report/ORDINARY_DISTANCE_DUAL_20261002.json).
+The current focused suites contain 224 passing checks, combining the broad
+run with the final rerun of the changed two-stage suite. The former
+crossing-restoration assertion failed and was replaced by an explicit
+hard-overlap infeasibility check; that scenario failure remains in the record.
+An independent 15 m/s crossing replay executes 17 of 19 requested 50 ms
+holds, then stops at 0.85 s with `pcbfNoNumericalResult`. Its 17 issued holds
+all exceed 50 ms computation time (subsequent median 0.364 s, maximum
+0.768 s). This is not a successful encounter or a real-time qualification.
+
 ## Primary restoration and secondary dissipation
 
 One nonnegative collision slack is assigned to each primary-horizon stage;

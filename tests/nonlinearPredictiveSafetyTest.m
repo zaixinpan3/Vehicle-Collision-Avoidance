@@ -61,12 +61,12 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual([dual.mu;dual.lambda],zeros(8,1));
             testCase.verifyEqual(norm(dual.normal),1,AbsTol=1e-12);
         end
-        function overlapHasANonzeroRestorationDirection(testCase)
+        function overlapDoesNotInventARestorationDirection(testCase)
             shape=[2.4;.95;0;0];
-            rows=predictiveSafetyGeometry.dualLinearization([0;0;0],shape,[0;0;0],shape,[0;1]);
-            testCase.verifyLessThan(rows.signedDistance,0);
-            testCase.verifyEqual(rows.normal,[0;1]);
-            testCase.verifyEqual(rows.jacobian(:,1:2),repmat([0,1],4,1));
+            rows=predictiveSafetyGeometry.dualLinearization([0;0;0],shape,[0;0;0],shape);
+            testCase.verifyEqual(rows.distance,0,AbsTol=1e-7);
+            testCase.verifyEqual(rows.normal,zeros(2,1),AbsTol=1e-7);
+            testCase.verifyEqual(rows.jacobian,zeros(4,3),AbsTol=1e-7);
         end
         function analyticDynamicsTangentMatchesFiniteDifferences(testCase,curvature)
             [~,~,cfg]=localFixture();x=[2;.2;.1;8;.3;.1];u=[.03;-.12];

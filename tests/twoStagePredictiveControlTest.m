@@ -101,27 +101,16 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyFalse(search.clfStageAttempted);
             testCase.verifyEqual(search.terminationReason,"pcbfNoNumericalResult");
         end
-        function positiveRestorableSafetySlackIsReducedBeforeClfOptimization(testCase)
-            result=runNonlinearPredictiveSafetyValidation(Scenarios="crossing",Frames=19, ...
-                ControllerConfiguration=struct('referenceSpeed',15,'controller',struct('horizonSteps',16)));
-            testCase.assertEqual(result.results.failure,"");
-            trace=result.results.trace;restored=false;
-            for frame=trace
-                attempts=frame.attempts;
-                original=attempts(1).primaryOptimum;
-                if isfinite(original) && frame.primaryOptimum<original-1e-3
-                    restored=true;
-                    % Restoration improves the primary objective; remaining
-                    % positive slack is still explicitly a relaxed result.
-                    testCase.verifyLessThan(frame.primaryOptimum,original);
-                    testCase.verifyTrue(frame.flowRestarted);
-                    testCase.verifyLessThanOrEqual(frame.predictiveBarrierValue,frame.slackCap+1e-5);
-                    testCase.verifyEqual(nnz([frame.solverStages.objective]=="clfSlack"),1);
-                    testCase.verifyFalse(frame.nonlinearValidationPerformed);
-                    testCase.verifyEqual(frame.clfFunction,"nominalCostToGo");
-                end
-            end
-            testCase.verifyTrue(restored);
+        function overlappingHardRowsHaveNoInventedRestorationDirection(testCase)
+            [ego,road,cfg]=localFixture();
+            cfg.controller.horizonSteps=1;
+            cfg.nonlinear.recoveryHorizonSeconds=cfg.controller.sampleTime;
+            target=struct('targetPositionInertial',[0;0], ...
+                'targetVelocityInertial',[0;0],'targetYawInertial',0);
+            % The start and hard completion anchor both overlap. Ordinary
+            % distance multipliers cannot provide a positive-buffer hard row.
+            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
+                'collisionAvoidanceController:noOptimizationSolution');
         end
         function unevaluableShiftUsesFreshInitializationBeforeOptimization(testCase)
             [ego,road,cfg]=localFixture();
@@ -162,6 +151,8 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
             target=struct('targetPositionInertial',[0;0], ...
                 'targetVelocityInertial',[40;0],'targetYawInertial',0);
             [command,inputs,problem]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyEqual(problem.metadata.search.primaryLowerBound, ...
+                cfg.collision.safetyMarginMeters,AbsTol=1e-6);
             testCase.verifyGreaterThan(problem.metadata.search.primaryOptimum,0);
             testCase.verifyGreaterThan(problem.solution.safety,0);
             testCase.verifyFalse(problem.metadata.zeroSlack);
