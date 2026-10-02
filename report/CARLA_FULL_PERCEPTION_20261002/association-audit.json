@@ -1,0 +1,5193 @@
+{
+  "method": "Scoring-only projection of the target collision center through native camera calibration and truth pose. This never changes selected detections or estimator inputs. A center exclusion is a diagnostic, not a full ground-truth box-IoU label.",
+  "selectionRule": "choose_single_detection sorts by confidence, then area independently each frame; targetIdx remains fixed at 1.",
+  "validFramesWhoseBoxExcludesTargetCenter": 34,
+  "frameIds": [
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    23,
+    30,
+    33,
+    34,
+    35,
+    237,
+    243,
+    244,
+    246,
+    247,
+    248,
+    250,
+    251,
+    252,
+    253,
+    254,
+    256,
+    258,
+    259,
+    260,
+    261,
+    262,
+    263,
+    266,
+    268,
+    270,
+    272
+  ],
+  "postTransientCenterIncludedDiagnosticRmseM": 0.40927339827825543,
+  "diagnosticSubsetCount": 177,
+  "representativeWrongSelections": [
+    {
+      "frame": 9,
+      "time": 0.18,
+      "valid": true,
+      "selectedBbox": [
+        388.5686340332031,
+        303.4171447753906,
+        639.496826171875,
+        455.0879821777344
+      ],
+      "trueTargetCenterPixel": [
+        320.1070547181919,
+        352.82893091099544
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.500937448274794
+    },
+    {
+      "frame": 237,
+      "time": 4.74,
+      "valid": true,
+      "selectedBbox": [
+        370.11541748046875,
+        326.4785461425781,
+        470.92889404296875,
+        382.8878173828125
+      ],
+      "trueTargetCenterPixel": [
+        318.6419873440487,
+        404.03985282445205
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 6.1345641812992975
+    },
+    {
+      "frame": 250,
+      "time": 5.0,
+      "valid": true,
+      "selectedBbox": [
+        389.4801940917969,
+        329.7310791015625,
+        597.3524169921875,
+        431.7197570800781
+      ],
+      "trueTargetCenterPixel": [
+        319.1368016566603,
+        402.42067311702107
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.81018442399887
+    }
+  ],
+  "records": [
+    {
+      "frame": 0,
+      "time": 0.0,
+      "valid": true,
+      "selectedBbox": [
+        286.66046142578125,
+        329.8483581542969,
+        353.894287109375,
+        383.5293884277344
+      ],
+      "trueTargetCenterPixel": [
+        320.09846803413217,
+        351.4363204770323
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3589246891747076
+    },
+    {
+      "frame": 1,
+      "time": 0.02,
+      "valid": true,
+      "selectedBbox": [
+        286.481201171875,
+        329.6554870605469,
+        353.94683837890625,
+        383.71441650390625
+      ],
+      "trueTargetCenterPixel": [
+        320.0971823290984,
+        351.6647304331736
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4292128818853105
+    },
+    {
+      "frame": 2,
+      "time": 0.04,
+      "valid": true,
+      "selectedBbox": [
+        286.1356506347656,
+        329.724853515625,
+        354.2962951660156,
+        384.65435791015625
+      ],
+      "trueTargetCenterPixel": [
+        320.0963676451737,
+        351.85932404876775
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4078935481546557
+    },
+    {
+      "frame": 3,
+      "time": 0.06,
+      "valid": true,
+      "selectedBbox": [
+        285.72869873046875,
+        329.8567810058594,
+        354.72808837890625,
+        385.1479797363281
+      ],
+      "trueTargetCenterPixel": [
+        320.0959498505117,
+        352.02393526535485
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4596619959529744
+    },
+    {
+      "frame": 4,
+      "time": 0.08,
+      "valid": true,
+      "selectedBbox": [
+        285.38720703125,
+        329.75885009765625,
+        354.96844482421875,
+        385.595947265625
+      ],
+      "trueTargetCenterPixel": [
+        320.0961011639927,
+        352.1666989505339
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4000181223075064
+    },
+    {
+      "frame": 5,
+      "time": 0.1,
+      "valid": true,
+      "selectedBbox": [
+        284.9529724121094,
+        329.782958984375,
+        355.3752746582031,
+        386.49798583984375
+      ],
+      "trueTargetCenterPixel": [
+        320.0969643950759,
+        352.30239583557346
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.24975135308106133
+    },
+    {
+      "frame": 6,
+      "time": 0.12,
+      "valid": true,
+      "selectedBbox": [
+        284.47259521484375,
+        329.6806335449219,
+        355.8934631347656,
+        387.2168273925781
+      ],
+      "trueTargetCenterPixel": [
+        320.09858473529965,
+        352.4352485188679
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.24694748539266173
+    },
+    {
+      "frame": 7,
+      "time": 0.14,
+      "valid": true,
+      "selectedBbox": [
+        284.1546630859375,
+        329.5924072265625,
+        356.13201904296875,
+        387.1513671875
+      ],
+      "trueTargetCenterPixel": [
+        320.1006953294793,
+        352.56623780138125
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3281967823413133
+    },
+    {
+      "frame": 8,
+      "time": 0.16,
+      "valid": true,
+      "selectedBbox": [
+        283.6732482910156,
+        329.5599670410156,
+        356.54583740234375,
+        388.5689392089844
+      ],
+      "trueTargetCenterPixel": [
+        320.10358186697584,
+        352.69770666361245
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.32730737256006365
+    },
+    {
+      "frame": 9,
+      "time": 0.18,
+      "valid": true,
+      "selectedBbox": [
+        388.5686340332031,
+        303.4171447753906,
+        639.496826171875,
+        455.0879821777344
+      ],
+      "trueTargetCenterPixel": [
+        320.1070547181919,
+        352.82893091099544
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.500937448274794
+    },
+    {
+      "frame": 10,
+      "time": 0.2,
+      "valid": true,
+      "selectedBbox": [
+        390.3497009277344,
+        302.576171875,
+        639.5101318359375,
+        463.9533386230469
+      ],
+      "trueTargetCenterPixel": [
+        320.1099948287419,
+        352.9549029498298
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.9403196376000995
+    },
+    {
+      "frame": 11,
+      "time": 0.22,
+      "valid": true,
+      "selectedBbox": [
+        392.20758056640625,
+        301.07769775390625,
+        639.5091552734375,
+        474.7586669921875
+      ],
+      "trueTargetCenterPixel": [
+        320.1121769160121,
+        353.0727541057428
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.112134027122198
+    },
+    {
+      "frame": 12,
+      "time": 0.24,
+      "valid": true,
+      "selectedBbox": [
+        393.8265380859375,
+        299.58795166015625,
+        639.6024169921875,
+        485.5562438964844
+      ],
+      "trueTargetCenterPixel": [
+        320.11341228457854,
+        353.1832407458853
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.116798291476219
+    },
+    {
+      "frame": 13,
+      "time": 0.26,
+      "valid": true,
+      "selectedBbox": [
+        395.56494140625,
+        298.3468933105469,
+        639.5079956054688,
+        500.4166259765625
+      ],
+      "trueTargetCenterPixel": [
+        320.1135731704791,
+        353.2888679715174
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.1308546726686775
+    },
+    {
+      "frame": 14,
+      "time": 0.28,
+      "valid": true,
+      "selectedBbox": [
+        397.85565185546875,
+        296.9268493652344,
+        639.2713623046875,
+        513.103271484375
+      ],
+      "trueTargetCenterPixel": [
+        320.11274291772156,
+        353.3870089433436
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.102355549701256
+    },
+    {
+      "frame": 15,
+      "time": 0.3,
+      "valid": true,
+      "selectedBbox": [
+        399.6871643066406,
+        295.052978515625,
+        639.3650512695312,
+        520.9463500976562
+      ],
+      "trueTargetCenterPixel": [
+        320.11091706960246,
+        353.4784767492069
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.075612252651509
+    },
+    {
+      "frame": 16,
+      "time": 0.32,
+      "valid": true,
+      "selectedBbox": [
+        279.6851806640625,
+        329.3592529296875,
+        359.9979248046875,
+        393.32989501953125
+      ],
+      "trueTargetCenterPixel": [
+        320.1082004052372,
+        353.56587388761494
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 1.1270673677802172
+    },
+    {
+      "frame": 17,
+      "time": 0.34,
+      "valid": true,
+      "selectedBbox": [
+        279.0282897949219,
+        329.2403564453125,
+        360.60247802734375,
+        394.4322814941406
+      ],
+      "trueTargetCenterPixel": [
+        320.1050598850854,
+        353.6700039501929
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 1.9615129996745901
+    },
+    {
+      "frame": 18,
+      "time": 0.36,
+      "valid": true,
+      "selectedBbox": [
+        278.54779052734375,
+        328.8683776855469,
+        361.329345703125,
+        393.4715881347656
+      ],
+      "trueTargetCenterPixel": [
+        320.102069580882,
+        353.7966393523353
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 1.8753894382301712
+    },
+    {
+      "frame": 19,
+      "time": 0.38,
+      "valid": true,
+      "selectedBbox": [
+        277.92926025390625,
+        328.7536315917969,
+        361.79583740234375,
+        394.50091552734375
+      ],
+      "trueTargetCenterPixel": [
+        320.0987449246458,
+        353.94559832031615
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 1.8274813979242368
+    },
+    {
+      "frame": 20,
+      "time": 0.4,
+      "valid": true,
+      "selectedBbox": [
+        277.47967529296875,
+        328.6455383300781,
+        362.3628234863281,
+        395.04156494140625
+      ],
+      "trueTargetCenterPixel": [
+        320.0954265147772,
+        354.11604216177085
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 1.9159790172233087
+    },
+    {
+      "frame": 21,
+      "time": 0.42,
+      "valid": true,
+      "selectedBbox": [
+        276.979248046875,
+        328.8470764160156,
+        362.80615234375,
+        395.6753234863281
+      ],
+      "trueTargetCenterPixel": [
+        320.0924932892293,
+        354.31417967643847
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 1.919932423839476
+    },
+    {
+      "frame": 22,
+      "time": 0.44,
+      "valid": true,
+      "selectedBbox": [
+        276.3131103515625,
+        328.5573425292969,
+        363.6903991699219,
+        396.8114318847656
+      ],
+      "trueTargetCenterPixel": [
+        320.0960234927292,
+        354.5452899093824
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 1.930279904402052
+    },
+    {
+      "frame": 23,
+      "time": 0.46,
+      "valid": true,
+      "selectedBbox": [
+        423.59063720703125,
+        290.86444091796875,
+        639.4676513671875,
+        543.1470336914062
+      ],
+      "trueTargetCenterPixel": [
+        320.10510617468685,
+        354.80972659425555
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 5.0353264690793615
+    },
+    {
+      "frame": 24,
+      "time": 0.48,
+      "valid": true,
+      "selectedBbox": [
+        275.0960388183594,
+        328.8436584472656,
+        365.15374755859375,
+        398.887939453125
+      ],
+      "trueTargetCenterPixel": [
+        320.1190398279899,
+        355.10468935319466
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.140110537272135
+    },
+    {
+      "frame": 25,
+      "time": 0.5,
+      "valid": true,
+      "selectedBbox": [
+        274.2945251464844,
+        328.9280700683594,
+        366.0264892578125,
+        400.0330505371094
+      ],
+      "trueTargetCenterPixel": [
+        320.1366806664352,
+        355.4271329921355
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.087492851021176
+    },
+    {
+      "frame": 26,
+      "time": 0.52,
+      "valid": true,
+      "selectedBbox": [
+        273.6522521972656,
+        328.78387451171875,
+        366.51220703125,
+        401.0245056152344
+      ],
+      "trueTargetCenterPixel": [
+        320.15438029701727,
+        355.7927555480056
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.379427124980735
+    },
+    {
+      "frame": 27,
+      "time": 0.54,
+      "valid": true,
+      "selectedBbox": [
+        272.8102111816406,
+        329.1158142089844,
+        367.008544921875,
+        402.51837158203125
+      ],
+      "trueTargetCenterPixel": [
+        320.1628208257044,
+        356.1957900263339
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.3827998158251713
+    },
+    {
+      "frame": 28,
+      "time": 0.56,
+      "valid": true,
+      "selectedBbox": [
+        272.060302734375,
+        329.1171569824219,
+        367.8243408203125,
+        404.00823974609375
+      ],
+      "trueTargetCenterPixel": [
+        320.16270872243814,
+        356.63109320465617
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.4436095854532094
+    },
+    {
+      "frame": 29,
+      "time": 0.58,
+      "valid": true,
+      "selectedBbox": [
+        271.4418640136719,
+        328.85400390625,
+        368.76806640625,
+        404.8334655761719
+      ],
+      "trueTargetCenterPixel": [
+        320.15522172386994,
+        357.1050363813936
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.342632122750117
+    },
+    {
+      "frame": 30,
+      "time": 0.6,
+      "valid": true,
+      "selectedBbox": [
+        461.1335144042969,
+        312.563720703125,
+        639.5936889648438,
+        537.3224487304688
+      ],
+      "trueTargetCenterPixel": [
+        320.1421817261462,
+        357.6192373738362
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 5.887759182561385
+    },
+    {
+      "frame": 31,
+      "time": 0.62,
+      "valid": true,
+      "selectedBbox": [
+        270.0810546875,
+        329.41436767578125,
+        370.4938049316406,
+        408.7524719238281
+      ],
+      "trueTargetCenterPixel": [
+        320.12616902399577,
+        358.1706324775204
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.3803531896642998
+    },
+    {
+      "frame": 32,
+      "time": 0.64,
+      "valid": true,
+      "selectedBbox": [
+        269.2422180175781,
+        329.2430725097656,
+        371.3072509765625,
+        410.43402099609375
+      ],
+      "trueTargetCenterPixel": [
+        320.1120452048866,
+        358.7630648792102
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.399865548275955
+    },
+    {
+      "frame": 33,
+      "time": 0.66,
+      "valid": true,
+      "selectedBbox": [
+        487.1535339355469,
+        360.03790283203125,
+        639.51220703125,
+        550.4254150390625
+      ],
+      "trueTargetCenterPixel": [
+        320.10022317267817,
+        359.39198361821417
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 6.154515787739682
+    },
+    {
+      "frame": 34,
+      "time": 0.68,
+      "valid": true,
+      "selectedBbox": [
+        499.1595153808594,
+        363.03125,
+        639.6256103515625,
+        551.75390625
+      ],
+      "trueTargetCenterPixel": [
+        320.091242361595,
+        360.05231792766415
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 6.250004701784574
+    },
+    {
+      "frame": 35,
+      "time": 0.7000000000000001,
+      "valid": true,
+      "selectedBbox": [
+        510.19696044921875,
+        366.3188781738281,
+        639.5592041015625,
+        576.2716064453125
+      ],
+      "trueTargetCenterPixel": [
+        320.0844298583342,
+        360.73729565131146
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 6.3456486250789945
+    },
+    {
+      "frame": 36,
+      "time": 0.72,
+      "valid": true,
+      "selectedBbox": [
+        265.2139587402344,
+        330.3660888671875,
+        374.89813232421875,
+        418.6143493652344
+      ],
+      "trueTargetCenterPixel": [
+        320.07903044892413,
+        361.4374579763185
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.385835652764808
+    },
+    {
+      "frame": 37,
+      "time": 0.74,
+      "valid": true,
+      "selectedBbox": [
+        264.2122497558594,
+        330.24993896484375,
+        375.8868713378906,
+        420.80877685546875
+      ],
+      "trueTargetCenterPixel": [
+        320.07485621976167,
+        362.1460679461193
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.387055901270853
+    },
+    {
+      "frame": 38,
+      "time": 0.76,
+      "valid": true,
+      "selectedBbox": [
+        263.07122802734375,
+        330.76739501953125,
+        376.9305725097656,
+        422.99951171875
+      ],
+      "trueTargetCenterPixel": [
+        320.07217581238956,
+        362.8501852096992
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 2.4109336294292336
+    },
+    {
+      "frame": 39,
+      "time": 0.78,
+      "valid": true,
+      "selectedBbox": [
+        262.2987060546875,
+        331.20025634765625,
+        378.2101135253906,
+        424.9088439941406
+      ],
+      "trueTargetCenterPixel": [
+        320.0707668423105,
+        363.5490877590777
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37884295806704144
+    },
+    {
+      "frame": 40,
+      "time": 0.8,
+      "valid": true,
+      "selectedBbox": [
+        261.0511169433594,
+        331.24774169921875,
+        379.24676513671875,
+        427.0522155761719
+      ],
+      "trueTargetCenterPixel": [
+        320.0706549155498,
+        364.2364643765069
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3383254490020244
+    },
+    {
+      "frame": 41,
+      "time": 0.8200000000000001,
+      "valid": true,
+      "selectedBbox": [
+        259.9024963378906,
+        331.6502380371094,
+        380.5005187988281,
+        429.8780212402344
+      ],
+      "trueTargetCenterPixel": [
+        320.0722435003923,
+        364.894604820899
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41390748145002776
+    },
+    {
+      "frame": 42,
+      "time": 0.84,
+      "valid": true,
+      "selectedBbox": [
+        258.53271484375,
+        332.124755859375,
+        381.6942443847656,
+        432.17132568359375
+      ],
+      "trueTargetCenterPixel": [
+        320.0748338623182,
+        365.52889489839964
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.446008975561558
+    },
+    {
+      "frame": 43,
+      "time": 0.86,
+      "valid": true,
+      "selectedBbox": [
+        257.1288757324219,
+        332.0369873046875,
+        382.76544189453125,
+        434.0886535644531
+      ],
+      "trueTargetCenterPixel": [
+        320.078481589696,
+        366.1466005227769
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4111360529551932
+    },
+    {
+      "frame": 44,
+      "time": 0.88,
+      "valid": true,
+      "selectedBbox": [
+        256.0594177246094,
+        332.442626953125,
+        384.0813903808594,
+        437.53106689453125
+      ],
+      "trueTargetCenterPixel": [
+        320.0834415808464,
+        366.7497884058583
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4020987638021889
+    },
+    {
+      "frame": 45,
+      "time": 0.9,
+      "valid": true,
+      "selectedBbox": [
+        254.63758850097656,
+        332.7501220703125,
+        385.5512390136719,
+        440.0286560058594
+      ],
+      "trueTargetCenterPixel": [
+        320.08791769400005,
+        367.3462226010448
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4769963223280896
+    },
+    {
+      "frame": 46,
+      "time": 0.92,
+      "valid": true,
+      "selectedBbox": [
+        252.85000610351562,
+        332.9682312011719,
+        387.01690673828125,
+        442.28948974609375
+      ],
+      "trueTargetCenterPixel": [
+        320.0988967106226,
+        367.9469199101936
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.458085556793266
+    },
+    {
+      "frame": 47,
+      "time": 0.9400000000000001,
+      "valid": true,
+      "selectedBbox": [
+        251.73770141601562,
+        333.1486511230469,
+        388.5159912109375,
+        445.533447265625
+      ],
+      "trueTargetCenterPixel": [
+        320.1180962002562,
+        368.56060638456097
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.46838948824585747
+    },
+    {
+      "frame": 48,
+      "time": 0.96,
+      "valid": true,
+      "selectedBbox": [
+        250.24642944335938,
+        333.310546875,
+        389.8711242675781,
+        448.9274597167969
+      ],
+      "trueTargetCenterPixel": [
+        320.14409329621344,
+        369.1883609510811
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.43589783728410303
+    },
+    {
+      "frame": 49,
+      "time": 0.98,
+      "valid": true,
+      "selectedBbox": [
+        248.63357543945312,
+        333.087158203125,
+        391.0649719238281,
+        452.0774230957031
+      ],
+      "trueTargetCenterPixel": [
+        320.17648834519525,
+        369.8212895773957
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.1812652134529936
+    },
+    {
+      "frame": 50,
+      "time": 1.0,
+      "valid": true,
+      "selectedBbox": [
+        247.49465942382812,
+        333.2848205566406,
+        392.93560791015625,
+        455.187255859375
+      ],
+      "trueTargetCenterPixel": [
+        320.20921314277814,
+        370.4587462224658
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4608012307316395
+    },
+    {
+      "frame": 51,
+      "time": 1.02,
+      "valid": true,
+      "selectedBbox": [
+        246.041015625,
+        333.0077209472656,
+        394.8180236816406,
+        458.42034912109375
+      ],
+      "trueTargetCenterPixel": [
+        320.22647706688934,
+        371.09005673152774
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38872800190026524
+    },
+    {
+      "frame": 52,
+      "time": 1.04,
+      "valid": true,
+      "selectedBbox": [
+        244.1549072265625,
+        332.963134765625,
+        396.1342468261719,
+        461.41302490234375
+      ],
+      "trueTargetCenterPixel": [
+        320.2300264700368,
+        371.7265508127478
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4761830115484204
+    },
+    {
+      "frame": 53,
+      "time": 1.06,
+      "valid": true,
+      "selectedBbox": [
+        242.26251220703125,
+        333.2996826171875,
+        398.1206359863281,
+        465.11480712890625
+      ],
+      "trueTargetCenterPixel": [
+        320.22184602359954,
+        372.37046324129807
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.48240537893338375
+    },
+    {
+      "frame": 54,
+      "time": 1.08,
+      "valid": true,
+      "selectedBbox": [
+        240.42245483398438,
+        333.521484375,
+        399.75738525390625,
+        468.20599365234375
+      ],
+      "trueTargetCenterPixel": [
+        320.2036487712569,
+        373.0269495891126
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.48608839232273476
+    },
+    {
+      "frame": 55,
+      "time": 1.1,
+      "valid": true,
+      "selectedBbox": [
+        238.54159545898438,
+        333.7424621582031,
+        402.0888671875,
+        472.32196044921875
+      ],
+      "trueTargetCenterPixel": [
+        320.1855501518487,
+        373.7054122326656
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.14456728541851044
+    },
+    {
+      "frame": 56,
+      "time": 1.12,
+      "valid": true,
+      "selectedBbox": [
+        236.50827026367188,
+        333.85955810546875,
+        404.0149841308594,
+        475.95703125
+      ],
+      "trueTargetCenterPixel": [
+        320.17046398063985,
+        374.40773198267925
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.012949400079835126
+    },
+    {
+      "frame": 57,
+      "time": 1.1400000000000001,
+      "valid": true,
+      "selectedBbox": [
+        234.42276000976562,
+        334.06427001953125,
+        406.2637023925781,
+        480.37042236328125
+      ],
+      "trueTargetCenterPixel": [
+        320.159045327902,
+        375.1349564137497
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.0224074289326924
+    },
+    {
+      "frame": 58,
+      "time": 1.16,
+      "valid": true,
+      "selectedBbox": [
+        232.07229614257812,
+        334.18792724609375,
+        408.55780029296875,
+        484.4432373046875
+      ],
+      "trueTargetCenterPixel": [
+        320.15130067869893,
+        375.88750610113624
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.19302687110586747
+    },
+    {
+      "frame": 59,
+      "time": 1.18,
+      "valid": true,
+      "selectedBbox": [
+        229.84812927246094,
+        334.3005065917969,
+        410.9642333984375,
+        489.1903381347656
+      ],
+      "trueTargetCenterPixel": [
+        320.14705735252363,
+        376.66423435452
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4864967250811165
+    },
+    {
+      "frame": 60,
+      "time": 1.2,
+      "valid": true,
+      "selectedBbox": [
+        227.48641967773438,
+        334.60614013671875,
+        413.3872375488281,
+        493.54693603515625
+      ],
+      "trueTargetCenterPixel": [
+        320.14525390744643,
+        377.4619463272815
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4823444378693375
+    },
+    {
+      "frame": 61,
+      "time": 1.22,
+      "valid": true,
+      "selectedBbox": [
+        224.74002075195312,
+        334.96954345703125,
+        416.0030212402344,
+        498.06671142578125
+      ],
+      "trueTargetCenterPixel": [
+        320.14496764103393,
+        378.28010488898497
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2416466106819631
+    },
+    {
+      "frame": 62,
+      "time": 1.24,
+      "valid": true,
+      "selectedBbox": [
+        222.1721954345703,
+        335.126953125,
+        418.8160705566406,
+        504.7330017089844
+      ],
+      "trueTargetCenterPixel": [
+        320.14495978924555,
+        379.1290627285793
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.28034812723720837
+    },
+    {
+      "frame": 63,
+      "time": 1.26,
+      "valid": true,
+      "selectedBbox": [
+        219.104248046875,
+        335.6767578125,
+        421.5794677734375,
+        510.73199462890625
+      ],
+      "trueTargetCenterPixel": [
+        320.14554333151517,
+        380.01143458402646
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2774890910102018
+    },
+    {
+      "frame": 64,
+      "time": 1.28,
+      "valid": true,
+      "selectedBbox": [
+        216.2122802734375,
+        335.97576904296875,
+        424.437744140625,
+        516.59130859375
+      ],
+      "trueTargetCenterPixel": [
+        320.14627644538564,
+        380.9259103834245
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2452347369517878
+    },
+    {
+      "frame": 65,
+      "time": 1.3,
+      "valid": true,
+      "selectedBbox": [
+        212.91622924804688,
+        335.9544372558594,
+        427.60406494140625,
+        522.8837890625
+      ],
+      "trueTargetCenterPixel": [
+        320.14698921029986,
+        381.87100304251453
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4113961612712296
+    },
+    {
+      "frame": 66,
+      "time": 1.32,
+      "valid": true,
+      "selectedBbox": [
+        209.68606567382812,
+        336.3231201171875,
+        430.8494567871094,
+        529.8935546875
+      ],
+      "trueTargetCenterPixel": [
+        320.1479143940583,
+        382.8477512975467
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3750287040026023
+    },
+    {
+      "frame": 67,
+      "time": 1.34,
+      "valid": true,
+      "selectedBbox": [
+        206.68760681152344,
+        336.7401428222656,
+        434.3671569824219,
+        536.9659423828125
+      ],
+      "trueTargetCenterPixel": [
+        320.1379918202364,
+        383.8217203591415
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4034120687218172
+    },
+    {
+      "frame": 68,
+      "time": 1.36,
+      "valid": true,
+      "selectedBbox": [
+        202.67462158203125,
+        336.5799865722656,
+        438.068603515625,
+        543.943359375
+      ],
+      "trueTargetCenterPixel": [
+        320.0974856847487,
+        384.68988712711763
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3630995567220521
+    },
+    {
+      "frame": 69,
+      "time": 1.3800000000000001,
+      "valid": true,
+      "selectedBbox": [
+        199.11117553710938,
+        336.8687744140625,
+        442.27484130859375,
+        553.040771484375
+      ],
+      "trueTargetCenterPixel": [
+        320.0344817612029,
+        385.4564687283227
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.353033521937611
+    },
+    {
+      "frame": 70,
+      "time": 1.4000000000000001,
+      "valid": true,
+      "selectedBbox": [
+        194.80508422851562,
+        336.81634521484375,
+        446.2548828125,
+        560.4337158203125
+      ],
+      "trueTargetCenterPixel": [
+        319.982444286091,
+        386.32159859770303
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3782074533663507
+    },
+    {
+      "frame": 71,
+      "time": 1.42,
+      "valid": true,
+      "selectedBbox": [
+        190.1484832763672,
+        336.9696044921875,
+        450.47210693359375,
+        569.4154052734375
+      ],
+      "trueTargetCenterPixel": [
+        319.95150460672176,
+        387.3606295939543
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.46331282687389314
+    },
+    {
+      "frame": 72,
+      "time": 1.44,
+      "valid": true,
+      "selectedBbox": [
+        185.4385223388672,
+        337.520751953125,
+        455.2845764160156,
+        579.70751953125
+      ],
+      "trueTargetCenterPixel": [
+        319.93840806401397,
+        388.57719484620725
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.46082182471826855
+    },
+    {
+      "frame": 73,
+      "time": 1.46,
+      "valid": true,
+      "selectedBbox": [
+        180.62420654296875,
+        338.2291259765625,
+        459.6038818359375,
+        590.4878540039062
+      ],
+      "trueTargetCenterPixel": [
+        319.93554219332816,
+        389.86164971594997
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4038568521648191
+    },
+    {
+      "frame": 74,
+      "time": 1.48,
+      "valid": true,
+      "selectedBbox": [
+        175.40435791015625,
+        338.9105529785156,
+        464.72705078125,
+        601.8471069335938
+      ],
+      "trueTargetCenterPixel": [
+        319.9365986848878,
+        391.1702851858765
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.25984447914418835
+    },
+    {
+      "frame": 75,
+      "time": 1.5,
+      "valid": true,
+      "selectedBbox": [
+        170.216796875,
+        339.20318603515625,
+        470.4659118652344,
+        614.1621704101562
+      ],
+      "trueTargetCenterPixel": [
+        319.93937284555483,
+        392.4959225366219
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4852666195069848
+    },
+    {
+      "frame": 76,
+      "time": 1.52,
+      "valid": true,
+      "selectedBbox": [
+        163.6381072998047,
+        339.7916564941406,
+        476.18914794921875,
+        626.7284545898438
+      ],
+      "trueTargetCenterPixel": [
+        319.9402675897199,
+        393.83266073132944
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4714446185612667
+    },
+    {
+      "frame": 77,
+      "time": 1.54,
+      "valid": true,
+      "selectedBbox": [
+        157.9064483642578,
+        340.3902893066406,
+        482.55047607421875,
+        639.2728271484375
+      ],
+      "trueTargetCenterPixel": [
+        319.9382398723065,
+        395.1768127210625
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4507559756689917
+    },
+    {
+      "frame": 78,
+      "time": 1.56,
+      "valid": true,
+      "selectedBbox": [
+        151.10960388183594,
+        340.874755859375,
+        488.8148498535156,
+        639.68408203125
+      ],
+      "trueTargetCenterPixel": [
+        319.9330006945726,
+        396.52620949942576
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.43423252008824414
+    },
+    {
+      "frame": 79,
+      "time": 1.58,
+      "valid": true,
+      "selectedBbox": [
+        144.2455291748047,
+        341.6722412109375,
+        495.92718505859375,
+        639.55224609375
+      ],
+      "trueTargetCenterPixel": [
+        319.9250021579956,
+        397.88502586555944
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3339371369063676
+    },
+    {
+      "frame": 80,
+      "time": 1.6,
+      "valid": true,
+      "selectedBbox": [
+        136.68402099609375,
+        341.92681884765625,
+        504.11004638671875,
+        639.3431396484375
+      ],
+      "trueTargetCenterPixel": [
+        319.9070859938902,
+        399.2903136110044
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36733618842793636
+    },
+    {
+      "frame": 81,
+      "time": 1.62,
+      "valid": true,
+      "selectedBbox": [
+        127.95552062988281,
+        342.55865478515625,
+        512.9095458984375,
+        638.975341796875
+      ],
+      "trueTargetCenterPixel": [
+        319.8663529269288,
+        400.77538986675285
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.30276279314141313
+    },
+    {
+      "frame": 82,
+      "time": 1.6400000000000001,
+      "valid": true,
+      "selectedBbox": [
+        116.71197509765625,
+        342.9055480957031,
+        522.1091918945312,
+        639.048095703125
+      ],
+      "trueTargetCenterPixel": [
+        319.80854505466573,
+        402.32566512979594
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2747910110039853
+    },
+    {
+      "frame": 83,
+      "time": 1.6600000000000001,
+      "valid": true,
+      "selectedBbox": [
+        109.42413330078125,
+        343.5653076171875,
+        530.00390625,
+        639.3062133789062
+      ],
+      "trueTargetCenterPixel": [
+        319.7553441834485,
+        403.8769169565976
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.30384775345538384
+    },
+    {
+      "frame": 84,
+      "time": 1.68,
+      "valid": true,
+      "selectedBbox": [
+        98.38200378417969,
+        343.79974365234375,
+        541.0758056640625,
+        639.4219970703125
+      ],
+      "trueTargetCenterPixel": [
+        319.7526222566409,
+        405.24563943871
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3601419388483158
+    },
+    {
+      "frame": 85,
+      "time": 1.7,
+      "valid": true,
+      "selectedBbox": [
+        85.46812438964844,
+        343.66082763671875,
+        554.181640625,
+        639.3333129882812
+      ],
+      "trueTargetCenterPixel": [
+        319.78857234453733,
+        406.44308970263023
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4274508075347309
+    },
+    {
+      "frame": 86,
+      "time": 1.72,
+      "valid": true,
+      "selectedBbox": [
+        85.70704650878906,
+        345.16021728515625,
+        551.2372436523438,
+        639.391357421875
+      ],
+      "trueTargetCenterPixel": [
+        319.4300570422547,
+        407.99996617585595
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4129413692202256
+    },
+    {
+      "frame": 87,
+      "time": 1.74,
+      "valid": true,
+      "selectedBbox": [
+        87.26985168457031,
+        346.2366027832031,
+        546.85791015625,
+        639.300537109375
+      ],
+      "trueTargetCenterPixel": [
+        319.02151953890393,
+        408.8248788846977
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.44007042095907456
+    },
+    {
+      "frame": 88,
+      "time": 1.76,
+      "valid": true,
+      "selectedBbox": [
+        89.81871032714844,
+        346.93341064453125,
+        542.77001953125,
+        639.3671264648438
+      ],
+      "trueTargetCenterPixel": [
+        318.7902825334313,
+        409.16802291271824
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3875767181053656
+    },
+    {
+      "frame": 89,
+      "time": 1.78,
+      "valid": true,
+      "selectedBbox": [
+        91.1387939453125,
+        346.9752502441406,
+        540.4505004882812,
+        639.4090576171875
+      ],
+      "trueTargetCenterPixel": [
+        318.6627476206389,
+        409.13334327043844
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.390247281085058
+    },
+    {
+      "frame": 90,
+      "time": 1.8,
+      "valid": true,
+      "selectedBbox": [
+        92.78996276855469,
+        347.02020263671875,
+        538.9175415039062,
+        639.3330688476562
+      ],
+      "trueTargetCenterPixel": [
+        318.5972040543543,
+        408.7927203751201
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3777255485077625
+    },
+    {
+      "frame": 91,
+      "time": 1.82,
+      "valid": true,
+      "selectedBbox": [
+        94.11122131347656,
+        346.5229797363281,
+        536.9659423828125,
+        639.3599853515625
+      ],
+      "trueTargetCenterPixel": [
+        318.5691847154082,
+        408.21595719568774
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3776075311753708
+    },
+    {
+      "frame": 92,
+      "time": 1.84,
+      "valid": true,
+      "selectedBbox": [
+        95.52275085449219,
+        345.97137451171875,
+        535.5704345703125,
+        639.4508056640625
+      ],
+      "trueTargetCenterPixel": [
+        318.5667266324835,
+        407.47916605878305
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.35244237445484317
+    },
+    {
+      "frame": 93,
+      "time": 1.86,
+      "valid": true,
+      "selectedBbox": [
+        96.40582275390625,
+        345.2938232421875,
+        534.3175048828125,
+        639.491455078125
+      ],
+      "trueTargetCenterPixel": [
+        318.5796414519793,
+        406.6445419676539
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.33405294982304673
+    },
+    {
+      "frame": 94,
+      "time": 1.8800000000000001,
+      "valid": true,
+      "selectedBbox": [
+        97.06416320800781,
+        344.57196044921875,
+        534.7691650390625,
+        639.4920654296875
+      ],
+      "trueTargetCenterPixel": [
+        318.5988345591863,
+        405.76070950367034
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.32662661739672916
+    },
+    {
+      "frame": 95,
+      "time": 1.9000000000000001,
+      "valid": true,
+      "selectedBbox": [
+        97.65547180175781,
+        343.85467529296875,
+        534.2490234375,
+        639.5438232421875
+      ],
+      "trueTargetCenterPixel": [
+        318.62280499651064,
+        404.89332763690993
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.32284288141566364
+    },
+    {
+      "frame": 96,
+      "time": 1.92,
+      "valid": true,
+      "selectedBbox": [
+        98.23612976074219,
+        343.099609375,
+        533.206298828125,
+        639.4617919921875
+      ],
+      "trueTargetCenterPixel": [
+        318.64902512159927,
+        404.06918280358565
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3060908787121224
+    },
+    {
+      "frame": 97,
+      "time": 1.94,
+      "valid": true,
+      "selectedBbox": [
+        98.52699279785156,
+        342.1845703125,
+        532.9277954101562,
+        639.5
+      ],
+      "trueTargetCenterPixel": [
+        318.67658161536934,
+        403.3114410911766
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2949232953339204
+    },
+    {
+      "frame": 98,
+      "time": 1.96,
+      "valid": true,
+      "selectedBbox": [
+        98.72456359863281,
+        341.4850769042969,
+        532.845947265625,
+        639.519775390625
+      ],
+      "trueTargetCenterPixel": [
+        318.70024865373335,
+        402.64536993395774
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.30791015630515484
+    },
+    {
+      "frame": 99,
+      "time": 1.98,
+      "valid": true,
+      "selectedBbox": [
+        98.70613098144531,
+        341.0758972167969,
+        532.7093505859375,
+        639.508056640625
+      ],
+      "trueTargetCenterPixel": [
+        318.7179395823141,
+        402.08374134006334
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2911526111971716
+    },
+    {
+      "frame": 100,
+      "time": 2.0,
+      "valid": true,
+      "selectedBbox": [
+        99.02902221679688,
+        340.5133972167969,
+        532.2913818359375,
+        639.4853515625
+      ],
+      "trueTargetCenterPixel": [
+        318.730471394088,
+        401.62572113556246
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.27347106280632877
+    },
+    {
+      "frame": 101,
+      "time": 2.02,
+      "valid": true,
+      "selectedBbox": [
+        98.78399658203125,
+        340.28533935546875,
+        533.378662109375,
+        639.4381103515625
+      ],
+      "trueTargetCenterPixel": [
+        318.7376878683827,
+        401.26622650853585
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.28122604166595083
+    },
+    {
+      "frame": 102,
+      "time": 2.04,
+      "valid": true,
+      "selectedBbox": [
+        98.81132507324219,
+        340.0912170410156,
+        532.760009765625,
+        639.400146484375
+      ],
+      "trueTargetCenterPixel": [
+        318.739543684775,
+        400.9929867098763
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2758554364990719
+    },
+    {
+      "frame": 103,
+      "time": 2.06,
+      "valid": true,
+      "selectedBbox": [
+        98.3182373046875,
+        339.9109802246094,
+        533.0059814453125,
+        639.4248657226562
+      ],
+      "trueTargetCenterPixel": [
+        318.7381103495198,
+        400.8000764394878
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2520961031406928
+    },
+    {
+      "frame": 104,
+      "time": 2.08,
+      "valid": true,
+      "selectedBbox": [
+        97.98883056640625,
+        339.6402893066406,
+        533.1461181640625,
+        639.4208984375
+      ],
+      "trueTargetCenterPixel": [
+        318.73640206995606,
+        400.6874320905284
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2707347619906029
+    },
+    {
+      "frame": 105,
+      "time": 2.1,
+      "valid": true,
+      "selectedBbox": [
+        97.65370178222656,
+        339.3875732421875,
+        533.5572509765625,
+        639.4386596679688
+      ],
+      "trueTargetCenterPixel": [
+        318.73477820662583,
+        400.63497171741926
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.27048675618781665
+    },
+    {
+      "frame": 106,
+      "time": 2.12,
+      "valid": true,
+      "selectedBbox": [
+        97.25672912597656,
+        339.3852844238281,
+        534.2862548828125,
+        639.4393310546875
+      ],
+      "trueTargetCenterPixel": [
+        318.7347244307982,
+        400.6258878225281
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2795561645132893
+    },
+    {
+      "frame": 107,
+      "time": 2.14,
+      "valid": true,
+      "selectedBbox": [
+        96.85346984863281,
+        339.38153076171875,
+        534.505126953125,
+        639.4161376953125
+      ],
+      "trueTargetCenterPixel": [
+        318.7399779108836,
+        400.6309678796092
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.2971720866433014
+    },
+    {
+      "frame": 108,
+      "time": 2.16,
+      "valid": true,
+      "selectedBbox": [
+        96.44973754882812,
+        339.21649169921875,
+        535.1939697265625,
+        639.3875122070312
+      ],
+      "trueTargetCenterPixel": [
+        318.7514430125921,
+        400.6364901940865
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3139640882299448
+    },
+    {
+      "frame": 109,
+      "time": 2.18,
+      "valid": true,
+      "selectedBbox": [
+        95.92404174804688,
+        339.1749267578125,
+        535.2965698242188,
+        639.3611450195312
+      ],
+      "trueTargetCenterPixel": [
+        318.76489109804766,
+        400.63654591116966
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3124590949371321
+    },
+    {
+      "frame": 110,
+      "time": 2.2,
+      "valid": true,
+      "selectedBbox": [
+        95.79496765136719,
+        339.1421813964844,
+        536.415283203125,
+        639.3413696289062
+      ],
+      "trueTargetCenterPixel": [
+        318.77702821026844,
+        400.6353746038337
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3137295368416144
+    },
+    {
+      "frame": 111,
+      "time": 2.22,
+      "valid": true,
+      "selectedBbox": [
+        94.70216369628906,
+        338.9173889160156,
+        537.5931396484375,
+        639.345458984375
+      ],
+      "trueTargetCenterPixel": [
+        318.7885014780818,
+        400.6305935634149
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.33127266749340495
+    },
+    {
+      "frame": 112,
+      "time": 2.24,
+      "valid": true,
+      "selectedBbox": [
+        93.81649780273438,
+        338.8802490234375,
+        538.3831787109375,
+        639.335205078125
+      ],
+      "trueTargetCenterPixel": [
+        318.7992430282808,
+        400.618071075733
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.31348159442136386
+    },
+    {
+      "frame": 113,
+      "time": 2.2600000000000002,
+      "valid": true,
+      "selectedBbox": [
+        92.83854675292969,
+        338.805908203125,
+        539.394287109375,
+        639.3944702148438
+      ],
+      "trueTargetCenterPixel": [
+        318.8081133313496,
+        400.58832482694913
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3457665286292687
+    },
+    {
+      "frame": 114,
+      "time": 2.2800000000000002,
+      "valid": true,
+      "selectedBbox": [
+        91.93812561035156,
+        338.7459716796875,
+        540.3269653320312,
+        639.3760986328125
+      ],
+      "trueTargetCenterPixel": [
+        318.8148865571257,
+        400.5409118562107
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3318477933829497
+    },
+    {
+      "frame": 115,
+      "time": 2.3000000000000003,
+      "valid": true,
+      "selectedBbox": [
+        90.50682067871094,
+        338.522705078125,
+        542.2052612304688,
+        639.4043579101562
+      ],
+      "trueTargetCenterPixel": [
+        318.8198665968471,
+        400.5245695935009
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36022660956632774
+    },
+    {
+      "frame": 116,
+      "time": 2.32,
+      "valid": true,
+      "selectedBbox": [
+        89.56163024902344,
+        338.47503662109375,
+        542.7849731445312,
+        639.3927001953125
+      ],
+      "trueTargetCenterPixel": [
+        318.82313374675016,
+        400.5569093395784
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36318462297584914
+    },
+    {
+      "frame": 117,
+      "time": 2.34,
+      "valid": true,
+      "selectedBbox": [
+        88.06578063964844,
+        338.43670654296875,
+        543.8295288085938,
+        639.3463745117188
+      ],
+      "trueTargetCenterPixel": [
+        318.82601457191936,
+        400.63437269279854
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38412143589367703
+    },
+    {
+      "frame": 118,
+      "time": 2.36,
+      "valid": true,
+      "selectedBbox": [
+        86.51942443847656,
+        338.41021728515625,
+        545.5297241210938,
+        639.3646240234375
+      ],
+      "trueTargetCenterPixel": [
+        318.8313246037041,
+        400.7463919901248
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3836383913462198
+    },
+    {
+      "frame": 119,
+      "time": 2.38,
+      "valid": true,
+      "selectedBbox": [
+        85.03457641601562,
+        338.4571228027344,
+        547.030029296875,
+        639.3311157226562
+      ],
+      "trueTargetCenterPixel": [
+        318.8379949183295,
+        400.89099462161727
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4015265149510622
+    },
+    {
+      "frame": 120,
+      "time": 2.4,
+      "valid": true,
+      "selectedBbox": [
+        83.49748229980469,
+        338.58917236328125,
+        548.6773681640625,
+        639.2694091796875
+      ],
+      "trueTargetCenterPixel": [
+        318.8468968808244,
+        401.06596315606475
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4048741128154148
+    },
+    {
+      "frame": 121,
+      "time": 2.42,
+      "valid": true,
+      "selectedBbox": [
+        81.9315185546875,
+        338.4237060546875,
+        550.639892578125,
+        639.2674560546875
+      ],
+      "trueTargetCenterPixel": [
+        318.8570974422568,
+        401.2829199101452
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.39054059706901517
+    },
+    {
+      "frame": 122,
+      "time": 2.44,
+      "valid": true,
+      "selectedBbox": [
+        80.81330871582031,
+        338.6884765625,
+        550.7947998046875,
+        639.276123046875
+      ],
+      "trueTargetCenterPixel": [
+        318.8843434453458,
+        401.5172712094682
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3977430385965784
+    },
+    {
+      "frame": 123,
+      "time": 2.46,
+      "valid": true,
+      "selectedBbox": [
+        80.96504211425781,
+        339.08447265625,
+        550.7681884765625,
+        639.24365234375
+      ],
+      "trueTargetCenterPixel": [
+        318.73971832550757,
+        401.67004246454803
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.39315097955492434
+    },
+    {
+      "frame": 124,
+      "time": 2.48,
+      "valid": true,
+      "selectedBbox": [
+        80.46920776367188,
+        339.28021240234375,
+        550.2291259765625,
+        639.2227172851562
+      ],
+      "trueTargetCenterPixel": [
+        318.66063010089937,
+        401.8373607885616
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4105977014443807
+    },
+    {
+      "frame": 125,
+      "time": 2.5,
+      "valid": true,
+      "selectedBbox": [
+        80.55337524414062,
+        339.36090087890625,
+        550.8023071289062,
+        639.2265625
+      ],
+      "trueTargetCenterPixel": [
+        318.621497267135,
+        402.01619551727015
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4010589849396138
+    },
+    {
+      "frame": 126,
+      "time": 2.52,
+      "valid": true,
+      "selectedBbox": [
+        80.05331420898438,
+        339.5975341796875,
+        549.8910522460938,
+        639.234375
+      ],
+      "trueTargetCenterPixel": [
+        318.60815099108544,
+        402.19447987352
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41850328396064906
+    },
+    {
+      "frame": 127,
+      "time": 2.54,
+      "valid": true,
+      "selectedBbox": [
+        80.08851623535156,
+        339.6245422363281,
+        550.39990234375,
+        639.2913818359375
+      ],
+      "trueTargetCenterPixel": [
+        318.6126045666491,
+        402.3612749022339
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4235933960919682
+    },
+    {
+      "frame": 128,
+      "time": 2.56,
+      "valid": true,
+      "selectedBbox": [
+        79.70925903320312,
+        339.7304382324219,
+        550.24560546875,
+        639.329345703125
+      ],
+      "trueTargetCenterPixel": [
+        318.62394767085465,
+        402.4980793991108
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4302726265921708
+    },
+    {
+      "frame": 129,
+      "time": 2.58,
+      "valid": true,
+      "selectedBbox": [
+        79.8548583984375,
+        339.7265930175781,
+        550.6549072265625,
+        639.3109130859375
+      ],
+      "trueTargetCenterPixel": [
+        318.6383632615545,
+        402.5748850806555
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4237066880433495
+    },
+    {
+      "frame": 130,
+      "time": 2.6,
+      "valid": true,
+      "selectedBbox": [
+        78.98941040039062,
+        339.4985046386719,
+        550.9588623046875,
+        639.2467041015625
+      ],
+      "trueTargetCenterPixel": [
+        318.6537256207086,
+        402.59768584718
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.42928346431577874
+    },
+    {
+      "frame": 131,
+      "time": 2.62,
+      "valid": true,
+      "selectedBbox": [
+        78.97369384765625,
+        339.7709045410156,
+        550.9590454101562,
+        639.270263671875
+      ],
+      "trueTargetCenterPixel": [
+        318.659384984328,
+        402.733960444611
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4192329316202549
+    },
+    {
+      "frame": 132,
+      "time": 2.64,
+      "valid": true,
+      "selectedBbox": [
+        79.17913818359375,
+        339.7461853027344,
+        550.8517456054688,
+        639.3483276367188
+      ],
+      "trueTargetCenterPixel": [
+        318.66294604259804,
+        402.8493077841772
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.42382726176809044
+    },
+    {
+      "frame": 133,
+      "time": 2.66,
+      "valid": true,
+      "selectedBbox": [
+        79.03469848632812,
+        339.728515625,
+        550.845458984375,
+        639.3150634765625
+      ],
+      "trueTargetCenterPixel": [
+        318.6645279872637,
+        402.95638935134576
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3977390358711663
+    },
+    {
+      "frame": 134,
+      "time": 2.68,
+      "valid": true,
+      "selectedBbox": [
+        80.14888000488281,
+        339.8467712402344,
+        550.8458862304688,
+        639.2842407226562
+      ],
+      "trueTargetCenterPixel": [
+        318.66667036054,
+        403.05662166076087
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3966293089883311
+    },
+    {
+      "frame": 135,
+      "time": 2.7,
+      "valid": true,
+      "selectedBbox": [
+        79.46713256835938,
+        339.85595703125,
+        550.6815185546875,
+        639.3182983398438
+      ],
+      "trueTargetCenterPixel": [
+        318.67074530772754,
+        403.1451545593738
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.39481842301406744
+    },
+    {
+      "frame": 136,
+      "time": 2.72,
+      "valid": true,
+      "selectedBbox": [
+        79.75247192382812,
+        340.0393981933594,
+        551.1478271484375,
+        639.3441772460938
+      ],
+      "trueTargetCenterPixel": [
+        318.67396259892746,
+        403.2019017128751
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41044033518301104
+    },
+    {
+      "frame": 137,
+      "time": 2.74,
+      "valid": true,
+      "selectedBbox": [
+        79.40863037109375,
+        339.98638916015625,
+        551.209716796875,
+        639.382080078125
+      ],
+      "trueTargetCenterPixel": [
+        318.6776653734008,
+        403.25963409965215
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41212962941472403
+    },
+    {
+      "frame": 138,
+      "time": 2.7600000000000002,
+      "valid": true,
+      "selectedBbox": [
+        80.07109069824219,
+        340.0179443359375,
+        551.3607177734375,
+        639.2966918945312
+      ],
+      "trueTargetCenterPixel": [
+        318.6809577192377,
+        403.321458624547
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3990068242795613
+    },
+    {
+      "frame": 139,
+      "time": 2.7800000000000002,
+      "valid": true,
+      "selectedBbox": [
+        79.5257568359375,
+        340.13623046875,
+        551.134033203125,
+        639.277587890625
+      ],
+      "trueTargetCenterPixel": [
+        318.6838922407589,
+        403.3898967453121
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38613439871060995
+    },
+    {
+      "frame": 140,
+      "time": 2.8000000000000003,
+      "valid": true,
+      "selectedBbox": [
+        79.54937744140625,
+        340.1629638671875,
+        551.2340087890625,
+        639.2783203125
+      ],
+      "trueTargetCenterPixel": [
+        318.68759631826435,
+        403.4896524774185
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4154730682386124
+    },
+    {
+      "frame": 141,
+      "time": 2.82,
+      "valid": true,
+      "selectedBbox": [
+        79.83187866210938,
+        340.44232177734375,
+        551.3489990234375,
+        639.3123168945312
+      ],
+      "trueTargetCenterPixel": [
+        318.6913967315623,
+        403.6199543067717
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.42029725774188964
+    },
+    {
+      "frame": 142,
+      "time": 2.84,
+      "valid": true,
+      "selectedBbox": [
+        79.51766967773438,
+        340.66778564453125,
+        551.06689453125,
+        639.194091796875
+      ],
+      "trueTargetCenterPixel": [
+        318.69511635023105,
+        403.7792662535519
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37216504738539663
+    },
+    {
+      "frame": 143,
+      "time": 2.86,
+      "valid": true,
+      "selectedBbox": [
+        79.48699951171875,
+        341.120361328125,
+        551.121826171875,
+        639.2395629882812
+      ],
+      "trueTargetCenterPixel": [
+        318.69894966981644,
+        403.96125192119246
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37105961039419005
+    },
+    {
+      "frame": 144,
+      "time": 2.88,
+      "valid": true,
+      "selectedBbox": [
+        79.26727294921875,
+        341.4061584472656,
+        551.2069091796875,
+        639.3135375976562
+      ],
+      "trueTargetCenterPixel": [
+        318.7010961540092,
+        404.1527510977221
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3811696978183281
+    },
+    {
+      "frame": 145,
+      "time": 2.9,
+      "valid": true,
+      "selectedBbox": [
+        79.712890625,
+        341.45123291015625,
+        551.5984497070312,
+        639.330810546875
+      ],
+      "trueTargetCenterPixel": [
+        318.70259512046715,
+        404.3482570915587
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37706099436939156
+    },
+    {
+      "frame": 146,
+      "time": 2.92,
+      "valid": true,
+      "selectedBbox": [
+        79.43768310546875,
+        341.3985900878906,
+        551.1400146484375,
+        639.2882080078125
+      ],
+      "trueTargetCenterPixel": [
+        318.70380248618875,
+        404.5458687935703
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37579755870250975
+    },
+    {
+      "frame": 147,
+      "time": 2.94,
+      "valid": true,
+      "selectedBbox": [
+        79.26153564453125,
+        341.7047119140625,
+        551.2780151367188,
+        639.250244140625
+      ],
+      "trueTargetCenterPixel": [
+        318.7055655499756,
+        404.7356744513026
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36654017648383697
+    },
+    {
+      "frame": 148,
+      "time": 2.96,
+      "valid": true,
+      "selectedBbox": [
+        79.50616455078125,
+        341.9425964355469,
+        551.1043090820312,
+        639.3370361328125
+      ],
+      "trueTargetCenterPixel": [
+        318.70733109979597,
+        404.90806698019077
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3657442430585763
+    },
+    {
+      "frame": 149,
+      "time": 2.98,
+      "valid": true,
+      "selectedBbox": [
+        79.7762451171875,
+        342.10595703125,
+        551.1873779296875,
+        639.3035278320312
+      ],
+      "trueTargetCenterPixel": [
+        318.71097209403155,
+        405.07171413018887
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38005226331196296
+    },
+    {
+      "frame": 150,
+      "time": 3.0,
+      "valid": true,
+      "selectedBbox": [
+        79.12954711914062,
+        342.3514404296875,
+        551.2177734375,
+        639.275634765625
+      ],
+      "trueTargetCenterPixel": [
+        318.7151008096979,
+        405.2102318605322
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.35540299912517986
+    },
+    {
+      "frame": 151,
+      "time": 3.02,
+      "valid": true,
+      "selectedBbox": [
+        79.316162109375,
+        342.44873046875,
+        551.0579833984375,
+        639.271484375
+      ],
+      "trueTargetCenterPixel": [
+        318.7195198547667,
+        405.32112785201656
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3616425182897984
+    },
+    {
+      "frame": 152,
+      "time": 3.04,
+      "valid": true,
+      "selectedBbox": [
+        79.79608154296875,
+        342.4418640136719,
+        551.1527099609375,
+        639.316650390625
+      ],
+      "trueTargetCenterPixel": [
+        318.72404201573374,
+        405.4051984625114
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.361674722234725
+    },
+    {
+      "frame": 153,
+      "time": 3.06,
+      "valid": true,
+      "selectedBbox": [
+        79.62747192382812,
+        342.4215393066406,
+        551.4327392578125,
+        639.37109375
+      ],
+      "trueTargetCenterPixel": [
+        318.7259935265376,
+        405.4542812191269
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3540240423384486
+    },
+    {
+      "frame": 154,
+      "time": 3.08,
+      "valid": true,
+      "selectedBbox": [
+        79.77655029296875,
+        342.28985595703125,
+        551.5404052734375,
+        639.2814331054688
+      ],
+      "trueTargetCenterPixel": [
+        318.72441394077936,
+        405.4525090353304
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3586086776405689
+    },
+    {
+      "frame": 155,
+      "time": 3.1,
+      "valid": true,
+      "selectedBbox": [
+        79.25396728515625,
+        342.32537841796875,
+        551.258056640625,
+        639.3699951171875
+      ],
+      "trueTargetCenterPixel": [
+        318.72069606574445,
+        405.4062445115066
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3545936368311839
+    },
+    {
+      "frame": 156,
+      "time": 3.12,
+      "valid": true,
+      "selectedBbox": [
+        79.91815185546875,
+        342.1264953613281,
+        551.5890502929688,
+        639.3106689453125
+      ],
+      "trueTargetCenterPixel": [
+        318.7161976451625,
+        405.3233943757983
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3414219338079097
+    },
+    {
+      "frame": 157,
+      "time": 3.14,
+      "valid": true,
+      "selectedBbox": [
+        79.32220458984375,
+        341.7815856933594,
+        551.46337890625,
+        639.26025390625
+      ],
+      "trueTargetCenterPixel": [
+        318.71116821860153,
+        405.217348740869
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3682100004775227
+    },
+    {
+      "frame": 158,
+      "time": 3.16,
+      "valid": true,
+      "selectedBbox": [
+        79.25201416015625,
+        341.48651123046875,
+        551.3349609375,
+        639.28173828125
+      ],
+      "trueTargetCenterPixel": [
+        318.70560998336015,
+        405.1170918121284
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.39059316837528324
+    },
+    {
+      "frame": 159,
+      "time": 3.18,
+      "valid": true,
+      "selectedBbox": [
+        79.21002197265625,
+        341.64373779296875,
+        551.021240234375,
+        639.2767333984375
+      ],
+      "trueTargetCenterPixel": [
+        318.69946951992154,
+        405.026241439873
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3625633257202462
+    },
+    {
+      "frame": 160,
+      "time": 3.2,
+      "valid": true,
+      "selectedBbox": [
+        80.05073547363281,
+        341.69921875,
+        551.4481201171875,
+        639.2606811523438
+      ],
+      "trueTargetCenterPixel": [
+        318.6933489188641,
+        404.9475494400425
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3887085748523676
+    },
+    {
+      "frame": 161,
+      "time": 3.22,
+      "valid": true,
+      "selectedBbox": [
+        79.67416381835938,
+        341.4313049316406,
+        551.3038330078125,
+        639.3209838867188
+      ],
+      "trueTargetCenterPixel": [
+        318.6847421069117,
+        404.9047787558244
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3626721488944388
+    },
+    {
+      "frame": 162,
+      "time": 3.24,
+      "valid": true,
+      "selectedBbox": [
+        79.7486572265625,
+        341.34228515625,
+        551.0008544921875,
+        639.2405395507812
+      ],
+      "trueTargetCenterPixel": [
+        318.67448817151666,
+        404.88901088173577
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3537399033038022
+    },
+    {
+      "frame": 163,
+      "time": 3.2600000000000002,
+      "valid": true,
+      "selectedBbox": [
+        79.6473388671875,
+        341.4389953613281,
+        550.981689453125,
+        639.2998046875
+      ],
+      "trueTargetCenterPixel": [
+        318.6680378118806,
+        404.85475704355486
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3682964337428267
+    },
+    {
+      "frame": 164,
+      "time": 3.2800000000000002,
+      "valid": true,
+      "selectedBbox": [
+        79.977783203125,
+        341.51611328125,
+        550.9105224609375,
+        639.3447265625
+      ],
+      "trueTargetCenterPixel": [
+        318.6615981955123,
+        404.8196498380953
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3561439479090411
+    },
+    {
+      "frame": 165,
+      "time": 3.3000000000000003,
+      "valid": true,
+      "selectedBbox": [
+        79.19683837890625,
+        341.62432861328125,
+        550.6571655273438,
+        639.3509521484375
+      ],
+      "trueTargetCenterPixel": [
+        318.6551741716506,
+        404.7822905880785
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3867637786049965
+    },
+    {
+      "frame": 166,
+      "time": 3.3200000000000003,
+      "valid": true,
+      "selectedBbox": [
+        79.77984619140625,
+        341.19549560546875,
+        550.780517578125,
+        639.3834228515625
+      ],
+      "trueTargetCenterPixel": [
+        318.6485884155528,
+        404.7417392474301
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3689767290973077
+    },
+    {
+      "frame": 167,
+      "time": 3.34,
+      "valid": true,
+      "selectedBbox": [
+        80.03166198730469,
+        341.1766357421875,
+        551.0424194335938,
+        639.4095458984375
+      ],
+      "trueTargetCenterPixel": [
+        318.64154674151797,
+        404.6997167076895
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3692570528711438
+    },
+    {
+      "frame": 168,
+      "time": 3.36,
+      "valid": true,
+      "selectedBbox": [
+        79.99789428710938,
+        341.10528564453125,
+        550.9533081054688,
+        639.336181640625
+      ],
+      "trueTargetCenterPixel": [
+        318.6343960081933,
+        404.6576437724286
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36975185456728793
+    },
+    {
+      "frame": 169,
+      "time": 3.38,
+      "valid": true,
+      "selectedBbox": [
+        80.07537841796875,
+        341.1646728515625,
+        550.4107666015625,
+        639.3778076171875
+      ],
+      "trueTargetCenterPixel": [
+        318.62710569200993,
+        404.60733651932816
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38990844765063826
+    },
+    {
+      "frame": 170,
+      "time": 3.4,
+      "valid": true,
+      "selectedBbox": [
+        79.94354248046875,
+        341.24810791015625,
+        550.542724609375,
+        639.383056640625
+      ],
+      "trueTargetCenterPixel": [
+        318.6197799067293,
+        404.5486443801337
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3983609824554638
+    },
+    {
+      "frame": 171,
+      "time": 3.42,
+      "valid": true,
+      "selectedBbox": [
+        79.9661865234375,
+        341.41668701171875,
+        551.077392578125,
+        639.385498046875
+      ],
+      "trueTargetCenterPixel": [
+        318.611633674443,
+        404.4775339845474
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.39977565748725025
+    },
+    {
+      "frame": 172,
+      "time": 3.44,
+      "valid": true,
+      "selectedBbox": [
+        79.53103637695312,
+        341.4331359863281,
+        551.1817626953125,
+        639.4044799804688
+      ],
+      "trueTargetCenterPixel": [
+        318.60284939074756,
+        404.38262290514166
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3796768544525298
+    },
+    {
+      "frame": 173,
+      "time": 3.46,
+      "valid": true,
+      "selectedBbox": [
+        79.63043212890625,
+        341.22027587890625,
+        550.8861083984375,
+        639.3878784179688
+      ],
+      "trueTargetCenterPixel": [
+        318.5939816396484,
+        404.2643218616604
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4178559605815186
+    },
+    {
+      "frame": 174,
+      "time": 3.48,
+      "valid": true,
+      "selectedBbox": [
+        79.6080322265625,
+        341.27728271484375,
+        551.1068115234375,
+        639.41064453125
+      ],
+      "trueTargetCenterPixel": [
+        318.5854376073483,
+        404.1203197119634
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3794909259596631
+    },
+    {
+      "frame": 175,
+      "time": 3.5,
+      "valid": true,
+      "selectedBbox": [
+        79.99053955078125,
+        341.22259521484375,
+        550.957763671875,
+        639.42138671875
+      ],
+      "trueTargetCenterPixel": [
+        318.5786400047228,
+        403.96110902345055
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3981011044175205
+    },
+    {
+      "frame": 176,
+      "time": 3.52,
+      "valid": true,
+      "selectedBbox": [
+        79.6263427734375,
+        341.30426025390625,
+        550.4706420898438,
+        639.3157958984375
+      ],
+      "trueTargetCenterPixel": [
+        318.5757122836004,
+        403.8154224674574
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3913752480891331
+    },
+    {
+      "frame": 177,
+      "time": 3.54,
+      "valid": true,
+      "selectedBbox": [
+        79.53912353515625,
+        341.2978820800781,
+        550.1224975585938,
+        639.310791015625
+      ],
+      "trueTargetCenterPixel": [
+        318.5749559392903,
+        403.68693018281266
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4125544021831917
+    },
+    {
+      "frame": 178,
+      "time": 3.56,
+      "valid": true,
+      "selectedBbox": [
+        79.51409912109375,
+        341.331787109375,
+        550.5838623046875,
+        639.3405151367188
+      ],
+      "trueTargetCenterPixel": [
+        318.5758190368565,
+        403.5788436342414
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4112858893299894
+    },
+    {
+      "frame": 179,
+      "time": 3.58,
+      "valid": true,
+      "selectedBbox": [
+        79.65850830078125,
+        341.1489562988281,
+        550.8760986328125,
+        639.2890625
+      ],
+      "trueTargetCenterPixel": [
+        318.5769582131746,
+        403.49022607019896
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.39300099916890563
+    },
+    {
+      "frame": 180,
+      "time": 3.6,
+      "valid": true,
+      "selectedBbox": [
+        79.935546875,
+        341.1722412109375,
+        550.6611328125,
+        639.3161010742188
+      ],
+      "trueTargetCenterPixel": [
+        318.57826982077137,
+        403.4192068733154
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.40023950547573295
+    },
+    {
+      "frame": 181,
+      "time": 3.62,
+      "valid": true,
+      "selectedBbox": [
+        79.83648681640625,
+        341.03485107421875,
+        550.7465209960938,
+        639.3015747070312
+      ],
+      "trueTargetCenterPixel": [
+        318.5797993118849,
+        403.3682969682837
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38697329607343783
+    },
+    {
+      "frame": 182,
+      "time": 3.64,
+      "valid": true,
+      "selectedBbox": [
+        79.67095947265625,
+        340.9532470703125,
+        551.1808471679688,
+        639.3660888671875
+      ],
+      "trueTargetCenterPixel": [
+        318.581187512,
+        403.3452892494682
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3953286646738775
+    },
+    {
+      "frame": 183,
+      "time": 3.66,
+      "valid": true,
+      "selectedBbox": [
+        79.90106201171875,
+        340.8698425292969,
+        550.736572265625,
+        639.39697265625
+      ],
+      "trueTargetCenterPixel": [
+        318.5828318353501,
+        403.3436069578901
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3763520965649161
+    },
+    {
+      "frame": 184,
+      "time": 3.68,
+      "valid": true,
+      "selectedBbox": [
+        79.42706298828125,
+        340.8418273925781,
+        550.920654296875,
+        639.4471435546875
+      ],
+      "trueTargetCenterPixel": [
+        318.58471030785057,
+        403.35780077183495
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3768687972970282
+    },
+    {
+      "frame": 185,
+      "time": 3.7,
+      "valid": true,
+      "selectedBbox": [
+        79.11990356445312,
+        340.9185791015625,
+        551.1185302734375,
+        639.4002685546875
+      ],
+      "trueTargetCenterPixel": [
+        318.58665899431253,
+        403.38157008366807
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38718064766021476
+    },
+    {
+      "frame": 186,
+      "time": 3.72,
+      "valid": true,
+      "selectedBbox": [
+        80.07646179199219,
+        340.940673828125,
+        550.5865478515625,
+        639.3579711914062
+      ],
+      "trueTargetCenterPixel": [
+        318.5889591596913,
+        403.4120446571766
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4148889467511734
+    },
+    {
+      "frame": 187,
+      "time": 3.74,
+      "valid": true,
+      "selectedBbox": [
+        79.58621215820312,
+        341.01123046875,
+        550.7831420898438,
+        639.3680419921875
+      ],
+      "trueTargetCenterPixel": [
+        318.5914783632757,
+        403.44864737987297
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4073670825009381
+    },
+    {
+      "frame": 188,
+      "time": 3.7600000000000002,
+      "valid": true,
+      "selectedBbox": [
+        79.65509033203125,
+        340.9359130859375,
+        551.1151733398438,
+        639.3701782226562
+      ],
+      "trueTargetCenterPixel": [
+        318.59367743899423,
+        403.49119794599665
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38852558286000727
+    },
+    {
+      "frame": 189,
+      "time": 3.7800000000000002,
+      "valid": true,
+      "selectedBbox": [
+        79.74627685546875,
+        340.9704284667969,
+        551.1312866210938,
+        639.3548583984375
+      ],
+      "trueTargetCenterPixel": [
+        318.5956855398768,
+        403.53045830866006
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3955542662169073
+    },
+    {
+      "frame": 190,
+      "time": 3.8000000000000003,
+      "valid": true,
+      "selectedBbox": [
+        79.83636474609375,
+        341.003173828125,
+        550.8883056640625,
+        639.33349609375
+      ],
+      "trueTargetCenterPixel": [
+        318.597373857025,
+        403.56664756917445
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38043253988493475
+    },
+    {
+      "frame": 191,
+      "time": 3.8200000000000003,
+      "valid": true,
+      "selectedBbox": [
+        79.59475708007812,
+        340.9871826171875,
+        550.9317626953125,
+        639.2870483398438
+      ],
+      "trueTargetCenterPixel": [
+        318.5990841762174,
+        403.59925549016066
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37294988255284234
+    },
+    {
+      "frame": 192,
+      "time": 3.84,
+      "valid": true,
+      "selectedBbox": [
+        79.63897705078125,
+        340.868408203125,
+        551.0975952148438,
+        639.3349609375
+      ],
+      "trueTargetCenterPixel": [
+        318.60028070880503,
+        403.62556173259946
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3753752315711342
+    },
+    {
+      "frame": 193,
+      "time": 3.86,
+      "valid": true,
+      "selectedBbox": [
+        80.12782287597656,
+        340.86761474609375,
+        551.107177734375,
+        639.353759765625
+      ],
+      "trueTargetCenterPixel": [
+        318.60147228094803,
+        403.64592081528417
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3741809947398264
+    },
+    {
+      "frame": 194,
+      "time": 3.88,
+      "valid": true,
+      "selectedBbox": [
+        80.51724243164062,
+        341.0233459472656,
+        550.4877319335938,
+        639.2951049804688
+      ],
+      "trueTargetCenterPixel": [
+        318.6024196028967,
+        403.65752306394063
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37589424625032686
+    },
+    {
+      "frame": 195,
+      "time": 3.9,
+      "valid": true,
+      "selectedBbox": [
+        79.818115234375,
+        341.0812683105469,
+        551.0821533203125,
+        639.315185546875
+      ],
+      "trueTargetCenterPixel": [
+        318.6037471011623,
+        403.6542630716833
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36712876911896003
+    },
+    {
+      "frame": 196,
+      "time": 3.92,
+      "valid": true,
+      "selectedBbox": [
+        79.84307861328125,
+        341.04937744140625,
+        551.347412109375,
+        639.3765869140625
+      ],
+      "trueTargetCenterPixel": [
+        318.6039153699624,
+        403.6439776816536
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3789297259057843
+    },
+    {
+      "frame": 197,
+      "time": 3.94,
+      "valid": true,
+      "selectedBbox": [
+        80.13691711425781,
+        341.17315673828125,
+        551.1083984375,
+        639.3204345703125
+      ],
+      "trueTargetCenterPixel": [
+        318.60363301880926,
+        403.63006978576345
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36224839820706745
+    },
+    {
+      "frame": 198,
+      "time": 3.96,
+      "valid": true,
+      "selectedBbox": [
+        79.57723999023438,
+        340.9656066894531,
+        550.8217163085938,
+        639.3193359375
+      ],
+      "trueTargetCenterPixel": [
+        318.6027396686161,
+        403.6066338607358
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.33747330540177867
+    },
+    {
+      "frame": 199,
+      "time": 3.98,
+      "valid": true,
+      "selectedBbox": [
+        80.2447509765625,
+        340.9271240234375,
+        550.623046875,
+        639.3338623046875
+      ],
+      "trueTargetCenterPixel": [
+        318.60194340973766,
+        403.5484998170776
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36698511442749987
+    },
+    {
+      "frame": 200,
+      "time": 4.0,
+      "valid": true,
+      "selectedBbox": [
+        80.44827270507812,
+        340.9221496582031,
+        551.2088012695312,
+        639.2882080078125
+      ],
+      "trueTargetCenterPixel": [
+        318.6013637750796,
+        403.45716119529015
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3236762919730141
+    },
+    {
+      "frame": 201,
+      "time": 4.0200000000000005,
+      "valid": true,
+      "selectedBbox": [
+        79.652587890625,
+        340.6995544433594,
+        550.8306884765625,
+        639.2678833007812
+      ],
+      "trueTargetCenterPixel": [
+        318.6009679342562,
+        403.3410240646365
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4118579950344287
+    },
+    {
+      "frame": 202,
+      "time": 4.04,
+      "valid": true,
+      "selectedBbox": [
+        79.20672607421875,
+        340.6094970703125,
+        550.8048706054688,
+        639.3017578125
+      ],
+      "trueTargetCenterPixel": [
+        318.60074234882245,
+        403.2039397958819
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36144967720019594
+    },
+    {
+      "frame": 203,
+      "time": 4.0600000000000005,
+      "valid": true,
+      "selectedBbox": [
+        79.484375,
+        340.4256896972656,
+        551.341796875,
+        639.2584838867188
+      ],
+      "trueTargetCenterPixel": [
+        318.60070474282634,
+        403.0458185490727
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.352195584956182
+    },
+    {
+      "frame": 204,
+      "time": 4.08,
+      "valid": true,
+      "selectedBbox": [
+        79.59210205078125,
+        340.2030334472656,
+        551.512451171875,
+        639.2525634765625
+      ],
+      "trueTargetCenterPixel": [
+        318.6007577424039,
+        402.8679693376986
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.33485320101519295
+    },
+    {
+      "frame": 205,
+      "time": 4.1,
+      "valid": true,
+      "selectedBbox": [
+        79.53173828125,
+        340.07574462890625,
+        551.568115234375,
+        639.2672119140625
+      ],
+      "trueTargetCenterPixel": [
+        318.6022363916683,
+        402.67330597257745
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3511849588901828
+    },
+    {
+      "frame": 206,
+      "time": 4.12,
+      "valid": true,
+      "selectedBbox": [
+        79.6766357421875,
+        339.81005859375,
+        550.8212890625,
+        639.1781005859375
+      ],
+      "trueTargetCenterPixel": [
+        318.6043453922437,
+        402.4666039217594
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3555719963282114
+    },
+    {
+      "frame": 207,
+      "time": 4.14,
+      "valid": true,
+      "selectedBbox": [
+        79.04010009765625,
+        339.64520263671875,
+        551.6285400390625,
+        639.1954345703125
+      ],
+      "trueTargetCenterPixel": [
+        318.6068905068253,
+        402.2538096939488
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3433984393802278
+    },
+    {
+      "frame": 208,
+      "time": 4.16,
+      "valid": true,
+      "selectedBbox": [
+        79.70761108398438,
+        339.5211181640625,
+        550.7835693359375,
+        639.2293701171875
+      ],
+      "trueTargetCenterPixel": [
+        318.6092931634723,
+        402.0471769764593
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3566738226422287
+    },
+    {
+      "frame": 209,
+      "time": 4.18,
+      "valid": true,
+      "selectedBbox": [
+        79.5443115234375,
+        339.2742614746094,
+        550.8782958984375,
+        639.1901245117188
+      ],
+      "trueTargetCenterPixel": [
+        318.6115446448949,
+        401.853046591065
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3595691397003202
+    },
+    {
+      "frame": 210,
+      "time": 4.2,
+      "valid": true,
+      "selectedBbox": [
+        79.22491455078125,
+        339.00994873046875,
+        550.7550048828125,
+        639.2747802734375
+      ],
+      "trueTargetCenterPixel": [
+        318.61328389298325,
+        401.6735141459687
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3683085282816942
+    },
+    {
+      "frame": 211,
+      "time": 4.22,
+      "valid": true,
+      "selectedBbox": [
+        79.44189453125,
+        338.9106140136719,
+        551.1536254882812,
+        639.24560546875
+      ],
+      "trueTargetCenterPixel": [
+        318.6151004736278,
+        401.5084718453369
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3631485470049494
+    },
+    {
+      "frame": 212,
+      "time": 4.24,
+      "valid": true,
+      "selectedBbox": [
+        79.3980712890625,
+        338.82952880859375,
+        551.2734985351562,
+        639.254150390625
+      ],
+      "trueTargetCenterPixel": [
+        318.6168004871708,
+        401.3717850815537
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37147404246573357
+    },
+    {
+      "frame": 213,
+      "time": 4.26,
+      "valid": true,
+      "selectedBbox": [
+        79.66143798828125,
+        338.746826171875,
+        551.5394897460938,
+        639.234619140625
+      ],
+      "trueTargetCenterPixel": [
+        318.6190852253663,
+        401.2709965224601
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3672190090820761
+    },
+    {
+      "frame": 214,
+      "time": 4.28,
+      "valid": true,
+      "selectedBbox": [
+        79.5411376953125,
+        338.6114501953125,
+        551.0413818359375,
+        639.2424926757812
+      ],
+      "trueTargetCenterPixel": [
+        318.6215673719709,
+        401.2064447823559
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.36481873699397577
+    },
+    {
+      "frame": 215,
+      "time": 4.3,
+      "valid": true,
+      "selectedBbox": [
+        79.004150390625,
+        338.62725830078125,
+        551.5526123046875,
+        639.232666015625
+      ],
+      "trueTargetCenterPixel": [
+        318.6253410502894,
+        401.160035249145
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.374696746028653
+    },
+    {
+      "frame": 216,
+      "time": 4.32,
+      "valid": true,
+      "selectedBbox": [
+        79.48486328125,
+        338.55792236328125,
+        551.3118896484375,
+        639.2362060546875
+      ],
+      "trueTargetCenterPixel": [
+        318.6311405891865,
+        401.1163144605811
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38426820257540295
+    },
+    {
+      "frame": 217,
+      "time": 4.34,
+      "valid": true,
+      "selectedBbox": [
+        78.93719482421875,
+        338.36865234375,
+        551.4571533203125,
+        639.2451171875
+      ],
+      "trueTargetCenterPixel": [
+        318.63666250639693,
+        401.0755929530653
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.40271163840147356
+    },
+    {
+      "frame": 218,
+      "time": 4.36,
+      "valid": true,
+      "selectedBbox": [
+        79.71978759765625,
+        338.33331298828125,
+        551.4722900390625,
+        639.169921875
+      ],
+      "trueTargetCenterPixel": [
+        318.64427755513464,
+        401.03953735356714
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3783109719884184
+    },
+    {
+      "frame": 219,
+      "time": 4.38,
+      "valid": true,
+      "selectedBbox": [
+        80.003662109375,
+        338.2091064453125,
+        551.4406127929688,
+        639.2681274414062
+      ],
+      "trueTargetCenterPixel": [
+        318.65352237281604,
+        400.99880236032544
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38702332692112357
+    },
+    {
+      "frame": 220,
+      "time": 4.4,
+      "valid": true,
+      "selectedBbox": [
+        78.76153564453125,
+        337.9774169921875,
+        551.7381591796875,
+        639.274169921875
+      ],
+      "trueTargetCenterPixel": [
+        318.663287994327,
+        400.9504352562852
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3903309514267208
+    },
+    {
+      "frame": 221,
+      "time": 4.42,
+      "valid": true,
+      "selectedBbox": [
+        79.069580078125,
+        337.9571228027344,
+        550.8719482421875,
+        639.3204345703125
+      ],
+      "trueTargetCenterPixel": [
+        318.6735808145416,
+        400.9481859612361
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.388023876410833
+    },
+    {
+      "frame": 222,
+      "time": 4.44,
+      "valid": true,
+      "selectedBbox": [
+        79.77459716796875,
+        338.0859680175781,
+        550.9573364257812,
+        639.3070678710938
+      ],
+      "trueTargetCenterPixel": [
+        318.6829859438209,
+        401.01344089824073
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.422193100830735
+    },
+    {
+      "frame": 223,
+      "time": 4.46,
+      "valid": true,
+      "selectedBbox": [
+        79.51718139648438,
+        338.238525390625,
+        551.2467041015625,
+        639.2510986328125
+      ],
+      "trueTargetCenterPixel": [
+        318.68921729563806,
+        401.1522391629865
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3840225805112916
+    },
+    {
+      "frame": 224,
+      "time": 4.48,
+      "valid": true,
+      "selectedBbox": [
+        79.34417724609375,
+        338.43145751953125,
+        551.4393310546875,
+        639.3421020507812
+      ],
+      "trueTargetCenterPixel": [
+        318.6905729231116,
+        401.35642853480937
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4218871197143513
+    },
+    {
+      "frame": 225,
+      "time": 4.5,
+      "valid": true,
+      "selectedBbox": [
+        78.69647216796875,
+        338.7113342285156,
+        551.4464111328125,
+        639.29052734375
+      ],
+      "trueTargetCenterPixel": [
+        318.69000627418274,
+        401.5786529156907
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.38143978900952186
+    },
+    {
+      "frame": 226,
+      "time": 4.5200000000000005,
+      "valid": true,
+      "selectedBbox": [
+        78.8671875,
+        339.03680419921875,
+        551.010986328125,
+        639.287109375
+      ],
+      "trueTargetCenterPixel": [
+        318.6890919331768,
+        401.81154919763094
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3893949293285493
+    },
+    {
+      "frame": 227,
+      "time": 4.54,
+      "valid": true,
+      "selectedBbox": [
+        78.68194580078125,
+        339.1778869628906,
+        551.2435302734375,
+        639.3154296875
+      ],
+      "trueTargetCenterPixel": [
+        318.6870335629686,
+        402.0525823231086
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4089879920564717
+    },
+    {
+      "frame": 228,
+      "time": 4.5600000000000005,
+      "valid": true,
+      "selectedBbox": [
+        78.93829345703125,
+        339.5787048339844,
+        551.688232421875,
+        639.3275146484375
+      ],
+      "trueTargetCenterPixel": [
+        318.6839156525947,
+        402.2982380639861
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4049987703312288
+    },
+    {
+      "frame": 229,
+      "time": 4.58,
+      "valid": true,
+      "selectedBbox": [
+        79.03985595703125,
+        339.5681457519531,
+        551.2747802734375,
+        639.3501586914062
+      ],
+      "trueTargetCenterPixel": [
+        318.68005024567344,
+        402.5500811364483
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.40360943226389967
+    },
+    {
+      "frame": 230,
+      "time": 4.6000000000000005,
+      "valid": true,
+      "selectedBbox": [
+        79.05963134765625,
+        339.69915771484375,
+        551.2066650390625,
+        639.3240356445312
+      ],
+      "trueTargetCenterPixel": [
+        318.6751141659586,
+        402.8094288231652
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3978384081759445
+    },
+    {
+      "frame": 231,
+      "time": 4.62,
+      "valid": true,
+      "selectedBbox": [
+        79.05572509765625,
+        339.9646911621094,
+        551.4453735351562,
+        639.2940673828125
+      ],
+      "trueTargetCenterPixel": [
+        318.67021322854873,
+        403.0700139110493
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4027909316819446
+    },
+    {
+      "frame": 232,
+      "time": 4.64,
+      "valid": true,
+      "selectedBbox": [
+        79.33184814453125,
+        340.1973876953125,
+        551.3843383789062,
+        639.38037109375
+      ],
+      "trueTargetCenterPixel": [
+        318.6651927483064,
+        403.32265652118247
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3951590881945617
+    },
+    {
+      "frame": 233,
+      "time": 4.66,
+      "valid": true,
+      "selectedBbox": [
+        80.24908447265625,
+        340.4766540527344,
+        550.8985595703125,
+        639.361328125
+      ],
+      "trueTargetCenterPixel": [
+        318.660210472705,
+        403.55852569550547
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37735093325668845
+    },
+    {
+      "frame": 234,
+      "time": 4.68,
+      "valid": true,
+      "selectedBbox": [
+        79.76556396484375,
+        340.9587707519531,
+        551.0209350585938,
+        639.303466796875
+      ],
+      "trueTargetCenterPixel": [
+        318.6550590864517,
+        403.7446375167991
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3752194016122393
+    },
+    {
+      "frame": 235,
+      "time": 4.7,
+      "valid": true,
+      "selectedBbox": [
+        79.36834716796875,
+        341.0765380859375,
+        550.974365234375,
+        639.2801513671875
+      ],
+      "trueTargetCenterPixel": [
+        318.6500381073947,
+        403.8821414136546
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.39849108202623507
+    },
+    {
+      "frame": 236,
+      "time": 4.72,
+      "valid": true,
+      "selectedBbox": [
+        79.68276977539062,
+        341.26220703125,
+        551.3797607421875,
+        639.286376953125
+      ],
+      "trueTargetCenterPixel": [
+        318.64550158446866,
+        403.9772782095241
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.388884947488677
+    },
+    {
+      "frame": 237,
+      "time": 4.74,
+      "valid": true,
+      "selectedBbox": [
+        370.11541748046875,
+        326.4785461425781,
+        470.92889404296875,
+        382.8878173828125
+      ],
+      "trueTargetCenterPixel": [
+        318.6419873440487,
+        404.03985282445205
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 6.1345641812992975
+    },
+    {
+      "frame": 238,
+      "time": 4.76,
+      "valid": true,
+      "selectedBbox": [
+        79.242919921875,
+        341.36944580078125,
+        551.19970703125,
+        639.3621826171875
+      ],
+      "trueTargetCenterPixel": [
+        318.63810955244537,
+        404.0781972013121
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3890496619519339
+    },
+    {
+      "frame": 239,
+      "time": 4.78,
+      "valid": true,
+      "selectedBbox": [
+        79.2135009765625,
+        341.21002197265625,
+        551.0244140625,
+        639.2965087890625
+      ],
+      "trueTargetCenterPixel": [
+        318.6343739695743,
+        404.09809404261006
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3930256061642933
+    },
+    {
+      "frame": 240,
+      "time": 4.8,
+      "valid": true,
+      "selectedBbox": [
+        79.28485107421875,
+        341.1974182128906,
+        551.02001953125,
+        639.3419189453125
+      ],
+      "trueTargetCenterPixel": [
+        318.63088118199676,
+        404.1056521562721
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.37942057779553495
+    },
+    {
+      "frame": 241,
+      "time": 4.82,
+      "valid": true,
+      "selectedBbox": [
+        79.5958251953125,
+        341.2845764160156,
+        551.2728271484375,
+        639.24560546875
+      ],
+      "trueTargetCenterPixel": [
+        318.628127929841,
+        404.0977886416778
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.370844336507148
+    },
+    {
+      "frame": 242,
+      "time": 4.84,
+      "valid": true,
+      "selectedBbox": [
+        79.21624755859375,
+        341.1558837890625,
+        551.3950805664062,
+        639.2888793945312
+      ],
+      "trueTargetCenterPixel": [
+        318.6665002176696,
+        403.9123151092303
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3731507151496164
+    },
+    {
+      "frame": 243,
+      "time": 4.86,
+      "valid": true,
+      "selectedBbox": [
+        377.64691162109375,
+        327.85272216796875,
+        511.2912902832031,
+        397.5257873535156
+      ],
+      "trueTargetCenterPixel": [
+        318.7704835530417,
+        403.35996242735854
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 5.025171938116135
+    },
+    {
+      "frame": 244,
+      "time": 4.88,
+      "valid": true,
+      "selectedBbox": [
+        378.4034729003906,
+        327.5360107421875,
+        519.7492065429688,
+        400.86663818359375
+      ],
+      "trueTargetCenterPixel": [
+        318.8308542389261,
+        402.7911448873297
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.816074831131785
+    },
+    {
+      "frame": 245,
+      "time": 4.9,
+      "valid": true,
+      "selectedBbox": [
+        78.93304443359375,
+        339.7611083984375,
+        551.2210083007812,
+        639.2223510742188
+      ],
+      "trueTargetCenterPixel": [
+        318.87374515870647,
+        402.4215880076532
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.40524197068978757
+    },
+    {
+      "frame": 246,
+      "time": 4.92,
+      "valid": true,
+      "selectedBbox": [
+        381.8141784667969,
+        328.28826904296875,
+        540.35107421875,
+        409.1068420410156
+      ],
+      "trueTargetCenterPixel": [
+        318.92074716366176,
+        402.20173808151173
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.473160387460372
+    },
+    {
+      "frame": 247,
+      "time": 4.94,
+      "valid": true,
+      "selectedBbox": [
+        384.3907470703125,
+        328.8617248535156,
+        552.023681640625,
+        414.02056884765625
+      ],
+      "trueTargetCenterPixel": [
+        318.9701905441317,
+        402.11372280234195
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.296447896553394
+    },
+    {
+      "frame": 248,
+      "time": 4.96,
+      "valid": true,
+      "selectedBbox": [
+        385.91534423828125,
+        328.87628173828125,
+        565.5888061523438,
+        419.08148193359375
+      ],
+      "trueTargetCenterPixel": [
+        319.02358540399365,
+        402.13389144923326
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 4.083738556686358
+    },
+    {
+      "frame": 249,
+      "time": 4.98,
+      "valid": true,
+      "selectedBbox": [
+        80.26628112792969,
+        339.30023193359375,
+        551.3897094726562,
+        639.219970703125
+      ],
+      "trueTargetCenterPixel": [
+        319.0799561203927,
+        402.2411117514447
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3846261049829952
+    },
+    {
+      "frame": 250,
+      "time": 5.0,
+      "valid": true,
+      "selectedBbox": [
+        389.4801940917969,
+        329.7310791015625,
+        597.3524169921875,
+        431.7197570800781
+      ],
+      "trueTargetCenterPixel": [
+        319.1368016566603,
+        402.42067311702107
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.81018442399887
+    },
+    {
+      "frame": 251,
+      "time": 5.0200000000000005,
+      "valid": true,
+      "selectedBbox": [
+        391.3012390136719,
+        329.529052734375,
+        616.3011474609375,
+        439.84515380859375
+      ],
+      "trueTargetCenterPixel": [
+        319.1916632008672,
+        402.6519501953442
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.613997043038994
+    },
+    {
+      "frame": 252,
+      "time": 5.04,
+      "valid": true,
+      "selectedBbox": [
+        393.48065185546875,
+        330.5702209472656,
+        638.7005615234375,
+        449.05218505859375
+      ],
+      "trueTargetCenterPixel": [
+        319.24400629720594,
+        402.89895892638725
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.5311856058043545
+    },
+    {
+      "frame": 253,
+      "time": 5.0600000000000005,
+      "valid": true,
+      "selectedBbox": [
+        394.9110412597656,
+        330.8565979003906,
+        639.660400390625,
+        459.5032958984375
+      ],
+      "trueTargetCenterPixel": [
+        319.2941723901499,
+        403.1423318954322
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.351475955781147
+    },
+    {
+      "frame": 254,
+      "time": 5.08,
+      "valid": true,
+      "selectedBbox": [
+        397.017822265625,
+        330.62115478515625,
+        639.4287109375,
+        471.95758056640625
+      ],
+      "trueTargetCenterPixel": [
+        319.34562333971985,
+        403.37873100094515
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.178603408415689
+    },
+    {
+      "frame": 255,
+      "time": 5.1000000000000005,
+      "valid": true,
+      "selectedBbox": [
+        81.87130737304688,
+        340.8330383300781,
+        553.0367431640625,
+        639.090576171875
+      ],
+      "trueTargetCenterPixel": [
+        319.402107492525,
+        403.6170249679546
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.34816133863036414
+    },
+    {
+      "frame": 256,
+      "time": 5.12,
+      "valid": true,
+      "selectedBbox": [
+        402.77825927734375,
+        332.5509948730469,
+        639.5032958984375,
+        502.982177734375
+      ],
+      "trueTargetCenterPixel": [
+        319.51731841223346,
+        403.5911723164984
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.115829030078409
+    },
+    {
+      "frame": 257,
+      "time": 5.14,
+      "valid": true,
+      "selectedBbox": [
+        82.37565612792969,
+        340.4372863769531,
+        555.2335205078125,
+        639.2037353515625
+      ],
+      "trueTargetCenterPixel": [
+        319.6395260166025,
+        403.4887752775259
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.336900829936696
+    },
+    {
+      "frame": 258,
+      "time": 5.16,
+      "valid": true,
+      "selectedBbox": [
+        409.86932373046875,
+        333.91107177734375,
+        639.4896240234375,
+        533.6781005859375
+      ],
+      "trueTargetCenterPixel": [
+        319.6765404636594,
+        403.4208815728967
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.0056525589886727
+    },
+    {
+      "frame": 259,
+      "time": 5.18,
+      "valid": true,
+      "selectedBbox": [
+        412.306396484375,
+        335.1531066894531,
+        639.3568115234375,
+        548.1636962890625
+      ],
+      "trueTargetCenterPixel": [
+        319.6274832286656,
+        403.6340545400661
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 2.929759694369099
+    },
+    {
+      "frame": 260,
+      "time": 5.2,
+      "valid": true,
+      "selectedBbox": [
+        415.052001953125,
+        336.0018005371094,
+        639.4221801757812,
+        562.9170532226562
+      ],
+      "trueTargetCenterPixel": [
+        319.5901224501347,
+        403.9057660694563
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 2.9242337417172024
+    },
+    {
+      "frame": 261,
+      "time": 5.22,
+      "valid": true,
+      "selectedBbox": [
+        419.9300537109375,
+        337.13970947265625,
+        639.5318603515625,
+        593.4761352539062
+      ],
+      "trueTargetCenterPixel": [
+        319.56906156070704,
+        404.0235072987534
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 2.953754219763409
+    },
+    {
+      "frame": 262,
+      "time": 5.24,
+      "valid": true,
+      "selectedBbox": [
+        423.8803405761719,
+        338.47003173828125,
+        639.5631713867188,
+        602.7012939453125
+      ],
+      "trueTargetCenterPixel": [
+        319.5573253250354,
+        404.0264075712041
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 1.8154773315637673
+    },
+    {
+      "frame": 263,
+      "time": 5.26,
+      "valid": true,
+      "selectedBbox": [
+        428.59039306640625,
+        342.3690185546875,
+        639.5570068359375,
+        594.589599609375
+      ],
+      "trueTargetCenterPixel": [
+        319.54930785355134,
+        403.94194160578706
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 1.7859498530232807
+    },
+    {
+      "frame": 264,
+      "time": 5.28,
+      "valid": true,
+      "selectedBbox": [
+        82.35934448242188,
+        340.9520568847656,
+        555.0999755859375,
+        639.3048095703125
+      ],
+      "trueTargetCenterPixel": [
+        319.5424633040624,
+        403.80154183269667
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.33500010920917356
+    },
+    {
+      "frame": 265,
+      "time": 5.3,
+      "valid": true,
+      "selectedBbox": [
+        82.76010131835938,
+        342.4900817871094,
+        553.35888671875,
+        639.20068359375
+      ],
+      "trueTargetCenterPixel": [
+        319.3620246040934,
+        405.08849127172783
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.9893900773339402
+    },
+    {
+      "frame": 266,
+      "time": 5.32,
+      "valid": true,
+      "selectedBbox": [
+        445.2652587890625,
+        350.43975830078125,
+        639.54296875,
+        564.41015625
+      ],
+      "trueTargetCenterPixel": [
+        319.18495414162317,
+        406.6888362001087
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 2.217160848864621
+    },
+    {
+      "frame": 267,
+      "time": 5.34,
+      "valid": true,
+      "selectedBbox": [
+        83.10490417480469,
+        345.51055908203125,
+        551.6941528320312,
+        639.1326904296875
+      ],
+      "trueTargetCenterPixel": [
+        319.1082942462958,
+        407.98346655102483
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.9549827931154031
+    },
+    {
+      "frame": 268,
+      "time": 5.36,
+      "valid": true,
+      "selectedBbox": [
+        459.3591003417969,
+        366.05889892578125,
+        639.5845947265625,
+        569.642822265625
+      ],
+      "trueTargetCenterPixel": [
+        319.043660347209,
+        408.8133647143131
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 1.540241037782901
+    },
+    {
+      "frame": 269,
+      "time": 5.38,
+      "valid": false,
+      "selectedBbox": null,
+      "trueTargetCenterPixel": [
+        319.0017861680006,
+        409.2783485376179
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": null
+    },
+    {
+      "frame": 270,
+      "time": 5.4,
+      "valid": true,
+      "selectedBbox": [
+        477.737548828125,
+        385.3352355957031,
+        639.5191650390625,
+        573.3799438476562
+      ],
+      "trueTargetCenterPixel": [
+        318.97318171504907,
+        409.4370121140939
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 2.932585164788428
+    },
+    {
+      "frame": 271,
+      "time": 5.42,
+      "valid": true,
+      "selectedBbox": [
+        84.00236511230469,
+        346.6854248046875,
+        549.6151123046875,
+        639.158447265625
+      ],
+      "trueTargetCenterPixel": [
+        318.95220725134243,
+        409.3427290846252
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4713529737388659
+    },
+    {
+      "frame": 272,
+      "time": 5.44,
+      "valid": true,
+      "selectedBbox": [
+        500.4552001953125,
+        392.88568115234375,
+        639.55908203125,
+        575.8534545898438
+      ],
+      "trueTargetCenterPixel": [
+        318.93671559772247,
+        409.0436222593739
+      ],
+      "selectedBoxContainsScoringTargetCenter": false,
+      "positionErrorM": 3.085979807345194
+    },
+    {
+      "frame": 273,
+      "time": 5.46,
+      "valid": true,
+      "selectedBbox": [
+        83.95732116699219,
+        346.2995300292969,
+        549.6640625,
+        639.1967163085938
+      ],
+      "trueTargetCenterPixel": [
+        318.9251580552204,
+        408.56192548765665
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5125962524949654
+    },
+    {
+      "frame": 274,
+      "time": 5.48,
+      "valid": true,
+      "selectedBbox": [
+        84.2601318359375,
+        345.32421875,
+        549.9400634765625,
+        639.2440795898438
+      ],
+      "trueTargetCenterPixel": [
+        318.9153271840538,
+        407.93597406603027
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4947795716188081
+    },
+    {
+      "frame": 275,
+      "time": 5.5,
+      "valid": true,
+      "selectedBbox": [
+        84.07943725585938,
+        344.3964538574219,
+        550.20263671875,
+        639.1735229492188
+      ],
+      "trueTargetCenterPixel": [
+        318.9059411120136,
+        407.2082152629631
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.48564562214995133
+    },
+    {
+      "frame": 276,
+      "time": 5.5200000000000005,
+      "valid": true,
+      "selectedBbox": [
+        83.28762817382812,
+        343.73724365234375,
+        549.3251953125,
+        639.2286376953125
+      ],
+      "trueTargetCenterPixel": [
+        318.895888700102,
+        406.42055962210134
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.48298030107441514
+    },
+    {
+      "frame": 277,
+      "time": 5.54,
+      "valid": true,
+      "selectedBbox": [
+        83.03404235839844,
+        342.9949951171875,
+        550.5594482421875,
+        639.0906982421875
+      ],
+      "trueTargetCenterPixel": [
+        318.8835449011772,
+        405.59664673737143
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.46487315399162576
+    },
+    {
+      "frame": 278,
+      "time": 5.5600000000000005,
+      "valid": true,
+      "selectedBbox": [
+        83.14993286132812,
+        340.97344970703125,
+        550.5062255859375,
+        639.215576171875
+      ],
+      "trueTargetCenterPixel": [
+        318.94917971813834,
+        403.7431682022245
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.424088592600852
+    },
+    {
+      "frame": 279,
+      "time": 5.58,
+      "valid": true,
+      "selectedBbox": [
+        82.94595336914062,
+        338.95452880859375,
+        551.04248046875,
+        639.2952880859375
+      ],
+      "trueTargetCenterPixel": [
+        318.99754215337066,
+        401.8009530285039
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.6499803111124751
+    },
+    {
+      "frame": 280,
+      "time": 5.6000000000000005,
+      "valid": true,
+      "selectedBbox": [
+        82.89141845703125,
+        337.251708984375,
+        551.4305419921875,
+        639.306396484375
+      ],
+      "trueTargetCenterPixel": [
+        319.08651895521257,
+        400.1917121352723
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5712271635505024
+    },
+    {
+      "frame": 281,
+      "time": 5.62,
+      "valid": true,
+      "selectedBbox": [
+        82.41116333007812,
+        336.14935302734375,
+        552.0945434570312,
+        639.2960205078125
+      ],
+      "trueTargetCenterPixel": [
+        319.17184951643196,
+        399.0360485425633
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.6766399050599256
+    },
+    {
+      "frame": 282,
+      "time": 5.64,
+      "valid": true,
+      "selectedBbox": [
+        82.77528381347656,
+        335.2515869140625,
+        552.30322265625,
+        639.3062744140625
+      ],
+      "trueTargetCenterPixel": [
+        319.21836057982455,
+        398.23323416463717
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.6820200476038766
+    },
+    {
+      "frame": 283,
+      "time": 5.66,
+      "valid": true,
+      "selectedBbox": [
+        82.07249450683594,
+        334.9754333496094,
+        551.9633178710938,
+        639.2109985351562
+      ],
+      "trueTargetCenterPixel": [
+        319.2486873869951,
+        397.75386792604945
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.3585976845470858
+    },
+    {
+      "frame": 284,
+      "time": 5.68,
+      "valid": true,
+      "selectedBbox": [
+        82.60194396972656,
+        334.66436767578125,
+        552.19287109375,
+        639.2355346679688
+      ],
+      "trueTargetCenterPixel": [
+        319.27356690738515,
+        397.540375973553
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4429290087474714
+    },
+    {
+      "frame": 285,
+      "time": 5.7,
+      "valid": true,
+      "selectedBbox": [
+        82.58457946777344,
+        334.7318115234375,
+        552.0023193359375,
+        639.2822265625
+      ],
+      "trueTargetCenterPixel": [
+        319.2986159923756,
+        397.5289720994568
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4506291382365539
+    },
+    {
+      "frame": 286,
+      "time": 5.72,
+      "valid": true,
+      "selectedBbox": [
+        83.2220458984375,
+        334.9825744628906,
+        552.0430908203125,
+        639.217529296875
+      ],
+      "trueTargetCenterPixel": [
+        319.3264942799365,
+        397.6824908518405
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4184996620233704
+    },
+    {
+      "frame": 287,
+      "time": 5.74,
+      "valid": true,
+      "selectedBbox": [
+        83.77577209472656,
+        335.2365417480469,
+        551.6002807617188,
+        639.2857666015625
+      ],
+      "trueTargetCenterPixel": [
+        319.357354040449,
+        397.94885021577204
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41813665951095685
+    },
+    {
+      "frame": 288,
+      "time": 5.76,
+      "valid": true,
+      "selectedBbox": [
+        83.49339294433594,
+        335.6983642578125,
+        551.8984375,
+        639.305908203125
+      ],
+      "trueTargetCenterPixel": [
+        319.3903960851799,
+        398.2856915666668
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41687606688293966
+    },
+    {
+      "frame": 289,
+      "time": 5.78,
+      "valid": true,
+      "selectedBbox": [
+        83.63934326171875,
+        336.053466796875,
+        551.8209228515625,
+        639.2813720703125
+      ],
+      "trueTargetCenterPixel": [
+        319.425141989181,
+        398.6576823063405
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41539037646121996
+    },
+    {
+      "frame": 290,
+      "time": 5.8,
+      "valid": true,
+      "selectedBbox": [
+        84.14450073242188,
+        336.3033447265625,
+        552.0917358398438,
+        639.3184814453125
+      ],
+      "trueTargetCenterPixel": [
+        319.4571943634785,
+        399.0500751664234
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.417969847534561
+    },
+    {
+      "frame": 291,
+      "time": 5.82,
+      "valid": true,
+      "selectedBbox": [
+        83.89175415039062,
+        336.7490539550781,
+        552.5360107421875,
+        639.269287109375
+      ],
+      "trueTargetCenterPixel": [
+        319.4855440203554,
+        399.4439392816417
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.41764795629009327
+    },
+    {
+      "frame": 292,
+      "time": 5.84,
+      "valid": true,
+      "selectedBbox": [
+        84.48316955566406,
+        337.14984130859375,
+        552.8327026367188,
+        639.2427368164062
+      ],
+      "trueTargetCenterPixel": [
+        319.51182060794537,
+        399.8223294301484
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.4091187045940581
+    },
+    {
+      "frame": 293,
+      "time": 5.86,
+      "valid": true,
+      "selectedBbox": [
+        84.45259094238281,
+        337.1495666503906,
+        552.8009033203125,
+        639.267578125
+      ],
+      "trueTargetCenterPixel": [
+        319.5365261114324,
+        400.1857706125863
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5056458487599016
+    },
+    {
+      "frame": 294,
+      "time": 5.88,
+      "valid": true,
+      "selectedBbox": [
+        84.30865478515625,
+        337.71197509765625,
+        552.9107055664062,
+        639.361083984375
+      ],
+      "trueTargetCenterPixel": [
+        319.56020542416456,
+        400.5628829245479
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5259056821377192
+    },
+    {
+      "frame": 295,
+      "time": 5.9,
+      "valid": true,
+      "selectedBbox": [
+        84.59234619140625,
+        338.10491943359375,
+        553.5918579101562,
+        639.234130859375
+      ],
+      "trueTargetCenterPixel": [
+        319.581853089873,
+        400.95100075757904
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5197109580813986
+    },
+    {
+      "frame": 296,
+      "time": 5.92,
+      "valid": true,
+      "selectedBbox": [
+        84.44902038574219,
+        338.56195068359375,
+        553.2440185546875,
+        639.2705688476562
+      ],
+      "trueTargetCenterPixel": [
+        319.6018312520369,
+        401.3203033813132
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5540693644406914
+    },
+    {
+      "frame": 297,
+      "time": 5.94,
+      "valid": true,
+      "selectedBbox": [
+        84.74617004394531,
+        338.8953857421875,
+        553.8948974609375,
+        639.305419921875
+      ],
+      "trueTargetCenterPixel": [
+        319.62080519446033,
+        401.6622017477871
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5396706969275405
+    },
+    {
+      "frame": 298,
+      "time": 5.96,
+      "valid": true,
+      "selectedBbox": [
+        84.7364501953125,
+        339.0627746582031,
+        554.210205078125,
+        639.249267578125
+      ],
+      "trueTargetCenterPixel": [
+        319.63985830857735,
+        401.9796412651607
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.554618505472411
+    },
+    {
+      "frame": 299,
+      "time": 5.98,
+      "valid": true,
+      "selectedBbox": [
+        83.53790283203125,
+        339.3670959472656,
+        554.2653198242188,
+        639.2591552734375
+      ],
+      "trueTargetCenterPixel": [
+        319.6592000499214,
+        402.2779971215343
+      ],
+      "selectedBoxContainsScoringTargetCenter": true,
+      "positionErrorM": 0.5165320949943211
+    }
+  ]
+}

@@ -1,0 +1,214 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,booktabs,amsmath}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\title{Native CARLA Perception-to-Estimator Smoke Test}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}
+\maketitle
+
+\section{Result}
+The complete tested input path ran successfully:
+native RGB/LiDAR/GNSS/IMU callbacks, causal sensor preparation, actual YOLO26x
+car detection, LiDAR association and rectangle fitting, then the unchanged
+NRMM estimator. Both the baseline and a camera-blackout run produced 300
+finite estimator publications with aligned clocks. However, the target
+position and velocity accuracy gates failed. This is a completed coverage
+experiment with a failed target-accuracy result, not an end-to-end accuracy
+pass. No gain or threshold was changed after truth scoring.
+
+Unlike the preceding state-proxy smoke test, this experiment did not supply
+actor position, velocity or acceleration to prediction. Truth was written to
+a separate scoring stream. Four prediction-file hashes were frozen before
+the scorer opened that stream. The perception summaries contain zero truth
+comparisons; the estimator entry point never opens the truth file.
+
+\section{Capture and sensor preparation}
+An owned CARLA 0.10.0 instance on port 2011 used off-screen rendering,
+low quality, disabled ray tracing and a nice level of 10. The shared port 2000
+was not modified, ticked, or signaled. The temporary server was stopped with
+SIGINT after a separate query verified zero vehicles and sensors; its launcher
+returned the expected signal exit code 130. The original shared process was
+absent at the later final check; its subsequent lifecycle was outside this test.
+
+The map was \path{Carla/Maps/Town10HD_Opt}. A map-only search chose spawn
+index 105, with 176 m of approximately straight continuation. The physical
+Lincoln MKZ ego and Dodge Charger target used the existing waypoint follower,
+11 m/s nominal speeds, 10 m look-ahead and a 15 m initial gap. Target speed
+convergence differed from the ego: the measured evaluation target speed was
+4.757--11.141 m/s, while ego speed was 8.193--11.188 m/s. Their range was
+4.729--10.782 m and maximum ego yaw rate was 0.05232 rad/s.
+
+Fifty stationary calibration samples and 150 driving warm-up samples preceded
+300 evaluation samples at 0.02 s. All 500 RGB/LiDAR/GNSS/IMU sample groups
+matched their CARLA frame IDs, and frame IDs were consecutive. The evaluated
+interval was 0--5.98 s. The front camera produced 640-by-640 RGB with a
+100-degree field of view and the map postprocess profile. The 64-channel
+LiDAR used 1,280,000 points/s, 50 revolutions/s, an 80 m range,
+$10/-30$ degree vertical limits, 0.02 m native range-noise standard deviation,
+and disabled synthetic dropoff. It collected a full sweep at each world step.
+
+GNSS and IMU were mounted at the vehicle API's declared ego center of mass,
+approximately $[0.15,0,0.35]$ m in actor coordinates. Native GNSS noise was
+configured to approximately 0.01 m standard deviation per axis. Native IMU
+acceleration and gyro standard deviations were 0.01 m/s$^2$ and
+0.0005 rad/s, with zero configured biases. LiDAR/IMU seed was 20261002;
+GNSS seed was 20261003. These Gaussian models are not deterministic error bounds.
+
+The input adapter uses the map's fixed Mercator georeference to convert native
+GNSS to local position. Velocity is the current-endpoint derivative of a
+quadratic fit over the last 0.4 s of GNSS positions. Forty stationary IMU
+samples initialize roll/pitch; subsequent attitude uses gyro integration and
+native compass yaw. CARLA's accelerometer includes gravity, which is removed
+before rotation into the planar body frame. CARLA compass has no configured
+noise model in this implementation; this ideal heading channel is a scope
+limitation. Static RGB/LiDAR extrinsics are shifted from the actor origin to
+the ego CG. Estimated sensor poses are composed from native measurements and
+those extrinsics, never copied from actor truth transforms. The native
+IMU, GNSS and Mercator implementation files in the installed CARLA source
+were inspected to determine units, gravity, axes and geographic conversion.
+
+The first capture adapter attempt encountered unsupported legacy camera
+gamma/motion-blur attributes. The actual blueprint attributes were enumerated,
+the adapter was corrected, and the failed attempt retained. A subsequent
+preflight detected an owned vehicle left after that failure; it was explicitly
+destroyed after ownership verification. The final capture completed in
+26.949 s with no cleanup errors. These setup failures are not successful runs.
+
+\section{Causal perception and estimator connection}
+The original perception program uses centered temporal windows and can fill
+earlier headings from later frames. A new explicit \texttt{--causal} mode
+in \path{perception/yolo_lidar_target_position.py} instead fits each current
+cluster against frozen past publications. Missing headings can be carried
+forward in the inertial frame and rotated into the current ego frame; startup
+headings are never filled from the future. The existing offline default is
+preserved. This flag addresses time dependence; the separate sensor-prepared
+dataset is what removes truth ego poses from this experiment.
+
+YOLO26x used confidence 0.18, IoU 0.45, a 640-pixel inference size, car-only
+acceptance, and the front camera. The rectangle used declared approximate
+sedan dimensions of 5.0 by 1.9 m, rather than target truth dimensions.
+The smoke configuration used a 1-degree coarse heading step and at most three
+current-frame heading iterations; other geometry gates retained their defaults.
+No CARLA labels, oracle heading, actor target position, or truth box was used
+to choose a detection or fit a position.
+
+The estimator consumed native GNSS position/derived velocity, compensated
+native IMU acceleration/gyro and the actual YOLO/LiDAR relative-position
+output. Missing perception became unavailable radar-like detections with NaN
+positions. Initialization used the first native GNSS/compass sample and first
+perception acquisition, with a co-moving, zero-acceleration target hypothesis.
+The production configuration, gains and existing RK4 MEX were unchanged.
+Every output was checked against the current sample time; the next runtime
+was checked at exactly one 0.02-second increment.
+
+For the fault case, only camera images at frames 150--164, corresponding to
+$[3.0,3.3)$ seconds, were replaced by a separately generated black test image.
+The original capture was preserved. The actual detector and LiDAR association
+were rerun; availability was never forced manually at the estimator interface.
+All 15 black frames had no target output, and detection resumed at frame 165.
+Baseline had one missing localization, frame 269. Blackout had 17 missing
+localizations: the 15 injected black frames plus frames 269 and 270.
+
+\section{Accuracy and functional checks}
+Accuracy limits were written to \path{protocol.json} before truth scoring.
+They retain the preceding smoke test's six estimator RMSE gates. The
+post-transient interval contains 200 samples at $t\geq2$ seconds.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Estimator RMSE & Baseline & Blackout & Limit \\
+\midrule
+Ego position (m) & 0.01379 & 0.01379 & 0.50 \\
+Ego inertial velocity (m/s) & 0.04773 & 0.04773 & 0.50 \\
+Ego body velocity (m/s) & 0.04699 & 0.04699 & 0.50 \\
+Ego yaw (degrees) & 0.05324 & 0.05324 & 5.00 \\
+Target relative position (m) & 1.24063 & 1.25972 & 0.50 \\
+Target inertial velocity (m/s) & 3.67216 & 3.81549 & 1.50 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Baseline valid perception was 299/300 (99.67\%). Blackout valid perception
+outside the 15 injected frames was 283/285 (99.30\%). Availability passed
+the 95\% gate, but raw perception post-transient position RMSE was
+1.24561/1.28333 m and its 95th percentile was 3.19589/3.33940 m, exceeding
+the 0.50/1.00 m gates. Maximum raw perception error over the whole capture
+was 6.34565 m. Baseline and blackout target-estimator maximum post-transient
+errors were 3.72786 and 3.75550 m. Maximum target-position error during the
+injected blackout was 0.45243 m; the larger later errors were associated with
+other detections, not the blank-camera interval.
+
+All 600 published states were finite. Median estimator-call durations were
+approximately 2.30/2.31 ms, with maxima 310.614/310.005 ms. These offline
+shared-machine measurements include cold calls; no real-time claim is made.
+
+\section{Failure localization and remaining limits}
+The dominant observed failure is object association. The existing
+\path{choose_single_detection} sorts cars by confidence and then image area
+independently at each frame. The output nevertheless always labels the
+measurement with \texttt{targetIdx=1}. Parked roadside cars can therefore
+replace the followed moving car without an identity change being reported.
+
+At frame 237, the selected box was approximately
+$[370.1,326.5,470.9,382.9]$ pixels, with confidence 0.9471. Inspection shows
+that it encloses the parked car to the right, rather than the large red lead
+vehicle. Its fitted relative position was $[10.21,2.74]$ m in CARLA body axes,
+and its scoring error was 6.135 m. Similar switches appear near frames 9--35
+and 243--272. A separate scoring-only projection found 34 valid frames where
+the selected box excluded the truth target center. This is a diagnostic,
+not a full truth-box-IoU classification. On the 177 post-transient valid
+frames whose selected box included that center, raw position RMSE was
+0.40927 m. That truth-selected subset is not a corrected deployment result.
+Persistent target association remains unimplemented and is the next concrete
+issue to resolve; the experiment did not change selection using truth.
+
+The 0.12 m configured target-measurement bound was exceeded on 297 baseline
+valid frames and 281 blackout valid frames. Derived GNSS velocity error over
+all evaluated samples had RMSE 0.22446 m/s and maximum 1.67199 m/s, exceeding
+the configured 0.02 m/s deterministic allowance. Target speed also fell below
+the default 10 m/s lower domain. Relative-position bounds were unavailable
+at 291/300 frames in both runs. Thus neither the nominal sensor bounds nor a
+domain-wide certificate is supported by this native-sensor experiment.
+
+\section{Validation and artifacts}
+Five new tests in \path{tests/yoloLidarCausalityTest.py} passed: future-prefix
+invariance, no backward filling at stationary startup, ego-frame conversion of
+carried headings during dropout, duplicate-time rejection and preservation
+of the explicit opt-in/offline default.
+The actual baseline and blackout perception outputs matched exactly for all
+150 frames before the image change. All estimator fields except runtime
+timing also matched exactly over that prefix. A separate native-input probe
+changed all subsequent GNSS/IMU samples; the first 150 prepared frames and
+poses stayed exactly unchanged. The probe contained an invalid truth file and
+a read trap, confirming that preparation never read truth. All clocks, counts,
+finite-state checks and independent scoring checks completed successfully.
+
+After the two main runs, a summary-only correction separated unresolved
+startup headings from headings actually filled by carrying a past value.
+An actual three-frame detector/geometry rerun verified zero filled and three
+unresolved headings, with unchanged predictions. The original main-run
+summaries are preserved, and source provenance distinguishes the main-run
+code hash from the final metadata-only revision.
+
+The execution directory is
+\path{simulation_output/carla_full_perception_20261002/}. It retains raw
+native sensor data, separate scoring truth, images/clouds, local capture and
+adapter scripts, two perception outputs, two estimator outputs and failed
+setup attempts. The tracked report directory
+\path{report/CARLA_FULL_PERCEPTION_20261002/} records exact commands,
+configuration, results, error traces, association/isolation audits and hashes.
+Raw capture files, model weights, CARLA tooling and generated binaries are
+excluded from the project commit. Identified export copies are retained in
+the external archive at
+\path{05_Project_B_Collision_Avoidance/2026-10-02_Native_Perception_Estimator/}.
+This experiment covers the estimator's front-camera/LiDAR target and native
+ego-measurement path; road-curb experiments and closed-loop controller
+execution are separate work.
+\end{document}

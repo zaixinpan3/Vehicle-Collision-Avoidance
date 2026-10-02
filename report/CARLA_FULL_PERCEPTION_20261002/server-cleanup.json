@@ -1,0 +1,14 @@
+{
+  "ownedServerPid": 2496204,
+  "port": 2011,
+  "additionalDestroyResults": [],
+  "remainingVehicles": [],
+  "remainingSensors": [],
+  "stopSignal": "SIGINT to verified owned PID only",
+  "ownedServerStopped": true,
+  "launcherExitCode": 130,
+  "sharedServerOriginalPid": 2454708,
+  "sharedOriginalProcessPresentAtFinalVerification": false,
+  "verificationAt": "2026-10-02T18:21:33.048402-05:00",
+  "sharedServerPolicy": "No world mutations, actor changes, ticks or signals were issued to the shared server. Its later lifecycle is outside this test."
+}

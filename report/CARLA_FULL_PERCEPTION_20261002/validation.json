@@ -1,0 +1,24 @@
+{
+  "recordedAt": "2026-10-02T18:21:33.048402-05:00",
+  "pythonCausalityTestsPassed": 5,
+  "pythonCausalityTestsFailed": 0,
+  "nativeSensorSamples": 500,
+  "evaluatedFrames": 300,
+  "allNativeFrameIdsAligned": true,
+  "consecutiveSimulationFrames": true,
+  "baselinePublishedStates": 300,
+  "blackoutPublishedStates": 300,
+  "allPublishedStatesFinite": true,
+  "estimatorTruthInput": false,
+  "perceptionTruthComparisonCount": 0,
+  "truthIsolationAndFuturePrefixChecksPassed": true,
+  "accuracyOutcome": "Failed predeclared target position/velocity and perception accuracy gates; preserved without retuning.",
+  "finalRevisionStartupCheck": {
+    "recordedAt": "2026-10-02T18:26:15.989593-05:00",
+    "frames": 3,
+    "filledHeadings": 0,
+    "unresolvedHeadings": 3,
+    "predictionsMatchMainRunPrefixExactly": true,
+    "result": "PASS"
+  }
+}

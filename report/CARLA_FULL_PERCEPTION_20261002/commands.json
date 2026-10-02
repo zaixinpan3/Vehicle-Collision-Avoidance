@@ -1,0 +1,24 @@
+{
+  "root": "/home/zai/Downloads/ResearchProjects/collisionAvoidance",
+  "commands": [
+    "nice -n 10 /home/zai/carla/Build/Package/material_fix_town10_sm6_high_low/Linux/CarlaUnreal/Binaries/Linux/CarlaUnreal CarlaUnreal -RenderOffScreen -nosound -quality-level=Low -noraytracing -world-port=2011 -ResX=640 -ResY=640 -dpcvars=r.RayTracing=0,r.Lumen.HardwareRayTracing=0,r.Streaming.PoolSize=768",
+    "/home/zai/carla-venv/bin/python -u simulation_output/carla_full_perception_20261002/captureNative.py --port 2011 --server-pid 2496204",
+    "python simulation_output/carla_full_perception_20261002/prepareNative.py",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python -u perception/yolo_lidar_target_position.py --dataset simulation_output/carla_full_perception_20261002/perception_inputs --model /home/zai/.cache/yolo26/yolo26x.pt --output simulation_output/carla_full_perception_20261002/perception_baseline --camera-id front --device 0 --image-size 640 --confidence 0.18 --center-mode rectangle --causal --rectangle-heading-step 1.0 --heading-iterations 3 --report-interval 25",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python -u perception/yolo_lidar_target_position.py --dataset simulation_output/carla_full_perception_20261002/blackout_inputs --model /home/zai/.cache/yolo26/yolo26x.pt --output simulation_output/carla_full_perception_20261002/perception_blackout --camera-id front --device 0 --image-size 640 --confidence 0.18 --center-mode rectangle --causal --rectangle-heading-step 1.0 --heading-iterations 3 --report-interval 25",
+    "matlab -singleCompThread -batch \"addpath('simulation_output/carla_full_perception_20261002'); runNativeEstimator('baseline');\"",
+    "matlab -singleCompThread -batch \"addpath('simulation_output/carla_full_perception_20261002'); runNativeEstimator('blackout');\"",
+    "python simulation_output/carla_full_perception_20261002/scoreNative.py",
+    "python tests/yoloLidarCausalityTest.py",
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python -u perception/yolo_lidar_target_position.py --dataset simulation_output/carla_full_perception_20261002/perception_inputs --model /home/zai/.cache/yolo26/yolo26x.pt --output simulation_output/carla_full_perception_20261002/startup_summary_check --camera-id front --device 0 --image-size 640 --confidence 0.18 --center-mode rectangle --causal --rectangle-heading-step 1.0 --heading-iterations 3 --max-frames 3 --report-interval 0"
+  ],
+  "methods": [
+    "First adapter attempt preserved: unsupported gamma/motion-blur camera attributes in CARLA 0.10.0. Use enumerated blueprint attributes and the Town10HD postprocess profile. A retained owned vehicle caused a subsequent preflight refusal; verified its ownership, destroyed it explicitly, and retained both failure logs.",
+    "Generate a separate all-black RGB test image and substitute only frames 150--164 in a derived input manifest; original RGB, LiDAR and native GNSS/IMU remain unchanged.",
+    "Synthetic native-sensor future perturbation after evaluation frame 149 leaves all first 150 ego frames exactly unchanged. An invalid scoring-truth file and read trap verify preprocessing never reads it.",
+    "Actual baseline/blackout YOLO-LiDAR output and estimator states (excluding timing) match exactly for the first 150 frames.",
+    "Scoring-only projection of truth target center into the camera checks selected boxes; no truth is fed back to prediction, no thresholds or gains are retuned.",
+    "Verified zero owned actors and sent SIGINT only to PID 2496204; process ended with signal exit 130. Port 2000 was not modified.",
+    "After the main runs, fix summary-only startup counts; actual three-frame YOLO/geometry rerun verifies filled=0, unresolved=3 and identical prediction prefix. Original main-run summaries preserved; both source hashes retained."
+  ]
+}

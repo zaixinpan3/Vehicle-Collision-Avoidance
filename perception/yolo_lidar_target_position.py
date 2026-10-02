@@ -1170,6 +1170,75 @@ def ego_yaw_from_transform(ego_to_world: np.ndarray) -> float:
     return math.atan2(float(ego_to_world[1, 0]), float(ego_to_world[0, 0]))
 
 
+def causal_track_estimates(
+    associations: list[dict[str, Any]],
+    args: argparse.Namespace,
+) -> tuple[list[list[CameraEstimate]], list[float | None], int]:
+    """Fit each arrival using only its current cluster and frozen past outputs.
+
+    Published positions are never refit using a later observation. A carried
+    heading is stored in the inertial frame and rotated into the current ego
+    frame. Unresolved startup headings remain unresolved until enough motion
+    has actually been observed; there is no backward fill from the future.
+    """
+    estimates_by_frame: list[list[CameraEstimate]] = []
+    headings: list[float | None] = []
+    history: list[tuple[float, np.ndarray]] = []
+    last_world_heading: float | None = None
+    resolved_count = 0
+    previous_time = -float("inf")
+    for record in associations:
+        stamp = float(record["time"])
+        if not math.isfinite(stamp) or stamp <= previous_time:
+            raise ValueError("Causal perception requires strictly increasing finite timestamps.")
+        previous_time = stamp
+        history = [(t, p) for t, p in history if stamp - t <= args.motion_heading_window]
+        heading = None if last_world_heading is None else wrap_angle(
+            last_world_heading - record["ego_yaw"]
+        )
+        resolved = False
+
+        def fit(current_heading: float | None) -> tuple[list[CameraEstimate], np.ndarray | None]:
+            estimates = [
+                estimate for detection, cluster in record["clusters"]
+                if (estimate := estimate_from_cluster(detection, cluster, args, current_heading)) is not None
+            ]
+            estimates = select_consistent_estimates(estimates, args.max_fusion_spread)
+            fused = fuse_estimates(estimates)
+            if fused is None:
+                return estimates, None
+            point = np.array([[fused[0][0], fused[0][1], 0.0]])
+            return estimates, transform_points(record["ego_to_world"], point)[0, :2]
+
+        for _ in range(max(1, args.heading_iterations)):
+            estimates, position = fit(heading)
+            track = history + ([] if position is None else [(stamp, position)])
+            if len(track) < 3:
+                break
+            times = np.array([t for t, _ in track])
+            velocity = fit_track_velocity(times, np.vstack([p for _, p in track]))
+            if velocity is None or np.linalg.norm(velocity) * (times[-1] - times[0]) < args.motion_heading_minimum_displacement:
+                break
+            resolved = True
+            measured = wrap_angle(math.atan2(velocity[1], velocity[0]) - record["ego_yaw"])
+            change = float("inf") if heading is None else abs(math.degrees(wrap_angle(measured - heading)))
+            heading = measured if heading is None else wrap_angle(
+                heading + args.heading_damping * wrap_angle(measured - heading)
+            )
+            if change <= args.heading_tolerance:
+                break
+        # Keep the returned fit consistent with its reported final heading.
+        estimates, position = fit(heading)
+        estimates_by_frame.append(estimates)
+        headings.append(heading)
+        resolved_count += int(resolved)
+        if heading is not None:
+            last_world_heading = wrap_angle(heading + record["ego_yaw"])
+        if position is not None:
+            history.append((stamp, position))
+    return estimates_by_frame, headings, resolved_count
+
+
 def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     dataset_root = args.dataset.resolve()
     metadata = load_json(dataset_root / "metadata.json")
@@ -1276,7 +1345,11 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     estimates_by_frame: list[list[CameraEstimate]] = []
     heading_iterations_run = 0
     heading_change_deg = float("inf")
-    for iteration in range(max(1, args.heading_iterations)):
+    if args.causal:
+        estimates_by_frame, headings, resolved = causal_track_estimates(associations, args)
+        heading_iterations_run = 1
+        heading_change_deg = None
+    for iteration in range(0 if args.causal else max(1, args.heading_iterations)):
         estimates_by_frame = []
         world_positions: list[np.ndarray | None] = []
         for record, heading in zip(associations, headings):
@@ -1438,13 +1511,15 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             "rectangle_heading_span_degrees": args.rectangle_heading_span,
             "rectangle_heading_smoothness": args.rectangle_heading_smoothness,
             "heading_source": "target motion direction",
+            "heading_temporal_mode": "causal, frozen past outputs" if args.causal else "offline, centered windows and nearest-frame filling",
             "heading_iterations_run": heading_iterations_run,
             "heading_final_max_change_degrees": heading_change_deg,
             "heading_damping": args.heading_damping,
             "motion_heading_window_s": args.motion_heading_window,
             "motion_heading_minimum_displacement_m": args.motion_heading_minimum_displacement,
             "motion_heading_resolved_frame_count": resolved,
-            "motion_heading_filled_frame_count": len(headings) - resolved,
+            "motion_heading_filled_frame_count": sum(h is not None for h in headings) - resolved,
+            "motion_heading_unresolved_frame_count": sum(h is None for h in headings),
             "rectangle_outlier_tolerance_m": args.rectangle_outlier_tolerance,
             "minimum_support_fraction": args.minimum_support_fraction,
             "min_object_height_m": args.min_object_height,
@@ -1595,6 +1670,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--rectangle-refine-heading-smoothness", type=float, default=0.5)
     parser.add_argument("--max-frames", type=int, default=None)
     parser.add_argument("--report-interval", type=int, default=25)
+    parser.add_argument(
+        "--causal", action="store_true",
+        help="Use only current/past frames for motion heading; never revise published positions or backfill from future frames.",
+    )
     return parser.parse_args(argv)
 
 

@@ -1,0 +1,12 @@
+{
+  "nativePreprocessorFuturePerturbationPrefixFrames": 150,
+  "nativePrefixExactlyEqual": true,
+  "invalidTruthFileNeverRead": true,
+  "nativeInputFilesOpened": [
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/simulation_output/carla_full_perception_20261002/native_causality_probe/native_capture/metadata.json",
+    "/home/zai/Downloads/ResearchProjects/collisionAvoidance/simulation_output/carla_full_perception_20261002/native_causality_probe/native_capture/raw_sensors.jsonl"
+  ],
+  "actualPerceptionBlackoutPrefixExactlyEqual": true,
+  "estimatorBlackoutPrefixExactlyEqualExcludingRuntime": true,
+  "mutations": "Synthetic probe modifies only native sensor samples at/after evaluation frame 150; original native capture unchanged."
+}
