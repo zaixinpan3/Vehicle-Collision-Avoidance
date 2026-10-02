@@ -1,0 +1,145 @@
+{
+  "firstContactSampleTime": 1.5116666666666674,
+  "holdTime": 1.5000000000000007,
+  "state": [
+    20.524712701878432,
+    2.984064815803446,
+    0.38021169224457313,
+    12.839480455977183,
+    -0.08522245867190813,
+    0.330815137519688
+  ],
+  "input": [
+    0.06931512762072917,
+    0.2234408653057562
+  ],
+  "initialization": "shiftedInputRollout",
+  "flowRestarted": true,
+  "primaryOptimum": 0.10000005918141687,
+  "safetySlack": 0.10000103449377298,
+  "clfSlack": 1164.3572361269273,
+  "solverStages": [
+    {
+      "objective": "pcbfSlack",
+      "exitFlag": 1,
+      "seconds": 0.034974,
+      "value": 0.10000005918141687
+    },
+    {
+      "objective": "pcbfSlack",
+      "exitFlag": 1,
+      "seconds": 0.035281,
+      "value": 0.10000002819890971
+    },
+    {
+      "objective": "clfSlack",
+      "exitFlag": 1,
+      "seconds": 0.156199,
+      "value": 1164.3572361269273
+    }
+  ],
+  "attempts": [
+    {
+      "initialization": "shiftedInputRollout",
+      "terminationReason": "twoStagesReturned",
+      "solverCalls": 2,
+      "stages": [
+        {
+          "objective": "pcbfSlack",
+          "exitFlag": 1,
+          "seconds": 0.034974,
+          "value": 0.10000005918141687
+        },
+        {
+          "objective": "clfSlack",
+          "exitFlag": 1,
+          "seconds": 0.156199,
+          "value": 1164.3572361269273
+        }
+      ],
+      "primaryOptimum": 0.10000005918141687,
+      "primaryLowerBound": 0,
+      "inputTrustScale": 1,
+      "initializationSeconds": 0.000695,
+      "formulationSeconds": 0.088254,
+      "clfConstructionSeconds": 0.011544
+    },
+    {
+      "initialization": "movingTargetFlow",
+      "terminationReason": "primaryReturned",
+      "solverCalls": 1,
+      "stages": {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 0.035281,
+        "value": 0.10000002819890971
+      },
+      "primaryOptimum": 0.10000002819890971,
+      "primaryLowerBound": 0,
+      "inputTrustScale": 1,
+      "initializationSeconds": 0.003587,
+      "formulationSeconds": 0.077892,
+      "clfConstructionSeconds": 0
+    }
+  ],
+  "lastContactSampleTime": 1.538333333333334,
+  "contactSamples": 17,
+  "positiveSlackHolds": [
+    {
+      "time": 1.1000000000000003,
+      "primaryOptimum": 0.10000009272912334,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    },
+    {
+      "time": 1.1500000000000004,
+      "primaryOptimum": 0.10000013311876937,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    },
+    {
+      "time": 1.2000000000000004,
+      "primaryOptimum": 0.10000036759998056,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    },
+    {
+      "time": 1.2500000000000004,
+      "primaryOptimum": 0.1000003450673083,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    },
+    {
+      "time": 1.3000000000000005,
+      "primaryOptimum": 0.10000000521624734,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    },
+    {
+      "time": 1.3500000000000005,
+      "primaryOptimum": 0.10000001730144965,
+      "flowRestarted": true,
+      "initialization": "movingTargetFlow"
+    },
+    {
+      "time": 1.4000000000000006,
+      "primaryOptimum": 0.10000005895916243,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    },
+    {
+      "time": 1.4500000000000006,
+      "primaryOptimum": 0.10000011894460628,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    },
+    {
+      "time": 1.5000000000000007,
+      "primaryOptimum": 0.10000005918141687,
+      "flowRestarted": true,
+      "initialization": "shiftedInputRollout"
+    }
+  ],
+  "minimumSignedSeparatingAxisGap": -0.1520237861367857,
+  "minimumSignedGapTime": 1.523333333333334
+}

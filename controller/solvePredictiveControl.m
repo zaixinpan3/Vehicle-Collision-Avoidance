@@ -190,39 +190,33 @@ function [anchor,source,failure]=localInitialization(model,previous)
 end
 
 function anchor=localFlowSeed(model,count)
-    % One flow-guided initialization, with no safety or terminal admission.
+    % A time-aligned Gaussian guides one transported-flow bicycle rollout.
+    % The curve's nominal arrival clock is approximate; the actual rollout
+    % and moving field always query the target at the same absolute time.
+    % This is an initialization, with no safety or terminal admission.
     cfg=model.cfg;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
     h=cfg.controller.sampleTime;tire=modifiedFialaTire.parameters(cfg);
     inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=x;
-    radius=0;
-    if ~isempty(model.target)
-        radius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset) ...
-            +norm(model.target(8:9))+norm(model.target(10:11))+cfg.collision.safetyMarginMeters;
-    end
+    guide=predictiveSafetyGeometry.movingGaussianGuide(x,model.lane,model.targetEpoch, ...
+        model.sampleIndex*h,count*h,cfg);radius=guide.radius;
     nominalTerminal=nonlinearBicycleModel.nominalTail(cfg,reference.curvature);
-    station=[];completionStarted=false;exited=localBeyondRange(x,0,model);
+    station=[];completionStarted=false;
     for index=1:count
         time=(model.sampleIndex+index-1)*h;
         q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time);
         projection=laneGeometry.project(x(1:2),model.lane,station);station=projection.station;
         direction=[cos(projection.heading);sin(projection.heading)];normal=[-direction(2);direction(1)];
-        deviation=nonlinearBicycleModel.error(x,model.lane,reference);active=false;
-        if ~exited
-            for preview=[0,.5,1,1.5,2,3]
-                future=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time+preview);
-                if isfield(model.lane,'referenceCurve')
-                    position=laneGeometry.referencePose(station+cfg.referenceSpeed*preview,0,model.lane.referenceCurve);
-                else,position=projection.point+cfg.referenceSpeed*preview*direction;
-                end
-                if norm(position-future(1:2))<radius+1,active=true;break;end
-            end
-        end
+        deviation=nonlinearBicycleModel.error(x,model.lane,reference);
+        elapsed=(index-1)*h;active=guide.amplitude~=0 && elapsed<=guide.endTime;
         if active && ~completionStarted
             yaw=q(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];offset=rotation*q(10:11);
             omega=q(4)*sin(q(6))/q(7);
             translation=q(4)*[cos(yaw+q(6));sin(yaw+q(6))]+omega*[-offset(2);offset(1)];
-            nominal=cfg.referenceSpeed*direction-.5*projection.lateralPosition*normal;
-            circulation=-.6*max(norm(nominal-translation),.5*cfg.referenceSpeed)/radius;
+            z=(elapsed-guide.centerTime)/guide.width;
+            lateral=guide.amplitude*exp(-.5*z^2);lateralRate=-z/guide.width*lateral;
+            nominal=cfg.referenceSpeed*direction ...
+                +(lateralRate-.5*(projection.lateralPosition-lateral))*normal;
+            circulation=-sign(guide.amplitude)*.6*max(norm(nominal-translation),.5*cfg.referenceSpeed)/radius;
             velocity=predictiveSafetyGeometry.movingFlowVelocity(x(1:2),nominal,q(1:2)+offset, ...
                 translation,radius*eye(2),zeros(2),circulation);
             heading=atan2(velocity(2),velocity(1));
@@ -239,7 +233,6 @@ function anchor=localFlowSeed(model,count)
         end
         u=localShape(u,x,previous,cfg,tire);
         inputs(:,index)=u;x=nonlinearBicycleModel.sample(x,u,cfg);states(:,index+1)=x;previous=u;
-        exited=exited || localBeyondRange(x,index*h,model);
     end
     anchor=struct('inputs',inputs,'states',states);
 end

@@ -12,7 +12,7 @@ and its affine prediction scope.
 | `terminalContinuation.m` | Augmented free-pose endpoint core, construction bounds and anchor-based terminal geometry |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single nominal cost-to-go CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Known target motion, transported flow guidance, ordinary distance-dual optimization and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target flow, timed Gaussian and transported-flow guidance, ordinary distance-dual optimization and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 

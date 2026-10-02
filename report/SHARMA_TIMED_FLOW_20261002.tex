@@ -1,0 +1,263 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,microtype,xurl,hyperref}
+\setlength{\emergencystretch}{3em}
+\usepackage[T1]{fontenc}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Constant-Acceleration/Sideslip Target Prediction and Timed Flow Initialization}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}
+\maketitle
+\section{Scope and source interpretation}
+The selected motion hypothesis is constant target tangential acceleration $A$
+and constant target sideslip $\beta$. No sideslip-rate state is added. This
+matches Sharma, Alai and Rajamani, \emph{Simultaneous ego-vehicle state
+estimation and vehicle trajectory tracking using a multistage high gain
+observer}, Transportation Research Part C 182 (2026), 105411, Sec.\ 2.3,
+Eqs.\ (16)--(18), DOI 10.1016/j.trc.2025.105411. The existing controller already implements this model.
+Consequently this task changes the flow initialization, rather than claiming
+to replace a previously different target predictor. The observer is unchanged.
+
+Cheng, Li, Liu, Li and Guo, \emph{Virtual Fluid-Flow-Model-Based Lane-Keeping
+Integrated With Collision Avoidance Control System Design}, IEEE TITS 22(10),
+6232--6241 (2021), DOI 10.1109/TITS.2020.2990211, Eqs.\ (34)--(36), motivate
+the Gaussian lateral profile. The time-dependent envelope fitting and its
+composition with transported flow below are project extensions, not results
+claimed by Cheng's static-obstacle experiment.
+
+\section{Target motion and coordinate frame}
+In inertial coordinates, or a frame fixed at the prediction origin,
+\[
+ \dot p=V\begin{bmatrix}\cos(\psi+\beta)\\\sin(\psi+\beta)\end{bmatrix},\quad
+ \dot V=A,\quad \dot\psi=V\sin\beta/l_r,\quad \dot A=\dot\beta=0.
+\]
+Thus $\kappa=\sin\beta/l_r$ is constant, while yaw rate need not be constant.
+Writing $s(t)=V_0t+At^2/2$, $a=\kappa s/2$, and
+$\operatorname{sinc}_0(a)=\sin(a)/a$ with its continuous value at zero gives
+\[
+ p(t)=p_0+s(t)\operatorname{sinc}_0(a)
+ \begin{bmatrix}\cos(\psi_0+\beta+a)\\\sin(\psi_0+\beta+a)\end{bmatrix},\quad
+ \psi(t)=\psi_0+\kappa s(t),\quad V(t)=V_0+At.
+\]
+No numerical quadrature or future ego-motion input is needed for this
+constant-$\beta$ case. The ego-motion terms in the moving relative-frame NRMM
+are coordinate transport terms; the controller already transforms its inputs
+to inertial coordinates. Initialization and optimization use the same fixed
+epoch and absolute-time target flow.
+
+The pre-existing signed-velocity convention is retained. In particular, this
+change does not introduce a stop clamp, which would change constant
+acceleration after the zero-speed event. The suggested nonzero constant
+$\dot\beta$ model and associated steering/friction clipping are outside the
+selected hypothesis and this implementation.
+
+\section{Time-aligned Gaussian envelope}
+On the finite seed horizon, use nominal arrival clock
+$s_E^0(t)=s_0+v_{\rm ref}t$. At the same sampled times, project the predicted
+target body center onto the given path to obtain $(s_C(t),d_C(t))$. The
+sampling interval is half a controller hold, currently 25 ms. Let $R$ be the
+existing sum of body half-diagonals, offset norms and node buffer. Define
+\[
+ r_i=s_E^0(t_i)-s_C(t_i),\qquad
+ \mathcal I=\{i:|r_i|<R\},\qquad h_i=\sqrt{R^2-r_i^2}\ (i\in\mathcal I).
+\]
+When no nominal time-aligned center pair enters the radius, the Gaussian
+amplitude is zero. Otherwise $t_c$ minimizes $r_i^2+d_C(t_i)^2$. Set the
+temporal width $T$ to the larger of the existing nominal lookahead and half
+the longitudinal interaction time span. With
+$g_i=\exp[-(t_i-t_c)^2/(2T^2)]$, the two scalar envelope amplitudes are
+\[
+ a_\sigma=\max\left(0,\max_{i\in\mathcal I}
+       \frac{\sigma d_C(t_i)+h_i}{g_i}\right),\qquad \sigma\in\{-1,1\}.
+\]
+Choose the smaller $a_\sigma$ (left under a numerical tie) and define
+\[
+ d_G(t)=\sigma a_\sigma e^{-(t-t_c)^2/(2T^2)},\qquad
+ \dot d_G(t)=-\frac{t-t_c}{T^2}d_G(t).
+\]
+The two amplitudes are a scalar side selection for one seed, not a maneuver
+bank or two optimized controllers. The construction uses the complete finite
+prediction even when the initial target is outside the encounter range.
+Since $t_c$ lies inside the interaction interval and $T$ is at least half
+its span, $g_i\ge e^{-2}$ on $\mathcal I$. The fitted amplitude cannot blow
+up through a vanishing Gaussian denominator on that finite interval.
+It never divides by relative closing speed. Equal-speed motion therefore has
+a finite guide or zero disturbance according to the actual timed geometry.
+
+For a straight path the fitted geometric Gaussian covers the sampled
+circular exclusion envelope on the selected side. This statement concerns
+the reference curve with its nominal clock only. On a curved path the Frenet
+envelope is an approximation. The nominal clock also differs from actual
+vehicle progress, so neither case certifies the bicycle trajectory.
+
+\section{One transported-flow nonlinear rollout}
+The Gaussian supplies an anticipatory guide to the existing cylinder field:
+\[
+ v_0=v_{\rm ref}\,\mathbf t+
+       [\dot d_G-0.5(d_E-d_G)]\,\mathbf n.
+\]
+For actual rollout position $p$, target center $c$, $q=(p-c)/R$,
+$r^2=\max(1,q^Tq)$, and $J$ the planar quarter-turn matrix, use
+\begin{align*}
+ w&=(v_0-\dot c)/R,\\
+ M(q)&=(1+r^{-2})I-2qq^Tr^{-4},\\
+ v_F&=\dot c+R\left[M(q)w+\gamma Jq/r^2\right],\\
+ \gamma&=-0.6\sigma\max(\|v_0-\dot c\|,0.5v_{\rm ref})/R.
+\end{align*}
+The center velocity includes rotation of any target body offset. Target and
+ego are evaluated at matching absolute times throughout this rollout. The
+unchanged heading/speed feedback, input shaping, and nonlinear Fiala RK4 map
+produce the actual state/input initialization. The temporal Gaussian stops
+guiding after its longitudinal interaction window; the existing terminal
+construction supplies the remainder of the seed.
+
+The Gaussian is not directly issued as a command. The controller retains
+one PCBF primary solve, one CLF secondary solve, and its existing bounded flow
+retry logic. Li ordinary-distance multipliers, hard completion constraints,
+CLF, trust boxes, node buffer, and execution semantics are unchanged. No
+nonlinear execution check, backup controller, observer modification, or
+road-boundary constraint is introduced.
+
+\section{Validation and experimental results}
+The baseline is commit \texttt{75b19ab}, with production collision geometry
+from \texttt{a073453}. Each paired scenario runs 160 holds of 50 ms (8 s).
+There are seven encounters at each of 8 and 15 m/s. Prefix lengths are 8 and
+16; the unchanged completion adds 60 holds. The sampled node buffer is
+0.10 m; the physical outcome criterion is strictly positive body distance.
+Observations are exact, road constraints are absent, and no random samples
+are drawn. Every initial given-path cruise baseline collides with its target.
+The same exact target epochs and configuration are used in both versions.
+
+Plant replay uses ODE45 with relative/absolute tolerances $10^{-11}/10^{-12}$
+and 31 samples per hold. The replay successor feeds the next controller call.
+A separate Python implementation recomputes all target poses and rectangle
+distances, agreeing with MATLAB within $10^{-9}$ m. The geometry audit does not
+assert nonlinear feasibility of the affine optimization. Historical aggregate
+admission criteria in the audit utility require online residuals that this
+controller deliberately does not compute; those criteria are not relabeled
+as passed.
+
+\paragraph{Focused tests.} The final distinct results are 109 passed, zero
+failed or incomplete, covering timed/moving flow, nonlinear target dynamics,
+two-stage orchestration, ordinary distance duals, and the nine-source-file
+budget. One initial positive-amplitude assertion used a fixture that did not
+actually intersect; after correcting the fixture to a prescribed meeting,
+all 16 flow tests passed. The remaining 93 tests passed in the preceding
+invocation. Code Analyzer reports only findings in unchanged portions of the
+controller and none in the new tests. Static whitespace checks pass.
+
+\paragraph{Seed audit.} The exact production initialization functions were
+extracted into temporary diagnostic helpers. Minimum RK4 node distance improves
+in all 14 initial rollouts. All new initial seeds have positive node distance,
+with minimum 0.217079 m; the old 15 m/s curved-head-on seed overlaps, while
+the new one has 3.326594 m minimum node distance. Five warmed timing samples
+per seed give a maximum new per-case median of 4.906 ms. These are seed-only
+measurements, not controller-call timings or safety certificates. A
+Gaussian-tracking-only prototype was also considered before retaining the
+composition with transported flow; its weaker bicycle rollouts were not used
+for the production campaign.
+
+\paragraph{Paired eight-second outcomes.} The baseline completes 10/14
+scenarios; all ten completed runs have positive sampled clearance. Two other
+runs stop on PCBF no-result failures, and two stop on the existing geometry
+dual precision check. One interrupted baseline run has already collided.
+The new initialization completes 14/14 in this window, with 13/14 avoiding
+contact. The 15 m/s turning-crossing collision remains.
+
+\paragraph{Nominal recovery extension.} Successful current runs are resumed
+with a 60 s cumulative cap until all five transverse errors remain within
+$[0.1\,\mathrm m,1^\circ,0.1\,\mathrm{m/s},0.05\,\mathrm{m/s},
+0.01\,\mathrm{rad/s}]$ for 1 s, starting no earlier than 8 s. Thirteen
+scenarios confirm recovery by 19.05 s, including the collision-containing
+turning-crossing run. Consequently \textbf{12/14 complete collision avoidance
+and nominal recovery}. The remaining 8 m/s braking-lead run stops at
+10.35 s on the existing distance-dual precision requirement before confirming
+recovery. Its observed minimum body distance is positive (0.138015 m).
+
+\begin{center}\small
+\begin{tabular}{rl l r r r}
+\toprule
+Speed & Scenario & Old 8 s & New gap (m) & Recovery (s) & Max run (s)\\
+\midrule
+8 & Head-on & Dual fail & 1.05374 & 15.70 & 0.976 \\
+8 & Accelerating head-on & Complete & 0.73664 & 17.50 & 0.400 \\
+8 & Braking lead & Complete & 0.13802 & Fail at 10.35 & 0.784 \\
+8 & Crossing & Complete & 0.04897 & 13.35 & 0.675 \\
+8 & Turning crossing & Complete & 0.05307 & 14.50 & 0.716 \\
+8 & Curved head-on & Complete & 1.31700 & 14.95 & 0.602 \\
+8 & Curved crossing & Complete & 0.04156 & 19.05 & 0.749 \\
+15 & Head-on & Complete & 0.09702 & 9.70 & 0.331 \\
+15 & Accelerating head-on & Complete & 0.09412 & 9.60 & 0.327 \\
+15 & Braking lead & Complete & 0.15543 & 10.90 & 0.902 \\
+15 & Crossing & PCBF fail & 0.05428 & 13.00 & 0.462 \\
+15 & Turning crossing & Dual fail & 0.00000 & 12.00 & 0.693 \\
+15 & Curved head-on & Complete & 0.52501 & 9.05 & 0.755 \\
+15 & Curved crossing & PCBF fail & 0.03333 & 15.75 & 0.681 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Every new run completes the initial 8 s. The gap column describes that window
+and is unchanged in the extensions. Recovery is the end of the 1 s dwell,
+not a mathematical convergence proof. The turning-crossing zero gap is a
+collision, even though its solver and eventual recovery complete. Baseline
+recovery was not extended, so no paired recovery-speed claim is made.
+
+\paragraph{Remaining collision mechanism.} New contact samples occur from
+1.511667 to 1.538333 s, inside the 1.50 s hold. The maximum sampled SAT overlap
+depth is 0.152024 m at 1.523333 s. Positive primary slack begins at 1.10 s.
+At the collision hold, both shifted and fresh-flow primary problems return
+approximately 0.10 slack with solver flag 1; the CLF stage also returns flag 1.
+
+A separate probe rebuilds the fresh seed at the recorded 1.10 s state and
+previous input. Its ninth midpoint, at 1.525 s, has overlapping rectangles.
+The ordinary-distance dual returns normal norm $7.9853\times10^{-10}$ and
+maximum Jacobian magnitude $1.95785\times10^{-9}$. The cold replay returns a
+finite solution with primary slack 0.100000051. Thus a near-zero-gradient
+collision row again absorbs the node buffer as slack. Improving initial
+rollouts has not removed this ordinary-distance degeneracy or the existing
+execution of positive-slack results. This probe rebuilds the intrinsic
+terminal core from the same configuration; it is not claimed to reproduce
+every warm-start numerical detail.
+
+\paragraph{Remaining numerical interruption.} At 10.35 s in 8 m/s braking
+lead, the existing ordinary-distance conic solver stops with flag $-7$ and a
+reported primal--dual gap $1.68\times10^{-6}$ m, exceeding its $10^{-6}$ m
+check. This is a geometry numerical-accuracy interruption, not evidence of
+physical collision or proof of MPC infeasibility. The collision-dual code and
+its thresholds were not changed in this study.
+
+\paragraph{Runtime.} MATLAB is run with \texttt{-singleCompThread}; compared
+controller campaigns do not run concurrently. During the initial continuous
+8 s campaign, the maximum running call (excluding each scenario's initial
+call) is 0.889515 s. The recovery extension runs in a fresh MATLAB process:
+its first resumed 8 m/s head-on call at 8.00 s takes 0.976457 s, including
+process-resume initialization overhead. The table retains that actual measured
+call. It must not be mislabeled as warmed steady-state solve time. No 0.1 s
+real-time bound is achieved or claimed.
+
+\paragraph{Reproducibility.} The repository retains renamed copies of the
+executed experiment scripts:
+\begin{itemize}
+\item \texttt{runTimedFlowCampaign}: the paired finite-duration campaign.
+\item \texttt{extendTimedFlowRecovery}: continuation to nominal recovery.
+\item \texttt{auditTimedFlowSeeds}: exact production-seed comparison.
+\item \texttt{analyzeTimedFlowStudy.py}: independent geometry and recovery audit.
+\end{itemize}
+The report bundle retains compact
+results, final test rows, the focused collision probe, source/paper hashes,
+and the actual command/method record. Full traces, continuation MAT files,
+source snapshots, logs, and the executed script versions are retained in the
+external experiment/archive export. Solver dependencies, unrelated estimator
+work, agent instructions, and literature PDFs are deliberately excluded from
+the project commit.
+
+
+\section{Limitations}
+Better reference geometry does not prove local convex feasibility or nonlinear
+closed-loop safety. A late reinitialization can still start too near a threat,
+and fixed ordinary-distance multipliers still lose their directional gradient
+at strict overlap. The independent replay measures sampled rectangle distance;
+it is not a continuous-time robustness proof. Reported durations are measured
+controller calls, not trajectory durations or isolated optimizer times.
+\end{document}

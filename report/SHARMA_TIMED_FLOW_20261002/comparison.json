@@ -1,0 +1,3058 @@
+{
+  "scope": "Independent sampled geometry and nominal-recovery audit; no nonlinear feasibility certification",
+  "physicalCriterion": "Strictly positive rectangle distance; the 0.10 m buffer is an affine-node requirement",
+  "results": [
+    {
+      "version": "baseline",
+      "speed": 8,
+      "scenario": "headOn",
+      "eightSeconds": {
+        "completed": false,
+        "executedFrames": 62,
+        "failure": "collisionAvoidanceController:distanceDualFailed: The ordinary distance dual failed its primal-dual check (exit flag -7, gap 1.45e-06 m).",
+        "failureTime": 3.1,
+        "failedFrameSeconds": 0.012724,
+        "minimumClearanceMeters": 0.5392610990383593,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          7.430934309030089,
+          0.16584137534197743,
+          -0.9454427928950224,
+          -0.19489641330701524,
+          -0.15703231747581028
+        ],
+        "samples": 1922,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 1.6067,
+        "maximumFrameSeconds": 1.6067,
+        "maximumRunningSeconds": 0.667668,
+        "runningDeadlineMisses100ms": 61
+      },
+      "final": {
+        "completed": false,
+        "executedFrames": 62,
+        "failure": "collisionAvoidanceController:distanceDualFailed: The ordinary distance dual failed its primal-dual check (exit flag -7, gap 1.45e-06 m).",
+        "failureTime": 3.1,
+        "failedFrameSeconds": 0.012724,
+        "minimumClearanceMeters": 0.5392610990383593,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          7.430934309030089,
+          0.16584137534197743,
+          -0.9454427928950224,
+          -0.19489641330701524,
+          -0.15703231747581028
+        ],
+        "samples": 1922,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 1.6067,
+        "maximumFrameSeconds": 1.6067,
+        "maximumRunningSeconds": 0.667668,
+        "runningDeadlineMisses100ms": 61,
+        "worstFrame": {
+          "time": 0,
+          "seconds": 1.6067,
+          "initializationSeconds": 0.052602,
+          "formulationSeconds": 0.338069,
+          "solverSeconds": 0.178631,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed8-headOn.json",
+      "sourceSha256": "cb669ab414bb36ec05dc7d4f1c7454e27a5017101ed675c572b476196c6060ea"
+    },
+    {
+      "version": "baseline",
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.42436205771805,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          5.066047596332112,
+          -0.15348626193419593,
+          -0.1617436701693462,
+          0.00967713317811291,
+          0.007911264139730076
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.34675,
+        "maximumFrameSeconds": 0.505253,
+        "maximumRunningSeconds": 0.505253,
+        "runningDeadlineMisses100ms": 76
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.42436205771805,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          5.066047596332112,
+          -0.15348626193419593,
+          -0.1617436701693462,
+          0.00967713317811291,
+          0.007911264139730076
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.34675,
+        "maximumFrameSeconds": 0.505253,
+        "maximumRunningSeconds": 0.505253,
+        "runningDeadlineMisses100ms": 76,
+        "worstFrame": {
+          "time": 0.49999999999999994,
+          "seconds": 0.505253,
+          "initializationSeconds": 0.000628,
+          "formulationSeconds": 0.12671,
+          "solverSeconds": 0.376212,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed8-acceleratingHeadOn.json",
+      "sourceSha256": "8837e71b75c3604e150b6c114971a18a87bc8feb29de3e155d17d7fbff52df53"
+    },
+    {
+      "version": "baseline",
+      "speed": 8,
+      "scenario": "brakingLead",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.0972290498805576,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.2292654453603986,
+          -0.08880156350368289,
+          -0.6093176818971227,
+          0.00820541533650241,
+          0.0078046104657761755
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.829744,
+        "maximumFrameSeconds": 0.969164,
+        "maximumRunningSeconds": 0.969164,
+        "runningDeadlineMisses100ms": 159
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.0972290498805576,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.2292654453603986,
+          -0.08880156350368289,
+          -0.6093176818971227,
+          0.00820541533650241,
+          0.0078046104657761755
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.829744,
+        "maximumFrameSeconds": 0.969164,
+        "maximumRunningSeconds": 0.969164,
+        "runningDeadlineMisses100ms": 159,
+        "worstFrame": {
+          "time": 3.8499999999999943,
+          "seconds": 0.969164,
+          "initializationSeconds": 0.000616,
+          "formulationSeconds": 0.138595,
+          "solverSeconds": 0.8284050000000001,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed8-brakingLead.json",
+      "sourceSha256": "e986c05f0462ff88331b247a8bf815370ccc604b7b36eda68f8121526fccf989"
+    },
+    {
+      "version": "baseline",
+      "speed": 8,
+      "scenario": "crossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.050025356322140696,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.126316075778064,
+          -0.1123316454289573,
+          -0.15240853563994072,
+          0.0019122483381892187,
+          0.0011711787134725245
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.341916,
+        "maximumFrameSeconds": 0.477367,
+        "maximumRunningSeconds": 0.477367,
+        "runningDeadlineMisses100ms": 96
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.050025356322140696,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.126316075778064,
+          -0.1123316454289573,
+          -0.15240853563994072,
+          0.0019122483381892187,
+          0.0011711787134725245
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.341916,
+        "maximumFrameSeconds": 0.477367,
+        "maximumRunningSeconds": 0.477367,
+        "runningDeadlineMisses100ms": 96,
+        "worstFrame": {
+          "time": 0.05,
+          "seconds": 0.477367,
+          "initializationSeconds": 0.000619,
+          "formulationSeconds": 0.140047,
+          "solverSeconds": 0.33511599999999997,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed8-crossing.json",
+      "sourceSha256": "6b0399079394e0607c380375465279df1c3fd469927ebdf74380d9a4a8bf7728"
+    },
+    {
+      "version": "baseline",
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.047261315479940905,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          3.2757287656373895,
+          -0.10021805974442032,
+          -0.10054528273286323,
+          0.03605111783119065,
+          0.03151003133465064
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.328922,
+        "maximumFrameSeconds": 0.373262,
+        "maximumRunningSeconds": 0.373262,
+        "runningDeadlineMisses100ms": 111
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.047261315479940905,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          3.2757287656373895,
+          -0.10021805974442032,
+          -0.10054528273286323,
+          0.03605111783119065,
+          0.03151003133465064
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.328922,
+        "maximumFrameSeconds": 0.373262,
+        "maximumRunningSeconds": 0.373262,
+        "runningDeadlineMisses100ms": 111,
+        "worstFrame": {
+          "time": 0.65,
+          "seconds": 0.373262,
+          "initializationSeconds": 0.000607,
+          "formulationSeconds": 0.142758,
+          "solverSeconds": 0.228357,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed8-turningCrossing.json",
+      "sourceSha256": "df157157049e5387bee20ad416cbbd14062a580bf06aee8770ba578a96bea267"
+    },
+    {
+      "version": "baseline",
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.728729084045464,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.9527450772805974,
+          -0.23819738547340932,
+          -0.19126375307409482,
+          -0.01778212856139858,
+          -0.013253655456793152
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.369891,
+        "maximumFrameSeconds": 0.369891,
+        "maximumRunningSeconds": 0.353616,
+        "runningDeadlineMisses100ms": 80
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.728729084045464,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.9527450772805974,
+          -0.23819738547340932,
+          -0.19126375307409482,
+          -0.01778212856139858,
+          -0.013253655456793152
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.369891,
+        "maximumFrameSeconds": 0.369891,
+        "maximumRunningSeconds": 0.353616,
+        "runningDeadlineMisses100ms": 80,
+        "worstFrame": {
+          "time": 0,
+          "seconds": 0.369891,
+          "initializationSeconds": 0.012391,
+          "formulationSeconds": 0.148421,
+          "solverSeconds": 0.195138,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed8-curvedHeadOn.json",
+      "sourceSha256": "b9d192843116e49ff4eb29714ed6862079b555e0f7470cdec5da2ce31aa7a1ed"
+    },
+    {
+      "version": "baseline",
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.054271799395242896,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.6606959066201838,
+          -0.20957657584382489,
+          -0.14909149860772075,
+          -0.03865939923479901,
+          -0.03301482965977745
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.333053,
+        "maximumFrameSeconds": 0.374335,
+        "maximumRunningSeconds": 0.374335,
+        "runningDeadlineMisses100ms": 103
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.054271799395242896,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.6606959066201838,
+          -0.20957657584382489,
+          -0.14909149860772075,
+          -0.03865939923479901,
+          -0.03301482965977745
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.333053,
+        "maximumFrameSeconds": 0.374335,
+        "maximumRunningSeconds": 0.374335,
+        "runningDeadlineMisses100ms": 103,
+        "worstFrame": {
+          "time": 3.7999999999999945,
+          "seconds": 0.374335,
+          "initializationSeconds": 0.000612,
+          "formulationSeconds": 0.042211,
+          "solverSeconds": 0.329932,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed8-curvedCrossing.json",
+      "sourceSha256": "7124b792d0dfe374ac253cadcf97f4776a363c0965252d6e9daaad41ef741944"
+    },
+    {
+      "version": "baseline",
+      "speed": 15,
+      "scenario": "headOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.06691554803797835,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.3611479522267999,
+          -0.03379005815552691,
+          -0.1437852499785386,
+          -0.00013759397211146745,
+          0.007184540941923993
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.491198,
+        "maximumFrameSeconds": 0.491198,
+        "maximumRunningSeconds": 0.418427,
+        "runningDeadlineMisses100ms": 90
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.06691554803797835,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.3611479522267999,
+          -0.03379005815552691,
+          -0.1437852499785386,
+          -0.00013759397211146745,
+          0.007184540941923993
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.491198,
+        "maximumFrameSeconds": 0.491198,
+        "maximumRunningSeconds": 0.418427,
+        "runningDeadlineMisses100ms": 90,
+        "worstFrame": {
+          "time": 0,
+          "seconds": 0.491198,
+          "initializationSeconds": 0.007362,
+          "formulationSeconds": 0.114425,
+          "solverSeconds": 0.224974,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed15-headOn.json",
+      "sourceSha256": "01fb66c09b6fc17cfb5280ddfe3618be8b550a4b17844c0821c0a0ceffdbbf7c"
+    },
+    {
+      "version": "baseline",
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.10310761638739144,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.16594296522013316,
+          -0.022982861567511,
+          -0.1117204654556545,
+          -0.00019311939719253188,
+          0.023275782735330444
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.327269,
+        "maximumFrameSeconds": 0.327269,
+        "maximumRunningSeconds": 0.31417,
+        "runningDeadlineMisses100ms": 87
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.10310761638739144,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.16594296522013316,
+          -0.022982861567511,
+          -0.1117204654556545,
+          -0.00019311939719253188,
+          0.023275782735330444
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.327269,
+        "maximumFrameSeconds": 0.327269,
+        "maximumRunningSeconds": 0.31417,
+        "runningDeadlineMisses100ms": 87,
+        "worstFrame": {
+          "time": 0,
+          "seconds": 0.327269,
+          "initializationSeconds": 0.004724,
+          "formulationSeconds": 0.107515,
+          "solverSeconds": 0.213352,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed15-acceleratingHeadOn.json",
+      "sourceSha256": "0244fdab38a0710868551804fc28b0ee461a02739043bc7fcf3fa8a8537c8b7e"
+    },
+    {
+      "version": "baseline",
+      "speed": 15,
+      "scenario": "brakingLead",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09722108922469988,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.674648527902623,
+          -0.11330001370168256,
+          -0.6248922791289857,
+          0.03870858689876703,
+          0.14522549513557073
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.299147,
+        "maximumFrameSeconds": 1.014504,
+        "maximumRunningSeconds": 1.014504,
+        "runningDeadlineMisses100ms": 159
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09722108922469988,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.674648527902623,
+          -0.11330001370168256,
+          -0.6248922791289857,
+          0.03870858689876703,
+          0.14522549513557073
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.299147,
+        "maximumFrameSeconds": 1.014504,
+        "maximumRunningSeconds": 1.014504,
+        "runningDeadlineMisses100ms": 159,
+        "worstFrame": {
+          "time": 2.3499999999999996,
+          "seconds": 1.014504,
+          "initializationSeconds": 0.000689,
+          "formulationSeconds": 0.190016,
+          "solverSeconds": 0.822217,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed15-brakingLead.json",
+      "sourceSha256": "2f5086f683b3622f032e5de2ba298fa02f198a33f9acdc35601f9417e25d5db9"
+    },
+    {
+      "version": "baseline",
+      "speed": 15,
+      "scenario": "crossing",
+      "eightSeconds": {
+        "completed": false,
+        "executedFrames": 17,
+        "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+        "failureTime": 0.8500000000000001,
+        "failedFrameSeconds": 0.456135,
+        "minimumClearanceMeters": 9.185561855893123,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.0036307632777204243,
+          0.01603587852897686,
+          -2.2900878374372784,
+          0.1377209874914584,
+          0.3003656525140403
+        ],
+        "samples": 527,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.383618,
+        "maximumFrameSeconds": 0.6196,
+        "maximumRunningSeconds": 0.6196,
+        "runningDeadlineMisses100ms": 16
+      },
+      "final": {
+        "completed": false,
+        "executedFrames": 17,
+        "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+        "failureTime": 0.8500000000000001,
+        "failedFrameSeconds": 0.456135,
+        "minimumClearanceMeters": 9.185561855893123,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.0036307632777204243,
+          0.01603587852897686,
+          -2.2900878374372784,
+          0.1377209874914584,
+          0.3003656525140403
+        ],
+        "samples": 527,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.383618,
+        "maximumFrameSeconds": 0.6196,
+        "maximumRunningSeconds": 0.6196,
+        "runningDeadlineMisses100ms": 16,
+        "worstFrame": {
+          "time": 0.3,
+          "seconds": 0.6196,
+          "initializationSeconds": 0.000673,
+          "formulationSeconds": 0.139504,
+          "solverSeconds": 0.477845,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed15-crossing.json",
+      "sourceSha256": "990da15cbd93824cfb3bfc6cc0758b71f1109c84787f5be4c248a5a3d4a350d1"
+    },
+    {
+      "version": "baseline",
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "eightSeconds": {
+        "completed": false,
+        "executedFrames": 46,
+        "failure": "collisionAvoidanceController:distanceDualFailed: The ordinary distance dual failed its primal-dual check (exit flag -7, gap 1.21e-06 m).",
+        "failureTime": 2.3000000000000003,
+        "failedFrameSeconds": 0.048732,
+        "minimumClearanceMeters": 0.0,
+        "strictlyCollisionFree": false,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          3.999131689782122,
+          0.0507683608178633,
+          -1.9907731669138187,
+          0.5284622907474601,
+          -0.34664695936379636
+        ],
+        "samples": 1426,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.37917,
+        "maximumFrameSeconds": 0.525717,
+        "maximumRunningSeconds": 0.525717,
+        "runningDeadlineMisses100ms": 45
+      },
+      "final": {
+        "completed": false,
+        "executedFrames": 46,
+        "failure": "collisionAvoidanceController:distanceDualFailed: The ordinary distance dual failed its primal-dual check (exit flag -7, gap 1.21e-06 m).",
+        "failureTime": 2.3000000000000003,
+        "failedFrameSeconds": 0.048732,
+        "minimumClearanceMeters": 0.0,
+        "strictlyCollisionFree": false,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          3.999131689782122,
+          0.0507683608178633,
+          -1.9907731669138187,
+          0.5284622907474601,
+          -0.34664695936379636
+        ],
+        "samples": 1426,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.37917,
+        "maximumFrameSeconds": 0.525717,
+        "maximumRunningSeconds": 0.525717,
+        "runningDeadlineMisses100ms": 45,
+        "worstFrame": {
+          "time": 1.0000000000000002,
+          "seconds": 0.525717,
+          "initializationSeconds": 0.005011,
+          "formulationSeconds": 0.234151,
+          "solverSeconds": 0.284752,
+          "solverCalls": 3
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed15-turningCrossing.json",
+      "sourceSha256": "8734b6a7ea47d1903964208662205f98b883a1087db4102cbf050f7815a3b47f"
+    },
+    {
+      "version": "baseline",
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09079897498563379,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          -1.6062741724643534,
+          -0.044169813463031955,
+          -0.22675221556174208,
+          -0.0006691918744467749,
+          0.03726222602799194
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.106221,
+        "maximumFrameSeconds": 0.506621,
+        "maximumRunningSeconds": 0.506621,
+        "runningDeadlineMisses100ms": 140
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09079897498563379,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          -1.6062741724643534,
+          -0.044169813463031955,
+          -0.22675221556174208,
+          -0.0006691918744467749,
+          0.03726222602799194
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.106221,
+        "maximumFrameSeconds": 0.506621,
+        "maximumRunningSeconds": 0.506621,
+        "runningDeadlineMisses100ms": 140,
+        "worstFrame": {
+          "time": 6.949999999999983,
+          "seconds": 0.506621,
+          "initializationSeconds": 0.000682,
+          "formulationSeconds": 0.02012,
+          "solverSeconds": 0.484152,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed15-curvedHeadOn.json",
+      "sourceSha256": "21299561a76142f4310734702b0eadb5d58196c4f493b05cad9ff1ed7fb62f73"
+    },
+    {
+      "version": "baseline",
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "eightSeconds": {
+        "completed": false,
+        "executedFrames": 16,
+        "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+        "failureTime": 0.8,
+        "failedFrameSeconds": 0.462686,
+        "minimumClearanceMeters": 10.562997535090936,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          -0.018917739440851036,
+          0.014481981240593708,
+          -2.039697713411986,
+          0.12644682702998167,
+          0.259308996497745
+        ],
+        "samples": 496,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.361137,
+        "maximumFrameSeconds": 0.728192,
+        "maximumRunningSeconds": 0.728192,
+        "runningDeadlineMisses100ms": 15
+      },
+      "final": {
+        "completed": false,
+        "executedFrames": 16,
+        "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (pcbfNoNumericalResult).",
+        "failureTime": 0.8,
+        "failedFrameSeconds": 0.462686,
+        "minimumClearanceMeters": 10.562997535090936,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          -0.018917739440851036,
+          0.014481981240593708,
+          -2.039697713411986,
+          0.12644682702998167,
+          0.259308996497745
+        ],
+        "samples": 496,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.361137,
+        "maximumFrameSeconds": 0.728192,
+        "maximumRunningSeconds": 0.728192,
+        "runningDeadlineMisses100ms": 15,
+        "worstFrame": {
+          "time": 0.25,
+          "seconds": 0.728192,
+          "initializationSeconds": 0.000684,
+          "formulationSeconds": 0.1476,
+          "solverSeconds": 0.57811,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline-campaign/speed15-curvedCrossing.json",
+      "sourceSha256": "27ea1f541a2721788c494395bdf0c46ef6429bfe060228639010977ec55fd4da"
+    },
+    {
+      "version": "current",
+      "speed": 8,
+      "scenario": "headOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 1.0537368272854604,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          4.3348154561211345,
+          -0.14654139714885933,
+          -0.22261928488824267,
+          0.0005088704930673684,
+          0.00032366124459570517
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.712597,
+        "maximumFrameSeconds": 0.712597,
+        "maximumRunningSeconds": 0.688275,
+        "runningDeadlineMisses100ms": 82
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 314,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 1.0537368272854604,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 14.700000000000074,
+          "confirmationTimeSeconds": 15.700000000000088
+        },
+        "finalTransverseError": [
+          -0.003151632537319108,
+          0.0016066144999185546,
+          -0.0025456719975531783,
+          -0.004015748408303566,
+          -0.0033799319142794825
+        ],
+        "samples": 9734,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.712597,
+        "maximumFrameSeconds": 0.976457,
+        "maximumRunningSeconds": 0.976457,
+        "runningDeadlineMisses100ms": 94,
+        "worstFrame": {
+          "time": 7.99999999999998,
+          "seconds": 0.976457,
+          "initializationSeconds": 0.101098,
+          "formulationSeconds": 0.168276,
+          "solverSeconds": 0.09109500000000001,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-headOn-recovery.json",
+      "sourceSha256": "c8054ec742a3936290f7430aa4cc488768bc80965669c154f5d3255d29350625"
+    },
+    {
+      "version": "current",
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.7366446568252634,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          6.636062786239238,
+          -0.17871763707502394,
+          -0.08241757502437874,
+          0.014583248598155876,
+          0.013217456002587677
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.339847,
+        "maximumFrameSeconds": 0.400382,
+        "maximumRunningSeconds": 0.400382,
+        "runningDeadlineMisses100ms": 86
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 350,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.7366446568252634,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 16.5000000000001,
+          "confirmationTimeSeconds": 17.500000000000114
+        },
+        "finalTransverseError": [
+          -0.0007950192859802478,
+          0.0007511927781907818,
+          -6.998481126174738e-05,
+          -0.0023382840631028788,
+          -0.0019472034566680074
+        ],
+        "samples": 10850,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.339847,
+        "maximumFrameSeconds": 0.400382,
+        "maximumRunningSeconds": 0.400382,
+        "runningDeadlineMisses100ms": 122,
+        "worstFrame": {
+          "time": 3.599999999999995,
+          "seconds": 0.400382,
+          "initializationSeconds": 0.000643,
+          "formulationSeconds": 0.017883,
+          "solverSeconds": 0.380275,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-acceleratingHeadOn-recovery.json",
+      "sourceSha256": "c3b11127856cd186e23d242470977e04c91a513708e03e66c55f8e36a385bfb1"
+    },
+    {
+      "version": "current",
+      "speed": 8,
+      "scenario": "brakingLead",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.13801542715441428,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.348784244196332,
+          -0.07062306717210949,
+          -0.444886388439226,
+          0.003608649199607275,
+          0.003432752113033163
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.478415,
+        "maximumFrameSeconds": 0.783624,
+        "maximumRunningSeconds": 0.783624,
+        "runningDeadlineMisses100ms": 159
+      },
+      "final": {
+        "completed": false,
+        "executedFrames": 207,
+        "failure": "collisionAvoidanceController:distanceDualFailed: The ordinary distance dual failed its primal-dual check (exit flag -7, gap 1.68e-06 m).",
+        "failureTime": 10.350000000000001,
+        "failedFrameSeconds": 0.09445,
+        "minimumClearanceMeters": 0.13801542715441428,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.0010885582563282701,
+          -0.04596169867796946,
+          -0.12728948553690067,
+          0.07207609950049984,
+          0.06274931785988397
+        ],
+        "samples": 6417,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.478415,
+        "maximumFrameSeconds": 0.783624,
+        "maximumRunningSeconds": 0.783624,
+        "runningDeadlineMisses100ms": 206,
+        "worstFrame": {
+          "time": 4.549999999999992,
+          "seconds": 0.783624,
+          "initializationSeconds": 0.000641,
+          "formulationSeconds": 0.139937,
+          "solverSeconds": 0.6413220000000001,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-brakingLead-recovery.json",
+      "sourceSha256": "bb5d3732bbd7611e6b3fdc023512f649b8249ea1f756a588d3b6a84a6c11d32f"
+    },
+    {
+      "version": "current",
+      "speed": 8,
+      "scenario": "crossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.048969458128945584,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.592238063961832,
+          -0.15772630927658524,
+          -0.07098092315560844,
+          0.0012300478424218625,
+          0.0038842109835524074
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.333935,
+        "maximumFrameSeconds": 0.674987,
+        "maximumRunningSeconds": 0.674987,
+        "runningDeadlineMisses100ms": 113
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 267,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.048969458128945584,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 12.35000000000004,
+          "confirmationTimeSeconds": 13.350000000000055
+        },
+        "finalTransverseError": [
+          -0.001934842530857378,
+          0.0011156445183172965,
+          -0.00024743477243482914,
+          -0.002967819956463661,
+          -0.0024945213800536253
+        ],
+        "samples": 8277,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.333935,
+        "maximumFrameSeconds": 0.674987,
+        "maximumRunningSeconds": 0.674987,
+        "runningDeadlineMisses100ms": 118,
+        "worstFrame": {
+          "time": 0.2,
+          "seconds": 0.674987,
+          "initializationSeconds": 0.000631,
+          "formulationSeconds": 0.139382,
+          "solverSeconds": 0.533268,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-crossing-recovery.json",
+      "sourceSha256": "d5961a1404310c1342591a19bbe3d5f8b40a63e30fc46d7e258ce82cf2836b2b"
+    },
+    {
+      "version": "current",
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.05306711779545402,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.1914338257696686,
+          -0.07727442970848131,
+          0.05334753406513748,
+          0.06424988144729817,
+          0.05783664067430583
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.320313,
+        "maximumFrameSeconds": 0.715719,
+        "maximumRunningSeconds": 0.715719,
+        "runningDeadlineMisses100ms": 117
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 290,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.05306711779545402,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 13.500000000000057,
+          "confirmationTimeSeconds": 14.500000000000071
+        },
+        "finalTransverseError": [
+          -0.0022221960600828797,
+          0.000457489002510308,
+          -1.7582340696264964e-05,
+          -6.059709775219831e-05,
+          -0.0001665447544164005
+        ],
+        "samples": 8990,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.320313,
+        "maximumFrameSeconds": 0.715719,
+        "maximumRunningSeconds": 0.715719,
+        "runningDeadlineMisses100ms": 180,
+        "worstFrame": {
+          "time": 0.3,
+          "seconds": 0.715719,
+          "initializationSeconds": 0.000646,
+          "formulationSeconds": 0.147073,
+          "solverSeconds": 0.566258,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-turningCrossing-recovery.json",
+      "sourceSha256": "55e10b8086ffeca10d914bd6bfeaf7e599a1b71f74ac66562f14965b754c8047"
+    },
+    {
+      "version": "current",
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 1.3169983712857334,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.7001489220307511,
+          -0.23573638521060733,
+          -0.17650069183618644,
+          0.046781327916723535,
+          0.051156384535198836
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.67417,
+        "maximumFrameSeconds": 0.67417,
+        "maximumRunningSeconds": 0.601739,
+        "runningDeadlineMisses100ms": 84
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 299,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 1.3169983712857334,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 13.950000000000063,
+          "confirmationTimeSeconds": 14.950000000000077
+        },
+        "finalTransverseError": [
+          -0.00753153363621986,
+          0.0017812060663735581,
+          -0.002195255571087351,
+          -0.0012018987426723124,
+          -0.0009483947909480345
+        ],
+        "samples": 9269,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.67417,
+        "maximumFrameSeconds": 0.67417,
+        "maximumRunningSeconds": 0.601739,
+        "runningDeadlineMisses100ms": 115,
+        "worstFrame": {
+          "time": 0,
+          "seconds": 0.67417,
+          "initializationSeconds": 0.008055,
+          "formulationSeconds": 0.150365,
+          "solverSeconds": 0.509107,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-curvedHeadOn-recovery.json",
+      "sourceSha256": "146e08e0fce2ae167d6b74da882800857cacd2b63bc339297327fc13189c8a34"
+    },
+    {
+      "version": "current",
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.04156498531115154,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          -0.8527395343681765,
+          -0.10749918713484338,
+          -0.0844831507644761,
+          0.1614199723890044,
+          0.14419352564859425
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.332897,
+        "maximumFrameSeconds": 0.748658,
+        "maximumRunningSeconds": 0.748658,
+        "runningDeadlineMisses100ms": 109
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 381,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.04156498531115154,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 18.05000000000012,
+          "confirmationTimeSeconds": 19.050000000000136
+        },
+        "finalTransverseError": [
+          -0.006395344648136584,
+          0.0017038321190600055,
+          -0.0030576836442550714,
+          -0.002042560969900749,
+          -0.001964567262412592
+        ],
+        "samples": 11811,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.332897,
+        "maximumFrameSeconds": 0.748658,
+        "maximumRunningSeconds": 0.748658,
+        "runningDeadlineMisses100ms": 211,
+        "worstFrame": {
+          "time": 1.4500000000000006,
+          "seconds": 0.748658,
+          "initializationSeconds": 0.000667,
+          "formulationSeconds": 0.122187,
+          "solverSeconds": 0.623613,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed8-curvedCrossing-recovery.json",
+      "sourceSha256": "2d27b63c05bf26446184a71849ff9677bb2336d6b7de24459d30c727e089d6d8"
+    },
+    {
+      "version": "current",
+      "speed": 15,
+      "scenario": "headOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09701574632057683,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.10069377624385938,
+          -0.01668299627919408,
+          -0.05570856923487,
+          -0.0040948407127788635,
+          0.029301477744272802
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.397895,
+        "maximumFrameSeconds": 0.397895,
+        "maximumRunningSeconds": 0.331284,
+        "runningDeadlineMisses100ms": 84
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 194,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09701574632057683,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 8.699999999999989,
+          "confirmationTimeSeconds": 9.700000000000003
+        },
+        "finalTransverseError": [
+          -0.004644601559975069,
+          0.0001228513637885733,
+          0.0015088841671051512,
+          -0.0003486211329846533,
+          0.00010098067731527773
+        ],
+        "samples": 6014,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.397895,
+        "maximumFrameSeconds": 0.397895,
+        "maximumRunningSeconds": 0.331284,
+        "runningDeadlineMisses100ms": 109,
+        "worstFrame": {
+          "time": 0,
+          "seconds": 0.397895,
+          "initializationSeconds": 0.004702,
+          "formulationSeconds": 0.110623,
+          "solverSeconds": 0.182831,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-headOn-recovery.json",
+      "sourceSha256": "d823a9e5fe3f7b37dfd9cfd1fe770aea1116d6b0ecaa60fd674bc3feac363a99"
+    },
+    {
+      "version": "current",
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09411842285941141,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.07705417529154455,
+          -0.013705834946518542,
+          -0.030654306880252946,
+          -0.005400962661074813,
+          0.022747506109682587
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.307785,
+        "maximumFrameSeconds": 0.327042,
+        "maximumRunningSeconds": 0.327042,
+        "runningDeadlineMisses100ms": 87
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 192,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.09411842285941141,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 8.599999999999987,
+          "confirmationTimeSeconds": 9.600000000000001
+        },
+        "finalTransverseError": [
+          -0.005551796918724225,
+          0.00016459519217295582,
+          0.002404975494002315,
+          -0.00024929511892257124,
+          0.0001610739737501115
+        ],
+        "samples": 5952,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.307785,
+        "maximumFrameSeconds": 0.327042,
+        "maximumRunningSeconds": 0.327042,
+        "runningDeadlineMisses100ms": 112,
+        "worstFrame": {
+          "time": 0.35,
+          "seconds": 0.327042,
+          "initializationSeconds": 0.000692,
+          "formulationSeconds": 0.092238,
+          "solverSeconds": 0.232717,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-acceleratingHeadOn-recovery.json",
+      "sourceSha256": "58fd0cf8a3fb340570080e88ae4f4308574cf3905436a813b5f6b60204347516"
+    },
+    {
+      "version": "current",
+      "speed": 15,
+      "scenario": "brakingLead",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.1554252457814036,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.5506230036216846,
+          -0.09924097474074753,
+          -0.8593792328518965,
+          0.006655183763374903,
+          0.17093910297392773
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.33619,
+        "maximumFrameSeconds": 0.889515,
+        "maximumRunningSeconds": 0.889515,
+        "runningDeadlineMisses100ms": 159
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 218,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.1554252457814036,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 9.900000000000006,
+          "confirmationTimeSeconds": 10.90000000000002
+        },
+        "finalTransverseError": [
+          -0.0016876176527288365,
+          0.0007077652554163022,
+          -0.006171975996265289,
+          0.00032175147413144835,
+          -0.0021925985246352493
+        ],
+        "samples": 6758,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.33619,
+        "maximumFrameSeconds": 0.90213,
+        "maximumRunningSeconds": 0.90213,
+        "runningDeadlineMisses100ms": 217,
+        "worstFrame": {
+          "time": 8.449999999999985,
+          "seconds": 0.90213,
+          "initializationSeconds": 0.000663,
+          "formulationSeconds": 0.15372100000000002,
+          "solverSeconds": 0.745933,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-brakingLead-recovery.json",
+      "sourceSha256": "f8b3c32f3ad4033aa47d517df8a939c539c8d4ad379f294efb1b81b1b8019743"
+    },
+    {
+      "version": "current",
+      "speed": 15,
+      "scenario": "crossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.05427516220428099,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          2.0778399513042425,
+          -0.051532819720895524,
+          -0.6585625450148385,
+          0.002119866988641711,
+          -0.0122542746118199
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.35208,
+        "maximumFrameSeconds": 0.462498,
+        "maximumRunningSeconds": 0.462498,
+        "runningDeadlineMisses100ms": 157
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 260,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.05427516220428099,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 12.000000000000036,
+          "confirmationTimeSeconds": 13.00000000000005
+        },
+        "finalTransverseError": [
+          -0.0037546936688607267,
+          0.00011532875405610784,
+          -0.0003500504365021584,
+          -0.0002878128086476697,
+          0.0002686241003319309
+        ],
+        "samples": 8060,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": true,
+        "firstFrameSeconds": 0.35208,
+        "maximumFrameSeconds": 0.462498,
+        "maximumRunningSeconds": 0.462498,
+        "runningDeadlineMisses100ms": 181,
+        "worstFrame": {
+          "time": 1.4500000000000006,
+          "seconds": 0.462498,
+          "initializationSeconds": 0.0045190000000000004,
+          "formulationSeconds": 0.161852,
+          "solverSeconds": 0.294337,
+          "solverCalls": 3
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-crossing-recovery.json",
+      "sourceSha256": "874575c978985cd104b58d3e74e0f85451ad27c751746152be9c47d39506393a"
+    },
+    {
+      "version": "current",
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.0,
+        "strictlyCollisionFree": false,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          1.2911468877111254,
+          -0.04294293095769956,
+          -0.39887198785475775,
+          0.005658055456611482,
+          0.03360607583912211
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.351267,
+        "maximumFrameSeconds": 0.692696,
+        "maximumRunningSeconds": 0.692696,
+        "runningDeadlineMisses100ms": 138
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 240,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.0,
+        "strictlyCollisionFree": false,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 11.000000000000021,
+          "confirmationTimeSeconds": 12.000000000000036
+        },
+        "finalTransverseError": [
+          -0.004108866839427353,
+          0.00027954717362798487,
+          -0.00131946931894511,
+          -0.0005177349489631935,
+          -0.00026155135262129756
+        ],
+        "samples": 7440,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.351267,
+        "maximumFrameSeconds": 0.692696,
+        "maximumRunningSeconds": 0.692696,
+        "runningDeadlineMisses100ms": 155,
+        "worstFrame": {
+          "time": 0.3,
+          "seconds": 0.692696,
+          "initializationSeconds": 0.000711,
+          "formulationSeconds": 0.127403,
+          "solverSeconds": 0.562747,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-turningCrossing-recovery.json",
+      "sourceSha256": "0a646a3a47ca94b8eb77a87d84fd08d77d74a4829332c6e4aaf11ddc1fafe833"
+    },
+    {
+      "version": "current",
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.5250114006093384,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          0.03019917747720692,
+          0.0008812406749425456,
+          -0.04064290323159625,
+          0.0022314840324170245,
+          -0.004448326413931794
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.140726,
+        "maximumFrameSeconds": 0.755258,
+        "maximumRunningSeconds": 0.755258,
+        "runningDeadlineMisses100ms": 124
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 181,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.5250114006093384,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 8.04999999999998,
+          "confirmationTimeSeconds": 9.049999999999994
+        },
+        "finalTransverseError": [
+          0.029989412803650833,
+          -0.0003585175697381543,
+          -0.04717052039074687,
+          0.0008248740528579955,
+          0.00032650236424726364
+        ],
+        "samples": 5611,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.140726,
+        "maximumFrameSeconds": 0.755258,
+        "maximumRunningSeconds": 0.755258,
+        "runningDeadlineMisses100ms": 145,
+        "worstFrame": {
+          "time": 0.25,
+          "seconds": 0.755258,
+          "initializationSeconds": 0.000701,
+          "formulationSeconds": 0.129861,
+          "solverSeconds": 0.623057,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-curvedHeadOn-recovery.json",
+      "sourceSha256": "e94dc513bc6b8327817ecbe02a6e9c41e4fb503d61c5c82216769011a4cbe35f"
+    },
+    {
+      "version": "current",
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "eightSeconds": {
+        "completed": true,
+        "executedFrames": 160,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.0333284003994725,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": false,
+        "recovery": {
+          "enabled": true,
+          "recovered": false,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": null,
+          "confirmationTimeSeconds": null
+        },
+        "finalTransverseError": [
+          -0.9340035989581166,
+          -0.03896405921746272,
+          -0.15904050207610254,
+          0.011250658596346746,
+          -0.03920748904074535
+        ],
+        "samples": 4960,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.360561,
+        "maximumFrameSeconds": 0.563322,
+        "maximumRunningSeconds": 0.563322,
+        "runningDeadlineMisses100ms": 123
+      },
+      "final": {
+        "completed": true,
+        "executedFrames": 315,
+        "failure": "",
+        "failureTime": null,
+        "failedFrameSeconds": null,
+        "minimumClearanceMeters": 0.0333284003994725,
+        "strictlyCollisionFree": true,
+        "sampledRecoveryConfirmed": true,
+        "recovery": {
+          "enabled": true,
+          "recovered": true,
+          "tolerances": [
+            0.1,
+            0.017453292519943295,
+            0.1,
+            0.05,
+            0.01
+          ],
+          "errorOrder": [
+            "lateralMeters",
+            "headingRadians",
+            "speedMetersPerSecond",
+            "lateralVelocityMetersPerSecond",
+            "yawRateRadiansPerSecond"
+          ],
+          "dwellSeconds": 1,
+          "minimumTimeSeconds": 8,
+          "entryTimeSeconds": 14.750000000000075,
+          "confirmationTimeSeconds": 15.750000000000089
+        },
+        "finalTransverseError": [
+          0.03478867177794221,
+          -0.00045248706300272164,
+          -0.0211965716619531,
+          -0.0022240971765591054,
+          -0.003956278759699575
+        ],
+        "samples": 9765,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldConverged": false,
+        "firstFrameSeconds": 0.360561,
+        "maximumFrameSeconds": 0.681234,
+        "maximumRunningSeconds": 0.681234,
+        "runningDeadlineMisses100ms": 273,
+        "worstFrame": {
+          "time": 8.04999999999998,
+          "seconds": 0.681234,
+          "initializationSeconds": 0.000683,
+          "formulationSeconds": 0.020184999999999998,
+          "solverSeconds": 0.658615,
+          "solverCalls": 2
+        }
+      },
+      "source": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/current-campaign/speed15-curvedCrossing-recovery.json",
+      "sourceSha256": "dbd768da4e90af6c116dd85c72422a3475977198a07a2e6582c02bd9f430d2dd"
+    }
+  ]
+}

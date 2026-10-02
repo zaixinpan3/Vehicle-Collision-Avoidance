@@ -1,0 +1,51 @@
+{
+  "baselineCommit": "75b19ab2fcad220d1337a0476ae2d0f341fac995",
+  "baselineSnapshot": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002/baseline",
+  "scope": "One constant-A constant-beta target model; flow initialization only. Frozen Li geometry, optimizer, CLF, configuration, and execution semantics.",
+  "matlab": "26.1.0.3276743 (R2026a) Update 3; -singleCompThread",
+  "papers": [
+    {
+      "path": "reference/Sharma et al. - 2026 - Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using a multistage high ga.pdf",
+      "sha256": "f8414de25dd6bfa1d65ed4c4681d57b692bf5837622a5e2fbee7bafff4f03621"
+    },
+    {
+      "path": "reference/Cheng et al. - 2021 - Virtual Fluid-Flow-Model-Based Lane-Keeping Integrated With Collision Avoidance Control System Desig.pdf",
+      "sha256": "ed13a80d7a3bea98a862096903ef6461204dea5107ac125cbca8f8e1b8da9c22"
+    }
+  ],
+  "sourceHashes": {
+    "controller/predictiveSafetyGeometry.m": "7c4a5ddcf30b581ebfab7598610a69099f36ea3c209babb4f3282c8b1d8257dd",
+    "controller/solvePredictiveControl.m": "383c3a92531aff383a408740cb2d837bbda5290d81bb898dec83222ac5cbc002",
+    "tests/movingTargetFlowTest.m": "fa464426083a80891ba96004e872970a1e8df1b87257b38fae0aa8f154521bb3",
+    "scripts/runTimedFlowCampaign.m": "1859819f12ae53d1962fb2a74142db9e702d14708d388604169ad5ad327c3908",
+    "scripts/extendTimedFlowRecovery.m": "72604eb449310185d076bfa2e3c01d4ebdcd329739d19e6d2305630e81783742",
+    "scripts/auditTimedFlowSeeds.m": "cc2bdb798fc8d0c9ac6b301c5e6e5816c413338de3113e1ab54a4ad090e4b4d9",
+    "scripts/analyzeTimedFlowStudy.py": "6ac4b69dc6def3ec80a2f6b5c4d7bfea29c958d7dbfb80cdc9442613ddbf4c42"
+  },
+  "experimentDirectory": "/home/zai/.cache/collisionAvoidance/sharma-flow-20261002",
+  "commands": [
+    "runtests five focused classes; all non-flow tests passed. One positive-amplitude test initially used a non-conflicting fixture; after constructing a guaranteed meeting and correcting the fixture, reran all movingTargetFlowTest cases. final-tests.csv contains 109 distinct passing final results.",
+    "Baseline campaign.m: 14 scenarios, Frames=160, exact observations, ODE45, RequireCollisionThreat=true, RecoveryDwellSeconds=1, no random draws.",
+    "Current auditSeeds.m and campaign.m with the same 14 fixtures and 160-frame cap.",
+    "Current extendRecovery.m: resume successful saved runs with cumulative Frames=1200, stop after one second of nominal recovery within fixed tolerances.",
+    "probeCollision.m: reconstruct the fresh seed from recorded t=1.10 s state/input, with the intrinsic terminal core rebuilt from unchanged configuration.",
+    "summarize.py: independent Python target/rectangle geometry and sampled recovery audit. Only geometry/recovery fields of auditJointPredictiveSafety are used; historical aggregate gates requiring online hard residuals are not relabeled as passed."
+  ],
+  "reproductionScripts": {
+    "scripts/runTimedFlowCampaign.m": "Renamed exact executed campaign.m",
+    "scripts/extendTimedFlowRecovery.m": "Renamed exact executed extendRecovery.m",
+    "scripts/auditTimedFlowSeeds.m": "Renamed exact executed auditSeeds.m",
+    "scripts/analyzeTimedFlowStudy.py": "Exact executed summarize.py"
+  },
+  "deliberateExclusions": [
+    "Estimator changes, report index/NRMM notes, agent files, literature PDFs, paper artifacts, solver dependencies/binaries, and other pre-existing worktree changes."
+  ],
+  "checks": [
+    "Final 109 distinct focused MATLAB tests passed; 16 moving flow cases rerun after correcting a non-conflicting test fixture.",
+    "Python byte compilation passed for scripts/analyzeTimedFlowStudy.py.",
+    "Code Analyzer completed on two changed core files, flow tests, three reproduced MATLAB experiment drivers and collision probe.",
+    "Independent Python geometry agrees with MATLAB for all 28 final baseline/current records; all 13 claimed recovery dwells independently confirmed.",
+    "English standalone technical PDF compiled without overfull boxes; table and text inspected.",
+    "git diff --check passed."
+  ]
+}

@@ -24,6 +24,35 @@ flow rollout is constructed; when no target is present, nominal path guidance
 supplies the initialization. Flow guidance is a search reference, not a safety
 certificate. No maneuver bank is used.
 
+The target keeps Sharma et al. (2026), Eq. (17)'s constant tangential
+acceleration `A` and constant sideslip `beta`. The prediction uses inertial
+coordinates, with `V(t)=V0+A*t` and curvature `sin(beta)/lr`; yaw rate therefore
+changes with speed. There is no added sideslip-rate state. The exact arc-length
+flow supplies both initialization and collision constraints at matching
+absolute times. The existing signed-velocity continuation is retained; a stop
+clamp would change the constant-acceleration model.
+
+The flow seed adds a timed Gaussian reference inspired by Cheng et al.
+(2021), Eqs. (34)-(36). On the finite seed horizon it pairs nominal station
+`s0+vRef*t` with the target's predicted station and lateral position. A single
+Gaussian's signed amplitude covers the sampled circular exclusion envelope
+on the less-displaced side. Its center is the closest nominal encounter time;
+its temporal width is at least the nominal lookahead and half the longitudinal
+interaction span. This finite-time construction never divides by closing
+speed. Its lateral displacement and derivative guide the existing moving
+cylinder field; that field still includes the target center velocity, including
+rotation of an offset body center. The guide previews the entire finite seed
+horizon, even when the target initially lies outside the encounter range.
+
+The nominal station clock is approximate. The actual Fiala rollout samples
+the moving field and the target at the same absolute time, but need not follow
+the Gaussian exactly. Neither the geometric envelope nor its curved-road
+Frenet approximation certifies this bicycle rollout. A failed seed remains a
+possible search object. This changes initialization only, without changing
+the Li distance dual, solver stages, CLF, or command acceptance semantics.
+The derivation, paired experiments, and remaining failures are recorded in
+[the timed-flow study](../report/SHARMA_TIMED_FLOW_20261002.tex).
+
 For an anchor `(xbar_i, ubar_i)` the shared model is
 
     x_(i+1) = f_h(xbar_i,ubar_i) + A_i (x_i-xbar_i) + B_i (u_i-ubar_i).
@@ -68,8 +97,8 @@ There is no signed-distance objective, preferred passing direction, normal
 normalization, or replacement of an overlapping distance dual. Zero
 multipliers stay zero: a relaxed row then needs at least the node buffer in
 slack, while a hard positive-buffer row is infeasible. Contact duals may be
-nonunique. The existing initialization policy is unchanged and receives no
-new repair rule. The retired signed-direction MEX is neither called nor built.
+nonunique. Flow initialization does not replace those multipliers or repair
+their zero gradients. The retired signed-direction MEX is neither called nor built.
 The exact rectangle-distance routine serves offline geometry, the existing
 encounter-range query, and an independent primal-dual check at each anchor.
 That check requires nonnegative multipliers and a unit-ball normal within

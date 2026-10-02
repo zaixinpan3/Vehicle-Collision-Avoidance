@@ -1,6 +1,44 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target flow, polygon duals and road coordinates.
     methods (Static)
+        function guide = movingGaussianGuide(state,lane,epoch,startTime,duration,cfg)
+            % Cheng (2021), Eqs. (34)-(36), with a time-aligned target envelope.
+            % The arrival map s(t)=s0+vRef*t is only a search-reference clock.
+            % Fit one Gaussian to the known moving exclusion envelope at the
+            % same times. No division by closing speed or safety admission.
+            projection=laneGeometry.project(state(1:2),lane);
+            guide=struct('station',projection.station,'amplitude',0,'centerTime',0, ...
+                'width',cfg.nominalClf.lookaheadSeconds,'endTime',0,'radius',0);
+            if isempty(epoch),return;end
+            radius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset) ...
+                +norm(epoch(8:9))+norm(epoch(10:11))+cfg.collision.safetyMarginMeters;
+            guide.radius=radius;
+            times=0:cfg.controller.sampleTime/2:duration;
+            station=projection.station+cfg.referenceSpeed*times;
+            position=zeros(2,numel(times));
+            for index=1:numel(times)
+                q=predictiveSafetyGeometry.targetFlow(epoch,startTime+times(index));
+                rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
+                position(:,index)=q(1:2)+rotation*q(10:11);
+            end
+            target=laneGeometry.project(position,lane,station);
+            longitudinal=station-target.station;lateral=target.lateralPosition;
+            active=abs(longitudinal)<radius;
+            if ~any(active & hypot(longitudinal,lateral)<radius),return;end
+            [~,closest]=min(hypot(longitudinal,lateral));guide.centerTime=times(closest);
+            first=find(active,1);last=find(active,1,'last');guide.endTime=times(last);
+            guide.width=max(guide.width,(times(last)-times(first))/2);
+            crossSection=sqrt(max(0,radius^2-longitudinal(active).^2));
+            kernel=exp(-.5*((times(active)-guide.centerTime)/guide.width).^2);
+            left=max([0,(lateral(active)+crossSection)./kernel]);
+            right=max([0,(-lateral(active)+crossSection)./kernel]);
+            % The smaller scalar envelope selects a side, not a second plan.
+            % Symmetric encounters retain the left preference under roundoff.
+            if left<=right+1e-10*max(1,max(left,right)),guide.amplitude=left;
+            else,guide.amplitude=-right;
+            end
+        end
+
         function velocity = movingFlowVelocity(position,nominal,center,translation,map,mapRate,circulation)
             % Transport a unit-cylinder flow through a moving ellipse frame.
             % Outside q'*q >= 1, exact first-order following preserves that
@@ -49,6 +87,9 @@ classdef predictiveSafetyGeometry
         end
 
         function next = targetFlow(q,time)
+            % Sharma NRMM (2026), Eq. (17), in inertial coordinates:
+            % Vdot=A, betadot=0, psidot=V*sin(beta)/lr. Constant curvature
+            % makes the position integral elementary even when A is nonzero.
             if isempty(q),next=q;return;end
             arc=q(4)*time+.5*q(5)*time^2;
             curvature=sin(q(6))/q(7);a=curvature*arc/2;scale=1;
