@@ -1,14 +1,14 @@
 # Controller source map
 
 The controller and configuration contain nine MATLAB source files. See
-[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for the two-stage problem
+[PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md) for budget inheritance and restoration
 and its affine prediction scope.
 
 | Source | Responsibility |
 | --- | --- |
 | `collisionAvoidanceController.m` | Fixed target epoch, input memory, solver orchestration, affine-result metadata and first input |
 | `readControllerInputs.m` | Ego, one target and given-path normalization |
-| `solvePredictiveControl.m` | Refine PCBF/CLF pairs within the hold, adapt input trust from nonlinear prediction error, and restore with one flow refresh |
+| `solvePredictiveControl.m` | Optimize CLF under inherited slack caps, restore PCBF when needed, and relinearize inaccurate predictions |
 | `terminalContinuation.m` | Augmented free-pose endpoint core, construction bounds and anchor-based terminal geometry |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single nominal cost-to-go CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
@@ -16,15 +16,13 @@ and its affine prediction scope.
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
-Each completed PCBF/CLF pair is rolled through the nonlinear model to measure
+Each completed CLF result is rolled through the nonlinear model to measure
 prediction agreement. Its full evaluable rollout becomes the next search
-anchor; the entire local model is rebuilt before another pair of solves.
-An accurate iterate with positive CLF slack at the input correction boundary
-also refines while its predicted or actual slack change exceeds the objective
-resolution, so that an artificial local box does not prevent recovery.
-Only an accurate completed second-stage result can supply the input. The
-best such iterate from the current frame survives later search failure. There
-is no stored executable witness or alternate controller. Flow is an initializer,
+anchor; the entire local model is rebuilt before another accuracy refinement.
+An accurate completed CLF result ends the current frame. The inherited prefix
+slack sum and first-stage cap replace a primary solve when feasible; a failed
+capped solve restores the primary problem. Extra rounds repair model accuracy.
+There is no stored executable witness or alternate controller. Flow is an initializer,
 not a safety certificate. Positive PCBF slack still denotes relaxation.
 Road boundaries remain excluded, and the original given path defines the
 single CLF. Terminal feedback is used only for construction.
@@ -54,7 +52,7 @@ zero multipliers and translation invariance. Overlap has no imposed direction.
 target ranges, primary priority, affine dynamics with consistent anchors,
 braking bounds, input increments distinct from physical steering limits,
 positive-slack reporting, same-frame rebuilding of both objectives, nonlinear
-prediction accuracy, further CLF descent after the first accurate iterate,
+prediction accuracy, first-accurate-iterate stopping, inherited budgets, failed-budget restoration,
 and rejection when no accurate pair exists within the budget. `clfNominalRecoveryTest` checks target-free
 nonlinear value decrease without requiring the optimizer to issue the nominal
 construction feedback. `nominalClfTest` checks the trim, strict local Lyapunov

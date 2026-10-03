@@ -1,0 +1,208 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,microtype,xurl,hyperref}
+\setlength{\emergencystretch}{3em}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Inherited Safety-Slack Budgets and One-Step CLF Optimization}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 2, 2026}
+\begin{document}\maketitle
+\section{Decision and outcome}
+The proposal is useful under a precise qualification: shifted slacks are a
+budget for the new problem, not automatically a nonlinear feasibility
+certificate. The controller now attempts the same CLF optimization directly
+under the inherited total and first-stage caps. Initialization or an
+unsuccessful capped solve invokes primary PCBF restoration. The first
+model-accurate CLF result ends the frame; positive CLF slack at a trust boundary
+no longer triggers optional polishing. Terminal feedback is appended to the
+shifted initialization. The controller, CLF, physical constraints, target
+contract, collision geometry and 0.10 m node buffer are unchanged.
+
+All fourteen prescribed danger cases are collision-free in the replay and
+reach the declared one-second nominal-recovery dwell. The previous controller
+had thirteen collision-free recoveries; its failing 15 m/s turning-crossing
+case now has 2.460924 m sampled clearance. The smallest coarse clearance is
+0.036045 m; targeted 50-microsecond replay refines it to 0.035084 m. This is
+experimental sampled evidence, not a continuous-plant safety theorem.
+
+The campaign contains 6,167 holds. Of these, 6,115 (99.16\%) use inherited
+budgets and 5,895 (95.59\%) require one numerical solve. Every issued frame
+completes the CLF objective. Median full-call runtime is 29.392 ms and the
+95th percentile is 42.406 ms. The warmed campaign maximum is 270.680 ms;
+excluding its first call gives 262.069 ms. A separate fresh-process controller
+call takes 1.064060 s. Fourteen calls exceed 100 ms and 207 exceed the 50 ms
+control period. The requested maximum of 0.1 s is not achieved.
+
+\section{Mathematical scope}
+Let the accepted horizon have $N$ prefix slacks and a hard completion tail:
+\[
+ S_k=\sum_{i=0}^{N-1}\xi_{i|k},\qquad
+ \widetilde\Xi_{k+1}=(\xi_{1|k},\ldots,\xi_{N-1|k},0).
+\]
+The next CLF problem imposes
+\[
+ \sum_i\xi_{i|k+1}\le\overline S_{k+1}=S_k-\xi_{0|k},\qquad
+ \xi_{0|k+1}\le\xi_{1|k}.
+\]
+The same inherited cap is held fixed through all accuracy refinements of a
+single physical frame. No tie increment is added to that cap, and no new
+weighted safety objective is introduced. The input-increment tie continues
+to penalize deviation from the linearization input, rather than zero input.
+
+For exact shared dynamics, an unchanged target contract, exact successor
+state, a feasible old trajectory and an admissible terminal continuation,
+the shifted trajectory witnesses feasibility of these constraints. The old
+hard tail supplies the new zero slack. This argument does not require finding
+the new globally minimum slack sum. In this ideal setting,
+\[
+ V_B^*(x_k)\le S_k,\qquad
+ S_{k+1}\le S_k-\xi_{0|k},\qquad
+ \sum_{k=0}^K\xi_{0|k}\le S_0.
+\]
+Thus the executed-stage slacks tend to zero, but the inequality alone does
+not establish $S_k\to0$: with $N=2$, repeatedly selecting $(0,c)$ preserves
+the total budget and first-stage cap while postponing future slack.
+The optimal-value proof in Huang et al., \emph{Predictive Control Barrier
+Functions: Bridging model predictive control and control barrier functions},
+Section III, therefore cannot simply be transferred to this trajectory budget
+(\url{https://arxiv.org/html/2502.08400v1}).
+
+In the actual implementation the old prediction is affine and the new anchor
+is integrated from the measurement. New dynamics/collision tangents and a
+refitted terminal pose need not preserve old feasibility. Consequently the
+inherited cap is attempted in the new conic problem. A failed capped solve
+returns to primary restoration, establishing a new budget and explicitly
+breaking the old monotonicity chain. Only a current CLF optimizer result can
+supply the command. No stored plan or alternate feedback controller is issued.
+The terminal feedback is solely a construction input for the appended hold.
+
+Continuation state version 67 stores the per-stage slacks and their sum.
+An inherited result reports \texttt{primaryOptimum=NaN} and
+\texttt{primaryOptimumComputed=false}; the achieved slack sum is not labelled
+as a freshly optimized PCBF value. The zero-correction anchor's assembled
+constraint residual is logged separately from optimization success. Only
+2,079 of the 6,115 accepted inherited-budget frames have this diagnostic at
+or below $10^{-8}$. Budgeted optimization can repair the other anchors, but
+these numbers rule out claiming that every raw shift is already feasible.
+
+There are 38 frames whose final solution requires primary restoration after
+an inherited attempt. Across accepted inherited results, the largest total
+cap excess is $1.308\times10^{-9}$ and the largest first-stage excess is
+$5.717\times10^{-10}$, reflecting finite numerical precision. The independently
+recomputed budget-transfer identity has maximum error $1.085\times10^{-19}$;
+the first-stage transfer is exact in the recorded arithmetic. The ideal
+monotonicity statement must not be asserted across restoration events or
+without accounting for numerical errors.
+
+\section{Experiment and validation protocol}
+The fourteen deterministic fixtures are the same seven encounter types at
+8 and 15 m/s. Constant-speed given-path cruising collides with the prescribed
+target in every case, with positive initial clearance. State observation is
+exact; target tangential acceleration and sideslip are constant. The control
+period is 50 ms, the prefix has eight or sixteen holds, and the completion
+tail lasts three seconds. Road constraints are absent. Physical success
+requires strictly positive body clearance, not a 0.10 m plant gap.
+
+The observation cap is 1,500 holds, never a success deadline. Every case stops
+only after one second inside all five nominal-error tolerances:
+$[0.1\,\mathrm m,1^\circ,0.1\,\mathrm{m/s},0.05\,\mathrm{m/s},
+0.01\,\mathrm{rad/s}]$. For the periodic 15 m/s curved-head-on fixture the
+confirmation at 72.15 s follows its second prescribed interaction near 56 s.
+
+Independent ODE45 plant replay uses 31 samples per hold, relative tolerance
+$10^{-11}$ and absolute tolerance $10^{-12}$. The Python geometry and
+recovery audit agrees over all 191,177 samples. Its legacy comprehensive
+\texttt{passed} flag additionally requests a hard-residual certificate and
+the configured node clearance as a physical margin; those are not the
+collision/recovery criteria used here. The geometry agreement, strictly
+positive distance and recovery dwell are inspected explicitly. For each
+case with minimum gap below 0.15 m, the closest hold and its two neighbors
+are also replayed at 1,001 samples per hold using tighter tolerances:
+12,012 additional samples remain separated.
+
+\begin{center}\small\begin{tabular}{rlrrr}\toprule
+Speed & Scenario & Coarse gap (m) & Recovery (s) & Peak call (s)\\\midrule
+8 & headOn & 1.819821 & 21.15 & 0.270680\\
+8 & acceleratingHeadOn & 1.418169 & 21.75 & 0.102239\\
+8 & brakingLead & 0.098671 & 15.35 & 0.262069\\
+8 & crossing & 0.542820 & 16.70 & 0.109072\\
+8 & turningCrossing & 0.757788 & 16.45 & 0.092475\\
+8 & curvedHeadOn & 2.252477 & 27.45 & 0.099239\\
+8 & curvedCrossing & 0.352692 & 19.95 & 0.093863\\
+15 & headOn & 0.049106 & 13.90 & 0.184289\\
+15 & acceleratingHeadOn & 0.036045 & 13.75 & 0.093511\\
+15 & brakingLead & 0.098796 & 17.80 & 0.174827\\
+15 & crossing & 2.454753 & 15.40 & 0.113523\\
+15 & turningCrossing & 2.460924 & 15.65 & 0.081000\\
+15 & curvedHeadOn & 1.863337 & 72.15 & 0.137250\\
+15 & curvedCrossing & 1.629113 & 20.90 & 0.083380\\
+\bottomrule\end{tabular}\end{center}
+Recovery is often slower than before: the 8 m/s head-on case changes from
+12.05 to 21.15 s and curved head-on from 13.15 to 27.45 s. The experiments
+support eventual recovery for these fixtures, not unchanged transients or a
+general stability theorem for one-step stopping.
+
+\section{Runtime and remaining bottleneck}
+The warmed campaign follows unit tests in the same MATLAB process; fresh
+startup is measured in a separate process. All timings include complete
+controller calls, not merely the numerical solver. The plant simulation
+applies each command at the nominal sample time; measured computation delay
+is not injected into the vehicle dynamics. The workstation is not isolated
+as a real-time target, so these measurements are not worst-case bounds.
+
+A paired replay of the original 15 m/s braking-lead fixture at 5.90 s uses
+four calls per implementation and the median of the last three. The prior
+version takes 0.428518 s with eight rounds and sixteen numerical solves;
+the new version takes 0.065500 s with one round and two numerical solves.
+That legacy fixture lacks per-stage slack history, so only its state-schema
+version is migrated and no inherited budget is supplied. It isolates the
+combined new stopping/terminal initialization behavior, rather than claiming
+an inherited one-solve benchmark with invented historical slacks.
+
+The campaign's refinement histogram is 5,926 one-round frames, 239 two-round
+frames, one three-round frame and one four-round frame. The worst running
+frame is 8 m/s braking-lead at 5.45 s, taking 262.069 ms and nine solves.
+Its normalized model discrepancies are $1.916,2.887,1.023,0.775$; only the
+fourth round meets the declared threshold of one. It includes two successful
+inherited CLF trials, one failed inherited trial, primary restoration and two
+unsuccessful flow primary trials. These iterations repair disagreement;
+none is triggered merely to further lower an accurate CLF slack.
+
+\begin{center}\begin{tabular}{lr}\toprule
+Worst running frame component & Milliseconds\\\midrule
+PCBF solves & 31.785\\
+CLF solves & 74.811\\
+Formulation excluding CLF & 71.458\\
+CLF construction & 65.312\\
+Prediction agreement & 7.806\\
+Initialization & 3.665\\
+Other & 7.232\\\bottomrule\end{tabular}\end{center}
+
+\section{Checks and reproducibility}
+All 270 selected MATLAB tests pass, including budget inheritance, first-stage
+caps, a disturbed-state budget failure followed by primary restoration,
+first-accurate-result stopping, both initialization objectives, single-CLF
+recovery, dynamics/geometry kernels, configuration and the core source budget.
+The formerly required extra CLF-polishing behavior is deliberately replaced
+by a stopping test; its practical recovery consequence is tested in all
+fourteen closed-loop fixtures. Factory Code Analyzer reports only existing
+sparse-assignment and unused-variable advisories.
+
+The initial campaign recorded \texttt{optimizationConverged=false} for an
+inherited result because the non-solver budget marker had no exit flag.
+The final code corrects this diagnostic to inspect numerical stages only;
+it does not alter the controls or any acceptance branch. The raw exports
+are preserved. An independent pass verifies positive termination of every
+selected numerical stage, and the final unit test asserts the corrected flag.
+The pre-correction source snapshot and exact one-line metadata change are
+preserved with the experiment exports.
+
+The compact JSON evidence includes scenario and runtime summaries, inherited
+budget identities, selected-stage termination, the worst frame, paired replay,
+dense closest-hold replay, test results and source hashes. Full MAT/JSON
+traces and reproducible diagnostic scripts are export copies in the external
+archive; vendor dependencies and generated binaries are excluded from the
+project commit. Commands use MATLAB R2026a Update 3 with
+\texttt{-singleCompThread}; the existing Clarabel 0.11.1 adapter is unchanged.
+\end{document}

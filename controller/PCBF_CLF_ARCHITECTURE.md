@@ -1,9 +1,9 @@
-# Two-stage PCBF / CLF iteration within one control hold
+# Inherited PCBF slack budgets and one-step CLF optimization
 
 Every frame uses the same target-independent nominal cost-to-go CLF, defined in
-[NOMINAL_CLF.md](NOMINAL_CLF.md). The objectives remain PCBF slack first, CLF
-slack second. A bounded input-increment tie term in the second objective makes
-the future plan determinate. There is no third optimization stage, target-range
+[NOMINAL_CLF.md](NOMINAL_CLF.md). Initialization and restoration minimize PCBF slack before CLF slack.
+A continuation frame first attempts CLF optimization under an inherited slack
+budget. A bounded input-increment tie term regularizes the future plan. There is no third optimization stage, target-range
 CLF switch, direct nominal-feedback command, or executable backup.
 
 ## Prediction and initialization
@@ -121,6 +121,60 @@ The original conic distance implementation and its historical experiment
 results remain recorded in the dated reports; they do not describe the
 current geometric implementation.
 
+## Inherited safety budget
+
+For an accepted affine prediction with prefix slacks `xi[0:N-1]`, retain
+`S = sum(xi)` and construct `xi_shift = [xi[1:N-1], 0]`. The CLF problem first
+uses the hard constraints
+
+    sum(xi_new) <= sum(xi_shift) = S - xi[0],
+    xi_new[0] <= xi_shift[0].
+
+No lexicographic tie is added to the inherited budget. The first-stage cap
+prevents transferring the available slack into the executed hold. Its rows
+cover the hold's start and midpoint, not continuous-time clearance. The same
+budget remains fixed through any model-accuracy refinement in this frame;
+`xi[0]` is subtracted once per physical sample, never once per iteration.
+The normal objective remains the same CLF slack plus bounded proximal tie.
+There is no additional weighted safety objective.
+
+In an exact common prediction model, if the previous full trajectory is
+feasible and its appended terminal feedback stays admissible, the shifted
+slacks and controls are a feasible candidate. The tail contributes the new
+zero slack. Consequently the budget-constrained problem is feasible without
+recomputing the optimum of the primary problem. The retained quantity is a
+trajectory-dependent upper bound on the optimal safety value, not the optimal
+PCBF value itself. Inherited-budget stages therefore record `primaryOptimum`
+as NaN and `primaryOptimumComputed` as false.
+
+This exact-shift premise does not automatically hold in the implemented
+nonlinear controller: the saved states satisfy the previous affine model;
+the new anchor is integrated from the current measurement; collision tangents
+and terminal placement are rebuilt. Even small discrepancies can invalidate
+a tight cap. The implementation attempts the inherited cap in the current
+convex program; `budgetAnchorResidual` records whether the zero-correction
+shift itself satisfies its assembled constraints. It is a diagnostic, not a
+nonlinear safety certificate. A failed capped CLF solve triggers primary
+restoration and the existing bounded flow retry. The restoration creates a
+new budget and breaks the previous monotonic-budget chain; this event is
+explicit in the attempt log. No stored plan supplies an issued command.
+
+Appending the old terminal feedback, rather than merely a trim input, uses
+the old terminal reference and augmented input memory. Outside that core the
+feedback is only an initializer; terminal membership still belongs to the
+new optimization. A target/context reset uses the existing explicit reset
+contract, rather than inheriting a budget for a changed problem.
+
+With exact feasibility and no restoration/tolerance errors,
+`S[k+1] <= S[k] - xi[0|k]` implies summability of the executed-stage slacks and
+`xi[0|k] -> 0`. It does not alone imply `S[k] -> 0`: the sequence `(0,c)` can
+postpone a future slack indefinitely while keeping its sum constant.
+Thus Huang et al.'s optimal-value convergence theorem cannot simply be
+relabelled as a theorem for this suboptimal budget. The reference is
+[Huang et al., 2025, Section III](https://arxiv.org/html/2502.08400v1).
+Finite solver tolerances and budget restorations further limit any exact
+monotonicity claim; closed-loop recovery and collisions are audited separately.
+
 ## Primary restoration and secondary dissipation
 
 One nonnegative collision slack is assigned to each primary-horizon stage;
@@ -211,21 +265,16 @@ agreement thresholds, not certified bounds on plant/model uncertainty or
 intersample safety.
 
 A ratio `r` is the maximum of the three errors divided by their tolerances.
-If `r <= 1`, the complete two-stage candidate becomes an eligible optimization
+If `r <= 1`, the completed CLF candidate becomes an eligible optimization
 iterate. A zero primary value never skips the CLF stage. Positive PCBF slack
 remains a relaxed result and is not interpreted as collision freedom.
 
-Accuracy is not the only stopping condition. If CLF slack is positive and
-the normalized first-input correction reaches the local box boundary (within
-1e-3), the controller rebuilds and solves both stages again while the current
-predicted or actual slack reduction exceeds `clfTieTolerance*max(1,V)`.
-Reductions smaller than that existing objective resolution end optional
-polishing. This is a local numerical stopping rule, not a proof of global
-nonlinear optimality. Otherwise a
-small, accurate correction can repeatedly stop short of a descent input,
-while the shifted second input restores the same bad trust center next frame.
-This condition depends on the existing CLF and numerical box, not target
-distance or a separate recovery mode.
+The first completed CLF solution satisfying model agreement ends the frame.
+Positive CLF slack at a local input boundary does not trigger optional extra
+rounds. Further rounds repair model disagreement only. This is a computational
+stopping rule, not a proof that a local step preserves global nominal recovery;
+the closed-loop campaign must test that property. The complete CLF objective
+has been solved before this stopping rule is considered.
 
 The full nonlinear propagation of the optimized inputs becomes the next
 anchor when evaluable. Damping every inaccurate candidate can leave its
@@ -239,22 +288,16 @@ directly issued. When `r > 1`, the next input trust scale contracts by
 derivatives, collision duals, terminal fit and CLF approximation are rebuilt.
 
 There are at most eight refinement rounds and a shared soft time budget.
-There is normally one PCBF/CLF pair once the previous frame supplies a useful
-anchor and trust scale. A returned scale can grow by at most 1.5 for the next
+A usable inherited cap normally needs one CLF solve. Initialization or
+budget restoration can also require primary solves. A returned scale can grow by at most 1.5 for the next
 frame when agreement is good, up to its nominal value of one. This does not
 impose a physical steering magnitude or slew bound. It also does not prove
 SQP convergence: no global merit-function descent theorem is asserted.
 
-The best accurate complete pair evaluated in this frame is retained, with
-priority to PCBF slack within its tie tolerance, then the actual nonlinear
-first-successor CLF slack. A later failed or inaccurate trial cannot delete
-it. `selectedRefinement` identifies this iterate, whereas `refinementCount`
-counts all evaluated pairs. This is ordinary retention of optimization
-iterates; it does not execute a previous frame's trajectory or another policy.
-A frame without any accurate completed pair reports
-`collisionAvoidanceController:noOptimizationSolution`; finite inaccurate
-solver vectors are no longer sufficient for execution. This deliberately
-implements the user-selected same-frame relinearization route.
+The first accurate result from the current frame is issued. A frame without
+an accurate completed CLF result reports
+`collisionAvoidanceController:noOptimizationSolution`; inaccurate numerical
+points and previous-frame plans are not issued instead.
 
 ## Terminal constraints
 
@@ -270,20 +313,20 @@ invariance argument nor the affine tail certifies the realized nonlinear plant.
 
 ## Issued commands, diagnostics and limits
 
-Only the selected second-stage optimizer result supplies the applied input.
-Its applied input is not clipped or replaced. A finite point with a
-nonpositive solver flag must still satisfy nonlinear prediction agreement;
-it is not thereby certified affine-feasible or optimal. If no sufficiently
-accurate completed second-stage result exists,
+Only the selected CLF optimizer result supplies the applied input.
+Its applied input is not clipped or replaced. A nonpositive solver flag cannot supply an input. Positive numerical
+termination and nonlinear prediction agreement are required; neither is a
+continuous-time safety certificate. If no sufficiently
+accurate completed CLF result exists,
 the controller reports `collisionAvoidanceController:noOptimizationSolution`.
 No previous trajectory or primary-only point is issued instead.
 
 `primaryOptimum` records the achieved primary value; without positive solver
 termination it is not a certified optimum. Attempt logs retain all primary
 models and timings; `selectedAttempt` identifies the model supplying the
-command. `optimizationConverged` describes the selected PCBF and CLF stages,
-not discarded restoration attempts. Continuation state version 66 distinguishes
-this single-CLF state schema from older stored plans. The optional stored
+command. `optimizationConverged` describes the numerical stages of the selected
+problem, not discarded restoration attempts or optimality of an inherited cap. Continuation state version 67 stores the per-stage slacks and their total
+alongside the existing single-CLF trajectory state. The optional stored
 `linearizationTrustScale` carries the learned step size, not an executable
 backup policy.
 

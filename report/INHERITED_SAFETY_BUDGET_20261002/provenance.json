@@ -1,0 +1,35 @@
+{
+  "recordedAt": "2026-10-02T20:20:26.132666-05:00",
+  "baselineCommit": "099a3d978d7ec7f05db039aed5bf39290f5baab1",
+  "baselineRuntimeCommit": "130b82ff6aa6ea30c53258346cebea784261697e",
+  "sourceHashes": {
+    "controller/solvePredictiveControl.m": "9980e76f51f17a2828a4fa483facc0e62590c498d53d7a77d17bcaf77538dcf6",
+    "controller/collisionAvoidanceController.m": "3bab76c652060a4c0259e363e0d72bf0360cdf287f884f91b20a020e82405e72",
+    "controller/terminalContinuation.m": "b6011d42c9474787c1062ea2ef32de9913142d2518d024987d6da62548d50e24",
+    "config/collisionAvoidanceControllerConfig.m": "9dcebea9f29178545e7bfedd60eb7c3cffa35155d71fb4592d172bcb8670b0eb",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "cbca0307481470353fa481e187d339d28f3590e49cda0557dc129a21c0922c81",
+    "tests/twoStagePredictiveControlTest.m": "b54831505c20efdae47ada79b182d09542b2911cb13f4f2f9d79a170b42d66ed",
+    "tests/nonlinearPredictiveSafetyTest.m": "f064299bd7691aeb057568d6d551aa6aaf8dbffe8794483ad5f6aac13791f16c"
+  },
+  "artifactHashes": {
+    "analysis.json": "f32dd6fd3b61cea0c3edb5c6fcf2d86ac42fd494a8c68e48e76bf719948b9a44",
+    "budget-audit.json": "5228089ec6ac925eb2d4eee3b72da576dca3f08aebeb49c92938376d8dfc7dbc",
+    "worst-frame.json": "eec54ee10aceaef581fe35ebfe5efbdb6183b1b188fb685ff1789c1d1ac9b60f",
+    "paired-worst.json": "78c8444075e4cc81cd9694d73f270aca0bcdf96fcd27271b2e3a41e6265fce62",
+    "tests.json": "b9f5d2bc1318778612f3feb5c6ceff7a4ea82a8d7b602a8deb879698a377fb22",
+    "code-analysis.json": "a0571c8f9196ef319e1372121a1c5f9da187b6ee1db25a094784858ed173b1e5",
+    "refined-clearance.json": "8ba7d62e15ddbca1258e8995bf954f4f07378440a41c3daae2e2802652f2f59e",
+    "cold-start-summary.json": "d4fd9bbcca9ba3155e8ed03e8eb5dac6a299584741b7c3e8ee1e6584b9d3c375"
+  },
+  "campaignSourceHash": "21a564d6dd4a521e4889c962d76be7bc1b405300eb69484c7e0974c53c2d34a2",
+  "campaignFinalDifference": "Only search.converged diagnostic excludes the non-numerical inherited-budget marker; no control or acceptance branch changed after the campaign.",
+  "cache": "/home/zai/.cache/collisionAvoidance/inherited-budget-20261002",
+  "commands": [
+    "matlab -singleCompThread -batch: runTimedFlowCampaign(pwd, output, 1500), after twoStagePredictiveControlTest and clfNominalRecoveryTest",
+    "Separate fresh MATLAB process: runNonlinearPredictiveSafetyValidation(Scenarios=\"headOn\", Frames=1, OutputFile=...)",
+    "compareWorstFrame(directory); validateBudgetController(directory)",
+    "python3 analyzeCampaign.py; python3 inspectBudgets.py",
+    "refineClosestHolds(directory)"
+  ],
+  "scope": "Exact-state deterministic sampled replay. Computation time is measured but is not imposed on the plant."
+}

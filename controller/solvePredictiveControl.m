@@ -1,13 +1,20 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
 %solvePredictiveControl Refine one PCBF/CLF controller within the current hold.
-% Each issued iterate completes both objectives and meets model accuracy.
-% Resolved CLF progress at the numerical input boundary triggers another round.
+% A shifted slack budget can replace the primary optimization, never the CLF.
+% Relinearization repairs model disagreement, not optional CLF polishing.
     if nargin<3,timer=tic;end
     cfg=model.cfg;solution=[];allAttempts=struct([]);allStages=struct([]);history=struct([]);
     restarted=false;selected=0;initialFailure="";selectedRound=0;
     model.inputTrustScale=1;
+    model.inheritedSlacks=[];
     if isstruct(previousState) && isfield(previousState,'linearizationTrustScale')
         model.inputTrustScale=previousState.linearizationTrustScale;
+    end
+    if isstruct(previousState) && isfield(previousState,'stageSlacks') ...
+            && isnumeric(previousState.stageSlacks) && isvector(previousState.stageSlacks) ...
+            && numel(previousState.stageSlacks)==cfg.controller.horizonSteps ...
+            && all(isfinite(previousState.stageSlacks)) && all(previousState.stageSlacks>=0)
+        model.inheritedSlacks=[reshape(previousState.stageSlacks(2:end),1,[]),0];
     end
     for iteration=1:cfg.nonlinear.maximumLinearizations
         model.allowFlowRestart=~restarted;
@@ -24,21 +31,15 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         agreement.actualClfReduction=search.clfInitialSlack-agreement.actualClfSlack;
         agreement.clfReductionResolved=max(abs([agreement.predictedClfReduction, ...
             agreement.actualClfReduction]))>cfg.solver.clfTieTolerance*scale;
-        agreement.trustBoundaryRefinement=agreement.ratio<=1 && agreement.clfReductionResolved ...
-            && candidate.clfSlack>cfg.solver.feasibilityTolerance*max(1,candidate.clfInitialValue) ...
-            && agreement.firstInputTrustActivity>=1-1e-3;
+        agreement.trustBoundaryRefinement=false;
         history=[history,agreement]; %#ok<AGROW>
         if agreement.ratio<=1
             candidate.predictionAgreement=agreement;
-            % Retain the best accurate two-stage iterate from this frame.
-            % This is optimization bookkeeping, not a previous-plan policy.
-            if isempty(solution) || localBetterIterate(candidate,solution,cfg)
-                solution=candidate;acceptedModel=trialModel;acceptedSearch=search;
-                selected=offset+search.selectedAttempt;selectedRound=iteration;
-                acceptedModel.nextTrustScale=min(1,trialModel.inputTrustScale ...
-                    *min(1.5,max(1,.8/sqrt(max(agreement.ratio,eps)))));
-            end
-            if ~agreement.trustBoundaryRefinement,break;end
+            solution=candidate;acceptedModel=trialModel;acceptedSearch=search;
+            selected=offset+search.selectedAttempt;selectedRound=iteration;
+            acceptedModel.nextTrustScale=min(1,trialModel.inputTrustScale ...
+                *min(1.5,max(1,.8/sqrt(max(agreement.ratio,eps)))));
+            break;
         end
         % The full nonlinear rollout closes the dynamics defect at the new
         % anchor. Damping an inaccurate but evaluable iterate can keep its
@@ -79,13 +80,6 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     search.refinementCount=numel(history);search.selectedRefinement=selectedRound;search.modelAgreementHistory=history;
     search.modelAgreementSatisfied=~isempty(solution);search.elapsedSeconds=toc(timer);
     search.returned=~isempty(solution);
-end
-
-function better=localBetterIterate(candidate,retained,cfg)
-    tie=cfg.solver.lexicographicTieTolerance;
-    better=candidate.safety<retained.safety-tie ...
-        || (candidate.safety<=retained.safety+tie ...
-        && candidate.predictionAgreement.actualClfSlack<retained.predictionAgreement.actualClfSlack);
 end
 
 function [agreement,rollout,valid]=localPredictionAgreement(candidate,model)
@@ -145,6 +139,33 @@ function [solution,search,model] = localRound(model,previousState,timer)
     if nargin<3,timer=tic;end
     wall=tic;[anchor,source,failure]=localInitialization(model,previousState);
     initializationSeconds=toc(wall);
+    budgetAttempts=struct([]);budgetStages=struct([]);
+    if ~isempty(model.inheritedSlacks) && any(source==["shiftedInputRollout","sameFrameRollout"])
+        wall=tic;[problem,model]=localFormulate(anchor,model);model.linearization=anchor;
+        search=localSearch(problem,model,source,toc(wall));
+        search.initializationSeconds=initializationSeconds;
+        search.budgetSource="shiftedTrajectory";search.slackCap=sum(model.inheritedSlacks);
+        search.firstSlackCap=model.inheritedSlacks(1);
+        problem.upper(problem.slackIndices(1))=search.firstSlackCap;
+        point=zeros(problem.clfIndex-1,1);point(problem.slackIndices)=model.inheritedSlacks;
+        cone=problem.cones(1);fullPoint=[point;0];
+        search.budgetAnchorResidual=max([0;problem.a*fullPoint-problem.b; ...
+            abs(problem.equal*fullPoint-problem.rhs);problem.lower-fullPoint;fullPoint-problem.upper; ...
+            norm(cone.A*fullPoint-cone.b)-cone.d.'*fullPoint+cone.gamma]);
+        % This cap is not a recomputed optimal PCBF value. The current problem
+        % can be infeasible after state or linearization discrepancies.
+        search.stages(1)=struct('objective',"inheritedSafetyBudget",'exitFlag',NaN, ...
+            'seconds',0,'value',search.slackCap,'numericalSolve',false,'solverInfo',struct());
+        [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
+        budgetAttempts=localAttempt(search);budgetStages=search.stages;
+        if ~isempty(solution)
+            search.selectedAttempt=1;search.attempts=budgetAttempts;search.linearizationCount=1;
+            search.flowRestarted=false;search.initializationFailure=failure;search.elapsedSeconds=toc(timer);return;
+        end
+        % Restore this optimization after a failed inherited-budget attempt.
+        % This branch never issues an input from the previous plan.
+        model.inheritedSlacks=[];initializationSeconds=0;
+    end
     [point,problem,search,model]=localPrimary(anchor,model,source,timer);
     search.initializationSeconds=initializationSeconds;
     attempts=localAttempt(search);stages=search.stages;selected=1;restarted=false;
@@ -194,6 +215,9 @@ function [solution,search,model] = localRound(model,previousState,timer)
     search.selectedAttempt=selected;search.stages=stages;search.attempts=attempts;
     search.linearizationCount=numel(attempts);search.solverCalls=sum([stages.numericalSolve]);search.flowRestarted=restarted;
     search.initializationFailure=failure;search.elapsedSeconds=toc(timer);
+    search.selectedAttempt=search.selectedAttempt+numel(budgetAttempts);
+    search.attempts=[budgetAttempts,search.attempts];search.stages=[budgetStages,search.stages];
+    search.linearizationCount=numel(search.attempts);search.solverCalls=sum([search.stages.numericalSolve]);
 end
 
 function [point,problem,search,model,extra,expanded]=localExpandPrimary(point,problem,search,model,anchor,timer)
@@ -217,20 +241,27 @@ function attempt=localAttempt(search)
     attempt=struct('initialization',search.initialization,'terminationReason',search.terminationReason, ...
         'solverCalls',search.solverCalls,'stages',search.stages,'primaryOptimum',search.primaryOptimum, ...
         'primaryLowerBound',search.primaryLowerBound,'inputTrustScale',search.inputTrustScale, ...
+        'budgetSource',search.budgetSource,'slackCap',search.slackCap, ...
+        'firstSlackCap',search.firstSlackCap,'budgetAnchorResidual',search.budgetAnchorResidual, ...
         'initializationSeconds',search.initializationSeconds,'formulationSeconds',search.formulationSeconds, ...
         'clfConstructionSeconds',search.clfConstructionSeconds);
+end
+
+function search=localSearch(problem,model,initialization,formulationSeconds)
+    search=struct('solverCalls',0,'source',"twoStageRealTimeIteration", ...
+        'initialization',initialization,'returned',false,'converged',false,'terminationReason',"timeLimit", ...
+        'formulationSeconds',formulationSeconds,'clfConstructionSeconds',0, ...
+        'inputTrustScale',model.inputTrustScale,'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
+        'budgetSource',"primaryOptimum",'firstSlackCap',Inf,'budgetAnchorResidual',NaN, ...
+        'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
+        'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}));
 end
 
 function [point,problem,search,model]=localPrimary(anchor,model,initialization,timer)
     if ~isfield(model,'inputTrustScale'),model.inputTrustScale=1;end
     cfg=model.cfg;point=[];wall=tic;[problem,model]=localFormulate(anchor,model);
     model.linearization=anchor;
-    search=struct('solverCalls',0,'source',"twoStageRealTimeIteration", ...
-        'initialization',initialization,'returned',false,'converged',false,'terminationReason',"timeLimit", ...
-        'formulationSeconds',toc(wall),'clfConstructionSeconds',0, ...
-        'inputTrustScale',model.inputTrustScale,'primaryOptimum',NaN,'primaryLowerBound',problem.primaryLowerBound,'slackCap',NaN,'clfInitialSlack',NaN, ...
-        'clfStageAttempted',false,'clfStageCompleted',false,'clfLowerBound',false, ...
-        'stages',struct('objective',{},'exitFlag',{},'seconds',{},'value',{},'numericalSolve',{},'solverInfo',{}));
+    search=localSearch(problem,model,initialization,toc(wall));
     remaining=cfg.solver.timeLimitSeconds-toc(timer);if remaining<=0,return;end
     primaryCount=problem.clfIndex-1;endpoint=problem.cones(1);wall=tic;
     % A feasible zero correction with zero nonnegative slacks attains the
@@ -293,7 +324,7 @@ function [solution,search,model]=localSecondary(point,problem,anchor,model,searc
         'minimumCollisionMargin',NaN,'terminalSeparationMargin',NaN, ...
         'encounterExit',problem.encounterExit,'affineValidationPerformed',false,'nonlinearValidationPerformed',false);
     search.stages(2).value=rho;search.clfStageCompleted=true;search.returned=true;
-    search.converged=all([search.stages.exitFlag]>0);
+    search.converged=all([search.stages([search.stages.numericalSolve]).exitFlag]>0);
     search.clfLowerBound=rho<=cfg.solver.feasibilityTolerance*problem.clfScale;
     search.terminationReason="twoStagesReturned";
 end
@@ -347,7 +378,10 @@ function [anchor,source,failure]=localInitialization(model,previous)
                 states=zeros(6,count+1);states(:,1)=model.initialState;
                 for index=1:count
                     if index>size(inputs,2)
-                        inputs(:,index)=localClip(model.terminal.reference.input,inputs(:,end),cfg);
+                        [~,~,deviation]=terminalContinuation.membership( ...
+                            [states(:,index);inputs(:,end)],model.sampleIndex+index-1,model.terminal);
+                        inputs(:,index)=localClip(model.terminal.reference.input ...
+                            +model.terminal.gain*deviation,inputs(:,end),cfg);
                     end
                     states(:,index+1)=nonlinearBicycleModel.sample(states(:,index),inputs(:,index),cfg);
                 end

@@ -85,12 +85,11 @@ is not, by itself, a theorem of nonlinear or continuous-plant decrease. Independ
 ODE45 replay and evaluation of the same V on consecutive measured states quantify
 that gap. Within-hold relinearization now measures nonlinear prediction and
 first-successor value agreement; it is not a complete nonlinear safety check.
-An accurate result with positive CLF slack at the first-input trust boundary
-also continues the same two-stage iteration while its predicted or actual
-slack reduction exceeds the existing scaled CLF tie resolution. The previous
-between-frame trust-scale adaptation remains in use. Thus a numerical correction box
-does not become an unintended permanent restriction on nominal recovery.
-The best accurate complete pair from the current frame is retained.
+The first accurate completed CLF solve ends the frame. The learned input trust
+scale still adapts between frames; extra rounds repair prediction disagreement
+only. The inherited safety cap can replace primary minimization, but never
+skips the CLF objective. One-step stopping does not itself establish closed-loop
+nominal recovery; experiments must detect persistent trust-center limitations.
 An exact inequality
 with zero slack implies asymptotic dissipation on an appropriate invariant domain;
 fixed numerical errors generally support practical convergence only.
