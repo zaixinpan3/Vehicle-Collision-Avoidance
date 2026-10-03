@@ -1,0 +1,137 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\title{Target Estimate Updates and Empirical Experiment Outcomes}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\textbf{Implemented behavior.} Every controller call uses the latest target
+estimate. The estimated acceleration and sideslip are constant over that
+call's prediction, while subsequent estimates may change:
+\[
+ \widehat A_{i|k}=\widehat A_k,\qquad
+ \widehat\beta_{i|k}=\widehat\beta_k,\qquad
+ (\widehat A_{k+1},\widehat\beta_{k+1})
+ \text{ need not equal }(\widehat A_k,\widehat\beta_k).
+\]
+The previous input plan remains the normal initialization. Target prediction
+updates do not require an enclosure certificate or an explicit controller
+reset. Heading is unwrapped against the previous prediction to preserve
+continuity. No assumption-status diagnostics are generated.
+
+\section{Theory and executable experiments}
+The conditional recursive-feasibility derivation in
+\path{controller/OBSERVER_ROBUST_PCBF_THEORY.tex} remains a mathematical result
+under its ideal premises. Experiments can exercise the same algorithm outside
+those premises. An unavailable, stale, incomplete or misaligned enclosure no
+longer throws an admission error. Usable current error bounds still tighten
+the existing optimization; an unusable bound supplies no tightening and is
+not treated as evidence of zero error. The existing terminal constraints,
+single CLF, primary restoration and numerical model-agreement/damping logic
+remain unchanged. Actual optimization failure still means that no control
+can be issued.
+
+The numerical interface uses one controller, without an executable backup or
+an additional CLF. No observer equations, gains, uncertainty radii, collision
+margin or physical target dynamics were retuned in this change.
+
+\section{Independent truth and failure definition}
+Previously the offline replay evaluated collision using the controller's
+target epoch. That was adequate for fixed exact observations but would let
+changed estimates alter the collision reference. The replay now advances
+target truth solely from the scenario's initial condition. Synthetic
+observations affect planning, never the physical target.
+
+Failure is rectangle contact/overlap in the independent replay or failure to
+return a finite solved control. A theoretical premise is not an experimental
+failure criterion. Recovery is a separately observed dwell in the nominal
+behavior tolerances. Reaching an observation cap without recovery is neither
+a collision nor a claim of recovery. Replay/harness execution errors have a
+separate inconclusive outcome. Historical reports are not rewritten.
+
+The replay uses \texttt{ode45}, relative tolerance $10^{-11}$, absolute
+tolerance $10^{-12}$ and 31 evaluations per 50 ms hold. It is finite sampled
+evidence, not an interval collision certificate.
+
+\section{Validation}
+The full MATLAB suite passed \textbf{682/682}, with no failed or
+incomplete tests. It covers updates of both estimated parameters within one
+prediction, warm-start preservation, heading wrapping, unavailable/stale
+enclosures, continued control after loss of a certificate, independent truth,
+collision failure despite continuing solved controls, actual optimization
+failure and observation caps without a false recovery claim. Existing
+finite uncertainty constraints can still make the optimization infeasible;
+the corresponding regression remains in place.
+
+A separate probe consumed an actual \texttt{onlineNrmmTrackingRuntime}
+publication initialized without an explicit error prior. Its ego speed was
+10 m/s, the target relative position was $(20,5)$ m, and target velocity was
+$(-12,0)$ m/s. The controller did not return a solved input: the PCBF stage returned no numerical solution. This is an actual
+optimization outcome, not a rejection of a theoretical premise. The paired
+study below uses synthetic target observations, so it does not resolve this
+real-publication case or constitute a sensor/observer closed-loop validation.
+
+\section{Paired closed-loop study}
+Three 8 m/s collision-threat scenarios were run with exact observations and
+with deterministic target-estimate perturbations. True target acceleration
+and sideslip stayed constant in each scenario. The observation perturbations
+were
+\begin{align*}
+ \Delta p&=0.03e^{-t/5}[\sin(3t),\cos(5t)]^\top\ \mathrm m,\\
+ \Delta V&=0.02e^{-t/5}\sin(2t)\ \mathrm{m/s},\\
+ \Delta A&=0.02e^{-t/5}\cos(4t)\ \mathrm{m/s^2},\\
+ \Delta\beta&=0.0005e^{-t/5}\sin(6t)\ \mathrm{rad}.
+\end{align*}
+The perturbed publications carried unavailable certificates. Their body
+heading was exact and the reported velocity direction was consistent with
+the perturbed sideslip. Ego observations were exact. No random seed is used.
+This isolates robustness to revised forecasts; it does not emulate a complete
+observer or claim performance for all measurement errors.
+
+The controller used an 8-step prefix and the existing completion horizon,
+0.20 m collision-node margin, 10 m path-center deviation limit, and no road
+boundary constraints. Each run continued until a one-second nominal-recovery
+dwell or an actual failure, with 1200 holds as an observation cap. Tolerances
+were 0.1 m lateral error, one degree heading error, 0.1 m/s speed error,
+0.05 m/s lateral velocity and 0.01 rad/s yaw-rate error.
+
+\begin{center}
+\small
+\begin{tabular}{llrrrr}
+\toprule
+Scenario & Observation & Holds & Min. gap (m) & Recovery (s) & Outcome\\
+\midrule
+Head-on & Exact & 204 & 1.3922 & 10.20 & recovered \\
+Accelerating head-on & Exact & 205 & 1.0645 & 10.25 & recovered \\
+Crossing & Exact & 254 & 0.1626 & 12.70 & recovered \\
+Head-on & Perturbed & 204 & 1.3951 & 10.20 & recovered \\
+Accelerating head-on & Perturbed & 205 & 1.0671 & 10.25 & recovered \\
+Crossing & Perturbed & 253 & 0.1997 & 12.65 & recovered \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Timing samples in the JSON are controller-call wall times (including the
+synthetic observation hook). Other processes were active; these measurements
+are not an isolated real-time deadline benchmark. Positive clearance below
+the node margin is recorded without reclassifying it as collision.
+
+\section{Reproduction and artifacts}
+Run \texttt{runtests('tests')} from the repository root. The paired study is
+run using the following entry point:
+\begin{quote}\small
+\path{scripts/verifyExperimentalAssumptionPolicy.m}
+\end{quote}
+Supply an external output directory and a 1200-hold cap. Compact final test counts, scenario
+results and source provenance are in
+\path{report/EXPERIMENTAL_ASSUMPTION_POLICY_20261003/}.
+Full traces, continuation files, console output and this report's derived PDF
+are retained as identified external archive exports. Operational source and
+tests are committed normally. Unrelated working-tree changes and external
+solver dependencies are excluded.
+\end{document}

@@ -2,7 +2,8 @@ function [command,predictedInput,prediction,controllerState] = ...
         collisionAvoidanceController(egoState,targetEstimate,laneCenterline,cfg,previousState)
 %collisionAvoidanceController Inherited safety budget with CLF optimization.
 % Controller state retains a target prediction and a linearization trajectory.
-% Timestamped observer sets update the prediction of constant target parameters.
+% Every current target estimate updates the prediction; its A and beta are
+% held constant within this frame, independently of proof-metadata availability.
 % Passing [] as previousState starts a new problem and a new target epoch.
 % The target motion is assumed only while a prediction stays within the
 % encounter range; metadata.encounterExitStep is its first node beyond it.
@@ -34,31 +35,21 @@ function [command,predictedInput,prediction,controllerState] = ...
             error('collisionAvoidanceController:changedContinuationProblem', ...
                 'Model, constraints or reference path changed. Pass an empty previousState to initialize a new problem.');
         end
-        if isfield(previousState,'uncertaintySpecified') && previousState.uncertaintySpecified ...
-                && (~ego.uncertaintySpecified || (~isempty(previousState.target) && isempty(observation)))
-            error('collisionAvoidanceController:missingCurrentEnclosure', ...
-                'Continue estimated-state control with current ego and target enclosures.');
-        end
         index=previousState.sampleIndex+1;epochTime=previousState.epochTime;targetEpoch=previousState.targetEpoch;
         expectedTime=epochTime+index*cfg.controller.sampleTime;
         if isfinite(ego.stateTime) && isfinite(epochTime) && abs(ego.stateTime-expectedTime)>1e-9*max(1,abs(expectedTime))
             error('collisionAvoidanceController:invalidSampleTime','Continuation requires consecutive absolute sample times.');
         end
     end
-    if ~isempty(observed) && observation.uncertaintySpecified
-        % Updating an estimate of constant parameters does not change the
-        % physical target-motion contract. Retain the absolute time convention.
-        targetEpoch=predictiveSafetyGeometry.predictTarget(observed,-index*cfg.controller.sampleTime);
-    end
     q=predictiveSafetyGeometry.predictTarget(targetEpoch,index*cfg.controller.sampleTime);
-    difference=Inf;
     if ~isempty(observed) && ~isempty(q)
-        difference=observed-q;
-        difference(3)=atan2(sin(difference(3)),cos(difference(3)));
+        observed(3)=q(3)+atan2(sin(observed(3)-q(3)),cos(observed(3)-q(3)));
     end
-    if ~isempty(observed) && norm(difference,inf)>1e-8*max(1,norm(q,inf))
-        error('collisionAvoidanceController:changedTargetTrajectory', ...
-            'The observation changes the fixed target trajectory. Initialize a new problem explicitly.');
+    if ~isempty(observed)
+        % Reanchor the prediction at the current estimate without resetting
+        % the ego input warm start. Cross-frame constancy is not required.
+        targetEpoch=predictiveSafetyGeometry.predictTarget(observed,-index*cfg.controller.sampleTime);
+        q=observed;
     end
     previous=zeros(2,1);
     if ~isempty(ego.heldActuatorInput),previous=ego.heldActuatorInput;

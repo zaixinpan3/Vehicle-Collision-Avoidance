@@ -86,11 +86,14 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(prediction.metadata.clfTieBound, ...
                 cfg.solver.clfTieTolerance*prediction.metadata.clfRequiredDecrease/cfg.nominalClf.decreaseFraction+1e-12);
         end
-        function unavailableBoundsCannotSilentlyBecomeExactStateControl(testCase)
+        function unavailableBoundsDoNotPreventASolvedControl(testCase)
             [ego,target,road,cfg]=localFixture(.01);
             ego.controllerErrorBound.available=false;
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:unavailableErrorBound');
+            ego.controllerErrorBound.bounds(:)=Inf;
+            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyFalse(prediction.metadata.uncertaintyIncluded);
+            testCase.verifyFalse(prediction.metadata.robustNonlinearSafetyCertified);
         end
         function anUncertaintyTubeWiderThanTheTerminalCoreIsNotSilentlyIgnored(testCase)
             [ego,~,road,cfg]=localFixture(0);
@@ -101,14 +104,37 @@ classdef observerPredictiveControlTest < matlab.unittest.TestCase
         function staleBoundsCannotBeUsedAtTheCurrentStateTime(testCase)
             [ego,target,road,cfg]=localFixture(.01);
             target.controllerErrorBound.time=-cfg.controller.sampleTime;
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:staleErrorBound');
+            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyEmpty(prediction.model.uncertainty.target);
         end
         function aRelativeSetCannotBeAttachedToADifferentEgoPose(testCase)
             [ego,target,road,cfg]=localFixture(.01);
             target.predictionErrorSet.referenceEgoPose(1)=1;
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,[]), ...
-                'collisionAvoidanceController:misalignedPredictionErrorSet');
+            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyFalse(prediction.metadata.commonPoseCancelled);
+            testCase.verifyEmpty(prediction.model.uncertainty.target);
+        end
+        function lossOfAnEnclosureDoesNotDiscardTheShiftedOptimization(testCase)
+            [ego,target,road,cfg]=localFixture(.001);
+            [command,~,first,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            next=nonlinearBicycleModel.sample(first.model.initialState,command.actuatorInput,cfg);
+            q=predictiveSafetyGeometry.predictTarget(first.model.target,cfg.controller.sampleTime);
+            [ego,target]=localPublication(next,q,cfg.controller.sampleTime,.001,zeros(6,1));
+            ego.controllerErrorBound.available=false;target.predictionErrorSet.available=false;
+            ego.heldActuatorInput=command.actuatorInput;
+            [command,~,second]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyEqual(second.metadata.search.initialization,"shiftedInputRollout");
+            testCase.verifyFalse(second.metadata.robustNonlinearSafetyCertified);
+        end
+        function aMissingTargetPredictionSetDoesNotStopTheController(testCase)
+            [ego,target,road,cfg]=localFixture(.01);
+            target=rmfield(target,'predictionErrorSet');
+            [command,~,prediction]=collisionAvoidanceController(ego,target,road,cfg,[]);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyEmpty(prediction.model.uncertainty.target);
         end
     end
 end

@@ -1,0 +1,46 @@
+{
+  "recordedAt": "2026-10-03T16:01:34.939045-05:00",
+  "baseCommit": "447056c8f2092e0691a27da15525436342e409b2",
+  "matlabVersion": "R2026a",
+  "matlabFlags": [
+    "-singleCompThread",
+    "-batch"
+  ],
+  "testCommand": "results=runtests('tests'); assertSuccess(results)",
+  "experimentCommand": "addpath('scripts'); verifyExperimentalAssumptionPolicy(outputDirectory,1200)",
+  "randomSeed": null,
+  "sourceHashes": {
+    "controller/collisionAvoidanceController.m": "347c9eb9809d411fa02b5da5d9d7c2c33057befe6c5feef3b4f24e568d25aab4",
+    "controller/readControllerInputs.m": "0b2ef87e45d084e9c7653642c2ee511a910f2fc40cb3d844451ef36fbfce5c0b",
+    "controller/predictiveSafetyGeometry.m": "21ed0bef2e49edfe39e6820c13142d07d160f58f990db45760be142ad461d074",
+    "controller/CONTROLLER_FILES.md": "d2e62ee1881c9a4e1fefa42ea1fdf8104e373d0eef3a82d168c9d63c65b9ebb7",
+    "controller/PCBF_CLF_ARCHITECTURE.md": "f84fa0511d2d4a28246078dda225362786186d9abf35aa3ce66479aa29e6f5b4",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "911c9512c74bb089c4ab510c6469f1347debde59291112decd05f7ee4aa0da33",
+    "scripts/verifyExperimentalAssumptionPolicy.m": "49e17a261ddf26c2fc1b5715e70392d94618c55255d80b7814ae429e66d783db",
+    "tests/observerPredictiveControlTest.m": "e6988889de8a17231d44dcc597720e06117ce7771cd497d94f6c9ad29d553fea",
+    "tests/nonlinearPredictiveSafetyTest.m": "6fde64088d74e52f26289d34c039671b2fb774b1a09021a70ed9592fc0a31dde",
+    "tests/nominalRecoveryValidationTest.m": "7b0a42768422077b17aa4e312e6bf6ae311ba85940790ce1046051b24f48226e",
+    "config/collisionAvoidanceControllerConfig.m": "be1cd65b58d017cb01346b9fbf1206e7b4128e9fa64db5efd9f53297dc25640d",
+    "config/nrmmTrackingConfig.m": "50c79c001f29c499023f974f85d1a06103ebbd9e47923ad986b7bf3d63072248",
+    "estimator/onlineNrmmTrackingRuntime.m": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05",
+    "estimator/nrmmControllerErrorBounds.m": "12c36834aa6bfd05311ac3e8b9e86d25e69d19429891d261e8198b22a4d0016f",
+    "controller/nonlinearBicycleModel.m": "280c5de71dfe3b27eace06095db1a36932f1a11d5bc538f5b103a092c8ecca33",
+    "controller/terminalContinuation.m": "350c98b9cb5475ddc883c6d90b4aab060d742a0c353f64f366b60bf48de8fb7a"
+  },
+  "testResults": {
+    "total": 682,
+    "passed": 682,
+    "failed": 0,
+    "incomplete": 0,
+    "testSeconds": 268.3827830000001
+  },
+  "rawOutputDirectory": "/home/zai/.cache/collisionAvoidance/experimental-assumptions-20261003/scenarios",
+  "exclusions": [
+    "Unrelated observer theory and report edits",
+    "Concurrent perception and Python test changes",
+    "Untracked administrative files",
+    "Manuscript and reference material",
+    "External solver dependencies and generated binaries"
+  ],
+  "note": "No assumption-status diagnostics. The initial development test exposed heading-wrap equivalence and was fixed; one full run was interrupted to apply the user instruction removing diagnostics. Only the final complete suite is reported as passed."
+}

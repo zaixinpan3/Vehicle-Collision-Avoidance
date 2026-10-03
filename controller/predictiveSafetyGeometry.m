@@ -9,18 +9,21 @@ classdef predictiveSafetyGeometry
                 'egoGenerator',diag(ego.errorBounds),'collisionGenerator',diag(ego.errorBounds), ...
                 'target',[],'relativeFrame',false);
             if isempty(observation),return;end
-            uncertainty.specified=uncertainty.specified || observation.uncertaintySpecified;
             set=observation.predictionErrorSet;
             if isempty(set),return;end
             required={'kind','time','available','referenceEgoPose','relativePosition', ...
                 'positionRadius','courseCenter','courseRadius','speedInterval', ...
                 'accelerationInterval','curvatureInterval','rearAxleDistance'};
             if ~isstruct(set) || ~isscalar(set) || ~all(isfield(set,required)) ...
-                    || ~isequal(string(set.kind),"nrmm-constant-parameter-set-v1") ...
-                    || ~isequal(set.available,true) || ~ego.uncertaintySpecified ...
-                    || ~observation.uncertaintySpecified
-                error('collisionAvoidanceController:invalidPredictionErrorSet', ...
-                    'The relative NRMM set requires available, aligned ego and target enclosures.');
+                    || ~(isequal(set.kind,"nrmm-constant-parameter-set-v1") ...
+                    || isequal(set.kind,'nrmm-constant-parameter-set-v1'))
+                return;
+            end
+            if ~isequal(set.available,true)
+                return;
+            end
+            if ~ego.uncertaintySpecified || ~observation.uncertaintySpecified
+                return;
             end
             fields={'time','referenceEgoPose','relativePosition','positionRadius','courseCenter', ...
                 'courseRadius','speedInterval','accelerationInterval','curvatureInterval','rearAxleDistance'};
@@ -28,14 +31,14 @@ classdef predictiveSafetyGeometry
             for index=1:numel(fields)
                 value=set.(fields{index});
                 if ~isnumeric(value) || ~isreal(value) || numel(value)~=sizes(index) || any(~isfinite(value),'all')
-                    error('collisionAvoidanceController:invalidPredictionErrorSet','Invalid NRMM set field %s.',fields{index});
+                    return;
                 end
                 set.(fields{index})=value(:);
             end
             intervals=[set.speedInterval,set.accelerationInterval,set.curvatureInterval];
             if any(intervals(1,:)>intervals(2,:)) || min([set.positionRadius,set.courseRadius])<0 ...
                     || set.rearAxleDistance<=0 || any(abs(set.curvatureInterval*set.rearAxleDistance)>1)
-                error('collisionAvoidanceController:invalidPredictionErrorSet','The NRMM parameter intervals are invalid.');
+                return;
             end
             rotation=[cos(ego.yaw),-sin(ego.yaw);sin(ego.yaw),cos(ego.yaw)];
             residual=[set.referenceEgoPose-ego.modelState(1:3); ...
@@ -44,8 +47,7 @@ classdef predictiveSafetyGeometry
                 set.rearAxleDistance-q(7)];
             residual(3)=atan2(sin(residual(3)),cos(residual(3)));
             if abs(set.time-ego.stateTime)>1e-9*max(1,abs(ego.stateTime)) || norm(residual,inf)>1e-8
-                error('collisionAvoidanceController:misalignedPredictionErrorSet', ...
-                    'The NRMM enclosure and published trajectory must share a state time and reference pose.');
+                return;
             end
             curvature=sin(q(6))/q(7);
             uncertainty.target=struct('positionRadius',set.positionRadius,'courseRadius',min(pi,set.courseRadius), ...
@@ -54,7 +56,7 @@ classdef predictiveSafetyGeometry
                 'curvatureRadius',max(abs(set.curvatureInterval-curvature)), ...
                 'sideslipRadius',max(abs(asin(set.curvatureInterval*q(7))-q(6))));
             uncertainty.collisionGenerator=diag([zeros(3,1);ego.errorBounds(4:6)]);
-            uncertainty.relativeFrame=true;
+            uncertainty.relativeFrame=true;uncertainty.specified=true;
         end
 
         function tube = targetErrorTube(q,errorSet,time)

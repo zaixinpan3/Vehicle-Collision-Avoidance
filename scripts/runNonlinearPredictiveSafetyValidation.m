@@ -5,6 +5,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
 % A positive RecoveryDwellSeconds enables sampled nominal-recovery stopping.
 % Frames is a cumulative observation cap, including when resuming a saved
 % continuation. A completed duration is distinct from confirmed recovery.
+% TargetEstimateFunction(targetTruth,egoTruth) is an optional synthetic
+% observation hook. It never changes the fixed physical target trajectory.
+% Theoretical certificate availability is not an experiment failure criterion.
     arguments
         options.Frames (1,1) double {mustBeInteger,mustBePositive} = 8
         options.Scenarios (1,:) string = ["recovery","oncoming","circular","turningTarget"]
@@ -18,7 +21,12 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         options.RecoveryTolerances (5,1) double {mustBePositive,mustBeFinite} = [.1;pi/180;.1;.05;.01]
         options.ContinuationFile (1,1) string = ""
         options.ResumeFrom (1,1) string = ""
+        options.TargetEstimateFunction = []
     end
+    assert(isempty(options.TargetEstimateFunction) || isa(options.TargetEstimateFunction,'function_handle'), ...
+        'TargetEstimateFunction must be empty or a function handle.');
+    observationModel="exactTargetState";
+    if ~isempty(options.TargetEstimateFunction),observationModel=string(func2str(options.TargetEstimateFunction));end
     assert((strlength(options.ContinuationFile)==0 && strlength(options.ResumeFrom)==0) ...
         || isscalar(options.Scenarios),'Continuation files require exactly one scenario.');
     root=fileparts(fileparts(mfilename('fullpath')));addpath(fullfile(root,'controller'),fullfile(root,'config'));
@@ -35,6 +43,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         maximumDeviation=0;
         firstClf=NaN;lastClf=NaN;maximumSlack=0;maxHorizon=0;warmStartedFrames=0;finalError=[];
         trace=struct([]);failedFrameSeconds=NaN;failureTime=NaN;passedTarget=false;
+        collisionDetected=false;collisionTime=NaN;controlUnavailable=false;executionError=false;
         recovery=struct('enabled',options.RecoveryDwellSeconds>0,'recovered',false, ...
             'tolerances',options.RecoveryTolerances,'errorOrder', ...
             ["lateralMeters","headingRadians","speedMetersPerSecond","lateralVelocityMetersPerSecond","yawRateRadiansPerSecond"], ...
@@ -50,6 +59,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
             saved=load(options.ResumeFrom,'continuation');saved=saved.continuation;r=saved.result;
             assert(isequaln(r.configuration,cfg) && r.scenario==name ...
                 && saved.stateTransition==options.StateTransition ...
+                && isfield(saved,'observationModel') && saved.observationModel==observationModel ...
                 && saved.prior.version==71, ...
                 'Continuation scenario, configuration and transition must match.');
             assert(isequaln(saved.recoveryOptions,recovery),'Recovery settings must match.');
@@ -68,9 +78,18 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         recoveryOptions=recovery;
         for frame=frames+1:options.Frames
             frameTimer=tic;
+            phase="controller";
             try
-                [command,~,problem,prior]=collisionAvoidanceController(ego,target,road,cfg,prior);
+                estimate=target;
+                if ~isempty(options.TargetEstimateFunction)
+                    estimate=options.TargetEstimateFunction(target,ego);
+                end
+                [command,~,problem,prior]=collisionAvoidanceController(ego,estimate,road,cfg,prior);
+                assert(problem.metadata.optimizationReturned && numel(command.actuatorInput)==2 ...
+                    && all(isfinite(command.actuatorInput),'all'), ...
+                    'runNonlinearPredictiveSafetyValidation:noControlOutput','No finite solved control was returned.');
                 frameSeconds=toc(frameTimer);
+                phase="replay";
                 maximumSeconds=max(maximumSeconds,frameSeconds);maxHorizon=max(maxHorizon,problem.metadata.horizonSteps);
                 x=problem.model.initialState;input=command.actuatorInput;
                 h=cfg.controller.sampleTime;
@@ -78,10 +97,13 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     linspace(0,h,31),x,odeset('RelTol',1e-11,'AbsTol',1e-12));
                 shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
                 for j=1:numel(times)
-                    q=predictiveSafetyGeometry.predictTarget(problem.model.targetEpoch,problem.model.sampleIndex*h+times(j));
+                    q=predictiveSafetyGeometry.predictTarget(initialTarget,ego.stateTime+times(j));
                     if ~isempty(q)
                         distance=predictiveSafetyGeometry.rectangle(states(j,1:3).',shape,q(1:3),q(8:11));
                         minimumClearance=min(minimumClearance,distance);
+                        if distance<=0 && ~collisionDetected
+                            collisionDetected=true;collisionTime=ego.stateTime+times(j);
+                        end
                     end
                     rotation=[cos(states(j,3)),-sin(states(j,3));sin(states(j,3)),cos(states(j,3))];
                     vertices=states(j,1:2).'+rotation*(shape(3:4)+shape(1:2).*[-1,1,1,-1;-1,-1,1,1]);
@@ -132,11 +154,15 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                     'predictionCollisionMargin',problem.metadata.minimumCollisionMargin);
                 if isempty(trace),trace=entry;else,trace(end+1)=entry;end %#ok<AGROW>
                 if ~isempty(target)
-                    q=predictiveSafetyGeometry.predictTarget(problem.model.targetEpoch,(problem.model.sampleIndex+1)*h);
+                    q=predictiveSafetyGeometry.predictTarget(initialTarget,ego.stateTime);
                     target=localTarget(q);
                     passedTarget=passedTarget || next(1)-q(1)>cfg.vehicle.length/2+q(8);
                 end
                 frames=frames+1;
+                if collisionDetected
+                    failure="runNonlinearPredictiveSafetyValidation:collision: Ground-truth rectangles touched or overlapped.";
+                    failureTime=collisionTime;break;
+                end
                 if recovery.enabled
                     inside=all(abs(finalError)<=options.RecoveryTolerances) ...
                         && ego.stateTime>=recovery.minimumTimeSeconds;
@@ -156,6 +182,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
                 end
             catch exception
                 failedFrameSeconds=toc(frameTimer);failureTime=(frame-1)*cfg.controller.sampleTime;
+                controlUnavailable=phase=="controller";executionError=~controlUnavailable;
                 failure=string(exception.identifier)+": "+string(exception.message);break;
             end
         end
@@ -165,8 +192,16 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         firstSeconds=NaN;if ~isempty(seconds),firstSeconds=seconds(1);end
         medianLater=NaN;p95Later=NaN;
         if ~isempty(later),medianLater=median(later);p95Later=prctile(later,95);end
+        outcome="observationLimit";
+        if recovery.recovered,outcome="recovered";end
+        if executionError,outcome="executionError";end
+        if controlUnavailable,outcome="controlUnavailable";end
+        if collisionDetected,outcome="collision";end
         results{index}=struct('scenario',name,'requestedFrames',options.Frames,'executedFrames',frames, ...
-            'completed',frames==options.Frames || recovery.recovered,'recovery',recovery, ...
+            'completed',strlength(failure)==0 && (frames==options.Frames || recovery.recovered),'recovery',recovery, ...
+            'outcome',outcome,'experimentFailed',collisionDetected || controlUnavailable, ...
+            'collisionDetected',collisionDetected,'collisionTimeSeconds',collisionTime, ...
+            'controlUnavailable',controlUnavailable,'executionError',executionError, ...
             'failure',failure,'minimumReplayClearanceMeters',minimumClearance, ...
             'minimumReplayRoadMarginMeters',minimumRoadMargin,'maximumFrameSeconds',maximumSeconds, ...
             'maximumHorizonSteps',maxHorizon,'initialClfValue',firstClf,'finalClfValue',lastClf, ...
@@ -185,6 +220,7 @@ function report = runNonlinearPredictiveSafetyValidation(options)
         if strlength(options.ContinuationFile)>0
             continuation=struct('ego',ego,'target',target,'prior',prior,'result',results{index}, ...
                 'stateTransition',options.StateTransition, ...
+                'observationModel',observationModel, ...
                 'recoveryOptions',recoveryOptions,'recoveryStart',recoveryStart);
             save(options.ContinuationFile,'continuation','-v7.3');
         end
@@ -193,7 +229,9 @@ function report = runNonlinearPredictiveSafetyValidation(options)
     report=struct('model',"nonlinear combined-slip Fiala; one constant-acceleration/constant-sideslip target", ...
         'targetStateOrder',["X","Y","psi","V","A","beta","lr","halfLength","halfWidth","offsetX","offsetY"], ...
         'scope',"two-stage affine PCBF/CLF with independent offline replay", ...
-        'stateObservation',options.StateTransition+" ego successor; fixed target epoch; no observer, noise or delay", ...
+        'stateObservation',options.StateTransition+" ego successor; target observation: "+observationModel, ...
+        'targetTruth',"fixed initial constant-A/constant-beta trajectory, independent of estimated forecasts", ...
+        'failureCriteria',["groundTruthCollision","noSolvedControlOutput"], ...
         'replay',struct('integrator',"ode45",'relativeTolerance',1e-11, ...
             'absoluteTolerance',1e-12,'samplesPerHold',31),'results',[results{:}]);
     if strlength(options.OutputFile)>0

@@ -40,6 +40,16 @@ and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
 and expose that limitation. Complete nonlinear robust safety remains conditional
 on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
 
+The latest point estimate always refreshes target A and beta, held constant
+only within the current prediction. Unavailable or stale certificates do not
+block execution; unsupported uncertainty padding is omitted without declaring
+zero estimation error. No assumption-status diagnostics are produced. Usable finite
+enclosures still tighten the same optimization. Experimental collision checks
+use independent fixed-parameter target truth, and failure means collision or
+no solved control output. Recovery, margin shortfalls and unverified theory
+premises are separate observations. `nominalRecoveryValidationTest` and
+`../scripts/verifyExperimentalAssumptionPolicy.m` exercise these distinctions.
+
 Initialization metadata uses `movingTargetPotentialField` and
 `potentialFieldRestarted`; `predictTarget` advances the prescribed target
 motion. The experiment entry points are `runPotentialFieldCampaign`,

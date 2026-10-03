@@ -10,8 +10,11 @@ The implementation now consumes timestamped NRMM observer enclosures. It
 propagates constant target-parameter sets analytically and ego error boxes
 through the shared affine variational model. Their supports tighten collision,
 path, physical-state, terminal-entry and first-successor CLF constraints.
-Inputs without uncertainty metadata retain the exact-state research baseline.
-Unavailable, stale or incomplete enclosures are not silently discarded.
+Usable current enclosures remain optimization data. Unavailable, stale,
+incomplete or misaligned proof metadata does not prevent
+optimization around the current point estimates. Its unsupported tightening
+is omitted explicitly; this does not assert that the corresponding error is
+zero. Inputs without uncertainty metadata use point-estimate prediction.
 This is an affine uncertainty integration, **not a certified nonlinear
 output-feedback PCBF**. The earlier baseline audit is retained in
 [the observer-to-PCBF gap analysis](../report/OBSERVER_ROBUST_PCBF_GAP_20261003.tex).
@@ -57,19 +60,46 @@ Rectangle orientation uncertainty contributes `2*reach*sin(min(pi,b_yaw)/2)`.
 The ego generator propagates as `G_next=A_i*G_i`, for fixed candidate inputs.
 This is an open-loop affine image, not a nonlinear tube with future feedback.
 
-Estimated target centers can update each sample while their true parameters
-remain constant. Previous inputs still initialize the next solve. The primary
+Every current target estimate, with or without an error certificate, updates
+the prediction center and its A and beta. These two parameters remain constant
+within that frame's prediction and may change at the next observation. The
+physical simulated target still obeys one fixed A and beta. Previous inputs
+still initialize the next solve. The primary
 budget is recomputed when observer metadata is present, because no inclusion
 of the new set in the old successor set has been established. The old slack
-sum therefore cannot justify a new hard safety cap. A missing current target
-enclosure after uncertain tracking is reported explicitly; the controller
-does not silently replace it by an exact extrapolation.
+sum therefore cannot justify a new hard safety cap. If current enclosures are
+unavailable, the numerical inherited-cap attempt and ordinary primary
+restoration remain available without a nesting claim. Missing current target
+observations retain the last target forecast. Neither this extrapolation nor a revised point estimate
+is relabeled a certified enclosure.
 
 Terminal entry reserves `sum_j ||L_f*G_intrinsic(:,j)||` inside the existing
 quotient ellipsoid. This can make the current nominal core infeasible even
 for small speed uncertainty. It is intentional that uncertainty is not
 dropped to force a solve. This entry test does not establish robust infinite
 continuation: the existing terminal policy/geometry remains nominal.
+
+### Experimental outcomes versus theorem premises
+
+The controller neither rejects revised forecasts because of an unproved
+theorem premise nor produces assumption-status diagnostics. A usable finite
+uncertainty constraint that actually makes the conic problem
+infeasible is still an optimization failure; it is not waived by this policy.
+The existing nonlinear model-agreement/damping mechanism is unchanged.
+
+`runNonlinearPredictiveSafetyValidation` propagates physical target truth from
+the scenario's initial state, independently of the controller's revised target
+forecast. Its optional `TargetEstimateFunction(targetTruth,egoTruth)` supplies
+synthetic observations without changing the plant. Rectangle contact/overlap
+in the independent replay, or failure to return a finite solved control,
+constitutes experimental failure. A positive clearance below the requested
+margin, an unverified theory premise, or no recovery yet at the observation
+cap is reported separately. Reaching that cap is not a recovery claim. Replay
+or harness errors have their own inconclusive `executionError` outcome.
+
+The ideal conditional theorem is unchanged. A successful run with unverified
+premises is empirical robustness evidence, not a proof that those premises
+hold or that recursive feasibility has been established.
 
 ## Prediction and initialization
 

@@ -133,12 +133,17 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             testCase.verifyFalse(isfield(problem,'certificate'));
             testCase.verifyEqual(problem.metadata.safetyScope,"affineSampledConstraints");
         end
-        function changedTargetForecastRequiresExplicitReinitialization(testCase)
+        function changedTargetForecastRetainsTheInputWarmStart(testCase)
             [ego,road,cfg]=localFixture();target=localTarget([30;5;0;6;1;0;1.6;2.4;.95;0;0]);
             [~,~,~,prior]=collisionAvoidanceController(ego,target,road,cfg,[]);
-            ego=localSuccessor(ego,prior);target.targetPositionInertial=[30.4;5.01];
-            testCase.verifyError(@()collisionAvoidanceController(ego,target,road,cfg,prior), ...
-                'collisionAvoidanceController:changedTargetTrajectory');
+            ego=localSuccessor(ego,prior);
+            updated=[30.4;5.01;0;6;1.02;.0005;1.6;2.4;.95;0;0];target=localTarget(updated);
+            [command,~,problem]=collisionAvoidanceController(ego,target,road,cfg,prior);
+            testCase.verifyTrue(all(isfinite(command.actuatorInput)));
+            testCase.verifyEqual(problem.model.target,updated,AbsTol=1e-12);
+            testCase.verifyEqual(problem.metadata.search.initialization,"shiftedInputRollout");
+            expected=predictiveSafetyGeometry.predictTarget(updated,(0:size(problem.inputTrajectory,2))*cfg.controller.sampleTime);
+            testCase.verifyEqual(problem.predictedJointState(7:10,:),expected(1:4,:),AbsTol=1e-11);
         end
         function headingWrapPreservesTheFixedTargetForecast(testCase)
             [ego,road,cfg]=localFixture();q=[100;100;pi-.001;8;0;.08;1.6;2.4;.95;0;0];
@@ -146,12 +151,12 @@ classdef nonlinearPredictiveSafetyTest < matlab.unittest.TestCase
             ego=localSuccessor(ego,prior);next=predictiveSafetyGeometry.predictTarget(prior.targetEpoch,cfg.controller.sampleTime);
             [~,~,problem,state]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
             testCase.verifyGreaterThan(next(3),pi);
-            testCase.verifyEqual(state.targetEpoch,prior.targetEpoch);
-            testCase.verifyEqual(problem.model.target,next);
+            testCase.verifyEqual(state.targetEpoch,prior.targetEpoch,AbsTol=1e-12);
+            testCase.verifyEqual(problem.model.target,next,AbsTol=1e-12);
             testCase.verifyTrue(problem.metadata.optimizationReturned);
             next(3)=next(3)+.01;
-            testCase.verifyError(@()collisionAvoidanceController(ego,localTarget(next),road,cfg,prior), ...
-                'collisionAvoidanceController:changedTargetTrajectory');
+            [~,~,updated]=collisionAvoidanceController(ego,localTarget(next),road,cfg,prior);
+            testCase.verifyEqual(updated.model.target,next,AbsTol=1e-12);
         end
         function targetDropoutUsesOneFixedAbsoluteEpoch(testCase)
             [ego,road,cfg]=localFixture();q=[30;5;0;6;1;0;1.6;2.4;.95;0;0];ego.stateTime=10;
