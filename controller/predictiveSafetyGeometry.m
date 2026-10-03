@@ -43,6 +43,12 @@ classdef predictiveSafetyGeometry
                 closing=max(0,futureTangent.'*(progress*futureTangent-targetVelocity))/cfg.referenceSpeed;
             end
             desiredLateral=-lateral/cfg.nominalClf.lookaheadSeconds+obstacleLateral;
+            % Project the guidance velocity into the path-corridor tangent
+            % bounds. This shapes a seed; only the optimizer enforces the
+            % vehicle-position constraint on its prediction.
+            limit=cfg.controller.maximumLateralDeviationMeters;
+            span=cfg.nominalClf.lookaheadSeconds;
+            desiredLateral=min((limit-lateral)/span,max((-limit-lateral)/span,desiredLateral));
             speed=max(max(1.5,.5*cfg.referenceSpeed),cfg.referenceSpeed*(1-.35*risk*min(2,closing)));
             heading=projection.heading+atan2(desiredLateral,speed);
         end

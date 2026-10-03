@@ -6,7 +6,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     cfg=model.cfg;solution=[];allAttempts=struct([]);allStages=struct([]);history=struct([]);
     restarted=false;selected=0;initialFailure="";selectedRound=0;
     lineSearchHistory=struct([]);
-    model.inputTrustScale=.25;
+    model.inputTrustScale=.125;
     model.inheritedSlacks=[];
     model.linearizationBuilds=0;
     if isstruct(previousState) && isfield(previousState,'linearizationTrustScale')
@@ -60,7 +60,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 || trialModel.linearizationBuilds>=cfg.nonlinear.maximumLinearizations
             break;
         end
-        model=trialModel;model.inheritedSlacks=[];model.inputTrustScale=.25;
+        model=trialModel;model.inheritedSlacks=[];model.inputTrustScale=.125;
         previousState=[];restarted=true;initialFailure="shiftedModelDisagreement";
         if toc(timer)>=cfg.solver.timeLimitSeconds,break;end
     end
@@ -149,19 +149,27 @@ end
 function [agreement,rollout,valid]=localPredictionAgreement(candidate,model)
     cfg=model.cfg;[rollout,valid]=localRollout(candidate.inputs,model);
     poseError=Inf;stateError=Inf;clfError=Inf;fullPoseError=Inf;actualSlack=Inf;
+    maximumDeviation=Inf;deviationRatio=0;
     poseCount=min(size(candidate.states,2),candidate.encounterExit+1);
     if valid
         [poseError,stateError,fullPoseError]=localTrajectoryError(candidate.states,rollout.states,cfg,poseCount);
         actual=nonlinearBicycleModel.nominalValue(rollout.states(:,2),model.lane,model.nominalReference);
         clfError=abs(actual-candidate.clfNextValue)/max(1,candidate.clfInitialValue);
         actualSlack=max(0,actual-candidate.clfInitialValue+candidate.clfRequiredDecrease);
+        projection=laneGeometry.project(rollout.states(1:2,:),model.lane);
+        maximumDeviation=max(abs(projection.lateralPosition));
+        if isfinite(cfg.controller.maximumLateralDeviationMeters)
+            deviationRatio=max(0,1+(maximumDeviation-cfg.controller.maximumLateralDeviationMeters) ...
+                /cfg.nonlinear.predictionToleranceMeters);
+        end
     end
     ratio=max([poseError/cfg.nonlinear.predictionToleranceMeters, ...
-        stateError/cfg.nonlinear.statePredictionTolerance,clfError/cfg.nonlinear.clfPredictionTolerance]);
+        stateError/cfg.nonlinear.statePredictionTolerance,clfError/cfg.nonlinear.clfPredictionTolerance,deviationRatio]);
     agreement=struct('poseErrorMeters',poseError,'fullPoseErrorMeters',fullPoseError, ...
         'poseConstraintNodeCount',poseCount,'scaledStateError',stateError, ...
         'scaledClfError',clfError,'ratio',ratio,'inputTrustScale',model.inputTrustScale, ...
-        'actualClfSlack',actualSlack,'firstInputTrustActivity', ...
+        'actualClfSlack',actualSlack,'maximumLateralDeviationMeters',maximumDeviation, ...
+        'lateralDeviationRatio',deviationRatio,'firstInputTrustActivity', ...
         max(abs(candidate.inputs(:,1)-model.linearization.inputs(:,1)) ...
         ./(model.inputTrustScale*cfg.nonlinear.trustRadius*[.15;.25])), ...
         'seconds',0,'stepFraction',1);
@@ -211,10 +219,13 @@ function [solution,search,model] = localRound(model,previousState,timer)
         search.firstSlackCap=model.inheritedSlacks(1);
         problem.upper(problem.slackIndices(1))=search.firstSlackCap;
         point=zeros(problem.clfIndex-1,1);point(problem.slackIndices)=model.inheritedSlacks;
-        cone=problem.cones(1);fullPoint=[point;0];
+        fullPoint=[point;0];
         search.budgetAnchorResidual=max([0;problem.a*fullPoint-problem.b; ...
-            abs(problem.equal*fullPoint-problem.rhs);problem.lower-fullPoint;fullPoint-problem.upper; ...
-            norm(cone.A*fullPoint-cone.b)-cone.d.'*fullPoint+cone.gamma]);
+            abs(problem.equal*fullPoint-problem.rhs);problem.lower-fullPoint;fullPoint-problem.upper]);
+        for cone=problem.cones(1:problem.primaryConeCount)
+            search.budgetAnchorResidual=max(search.budgetAnchorResidual, ...
+                norm(cone.A*fullPoint-cone.b)-cone.d.'*fullPoint+cone.gamma);
+        end
         % This cap is not a recomputed optimal PCBF value. The current problem
         % can be infeasible after state or linearization discrepancies.
         search.stages(1)=struct('objective',"inheritedSafetyBudget",'exitFlag',NaN, ...
@@ -356,19 +367,23 @@ function [point,problem,search,model]=localPrimary(anchor,model,initialization,t
     model.linearization=anchor;
     search=localSearch(problem,model,initialization,formulationSeconds);
     remaining=cfg.solver.timeLimitSeconds-toc(timer);if remaining<=0,return;end
-    primaryCount=problem.clfIndex-1;endpoint=problem.cones(1);wall=tic;
+    primaryCount=problem.clfIndex-1;primaryCone=problem.cones(1:problem.primaryConeCount);wall=tic;
+    coneFeasible=true;
+    for index=1:numel(primaryCone)
+        cone=primaryCone(index);coneFeasible=coneFeasible && norm(cone.b)<=-cone.gamma;
+        primaryCone(index).A=cone.A(:,1:primaryCount);primaryCone(index).d=cone.d(1:primaryCount);
+    end
     % A feasible zero correction with zero nonnegative slacks attains the
     % global lower bound. Include every primary constraint, not just safety.
     if all(problem.b>=0) && all(problem.rhs==0) ...
             && all(problem.lower(1:primaryCount)<=0) && all(problem.upper(1:primaryCount)>=0) ...
-            && norm(endpoint.b)<=-endpoint.gamma
+            && coneFeasible
         point=zeros(primaryCount,1);search.primaryOptimum=0;
         search.slackCap=cfg.solver.lexicographicTieTolerance;
         search.stages(1)=struct('objective',"pcbfSlack",'exitFlag',1, ...
             'seconds',toc(wall),'value',0,'numericalSolve',false,'solverInfo',struct());
         search.terminationReason="primaryReturned";return;
     end
-    primaryCone=endpoint;primaryCone.A=endpoint.A(:,1:primaryCount);primaryCone.d=endpoint.d(1:primaryCount);
     wall=tic;
     [point,flag,solverInfo]=localConicSolve(sparse(primaryCount,primaryCount),problem.safetyObjective(1:primaryCount),primaryCone, ...
         problem.a(:,1:primaryCount),problem.b,problem.equal(:,1:primaryCount),problem.rhs, ...
@@ -549,10 +564,18 @@ function [problem,model]=localFormulate(anchor,model)
     is=iu(end)+(1:prefix);ic=is(end)+1;nv=ic;
     equal=sparse(6*(count+1),nv);rhs=zeros(6*(count+1),1);equal(1:6,ix(:,1))=eye(6);
     rhs(1:6)=model.initialState-anchor.states(:,1);
-    rows=cell(1,5*count+3);bounds=cell(size(rows));rowCount=0;
+    rows=cell(1,7*count+4);bounds=cell(size(rows));rowCount=0;
+    pathCones=struct('A',{},'b',{},'d',{},'gamma',{});
+    deviationLimit=cfg.controller.maximumLateralDeviationMeters;
+    % Reserve the existing position-accuracy tolerance inside the hard bound.
+    pathLimit=deviationLimit-min(cfg.nonlinear.predictionToleranceMeters,deviationLimit/100);
     lower=-Inf(nv,1);upper=Inf(nv,1);radius=cfg.nonlinear.trustRadius;
     lower(ix(:))=-repmat(radius*[5;5;.5;5;3;1.5],count+1,1);upper(ix(:))=-lower(ix(:));
     lower(iu(:))=-repmat(model.inputTrustScale*radius*[.15;.25],count,1);upper(iu(:))=-lower(iu(:));lower([is,ic])=0;
+    pathBox=zeros(nv,1);pathBox(ix(:))=upper(ix(:));
+    % Cover the existing maximum fresh-input box expansion as well. Removing
+    % a redundant corridor row remains valid if that box is enlarged later.
+    pathBox(iu(:))=repmat(max(2,model.inputTrustScale)*radius*[.15;.25],count,1);
     % Numerical RTI corrections are local to the new anchor at every sample.
     % Steering still has no actuator magnitude or slew constraint.
     inputLower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)];
@@ -573,6 +596,12 @@ function [problem,model]=localFormulate(anchor,model)
         rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
         if departure==Inf && localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model),departure=index-1;end
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
+        if isfinite(deviationLimit)
+            limit=pathLimit;if index==1,limit=deviationLimit;end
+            [r,bound,cone]=localPathRows(x(1:2),map(1:2,:),model.lane,limit,pathBox);
+            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+            pathCones=[pathCones,cone]; %#ok<AGROW>
+        end
         if index<=departure
             [g,j]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
             if index==1,primaryLowerBound=max(0,-min(g));end
@@ -580,6 +609,11 @@ function [problem,model]=localFormulate(anchor,model)
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
+        if isfinite(deviationLimit)
+            [r,bound,cone]=localPathRows(middle(1:2),map(1:2,:),model.lane,pathLimit,pathBox);
+            rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+            pathCones=[pathCones,cone]; %#ok<AGROW>
+        end
         if index<=departure
             [g,j]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
             r=-j*map;if index<=prefix,r(:,is(index))=-1;end
@@ -608,12 +642,29 @@ function [problem,model]=localFormulate(anchor,model)
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
     end
+    if isfinite(deviationLimit)
+        [r,bound,cone]=localPathRows(y(1:2),map(1:2,:),model.lane,pathLimit,pathBox);
+        rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
+        pathCones=[pathCones,cone];
+    end
+    primaryCones=[endpoint,pathCones];
     objective=zeros(nv,1);objective(is)=1;
     problem=struct('a',vertcat(rows{1:rowCount}),'b',vertcat(bounds{1:rowCount}), ...
-        'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',endpoint, ...
+        'equal',equal,'rhs',rhs,'lower',lower,'upper',upper,'cones',primaryCones, ...
+        'primaryConeCount',numel(primaryCones), ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
         'terminalA',terminalA,'terminalB',terminalB,'encounterExit',departure);
+end
+
+function [rows,bounds,cone]=localPathRows(position,map,lane,limit,box)
+    region=laneGeometry.deviationRegion(position,lane,limit);
+    rows=region.a*map;bounds=region.b;
+    active=abs(rows)*box>bounds;rows=rows(active,:);bounds=bounds(active);
+    cone=struct('A',{},'b',{},'d',{},'gamma',{});
+    if isfinite(region.radius) && norm(abs(region.center)+abs(map)*box)>region.radius
+        cone=localCone(map,region.center,zeros(size(map,2),1),-region.radius);
+    end
 end
 
 function problem=localAddClf(problem,anchor,model)

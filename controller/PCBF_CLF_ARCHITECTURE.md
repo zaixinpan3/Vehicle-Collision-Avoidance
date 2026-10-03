@@ -209,6 +209,9 @@ One nonnegative collision slack is assigned to each primary-horizon stage;
 it relaxes the start and midpoint separation rows. Completion-tail rows are
 hard. The node buffer is 0.10 m, whereas the experiment's physical pass criterion
 is positive rectangle clearance. No road-boundary constraint is imposed.
+The independent given-path center-deviation bound is described in
+[PATH_DEVIATION_BOUND.md](PATH_DEVIATION_BOUND.md); it defaults to 10 m and is
+hard in both optimization stages, including the finite completion tail.
 
 The first problem minimizes the sum of PCBF slacks. The unbounded CLF slack
 and its cone are eliminated from this problem without changing its feasible
@@ -279,9 +282,10 @@ The agreement measures are
 
 For `E_pose`, the maximum covers nodes supporting active collision rows
 (including the endpoint of the last such hold), or the full horizon when
-terminal geometry remains active. After the encounter exit, free positions
-have no pose constraint and do not restrict this accuracy test. With no pose
-constraints, only the fixed initial node enters. `E_state` still covers all
+terminal geometry remains active. After the encounter exit, positions do not
+restrict this collision-pose discrepancy measure. The separate path-deviation
+measure below still covers the full nonlinear prediction. With no collision
+pose constraints, only the fixed initial node enters this discrepancy measure. `E_state` still covers all
 horizon nodes and `E_clf` always evaluates the actual first successor value.
 The full-horizon pose discrepancy is separately reported as
 `fullPoseErrorMeters`; `poseConstraintNodeCount` identifies the measured
@@ -293,7 +297,14 @@ position error with a large heading error. The defaults are 0.01 m for
 agreement thresholds, not certified bounds on plant/model uncertainty or
 intersample safety.
 
-A ratio `r` is the maximum of the three errors divided by their tolerances.
+The nonlinear rollout also projects every state onto the given path. For a
+finite lateral limit `L`, it contributes
+`max(0, 1 + (max(abs(e_y_nl))-L)/predictionToleranceMeters)` to the agreement
+ratio. Thus a trajectory outside the path corridor cannot be accepted merely
+because its model errors are small. This reuses the existing rollout and damping;
+it adds no trajectory linearization or optimization stage.
+
+A ratio `r` is the maximum of the three normalized errors and this deviation ratio.
 If `r <= 1`, the completed CLF candidate becomes an eligible optimization
 iterate. A zero primary value never skips the CLF stage. Positive PCBF slack
 remains a relaxed result and is not interpreted as collision freedom.
@@ -351,7 +362,7 @@ rollout may replace the initialization and receive its own model. A fresh seed
 that fails reports failure; it is not repeatedly optimized and relinearized.
 `maximumLinearizations=1` disables the fresh retry after a built shifted model;
 the default of two allows it. Startup has only the one fresh model regardless.
-The initial input trust scale is 0.25; the previous accepted scale is inherited
+The initial input trust scale is 0.125; the previous accepted scale is inherited
 on a normal frame. This local numerical step bound is not an actuator constraint.
 
 A failed inherited-budget attempt restores PCBF on the existing matrices and
@@ -401,7 +412,7 @@ models and timings; `selectedAttempt` identifies the model supplying the
 command. `optimizationConverged` describes the numerical stages of the selected
 problem, not discarded restoration attempts, optimality of an inherited cap,
 or optimality of an issued damped point. `secondaryOptimumApplied` distinguishes
-a full solution from a damped step. Continuation state version 70 stores the per-stage slacks and their total
+a full solution from a damped step. Continuation state version 71 stores the per-stage slacks and their total
 alongside the existing single-CLF trajectory state. The optional stored
 `linearizationTrustScale` carries the learned step size, not an executable
 backup policy.

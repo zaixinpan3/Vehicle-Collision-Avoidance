@@ -1,6 +1,26 @@
 classdef laneGeometry
     %laneGeometry Nominal straight and circular lane coordinates.
     methods (Static)
+        function region = deviationRegion(position,lane,limit)
+            % A convex inner region of the center-position path corridor.
+            % Coordinates are displacements from position. A circular path
+            % uses its exact outer disk and a supporting inner half-plane.
+            projection=laneGeometry.project(position,lane);
+            normal=[-sin(projection.heading),cos(projection.heading)];
+            region=struct('a',[normal;-normal], ...
+                'b',[limit-projection.lateralPosition;limit+projection.lateralPosition], ...
+                'center',zeros(2,0),'radius',Inf);
+            if isfield(lane,'referenceCurve') && lane.referenceCurve.curvature~=0
+                curve=lane.referenceCurve;radius=1/abs(curve.curvature);
+                center=curve.origin+[-sin(curve.heading);cos(curve.heading)]/curve.curvature;
+                radial=position-center;distance=norm(radial);
+                direction=-sign(curve.curvature)*normal;
+                if distance>0,direction=radial.'/distance;end
+                region.a=-direction;region.b=distance-max(0,radius-limit);
+                region.center=center-position;region.radius=radius+limit;
+            end
+        end
+
         function curve = validateReferenceCurve(curve)
             required = ["origin", "heading", "curvature", "length"];
             if ~isstruct(curve) || ~isscalar(curve) || ~all(isfield(curve, required))

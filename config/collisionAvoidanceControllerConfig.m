@@ -21,15 +21,16 @@ end
 
 function cfg=localDefaults()
     cfg.referenceSpeed=15;
-    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
+    cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512, ...
+        'maximumLateralDeviationMeters',10);
     % trustRadius scales RTI state/input corrections about each fresh rollout.
     cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
         'trustRadius',.5,'maximumLinearizations',2,'predictionToleranceMeters',.01, ...
         'statePredictionTolerance',.01,'clfPredictionTolerance',.01, ...
-        'recoveryHorizonSeconds',3);
+        'recoveryHorizonSeconds',4);
     % Potential-field seed parameters; these are not optimized actuator limits.
     cfg.initialization=struct('previewSeconds',3,'previewStepSeconds',.1, ...
-        'clearancePaddingMeters',.7,'settlingSeconds',2,'brakingRatioLimit',.3, ...
+        'clearancePaddingMeters',.7,'settlingSeconds',1.5,'brakingRatioLimit',.3, ...
         'lateralAccelerationFraction',.98,'frontForceFraction',.98,'speedGain',1);
     % A target farther than encounterRangeMeters (body to body) carries no
     % collision risk. Its constant speed-rate and sideslip motion is assumed
@@ -80,6 +81,7 @@ end
 function localValidate(cfg)
     validateattributes(cfg.referenceSpeed,{'double'},{'scalar','real','finite','positive'});
     validateattributes(cfg.controller.sampleTime,{'double'},{'scalar','real','finite','positive'});
+    validateattributes(cfg.controller.maximumLateralDeviationMeters,{'double'},{'scalar','real','nonnan','positive'});
     for name=["horizonSteps","maximumHorizonSteps"]
         validateattributes(cfg.controller.(name),{'double'},{'scalar','real','finite','integer','positive'});
     end

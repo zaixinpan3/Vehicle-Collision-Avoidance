@@ -10,7 +10,11 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
     end
     methods (Test)
         function feasibleDampingAvoidsASecondHeadOnOptimization(testCase)
-            [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
+            [ego,~,cfg]=localFixture();
+            % The smaller startup correction now passes the default CLF
+            % agreement threshold; tighten it here to exercise damping.
+            cfg.nonlinear.clfPredictionTolerance=.005;
+            [~,q,road]=collisionThreatScenario("headOn",cfg);
             target=struct('targetPositionInertial',q(1:2), ...
                 'targetVelocityInertial',q(4)*[cos(q(3));sin(q(3))],'targetYawInertial',q(3));
             [command,inputs,problem,state]=collisionAvoidanceController(ego,target,road,cfg,[]);
