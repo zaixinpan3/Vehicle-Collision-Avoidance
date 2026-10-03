@@ -40,6 +40,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
             struct("nonlinear", struct("proposalFunction", @sin))}
         invalidCrossingGap = {-0.1, Inf, NaN, [0.1, 0.2]}
         invalidActuation = {[], 1.0, struct([])}
+        invalidSlewWeight = {-1, NaN, Inf, [1,2]}
     end
 
     methods (TestClassSetup)
@@ -53,6 +54,17 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function inputSlewPreferenceCanBeRemovedWithoutAddingAHardRateLimit(testCase)
+            cfg=collisionAvoidanceControllerConfig(struct('inputPenalty',struct('slewWeight',0)));
+            testCase.verifyEqual(cfg.inputPenalty.slewWeight,0);
+            testCase.verifyEqual(cfg.model.brakingRatioRateMaximum,Inf);
+            testCase.verifyEqual(cfg.collision.safetyMarginMeters,.10);
+        end
+        function inputSlewPreferenceRequiresAFiniteNonnegativeWeight(testCase,invalidSlewWeight)
+            testCase.verifyError(@()collisionAvoidanceControllerConfig( ...
+                struct('inputPenalty',struct('slewWeight',invalidSlewWeight))), ...
+                'collisionAvoidanceController:invalidConfiguration');
+        end
         function targetRearAxleDistanceIsPositiveAndIndependentOfEgoGeometry(testCase)
             cfg=collisionAvoidanceControllerConfig(struct('target',struct('rearAxleDistance',1.8)));
             testCase.verifyEqual(cfg.target.rearAxleDistance,1.8);

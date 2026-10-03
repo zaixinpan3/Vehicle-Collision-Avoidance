@@ -1,0 +1,191 @@
+\documentclass[10pt]{article}
+\usepackage[margin=.8in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,longtable,hyperref,xurl}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Soft Input Continuity in the Single PCBF--CLF Controller}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\section{Decision and algorithm}
+The user retained the existing 0.10-m optimization margin and requested a soft
+preference for gentler maneuvers whenever feasible. The original squared
+correction cost favors staying near the initialization inputs, which can
+already contain abrupt steering and braking changes. It does not directly
+prefer continuity between actual consecutive commands.
+
+The same CLF optimization now minimizes
+\[
+ \frac{\rho}{\max(1,V(x))}+\epsilon R,\qquad
+ R=\frac{R_a+wR_s}{1+w},\quad w=0.5,\quad\epsilon=10^{-4}.
+\]
+Let $u_i=\bar u_i+d_i$, with componentwise numerical correction radii $r_l$,
+$i=0,\ldots,M-1$, $l=1,2$. The anchor term remains
+\[
+ R_a=\frac{1}{2M}\sum_{i,l}\frac{d_{l,i}^2}{r_l^2}.
+\]
+For the added continuity preference, set $u_{-1}=\bar u_{-1}$ to the previously
+applied command and $d_{-1}=0$. Define
+\[
+ b_{l,i}=|\bar u_{l,i}-\bar u_{l,i-1}|+r_l+r_{l,i-1},\quad
+ B_l^2=\sum_i b_{l,i}^2,\qquad
+ R_s=\frac12\sum_l\frac{\sum_i(u_{l,i}-u_{l,i-1})^2}{B_l^2},
+\]
+where $r_{l,-1}=0$ and the other radii equal $r_l$. Uniform normalization per
+actuator preserves equal weighting at every prediction step. The correction
+box gives $0\le R_a,R_s,R\le1$, so the existing bound on the effect of the
+regularizer on minimum scaled CLF slack remains $\epsilon$ at an exact optimum.
+Numerical solver tolerances add their own error. The PCBF budget remains hard.
+
+The anchor reference is still the linearization input, not zero. The new term
+vanishes for a constant nonzero sequence matching input memory. There is no
+hard steering magnitude or slew constraint, new CLF, controller mode, backup,
+cone, optimization stage or relinearization introduced by this change.
+Normal frames continue to shift the preceding trajectory; the same existing
+failure-triggered initialization and damping remain. The objective is one
+sparse positive-semidefinite quadratic with a linear term; its constant is
+omitted. Clarabel receives the upper triangular Hessian, as required by its
+native adapter. The continuity term couples adjacent inputs. The continuation
+state version is 69 and its context includes the new weight.
+
+\section{Validation contract and comparison}
+The comparison reuses the original fourteen collision-threat cases, seven
+geometries at 8 and 15 m/s, and the original result source commit
+\path{b16771139356ec252ed8deb4bb341cc22ffb023a}. Initial ego states, targets and
+all pre-existing configuration fields were verified identical. Target
+acceleration and sideslip are fixed and known; ego observation is exact.
+Road constraints remain absent. Holds are 50 ms, with the same 8/16-step
+PCBF prefix and 60-step completion. ODE45 applies the selected command with
+relative/absolute tolerances $10^{-11}$ and $10^{-12}$; 31 outputs per hold
+independently audit rectangle clearance. Measured computation delay is not
+injected into plant time. There is no random seed.
+
+Simulation continues through the post-conflict one-second nominal dwell, with
+error tolerances
+\[ [0.1\,\mathrm m,1^\circ,0.1\,\mathrm{m/s},
+0.05\,\mathrm{m/s},0.01\,\mathrm{rad/s}]. \]
+The 1,500-hold observation cap is
+not a recovery-speed requirement. The 15-m/s circular head-on fixture has
+another encounter near 56 s; that later threat is retained.
+
+For each actuator the measured total variation energy is
+\[
+ E_l=\frac{1}{h}\sum_{k=0}^{K-1}(u_{l,k}-u_{l,k-1})^2.
+\]
+The initial input memory is $[0,0]^\top$ in these fixtures. All executed holds
+through recovery are included, without averaging by trajectory duration. Thus
+longer quiet recovery cannot reduce this metric by diluting a time average.
+Body acceleration peaks are evaluated directly from the nonlinear derivative
+at the stored dense plant states:
+$a_x=\dot v_x-v_y r$, $a_y=\dot v_y+v_x r$. These include one-sided hold
+endpoints and are sampled nominal-model measurements.
+
+\section{Results}
+All 14 cases recovered without sampled collision or solver interruption over
+5,154 holds. Total steering variation decreased by 19.3\% across the family,
+and total braking-ratio variation decreased by 38.8\%. Steering variation
+improved in 11/14 cases and braking variation in 12/14. Their median per-case
+changes were $-6.5\%$ and $-36.8\%$. Peak steering decreased in 12 cases and
+peak lateral acceleration in 10 cases. This is a measured preference, not a
+claim that every maneuver metric improves.
+
+\begin{center}\small
+\begin{tabular}{rlrrrrr}
+\toprule
+Speed & Scenario & Recovery (s) & Gap (m) & $\Delta E_\delta$ (\%) & $\Delta E_b$ (\%) & Run max (ms)\\
+\midrule
+8 & headOn & 22.40 & 1.7130 & -54.7 & -64.4 & 78.12 \\
+8 & acceleratingHeadOn & 12.70 & 1.3191 & -2.7 & -38.0 & 47.94 \\
+8 & brakingLead & 14.85 & 1.3361 & -0.7 & -54.2 & 58.65 \\
+8 & crossing & 18.40 & 0.0380 & -42.7 & -79.7 & 39.64 \\
+8 & turningCrossing & 12.05 & 0.1039 & -5.4 & -14.3 & 50.93 \\
+8 & curvedHeadOn & 27.00 & 2.1486 & -50.3 & -71.5 & 41.19 \\
+8 & curvedCrossing & 13.30 & 0.0912 & -5.6 & +4.7 & 53.26 \\
+15 & headOn & 10.20 & 0.1791 & -9.6 & -40.9 & 43.05 \\
+15 & acceleratingHeadOn & 10.30 & 0.0495 & -7.3 & -45.6 & 74.89 \\
+15 & brakingLead & 16.35 & 0.6414 & +12.4 & -23.8 & 59.58 \\
+15 & crossing & 11.85 & 3.4016 & +1.2 & -32.5 & 51.58 \\
+15 & turningCrossing & 11.55 & 3.1547 & +7.3 & -3.6 & 46.91 \\
+15 & curvedHeadOn & 65.95 & 3.9834 & -19.1 & -35.6 & 59.16 \\
+15 & curvedCrossing & 10.80 & 2.6241 & -40.0 & +9.5 & 50.24 \\
+\bottomrule
+\end{tabular}
+\end{center}
+The 8-m/s head-on case changes from 30.48 to 23.53 degrees maximum steering
+and from 7.578 to 5.786 m/s$^2$ peak lateral acceleration. Its recovery
+confirmation changes from 12.60 to 22.40 s, which remains within the requested
+eventual-recovery goal. The 8-m/s curved head-on case also uses a gentler,
+longer maneuver (17.90 to 27.00 s recovery). Conversely, steering variation
+increases 12.4\% in the 15-m/s braking-lead case, and its lateral acceleration
+peak rises from 7.375 to 7.575 m/s$^2$. Abrupt first avoidance commands can
+remain; median change in the maximum sampled steering rate is approximately
+zero. No global comfort optimum is claimed.
+
+The 0.10-m setting remains a constraint of the affine collision model. The
+smallest dense nonlinear replay gap is 38.044 mm in the 8-m/s crossing case,
+down from 49.477 mm as the preceding campaign's overall minimum. In that
+particular crossing case the prior gap was about 91.5 mm. A larger nominal
+margin has not been silently retained, and this experiment does not establish
+a 0.10-m continuous-plant clearance guarantee. Positive measured clearance
+is reported separately from the configured margin.
+
+Continuation controller-call median, 95th percentile and maximum are
+13.892, 26.420 and 78.116 ms. The prior values were 13.572, 26.399 and
+81.396 ms. There are no continuation calls over 100 ms; 24 exceed the 50-ms
+sample period. The maximum first call is 887.342 ms, including startup and
+cached-construction effects; it is excluded only from the continuation
+statistics, not hidden as an achieved real-time startup deadline. Timing was
+measured without a profiler on a shared workstation, so this is an observed
+distribution rather than a worst-case deadline guarantee.
+
+There are 5,082 one-model frames and 72 failed-shift/fresh-seed frames. A total
+of 5,030 frames use one numerical solve, 36 use damping, and the maximum is
+four numerical solves in an exceptional frame. Although the preference adds
+no optimization stage, it can change active constraints and exceptional solve
+counts. The slowest continuation is 8-m/s head-on frame 5:
+\begin{center}\begin{tabular}{lr}\toprule Component & ms\\\midrule
+Initialization/shift & 1.786\\
+Problem construction including CLF & 34.156\\
+Numerical optimization & 13.014\\
+Full-step model agreement & 0.906\\
+Damping & 0.000\\
+Other controller overhead & 28.254\\
+\bottomrule\end{tabular}\end{center}
+The final component is a timing remainder, not a profiled attribution.
+
+\section{Exploration and regression}
+Before the user retained 0.10 m, the original objective with a 0.30-m margin
+completed recovery in 11 of 14 cases. The 8-m/s curved crossing and both
+15-m/s straight head-on variants encountered model-agreement failure.
+Short screens at 0.20/0.25 m and a 0.30-m screen with larger initialization
+padding did not remove every failure. These observations do not prove physical
+infeasibility. None of these margin or padding changes remains in the final
+controller.
+
+An initial stage-dependent normalization with weight 9 was discarded. With
+uniform channel normalization, weights 0.1, 0.3, 1 and 3 passed short
+120-hold screens on three difficult fixtures, but these screens did not prove
+recovery. The subsequent full weight-1 campaign recovered in 13/14 cases,
+with a model-agreement interruption after 116 holds in the 8-m/s braking-lead
+case. Weights 0.1, 0.3 and 0.5 then completed that case; the selected weight
+0.5 completed the final full fourteen-case campaign. Selection is empirical
+on this scenario family, not a claim of optimal tuning or out-of-family safety.
+Exact exploratory outcomes and source hashes are in the adjacent JSON export.
+
+All 395 focused MATLAB tests pass across 18 suites. Added tests verify that
+input continuity can improve without sacrificing zero CLF slack or requiring
+another solve, that zero weight is permitted and invalid weights are rejected,
+and that the solver handles the coupled quadratic's upper-triangular Hessian.
+Existing coverage retains shifted budgets, damping, single-CLF behavior,
+nonlinear dynamics, terminal continuation and displaced-state recovery.
+Code Analyzer reports the pre-existing sparse-index suggestions and an unused
+suppression, plus a workstation settings-file warning; no new changed-code
+finding was introduced. The source diff passes whitespace validation.
+
+Reproduction uses \texttt{runTimedFlowCampaign(root,out,1500)} with the committed
+configuration, the eighteen suites listed in the provenance export, and the
+recorded comparison/acceleration scripts. Machine-readable results, tests,
+source identities and actual commands accompany this report. Raw experiment
+exports and analysis methods are retained as identified archive copies.
+\end{document}

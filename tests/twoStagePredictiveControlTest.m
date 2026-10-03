@@ -9,6 +9,19 @@ classdef twoStagePredictiveControlTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function softInputPreferenceReducesVariationWithoutSacrificingZeroClfSlack(testCase)
+            [ego,road,cfg]=localFixture();ego.position(2)=.1;
+            plain=cfg;plain.inputPenalty.slewWeight=0;
+            [~,original,originalProblem]=collisionAvoidanceController(ego,[],road,plain,[]);
+            [~,smooth,smoothProblem]=collisionAvoidanceController(ego,[],road,cfg,[]);
+            originalVariation=sum(diff([zeros(2,1),original],1,2).^2,2);
+            smoothVariation=sum(diff([zeros(2,1),smooth],1,2).^2,2);
+            testCase.verifyLessThan(smoothVariation,originalVariation);
+            testCase.verifyLessThanOrEqual([originalProblem.solution.clfSlack,smoothProblem.solution.clfSlack], ...
+                cfg.solver.feasibilityTolerance);
+            testCase.verifyEqual(smoothProblem.metadata.search.linearizationCount,1);
+            testCase.verifyEqual(smoothProblem.metadata.search.solverCalls,1);
+        end
         function feasibleDampingAvoidsASecondHeadOnOptimization(testCase)
             [ego,~,cfg]=localFixture();[~,q,road]=collisionThreatScenario("headOn",cfg);
             target=struct('targetPositionInertial',q(1:2), ...

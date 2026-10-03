@@ -7,6 +7,14 @@ classdef predictiveConicSolverTest < matlab.unittest.TestCase
         end
     end
     methods (Test)
+        function coupledInputChangesUseTheSymmetricUpperTriangle(testCase)
+            % Minimize (u0-1)^2 + (u1-u0)^2 inside an inactive input box.
+            quadratic=sparse([4,-2;0,2]);
+            [x,flag]=predictiveConicSolverMex(quadratic,[-2;0], ...
+                sparse([eye(2);-eye(2)]),2*ones(4,1),4,1,localOptions());
+            testCase.verifyGreaterThan(flag,0);
+            testCase.verifyEqual(x,[1;1],AbsTol=1e-7);
+        end
         function quadraticCostRespectsLinearBounds(testCase)
             [x,flag]=predictiveConicSolverMex(sparse(1),-2,sparse([1;-1]),[1;1],2,1,localOptions());
             testCase.verifyGreaterThan(flag,0);

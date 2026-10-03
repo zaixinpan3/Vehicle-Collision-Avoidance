@@ -1,0 +1,659 @@
+{
+  "method": "All executed holds from initial state through one-second post-conflict nominal recovery; no averaging by recovery duration. Input variation E=sum((u[k]-u[k-1])^2)/h, h=0.05 s, initial input memory [0,0] for these fixtures. Body-frame accelerations evaluated from the original nonlinear derivative at all 31 ODE45 outputs per hold (including one-sided endpoints). Peak rate is a sampled command jump divided by h, not actuator interpolation or a hard rate limit.",
+  "baselineCommit": "b16771139356ec252ed8deb4bb341cc22ffb023a",
+  "identicalFixturesAndConfigurationExceptNewInputPreference": true,
+  "summary": {
+    "steeringVariationRadSquaredPerSecond": {
+      "improvedCases": 11,
+      "increasedCases": 3,
+      "numericallyUnchangedCases": 0,
+      "medianPercentageChange": -6.480618383071563,
+      "baselineSum": 20.360446412869223,
+      "newSum": 16.424273387483012,
+      "pooledPercentageChange": -19.332449522807494
+    },
+    "brakingVariationPerSecond": {
+      "improvedCases": 12,
+      "increasedCases": 2,
+      "numericallyUnchangedCases": 0,
+      "medianPercentageChange": -36.77535547147332,
+      "baselineSum": 119.58728785147215,
+      "newSum": 73.15035159861591,
+      "pooledPercentageChange": -38.83099707933094
+    },
+    "peakSteeringDegrees": {
+      "improvedCases": 12,
+      "increasedCases": 2,
+      "numericallyUnchangedCases": 0,
+      "medianPercentageChange": -2.5980917001131476
+    },
+    "peakSteeringRateDegreesPerSecond": {
+      "improvedCases": 2,
+      "increasedCases": 2,
+      "numericallyUnchangedCases": 10,
+      "medianPercentageChange": 4.773959005888173e-12
+    },
+    "peakBrakingRatioChange": {
+      "improvedCases": 9,
+      "increasedCases": 4,
+      "numericallyUnchangedCases": 1,
+      "medianPercentageChange": -10.632918643415163
+    },
+    "peakLongitudinalAccelerationMetersPerSecondSquared": {
+      "improvedCases": 12,
+      "increasedCases": 2,
+      "numericallyUnchangedCases": 0,
+      "medianPercentageChange": -1.0991187826241533
+    },
+    "peakLateralAccelerationMetersPerSecondSquared": {
+      "improvedCases": 10,
+      "increasedCases": 4,
+      "numericallyUnchangedCases": 0,
+      "medianPercentageChange": -0.33360372188025456
+    }
+  },
+  "cases": [
+    {
+      "speed": 8,
+      "scenario": "headOn",
+      "baseline": {
+        "holds": 252,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 12.600000000000044,
+        "minimumClearanceMeters": 1.7211276248500869,
+        "steeringVariationRadSquaredPerSecond": 1.9827019322999577,
+        "brakingVariationPerSecond": 7.9910701300481675,
+        "peakSteeringDegrees": 30.48488058740807,
+        "peakSteeringRateDegreesPerSecond": 173.78370753501912,
+        "peakBrakingRatioChange": 0.4247155240789929,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.999563047279233,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.577791626960011,
+        "samples": 7812
+      },
+      "softInputPreference": {
+        "holds": 448,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 22.400000000000183,
+        "minimumClearanceMeters": 1.7130454982445082,
+        "steeringVariationRadSquaredPerSecond": 0.8986172463056161,
+        "brakingVariationPerSecond": 2.8461694123916215,
+        "peakSteeringDegrees": 23.532186914020677,
+        "peakSteeringRateDegreesPerSecond": 173.7837075349839,
+        "peakBrakingRatioChange": 0.2856428265881925,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.912777244112625,
+        "peakLateralAccelerationMetersPerSecondSquared": 5.785986181822303,
+        "samples": 13888
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -54.67713872335771,
+        "brakingVariationPerSecond": -64.38312558803104,
+        "peakSteeringDegrees": -22.807022823829715,
+        "peakSteeringRateDegreesPerSecond": -2.0261570199409107e-11,
+        "peakBrakingRatioChange": -32.744905614736666,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -2.169882113138477,
+        "peakLateralAccelerationMetersPerSecondSquared": -23.64548318751446
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "baseline": {
+        "holds": 251,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 12.550000000000043,
+        "minimumClearanceMeters": 1.3234741400370638,
+        "steeringVariationRadSquaredPerSecond": 2.2298341910695476,
+        "brakingVariationPerSecond": 6.175486741982362,
+        "peakSteeringDegrees": 31.93634431458904,
+        "peakSteeringRateDegreesPerSecond": 172.7502866106255,
+        "peakBrakingRatioChange": 0.29941885124958434,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 4.057943568167339,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.572703212389707,
+        "samples": 7781
+      },
+      "softInputPreference": {
+        "holds": 254,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 12.700000000000045,
+        "minimumClearanceMeters": 1.3190790657963782,
+        "steeringVariationRadSquaredPerSecond": 2.1690935531774236,
+        "brakingVariationPerSecond": 3.8312937286595505,
+        "peakSteeringDegrees": 29.78390157475066,
+        "peakSteeringRateDegreesPerSecond": 210.33269861913723,
+        "peakBrakingRatioChange": 0.2909188449648299,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.9728989055012227,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.699763982980801,
+        "samples": 7874
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -2.723997960717861,
+        "brakingVariationPerSecond": -37.959647737342785,
+        "peakSteeringDegrees": -6.739790624235931,
+        "peakSteeringRateDegreesPerSecond": 21.755339887349344,
+        "peakBrakingRatioChange": -2.8388347124039814,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -2.095757647623575,
+        "peakLateralAccelerationMetersPerSecondSquared": 1.677878652146414
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "baseline": {
+        "holds": 270,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 13.500000000000057,
+        "minimumClearanceMeters": 1.1829873957707204,
+        "steeringVariationRadSquaredPerSecond": 0.9444918945170939,
+        "brakingVariationPerSecond": 7.957966762023132,
+        "peakSteeringDegrees": 17.331664031781543,
+        "peakSteeringRateDegreesPerSecond": 181.6002429913519,
+        "peakBrakingRatioChange": 0.31235605266714767,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 2.356325967905121,
+        "peakLateralAccelerationMetersPerSecondSquared": 6.380205877815254,
+        "samples": 8370
+      },
+      "softInputPreference": {
+        "holds": 297,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 14.850000000000076,
+        "minimumClearanceMeters": 1.3361280936326443,
+        "steeringVariationRadSquaredPerSecond": 0.9380349944570846,
+        "brakingVariationPerSecond": 3.6463831968337126,
+        "peakSteeringDegrees": 16.858624003314564,
+        "peakSteeringRateDegreesPerSecond": 181.6002429913687,
+        "peakBrakingRatioChange": 0.3406721154677148,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 2.7875408980376126,
+        "peakLateralAccelerationMetersPerSecondSquared": 6.3049855437504725,
+        "samples": 9207
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -0.683637424258754,
+        "brakingVariationPerSecond": -54.17946184149803,
+        "peakSteeringDegrees": -2.7293399387361306,
+        "peakSteeringRateDegreesPerSecond": 9.259260025373806e-12,
+        "peakBrakingRatioChange": 9.06531586591064,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 18.300308870926752,
+        "peakLateralAccelerationMetersPerSecondSquared": -1.1789640570429305
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "baseline": {
+        "holds": 252,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 12.600000000000044,
+        "minimumClearanceMeters": 0.09152554740246117,
+        "steeringVariationRadSquaredPerSecond": 1.286310761055609,
+        "brakingVariationPerSecond": 12.968386995480735,
+        "peakSteeringDegrees": 21.58980726706937,
+        "peakSteeringRateDegreesPerSecond": 173.78370753493323,
+        "peakBrakingRatioChange": 0.618866924616303,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.5724728375316803,
+        "peakLateralAccelerationMetersPerSecondSquared": 6.9287300848086115,
+        "samples": 7812
+      },
+      "softInputPreference": {
+        "holds": 368,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 18.400000000000126,
+        "minimumClearanceMeters": 0.03804387417596184,
+        "steeringVariationRadSquaredPerSecond": 0.7371479319524499,
+        "brakingVariationPerSecond": 2.6320560200822776,
+        "peakSteeringDegrees": 16.79560267725851,
+        "peakSteeringRateDegreesPerSecond": 173.78370753493374,
+        "peakBrakingRatioChange": 0.28564282658868,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.551526072102766,
+        "peakLateralAccelerationMetersPerSecondSquared": 5.5230080284831065,
+        "samples": 11408
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -42.69285819023153,
+        "brakingVariationPerSecond": -79.70406018111964,
+        "peakSteeringDegrees": -22.20587025398505,
+        "peakSteeringRateDegreesPerSecond": 2.886579864025407e-13,
+        "peakBrakingRatioChange": -53.84422478777997,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -0.5863379900009846,
+        "peakLateralAccelerationMetersPerSecondSquared": -20.2883073682951
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "baseline": {
+        "holds": 242,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 12.100000000000037,
+        "minimumClearanceMeters": 0.10317053300150375,
+        "steeringVariationRadSquaredPerSecond": 1.5137694335936829,
+        "brakingVariationPerSecond": 7.298761710283627,
+        "peakSteeringDegrees": 23.252611778548513,
+        "peakSteeringRateDegreesPerSecond": 173.78370753496162,
+        "peakBrakingRatioChange": 0.34923842578053177,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.6027559730482657,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.169468260579579,
+        "samples": 7502
+      },
+      "softInputPreference": {
+        "holds": 241,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 12.050000000000036,
+        "minimumClearanceMeters": 0.10389417865325026,
+        "steeringVariationRadSquaredPerSecond": 1.4318924636536006,
+        "brakingVariationPerSecond": 6.258053369792811,
+        "peakSteeringDegrees": 22.679006245263697,
+        "peakSteeringRateDegreesPerSecond": 173.78370753496148,
+        "peakBrakingRatioChange": 0.3234994616408544,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.5615255022251286,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.1425714225065065,
+        "samples": 7471
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -5.408813794430156,
+        "brakingVariationPerSecond": -14.258697321553948,
+        "peakSteeringDegrees": -2.4668434614901646,
+        "peakSteeringRateDegreesPerSecond": -7.771561172376096e-14,
+        "peakBrakingRatioChange": -7.370026388749162,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -1.1444147516949998,
+        "peakLateralAccelerationMetersPerSecondSquared": -0.3751580604793525
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "baseline": {
+        "holds": 358,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 17.90000000000012,
+        "minimumClearanceMeters": 2.148090956096322,
+        "steeringVariationRadSquaredPerSecond": 1.930191312468959,
+        "brakingVariationPerSecond": 9.679230867408968,
+        "peakSteeringDegrees": 29.058867801318904,
+        "peakSteeringRateDegreesPerSecond": 188.1254399441937,
+        "peakBrakingRatioChange": 0.4942115175849401,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 4.007229762276735,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.453667998169129,
+        "samples": 11098
+      },
+      "softInputPreference": {
+        "holds": 540,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 27.00000000000025,
+        "minimumClearanceMeters": 2.1485812646188203,
+        "steeringVariationRadSquaredPerSecond": 0.9595345567977315,
+        "brakingVariationPerSecond": 2.7581096039211817,
+        "peakSteeringDegrees": 23.698760430476945,
+        "peakSteeringRateDegreesPerSecond": 188.12543994494115,
+        "peakBrakingRatioChange": 0.285348676194343,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.9222703441570035,
+        "peakLateralAccelerationMetersPerSecondSquared": 5.7966023230436425,
+        "samples": 16740
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -50.28811130797364,
+        "brakingVariationPerSecond": -71.50486808607863,
+        "peakSteeringDegrees": -18.445685521851885,
+        "peakSteeringRateDegreesPerSecond": 3.97326616052851e-10,
+        "peakBrakingRatioChange": -42.26183202108393,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -2.1201534017221135,
+        "peakLateralAccelerationMetersPerSecondSquared": -22.231546609434673
+      }
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "baseline": {
+        "holds": 261,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 13.05000000000005,
+        "minimumClearanceMeters": 0.09440350488972528,
+        "steeringVariationRadSquaredPerSecond": 1.8712415174670354,
+        "brakingVariationPerSecond": 5.99052550779054,
+        "peakSteeringDegrees": 23.53984822636701,
+        "peakSteeringRateDegreesPerSecond": 188.12543994420795,
+        "peakBrakingRatioChange": 0.2941829921434985,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.59645598436206,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.290017402437414,
+        "samples": 8091
+      },
+      "softInputPreference": {
+        "holds": 266,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 13.300000000000054,
+        "minimumClearanceMeters": 0.09123677152203519,
+        "steeringVariationRadSquaredPerSecond": 1.7662146645691001,
+        "brakingVariationPerSecond": 6.27104443068194,
+        "peakSteeringDegrees": 23.291483410971022,
+        "peakSteeringRateDegreesPerSecond": 188.12543994420153,
+        "peakBrakingRatioChange": 0.309611662447836,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.578604908993621,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.268726951572506,
+        "samples": 8246
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -5.6126829122572275,
+        "brakingVariationPerSecond": 4.682709764386961,
+        "peakSteeringDegrees": -1.0550824839974715,
+        "peakSteeringRateDegreesPerSecond": -3.419486915845482e-12,
+        "peakBrakingRatioChange": 5.244582697293243,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -0.4963518376440046,
+        "peakLateralAccelerationMetersPerSecondSquared": -0.2920493832811566
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "headOn",
+      "baseline": {
+        "holds": 203,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 10.15000000000001,
+        "minimumClearanceMeters": 0.17590262602811504,
+        "steeringVariationRadSquaredPerSecond": 1.0902314160400164,
+        "brakingVariationPerSecond": 6.443604882043035,
+        "peakSteeringDegrees": 11.17891767134616,
+        "peakSteeringRateDegreesPerSecond": 140.6202852028964,
+        "peakBrakingRatioChange": 0.3484936001922304,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.238826198778997,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.882917623479433,
+        "samples": 6293
+      },
+      "softInputPreference": {
+        "holds": 204,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 10.20000000000001,
+        "minimumClearanceMeters": 0.17911261339394305,
+        "steeringVariationRadSquaredPerSecond": 0.9861124920041723,
+        "brakingVariationPerSecond": 3.8091679387516573,
+        "peakSteeringDegrees": 11.225809916939408,
+        "peakSteeringRateDegreesPerSecond": 140.6202852044172,
+        "peakBrakingRatioChange": 0.287136548591356,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.2296358664953413,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.852727789271373,
+        "samples": 6324
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -9.550167285953759,
+        "brakingVariationPerSecond": -40.884520257177726,
+        "peakSteeringDegrees": 0.41947035457146065,
+        "peakSteeringRateDegreesPerSecond": 1.0814904527478575e-09,
+        "peakBrakingRatioChange": -17.606363952459848,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -0.2837550309775838,
+        "peakLateralAccelerationMetersPerSecondSquared": -0.3829779232772723
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "baseline": {
+        "holds": 206,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 10.300000000000011,
+        "minimumClearanceMeters": 0.04947667731925961,
+        "steeringVariationRadSquaredPerSecond": 1.1900526366447886,
+        "brakingVariationPerSecond": 10.40602183413523,
+        "peakSteeringDegrees": 11.745448097454016,
+        "peakSteeringRateDegreesPerSecond": 146.80156451814142,
+        "peakBrakingRatioChange": 0.6044061487116199,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.4636566599469547,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.866102475795234,
+        "samples": 6386
+      },
+      "softInputPreference": {
+        "holds": 206,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 10.300000000000011,
+        "minimumClearanceMeters": 0.04946426670072444,
+        "steeringVariationRadSquaredPerSecond": 1.1026009777513572,
+        "brakingVariationPerSecond": 5.657726707159569,
+        "peakSteeringDegrees": 11.683288697356021,
+        "peakSteeringRateDegreesPerSecond": 140.6202852138573,
+        "peakBrakingRatioChange": 0.35899581251439183,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.427155855881275,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.829825697533345,
+        "samples": 6386
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -7.348553853885898,
+        "brakingVariationPerSecond": -45.63026296369728,
+        "peakSteeringDegrees": -0.5292211891981258,
+        "peakSteeringRateDegreesPerSecond": -4.210635850219601,
+        "peakBrakingRatioChange": -40.603547253838514,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -1.0538228135533068,
+        "peakLateralAccelerationMetersPerSecondSquared": -0.4611785617275599
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "baseline": {
+        "holds": 322,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 16.100000000000094,
+        "minimumClearanceMeters": 0.872130967594351,
+        "steeringVariationRadSquaredPerSecond": 0.8163730163040314,
+        "brakingVariationPerSecond": 11.654075265263776,
+        "peakSteeringDegrees": 7.998993271198446,
+        "peakSteeringRateDegreesPerSecond": 127.80195691665892,
+        "peakBrakingRatioChange": 0.33617033410130465,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 2.993471636649052,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.375460375386628,
+        "samples": 9982
+      },
+      "softInputPreference": {
+        "holds": 327,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 16.350000000000097,
+        "minimumClearanceMeters": 0.6414119721882076,
+        "steeringVariationRadSquaredPerSecond": 0.9176547449869427,
+        "brakingVariationPerSecond": 8.88254062929018,
+        "peakSteeringDegrees": 8.060352846383841,
+        "peakSteeringRateDegreesPerSecond": 139.0461409097309,
+        "peakBrakingRatioChange": 0.33637261435298793,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.1330342721281808,
+        "peakLateralAccelerationMetersPerSecondSquared": 7.574710877366335,
+        "samples": 10137
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": 12.406305286943997,
+        "brakingVariationPerSecond": -23.781677849931626,
+        "peakSteeringDegrees": 0.7670912214206904,
+        "peakSteeringRateDegreesPerSecond": 8.79813131531657,
+        "peakBrakingRatioChange": 0.06017195188388058,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 4.6622334339321725,
+        "peakLateralAccelerationMetersPerSecondSquared": 2.7015330818486394
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "baseline": {
+        "holds": 231,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 11.55000000000003,
+        "minimumClearanceMeters": 3.3412557922426154,
+        "steeringVariationRadSquaredPerSecond": 0.8450767155975991,
+        "brakingVariationPerSecond": 7.427834644613626,
+        "peakSteeringDegrees": 11.299320879765137,
+        "peakSteeringRateDegreesPerSecond": 140.62028520289064,
+        "peakBrakingRatioChange": 0.3596669430518604,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.253935023565577,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.214352835781172,
+        "samples": 7161
+      },
+      "softInputPreference": {
+        "holds": 237,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 11.850000000000033,
+        "minimumClearanceMeters": 3.401584632355687,
+        "steeringVariationRadSquaredPerSecond": 0.8552089999576457,
+        "brakingVariationPerSecond": 5.0162035684945305,
+        "peakSteeringDegrees": 11.151279980777517,
+        "peakSteeringRateDegreesPerSecond": 140.62028520287532,
+        "peakBrakingRatioChange": 0.28713654858942894,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.2417711126153814,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.200194365823496,
+        "samples": 7347
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": 1.1989780540671235,
+        "brakingVariationPerSecond": -32.467484691085794,
+        "peakSteeringDegrees": -1.310175191614682,
+        "peakSteeringRateDegreesPerSecond": -1.0891287871572786e-11,
+        "peakBrakingRatioChange": -20.165988524548194,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -0.37382156871916816,
+        "peakLateralAccelerationMetersPerSecondSquared": -0.17236257366499697
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "baseline": {
+        "holds": 228,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 11.400000000000027,
+        "minimumClearanceMeters": 3.184079419145391,
+        "steeringVariationRadSquaredPerSecond": 0.7980351622703777,
+        "brakingVariationPerSecond": 9.778170482832591,
+        "peakSteeringDegrees": 11.17827057064691,
+        "peakSteeringRateDegreesPerSecond": 140.62028520289587,
+        "peakBrakingRatioChange": 0.4404514399480692,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.2541800931698517,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.200268645015434,
+        "samples": 7068
+      },
+      "softInputPreference": {
+        "holds": 231,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 11.55000000000003,
+        "minimumClearanceMeters": 3.154735227260362,
+        "steeringVariationRadSquaredPerSecond": 0.8560083308908728,
+        "brakingVariationPerSecond": 9.422349858969277,
+        "peakSteeringDegrees": 10.67141402827236,
+        "peakSteeringRateDegreesPerSecond": 140.62028520293282,
+        "peakBrakingRatioChange": 0.4791215271968614,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.1427274232618343,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.183343417952402,
+        "samples": 7161
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": 7.264488002704517,
+        "brakingVariationPerSecond": -3.6389284118948817,
+        "peakSteeringDegrees": -4.534301967117416,
+        "peakSteeringRateDegreesPerSecond": 2.6267876762631204e-11,
+        "peakBrakingRatioChange": 8.779648274813589,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -3.4249078636410912,
+        "peakLateralAccelerationMetersPerSecondSquared": -0.20639844614505076
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "baseline": {
+        "holds": 1320,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 65.9999999999984,
+        "minimumClearanceMeters": 3.9997038894062595,
+        "steeringVariationRadSquaredPerSecond": 2.3373684732432554,
+        "brakingVariationPerSecond": 11.534371215190392,
+        "peakSteeringDegrees": 12.310998264147598,
+        "peakSteeringRateDegreesPerSecond": 163.73523364287675,
+        "peakBrakingRatioChange": 0.3551706938560761,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.317238016699791,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.123074274195616,
+        "samples": 40920
+      },
+      "softInputPreference": {
+        "holds": 1319,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 65.9499999999984,
+        "minimumClearanceMeters": 3.983353057661128,
+        "steeringVariationRadSquaredPerSecond": 1.8918058782297453,
+        "brakingVariationPerSecond": 7.429165865623003,
+        "peakSteeringDegrees": 11.34430771567422,
+        "peakSteeringRateDegreesPerSecond": 153.59217196814106,
+        "peakBrakingRatioChange": 0.30581684587243296,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.252190342297718,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.128063987648767,
+        "samples": 40889
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -19.062574006368028,
+        "brakingVariationPerSecond": -35.591063205603845,
+        "peakSteeringDegrees": -7.852251521215781,
+        "peakSteeringRateDegreesPerSecond": -6.194794760459887,
+        "peakBrakingRatioChange": -13.895810898081162,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -1.9608986173017207,
+        "peakLateralAccelerationMetersPerSecondSquared": 0.061426416707788256
+      }
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "baseline": {
+        "holds": 222,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 11.100000000000023,
+        "minimumClearanceMeters": 2.583117306562303,
+        "steeringVariationRadSquaredPerSecond": 1.5247679502972693,
+        "brakingVariationPerSecond": 4.281780812375966,
+        "peakSteeringDegrees": 11.320745811653358,
+        "peakSteeringRateDegreesPerSecond": 153.59217196834678,
+        "peakBrakingRatioChange": 0.286143053152578,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.323830880882561,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.13787759673181,
+        "samples": 6882
+      },
+      "softInputPreference": {
+        "holds": 216,
+        "recovered": true,
+        "failure": "",
+        "recoverySeconds": 10.800000000000018,
+        "minimumClearanceMeters": 2.6241429992049885,
+        "steeringVariationRadSquaredPerSecond": 0.9143465527492709,
+        "brakingVariationPerSecond": 4.6900872679646195,
+        "peakSteeringDegrees": 11.105043241148785,
+        "peakSteeringRateDegreesPerSecond": 153.59217196885388,
+        "peakBrakingRatioChange": 0.28614305315334276,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": 3.224301306968438,
+        "peakLateralAccelerationMetersPerSecondSquared": 8.152954418690998,
+        "samples": 6696
+      },
+      "percentageChange": {
+        "steeringVariationRadSquaredPerSecond": -40.03372430729478,
+        "brakingVariationPerSecond": 9.535902781583161,
+        "peakSteeringDegrees": -1.9053742049621292,
+        "peakSteeringRateDegreesPerSecond": 3.3015812306302905e-10,
+        "peakBrakingRatioChange": 2.672750909482602e-10,
+        "peakLongitudinalAccelerationMetersPerSecondSquared": -2.9944235275801923,
+        "peakLateralAccelerationMetersPerSecondSquared": 0.18526724910734593
+      }
+    }
+  ]
+}

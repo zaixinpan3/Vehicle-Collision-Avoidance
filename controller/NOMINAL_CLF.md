@@ -69,14 +69,34 @@ calculation, without nominal return simulations or new derivatives.
 The objective is
 
     rho / max(1,V(x)) + epsilon * R(dU),
-    R(dU) = (1/(2M)) sum_i ||diag(r_delta,r_b)^(-1) dU_i||^2.
+    R = (R_anchor + w * R_slew) / (1+w),
+    R_anchor = (1/(2M)) sum_i ||diag(r_delta,r_b)^(-1) dU_i||^2.
 
-The input correction box implies 0 <= R <= 1. Therefore, at an exact optimum,
-the regularizer changes minimum scaled CLF slack by at most
-`epsilon = clfTieTolerance = 1e-4`. Inputs are penalized relative to the
-linearization input, not zero. This also prevents arbitrary future inputs
-from becoming poor trust centers after shifting. Solver tolerances add their
-own numerical error.
+Here `w = inputPenalty.slewWeight` (default 0.5) is a soft preference for
+continuous steering and braking-ratio commands. Let `U[-1]` be the actual
+previously applied input and set
+
+    dbar_i = Ubar_i - Ubar_(i-1),
+    B_l^2 = sum_i (abs(dbar_(l,i)) + r_l + r_(l,i-1))^2,
+    R_slew = (1/2) sum_l sum_i (U_(l,i)-U_(l,i-1))^2 / B_l^2,
+
+where `r_(l,-1)=0` and the other correction radii equal `r_l`. Thus the first
+term includes the transition from the last issued command; later terms
+penalize actual consecutive inputs, not just consecutive corrections. A
+single normalization per actuator preserves the same preference at every
+prediction stage. The sample time is fixed within a plan, so penalizing these
+increments is equivalent to penalizing their rates up to a constant factor.
+
+The correction box implies `0 <= R_anchor,R_slew <= 1`, hence `0 <= R <= 1`.
+At an exact optimum the effect on minimum scaled CLF slack is still bounded by
+`epsilon = clfTieTolerance = 1e-4`; solver tolerances add numerical error.
+The anchor term still penalizes deviation from the linearization input,
+never absolute zero input. The slew term is a preference, not a physical
+steering or slew limit. It vanishes for a constant nonzero input sequence
+matching input memory. It introduces a sparse quadratic and linear objective
+term, with no new constraint, cone, optimization stage or trajectory model.
+This preference does not guarantee that every closed-loop acceleration peak
+decreases; the experiments measure that separately from safety and recovery.
 
 The PCBF budget is a hard constraint of this convex problem. It comes from
 shifted stage slacks when available, or a primary slack minimization during

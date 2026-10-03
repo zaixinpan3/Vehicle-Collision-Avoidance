@@ -1,0 +1,114 @@
+[
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed8-headOn.json",
+    "sha256": "d22d745378511db41a5fdb50bdc66985c7c9820059ae76235829c78447670144"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-headOn.json",
+    "sha256": "468986f8fdd50809078ea9ca80b2130079acd8c3ccf4affe7d1bb0d52670f075"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed8-acceleratingHeadOn.json",
+    "sha256": "caf50c512f56f382e519537432c3a3ef1c2e6cb4362b6e8d712b7f69f3f7a991"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-acceleratingHeadOn.json",
+    "sha256": "cde4e16e470f2328e4de4ac5a3ed7c2b61cf7f183bee453f7e294ccc5c6b8162"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed8-brakingLead.json",
+    "sha256": "5b67f66c761000d18c5ce2a92a8442227e4b5140789087426bc3b841e7946e40"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-brakingLead.json",
+    "sha256": "8cb4dbfa2d8615eda28af39f2f5647eab9b83dc12fc9ea227da0d84339f38309"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed8-crossing.json",
+    "sha256": "141fedc9506362515055f7cc072b69ccbe8585da128f713f2f3850b4ec851f1c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-crossing.json",
+    "sha256": "461969bca0062ce76a01612b92e04f4a1325a789aaacde5921195ef07eaf8127"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed8-turningCrossing.json",
+    "sha256": "c63d34ff2028fe3ae477763d5024e3050fd71e4a3d89929d98b43162e60cea6a"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-turningCrossing.json",
+    "sha256": "4b688cacef2f2be93112f495a389d34ceb57e0954f2ae8eacf2fd06af58f09bd"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed8-curvedHeadOn.json",
+    "sha256": "af408fca1e43c912530fc2c72f84c5fb77038732b56e0cf50b057da33ea00b68"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-curvedHeadOn.json",
+    "sha256": "4f37871a80028d013cb7d3ef257f5a307d60bfb922f9518ae3183583bef0cfae"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed8-curvedCrossing.json",
+    "sha256": "d250b30c8859f1cdb810d189eff15766d6b2c46e610fd993ab8ec4042b0e5f65"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed8-curvedCrossing.json",
+    "sha256": "f2d8edc48ae10507c496ec30955ed0ae549961675a6629536de716e5d3a415f4"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed15-headOn.json",
+    "sha256": "0a670ac8fe6bf551a49acd9de26507dbba022e9b584c15aa4c20b6d4750e847c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed15-headOn.json",
+    "sha256": "058098cff51577cdee47141eb1fd2953a5f37865f2c838509c9529198fcb5219"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed15-acceleratingHeadOn.json",
+    "sha256": "88a5ee3355605ff11978499c15b28bc5011d1f98a7508101fbc4fb53b32e619c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed15-acceleratingHeadOn.json",
+    "sha256": "489d02edbfe0eee294820686f7d060adeff342688f900f71be4042dc28539346"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed15-brakingLead.json",
+    "sha256": "45ad82a511431316cd7d20b7614d424d91c0ca8dd498a4178e45f0e168fef1ea"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed15-brakingLead.json",
+    "sha256": "6077d8c675f216d5d967b1f45aa288e4a0fb25924373a344e498747f89b9730e"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed15-crossing.json",
+    "sha256": "50c1e02b29acc46a5696290085a6b545e253ce1f1325152222d4db4965239bf8"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed15-crossing.json",
+    "sha256": "0b1f8fb58879f7dc8ddf3cec9a59616fa66b1ff1ba2de34e14e1f9c1655a5423"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed15-turningCrossing.json",
+    "sha256": "a74229721571beb7abb48535679939e115882fb849128b09cfbebf340d16fb42"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed15-turningCrossing.json",
+    "sha256": "ebdae49a439c43e9e553630c284af709d98083585bbf3471637893b6d0c42128"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed15-curvedHeadOn.json",
+    "sha256": "003a622a359c627acd46d12d50272b52775558d35c0e8cc4c763db26776b6008"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed15-curvedHeadOn.json",
+    "sha256": "4b4cbc0f5fdacbd60a18b69f1b096daf1a8e83e8ecadef0018c40ea0fe50e42c"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign/speed15-curvedCrossing.json",
+    "sha256": "39186d4906f4a8f83fe269c94fb28efc1db59ea766a2c35113218c0c04a56a80"
+  },
+  {
+    "path": "/home/zai/.cache/collisionAvoidance/gentle-inputs-20261003/validated-campaign/speed15-curvedCrossing.json",
+    "sha256": "dd6b170b624792c9376ad0682ff2479e5326b9c1b9d28be5e15c5a0e4a299db0"
+  }
+]

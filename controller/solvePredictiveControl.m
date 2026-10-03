@@ -309,16 +309,14 @@ function [point,problem,search,model,extra,expanded]=localExpandPrimary(point,pr
 end
 
 function problem=localInputBox(problem,anchor,model)
-    cfg=model.cfg;iu=problem.inputIndices;count=size(iu,2);
+    cfg=model.cfg;iu=problem.inputIndices;
     radius=model.inputTrustScale*cfg.nonlinear.trustRadius*[.15;.25];
     lower=[-Inf;max(-1+1e-8,cfg.actuation.brakingRatioMinimum)]-anchor.inputs;
     upper=[Inf;min(1-1e-8,cfg.actuation.brakingRatioMaximum)]-anchor.inputs;
     problem.lower(iu(:))=reshape(max(-radius,lower),[],1);
     problem.upper(iu(:))=reshape(min(radius,upper),[],1);
     if isfield(problem,'clf')
-        scale=repmat(1./(radius*sqrt(2*count)),count,1);
-        increment=sparse(1:numel(iu),iu(:),scale,numel(iu),numel(problem.lower));
-        problem.quadratic=2*cfg.solver.clfTieTolerance*(increment.'*increment);
+        [problem.quadratic,problem.inputLinear]=localInputPenalty(problem,anchor,model);
     end
 end
 
@@ -396,10 +394,9 @@ function [solution,search,model,sharedProblem]=localSecondary(point,problem,anch
     problem.a=[problem.a;problem.safetyObjective.'];problem.b=[problem.b;search.slackCap];
     remaining=cfg.solver.timeLimitSeconds-toc(timer);
     if remaining<=0,search.terminationReason="timeLimit";return;end
-    % The input box implies ||R*dU||^2<=1. The native quadratic is exactly
-    % the former epigraph penalty; it changes scaled CLF slack by at most
-    % clfTieTolerance and penalizes departure from the anchor, not zero.
-    objective=zeros(size(problem.safetyObjective));objective(problem.clfIndex)=1;
+    % Both normalized penalties are in [0,1] on the correction box. Their
+    % convex combination keeps the same bounded effect on minimum CLF slack.
+    objective=problem.inputLinear;objective(problem.clfIndex)=1;
     search.clfStageAttempted=true;wall=tic;
     [second,flag,solverInfo]=localConicSolve(problem.quadratic,objective,problem.cones,problem.a,problem.b, ...
         problem.equal,problem.rhs,problem.lower,problem.upper,cfg,remaining, ...
@@ -617,18 +614,39 @@ function [problem,model]=localFormulate(anchor,model)
 end
 
 function problem=localAddClf(problem,anchor,model)
-    nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
+    nv=numel(problem.safetyObjective);ic=problem.clfIndex;
     [map,offset,constant,value,scale,modelConstant,clf]=localNominalClf(anchor,model,problem.stateIndices(:,2),nv);
     axis=sparse(1,nv);axis(ic)=1;
     cone=localCone([2*map;axis],[-2*offset;1-constant],axis.',-1-constant);
-    inputScale=repmat(1./(model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25]*sqrt(2*count)),count,1);
-    increment=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
-    problem.quadratic=2*model.cfg.solver.clfTieTolerance*(increment.'*increment);
+    [problem.quadratic,problem.inputLinear]=localInputPenalty(problem,anchor,model);
     problem.cones=[problem.cones,cone];
     problem.clfScale=scale;problem.clfMap=map;problem.clfOffset=offset;
     problem.clfModelConstant=modelConstant;problem.clf=clf;problem.initialClfValue=value;
     problem.clfTieBound=model.cfg.solver.clfTieTolerance*scale;
     problem.initialClfSlack=max(0,(norm(offset)^2-constant)*scale);
+end
+
+function [quadratic,linear]=localInputPenalty(problem,anchor,model)
+    % Input deviation stays relative to the anchor. The additional preference
+    % penalizes actual consecutive controls, including the last issued input.
+    cfg=model.cfg;iu=problem.inputIndices;count=size(iu,2);nv=numel(problem.lower);
+    radius=model.inputTrustScale*cfg.nonlinear.trustRadius*[.15;.25];
+    scale=repmat(1./(radius*sqrt(2*count)),count,1);
+    increment=sparse(1:numel(iu),iu(:),scale,numel(iu),nv);
+    difference=speye(count)-sparse(2:count,1:count-1,ones(1,count-1),count,count);
+    selection=sparse(1:numel(iu),iu(:),1,numel(iu),nv);
+    offset=reshape([anchor.inputs(:,1)-model.previousInput,diff(anchor.inputs,1,2)],[],1);
+    bound=reshape(abs(offset),2,count)+repmat(radius,1,count)+[zeros(2,1),repmat(radius,1,count-1)];
+    % A single scale per actuator preserves equal preference at every time.
+    % Each channel's squared variation is bounded by sum(bound.^2).
+    scale=repmat(1./sqrt(2*sum(bound.^2,2)),count,1);
+    normalization=spdiags(scale,0,numel(iu),numel(iu));
+    slew=normalization*kron(difference,speye(2))*selection;
+    offset=normalization*offset;weight=cfg.inputPenalty.slewWeight;
+    factor=cfg.solver.clfTieTolerance/(1+weight);
+    % Clarabel's native interface stores the symmetric Hessian by its upper triangle.
+    quadratic=triu(2*factor*(increment.'*increment+weight*(slew.'*slew)));
+    linear=2*factor*weight*(slew.'*offset);
 end
 
 function [map,offset,constant,value,scale,modelConstant,clf]=localNominalClf(anchor,model,next,nv)
