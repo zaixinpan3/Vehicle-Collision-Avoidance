@@ -228,7 +228,21 @@ def fit_known_size_rectangle(
     initial_heading_span_degrees: float,
     max_heading_change_degrees: float,
     heading_smoothness: float,
+    placement_mode: str = "edge",
+    symmetry_minimum_support: float = 0.8,
 ) -> tuple[np.ndarray, dict[str, Any]]:
+    """Fit visible faces, optionally assuming symmetric tangential support.
+
+    Symmetric placement centers the most completely observed axis when its
+    span covers enough of the known dimension. This addresses a visible body
+    face narrower than the declared bounding box. It assumes approximately
+    symmetric visibility along that axis; asymmetric occlusion can violate it.
+    The face-normal axis retains the existing edge anchoring.
+    """
+    if placement_mode not in ("edge", "symmetric"):
+        raise ValueError("Rectangle placement must be edge or symmetric.")
+    if not 0.0 < symmetry_minimum_support <= 1.0:
+        raise ValueError("Rectangle symmetry minimum support must be in (0, 1].")
     points_xy = points_ego[:, :2]
     median_xy = np.median(points_xy, axis=0)
     if heading_hint is None:
@@ -269,6 +283,16 @@ def fit_known_size_rectangle(
             lateral, vehicle_width, quantile
         )
         observed_lateral_span = lateral_high - lateral_low
+        symmetric_axis = None
+        if placement_mode == "symmetric":
+            longitudinal_coverage = (longitudinal_high - longitudinal_low) / vehicle_length
+            lateral_coverage = observed_lateral_span / vehicle_width
+            if lateral_coverage >= max(symmetry_minimum_support, longitudinal_coverage):
+                lateral_placements = [0.5 * (lateral_low + lateral_high)]
+                symmetric_axis = "lateral"
+            elif longitudinal_coverage >= symmetry_minimum_support:
+                longitudinal_placements = [0.5 * (longitudinal_low + longitudinal_high)]
+                symmetric_axis = "longitudinal"
         # The axis is flipped above to point away from the sensor, and a
         # rectangle is unchanged by a half turn, so the deviation from the
         # reference heading must be measured modulo 180 degrees.  Taken modulo
@@ -382,6 +406,9 @@ def fit_known_size_rectangle(
             "rear_support_m": rear_support,
             "lateral_center_m": lateral_center,
             "support_quantile_percent": quantile,
+            "placement_mode": placement_mode,
+            "symmetry_minimum_support": symmetry_minimum_support,
+            "symmetric_axis": symmetric_axis,
             "observed_longitudinal_span_m": float(
                 np.max(longitudinal) - np.min(longitudinal)
             ),
@@ -575,6 +602,8 @@ def estimate_from_cluster(
             args.rectangle_initial_heading_span,
             args.rectangle_heading_span,
             args.rectangle_heading_smoothness,
+            args.rectangle_placement,
+            args.rectangle_symmetry_minimum_support,
         )
         initial_violation = rectangle_containment_violation(cluster, initial_rectangle)
         rectangle_inliers = initial_violation <= args.rectangle_outlier_tolerance
@@ -590,6 +619,8 @@ def estimate_from_cluster(
                 args.rectangle_initial_heading_span,
                 args.rectangle_refine_heading_span,
                 args.rectangle_refine_heading_smoothness,
+                args.rectangle_placement,
+                args.rectangle_symmetry_minimum_support,
             )
         else:
             fit_cluster = cluster
@@ -1569,6 +1600,8 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
             "center_mode": args.center_mode,
             "surface_center_offset_m": args.surface_center_offset,
             "rectangle_support_quantile_percent": args.rectangle_support_quantile,
+            "rectangle_placement": args.rectangle_placement,
+            "rectangle_symmetry_minimum_support": args.rectangle_symmetry_minimum_support,
             "rectangle_heading_step_degrees": args.rectangle_heading_step,
             "rectangle_initial_heading_span_degrees": args.rectangle_initial_heading_span,
             "rectangle_heading_span_degrees": args.rectangle_heading_span,
@@ -1675,6 +1708,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--use-static-lidar-transform", action="store_true")
     parser.add_argument("--rectangle-support-quantile", type=float, default=2.0)
+    parser.add_argument(
+        "--rectangle-placement", choices=["edge", "symmetric"], default="edge",
+        help=(
+            "Symmetric centers the best-supported visible face tangentially; "
+            "use only when visibility is approximately symmetric. Edge preserves face anchoring."
+        ),
+    )
+    parser.add_argument(
+        "--rectangle-symmetry-minimum-support", type=float, default=0.8,
+        help="Minimum fraction of a known dimension observed before symmetric placement, in (0, 1].",
+    )
     parser.add_argument("--rectangle-heading-step", type=float, default=0.1)
     parser.add_argument(
         "--rectangle-initial-heading-span",
@@ -1746,7 +1790,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--causal", action="store_true",
         help="Use only current/past frames for motion heading; never revise published positions or backfill from future frames.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if not 0.0 < args.rectangle_symmetry_minimum_support <= 1.0:
+        parser.error("--rectangle-symmetry-minimum-support must be in (0, 1].")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:

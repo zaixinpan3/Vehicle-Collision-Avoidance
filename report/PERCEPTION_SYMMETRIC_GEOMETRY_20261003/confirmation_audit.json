@@ -1,0 +1,44 @@
+{
+  "artifactKind": "Scoring-only audit; no truth feeds deployed predictions",
+  "actualDetectorCases": [
+    "edge",
+    "symmetric",
+    "symmetric_blackout"
+  ],
+  "totalFiniteEstimatorPublications": 900,
+  "measurementPrefixEqualBeforeBlackout": true,
+  "estimatorPrefixEqualBeforeBlackout": true,
+  "identicalEgoStates": true,
+  "missingFrames": [
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164
+  ],
+  "firstReacquisitionFrame": 165,
+  "synchronizedNativeGroups": 500,
+  "consecutiveNativeFrames": true,
+  "targetTrueSpeedRangeMps": [
+    4.76736305849287,
+    10.792305075424817
+  ],
+  "estimatedDomainInvalidFrames": {
+    "edge": 162,
+    "symmetric": 164,
+    "symmetric_blackout": 158
+  },
+  "rawBoundM": 0.12,
+  "oracleExcluded": true,
+  "frozenPredictionAndScenarioSourcesUnchanged": true
+}

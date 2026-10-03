@@ -1,0 +1,170 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,booktabs,amsmath,graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\title{Symmetric Face Support: Tracking Gains and Startup Limits}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\section{Results and comparison protocol}
+The selected change is an optional LiDAR rectangle placement rule. Actual
+YOLO26x detection, native GNSS/IMU preparation and the unchanged NRMM runtime
+were replayed on the previous parked-free capture and a prospectively specified
+new capture. Both compare the same input streams, declared target dimensions,
+confidence association, causal heading estimation and observer gains. Only
+rectangle placement differs between each ordinary edge/symmetric pair.
+
+\begin{center}\small
+\begin{tabular}{@{}llrrrr@{}}\toprule
+Capture & Placement & Raw pos. & Est. pos. & Est. vel. & Valid \\
+ & & (m) & (m) & (m/s) & /300 \\\midrule
+Development, 15 m & Edge & 0.1629 & 0.1831 & 0.4195 & 300 \\
+ & Symmetric & 0.0674 & 0.0946 & 0.3049 & 300 \\
+ & Symmetric + blackout & 0.0657 & 0.1034 & 0.3221 & 285 \\
+Confirmation, 20 m & Edge & 0.1513 & 0.1983 & 0.6891 & 300 \\
+ & Symmetric & 0.0661 & 0.1430 & 0.4997 & 300 \\
+ & Symmetric + blackout & 0.0674 & 0.1725 & 0.5882 & 285 \\
+\bottomrule\end{tabular}\end{center}
+
+These are planar vector RMSE over 2.00--5.98 s, matching the previous
+experiment's fixed acquisition exclusion. Raw RMSE includes available
+measurements; estimator RMSE includes every frame, including dropouts.
+All-frame RMSE, p95, maxima, availability and prediction hashes are also
+exported in the compact metrics. The development baseline cached replay
+reproduced the previous actual detector positions within $1.8\times10^{-14}$ m;
+actual inference reproduced the selected prototype within
+$1.6\times10^{-14}$ m. Confirmation cases all reran the actual detector.
+The previous data guided selection; it is not independent validation.
+
+The improvement is conditional on the predeclared 2 s acquisition exclusion.
+Over all 300 confirmation frames, symmetric mode is worse: raw position
+RMSE changes from 0.5349 to 0.5548 m, estimated position from 0.6437 to
+0.6948 m, and velocity from 2.4888 to 2.6381 m/s. The first frame has
+2.167/2.261 m position error and an approximately right-angle fitted-heading
+ambiguity. Errors in initial geometry and the causal motion heading interact
+before acquisition settles. The change does not solve cold start and must not
+be described as a uniform improvement. Over all development frames, estimated
+position/velocity do improve from 0.2131 m / 0.9137 m/s to
+0.1314 m / 0.8195 m/s. Both statistical views are retained.
+
+
+\section{Mechanism and implementation}
+The old development error after 2 s has mean longitudinal/lateral components
+of 0.0527/0.1266 m in CARLA ego axes. Lateral standard deviation is 0.0874 m.
+The fitted upper rear surface is narrower than the declared 1.9 m bounding
+box. The previous placement anchors one observed endpoint to a box edge,
+introducing a lateral offset even when the visible surface is centered.
+A point centroid would instead depend strongly on return density.
+
+For each candidate heading, let $\ell_j,u_j$ be the observed support limits
+along dimension $d_j$, and $r_j=(u_j-\ell_j)/d_j$. In symmetric mode, select
+the axis with largest $r_j$. If $r_j\ge0.8$, place its center at
+$(\ell_j+u_j)/2$ and retain face anchoring on the other axis. Otherwise retain
+both legacy edge candidates. Initial support limits use the existing 2nd/98th
+percentiles; the existing inlier refinement uses extrema. Both fitting stages
+apply the same rule. The containment objective and heading prior are unchanged.
+
+This assumes approximately symmetric visibility along the selected axis.
+The 0.8 gate tests observed coverage, not the truth of that assumption.
+Asymmetric occlusion can still bias the midpoint, so the new behavior is
+explicitly enabled with \texttt{--rectangle-placement symmetric}; legacy
+\texttt{edge} remains the default. The support fraction is exposed as
+\texttt{--rectangle-symmetry-minimum-support}, default 0.8. Outputs record
+mode, threshold and selected symmetry axis. No ground-truth bias subtraction,
+learned offset, future-frame smoothing or target identity information is used.
+
+The development mean error becomes 0.0543/0.0231 m. Fitted-heading RMSE
+falls from 1.107 to 0.680 degrees. Residual longitudinal offset is retained;
+approximate vehicle geometry and which body surfaces return LiDAR points
+remain relevant. This experiment does not calibrate away that residual.
+
+\section{Fresh confirmation and missing observations}
+Before new capture, source hashes, parameters and scoring rules were frozen in
+\path{confirmation_plan.json}. The initial gap changed from 15 to 20 m;
+LiDAR/IMU seed changed from 20261002 to 20261003, and GNSS seed from
+20261003 to 20261004. The target body, map-selected Town10HD\_Opt straight,
+spawn index 105, nominal 11 m/s follower speeds and sensor layout stayed the
+same. This is a new range/noise realization on the same route, not broad
+scenario validation. No prediction parameters were retuned after capture.
+
+An owned CARLA 0.10 instance on port 2011 used the existing scene configuration
+to hide 143 static vehicle mesh components before spawning the two actors.
+It produced 50 stationary calibration, 150 driving warm-up and 300 evaluation
+groups at 0.02 s. All 500 native RGB/LiDAR/GNSS/IMU frame IDs matched and
+simulation frames were consecutive. Capture and cleanup details are in
+\path{server_lifecycle.json}; shared port 2000 was not contacted or modified.
+
+The extra case replaces only derived RGB paths for frames 150--164 with a
+black image, a 0.30 s interruption at 3.00 s. Both captures have exactly 15
+missing measurements and reacquire at frame 165. All 300 estimates remain
+finite. Normal and interrupted outputs are identical through frame 149,
+and all cases have identical ego estimates. Prediction hashes were written
+before each separate scorer opened the truth stream. Production perception
+summaries contain zero truth comparisons. Calibration and preparation use
+native sensor callbacks, fixed georeference and extrinsics only.
+
+\section{Alternatives examined and remaining velocity error}
+Using the first 0.4 s of measured target world positions to reset the target
+velocity causally at frame 20 reduced development velocity RMSE only from
+0.3049 to 0.2934 m/s with a linear fit, or 0.2919 m/s with a quadratic fit.
+Position RMSE was 0.0933 and 0.0928 m. The quadratic fit inferred noisy lateral
+velocity/acceleration. This limited improvement does not justify introducing
+an additional reset into the deployed path; the experiment remains a local
+prototype, with no production estimator or adapter change.
+
+A separately labeled oracle diagnostic supplied exact truth-derived target
+relative positions while retaining native ego signals and the same estimator.
+Its position/velocity RMSE was 0.0389 m / 0.2667 m/s. This is diagnostic only,
+not achievable sensor-pipeline performance. It shows that correcting target
+geometry alone cannot remove all remaining error in this trajectory.
+With symmetric measured geometry, velocity RMSE is 0.5803 m/s in 2--3 s,
+0.1403 in 3--4 s, and 0.0879 in 4--6 s. Dynamic response and native ego signal
+quality deserve separate experiments; they were not retuned here. The ego
+estimated velocity RMSE is 0.0477 m/s (derived native GNSS velocity: 0.1127
+m/s). The target accelerates from 4.76 m/s at acquisition to 10.05 m/s at
+2 s and 11.12 m/s at 4 s. This prioritizes target transient response as a
+follow-up investigation; it does not uniquely identify every error source.
+
+\section{Validation, limits and use}
+All 23 Python association, causality and rectangle behavior tests pass. New
+checks cover a narrow rear body, side-face localization, rigid transforms,
+uneven point density, weak-support fallback, full rectangles, invalid support
+fractions, the legacy default and prefix invariance through the actual fitter.
+Production estimator/configuration hashes remain unchanged; MATLAB replays
+exercise the existing runtime on all 300 frames per case. Complete commands,
+versions, timings, audits and diagnostic provenance accompany this report.
+
+Successful RMSE checks do not certify a deterministic error bound. Counts of
+raw errors exceeding the configured 0.12 m bound, estimated-domain violations
+and actual speed ranges are reported. Some speeds are below the configured
+10 m/s target-domain minimum. Native compass heading retains the preceding
+experiment's ideal-heading limitation. Runtime bound availability does not
+validate these premises. Offline YOLO/LiDAR processing exceeds the six-second
+record duration; no 50 Hz real-time or closed-loop safety claim is made.
+
+To enable the selected configuration, retain the previous native pipeline and
+use the following options (normal confidence association suffices in the
+parked-free scene):
+\begin{verbatim}
+--camera-id front --causal --target-association confidence
+--center-mode rectangle --rectangle-heading-step 1
+--heading-iterations 3 --min-depth 0.1 --min-object-height 0
+--rectangle-placement symmetric
+--rectangle-symmetry-minimum-support 0.8
+\end{verbatim}
+Raw captures, drivers and generated figures remain ignored local artifacts;
+the external archive retains identified exports and source hashes. Tracked
+artifacts are the perception change, behavior tests, this English report and
+compact results. Unrelated workspace work is excluded.
+\IfFileExists{accuracy_trace.pdf}{\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{accuracy_trace.pdf}
+\caption{Frozen error traces including acquisition. The vertical line marks
+2 s; the green band applies only to the camera-blackout case.}
+\end{figure}}{}
+\end{document}

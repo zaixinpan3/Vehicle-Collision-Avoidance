@@ -1,0 +1,82 @@
+{
+  "frozenAt": "2026-10-03T01:43:18.419358-05:00",
+  "purpose": "Prospective fixed-parameter confirmation at a new initial gap and new sensor noise seeds, on the same route and target body; not validation across routes, bodies or occlusions.",
+  "capture": {
+    "port": 2011,
+    "initialGapM": 20.0,
+    "priorDevelopmentGapM": 15.0,
+    "lidarImuSeed": 20261003,
+    "gnssSeed": 20261004,
+    "dtSeconds": 0.02,
+    "stationaryFrames": 50,
+    "warmupFrames": 150,
+    "evaluationFrames": 300
+  },
+  "cases": [
+    {
+      "name": "edge",
+      "placement": "edge",
+      "minDepthM": 0.1,
+      "minObjectHeightM": 0
+    },
+    {
+      "name": "symmetric",
+      "placement": "symmetric",
+      "minDepthM": 0.1,
+      "minObjectHeightM": 0
+    },
+    {
+      "name": "symmetric_blackout",
+      "placement": "symmetric",
+      "minDepthM": 0.1,
+      "minObjectHeightM": 0
+    }
+  ],
+  "fixedScoring": {
+    "warmupSeconds": 2.0,
+    "rawPositionRmseGateM": 0.5,
+    "targetPositionRmseGateM": 0.5,
+    "targetVelocityRmseGateMps": 1.5,
+    "availabilityOutsideBlackout": 0.95
+  },
+  "fixedParameters": {
+    "rectangleSymmetryMinimumSupport": 0.8,
+    "headingStepDeg": 1.0,
+    "headingIterations": 3,
+    "targetAssociation": "confidence",
+    "causal": true
+  },
+  "noRetuning": "No perception, preprocessing, estimator configuration or gains will be altered after capture or scoring; report failure if improvement does not generalize.",
+  "sourceHashes": {
+    "perception/yolo_lidar_target_position.py": "41e7dfc595dcac882ca2f26bfeedcbfead332dbd419ab01db6e5d3b07fda9993",
+    "tests/yoloLidarRectangleTest.py": "3b4691bb2e5c8d2461122675c2df9e2b53bfe3ea7fb0991bc03e55c955c177b4",
+    "config/carlaPerceptionScene.json": "80cf738db28c53f11bb4fc193309b8a1e2fcc555fb5935a8eae599df400d6dc3",
+    "config/nrmmTrackingConfig.m": "50c79c001f29c499023f974f85d1a06103ebbd9e47923ad986b7bf3d63072248",
+    "estimator/certifiedKinematicCourseCorrespondence.m": "e969fc6c2aee79fd4eb9976d6a7342609499c7a6e40b2ad1f8516fb1a3288e5b",
+    "estimator/certifiedRotationCorrespondence.m": "fe3848a3e72ba4da39b800f2f374e85d37c457aad7df8e24c5f5dc250309b37e",
+    "estimator/nrmmControllerErrorBounds.m": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc",
+    "estimator/nrmmKinematicVelocityMeasurement.m": "0f075c3dafeb4b11a8cda324f39c88e370c29c35ba9755a4412f20a83f5edfae",
+    "estimator/nrmmObserverCertificate.m": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308",
+    "estimator/nrmmObserverRk4Interval.m": "33c395fb3f5905853a19dfd1e6502b80d1a50ffcb281934e98a00b459f6dd795",
+    "estimator/nrmmObserverVectorField.m": "df803b56eb8c3584f9903d271b15f0168d1881ba0bdcf4cba2688c6d48ee5686",
+    "estimator/nrmmPositionErrorBound.m": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5",
+    "estimator/nrmmTargetHistory.m": "7d42d50c49d6217738a9b0247d2ad1faa8563b8066d03e9556e0185e4984522e",
+    "estimator/nrmmTargetLipschitzCertificate.m": "d1f561ad3c3de0868d73b5f45589b30af2b574136316faaca80bfa8100f9c8ba",
+    "estimator/nrmmTargetParameterErrorBounds.m": "6d1104488dc5b9b2d8dda8c3274a6f24294fef0e5d767df6008cb8a473d8d850",
+    "estimator/nrmmTargetTrackerDerivative.m": "6e38b0cbb14d316af51f841d6d0c9a5faf2047a898868d9171df912094a5f088",
+    "estimator/nrmmVelocityDisturbanceBound.m": "84c4c6e9e4c1b47c395df29f5c71043854522d563c7222922aeeb2be9160951a",
+    "estimator/nrmmYawObserverDerivative.m": "732496acba9d6c793d443d53c5fd424912016755cdc3178fe8160e23e46dc70d",
+    "estimator/nrmmYawSet.m": "cc30d09659426872322c8c28d373144680a1dcf23a1ec5354f35f30b1079c295",
+    "estimator/onlineNrmmTrackingRuntime.m": "61a4737a086c076f732ce61705253268f0e66367e30c54647bac7069da91ac05",
+    "estimator/sharmaMultistageObserverDesign.m": "d11057981c43415fa7678513e205cc7d2365c0f237df0c2c07fc116171cb32c5",
+    "estimator/sharmaMultistageObserverRuntime.m": "807a2a0e97d91639f4864791274dcd3c5d70554e996a0e675a408251c4f56fd0",
+    "estimator/sharmaNrmmCompanionDerivative.m": "01ca12dbaa5ea3e8fa335ad139b34de5a6e3ca556a50f884a11cab48ab7e4a41",
+    "estimator/synthesizeNrmmObserverGains.m": "ee4365427a46012eb1eecd19b6b919b2a08b3c13687bb84e6d805dfd028f8a0d",
+    "estimator/synthesizeTargetTrackerCertificate.m": "767da0b6bbcc34f228bc74914d443539a8d94d605ce5121b0221dd6be93d9464",
+    "simulation_output/perception_geometry_confirmation_20261003/captureNative.py": "5f0ca6b52bf40973afad7ae397b02e1f8c2452f43e409afc7d852f098547a3d2",
+    "simulation_output/perception_geometry_confirmation_20261003/prepareNative.py": "8dbc7ae5b159f20931f7511afc7f3a8b5c6286adcf931cf25a23c27702235e57",
+    "simulation_output/perception_geometry_confirmation_20261003/runPipeline.py": "b57e64fa667e80784db69cec31b65b5d177b57d5135643e2cd941e1f2eeaa135",
+    "simulation_output/perception_geometry_confirmation_20261003/scoreGeometry.py": "873b12e6ae321725fd99b5953acffaf18cf22939aba5fe9f3281944cd09a114b",
+    "simulation_output/perception_geometry_confirmation_20261003/runNativeEstimator.m": "ca077db3b5a2b264bd3d4271e91c35dd1cc08eab9fe31efd2b9ee63bafa993d8"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "artifactKind": "Scoring-only audit; no truth feeds deployed predictions",
+  "actualDetectorCases": [
+    "symmetric",
+    "symmetric_blackout"
+  ],
+  "totalFiniteEstimatorPublications": 900,
+  "measurementPrefixEqualBeforeBlackout": true,
+  "estimatorPrefixEqualBeforeBlackout": true,
+  "identicalEgoStates": true,
+  "missingFrames": [
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164
+  ],
+  "firstReacquisitionFrame": 165,
+  "synchronizedNativeGroups": 500,
+  "consecutiveNativeFrames": true,
+  "targetTrueSpeedRangeMps": [
+    4.7573678781819275,
+    11.141045767751033
+  ],
+  "estimatedDomainInvalidFrames": {
+    "baseline": 127,
+    "symmetric": 128,
+    "symmetric_blackout": 128
+  },
+  "rawBoundM": 0.12,
+  "oracleExcluded": true,
+  "actualVsCachedPrototypeMaximumAbsolutePositionDifferenceM": 1.5987211554602254e-14,
+  "baselinePredictionSource": "Cached measured-only replay, previously checked to reproduce the prior actual detector baseline to 1.8e-14 m."
+}

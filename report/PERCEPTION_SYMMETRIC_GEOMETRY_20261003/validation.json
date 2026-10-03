@@ -1,0 +1,13 @@
+{
+  "pythonCommand": "python -m unittest discover -s tests -p 'yoloLidar*Test.py' -v",
+  "pythonTestsPassed": 23,
+  "matlabMethod": "Unchanged production onlineNrmmTrackingRuntime, complete 300-frame native replays; MATLAB CLI because no MATLAB MCP tools were available.",
+  "productionEstimatorSourcesUnchanged": true,
+  "deploymentMode": "Optional --rectangle-placement symmetric; existing edge placement remains default.",
+  "scope": "Same route and vehicle, new gap and noise seeds for prospective confirmation. No generalization claim across roads, vehicles or asymmetric occlusions.",
+  "technicalReportPages": 4,
+  "technicalReportCompiled": true,
+  "technicalReportVisualInspection": "First-page table and explicit startup limitation inspected; all-frame error plot inspected.",
+  "coldStartLimitation": "Fresh full-record RMSE worsens; report explicitly separates all-frame and fixed post-2-second results.",
+  "jsonArtifactsParsed": 11
+}
