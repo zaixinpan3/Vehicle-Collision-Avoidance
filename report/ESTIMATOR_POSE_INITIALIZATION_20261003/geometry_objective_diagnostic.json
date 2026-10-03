@@ -1,0 +1,107 @@
+[
+  {
+    "frame": 100,
+    "geometryCostAtTruePose": 0.11557450130891797,
+    "geometryCostAtFittedPose": 0.09321566433994492,
+    "truePose": [
+      4.811788202664986,
+      -0.015421873646829856,
+      -6.791060779702058e-05
+    ],
+    "fitPose": [
+      4.892152581369113,
+      0.4018429813674405,
+      0.08364856664972617
+    ],
+    "pointCount": 995,
+    "firstStageSymmetricAxis": null,
+    "initialAxisCoverage": [
+      0.395234254825255,
+      0.7957259284798512
+    ]
+  },
+  {
+    "frame": 150,
+    "geometryCostAtTruePose": 0.12320956477220583,
+    "geometryCostAtFittedPose": 0.09754070932366597,
+    "truePose": [
+      4.7309733950419695,
+      -0.015221581677469068,
+      0.0005709817377129887
+    ],
+    "fitPose": [
+      4.819730701983453,
+      0.41251794545216425,
+      0.08789021934189968
+    ],
+    "pointCount": 955,
+    "firstStageSymmetricAxis": null,
+    "initialAxisCoverage": [
+      0.38168487594085254,
+      0.7873120221095677
+    ]
+  },
+  {
+    "frame": 200,
+    "geometryCostAtTruePose": 0.12359253330751327,
+    "geometryCostAtFittedPose": 0.09782082188471578,
+    "truePose": [
+      4.730588785836943,
+      -0.01656688661293848,
+      0.00022849922152879865
+    ],
+    "fitPose": [
+      4.804965924396433,
+      0.4555894675880335,
+      0.10762905061689153
+    ],
+    "pointCount": 965,
+    "firstStageSymmetricAxis": null,
+    "initialAxisCoverage": [
+      0.389305113484664,
+      0.7859761800498863
+    ]
+  },
+  {
+    "frame": 250,
+    "geometryCostAtTruePose": 0.12202323406435833,
+    "geometryCostAtFittedPose": 0.09712135534231625,
+    "truePose": [
+      4.732101218562098,
+      -0.010229433248560266,
+      0.0017816547692630104
+    ],
+    "fitPose": [
+      4.815970452568026,
+      0.42635497819566825,
+      0.09354500052405204
+    ],
+    "pointCount": 976,
+    "firstStageSymmetricAxis": null,
+    "initialAxisCoverage": [
+      0.38723819794798625,
+      0.7890786347423648
+    ]
+  },
+  {
+    "frame": 299,
+    "geometryCostAtTruePose": 0.12112994561841366,
+    "geometryCostAtFittedPose": 0.09741775144510738,
+    "truePose": [
+      4.73384559358688,
+      -0.004040565925591877,
+      -2.1305288720633905e-05
+    ],
+    "fitPose": [
+      4.812637394510108,
+      0.43473792055460203,
+      0.09922918104524162
+    ],
+    "pointCount": 979,
+    "firstStageSymmetricAxis": null,
+    "initialAxisCoverage": [
+      0.38868709685991815,
+      0.7988616197191107
+    ]
+  }
+]

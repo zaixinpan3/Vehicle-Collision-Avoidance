@@ -1,0 +1,19 @@
+{
+  "recordedAt": "2026-10-03T15:28:04.641008-05:00",
+  "baselineCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "method": "Use the current-time predicted relative center and body heading as the three-variable local rectangle fit seed. Point-cloud geometry alone determines the objective; no pose-prior penalty or fixed heading. Bootstrap the first center from observed geometry and the existing co-moving heading assumption. Do not feed predictions back as measurements during missing detections.",
+  "cases": [
+    "dev_pose",
+    "dev_pose_blackout",
+    "conf_pose",
+    "conf_pose_blackout"
+  ],
+  "validation": "Synthetic geometry and causal timing tests; cached actual detections then actual detector/MATLAB replays; truth read only by a separate scorer after prediction hashes. Both captures are previously seen.",
+  "runtimeIsolation": "Committed MATLAB sources copied to runtime_snapshot because another session is changing controller/error-bound files. No other workspace changes or CARLA server are touched.",
+  "objective": "Capped nearest-face residual plus the existing weight-20 containment penalty; optional observed tangential symmetry residual. Three free pose variables initialized from the predicted pose. Geometry settings frozen before truth scoring.",
+  "expectedLimitations": [
+    "Single-face tangent translation may be unobservable; a seed can choose a solution but cannot create information.",
+    "A local optimizer may follow a wrong initial basin.",
+    "Observed vehicle surfaces differ from a perfect rectangle."
+  ]
+}

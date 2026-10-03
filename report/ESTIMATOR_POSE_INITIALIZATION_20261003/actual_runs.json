@@ -1,0 +1,46 @@
+[
+  {
+    "case": "dev_actual_pose",
+    "device": "0",
+    "frontend": "Actual YOLO and LiDAR association",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 102.4522676889901
+  },
+  {
+    "case": "dev_actual_pose_blackout",
+    "device": "0",
+    "frontend": "Actual YOLO and LiDAR association",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 285,
+    "wallSeconds": 93.63564116501948
+  },
+  {
+    "case": "conf_actual_pose",
+    "device": "0",
+    "frontend": "Actual YOLO and LiDAR association",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 53.87252911098767
+  },
+  {
+    "case": "conf_actual_pose_blackout",
+    "device": "0",
+    "frontend": "Actual YOLO and LiDAR association",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 285,
+    "wallSeconds": 51.87597136601107
+  }
+]

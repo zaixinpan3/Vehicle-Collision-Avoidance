@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-10-03T15:36:12.618666-05:00",
+  "prototypeCommand": "env OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python -u simulation_output/estimator_pose_initialization_20261003/runPose.py dev_pose dev_pose_blackout conf_pose conf_pose_blackout conf_bias20 conf_bias90",
+  "actualCommand": "env OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python; torch.cuda.set_per_process_memory_fraction(0.2,0); runPose.py --actual --device 0 dev_actual_pose dev_actual_pose_blackout conf_actual_pose conf_actual_pose_blackout",
+  "pythonTests": "python -m unittest discover -s tests -p 'yoloLidar*Test.py' -v",
+  "matlabTests": [
+    "sharedMeasurementPreservesCurrentPublicationAndEveryNextState",
+    "outputActionLeavesRuntimeStateUntouched",
+    "cascadedObserverConvergesOnAnalyticManeuver",
+    "radarDropoutAdvancesPurePrediction"
+  ],
+  "matlabCommand": "env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nice -n 10 matlab -singleCompThread -batch; cd runtime_snapshot; select the four named methods from tests/onlineNrmmTrackingRuntimeTest.m using testsuite, run, assertSuccess.",
+  "mcpAvailability": "No MATLAB MCP evaluation tool was available. MATLAB Engine runs the actual runtime; MATLAB CLI runs matlab.unittest.",
+  "resourceScheduling": "Previously recorded inputs only; no CARLA access. Committed MATLAB snapshot isolates concurrent workspace edits. Shared GPU 0, 20 percent per-process PyTorch allocation cap; lower CPU scheduling priority and two numerical threads.",
+  "initialFailure": "Snapshot initially had no solver path. Both the initial prototype and four MATLAB tests failed for missing YALMIP/SeDuMi. The existing solver directory was then referenced by symlink. Those failure logs are retained; no dependency was copied, installed or edited.",
+  "scoring": "scoreFeedback.py separately hashes prediction files before reading scoring_truth.jsonl; no geometric tuning after scoring."
+}

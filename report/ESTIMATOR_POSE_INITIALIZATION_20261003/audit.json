@@ -1,0 +1,117 @@
+{
+  "captures": {
+    "dev": {
+      "framesPerCase": 300,
+      "finiteEstimatorPublications": 600,
+      "currentTimePriorEqualsPublishedPredictedState": true,
+      "initialPoseIsUsedByTheOptimizer": true,
+      "noPosePriorPenalty": true,
+      "bothPositionAndHeadingAreCorrected": true,
+      "predictionNeverUsedAsMissingMeasurement": true,
+      "identicalPrefixBeforeBlackout": true,
+      "reacquisitionFrame": 165,
+      "blackoutMissingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "identicalEgoStates": true,
+      "actualVsCachedPrototypeMaximumPositionDifferenceM": 5.260163415954366e-10,
+      "fitDiagnostics": {
+        "dev_actual_pose": {
+          "validFits": 300,
+          "firstStageConverged": 299,
+          "refinementConverged": 294,
+          "positionCorrectionMaximumM": 0.45189387846501966,
+          "headingCorrectionMaximumDegrees": 7.487245647641438,
+          "positionCorrectionMedianM": 0.07737014931168909,
+          "headingCorrectionMedianDegrees": 3.177812423109046
+        },
+        "dev_actual_pose_blackout": {
+          "validFits": 285,
+          "firstStageConverged": 284,
+          "refinementConverged": 278,
+          "positionCorrectionMaximumM": 0.45189387846501966,
+          "headingCorrectionMaximumDegrees": 9.149224564810718,
+          "positionCorrectionMedianM": 0.08657764718713,
+          "headingCorrectionMedianDegrees": 3.0071839308868014
+        }
+      }
+    },
+    "conf": {
+      "framesPerCase": 300,
+      "finiteEstimatorPublications": 600,
+      "currentTimePriorEqualsPublishedPredictedState": true,
+      "initialPoseIsUsedByTheOptimizer": true,
+      "noPosePriorPenalty": true,
+      "bothPositionAndHeadingAreCorrected": true,
+      "predictionNeverUsedAsMissingMeasurement": true,
+      "identicalPrefixBeforeBlackout": true,
+      "reacquisitionFrame": 165,
+      "blackoutMissingFrames": [
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "identicalEgoStates": true,
+      "actualVsCachedPrototypeMaximumPositionDifferenceM": 0.0,
+      "fitDiagnostics": {
+        "conf_actual_pose": {
+          "validFits": 300,
+          "firstStageConverged": 300,
+          "refinementConverged": 294,
+          "positionCorrectionMaximumM": 0.38732454957172835,
+          "headingCorrectionMaximumDegrees": 11.540502406251443,
+          "positionCorrectionMedianM": 0.053801441001849776,
+          "headingCorrectionMedianDegrees": 0.7455908447524036
+        },
+        "conf_actual_pose_blackout": {
+          "validFits": 285,
+          "firstStageConverged": 285,
+          "refinementConverged": 279,
+          "positionCorrectionMaximumM": 0.38732454957172835,
+          "headingCorrectionMaximumDegrees": 11.540502406251443,
+          "positionCorrectionMedianM": 0.05519724303530562,
+          "headingCorrectionMedianDegrees": 0.7628985817183715
+        }
+      }
+    }
+  },
+  "predictionHashes": {
+    "perception_dev_actual_pose/target_measurements.jsonl": "e3af7e174139d294fb75deaa390f8db76016d622af0093f80cd41df6c2ba44c9",
+    "estimator_dev_actual_pose/predictions.csv": "2a55ac6149e7481ff726e33a0dfaa62867a1aad1246693e002a267b2416ce726",
+    "perception_dev_actual_pose_blackout/target_measurements.jsonl": "40380db521ef4e3f1f9b3738a6663e32db24f87d0ba7d1a1086359022a8689ef",
+    "estimator_dev_actual_pose_blackout/predictions.csv": "e16a49c0abdb7ae88d701038f527d404e190e3b113749b792a47a3cb1bb93777",
+    "perception_conf_actual_pose/target_measurements.jsonl": "65a23b7085f98d3e7aa7bd7445158d653c81a24c61b9056a224311867b5fd351",
+    "estimator_conf_actual_pose/predictions.csv": "ded903fbe5fd8a12e9f93e5272267d477b87f7eb89890b07fc3d02e9e1ddd988",
+    "perception_conf_actual_pose_blackout/target_measurements.jsonl": "c4f7e9ba0b42676b16becf9328b4ddaba263ca1dfe52daf780109239839810b7",
+    "estimator_conf_actual_pose_blackout/predictions.csv": "6752f2d8d51ef583b99f2f5ddc9d7f96f1780801521eaadb352f22f68db60eb4"
+  },
+  "noCarlaConnection": true,
+  "runtimeSnapshotCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "scope": "Previously seen recordings, same straight route and vehicle. Local geometry optimization is not a global pose guarantee or a new observer error certificate."
+}

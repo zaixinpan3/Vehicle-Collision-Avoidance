@@ -1,0 +1,20 @@
+{
+  "pythonTestsPassed": 41,
+  "matlabTestsPassed": 4,
+  "actualDetectorReplays": 4,
+  "finiteEstimatorPublications": 1200,
+  "priorRole": "Initialize center, yaw and observed-support selection; no prior penalty and no locked pose variables.",
+  "defaultPathPreserved": true,
+  "carlaServerAccess": false,
+  "runtimeSnapshotCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "initialDependencyFailure": "Snapshot initially lacked the existing YALMIP/SeDuMi path. Reusing the existing solver tree by symlink resolved this; initial failure logs are retained.",
+  "limitations": "20 m improves; 15 m regresses. Local convergence, incomplete geometry and model mismatch prevent a uniform accuracy or deterministic observer-bound claim.",
+  "technicalReportPdf": {
+    "path": "simulation_output/estimator_pose_initialization_20261003/ESTIMATOR_POSE_INITIALIZATION_20261003.pdf",
+    "pages": 5,
+    "twoPassLatexBuildPassed": true,
+    "overfullBoxes": 0,
+    "textExtractionChecked": true,
+    "figureAndLayoutVisuallyInspected": true
+  }
+}

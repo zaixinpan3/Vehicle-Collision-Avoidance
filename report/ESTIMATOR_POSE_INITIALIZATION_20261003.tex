@@ -1,0 +1,180 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}\usepackage{xurl}
+\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}\setlength{\emergencystretch}{3em}
+\title{Predicted Target Pose as the Initial Value for LiDAR Rectangle Fitting}
+\author{Pan Dynamics Collision Avoidance Research}\date{October 3, 2026}
+\begin{document}\maketitle
+\section{Implementation and measured result}
+The new perception path obtains both relative center and body heading from the
+NRMM state predicted to the current sample. That planar pose initializes a
+local rectangle fit in three free variables, $(c_x,c_y,\psi)$. Current point
+cloud geometry can correct all three variables; none is locked or penalized
+against the observer prediction. Declared length and width remain fixed.
+The fitted center then becomes the current target-position observation.
+
+The full perception and estimation replay was executed on the same previously
+recorded 15 m and 20 m following-vehicle datasets used in earlier studies.
+Actual YOLO26x inference, native LiDAR association, native ego preprocessing
+and the committed MATLAB NRMM runtime were used. Each recording contains
+300 evaluation frames at 0.02 s. The parked vehicles were already hidden in
+these captures; no CARLA server was contacted for this work.
+
+\begin{center}\scriptsize
+\begin{tabular}{@{}llrrrrr@{}}\toprule
+ & & \multicolumn{3}{c}{After 2 seconds} & \multicolumn{2}{c}{All frames} \\
+Data & Fit method & Raw pos. & Est. pos. & Est. vel. & Est. pos. & Est. vel. \\
+ & & m & m & m/s & m & m/s \\\midrule
+15 m & Previous motion heading & 0.0674 & 0.0946 & 0.3049 & 0.1314 & 0.8195 \\
+15 m & Fixed NRMM heading & 0.0810 & 0.1274 & 0.4471 & 0.1557 & 0.8663 \\
+15 m & Predicted pose initialization & 0.2452 & 0.2648 & 0.4430 & 0.2354 & 0.8478 \\
+20 m & Previous motion heading & 0.0661 & 0.1430 & 0.4997 & 0.6948 & 2.6381 \\
+20 m & Fixed NRMM heading & 0.0719 & 0.1018 & 0.3782 & 0.1476 & 0.8506 \\
+20 m & Predicted pose initialization & 0.0639 & 0.0637 & 0.1619 & 0.1155 & 0.7775 \\
+\bottomrule\end{tabular}\end{center}
+
+The 20 m result improves relative to the fixed-heading feedback implementation,
+including its 0.3 s camera interruption. The 15 m position result regresses.
+The pose-initialization API therefore remains optional. The comparison evaluates
+the complete new local fitter: freeing translation also changes the earlier
+face-anchored placement problem, so the gain cannot be attributed exclusively
+to adding position to the seed. Both recordings were already seen; these are
+conditional measured findings, not independent validation.
+
+\section{Prediction, fitting and update order}
+Let the runtime's state predicted from measurements through $k-1$ be available
+at $t_k$. Its relative target position is already in current ego body axes.
+The initialization for the measured point cloud is
+\[
+ z_k^0=\begin{bmatrix}\hat\rho_{x,k}^{-}&\hat\rho_{y,k}^{-}&
+ \hat\psi_{C/E,k}^{-}\end{bmatrix}^{\!T},\qquad
+ \hat\psi_{C/E}^{-}=\operatorname{atan2}(\hat q_y^{-},\hat q_x^{-})-\hat\beta_C^{-}.
+\]
+The native CARLA adapter changes the signs of the second position coordinate
+and relative heading to match CARLA planar coordinates. It uses
+\path{targetEstimate.relativePosition} and \path{targetRelativeHeading}
+directly, without an estimated-world-yaw conversion.
+
+The order is prediction query, current-cloud fit, then the existing
+\path{onlineNrmmTrackingRuntime} \texttt{sample} action. The prior state time
+must equal the frame time and its latest input time must strictly precede that
+frame. Audit comparisons verify that each supplied predicted position and
+heading equal the runtime's current published pre-update state. No repeated
+estimator correction or same-frame prediction/fit feedback cycle is performed.
+Both geometric fitting stages precede the single measurement update.
+
+A missing detection is passed as a missing observation. The runtime continues
+its prediction, but its predicted center is never passed back as a synthetic
+measurement. The normal and interrupted runs have identical first 150
+measurements and estimator states, exactly 15 missing camera detections at
+frames 150--164, and reacquisition at frame 165.
+
+There is no previous target pose at first acquisition. For this fixture, native
+GNSS ego velocity supplies the existing co-moving initial heading assumption.
+The first center is initialized from current point-cloud face placement, after
+which all three pose variables are refined. This is labeled initialization;
+it is not a converged target-state prediction or an arbitrary-acquisition solution.
+
+\section{Geometry objective and local numerical method}
+For a point $p_i$, define the rectangle-local coordinate
+$u_i=R(\psi)^T(p_i-c)$ and the signed axis overflow
+$e_i=|u_i|-[L/2,W/2]^T$. The optimized geometry cost is
+\[
+ J(c,\psi)=\frac1N\sum_i\left[
+ \min\{\min_j |e_{ij}|^2,0.25\}
+ +20\|\max(e_i,0)\|^2\right]+J_{\rm sym}.
+\]
+The boundary cap is in square metres. The residual is the existing nearest-face
+closeness plus containment construction, rather than a likelihood for a
+statistically exact vehicle-surface model. The dimensions are 5.0 by 1.9 m.
+
+Symmetric placement uses the existing approximately symmetric visibility
+assumption. At the beginning of each fitting stage, point projections in the
+seed orientation select the most covered axis, if its support fraction is at
+least 0.8. For that axis, $J_{\rm sym}$ is the squared midpoint of the two
+support quantiles of $u_i$; otherwise it is zero. The support axis stays fixed
+within that local solve. Thus the seed also initializes support selection; no
+position or heading regularization term is added. The first stage uses 2 and
+98 percent support quantiles, removes points outside the rectangle by more
+than 0.15 m, and the refinement uses the first fitted pose and zero-percent
+support quantiles on retained points.
+
+A small NumPy damped Gauss--Newton implementation minimizes these residuals
+using central-difference derivatives. Angular steps are scaled by rectangle
+corner displacement. A 0.5 m scaled limit bounds each numerical step, not the
+total correction; there is no hard yaw window around the prediction.
+The iteration limit is 60 per stage, and convergence diagnostics are retained.
+A finite, improved result at the limit is not a claim of global optimality.
+No new SciPy or other numerical dependency is introduced.
+
+Tests with two visible faces recover a known rectangle from biased centers and
+headings. A separate partial-face test retains different tangential positions
+from different seeds, correctly exposing missing geometric information.
+Initialization can select a local solution, but cannot make an unobserved
+direction observable.
+
+\section{Initialization stress and the 15 m regression}
+Cached actual detections and native clouds were used for two initialization
+stress cases without changing the estimator equations or gains. With a
+20-degree initial target heading error, the 20 m pose-initialized fit reaches
+0.0661 m position and 0.1725 m/s velocity RMSE after 2 s. The preceding locked
+heading experiment gave 0.6761 m and 2.5280 m/s. With a 90-degree error the new
+post-2-second result is 0.1140 m and 0.7355 m/s, but the full-record position
+RMSE remains 1.3167 m. Improved later recovery does not remove the large
+acquisition error or establish global recovery.
+
+The 15 m result demonstrates an objective-model limitation. At prototype frame
+200, the first-stage objective evaluated at actor-truth pose is 0.12359, while
+the fitted pose has lower cost 0.09782 despite about 0.47 m lateral displacement
+and a 6.17-degree heading. The initial lateral support fraction is 0.786, below
+the pre-existing 0.8 symmetry threshold. Refinement reduces the displacement
+but does not eliminate the bias. Five sampled frames reproduce the same
+cost-versus-accuracy discrepancy. Truth is used only for this post-run
+diagnostic, not in initialization or fitting.
+
+These measurements show that allowing all pose variables to move can expose
+weak support and imperfect rectangle-surface modeling. Reducing that geometry
+cost does not guarantee a more accurate collision center. No threshold was
+retuned using the truth diagnostic. Neither a new observer stability proof nor
+a deterministic error bound follows from these experiments. Existing
+measurement and operating-domain assumptions must still be checked for the
+coupled measurement path; native compass heading retains the earlier ideal
+heading limitation.
+
+\section{Validation, scope and reproduction}
+All 41 Python tests pass, including the existing 32 tests and nine new pose
+initialization behaviors. Four focused MATLAB tests pass for current
+publication/next-state equivalence, read-only output, analytic maneuver
+convergence and pure prediction through dropout. Four actual detector and
+MATLAB replays produce 1200 finite estimator publications. The audit records
+pose corrections, stage convergence, strict timestamps, exact prefix
+invariance, reacquisition, and agreement with cached-detection prototypes.
+
+Another session was editing controller and error-bound files. To keep the
+comparison reproducible, this study uses a local copy of committed MATLAB
+sources from \path{26cd6f3998d17fd49f1cd9254245805d17f4d3ae}. It reuses the
+existing YALMIP/SeDuMi tree by symlink. The initial missing-dependency-path
+failure and successful retry are preserved. Concurrent source edits were not
+modified or included in this task. Actual inference uses lower scheduling
+priority and a 20 percent PyTorch allocation cap on GPU 0; no other process or
+CARLA server is changed. Wall times describe offline replay, not a real-time
+50 Hz guarantee.
+
+The API is \path{run_pipeline(args,pose_feedback=adapter)}. The adapter supplies
+\path{PosePrior(position_ego_m,heading_ego_rad,state_time,last_measurement_time,source)}
+from its \texttt{predict} method and receives measured positions or missing
+observations through \texttt{update}. Heading-only and pose feedback modes
+cannot be selected together. Existing default behavior is preserved.
+
+Source, tests and compact results are tracked. Local replay orchestration,
+MATLAB snapshots, caches, raw recordings, model weights and generated figures
+remain outside Git. Identified technical exports and command/source hashes
+support reproduction without introducing CARLA tooling into the repository.
+\IfFileExists{pose_trace.pdf}{\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{pose_trace.pdf}
+\caption{Actual perception and estimator errors. The vertical line marks the
+fixed 2 s acquisition exclusion; shading marks the camera interruption used
+only in the interrupted pose-feedback case.}\end{figure}}{}
+\end{document}

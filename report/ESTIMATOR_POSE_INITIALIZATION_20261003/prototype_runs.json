@@ -1,0 +1,68 @@
+[
+  {
+    "case": "dev_pose",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 14.141880475042854
+  },
+  {
+    "case": "dev_pose_blackout",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 285,
+    "wallSeconds": 12.008943071996327
+  },
+  {
+    "case": "conf_pose",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 9.987679162004497
+  },
+  {
+    "case": "conf_pose_blackout",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 0.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 285,
+    "wallSeconds": 9.924687222985085
+  },
+  {
+    "case": "conf_bias20",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 20.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 10.539768772025127
+  },
+  {
+    "case": "conf_bias90",
+    "device": "0",
+    "frontend": "Frozen actual selected detections and native LiDAR clusters",
+    "placement": "symmetric",
+    "initialHeadingOffsetDeg": 90.0,
+    "holdInitialHeading": false,
+    "completed": true,
+    "validFrames": 300,
+    "wallSeconds": 10.904806158971041
+  }
+]
