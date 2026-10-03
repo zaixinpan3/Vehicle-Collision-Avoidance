@@ -1,0 +1,75 @@
+{
+  "scope": "Scene visibility and native sensor capture only; no estimator replay.",
+  "configuration": {
+    "hideParkedVehicles": true,
+    "parkedVehicleLabels": [
+      "Car",
+      "Truck",
+      "Bus",
+      "Motorcycle",
+      "Bicycle"
+    ]
+  },
+  "serverPort": 2011,
+  "ownedServerPid": 2685234,
+  "serverVersion": "0.10.0",
+  "map": "Carla/Maps/Town10HD_Opt",
+  "completed": true,
+  "nativeSampleGroups": 500,
+  "evaluationRgbImages": 300,
+  "evaluationLidarClouds": 300,
+  "consecutiveFrames": true,
+  "alignedSensorFrames": true,
+  "disabledVehicleMeshComponents": 143,
+  "componentsByLabel": {
+    "Car": 47,
+    "Truck": 30,
+    "Bus": 2,
+    "Motorcycle": 8,
+    "Bicycle": 56
+  },
+  "egoBlueprint": "vehicle.lincoln.mkz",
+  "targetBlueprint": "vehicle.dodge.charger",
+  "spawnIndex": 105,
+  "dtSeconds": 0.02,
+  "captureWallSeconds": 75.3269553030259,
+  "cleanupErrors": [],
+  "parkedCarLidarCheck": {
+    "evaluationFrame": 237,
+    "environmentObject": {
+      "id": 4120838475396380074,
+      "label": "Car",
+      "name": "BP_LincolnMKZ_Parked_C_3_SM_0",
+      "box": {
+        "location": [
+          12.229292869567871,
+          10.25362491607666,
+          0.9209110140800476
+        ],
+        "extent": [
+          2.3870272636413574,
+          0.8989407420158386,
+          0.5314263105392456
+        ],
+        "rotation": [
+          0.0,
+          180.0,
+          -0.0
+        ]
+      }
+    },
+    "beforePointsInBox": 140,
+    "afterPointsInBox": 0,
+    "worldCoordinatesMethod": "Scoring-only actor transform times fixed sensor extrinsic; native LiDAR returns unchanged.",
+    "egoPositionDifferenceM": 0.0,
+    "targetPositionDifferenceM": 0.0
+  },
+  "firstServerLaunch": {
+    "exitCode": 1,
+    "diagnosis": "Exited during startup; no explicit failure cause in retained log."
+  },
+  "retryServerLaunch": {
+    "ready": true,
+    "change": "Allocated PTY and enabled full stdout logging."
+  }
+}

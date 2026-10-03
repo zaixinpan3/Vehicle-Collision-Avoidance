@@ -1,0 +1,4 @@
+{
+    "hideParkedVehicles": true,
+    "parkedVehicleLabels": ["Car", "Truck", "Bus", "Motorcycle", "Bicycle"]
+}
