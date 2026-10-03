@@ -95,8 +95,9 @@ reports the issued slack and `secondaryOptimumApplied=false`.
 
 An inherited safety budget alone does not prove that the zero-correction point
 satisfies the terminal cone. Damping is unavailable when that point is infeasible.
-There are at most two trajectory model builds per frame, shared by fresh-flow
-initialization and an optional correction after model disagreement. Restoring
+There is one trajectory model per initialization. A failed shifted model may
+request one fresh potential-field initialization and its model; a fresh model
+is never repeatedly relinearized in that hold. Restoring
 a failed inherited budget or enlarging an input correction box reuses the
 already built model. See [PCBF_CLF_ARCHITECTURE.md](PCBF_CLF_ARCHITECTURE.md).
 

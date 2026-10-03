@@ -1,54 +1,50 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target flow, polygon duals and road coordinates.
     methods (Static)
-        function guide = movingGaussianGuide(state,lane,epoch,startTime,duration,cfg)
-            % Cheng (2021), Eqs. (34)-(36), with a time-aligned target envelope.
-            % The arrival map s(t)=s0+vRef*t is only a search-reference clock.
-            % Fit one Gaussian to the known moving exclusion envelope at the
-            % same times. No division by closing speed or safety admission.
-            projection=laneGeometry.project(state(1:2),lane);
-            guide=struct('station',projection.station,'amplitude',0,'centerTime',0, ...
-                'width',cfg.nominalClf.lookaheadSeconds,'endTime',0,'radius',0);
-            if isempty(epoch),return;end
-            radius=norm([cfg.vehicle.length;cfg.vehicle.width]/2)+norm(cfg.vehicle.rectangleOffset) ...
-                +norm(epoch(8:9))+norm(epoch(10:11))+cfg.collision.safetyMarginMeters;
-            guide.radius=radius;
-            times=0:cfg.controller.sampleTime/2:duration;
-            station=projection.station+cfg.referenceSpeed*times;
-            position=zeros(2,numel(times));
-            for index=1:numel(times)
-                q=predictiveSafetyGeometry.targetFlow(epoch,startTime+times(index));
-                rotation=[cos(q(3)),-sin(q(3));sin(q(3)),cos(q(3))];
-                position(:,index)=q(1:2)+rotation*q(10:11);
+        function [heading,speed,side,risk] = potentialGuidance(x,lane,epoch,time,cfg,side)
+            % Zhai-inspired motion-aware repulsion with a passing circulation.
+            % Matching-time prediction adapts the field to target speed and
+            % acceleration; it is guidance, not a safety certificate.
+            projection=laneGeometry.project(x(1:2),lane);
+            tangent=[cos(projection.heading);sin(projection.heading)];normal=[-tangent(2);tangent(1)];
+            rotation=[cos(x(3)),-sin(x(3));sin(x(3)),cos(x(3))];
+            velocity=rotation*x(4:5);progress=max(1,tangent.'*velocity);
+            lateral=projection.lateralPosition;risk=0;obstacleLateral=0;closing=0;
+            if ~isempty(epoch)
+                times=0:cfg.initialization.previewStepSeconds:cfg.initialization.previewSeconds;
+                if isfield(lane,'referenceCurve')
+                    [positions,angles]=laneGeometry.referencePose(projection.station+progress*times,lateral*exp(-times/cfg.nominalClf.lookaheadSeconds),lane.referenceCurve);
+                else
+                    positions=projection.point+progress*tangent*times+normal*(lateral*exp(-times/cfg.nominalClf.lookaheadSeconds));angles=projection.heading+zeros(size(times));
+                end
+                target=predictiveSafetyGeometry.targetFlow(epoch,time+times);
+                centers=target(1:2,:)+[cos(target(3,:)).*target(10,:)-sin(target(3,:)).*target(11,:); ...
+                    sin(target(3,:)).*target(10,:)+cos(target(3,:)).*target(11,:)];
+                differences=positions-centers;
+                longitudinal=sum([cos(angles);sin(angles)].*differences,1);
+                transverse=sum([-sin(angles);cos(angles)].*differences,1);
+                yaw=target(3,:)-angles;
+                a=cfg.vehicle.length/2+abs(cos(yaw)).*target(8,:)+abs(sin(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
+                b=cfg.vehicle.width/2+abs(sin(yaw)).*target(8,:)+abs(cos(yaw)).*target(9,:)+cfg.initialization.clearancePaddingMeters+norm(cfg.vehicle.rectangleOffset);
+                rho=(longitudinal./a).^2+(transverse./b).^2;
+                potential=exp(-.5*rho-times/(2*cfg.nominalClf.lookaheadSeconds));
+                [risk,k]=max(potential);
+                targetVelocity=target(4,k)*[cos(target(3,k)+target(6,k));sin(target(3,k)+target(6,k))];
+                futureTangent=[cos(angles(k));sin(angles(k))];
+                if side==0
+                    [~,closest]=min(rho);
+                    otherVelocity=target(4,closest)*[cos(target(3,closest)+target(6,closest));sin(target(3,closest)+target(6,closest))];
+                    preference=transverse(closest)-.3*[-sin(angles(closest)),cos(angles(closest))]*otherVelocity;
+                    side=1;if preference < -1e-8,side=-1;end
+                end
+                radial=x(1:2)-centers(:,1);
+                circulation=-side*tangent.'*radial/max(norm(radial),1);
+                obstacleLateral=.7*cfg.referenceSpeed*risk*(transverse(k)/b(k)+2*circulation);
+                closing=max(0,futureTangent.'*(progress*futureTangent-targetVelocity))/cfg.referenceSpeed;
             end
-            target=laneGeometry.project(position,lane,station);
-            longitudinal=station-target.station;lateral=target.lateralPosition;
-            active=abs(longitudinal)<radius;
-            if ~any(active & hypot(longitudinal,lateral)<radius),return;end
-            [~,closest]=min(hypot(longitudinal,lateral));guide.centerTime=times(closest);
-            first=find(active,1);last=find(active,1,'last');guide.endTime=times(last);
-            guide.width=max(guide.width,(times(last)-times(first))/2);
-            crossSection=sqrt(max(0,radius^2-longitudinal(active).^2));
-            kernel=exp(-.5*((times(active)-guide.centerTime)/guide.width).^2);
-            left=max([0,(lateral(active)+crossSection)./kernel]);
-            right=max([0,(-lateral(active)+crossSection)./kernel]);
-            % The smaller scalar envelope selects a side, not a second plan.
-            % Symmetric encounters retain the left preference under roundoff.
-            if left<=right+1e-10*max(1,max(left,right)),guide.amplitude=left;
-            else,guide.amplitude=-right;
-            end
-        end
-
-        function velocity = movingFlowVelocity(position,nominal,center,translation,map,mapRate,circulation)
-            % Transport a unit-cylinder flow through a moving ellipse frame.
-            % Outside q'*q >= 1, exact first-order following preserves that
-            % exterior. This is guidance, not a bicycle safety certificate.
-            % The interior regularization only keeps restoration seeds finite.
-            q=map\(position-center);radiusSquared=max(1,q.'*q);
-            relative=map\(nominal-translation-mapRate*q);
-            modulation=(1+1/radiusSquared)*eye(2)-2*(q*q.')/radiusSquared^2;
-            tangent=[-q(2);q(1)];
-            velocity=translation+mapRate*q+map*(modulation*relative+circulation*tangent/radiusSquared);
+            desiredLateral=-lateral/cfg.nominalClf.lookaheadSeconds+obstacleLateral;
+            speed=max(max(1.5,.5*cfg.referenceSpeed),cfg.referenceSpeed*(1-.35*risk*min(2,closing)));
+            heading=projection.heading+atan2(desiredLateral,speed);
         end
 
         function q = target(observation,raw,~)
@@ -91,11 +87,12 @@ classdef predictiveSafetyGeometry
             % Vdot=A, betadot=0, psidot=V*sin(beta)/lr. Constant curvature
             % makes the position integral elementary even when A is nonzero.
             if isempty(q),next=q;return;end
-            arc=q(4)*time+.5*q(5)*time^2;
-            curvature=sin(q(6))/q(7);a=curvature*arc/2;scale=1;
-            if a~=0,scale=sin(a)/a;end
-            next=q;next(1:2)=q(1:2)+arc*scale*predictiveSafetyGeometry.direction(q(3)+q(6)+a);
-            next(3)=q(3)+curvature*arc;next(4)=q(4)+q(5)*time;
+            time=reshape(time,1,[]);arc=q(4)*time+.5*q(5)*time.^2;
+            curvature=sin(q(6))/q(7);a=curvature*arc/2;scale=ones(size(a));
+            nonzero=a~=0;scale(nonzero)=sin(a(nonzero))./a(nonzero);
+            next=repmat(q,1,numel(time));
+            next(1:2,:)=q(1:2)+(arc.*scale).*predictiveSafetyGeometry.direction(q(3)+q(6)+a);
+            next(3,:)=q(3)+curvature*arc;next(4,:)=q(4)+q(5)*time;
         end
 
         function tangent = direction(angle)

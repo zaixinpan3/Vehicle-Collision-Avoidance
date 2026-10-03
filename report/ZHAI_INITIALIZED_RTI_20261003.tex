@@ -1,0 +1,167 @@
+\documentclass[10pt]{article}
+\usepackage[margin=.8in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,longtable,hyperref,xurl}
+\hypersetup{colorlinks=true,urlcolor=blue,linkcolor=blue}
+\title{Potential-Initialized PCBF--CLF RTI: One Model per Initialization}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\section{Implemented behavior}
+Normal frames shift the previous input sequence and roll it out from the current
+state. They linearize that trajectory once and attempt the inherited-safety-budget
+CLF problem. Startup, an unevaluable shift, or a failed shifted optimization uses
+a fresh motion-aware potential-field initialization. A failed shifted model may
+be replaced once by this new seed and its model. An optimized rollout is never
+relinearized again within the same hold. A fresh seed that fails reports failure;
+no previous plan, seed control or primary-only point becomes an executable backup.
+
+The same single analytic quadratic CLF remains in every case. A zero PCBF lower
+bound does not skip CLF optimization. Damping interpolates a feasible segment
+of the same conic problem and uses cheap nonlinear model-agreement evaluations;
+it does not rebuild dynamics or call another solver. Initialization/restoration
+may still require PCBF and CLF solves. The numerical correction box can grow
+between frames when agreement is good; permanently capping it at the small
+initial scale substantially delayed nominal recovery in a discarded prototype.
+
+\section{Transfer from Zhai et al.}
+The local paper by Zhai, Liu, Zhang and Wang, IEEE Access 12 (2024),
+19665--19681, DOI \path{10.1109/ACCESS.2024.3355952}, motivates directional repulsion,
+relative-motion awareness, and coupled course/speed guidance (Sections III--IV).
+This implementation does not reproduce its printed equations, tracked-vehicle
+model, eight behavior priorities or Bezier tracker. The preceding assessment
+\path{report/FLOW_INITIALIZATION_ZHAI_20261002.tex} records the formula issues.
+
+At each seed hold, preview the actual ego tangent speed and an exponential
+lateral return to the given path. Pair every ego preview position with the known
+target at the same absolute time. The target keeps constant tangential
+acceleration and sideslip, with exact constant-curvature propagation. In the
+road frame, form the directional interaction measure
+\[
+ w_j=\exp\!\left[-\tfrac12\left((\Delta s_j/a_j)^2+
+ (\Delta d_j/b_j)^2\right)-\tau_j/(2T)\right],\qquad w=\max_jw_j.
+\]
+The dimensions $a_j,b_j$ use rectangle supports, target orientation, body-center
+offsets and seed padding. Lateral attraction, normalized lateral repulsion and
+bounded circulation give a course demand; predicted longitudinal closing gives
+a speed reduction. This is a guidance field, not the full gradient of a claimed
+scalar safety potential. It never divides by closing speed. A passing sign is
+held within each seed rather than enumerating maneuver modes.
+
+Inverse Fiala front-force guidance and a speed loop produce controls; the actual
+nonlinear bicycle RK4 map produces the anchor states. The final two seconds
+settle intrinsic velocity/input state toward the existing free-pose straight
+core. Endpoint position and heading remain free. The same completion is used
+for target-free initialization, where regression testing exposed that continued
+path recovery could miss the tiny core. No extra CLF or collision acceptance
+test is added.
+
+The seed parameters are common to all cases: three-second preview, 0.1-second
+preview spacing, 0.7-m guidance padding, 0.3 braking-ratio shaping, 0.98 lateral
+acceleration/front-force fractions, and unit speed gain. These are initialization
+parameters, not physical steering limits or optimized-input clipping. The
+braking parameter was selected through a bounded raw-seed sweep on the failed
+accelerating head-on case. No claim of parameter optimality or generalization
+outside the evaluated family is made. The old fitted Gaussian displacement,
+transported-cylinder helper and obsolete comparison driver were removed.
+
+\section{Experiment contract}
+The seven prescribed collision threats are evaluated at 8 and 15 m/s. Holds are
+50 ms; PCBF prefixes have 8/16 steps and the unchanged completion adds 60 steps.
+The input is applied to ODE45 with relative/absolute tolerances $10^{-11}$ and
+$10^{-12}$; 31 output samples per hold audit rectangle clearance. State is exact,
+road constraints are absent, and target motion is fixed and known. There is no
+random seed. Computation latency is measured but not injected into plant time.
+
+The observation cap is 1,500 holds, not a success deadline. Success requires
+post-conflict errors below
+\[ [0.1\,\mathrm m,1^\circ,0.1\,\mathrm{m/s},
+0.05\,\mathrm{m/s},0.01\,\mathrm{rad/s}] \]
+continuously for one second.
+The controller's 0.10-m margin constrains its affine collision rows. Dense
+nonlinear replay clearance is a separate measurement, not an assertion that
+this margin is certified on the continuous plant.
+
+\section{Closed-loop results}
+All 14 cases recovered without sampled collision or solver interruption, across 4,618 holds. Minimum replay clearance was 49.477 mm. The slowest recovery confirmation was 66.00 s.
+
+\begin{center}\small
+\begin{tabular}{rlrrrr}
+\toprule
+Speed & Scenario & Recovery (s) & Gap (m) & Max $|e_y|$ (m) & Run max (ms)\\
+\midrule
+8 & headOn & 12.60 & 1.7211 & 5.956 & 81.40\\
+8 & acceleratingHeadOn & 12.55 & 1.3235 & 5.876 & 46.77\\
+8 & brakingLead & 13.50 & 1.1830 & 5.549 & 52.86\\
+8 & crossing & 12.60 & 0.0915 & 5.722 & 46.49\\
+8 & turningCrossing & 12.10 & 0.1032 & 5.609 & 50.84\\
+8 & curvedHeadOn & 17.90 & 2.1481 & 6.084 & 43.03\\
+8 & curvedCrossing & 13.05 & 0.0944 & 5.750 & 51.53\\
+15 & headOn & 10.15 & 0.1759 & 7.241 & 47.38\\
+15 & acceleratingHeadOn & 10.30 & 0.0495 & 6.872 & 56.30\\
+15 & brakingLead & 16.10 & 0.8721 & 7.871 & 56.21\\
+15 & crossing & 11.55 & 3.3413 & 10.773 & 43.39\\
+15 & turningCrossing & 11.40 & 3.1841 & 10.478 & 44.17\\
+15 & curvedHeadOn & 66.00 & 3.9997 & 11.143 & 62.99\\
+15 & curvedCrossing & 11.10 & 2.5831 & 10.017 & 44.56\\
+\bottomrule
+\end{tabular}\end{center}
+``Run max'' excludes each scenario's first call. These are controller-call wall
+measurements without a profiler; the workstation was shared with other research
+processes. They establish an observed distribution, not a worst-case deadline.
+
+Continuation median, 95th percentile and maximum were 13.572, 26.399 and 81.396 ms. There were 0 continuation frames over 100 ms and 18 over the 50-ms hold. The largest first call was 864.633 ms, including startup/cached-construction effects.
+
+There were 4,545 one-model frames and 73 failed-shift/fresh-seed frames. 4,510 frames used one numerical solve, 33 used damping, and no frame used more than 3 solves. These counts distinguish one linearization per initialization from a promise of one numerical solve in every exception.
+
+The slowest continuation was 8 m/s headOn, frame 5. Its measured components were:
+\begin{center}\begin{tabular}{lr}\toprule Component & ms\\\midrule
+Shift / initialization & 1.854\\
+Problem construction (including CLF) & 32.987\\
+Numerical solvers & 15.270\\
+Full-step model agreement & 0.914\\
+Damping & 0.000\\
+Other controller overhead & 30.371\\
+\bottomrule\end{tabular}\end{center}
+Other overhead is a remainder, not a profiled function attribution.
+
+The 66-second confirmation in the 15-m/s curved head-on case is not a
+66-second first-encounter recovery. The trace first satisfies a one-second
+nominal dwell at 11.1 s. The prescribed constant-sideslip target follows a
+circular orbit and produces another encounter near 56 s (the cruise baseline's
+last overlap is 56.445 s). The controller avoids again and confirms recovery
+at 66 s. The campaign deliberately observes through that later threat.
+
+\section{Raw seeds, limitations and validation}
+All fourteen raw seed ODE45 replays have positive sampled clearance. Only
+thirteen raw endpoints lie inside the intrinsic terminal core; optimization
+still performs local repair where needed. The seed alone is not a safety
+witness. Compared with the preceding Gaussian audit, lateral displacement is
+smaller in 6/14 cases, and its median decreases from 15.137 to 13.424 m; the
+largest displacement increases from 19.983 to 20.365 m. Thus this is not a
+uniform improvement in geometric path compactness. The measured contribution
+is motion-aware initialization supporting the requested one-model architecture
+and successful closed-loop recovery on this family.
+
+An intermediate fourteen-case campaign recovered in thirteen cases. The
+15-m/s accelerating head-on seed slightly violated a collision row, inducing a
+nonzero PCBF correction. Interpolating from that primary point could not drive
+its nonlinear model error to zero: damping shrinks the CLF displacement, not
+the primary displacement from the anchor. Adjusting the coupled speed/turn
+seed removed that failure without another SCP linearization. Earlier raw-seed
+prototypes are exploratory attempts, not additional successful campaigns. The
+legacy stress fixture with a tenfold input correction radius also fails from
+the new seed. Its regression now explicitly expects a reported failure, not
+an inaccurate command or another same-seed linearization. Thus success of the
+fourteen default cases is not a universal feasibility claim.
+
+The final focused MATLAB regression contains 388 passing tests in 18 suites, covering target prediction, field frame/time consistency, shifted inputs, fresh initialization on failure, inherited budgets, damping, the single CLF, terminal sets, tire/road-load models and nominal recovery. A persistent solver entry point also fixes test-fixture path restoration invalidating a cached availability flag.
+
+Reproduction uses \texttt{runTimedFlowCampaign(root,out,1500)} and
+\texttt{auditFlowInitialization(out)}. Machine-readable results, test outcomes,
+source hashes and exact commands are adjacent to this report. Raw traces and
+identified archive export copies retain the underlying evidence. The historical
+Gaussian audit must be reproduced from its recorded commit; its retired
+algorithm is not retained as a controller option.
+\end{document}

@@ -1,12 +1,12 @@
 function [solution,search,model] = solvePredictiveControl(model,previousState,timer)
-%solvePredictiveControl One RTI correction and at most one model rebuild.
+%solvePredictiveControl One model per shifted or freshly initialized trajectory.
 % A shifted slack budget can replace the primary optimization, never the CLF.
-% A feasible convex segment can repair model disagreement before rebuilding.
+% Damping reuses that model; only a failed shift can request a fresh seed.
     if nargin<3,timer=tic;end
     cfg=model.cfg;solution=[];allAttempts=struct([]);allStages=struct([]);history=struct([]);
     restarted=false;selected=0;initialFailure="";selectedRound=0;
     lineSearchHistory=struct([]);
-    model.inputTrustScale=1;
+    model.inputTrustScale=.25;
     model.inheritedSlacks=[];
     model.linearizationBuilds=0;
     if isstruct(previousState) && isfield(previousState,'linearizationTrustScale')
@@ -28,7 +28,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         if strlength(search.initializationFailure)>0,initialFailure=search.initializationFailure;end
         if isempty(candidate),break;end
         segment=candidate.searchSegment;candidate=rmfield(candidate,'searchSegment');
-        wall=tic;[agreement,rollout,valid]=localPredictionAgreement(candidate,trialModel);
+        wall=tic;[agreement,~,~]=localPredictionAgreement(candidate,trialModel);
         agreement.seconds=toc(wall);agreement.stepFraction=1;
         scale=max(1,candidate.clfInitialValue);
         agreement.predictedClfReduction=search.clfInitialSlack-candidate.clfSlack;
@@ -54,32 +54,14 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
                 [candidate.states(:,end);candidate.inputs(:,end)],model.sampleIndex+size(candidate.inputs,2));
             break;
         end
-        % The full nonlinear rollout closes the dynamics defect at the new
-        % anchor. Damping an inaccurate but evaluable iterate can keep its
-        % endpoint outside the tiny terminal core and force repeated expansion.
-        model=trialModel;
-        if ~valid
-            anchor=trialModel.linearization;fraction=.5;
-            for backtrack=1:9
-                inputs=anchor.inputs+fraction*(candidate.inputs-anchor.inputs);
-                [rollout,valid]=localRollout(inputs,trialModel);
-                if valid,break;end
-                fraction=fraction/2;
-            end
-            history(end).stepFraction=fraction;
+        % A failed shifted correction may start one new potential-field seed.
+        % Never linearize the optimized rollout again in this sampling hold.
+        if restarted || search.initialization~="shiftedInputRollout" ...
+                || trialModel.linearizationBuilds>=cfg.nonlinear.maximumLinearizations
+            break;
         end
-        if valid
-            model.iterationAnchor=rollout;
-            model.terminal=terminalContinuation.fit(model.terminal, ...
-                [rollout.states(:,end);rollout.inputs(:,end)],model.sampleIndex+size(rollout.inputs,2));
-        else
-            model.iterationAnchor=trialModel.linearization;
-        end
-        if agreement.ratio>1
-            fraction=min(.5,.8/sqrt(agreement.ratio));
-            if ~isfinite(fraction),fraction=.1;end
-            model.inputTrustScale=max(1/1024,model.inputTrustScale*max(fraction,.1));
-        end
+        model=trialModel;model.inheritedSlacks=[];model.inputTrustScale=.25;
+        previousState=[];restarted=true;initialFailure="shiftedModelDisagreement";
         if toc(timer)>=cfg.solver.timeLimitSeconds,break;end
     end
     if ~isempty(solution)
@@ -215,13 +197,13 @@ end
 
 function [solution,search,model] = localRound(model,previousState,timer)
 %localRound Restore one affine PCBF problem, then solve its CLF objective.
-% A finite candidate is returned to the outer model-agreement iteration.
+% A finite candidate is returned for model agreement and optional damping.
     if nargin<3,timer=tic;end
     wall=tic;[anchor,source,failure]=localInitialization(model,previousState);
     initializationSeconds=toc(wall);
     budgetAttempts=struct([]);budgetStages=struct([]);
     sharedProblem=[];
-    if ~isempty(model.inheritedSlacks) && any(source==["shiftedInputRollout","sameFrameRollout"])
+    if ~isempty(model.inheritedSlacks) && source=="shiftedInputRollout"
         wall=tic;[problem,model]=localFormulate(anchor,model);model.linearization=anchor;
         search=localSearch(problem,model,source,toc(wall));
         search.initializationSeconds=initializationSeconds;
@@ -256,7 +238,7 @@ function [solution,search,model] = localRound(model,previousState,timer)
         if expanded,selected=numel(attempts);end
     end
     needsRestoration=isempty(point) || search.primaryOptimum>problem.primaryLowerBound+model.cfg.solver.feasibilityTolerance;
-    if any(source==["shiftedInputRollout","sameFrameRollout"]) && needsRestoration && model.allowFlowRestart ...
+    if source=="shiftedInputRollout" && needsRestoration && model.allowFlowRestart ...
             && model.linearizationBuilds<model.cfg.nonlinear.maximumLinearizations && toc(timer)<model.cfg.solver.timeLimitSeconds
         reason=search.terminationReason;
         if ~isempty(point),reason="positiveRestorablePcbfSlack";end
@@ -281,7 +263,7 @@ function [solution,search,model] = localRound(model,previousState,timer)
     [solution,search,model]=localSecondary(point,problem,anchor,model,search,timer);
     stages=[stages,search.stages(2:end)];attempts(selected)=localAttempt(search);
     % A failed CLF solve can still use the one available fresh initialization.
-    if isempty(solution) && any(search.initialization==["shiftedInputRollout","sameFrameRollout"]) && ~restarted && model.allowFlowRestart ...
+    if isempty(solution) && search.initialization=="shiftedInputRollout" && ~restarted && model.allowFlowRestart ...
             && model.linearizationBuilds<model.cfg.nonlinear.maximumLinearizations ...
             && search.terminationReason=="clfNoNumericalResult" && toc(timer)<model.cfg.solver.timeLimitSeconds
         failure=search.terminationReason;wall=tic;anchor=localFlowSeed(model,size(anchor.inputs,2));initializationSeconds=toc(wall);
@@ -449,14 +431,17 @@ function solution=localDecode(point,problem,anchor)
 end
 
 function [point,flag,solverInfo]=localConicSolve(quadratic,objective,cones,a,b,equal,rhs,lower,upper,cfg,remaining,gapTolerance)
-    persistent available
-    if isempty(available)
+    persistent solver
+    if isempty(solver)
         directory=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
         if isfolder(directory),addpath(directory);end
         assert(exist('predictiveConicSolverMex','file')==3, ...
             'collisionAvoidanceController:missingConicSolver', ...
             'Run scripts/buildPredictiveConicSolver to compile the Clarabel adapter.');
-        available=true;
+        % Retain the resolved entry point when a caller restores MATLAB's
+        % path (for example a test fixture). A cached availability flag alone
+        % would survive that restoration while name resolution would fail.
+        solver=@predictiveConicSolverMex;
     end
     count=numel(objective);identity=speye(count);low=isfinite(lower);high=isfinite(upper);
     rows=cell(1,numel(cones)+1);bounds=cell(size(rows));
@@ -467,7 +452,7 @@ function [point,flag,solverInfo]=localConicSolve(quadratic,objective,cones,a,b,e
         cone=cones(k);rows{k+1}=[-cone.d.';-cone.A];bounds{k+1}=[-cone.gamma;-cone.b];
         dimensions(k+2)=size(cone.A,1)+1;
     end
-    [point,flag,solverInfo]=predictiveConicSolverMex(quadratic,objective, ...
+    [point,flag,solverInfo]=solver(quadratic,objective, ...
         vertcat(rows{:}),vertcat(bounds{:}),dimensions,[0,1,2*ones(1,numel(cones))], ...
         [cfg.solver.maxIterations;remaining;cfg.solver.constraintTolerance;gapTolerance;cfg.solver.feasibilityTolerance]);
 end
@@ -478,9 +463,6 @@ end
 
 function [anchor,source,failure]=localInitialization(model,previous)
     cfg=model.cfg;
-    if isfield(model,'iterationAnchor')
-        anchor=model.iterationAnchor;source="sameFrameRollout";failure="";return;
-    end
     count=min(cfg.controller.maximumHorizonSteps,cfg.controller.horizonSteps ...
         +ceil(cfg.nonlinear.recoveryHorizonSeconds/cfg.controller.sampleTime));
     source="movingTargetFlow";failure="";
@@ -518,60 +500,46 @@ function [anchor,source,failure]=localInitialization(model,previous)
 end
 
 function anchor=localFlowSeed(model,count)
-    % A time-aligned Gaussian guides one transported-flow bicycle rollout.
-    % The curve's nominal arrival clock is approximate; the actual rollout
-    % and moving field always query the target at the same absolute time.
-    % This is an initialization, with no safety or terminal admission.
+    % A single potential-guided bicycle rollout, used only without a usable
+    % shift or after its optimization fails. No seed supplies an issued input.
     cfg=model.cfg;reference=model.nominalReference;x=model.initialState;previous=model.previousInput;
-    h=cfg.controller.sampleTime;tire=modifiedFialaTire.parameters(cfg);
-    inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=x;
-    guide=predictiveSafetyGeometry.movingGaussianGuide(x,model.lane,model.targetEpoch, ...
-        model.sampleIndex*h,count*h,cfg);radius=guide.radius;
-    nominalTerminal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
-    station=[];completionStarted=false;
+    h=cfg.controller.sampleTime;
+    inputs=zeros(2,count);states=zeros(6,count+1);states(:,1)=x;side=0;
+    nominal=nonlinearBicycleModel.nominalGuidanceParameters(cfg,reference.curvature);
+    settle=max(cfg.controller.horizonSteps,count-ceil(cfg.initialization.settlingSeconds/h));
     for index=1:count
         time=(model.sampleIndex+index-1)*h;
-        q=predictiveSafetyGeometry.targetFlow(model.targetEpoch,time);
-        projection=laneGeometry.project(x(1:2),model.lane,station);station=projection.station;
-        direction=[cos(projection.heading);sin(projection.heading)];normal=[-direction(2);direction(1)];
-        deviation=nonlinearBicycleModel.error(x,model.lane,reference);
-        elapsed=(index-1)*h;active=guide.amplitude~=0 && elapsed<=guide.endTime;
-        if active && ~completionStarted
-            yaw=q(3);rotation=[cos(yaw),-sin(yaw);sin(yaw),cos(yaw)];offset=rotation*q(10:11);
-            omega=q(4)*sin(q(6))/q(7);
-            translation=q(4)*[cos(yaw+q(6));sin(yaw+q(6))]+omega*[-offset(2);offset(1)];
-            z=(elapsed-guide.centerTime)/guide.width;
-            lateral=guide.amplitude*exp(-.5*z^2);lateralRate=-z/guide.width*lateral;
-            nominal=cfg.referenceSpeed*direction ...
-                +(lateralRate-.5*(projection.lateralPosition-lateral))*normal;
-            circulation=-sign(guide.amplitude)*.6*max(norm(nominal-translation),.5*cfg.referenceSpeed)/radius;
-            velocity=predictiveSafetyGeometry.movingFlowVelocity(x(1:2),nominal,q(1:2)+offset, ...
-                translation,radius*eye(2),zeros(2),circulation);
-            heading=atan2(velocity(2),velocity(1));
-            desiredSpeed=min(cfg.referenceSpeed,max(max(1.5,.5*cfg.referenceSpeed),norm(velocity)));
-            deviation(1)=0;deviation(2)=atan2(sin(x(3)-heading),cos(x(3)-heading));
-            deviation(3)=x(4)-desiredSpeed;
+        if index>settle
+            % Settle intrinsic velocities into the existing free-pose
+            % straight core; the endpoint position and heading remain free.
+            u=localGuidanceInput(x,previous,0,cfg.referenceSpeed,cfg,model.terminal.reference);
+        elseif isempty(model.targetEpoch)
+            u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominal);
+        else
+            [heading,speed,side]=predictiveSafetyGeometry.potentialGuidance(x,model.lane,model.targetEpoch,time,cfg,side);
+            course=x(3)+atan2(x(5),x(4));
+            yawRate=reference.curvature*hypot(x(4),x(5)) ...
+                -cfg.nominalClf.courseGain*atan2(sin(course-heading),cos(course-heading));
+            u=localGuidanceInput(x,previous,yawRate,speed,cfg,reference);
         end
-        if index>cfg.controller.horizonSteps && (~active || completionStarted)
-            completionStarted=true;seed=terminalContinuation.fit(model.terminal,[x;previous],model.sampleIndex+index-1);
-            [~,~,deviation]=terminalContinuation.membership([x;previous],seed.epochIndex,seed);
-            u=seed.reference.input+seed.gain*deviation;
-        elseif active,u=reference.input+reference.gain*deviation;
-        else,u=nonlinearBicycleModel.nominalFeedback(x,previous,model.lane,reference,cfg,nominalTerminal);
-        end
-        u=localShape(u,x,previous,cfg,tire);
         inputs(:,index)=u;x=nonlinearBicycleModel.sample(x,u,cfg);states(:,index+1)=x;previous=u;
     end
     anchor=struct('inputs',inputs,'states',states);
 end
 
-function u=localShape(u,x,previous,cfg,tire)
-    u(2)=min(.35,max(-.35,u(2)));u=localClip(u,previous,cfg);
-    % Tire-informed seed shaping does not bound the optimized steering.
-    slipLimit=atan(3*tire.longitudinalForceScale(1)*sqrt(1-u(2)^2) ...
-        /tire.corneringStiffness(1)*(1-(1-.8)^(1/3)));
-    zeroSlip=atan2(x(5)+cfg.vehicle.lf*x(6),max(x(4),cfg.model.scheduleSpeedFloor));
-    u(1)=min(zeroSlip+slipLimit,max(zeroSlip-slipLimit,u(1)));u=localClip(u,previous,cfg);
+function u=localGuidanceInput(x,previous,yawRate,speed,cfg,reference)
+    tire=modifiedFialaTire.parameters(cfg);
+    limit=cfg.initialization.lateralAccelerationFraction*min(tire.frictionCoefficient)*cfg.vehicle.gravity/max(hypot(x(4),x(5)),1);
+    yawRate=min(limit,max(-limit,yawRate));
+    b=reference.input(2)+cfg.initialization.speedGain*(speed-x(4));
+    b=min(cfg.initialization.brakingRatioLimit,max(-cfg.initialization.brakingRatioLimit,b));
+    clipped=localClip([0;b],previous,cfg);b=clipped(2);
+    rear=modifiedFialaTire.evaluate([0;atan2(x(5)-cfg.vehicle.lr*x(6),x(4))],b,cfg);
+    front=(cfg.vehicle.Iz*cfg.nominalClf.yawRateGain*(yawRate-x(6))+cfg.vehicle.lr*rear(2))/cfg.vehicle.lf;
+    capacity=tire.longitudinalForceScale(1)*sqrt(1-b^2);
+    fraction=min(abs(front)/capacity,cfg.initialization.frontForceFraction);
+    slip=-sign(front)*atan(3*capacity*(1-(1-fraction)^(1/3))/tire.corneringStiffness(1));
+    u=[atan2(x(5)+cfg.vehicle.lf*x(6),x(4))-slip;b];
 end
 
 function [problem,model]=localFormulate(anchor,model)

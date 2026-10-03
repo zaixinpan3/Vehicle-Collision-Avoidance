@@ -27,6 +27,10 @@ function cfg=localDefaults()
         'trustRadius',.5,'maximumLinearizations',2,'predictionToleranceMeters',.01, ...
         'statePredictionTolerance',.01,'clfPredictionTolerance',.01, ...
         'recoveryHorizonSeconds',3);
+    % Potential-field seed parameters; these are not optimized actuator limits.
+    cfg.initialization=struct('previewSeconds',3,'previewStepSeconds',.1, ...
+        'clearancePaddingMeters',.7,'settlingSeconds',2,'brakingRatioLimit',.3, ...
+        'lateralAccelerationFraction',.98,'frontForceFraction',.98,'speedGain',1);
     % A target farther than encounterRangeMeters (body to body) carries no
     % collision risk. Its constant speed-rate and sideslip motion is assumed
     % only until a prediction first exceeds that range. Inf never ends it.
@@ -87,6 +91,15 @@ function localValidate(cfg)
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
     end
     validateattributes(cfg.nonlinear.maximumLinearizations,{'double'},{'scalar','real','finite','integer','>=',1,'<=',2});
+    for name=string(fieldnames(cfg.initialization)).'
+        validateattributes(cfg.initialization.(name),{'double'},{'scalar','real','finite','positive'});
+    end
+    if cfg.initialization.previewStepSeconds>cfg.initialization.previewSeconds
+        localInvalid('Initialization preview step cannot exceed its duration.');
+    end
+    for name=["lateralAccelerationFraction","frontForceFraction","brakingRatioLimit"]
+        if cfg.initialization.(name)>=1,localInvalid('initialization.%s must lie in (0,1).',name);end
+    end
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','nonnan','positive'});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters

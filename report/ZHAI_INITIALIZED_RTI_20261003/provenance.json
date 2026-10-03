@@ -1,0 +1,133 @@
+{
+  "recordedAt": "2026-10-03T00:15:47.864746-05:00",
+  "environment": "MATLAB R2026a Update 3, Linux, -singleCompThread; shared workstation",
+  "parentHead": "9a5ab8ee4cf8de6fe359dd061bec0a2ac7c9f9ef",
+  "parentNote": "Concurrent perception-report commit changed repository HEAD but no examined controller/configuration/scenario sources.",
+  "baselineAssessmentCommit": "a55b43ca97175b5a11ea8c0f55f6102dd92d602f",
+  "sourceHashes": {
+    "controller/collisionAvoidanceController.m": "8897c042303f58e2499876d4026a26b01fdc34b02545d3aed03813766ae99539",
+    "controller/laneGeometry.m": "d4b02dca46c3e260d70166064f584819caaecd2a16df0a8e7270ff0b472654cc",
+    "controller/modifiedFialaTire.m": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+    "controller/nonlinearBicycleModel.m": "c55943a9df940c134c291da86353486a68ebad7d06aa5eefab09dd17a5d6071c",
+    "controller/predictiveSafetyGeometry.m": "f2daf473b06c4b79ff017830ce445e5984ea50921ecd633311da21a9f662b156",
+    "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+    "controller/solvePredictiveControl.m": "46c36e2f1127944cd00af98f9c6e5755d3a5750fa9b2920fbae468dd1e21e692",
+    "controller/terminalContinuation.m": "b6011d42c9474787c1062ea2ef32de9913142d2518d024987d6da62548d50e24",
+    "config/collisionAvoidanceControllerConfig.m": "a1f0fb71009d78fc5b46c21721d91e3c05e88ff0cd0167fa560810ed5d6a1422",
+    "scripts/collisionThreatScenario.m": "a99f44d628d5c168e7dd5caea6a1c27d59db423dbbc2fbf8d31794499090e310",
+    "scripts/givenPathCollisionBaseline.m": "89d60fe09c8d283cd8a0c0f7869cc09b93b587b76a1f14a5c314aa93a4fb5d09",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "b22d71e60ca6e052b08bf730b8121088dcc58d776ce282b123f613f358b461c8",
+    "scripts/runTimedFlowCampaign.m": "265f33b7dd33bd054e8d42677bf5fced253e53e999acd1597d50a7db4dd6d8b5",
+    "scripts/auditFlowInitialization.m": "c6659fc36b8949c4f0db96676ac217803c9993cab66fc8e468a56c96b79901ec",
+    "tests/movingTargetFlowTest.m": "443b2eb2e710fc174265cb4681ccc0c6205c78b8c1438990ceeca49bae822882",
+    "tests/twoStagePredictiveControlTest.m": "fcda5a60847335378f12e7ed3a5914e03bb6bb88d0ecc464ed2bc29d22b261c7",
+    "tests/nonlinearPredictiveSafetyTest.m": "10ea6c772cb0a5c4ba8defaf127c48234d4f2e31c36be96e74d32f55668bbc1c"
+  },
+  "paper": {
+    "path": "reference/Zhai et al. - 2024 - Local Trajectory Planning for Obstacle Avoidance of Unmanned Tracked Vehicles Based on Artificial Po.pdf",
+    "sha256": "28bb428f77fce12810a1a6533e3d4e5cdac920acb9a2a0a8295786296be6fad9",
+    "doi": "10.1109/ACCESS.2024.3355952"
+  },
+  "commands": [
+    "MATLAB runtests('tests/twoStagePredictiveControlTest.m') after retaining the legacy oversized-correction fixture under the one-model failure contract; assertSuccess passed; outcomes in final-stage-tests.json",
+    "matlab -singleCompThread -batch \"addpath('scripts'); runTimedFlowCampaign(pwd,'/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/validated-campaign',1500);\"",
+    "matlab -singleCompThread -batch \"run('/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/runChecks.m');\"",
+    "matlab -singleCompThread -batch \"run('/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/checkCode.m');\"",
+    "MATLAB auditFlowInitialization('/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/final-seeds'), executed after the first focused test run; only target-free seed completion and solver entry-point resolution changed afterward; final campaign exactly repeats all target scenario inputs and states",
+    "python /home/zai/.cache/collisionAvoidance/zhai-rti-20261002/summarize.py",
+    "python /home/zai/.cache/collisionAvoidance/zhai-rti-20261002/writeReport.py",
+    "pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/home/zai/.cache/collisionAvoidance/zhai-rti-20261002 report/ZHAI_INITIALIZED_RTI_20261003.tex; two successful passes; no overfull boxes or undefined references; rendered result/limitation pages inspected"
+  ],
+  "tests": {
+    "total": 388,
+    "passed": 388,
+    "failed": 0,
+    "suites": 18,
+    "result": "tests.json",
+    "executionNote": "387 tests passed in the full focused run; the updated two-stage class was then rerun after retaining its oversized-correction fixture as an explicit expected failure. Aggregated by test name."
+  },
+  "independentTechnicalPdf": {
+    "path": "/home/zai/.cache/collisionAvoidance/zhai-rti-20261002/ZHAI_INITIALIZED_RTI_20261003.pdf",
+    "sha256": "fe74b4a372ded43f5bcf11fb64169363cb4b06cfbc03d0daff6c1ead78db2868"
+  },
+  "repeatedCampaign": [
+    {
+      "speed": 8,
+      "scenario": "headOn",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 8,
+      "scenario": "brakingLead",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 8,
+      "scenario": "crossing",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 15,
+      "scenario": "headOn",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 15,
+      "scenario": "brakingLead",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 15,
+      "scenario": "crossing",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    },
+    {
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "allSampledStatesAndInputsExactlyRepeated": true
+    }
+  ],
+  "seedTraceSha256": "6a73ad9e168d6177a61bf5da0775f5f9ce7ce089c595a4b9e405cea6c8dfc652",
+  "exclusions": [
+    "Unrelated estimator/report-index edits",
+    "Administrative instruction files",
+    "Manuscript/perception/reference working files",
+    "Nested solver tree and generated binaries"
+  ],
+  "scope": "Nominal exact-state sampled replay; no continuous-plant certificate, observation errors, road bounds or latency-injected plant."
+}

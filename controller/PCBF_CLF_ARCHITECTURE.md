@@ -32,26 +32,54 @@ flow supplies both initialization and collision constraints at matching
 absolute times. The existing signed-velocity continuation is retained; a stop
 clamp would change the constant-acceleration model.
 
-The flow seed adds a timed Gaussian reference inspired by Cheng et al.
-(2021), Eqs. (34)-(36). On the finite seed horizon it pairs nominal station
-`s0+vRef*t` with the target's predicted station and lateral position. A single
-Gaussian's signed amplitude covers the sampled circular exclusion envelope
-on the less-displaced side. Its center is the closest nominal encounter time;
-its temporal width is at least the nominal lookahead and half the longitudinal
-interaction span. This finite-time construction never divides by closing
-speed. Its lateral displacement and derivative guide the existing moving
-cylinder field; that field still includes the target center velocity, including
-rotation of an offset body center. The guide previews the entire finite seed
-horizon, even when the target initially lies outside the encounter range.
+The initialization borrows Zhai et al. (2024), IEEE Access,
+DOI 10.1109/ACCESS.2024.3355952: direction-dependent obstacle influence,
+motion-dependent repulsion, and joint course/speed guidance. It is an adaptation,
+not a reproduction of their printed potential equations, tracked-vehicle model,
+Bezier path, or eight behavioral priorities. The local-paper assessment in
+[FLOW_INITIALIZATION_ZHAI_20261002.tex](../report/FLOW_INITIALIZATION_ZHAI_20261002.tex)
+records the formula issues and the need for longitudinal planning.
 
-The nominal station clock is approximate. The actual Fiala rollout samples
-the moving field and the target at the same absolute time, but need not follow
-the Gaussian exactly. Neither the geometric envelope nor its curved-road
-Frenet approximation certifies this bicycle rollout. A failed seed remains a
-possible search object. The flow constructor supplies only the initial
-trajectory; the bounded RTI correction and optional second model control prediction accuracy.
-The derivation, paired experiments, and remaining failures are recorded in
-[the timed-flow study](../report/SHARMA_TIMED_FLOW_20261002.tex).
+At each seed hold, project the actual nonlinear ego state onto the given path.
+Preview station using its measured tangent velocity, and preview lateral return
+as `d(tau) = d(0)*exp(-tau/T)`, with `T = lookaheadSeconds`. Compare these positions
+with the target at the same absolute times. With rectangle supports `a_j,b_j`
+in the local road axes, define
+
+    r_j^2 = (Delta_s_j/a_j)^2 + (Delta_d_j/b_j)^2,
+    w_j = exp(-r_j^2/2 - tau_j/(2*T)),  w = max_j w_j.
+
+The supports include both vehicles' dimensions, the target orientation, body
+center offsets, and the seed padding. They are a directional guidance envelope,
+not an exact collision constraint. A held passing sign is selected once per
+seed from the closest predicted encounter and transverse target velocity. A
+bounded circulation component resolves symmetric head-on geometry. The field is
+
+    v_d = -d/T + 0.7*v_ref*w*(Delta_d_star/b_star + 2*c),
+    v_s = max(1.5, 0.5*v_ref, v_ref*(1-0.35*w*min(2,closing/v_ref))),
+    heading_d = heading_path + atan2(v_d,v_s).
+
+Here `c = -side*tangent'*(p_ego-p_target)/max(norm(p_ego-p_target),1)`.
+The star denotes the largest predicted influence. This combines attraction,
+a normalized lateral repulsion and circulation; it is not claimed to be the
+full gradient of one scalar potential. There is no division by closing speed.
+Both acceleration and sideslip affect the target preview through the exact flow.
+The Gaussian now measures predicted interaction; no fitted Gaussian displacement
+or fixed nominal-speed station clock is used.
+
+Course guidance produces a yaw-rate demand. Inverse Fiala force feedback and a
+speed loop produce controls, which are rolled out through the same nonlinear
+bicycle RK4 map. Seed-only friction and braking shaping keep this reference
+within the useful tire region; they do not add steering magnitude or slew limits
+to the optimization. The last `settlingSeconds` settle intrinsic velocities into
+the existing free-pose straight terminal core. The final pose remains free, so
+this construction does not require arrival at a fixed path station. A seed may
+still violate collision or terminal constraints and is never executable by itself.
+
+**Normal frames shift the previous input plan.** Only startup, an unevaluable
+shift, or failure of its optimization/accuracy step constructs this new field
+rollout. Each shifted or fresh trajectory is linearized once. There is no SCP
+iteration on an optimized nonlinear rollout within the same hold.
 
 For an anchor `(xbar_i, ubar_i)` the shared model is
 
@@ -198,7 +226,7 @@ current-state rows supply the unavoidable lower bound
 When a shifted problem has no numerical point, or its primary value exceeds
 this lower bound, one fresh flow model is tried. Primary values are compared only after positive solver termination; a finite
 array from a failed primary solve is not a valid PCBF optimum. The smaller
-primary value is retained, with ties favoring the shifted model. A fresh or relinearized problem that reports infeasibility or numerical
+primary value is retained, with ties favoring the shifted model. A fresh problem that reports infeasibility or numerical
 stalling permits one bounded enlargement to twice the nominal input box; its better primary result is retained. State boxes, physical bounds,
 collision rows and terminal conditions remain. The CLF is constructed only once for each model and reused if the inherited budget needs primary restoration. At most one fresh-flow retry is used across
 the complete within-frame refinement, rather than resetting that allowance
@@ -238,7 +266,7 @@ acceptance error is additional to the analytic lexicographic tie bounds.
 Infeasibility rays, time-limit iterates and unresolved numerical failures return
 no point. `solverInfo` records native status, iterations and residuals.
 
-## Nonlinear model agreement and relinearization
+## Nonlinear model agreement and damping
 
 Each completed PCBF/CLF pair produces an affine state trajectory and input
 sequence. The inputs are propagated from the current measured state through
@@ -272,13 +300,13 @@ remains a relaxed result and is not interpreted as collision freedom.
 
 The first completed CLF step satisfying model agreement ends the frame.
 Positive CLF slack at a local input boundary does not trigger optional extra
-rounds. Further rounds repair model disagreement only. This is a computational
+rounds. A failed shift can request a fresh initialization only. This is a computational
 stopping rule, not a proof that a local step preserves global nominal recovery;
 the closed-loop campaign must test that property. The complete CLF objective
 has been solved before this stopping rule is considered. A damped step need
 not attain the optimum of that solved CLF problem.
 
-Before rebuilding an inaccurate model, retain the primary point `zP` and the
+To damp an inaccurate optimization step, retain the primary point `zP` and the
 secondary point `zS` of the same assembled conic problem. In an inherited-budget
 attempt, `zP` is the zero correction with the shifted slacks; it is not presumed
 feasible. Give `zP` the minimum nonnegative CLF epigraph height for its first
@@ -313,25 +341,18 @@ The approximate quadratic scaling of linearization error applies when the
 segment starts at the nonlinear linearization anchor. A nonzero primary
 correction can retain model error even as alpha tends to zero. Neither a small
 fraction nor conic feasibility proves nonlinear collision freedom. An infeasible
-base or unsuccessful bounded line search therefore returns to relinearization.
+base or unsuccessful bounded line search does not create another linearization
+of the same plan.
 
-After unsuccessful damping, the full nonlinear propagation of the optimized
-inputs becomes the next anchor when evaluable. Rebasing to every damped trial can leave its
-endpoint far from the small terminal core; shrinking the next correction
-box then creates artificial infeasibility and repeated expansion. Rebasing
-the complete trajectory avoids that particular obstruction. Only an invalid
-nonlinear rollout uses up to nine halved input steps to recover an evaluable
-anchor; otherwise the old anchor remains. These search controls are never
-directly issued. When `r > 1`, the next input trust scale contracts by
-`max(0.1,min(0.5,0.8/sqrt(r)))`, with a floor of 1/1024. Dynamics, tire
-derivatives, collision duals, terminal fit and CLF approximation are rebuilt.
-
-There are at most **two actual trajectory model builds** per frame. The normal
-path is one model and one inherited-budget CLF solve. The second build is shared
-by a fresh-flow retry or a correction after model disagreement; neither can
-silently reset the allowance. No third build is permitted. The optional second
-correction uses at most half the previous input radius. This avoids spending
-multiple rounds making only small radius reductions for ratios just above one.
+There are at most **two actual trajectory model builds** per frame. A normal
+frame uses one shifted model and one inherited-budget CLF solve. If the shifted
+problem cannot produce an accurate completed CLF result, one fresh potential
+rollout may replace the initialization and receive its own model. A fresh seed
+that fails reports failure; it is not repeatedly optimized and relinearized.
+`maximumLinearizations=1` disables the fresh retry after a built shifted model;
+the default of two allows it. Startup has only the one fresh model regardless.
+The initial input trust scale is 0.25; the previous accepted scale is inherited
+on a normal frame. This local numerical step bound is not an actuator constraint.
 
 A failed inherited-budget attempt restores PCBF on the existing matrices and
 reuses the analytic CLF cone. One bounded input-box enlargement also reuses those
@@ -380,7 +401,7 @@ models and timings; `selectedAttempt` identifies the model supplying the
 command. `optimizationConverged` describes the numerical stages of the selected
 problem, not discarded restoration attempts, optimality of an inherited cap,
 or optimality of an issued damped point. `secondaryOptimumApplied` distinguishes
-a full solution from a damped step. Continuation state version 67 stores the per-stage slacks and their total
+a full solution from a damped step. Continuation state version 68 stores the per-stage slacks and their total
 alongside the existing single-CLF trajectory state. The optional stored
 `linearizationTrustScale` carries the learned step size, not an executable
 backup policy.
