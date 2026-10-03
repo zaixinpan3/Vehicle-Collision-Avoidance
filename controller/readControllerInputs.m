@@ -5,6 +5,8 @@ function [ego,lane,road,target] = readControllerInputs(egoState,targetEstimate,l
     end
     ego=localReadEgoState(egoState);
     ego.stateTime=localOptionalStateScalar(egoState,"stateTime",NaN);
+    [ego.errorBounds,ego.uncertaintySpecified]=localErrorBounds(egoState, ...
+        "ego-state-v1",6,ego.stateTime);
     [lane,road]=localReadLane(laneCenterline,ego);
     target=[];
     if isempty(targetEstimate),return;end
@@ -26,6 +28,41 @@ function [ego,lane,road,target] = readControllerInputs(egoState,targetEstimate,l
         'rearAxleDistance',localTargetDimension(targetEstimate,"targetRearAxleDistance",cfg.target.rearAxleDistance), ...
         'length',localTargetDimension(targetEstimate,"targetLength",cfg.target.defaultLength), ...
         'width',localTargetDimension(targetEstimate,"targetWidth",cfg.target.defaultWidth));
+    [target.errorBounds,target.uncertaintySpecified]=localErrorBounds(targetEstimate, ...
+        "target-state-v1",8,ego.stateTime);
+    target.predictionErrorSet=[];
+    if isfield(targetEstimate,'predictionErrorSet')
+        target.predictionErrorSet=targetEstimate.predictionErrorSet;
+    end
+    if target.uncertaintySpecified && any(target.errorBounds>0) && isempty(target.predictionErrorSet)
+        error('collisionAvoidanceController:missingPredictionErrorSet', ...
+            'A target state enclosure requires the constant-parameter NRMM prediction set.');
+    end
+end
+
+function [bounds,specified]=localErrorBounds(data,kind,count,time)
+    specified=isfield(data,'controllerErrorBound');bounds=zeros(count,1);
+    if ~specified
+        if isfield(data,'controllerStateErrorBound')
+            error('collisionAvoidanceController:missingErrorCertificate', ...
+                'State error radii require a timestamped controllerErrorBound.');
+        end
+        return;
+    end
+    certificate=data.controllerErrorBound;
+    fields={'kind','time','bounds','available'};
+    if ~isstruct(certificate) || ~isscalar(certificate) || ~all(isfield(certificate,fields)) ...
+            || ~isequal(string(certificate.kind),kind) || ~isequal(certificate.available,true)
+        error('collisionAvoidanceController:unavailableErrorBound','The current observer enclosure is unavailable.');
+    end
+    bounds=localFiniteVector(certificate.bounds,count,'controllerErrorBound.bounds');
+    if any(bounds<0)
+        error('collisionAvoidanceController:invalidErrorBound','Error radii must be nonnegative.');
+    end
+    if ~isscalar(certificate.time) || ~isfinite(certificate.time) || ~isfinite(time) ...
+            || abs(certificate.time-time)>1e-9*max(1,abs(time))
+        error('collisionAvoidanceController:staleErrorBound','Observer enclosures must describe the current stateTime.');
+    end
 end
 
 function ego = localReadEgoState(data)

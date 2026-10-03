@@ -68,15 +68,40 @@ calculation, without nominal return simulations or new derivatives.
 
 The objective is
 
-    rho / max(1,V(x)) + epsilon * R(dU),
+    (rho + epsilon * lossLower * R(dU)) / max(1,V(x)),
     R(dU) = (1/(2M)) sum_i ||diag(r_delta,r_b)^(-1) dU_i||^2.
 
-The input correction box implies 0 <= R <= 1. Therefore, at an exact optimum,
-the regularizer changes minimum scaled CLF slack by at most
-`epsilon = clfTieTolerance = 1e-4`. Inputs are penalized relative to the
+The input correction box implies 0 <= R <= 1. `lossLower` is a lower bound on
+`e'Qe` over the current affine uncertainty set (exactly `e'Qe` with zero error).
+Therefore, at an exact optimum, the regularizer changes minimum physical
+CLF slack by at most `epsilon * lossLower`, with
+`epsilon = clfTieTolerance = 1e-4`. Its allowance vanishes at nominal behavior.
+Inputs are penalized relative to the
 linearization input, not zero. This also prevents arbitrary future inputs
 from becoming poor trust centers after shifting. Solver tolerances add their
 own numerical error.
+
+With current and successor generators `G0,G1`, the same CLF uses
+
+    b0 = sum_j ||chol(P)*J0*G0(:,j)||,
+    b1 = sum_j ||chol(P)*J1*G1(:,j)||,
+    bQ = sum_j ||sqrt(Q)*J0*G0(:,j)||,
+    budget = max(0,sqrt(V0)-b0)^2 - eta*(||sqrt(Q)*e0||+bQ)^2,
+    lossLower = max(0,||sqrt(Q)*e0||-bQ)^2.
+
+The successor upper bound is `(1+w)*V_aff+(1+1/w)*b1^2`, using Young's
+inequality with positive fixed `w` when `b1>0`; zero uncertainty recovers
+`V_aff` exactly. It is constrained by `budget+rho` with the existing single
+SOC. This is a sufficient robust inequality for the affine error model,
+not another CLF. The nonlinear agreement diagnostic still compares mean
+values, rather than mistaking an uncertainty reserve for linearization error.
+`clfWorstNextValue` and `clfCurrentBudget` record the separate bounds.
+
+The remaining nonlinear error-chart and dynamics remainders are not enclosed.
+Persistent observation uncertainty can require positive slack near the path;
+neither zero affine slack nor this implementation proves exact asymptotic
+recovery of the nonlinear uncertain plant. See the conditional theorem in
+`OBSERVER_ROBUST_PCBF_THEORY.tex` for the additional premises.
 
 This constraint controls the first successor only. Future inputs are chosen
 through horizon feasibility and the input correction cost; they do not each

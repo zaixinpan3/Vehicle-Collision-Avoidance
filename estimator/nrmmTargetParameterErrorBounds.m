@@ -15,7 +15,8 @@ function bounds = nrmmTargetParameterErrorBounds(velocity, acceleration, ...
 %   curvatureInterval    [lo; hi] of the normal acceleration over the speed
 %                        squared, a_N/V^2, over both balls, or [-Inf; Inf] when
 %                        the velocity ball contains rest.
-% The same bounds hold for a box of the same radii, which lies inside the ball.
+% For vector error boxes, supply the Euclidean norms of their half-widths as
+% velocityRadius and accelerationRadius; a component radius alone is insufficient.
     arguments
         velocity (2,1) double {mustBeReal,mustBeFinite}
         acceleration (2,1) double {mustBeReal,mustBeFinite}

@@ -6,12 +6,14 @@ A continuation frame first attempts CLF optimization under an inherited slack
 budget. A bounded input-increment tie term regularizes the future plan. There is no third optimization stage, target-range
 CLF switch, direct nominal-feedback command, or executable backup.
 
-The current implementation is a certainty-equivalent research baseline. It
-does not consume the NRMM observer's timestamped error enclosures, propagate
-uncertainty over its horizon, or certify an output-feedback robust PCBF.
-Its fixed node margin and model-agreement thresholds do not supply that
-missing guarantee. The source and runtime audit, and the mathematical
-integration requirements, are recorded in
+The implementation now consumes timestamped NRMM observer enclosures. It
+propagates constant target-parameter sets analytically and ego error boxes
+through the shared affine variational model. Their supports tighten collision,
+path, physical-state, terminal-entry and first-successor CLF constraints.
+Inputs without uncertainty metadata retain the exact-state research baseline.
+Unavailable, stale or incomplete enclosures are not silently discarded.
+This is an affine uncertainty integration, **not a certified nonlinear
+output-feedback PCBF**. The earlier baseline audit is retained in
 [the observer-to-PCBF gap analysis](../report/OBSERVER_ROBUST_PCBF_GAP_20261003.tex).
 
 The completed mathematical design is in
@@ -21,8 +23,53 @@ rectangle constraints, an information-state terminal/shift theorem, and
 disturbance-dependent recovery with this same CLF. A vanishing proximal
 weight preserves dissipation in one convex solve. These are conditional
 theoretical results, with finite checks in
-`scripts/verifyObserverRobustConnection.m`; the production controller has not
-yet been changed to realize their set propagation or certification premises.
+`scripts/verifyObserverRobustConnection.m`. The executable interface realizes
+part of that design; nonlinear remainder bounds, a causal output-feedback
+prediction policy, posterior-set inclusion, robust terminal invariance and
+continuous-hold safety remain unimplemented certification premises.
+
+## Current observer integration
+
+`nrmmControllerErrorBounds` publishes a relative position ball, course bound
+and intervals for speed, constant tangential acceleration A and constant
+curvature `kappa=sin(beta)/lr`. It intersects the reconstructed intervals with
+the declared target domain and recenters acceleration error at the clipped
+acceleration value actually published. There is no target-model mismatch
+allowance or sideslip-rate state. Every possible future target obeys the
+same constant-A, constant-beta contract.
+
+Let `s=V0*t+A0*t^2/2` and `b_s=b_V*|t|+b_A*t^2/2`. The analytic target bounds
+implemented in `targetErrorTube` are
+
+    b_p(t) = b_p(0) + b_s + |s|*b_course(0) + s^2*b_kappa/2,
+    b_course(t) = min(pi, b_course(0) + |s|*b_kappa + (|kappa0|+b_kappa)*b_s),
+    b_yaw(t) = min(pi, b_course(t) + b_beta).
+
+They enclose the fixed-parameter family without predicting future measurement
+updates or shrinking the reachable set using future observer decay. Common
+absolute ego pose cancels from pairwise distance: the aligned relative target
+set and ego intrinsic velocity/rate errors are propagated in the frame frozen
+at the current sample. Full ego pose uncertainty remains in path and CLF rows.
+
+For each fixed separating normal, position uncertainty uses directional
+support of the propagated ego generators plus the target position radius.
+Rectangle orientation uncertainty contributes `2*reach*sin(min(pi,b_yaw)/2)`.
+The ego generator propagates as `G_next=A_i*G_i`, for fixed candidate inputs.
+This is an open-loop affine image, not a nonlinear tube with future feedback.
+
+Estimated target centers can update each sample while their true parameters
+remain constant. Previous inputs still initialize the next solve. The primary
+budget is recomputed when observer metadata is present, because no inclusion
+of the new set in the old successor set has been established. The old slack
+sum therefore cannot justify a new hard safety cap. A missing current target
+enclosure after uncertain tracking is reported explicitly; the controller
+does not silently replace it by an exact extrapolation.
+
+Terminal entry reserves `sum_j ||L_f*G_intrinsic(:,j)||` inside the existing
+quotient ellipsoid. This can make the current nominal core infeasible even
+for small speed uncertainty. It is intentional that uncertainty is not
+dropped to force a solve. This entry test does not establish robust infinite
+continuation: the existing terminal policy/geometry remains nominal.
 
 ## Prediction and initialization
 
@@ -265,12 +312,14 @@ no cost-to-go rollouts or finite-difference curvature calculations. This
 quadratic is locally justified, not a global nonlinear CLF; positive slack can
 remain necessary away from cruise even without a target. The secondary minimizes
 
-    rho / max(V(x),1) + epsilon * R(dU),
+    (rho + epsilon * lossLower * R(dU)) / max(V(x),1),
     sum(xi) <= inheritedBudget or achievedPrimary + lexicographicTieTolerance.
 
 `R` is the normalized squared input increment about the linearization inputs.
-At an exact optimum its effect on minimum scaled CLF slack is bounded by
-`epsilon = clfTieTolerance = 1e-4`. It penalizes neither absolute zero input
+At an exact optimum its effect on minimum physical CLF slack is bounded by
+`epsilon * lossLower`, where `epsilon = clfTieTolerance = 1e-4` and
+`lossLower` bounds `e'Qe` from below over the current affine error set.
+The tie vanishes at nominal behavior. It penalizes neither absolute zero input
 nor deviation from the construction feedback. PCBF priority is retained;
 CLF minimization has this explicit bounded tie allowance. A zero primary
 result still runs the CLF stage. The componentwise input boxes imply `R <= 1`,

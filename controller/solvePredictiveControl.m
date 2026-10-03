@@ -3,6 +3,10 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
 % A shifted slack budget can replace the primary optimization, never the CLF.
 % Damping reuses that model; only a failed shift can request a fresh seed.
     if nargin<3,timer=tic;end
+    if ~isfield(model,'uncertainty')
+        model.uncertainty=struct('specified',false,'egoGenerator',zeros(6), ...
+            'collisionGenerator',zeros(6),'target',[],'relativeFrame',false);
+    end
     cfg=model.cfg;solution=[];allAttempts=struct([]);allStages=struct([]);history=struct([]);
     restarted=false;selected=0;initialFailure="";selectedRound=0;
     lineSearchHistory=struct([]);
@@ -12,7 +16,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
     if isstruct(previousState) && isfield(previousState,'linearizationTrustScale')
         model.inputTrustScale=previousState.linearizationTrustScale;
     end
-    if isstruct(previousState) && isfield(previousState,'stageSlacks') ...
+    if ~model.uncertainty.specified && isstruct(previousState) && isfield(previousState,'stageSlacks') ...
             && isnumeric(previousState.stageSlacks) && isvector(previousState.stageSlacks) ...
             && numel(previousState.stageSlacks)==cfg.controller.horizonSteps ...
             && all(isfinite(previousState.stageSlacks)) && all(previousState.stageSlacks>=0)
@@ -26,7 +30,7 @@ function [solution,search,model] = solvePredictiveControl(model,previousState,ti
         allStages=[allStages,search.stages]; %#ok<AGROW>
         restarted=restarted || search.potentialFieldRestarted;
         if strlength(search.initializationFailure)>0,initialFailure=search.initializationFailure;end
-        if isempty(candidate),break;end
+        if isempty(candidate),model=trialModel;break;end
         segment=candidate.searchSegment;candidate=rmfield(candidate,'searchSegment');
         wall=tic;[agreement,~,~]=localPredictionAgreement(candidate,trialModel);
         agreement.seconds=toc(wall);agreement.stepFraction=1;
@@ -134,7 +138,7 @@ end
 
 function slack=localClfSlack(point,problem)
     next=(norm(problem.clfMap*point+problem.clfOffset)^2+problem.clfModelConstant)*problem.clfScale;
-    slack=max(0,next-problem.initialClfValue+problem.clf.requiredDecrease);
+    slack=max(0,next-problem.clfCurrentBudget);
 end
 
 function residual=localConvexResidual(point,problem)
@@ -329,7 +333,7 @@ function problem=localInputBox(problem,anchor,model)
     if isfield(problem,'clf')
         scale=repmat(1./(radius*sqrt(2*count)),count,1);
         increment=sparse(1:numel(iu),iu(:),scale,numel(iu),numel(problem.lower));
-        problem.quadratic=2*cfg.solver.clfTieTolerance*(increment.'*increment);
+        problem.quadratic=2*problem.clfTieBound/problem.clfScale*(increment.'*increment);
     end
 end
 
@@ -435,12 +439,14 @@ function solution=localDecode(point,problem,anchor)
     inputs=anchor.inputs+reshape(point(problem.inputIndices),size(anchor.inputs));
     states=anchor.states+reshape(point(problem.stateIndices),size(anchor.states));
     slacks=max(0,point(problem.slackIndices));rho=problem.clfScale*max(0,point(problem.clfIndex));
-    nextValue=(norm(problem.clfMap*point+problem.clfOffset)^2+problem.clfModelConstant)*problem.clfScale;
+    nextValue=norm(problem.nominalClfMap*point+problem.nominalClfOffset)^2*problem.clfScale;
+    worstNext=(norm(problem.clfMap*point+problem.clfOffset)^2+problem.clfModelConstant)*problem.clfScale;
     solution=struct('inputs',inputs,'states',states,'stageSlacks',slacks.', ...
         'safety',sum(slacks),'hard',NaN,'clfSlack',rho, ...
         'clfInitialValue',problem.initialClfValue,'clfNextValue',nextValue, ...
         'clfFunction',problem.clf.function,'clfRequiredDecrease',problem.clf.requiredDecrease, ...
-        'clfTieBound',problem.clfTieBound, ...
+        'clfTieBound',problem.clfTieBound,'clfWorstNextValue',worstNext,'clfCurrentBudget',problem.clfCurrentBudget, ...
+        'maximumCollisionTighteningMeters',problem.maximumCollisionTighteningMeters, ...
         'minimumCollisionMargin',NaN,'terminalSeparationMargin',NaN, ...
         'encounterExit',problem.encounterExit,'affineValidationPerformed',false,'nonlinearValidationPerformed',false);
 end
@@ -583,9 +589,20 @@ function [problem,model]=localFormulate(anchor,model)
     rate=[Inf;cfg.model.brakingRatioRateMaximum]*cfg.controller.sampleTime;
     [physicalLower,physicalUpper]=localStateLimits(cfg);
     primaryLowerBound=0;departure=Inf;if isempty(model.target),departure=0;end
+    generator=model.uncertainty.egoGenerator;collisionGenerator=model.uncertainty.collisionGenerator;
+    maximumTightening=0;
+    times=(0:2*count)*cfg.controller.sampleTime/2;
+    targetTube=predictiveSafetyGeometry.targetErrorTube(model.target,model.uncertainty.target,times);
+    uncertaintyPrediction=struct('time',times,'target',targetTube, ...
+        'egoStateRadius',zeros(6,2*count+1),'collisionStateRadius',zeros(6,2*count+1));
     for index=1:count
         x=anchor.states(:,index);input=anchor.inputs(:,index);nextReference=anchor.states(:,index+1);
         [middle,am,bm,next,a,b]=nonlinearBicycleModel.hold(x,input,cfg);
+        middleGenerator=am*generator;nextGenerator=a*generator;
+        middleCollisionGenerator=am*collisionGenerator;
+        if index==1,firstStateGenerator=nextGenerator;end
+        uncertaintyPrediction.egoStateRadius(:,2*index-1:2*index)=[sum(abs(generator),2),sum(abs(middleGenerator),2)];
+        uncertaintyPrediction.collisionStateRadius(:,2*index-1:2*index)=[sum(abs(collisionGenerator),2),sum(abs(middleCollisionGenerator),2)];
         eq=6*index+(1:6);equal(eq,ix(:,index+1))=eye(6);equal(eq,ix(:,index))=-a;equal(eq,iu(:,index))=-b;
         rhs(eq)=next-nextReference;
         lower(iu(:,index))=max(lower(iu(:,index)),inputLower-input);
@@ -594,56 +611,67 @@ function [problem,model]=localFormulate(anchor,model)
         if index>1,r(:,iu(:,index-1))=-eye(2);previous=anchor.inputs(:,index-1);end
         finite=isfinite(rate);difference=input-previous;
         rowCount=rowCount+1;rows{rowCount}=[r(finite,:);-r(finite,:)];bounds{rowCount}=[rate(finite)-difference(finite);rate(finite)+difference(finite)];
-        if departure==Inf && localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model),departure=index-1;end
+        if departure==Inf && localBeyondRange(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator),departure=index-1;end
         map=sparse(6,nv);map(:,ix(:,index))=eye(6);
         if isfinite(deviationLimit)
             limit=pathLimit;if index==1,limit=deviationLimit;end
-            [r,bound,cone]=localPathRows(x(1:2),map(1:2,:),model.lane,limit,pathBox);
+            [r,bound,cone]=localPathRows(x(1:2),map(1:2,:),model.lane,limit,pathBox,generator(1:2,:));
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
             pathCones=[pathCones,cone]; %#ok<AGROW>
         end
         if index<=departure
-            [g,j]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model);
+            [g,j,tightening]=localSafetyRows(x,(index-1)*cfg.controller.sampleTime,model,collisionGenerator);
+            maximumTightening=max(maximumTightening,max(tightening));
             if index==1,primaryLowerBound=max(0,-min(g));end
             r=-j*map;if index<=prefix,r(:,is(index))=-1;end
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
         map(:,ix(:,index))=am;map(:,iu(:,index))=bm;
         if isfinite(deviationLimit)
-            [r,bound,cone]=localPathRows(middle(1:2),map(1:2,:),model.lane,pathLimit,pathBox);
+            [r,bound,cone]=localPathRows(middle(1:2),map(1:2,:),model.lane,pathLimit,pathBox,middleGenerator(1:2,:));
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
             pathCones=[pathCones,cone]; %#ok<AGROW>
         end
         if index<=departure
-            [g,j]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model);
+            [g,j,tightening]=localSafetyRows(middle,(index-.5)*cfg.controller.sampleTime,model,middleCollisionGenerator);
+            maximumTightening=max(maximumTightening,max(tightening));
             r=-j*map;if index<=prefix,r(:,is(index))=-1;end
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
         rowCount=rowCount+1;rows{rowCount}=[map(4:6,:);-map(4:6,:)];
-        bounds{rowCount}=[physicalUpper-middle(4:6);middle(4:6)-physicalLower];
+        middleRadius=sum(abs(middleGenerator(4:6,:)),2);nextRadius=sum(abs(nextGenerator(4:6,:)),2);
+        bounds{rowCount}=[physicalUpper-middle(4:6)-middleRadius;middle(4:6)-physicalLower-middleRadius];
         jx=ix(:,index+1);
-        lower(jx(4:6))=max(lower(jx(4:6)),physicalLower-nextReference(4:6));
-        upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-nextReference(4:6));
+        lower(jx(4:6))=max(lower(jx(4:6)),physicalLower-nextReference(4:6)+nextRadius);
+        upper(jx(4:6))=min(upper(jx(4:6)),physicalUpper-nextReference(4:6)-nextRadius);
+        generator=nextGenerator;collisionGenerator=a*collisionGenerator;
     end
+    uncertaintyPrediction.egoStateRadius(:,end)=sum(abs(generator),2);
+    uncertaintyPrediction.collisionStateRadius(:,end)=sum(abs(collisionGenerator),2);
+    model.uncertaintyPrediction=uncertaintyPrediction;
     endIndex=model.sampleIndex+count;y=[anchor.states(:,end);anchor.inputs(:,end)];
     [seed,poseJacobian]=terminalContinuation.fit(model.terminal,y,endIndex);model.terminal=seed;
     deviation=y(4:8)-[seed.base(4:6);seed.reference.input];
     map=sparse(8,nv);map(1:6,ix(:,end))=eye(6);map(7:8,iu(:,end))=eye(2);
-    endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius);
+    endpointReserve=sum(vecnorm(seed.quotientFactor*[generator(4:6,:);zeros(2,6)]));
+    model.uncertaintyPrediction.terminalCoreRadius=seed.radius;
+    model.uncertaintyPrediction.terminalReserve=endpointReserve;
+    endpoint=localCone(seed.quotientFactor*map(4:8,:),-seed.quotientFactor*deviation,zeros(nv,1),-seed.radius+endpointReserve);
     terminalA=zeros(0,nv);terminalB=zeros(0,1);
     if departure>count
-        if localBeyondRange(y(1:6),count*cfg.controller.sampleTime,model),departure=count;
+        if localBeyondRange(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator),departure=count;
         else
             [~,terminalB,gradient]=localTerminalClearance(seed,count,model);
             terminalA=-gradient*poseJacobian*map;
             rowCount=rowCount+1;rows{rowCount}=terminalA;bounds{rowCount}=terminalB;
-            [g,j]=localSafetyRows(y(1:6),count*cfg.controller.sampleTime,model);
+            [g,j,tightening]=localSafetyRows(y(1:6),count*cfg.controller.sampleTime,model,collisionGenerator);
+            maximumTightening=max(maximumTightening,max(tightening));
             r=sparse(size(j,1),nv);r(:,ix(:,end))=-j;
             rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=g;
         end
     end
     if isfinite(deviationLimit)
-        [r,bound,cone]=localPathRows(y(1:2),map(1:2,:),model.lane,pathLimit,pathBox);
+        [r,bound,cone]=localPathRows(y(1:2),map(1:2,:),model.lane,pathLimit,pathBox,generator(1:2,:));
         rowCount=rowCount+1;rows{rowCount}=r;bounds{rowCount}=bound;
         pathCones=[pathCones,cone];
     end
@@ -654,31 +682,56 @@ function [problem,model]=localFormulate(anchor,model)
         'primaryConeCount',numel(primaryCones), ...
         'stateIndices',ix,'inputIndices',iu,'slackIndices',is,'clfIndex',ic, ...
         'safetyObjective',objective,'primaryLowerBound',primaryLowerBound, ...
-        'terminalA',terminalA,'terminalB',terminalB,'encounterExit',departure);
+        'terminalA',terminalA,'terminalB',terminalB,'encounterExit',departure, ...
+        'maximumCollisionTighteningMeters',maximumTightening,'firstStateGenerator',firstStateGenerator);
 end
 
-function [rows,bounds,cone]=localPathRows(position,map,lane,limit,box)
+function [rows,bounds,cone]=localPathRows(position,map,lane,limit,box,generator)
     region=laneGeometry.deviationRegion(position,lane,limit);
-    rows=region.a*map;bounds=region.b;
+    rows=region.a*map;bounds=region.b-sum(abs(region.a*generator),2);
     active=abs(rows)*box>bounds;rows=rows(active,:);bounds=bounds(active);
     cone=struct('A',{},'b',{},'d',{},'gamma',{});
-    if isfinite(region.radius) && norm(abs(region.center)+abs(map)*box)>region.radius
-        cone=localCone(map,region.center,zeros(size(map,2),1),-region.radius);
+    radius=region.radius-sum(vecnorm(generator));
+    if isfinite(radius) && norm(abs(region.center)+abs(map)*box)>radius
+        cone=localCone(map,region.center,zeros(size(map,2),1),-radius);
     end
 end
 
 function problem=localAddClf(problem,anchor,model)
     nv=numel(problem.safetyObjective);iu=problem.inputIndices;ic=problem.clfIndex;count=size(iu,2);
-    [map,offset,constant,value,scale,modelConstant,clf]=localNominalClf(anchor,model,problem.stateIndices(:,2),nv);
+    [nominalMap,nominalOffset,~,value,scale,~,clf]=localNominalClf(anchor,model,problem.stateIndices(:,2),nv);
+    [e0,j0]=nonlinearBicycleModel.errorLinearization(model.initialState,model.lane,model.nominalReference);
+    [~,j1]=nonlinearBicycleModel.errorLinearization(anchor.states(:,2),model.lane,model.nominalReference);
+    factor=model.nominalReference.factor;
+    initialRadius=sum(vecnorm(factor*j0*model.uncertainty.egoGenerator));
+    nextRadius=sum(vecnorm(factor*j1*problem.firstStateGenerator));
+    scales=[model.cfg.clf.lateralPositionErrorScale;model.cfg.clf.headingErrorScale; ...
+        model.cfg.clf.speedErrorScale;model.cfg.clf.lateralVelocityErrorScale;model.cfg.clf.yawRateErrorScale];
+    lossRadius=sum(vecnorm((j0*model.uncertainty.egoGenerator)./scales));
+    lossCenter=norm(e0./scales);
+    lossLower=max(0,lossCenter-lossRadius)^2;
+    currentBudget=max(0,sqrt(value)-initialRadius)^2 ...
+        -model.cfg.nominalClf.decreaseFraction*(lossCenter+lossRadius)^2;
+    % Young's inequality keeps one SOC and the same CLF. Mean values remain
+    % separate from these bounds for the existing model-agreement diagnostic.
+    multiplier=1;bias=0;
+    if nextRadius>0
+        weight=min(1,nextRadius/max(norm(nominalOffset)*sqrt(scale),eps));
+        multiplier=1+weight;bias=(1+1/weight)*nextRadius^2;
+    end
+    map=sqrt(multiplier)*nominalMap;offset=sqrt(multiplier)*nominalOffset;
+    modelConstant=bias/scale;constant=(currentBudget-bias)/scale;
     axis=sparse(1,nv);axis(ic)=1;
     cone=localCone([2*map;axis],[-2*offset;1-constant],axis.',-1-constant);
     inputScale=repmat(1./(model.inputTrustScale*model.cfg.nonlinear.trustRadius*[.15;.25]*sqrt(2*count)),count,1);
     increment=sparse(1:numel(iu),iu(:),inputScale,numel(iu),nv);
-    problem.quadratic=2*model.cfg.solver.clfTieTolerance*(increment.'*increment);
+    problem.clfTieBound=model.cfg.solver.clfTieTolerance*lossLower;
+    problem.quadratic=2*problem.clfTieBound/scale*(increment.'*increment);
     problem.cones=[problem.cones,cone];
     problem.clfScale=scale;problem.clfMap=map;problem.clfOffset=offset;
+    problem.nominalClfMap=nominalMap;problem.nominalClfOffset=nominalOffset;
+    problem.clfCurrentBudget=currentBudget;
     problem.clfModelConstant=modelConstant;problem.clf=clf;problem.initialClfValue=value;
-    problem.clfTieBound=model.cfg.solver.clfTieTolerance*scale;
     problem.initialClfSlack=max(0,(norm(offset)^2-constant)*scale);
 end
 
@@ -705,20 +758,35 @@ function u=localClip(u,previous,cfg)
     u=min(upper,max(lower,min(previous+rate,max(previous-rate,u))));
 end
 
-function [values,jacobian]=localSafetyRows(x,time,model)
+function [values,jacobian,tightening]=localSafetyRows(x,time,model,generator)
     cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
     q=localTargetAt(model,time);
     dual=predictiveSafetyGeometry.dualLinearization(x(1:3),shape,q(1:3),q(8:11));
     values=dual.value-cfg.collision.safetyMarginMeters;
     jacobian=[dual.jacobian,zeros(4,3)];
+    % Directional position support retains correlation across the affine
+    % ego dynamics. Rotation uses an exact chord bound for each rectangle.
+    normal=jacobian(:,1:2);normalNorm=vecnorm(normal,2,2);
+    tube=predictiveSafetyGeometry.targetErrorTube(model.target,model.uncertainty.target,time);
+    egoReach=norm(shape(1:2))+norm(shape(3:4));
+    targetReach=norm(q(8:9))+norm(q(10:11));
+    yawRadius=sum(abs(generator(3,:)));
+    reserve=2*egoReach*sin(min(pi,yawRadius)/2)+tube.positionRadius ...
+        +2*targetReach*sin(tube.yawRadius/2);
+    tightening=sum(abs(normal*generator(1:2,:)),2)+normalNorm*reserve;
+    values=values-tightening;
 end
 
-function beyond=localBeyondRange(x,time,model)
+function beyond=localBeyondRange(x,time,model,generator)
     beyond=isempty(model.target);
     if ~beyond
         cfg=model.cfg;shape=[cfg.vehicle.length/2;cfg.vehicle.width/2;cfg.vehicle.rectangleOffset];
         q=localTargetAt(model,time);
-        beyond=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3),q(8:11))>cfg.collision.encounterRangeMeters;
+        tube=predictiveSafetyGeometry.targetErrorTube(model.target,model.uncertainty.target,time);
+        reserve=sum(vecnorm(generator(1:2,:))) ...
+            +2*(norm(shape(1:2))+norm(shape(3:4)))*sin(min(pi,sum(abs(generator(3,:))))/2) ...
+            +tube.positionRadius+2*(norm(q(8:9))+norm(q(10:11)))*sin(tube.yawRadius/2);
+        beyond=predictiveSafetyGeometry.rectangle(x(1:3),shape,q(1:3),q(8:11))-reserve>cfg.collision.encounterRangeMeters;
     end
 end
 

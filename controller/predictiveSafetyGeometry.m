@@ -1,6 +1,81 @@
 classdef predictiveSafetyGeometry
     %predictiveSafetyGeometry Target prediction, potential guidance and polygon geometry.
     methods (Static)
+        function uncertainty = observerUncertainty(ego,observation,q)
+            % A common uncertain rigid pose cancels from pairwise distance.
+            % Relative target balls are therefore used in the frame frozen at
+            % this sample; path and CLF rows still use the full ego error box.
+            uncertainty=struct('specified',ego.uncertaintySpecified, ...
+                'egoGenerator',diag(ego.errorBounds),'collisionGenerator',diag(ego.errorBounds), ...
+                'target',[],'relativeFrame',false);
+            if isempty(observation),return;end
+            uncertainty.specified=uncertainty.specified || observation.uncertaintySpecified;
+            set=observation.predictionErrorSet;
+            if isempty(set),return;end
+            required={'kind','time','available','referenceEgoPose','relativePosition', ...
+                'positionRadius','courseCenter','courseRadius','speedInterval', ...
+                'accelerationInterval','curvatureInterval','rearAxleDistance'};
+            if ~isstruct(set) || ~isscalar(set) || ~all(isfield(set,required)) ...
+                    || ~isequal(string(set.kind),"nrmm-constant-parameter-set-v1") ...
+                    || ~isequal(set.available,true) || ~ego.uncertaintySpecified ...
+                    || ~observation.uncertaintySpecified
+                error('collisionAvoidanceController:invalidPredictionErrorSet', ...
+                    'The relative NRMM set requires available, aligned ego and target enclosures.');
+            end
+            fields={'time','referenceEgoPose','relativePosition','positionRadius','courseCenter', ...
+                'courseRadius','speedInterval','accelerationInterval','curvatureInterval','rearAxleDistance'};
+            sizes=[1,3,2,1,1,1,2,2,2,1];
+            for index=1:numel(fields)
+                value=set.(fields{index});
+                if ~isnumeric(value) || ~isreal(value) || numel(value)~=sizes(index) || any(~isfinite(value),'all')
+                    error('collisionAvoidanceController:invalidPredictionErrorSet','Invalid NRMM set field %s.',fields{index});
+                end
+                set.(fields{index})=value(:);
+            end
+            intervals=[set.speedInterval,set.accelerationInterval,set.curvatureInterval];
+            if any(intervals(1,:)>intervals(2,:)) || min([set.positionRadius,set.courseRadius])<0 ...
+                    || set.rearAxleDistance<=0 || any(abs(set.curvatureInterval*set.rearAxleDistance)>1)
+                error('collisionAvoidanceController:invalidPredictionErrorSet','The NRMM parameter intervals are invalid.');
+            end
+            rotation=[cos(ego.yaw),-sin(ego.yaw);sin(ego.yaw),cos(ego.yaw)];
+            residual=[set.referenceEgoPose-ego.modelState(1:3); ...
+                ego.position+rotation*set.relativePosition-q(1:2); ...
+                atan2(sin(ego.yaw+set.courseCenter-q(3)-q(6)),cos(ego.yaw+set.courseCenter-q(3)-q(6))); ...
+                set.rearAxleDistance-q(7)];
+            residual(3)=atan2(sin(residual(3)),cos(residual(3)));
+            if abs(set.time-ego.stateTime)>1e-9*max(1,abs(ego.stateTime)) || norm(residual,inf)>1e-8
+                error('collisionAvoidanceController:misalignedPredictionErrorSet', ...
+                    'The NRMM enclosure and published trajectory must share a state time and reference pose.');
+            end
+            curvature=sin(q(6))/q(7);
+            uncertainty.target=struct('positionRadius',set.positionRadius,'courseRadius',min(pi,set.courseRadius), ...
+                'speedRadius',max(abs(set.speedInterval-q(4))), ...
+                'accelerationRadius',max(abs(set.accelerationInterval-q(5))), ...
+                'curvatureRadius',max(abs(set.curvatureInterval-curvature)), ...
+                'sideslipRadius',max(abs(asin(set.curvatureInterval*q(7))-q(6))));
+            uncertainty.collisionGenerator=diag([zeros(3,1);ego.errorBounds(4:6)]);
+            uncertainty.relativeFrame=true;
+        end
+
+        function tube = targetErrorTube(q,errorSet,time)
+            % Exact analytic enclosure of constant-A, constant-beta paths.
+            % Split the arc-length endpoint error from the course/curvature
+            % error on the nominal arc. No future observer decay is assumed.
+            time=reshape(time,1,[]);
+            tube=struct('positionRadius',zeros(size(time)),'yawRadius',zeros(size(time)), ...
+                'courseRadius',zeros(size(time)),'speedRadius',zeros(size(time)));
+            if isempty(errorSet),return;end
+            arc=q(4)*time+.5*q(5)*time.^2;
+            arcError=errorSet.speedRadius*abs(time)+.5*errorSet.accelerationRadius*time.^2;
+            curvature=abs(sin(q(6))/q(7));
+            tube.positionRadius=errorSet.positionRadius+arcError+abs(arc)*errorSet.courseRadius ...
+                +.5*arc.^2*errorSet.curvatureRadius;
+            tube.courseRadius=min(pi,errorSet.courseRadius+abs(arc)*errorSet.curvatureRadius ...
+                +(curvature+errorSet.curvatureRadius)*arcError);
+            tube.yawRadius=min(pi,tube.courseRadius+errorSet.sideslipRadius);
+            tube.speedRadius=errorSet.speedRadius+errorSet.accelerationRadius*abs(time);
+        end
+
         function [heading,speed,side,risk] = potentialGuidance(x,lane,epoch,time,cfg,side)
             % Zhai-inspired motion-aware repulsion with a passing circulation.
             % Matching-time prediction adapts the field to target speed and

@@ -1,0 +1,268 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\title{Executable Observer--Controller Uncertainty Integration}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\textbf{Result.} The observer's timestamped error enclosures now enter the
+controller's prediction and constraints. Constant target-parameter uncertainty
+is propagated analytically; ego uncertainty is propagated through the existing
+affine model. Collision, path, physical-state, terminal-entry and the single
+CLF constraints are tightened. This is a partial implementation of
+\path{controller/OBSERVER_ROBUST_PCBF_THEORY.tex}, not completion of its
+nonlinear output-feedback safety certificate.
+
+The integration also exposes a concrete blocker: with a valid representative
+observer publication, the required terminal uncertainty reserve is about
+315 times the existing nominal terminal-core radius. The controller rejects
+that problem instead of silently treating the estimated state as exact.
+
+\section{Motion contract and implementation scope}
+The true target obeys
+\[
+ \dot V_C=A_C,\qquad \dot A_C=0,\qquad \dot\beta_C=0,\qquad
+ \dot\psi_C=V_C\sin\beta_C/l_r.
+\]
+There is no target jerk disturbance, sideslip-rate state, or off-contract
+maneuver in this study. Updating an estimate of $A_C$ or $\beta_C$ does not
+mean that the true parameters change. Every member of a current prediction
+set obeys this same motion contract. Existing observer API support for other
+research configurations was not extended or used here.
+
+The controller remains one PCBF--CLF controller. Previous inputs normally
+initialize the new nonlinear rollout. An unavailable or failed shift can use
+the existing Zhai-inspired potential-field initializer. Each anchor is
+linearized once; no executable backup or additional CLF was introduced.
+The collision node margin remains $0.20\,\mathrm m$, the path-center deviation
+limit remains $10\,\mathrm m$, and road boundaries remain disabled.
+
+\section{Observer publication and exact target-set propagation}
+\texttt{nrmmControllerErrorBounds} now publishes an aligned relative-position
+ball, relative-course bound, and intervals for current speed, constant
+acceleration and constant curvature $\kappa_C=\sin\beta_C/l_r$. The inverse
+reconstruction's acceleration estimate can be clipped. Its error radius is
+therefore recentered at the acceleration actually published to the controller:
+\[
+ b_{A,\mathrm{published}}
+ =b_{A,\mathrm{raw}}+|\widehat A_{\mathrm{raw}}-\widehat A_{\mathrm{published}}|.
+\]
+The parameter intervals are intersected with the declared physical domain.
+Current timestamp, availability, center alignment and finite radii are part
+of this interface. Missing or invalid certificates are not converted to zero
+uncertainty. Inputs without uncertainty metadata continue to declare exact
+states, recovering the existing baseline.
+
+For a current nominal target, write
+\[
+ s(t)=V_0t+\tfrac12 A_0t^2,\qquad
+ b_s(t)=b_V|t|+\tfrac12b_At^2.
+\]
+The analytic enclosure used by \texttt{targetErrorTube} is
+\begin{align*}
+ b_p(t)&=b_p(0)+b_s(t)+|s(t)|b_\gamma(0)+\tfrac12s(t)^2b_\kappa,\\
+ b_\gamma(t)&=\min\{\pi,b_\gamma(0)+|s(t)|b_\kappa
+                       +( |\kappa_0|+b_\kappa)b_s(t)\},\\
+ b_\psi(t)&=\min\{\pi,b_\gamma(t)+b_\beta\}.
+\end{align*}
+To obtain the position bound, split the uncertain arc endpoint from the
+integral over the nominal arc. The unit tangent bounds the first difference
+by $b_s$; integration of course and curvature differences bounds the second
+by $|s|b_\gamma+\tfrac12s^2b_\kappa$. The formulas also enclose the existing
+signed-arc convention. No stop clamp was added to alter the target contract.
+These bounds do not assume future measurements or shrink a reachable set
+using a future observer convergence rate.
+
+\section{Constraint tightening and update semantics}
+Pairwise rectangle distance is invariant to a common rigid pose. When the
+relative target publication and ego state share the same reference pose,
+the collision calculation uses a frame frozen at that sample. Its initial
+ego generator retains body-velocity and yaw-rate uncertainty, while common
+absolute position and orientation cancel. Global pose uncertainty is still
+included in path and CLF constraints.
+
+The ego generator is propagated as $G_{i+1}=A_iG_i$, using the dynamics
+Jacobians already computed for the affine optimization. For a fixed
+separating normal $n$, the added collision reserve is
+\[
+ \|n^\top G_{p,i}\|_1+\|n\|_2
+ \left[b_{p,C}(t_i)+2R_E\sin\frac{\min(\pi,b_{\psi,E,i})}{2}
+                     +2R_C\sin\frac{b_{\psi,C}(t_i)}{2}\right],
+\]
+where $R_E,R_C$ include rectangle center offsets. The orientation terms are
+geometric chord bounds. The ego propagation and nominal collision
+convexification remain affine approximations; no whole-domain nonlinear
+dynamics or nominal-geometry remainder was added.
+
+Updated target estimates are accepted without requiring the user to reset
+the controller. The previous input plan remains a warm start. However,
+observer-input frames recompute their primary safety budget: the code has
+not established inclusion of a new information set in the previous
+successor set. Consequently, an old slack sum cannot certify a cap for the
+new set. A fresh current target enclosure is required after uncertain tracking;
+silently continuing an old target as exact is not permitted.
+
+Terminal entry reserves
+\[
+ r_{\mathrm{unc}}=\sum_j\|L_fG_{\mathrm{intrinsic},j}\|_2,
+ \qquad \|L_fe_f\|_2\le r_f-r_{\mathrm{unc}}
+\]
+inside the existing free-pose quotient family. This is a sufficient affine
+entry test, not robust invariance of an output-feedback terminal policy.
+The nominal terminal separation/departure construction is unchanged.
+
+\section{The same CLF, with bounded uncertainty and a vanishing tie}
+The single function remains $V=e^\top Pe$, with desired loss
+$\ell=e^\top Qe$ and decrease coefficient $\eta=0.5$. Define
+\begin{align*}
+ b_0&=\sum_j\|P^{1/2}J_0G_{0,j}\|_2,&
+ b_1&=\sum_j\|P^{1/2}J_1G_{1,j}\|_2,\\
+ b_Q&=\sum_j\|Q^{1/2}J_0G_{0,j}\|_2,&
+ B_0&=(\sqrt{V_0}-b_0)_+^2-\eta(\sqrt{\ell_0}+b_Q)^2.
+\end{align*}
+For fixed positive $w$, Young's inequality gives the convex sufficient row
+\[
+ (1+w)V_{1,\mathrm{aff}}+(1+1/w)b_1^2\le B_0+\rho.
+\]
+With $b_1=0$, the implementation uses the exact nominal quadratic instead.
+The existing single SOC represents this inequality. Mean successor values
+remain separate from uncertainty upper bounds in model-agreement diagnostics.
+The objective is now
+\[
+ \frac{\rho+\epsilon\underline\ell R(\Delta U)}{\max(1,V_0)},\qquad
+ \underline\ell=(\sqrt{\ell_0}-b_Q)_+^2,\quad 0\le R\le1,
+ \quad \epsilon=10^{-4}.
+\]
+The tie penalizes input deviations from the linearization inputs. Its possible
+physical CLF-slack sacrifice is at most $\epsilon\underline\ell$ at an exact
+optimum and vanishes at nominal behavior. Solver tolerances and nonlinear
+approximation errors are additional. This implements the affine sufficient
+condition; it does not prove global nonlinear CLF dissipation.
+
+\section{Validation and the measured terminal obstruction}
+The complete MATLAB suite passed: \textbf{677 passed, zero failed, zero
+incomplete}. Focused tests cover exact target-family enclosure, zero-radius
+reduction, common-pose cancellation, changed target estimates, geometric
+tightening, affine CLF bounds and unavailable/stale enclosures.
+
+The deterministic interface probe increases the target position radius from
+$0.01$ to $0.10\,\mathrm m$. The maximum collision-row reserve increases from
+$0.01$ to $0.10\,\mathrm m$, and the future optimized input sequence changes
+(Frobenius difference approximately $1.95\times10^{-4}$ in mixed steering/input
+coordinates). The first command is effectively unchanged in this particular
+probe. A $1\,\mathrm{mm}$ position-estimate correction and a
+$0.001\,\mathrm{m/s^2}$ acceleration-estimate correction are accepted using a
+shifted input initialization, one linearization and a recomputed primary
+budget. Both acceleration intervals contain the same true constant $A=0$.
+
+The real-runtime probe uses a cruising ego at $10\,\mathrm{m/s}$ and a target
+at relative position $(20,5)\,\mathrm m$, traveling at $12\,\mathrm{m/s}$ in
+the opposite direction with $A=\beta=0$. The points initially equal truth;
+declared valid initial error bounds are nonzero. Published ego radii are
+approximately $(0.12,0.12,0.002,0.02,0.02,0.002)$ in the controller's state
+units. The target parameter intervals are
+\[
+ V_C\in[11.95,12.05],\quad A_C\in[-0.02,0.02],\quad
+ \kappa_C\in[-1.40054,1.40054]\times10^{-4}.
+\]
+The $4.4\,\mathrm s$ target position radius grows to approximately
+$0.949\,\mathrm m$. The interface is accepted, but the robustified affine
+optimization has no solution. Its terminal metrics are
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Quantity & Value\\
+\midrule
+Nominal terminal weighted radius $r_f$ & $0.00048828125$\\
+Required affine uncertainty reserve $r_{\mathrm{unc}}$ & $0.1540034$\\
+Reserve/radius ratio & $315.399$\\
+Pure longitudinal-speed half-width of the core & $0.00006435\,\mathrm{m/s}$\\
+Propagated longitudinal-speed radius & $0.0202953\,\mathrm{m/s}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The two weighted radii are not physical distances. Even without a difficult
+collision, the fixed-input uncertainty family cannot fit into this tiny
+precise-state terminal neighborhood. This is not evidence that the real target
+violated its model, nor evidence of physical inevitability. It identifies the
+need for a causal prediction policy and an information-state terminal design.
+
+\section{Exact-state scenario regression}
+The regression uses the existing fourteen scenarios, speeds $8$ and
+$15\,\mathrm{m/s}$, sampling at $0.05\,\mathrm s$, and independent tight
+\texttt{ode45} replay. No observer uncertainty is injected in this campaign.
+Nominal recovery requires the five existing error tolerances for a one-second
+dwell after the prescribed encounter. Frame caps are observation limits,
+not success criteria. Thirteen scenarios avoid collision and recover; the
+$15\,\mathrm{m/s}$ accelerating head-on case still stops after five executed
+holds, at $t=0.25\,\mathrm s$, because model agreement is not reached.
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+Scenario & Speed & Minimum gap (m) & Recovery (s) & Outcome\\
+\midrule
+Head-on & 8 & 1.3921 & 10.20 & Recovered \\
+Accelerating head-on & 8 & 1.0645 & 10.25 & Recovered \\
+Braking lead & 8 & 0.5901 & 13.15 & Recovered \\
+Crossing & 8 & 0.1626 & 12.55 & Recovered \\
+Turning crossing & 8 & 0.1936 & 12.80 & Recovered \\
+Curved head-on & 8 & 1.7863 & 9.90 & Recovered \\
+Curved crossing & 8 & 0.1904 & 9.95 & Recovered \\
+Head-on & 15 & 0.2228 & 7.35 & Recovered \\
+Accelerating head-on & 15 & 13.4432 & --- & Stopped \\
+Braking lead & 15 & 1.2591 & 18.55 & Recovered \\
+Crossing & 15 & 1.2889 & 8.60 & Recovered \\
+Turning crossing & 15 & 1.2491 & 8.10 & Recovered \\
+Curved head-on & 15 & 2.3221 & 63.75 & Recovered \\
+Curved crossing & 15 & 1.0060 & 8.00 & Recovered \\
+\bottomrule
+\end{tabular}
+\end{center}
+The failed case's minimum gap only describes its executed prefix. The
+overall minimum replay gap is approximately $0.16263\,\mathrm m$: positive,
+but smaller than the nominal $0.20\,\mathrm m$ node margin. This remains a
+demonstration of the gap between affine sampled constraints and nonlinear
+whole-hold clearance, not a verified $0.20\,\mathrm m$ robust guarantee.
+
+The extended curved head-on case has a second encounter because both target
+and reference continue on circles under their fixed motion laws. The driver's
+baseline last-contact time is $56.445\,\mathrm s$. Extending its unfinished
+run confirms recovery at $63.75\,\mathrm s$, rather than classifying a time
+cap as controller failure. The target contract is not changed to force it to
+leave. Timing records are preserved, but overlap with other MATLAB validation
+means this campaign is not a dedicated real-time benchmark.
+
+\section{What is still required}
+The operational connection is implemented and tested, but these remaining
+premises are substantive, not documentation details:
+\begin{enumerate}
+ \item A causal output-feedback prediction tube must replace the fixed-input
+ affine image if future feedback is used to reduce spread. Future estimation
+ error must enter with its correct sign and a valid bound.
+ \item The terminal information set and its policy must accommodate the
+ observer error floor. Enlarging the old radius without a new invariant-set
+ argument, or omitting its uncertainty reserve, would not establish this.
+ \item Whole-domain nonlinear dynamics/error-chart/geometry remainders and
+ whole-hold separation reserves are needed for nonlinear collision guarantees.
+ \item Posterior intersection and successor-set inclusion are needed before
+ noisy frames can safely inherit a previous PCBF budget.
+\end{enumerate}
+Positive PCBF slack remains an explicit relaxation, not a requested-clearance
+certificate. The current metadata explicitly reports that nonlinear robust
+safety and recursive feasibility remain uncertified.
+
+\section{Reproducibility}
+Machine-readable tests, integration probes and compact scenario results are
+in \path{report/OBSERVER_CONTROLLER_INTEGRATION_20261003/}.
+\path{scripts/verifyObserverControllerIntegration.m} regenerates the targeted
+interface and terminal-obstruction measurements. The experiment commands,
+source hashes and evidence locations are recorded in the associated
+\texttt{provenance.json}. Local logs and full scenario continuations are kept
+as identified external export copies with the project commit record.
+\end{document}

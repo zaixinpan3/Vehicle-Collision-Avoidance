@@ -104,19 +104,12 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
     output.targetEstimate.targetAccelerationInertialErrorBound = values(5:6);
     output.targetEstimate.targetYawErrorBound = values(7);
     output.targetEstimate.targetYawRateErrorBound = values(8);
-    % The controller reads scalarAccelerationMaximum as a bound on the
-    % acceleration magnitude |a| = hypot(A, V*omega), not on the speed-rate A.
+    % This legacy contract field bounds |a| = hypot(A, V*omega), not A.
+    % The prediction set below supplies the constant-parameter intervals.
     output.targetEstimate.predictionMotion = [];
     if design.target.modelJerkMaximum == 0
-        % Exact NRMM: constant speed-rate and constant sideslip, so a path of
-        % constant curvature sin(beta)/l_r. The controller propagates every
-        % such path through the estimate box and the NRMM parameter error
-        % bounds published below, which come from the tracker's component
-        % balls (frame-free speed, speed-rate and normal acceleration; the
-        % course adds the ego yaw error) rather than from the inertial box.
-        % A nonzero modelJerkMaximum admits motion outside every NRMM path;
-        % no motion contract describes it, so none is published and the
-        % controller refuses the target at admission.
+        % Every member has constant A and beta. Parameter uncertainty does
+        % not introduce time-varying target maneuvers or future process noise.
         output.targetEstimate.predictionMotion = struct( ...
             "kind","nrmm-motion-v1", ...
             "curvatureMaximum",sin(domain.sideslipMaximum)/domain.rearAxleDistance, ...
@@ -124,6 +117,16 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
             "scalarAccelerationMaximum",domain.accelerationNormBound);
         parameters = nrmmTargetParameterErrorBounds(target.targetVelocity, ...
             target.targetAcceleration, components(2), components(3), bound.yaw);
+        % The inverse reconstruction clips A. Recenter its enclosure at the
+        % value actually published to the controller, not the raw projection.
+        rawAcceleration = 0;
+        if speed > 0
+            rawAcceleration = dot(target.targetVelocity,target.targetAcceleration)/speed;
+        end
+        parameters.speedRateErrorBound = parameters.speedRateErrorBound ...
+            + abs(rawAcceleration-target.targetScalarAcceleration);
+        output.targetEstimate.predictionErrorSet = localPredictionSet( ...
+            output,target,components,parameters,domain,available);
         if ~available
             parameters = struct("speedErrorBound", Inf, "courseErrorBound", Inf, ...
                 "speedRateErrorBound", Inf, "curvatureInterval", [-Inf; Inf]);
@@ -133,6 +136,35 @@ function output = nrmmControllerErrorBounds(output, bound, input, design)
         output.targetEstimate.targetSpeedRateErrorBound = parameters.speedRateErrorBound;
         output.targetEstimate.targetCurvatureInterval = parameters.curvatureInterval;
     end
+end
+
+function set = localPredictionSet(output,target,components,parameters,domain,available)
+    curvatureLimit = sin(domain.sideslipMaximum)/domain.rearAxleDistance;
+    speed = norm(target.targetVelocity);
+    speedInterval = [max(domain.speedMinimum,speed-components(2)); ...
+        min(domain.speedMaximum,speed+components(2))];
+    accelerationInterval = [max(-domain.scalarAccelerationMaximum, ...
+        target.targetScalarAcceleration-parameters.speedRateErrorBound); ...
+        min(domain.scalarAccelerationMaximum, ...
+        target.targetScalarAcceleration+parameters.speedRateErrorBound)];
+    curvatureInterval = [max(-curvatureLimit,parameters.curvatureInterval(1)); ...
+        min(curvatureLimit,parameters.curvatureInterval(2))];
+    courseRadius = pi;
+    if components(2) < speed,courseRadius = asin(components(2)/speed);end
+    yaw = NaN;
+    if isfield(output,'egoYaw'),yaw = output.egoYaw;end
+    intervals = [speedInterval,accelerationInterval,curvatureInterval];
+    available = available && isfinite(yaw) && all(isfinite(intervals),'all') ...
+        && all(intervals(1,:) <= intervals(2,:));
+    set = struct('kind',"nrmm-constant-parameter-set-v1",'time',output.stateTime, ...
+        'available',available,'referenceEgoPose',[output.egoPositionInertial;yaw], ...
+        'relativePosition',target.relativePosition,'positionRadius',components(1), ...
+        'courseCenter',atan2(target.targetVelocity(2),target.targetVelocity(1)), ...
+        'courseRadius',courseRadius,'speedInterval',speedInterval, ...
+        'accelerationInterval',accelerationInterval,'curvatureInterval',curvatureInterval, ...
+        'rearAxleDistance',domain.rearAxleDistance, ...
+        'scope',"currentObserverEnclosureWithConstantParameters", ...
+        'futureMeasurementsAssumed',false);
 end
 
 function radius = localVelocityBounds(output, bound, input, design, age)

@@ -6,13 +6,13 @@ and its affine prediction scope.
 
 | Source | Responsibility |
 | --- | --- |
-| `collisionAvoidanceController.m` | Fixed target epoch, input memory, solver orchestration, affine-result metadata and first input |
-| `readControllerInputs.m` | Ego, one target and given-path normalization |
+| `collisionAvoidanceController.m` | Target prediction updates, input memory, solver orchestration, uncertainty scope and first input |
+| `readControllerInputs.m` | Ego, one target, timestamped error enclosures and given-path normalization |
 | `solvePredictiveControl.m` | Optimize CLF under inherited slack caps, restore PCBF when needed, and build one model per shifted or fresh potential-field seed |
 | `terminalContinuation.m` | Augmented free-pose endpoint core, construction bounds and anchor-based terminal geometry |
 | `nonlinearBicycleModel.m` | Fiala bicycle RK4, variational tangents, road load, trim, and the single analytic quadratic CLF ([NOMINAL_CLF.md](NOMINAL_CLF.md)) |
 | `modifiedFialaTire.m` | Combined-slip tire forces and derivatives |
-| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction, Zhai-inspired artificial potential guidance, exact ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
+| `predictiveSafetyGeometry.m` | Constant-acceleration/sideslip target prediction and analytic parameter-set enclosure, common-pose cancellation, Zhai-inspired artificial potential guidance, ordinary-distance dual multipliers and fixed-multiplier rows; offline interval geometry |
 | `laneGeometry.m` | Straight and circular given-path coordinates |
 | `../config/collisionAvoidanceControllerConfig.m` | Defaults, merging and validation |
 
@@ -29,6 +29,16 @@ field supplies initialization, not a safety certificate. Positive PCBF slack
 still denotes relaxation.
 Road boundaries remain excluded, and the original given path defines the
 single CLF. Terminal feedback is used only for construction.
+
+Observer inputs now tighten affine sampled collision, path, physical-state,
+terminal-entry and CLF constraints. Updated observer sets preserve the input
+warm start but require a new primary budget. No posterior-inclusion or robust
+terminal invariance proof has been implemented. A finite affine error tube
+larger than the existing nominal terminal core can make the problem infeasible;
+the radii are not discarded to obtain a command. `observerPredictiveControlTest`
+and `../scripts/verifyObserverControllerIntegration.m` exercise this interface
+and expose that limitation. Complete nonlinear robust safety remains conditional
+on the additional premises in `OBSERVER_ROBUST_PCBF_THEORY.tex`.
 
 Initialization metadata uses `movingTargetPotentialField` and
 `potentialFieldRestarted`; `predictTarget` advances the prescribed target

@@ -1,0 +1,808 @@
+{
+  "scope": "Exact-state regression; no observer errors. ode45 replay; timings overlap other MATLAB validation and are not deadline certification.",
+  "sampleTimeSeconds": 0.05,
+  "safetyMarginMeters": 0.2,
+  "maximumLateralDeviationMeters": 10,
+  "recovered": 13,
+  "scenarios": 14,
+  "results": [
+    {
+      "scenario": "headOn",
+      "speed": 8,
+      "executedFrames": 204,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.7983333333333333,
+        "entryTimeSeconds": 9.199999999999996,
+        "confirmationTimeSeconds": 10.20000000000001
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 1.3920592903350133,
+      "maximumReplayLateralDeviationMeters": 5.451118935469896,
+      "finalTransverseError": [
+        0.006797009143503084,
+        -0.0009139313462948873,
+        0.003739136955351441,
+        0.00011372428081851034,
+        0.0001470975310564778
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 210,
+      "firstFrameSeconds": 1.035811,
+      "subsequentMedianSeconds": 0.022647,
+      "subsequentP95Seconds": 0.055143899999999996,
+      "maximumFrameSeconds": 1.035811,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        0,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "acceleratingHeadOn",
+      "speed": 8,
+      "executedFrames": 205,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.7083333333333335,
+        "entryTimeSeconds": 9.249999999999996,
+        "confirmationTimeSeconds": 10.25000000000001
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 1.0644901290110353,
+      "maximumReplayLateralDeviationMeters": 5.310547468597707,
+      "finalTransverseError": [
+        0.00536877624093656,
+        -0.0005810343615757428,
+        0.0016554958284604737,
+        -0.0005069363278853479,
+        -0.0003643974592204058
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 211,
+      "firstFrameSeconds": 0.080618,
+      "subsequentMedianSeconds": 0.0217315,
+      "subsequentP95Seconds": 0.04053299999999999,
+      "maximumFrameSeconds": 0.089051,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        1,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "brakingLead",
+      "speed": 8,
+      "executedFrames": 263,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 6.646666666666667,
+        "entryTimeSeconds": 12.150000000000038,
+        "confirmationTimeSeconds": 13.150000000000052
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.5901028449122314,
+      "maximumReplayLateralDeviationMeters": 5.444640657546305,
+      "finalTransverseError": [
+        0.01447816774026354,
+        -0.001975942922054432,
+        -0.008740686630542172,
+        0.0002500397201667578,
+        -0.00019812395286598777
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 275,
+      "firstFrameSeconds": 0.048369,
+      "subsequentMedianSeconds": 0.039976,
+      "subsequentP95Seconds": 0.046592999999999996,
+      "maximumFrameSeconds": 0.092568,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        6.25,
+        0,
+        0,
+        8,
+        -0.5,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "crossing",
+      "speed": 8,
+      "executedFrames": 251,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 2.0183333333333335,
+        "entryTimeSeconds": 11.55000000000003,
+        "confirmationTimeSeconds": 12.550000000000043
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.16262583141387119,
+      "maximumReplayLateralDeviationMeters": 5.760705302585194,
+      "finalTransverseError": [
+        0.00273569048420014,
+        1.6841703965594338e-06,
+        0.003606317309635898,
+        -0.0011957778450194189,
+        -0.0009633058482330964
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 262,
+      "firstFrameSeconds": 0.050188,
+      "subsequentMedianSeconds": 0.023846,
+      "subsequentP95Seconds": 0.04179,
+      "maximumFrameSeconds": 0.08843,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        12.8,
+        12.8,
+        -1.5707963267948966,
+        8,
+        0,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 8,
+      "executedFrames": 256,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.935,
+        "entryTimeSeconds": 11.800000000000033,
+        "confirmationTimeSeconds": 12.800000000000047
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.19358738607006434,
+      "maximumReplayLateralDeviationMeters": 5.588602573269169,
+      "finalTransverseError": [
+        0.009486689558445446,
+        -0.0019615960456865434,
+        0.008192207757913295,
+        0.0020175079397319654,
+        0.0017831669489094721
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 272,
+      "firstFrameSeconds": 0.055893,
+      "subsequentMedianSeconds": 0.041249,
+      "subsequentP95Seconds": 0.0576,
+      "maximumFrameSeconds": 0.118848,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        16.124983300907992,
+        14.206762804944406,
+        -2.080604684085137,
+        8.4,
+        1,
+        0.05,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "curvedHeadOn",
+      "speed": 8,
+      "executedFrames": 198,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.9000000000000001,
+        "entryTimeSeconds": 8.899999999999991,
+        "confirmationTimeSeconds": 9.900000000000006
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 1.7862922803917778,
+      "maximumReplayLateralDeviationMeters": 5.603672742815918,
+      "finalTransverseError": [
+        -0.013810973573609367,
+        0.0023834300142677785,
+        0.007480714226358209,
+        -0.0019163972446662667,
+        -0.0016323738772868399
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 206,
+      "firstFrameSeconds": 0.090294,
+      "subsequentMedianSeconds": 0.026551,
+      "subsequentP95Seconds": 0.04607119999999998,
+      "maximumFrameSeconds": 0.090294,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        25.53015217722975,
+        1.6361642591888819,
+        3.277592738925584,
+        8,
+        0,
+        -0.008000085335791027,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "curvedCrossing",
+      "speed": 8,
+      "executedFrames": 199,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.9366666666666668,
+        "entryTimeSeconds": 8.949999999999992,
+        "confirmationTimeSeconds": 9.950000000000006
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.1903746460120733,
+      "maximumReplayLateralDeviationMeters": 5.769585648915463,
+      "finalTransverseError": [
+        -0.011184331246632496,
+        0.0020673328021419465,
+        0.005955346307596976,
+        -0.0016850331454215661,
+        -0.0014314295712079539
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 209,
+      "firstFrameSeconds": 0.052734,
+      "subsequentMedianSeconds": 0.023765500000000002,
+      "subsequentP95Seconds": 0.04346,
+      "maximumFrameSeconds": 0.082438,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        14.7391861328936,
+        15.550524835856962,
+        -1.9306939349865844,
+        9.2,
+        0.5,
+        0.04,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "headOn",
+      "speed": 15,
+      "executedFrames": 147,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.2516666666666667,
+        "entryTimeSeconds": 6.349999999999985,
+        "confirmationTimeSeconds": 7.349999999999982
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 0.22280513501681995,
+      "maximumReplayLateralDeviationMeters": 5.115432444022037,
+      "finalTransverseError": [
+        0.009735627710861986,
+        -0.002075455127463254,
+        -0.01183768009922126,
+        -0.0007962301872280823,
+        0.003248417226821746
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 153,
+      "firstFrameSeconds": 0.201703,
+      "subsequentMedianSeconds": 0.024966500000000003,
+      "subsequentP95Seconds": 0.0403362,
+      "maximumFrameSeconds": 0.201703,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        0,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "acceleratingHeadOn",
+      "speed": 15,
+      "executedFrames": 5,
+      "recovery": {
+        "enabled": true,
+        "recovered": false,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.2183333333333335,
+        "entryTimeSeconds": [],
+        "confirmationTimeSeconds": []
+      },
+      "failure": "collisionAvoidanceController:noOptimizationSolution: The two-stage affine optimization did not complete (linearizationAccuracyNotReached).",
+      "minimumReplayClearanceMeters": 13.443238159899977,
+      "maximumReplayLateralDeviationMeters": 0.13273996774752414,
+      "finalTransverseError": [
+        0.13273996774752414,
+        0.08093705022228752,
+        -0.71939008633551,
+        -0.020307751567340195,
+        0.4765306018833928
+      ],
+      "failureTime": 0.25,
+      "totalSolverCalls": 8,
+      "firstFrameSeconds": 0.050392,
+      "subsequentMedianSeconds": 0.0411635,
+      "subsequentP95Seconds": 0.096439,
+      "maximumFrameSeconds": 0.096439,
+      "failedFrameSeconds": 0.099756,
+      "targetInitialState": [
+        24,
+        0,
+        3.141592653589793,
+        8,
+        1,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "brakingLead",
+      "speed": 15,
+      "executedFrames": 371,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 6.646666666666667,
+        "entryTimeSeconds": 17.550000000000114,
+        "confirmationTimeSeconds": 18.55000000000013
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 1.2591029531411764,
+      "maximumReplayLateralDeviationMeters": 7.691993467133728,
+      "finalTransverseError": [
+        0.002801195466837209,
+        0.00022047331769916865,
+        -0.09112690400280954,
+        -0.00014024131613852854,
+        0.0007189457195123759
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 393,
+      "firstFrameSeconds": 0.054288,
+      "subsequentMedianSeconds": 0.043734999999999996,
+      "subsequentP95Seconds": 0.068211,
+      "maximumFrameSeconds": 0.112807,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        6.25,
+        0,
+        0,
+        15,
+        -0.5,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "crossing",
+      "speed": 15,
+      "executedFrames": 172,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.8216666666666668,
+        "entryTimeSeconds": 7.599999999999981,
+        "confirmationTimeSeconds": 8.599999999999987
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 1.2889206323159976,
+      "maximumReplayLateralDeviationMeters": 6.467807339439867,
+      "finalTransverseError": [
+        -0.008415645248576367,
+        0.005063606147787621,
+        -0.0170869940270304,
+        -0.0008595818953484573,
+        -0.0035077917092510673
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 178,
+      "firstFrameSeconds": 0.047441,
+      "subsequentMedianSeconds": 0.025516,
+      "subsequentP95Seconds": 0.043642299999999995,
+      "maximumFrameSeconds": 0.075408,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        24,
+        12.8,
+        -1.5707963267948966,
+        8,
+        0,
+        0,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "turningCrossing",
+      "speed": 15,
+      "executedFrames": 162,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.8266666666666669,
+        "entryTimeSeconds": 7.099999999999983,
+        "confirmationTimeSeconds": 8.09999999999998
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 1.2490696200631852,
+      "maximumReplayLateralDeviationMeters": 6.449948381206567,
+      "finalTransverseError": [
+        0.01128440526388127,
+        -0.0021032563751746105,
+        -0.012220301973830061,
+        -0.0006445537292836537,
+        0.003533434107037243
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 170,
+      "firstFrameSeconds": 0.043562,
+      "subsequentMedianSeconds": 0.027391,
+      "subsequentP95Seconds": 0.04420599999999999,
+      "maximumFrameSeconds": 0.083106,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        27.32498330090799,
+        14.206762804944406,
+        -2.080604684085137,
+        8.4,
+        1,
+        0.05,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "curvedHeadOn",
+      "speed": 15,
+      "executedFrames": 1275,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 56.445,
+        "entryTimeSeconds": 62.74999999999857,
+        "confirmationTimeSeconds": 63.749999999998515
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 2.3221374094392533,
+      "maximumReplayLateralDeviationMeters": 7.441279681955081,
+      "finalTransverseError": [
+        -0.0048466052188836165,
+        0.0014459385010156859,
+        -0.014655322809920435,
+        -0.0005637757423848574,
+        0.002091499786577161
+      ],
+      "failureTime": null,
+      "totalSolverCalls": 1320,
+      "firstFrameSeconds": 0.03082,
+      "subsequentMedianSeconds": 0.0266735,
+      "subsequentP95Seconds": 0.04313619999999999,
+      "maximumFrameSeconds": 0.303982,
+      "failedFrameSeconds": null,
+      "targetInitialState": [
+        36.59270109359492,
+        3.3760588669965212,
+        3.333592738925584,
+        8,
+        0,
+        -0.008000085335791027,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "curvedCrossing",
+      "speed": 15,
+      "executedFrames": 160,
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.8250000000000002,
+        "entryTimeSeconds": 6.999999999999983,
+        "confirmationTimeSeconds": 7.99999999999998
+      },
+      "failure": "",
+      "minimumReplayClearanceMeters": 1.0060392062198096,
+      "maximumReplayLateralDeviationMeters": 6.362139553238984,
+      "finalTransverseError": [
+        0.009405520347834321,
+        -0.0027882418315112794,
+        -0.015480437247164858,
+        -0.0006260363293860843,
+        0.006253344084933457
+      ],
+      "failureTime": [],
+      "totalSolverCalls": 165,
+      "firstFrameSeconds": 0.048637,
+      "subsequentMedianSeconds": 0.025897,
+      "subsequentP95Seconds": 0.04312714999999999,
+      "maximumFrameSeconds": 0.086752,
+      "failedFrameSeconds": [],
+      "targetInitialState": [
+        25.039853870567335,
+        16.664629123759827,
+        -1.8746939349865843,
+        9.2,
+        0.5,
+        0.04,
+        1.6,
+        2.4,
+        0.95,
+        0,
+        0
+      ]
+    }
+  ]
+}

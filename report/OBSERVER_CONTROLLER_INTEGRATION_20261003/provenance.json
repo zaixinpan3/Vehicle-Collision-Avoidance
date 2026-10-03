@@ -1,0 +1,245 @@
+{
+  "preparedAt": "2026-10-03T15:38:30.791412-05:00",
+  "mathematicalDesignCommit": "47bf90121b06a18ab2addcc98c94c9c13250f7d1",
+  "repositoryHeadAtSnapshot": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "scope": "Partial executable observer/controller integration, exact constant-A/constant-beta target contract; no certified nonlinear robust safety claim.",
+  "matlab": "R2026a, single computation thread",
+  "tests": {
+    "fullSuite": {
+      "total": 677,
+      "passed": 677,
+      "failed": 0
+    },
+    "finalFocused": {
+      "total": 27,
+      "passed": 27
+    }
+  },
+  "commandsOrMethods": [
+    "matlab -singleCompThread -batch \"r=runtests('tests'); assertSuccess(r)\" (the actual invocation also saved the result table and MAT file under the cache and used -logfile)",
+    "matlab -singleCompThread -batch \"addpath('scripts'); verifyObserverControllerIntegration('/home/zai/.cache/collisionAvoidance/observer-integration-20261003/integration.json'); r=runtests({'tests/nrmmControllerErrorBoundsTest.m','tests/observerPredictiveControlTest.m'}); assertSuccess(r)\" (result serialization and logfile captured separately)",
+    "matlab -singleCompThread -batch \"addpath('scripts'); runPotentialFieldCampaign(pwd,'/home/zai/.cache/collisionAvoidance/observer-integration-20261003/nominal-campaign',1200);\"",
+    "matlab -singleCompThread -batch \"addpath('scripts'); extendPotentialFieldRecovery(pwd,'/home/zai/.cache/collisionAvoidance/observer-integration-20261003/nominal-campaign',2000);\"",
+    "checkcode(...,'-id') for the nine changed/new MATLAB source and test files; code-analysis.json stores the actual diagnostics",
+    "pdflatex -interaction=nonstopmode -halt-on-error -output-directory=/home/zai/.cache/collisionAvoidance/observer-integration-20261003 OBSERVER_CONTROLLER_INTEGRATION_20261003.tex (working directory report; final five-page PDF verified with pdftotext and rendered page 4)",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Actual observer publication is admitted but its affine optimization is infeasible: terminal reserve/core ratio 315.399.",
+    "13/14 exact-state scenarios recover without observed collision; 15 m/s accelerating head-on still fails its sixth optimization at t=0.25 s.",
+    "Minimum nonlinear replay clearance 0.162626 m is below the 0.20 m affine node margin.",
+    "Target-aware noisy closed-loop campaign was not claimed or performed. Full nonlinear remainders, causal output-feedback tube policy, posterior intersection and robust terminal closure remain unimplemented.",
+    "Scenario timings overlap other MATLAB validation and are not a dedicated deadline benchmark."
+  ],
+  "deliberateExclusions": [
+    "Unrelated observer theory and research-report modifications",
+    "Concurrent perception implementation and Python tests",
+    "Untracked repository instruction/configuration documents and manuscript/reference artifacts",
+    "solver/ and native/vendor dependency trees"
+  ],
+  "sourceAndResultHashes": [
+    {
+      "path": "controller/CONTROLLER_FILES.md",
+      "sha256": "d47bbccf4ea780ca0835a7858dbc87fb59275caa0644226fa34c563304a36502"
+    },
+    {
+      "path": "controller/NOMINAL_CLF.md",
+      "sha256": "901ac5fc911b7792a0cb88816f2a98177edded901477c5b0cd6ea0ceff0bc5f0"
+    },
+    {
+      "path": "controller/PCBF_CLF_ARCHITECTURE.md",
+      "sha256": "8317644fb97e6be1d563e69771521422bac316f5a322638055f98daac2608725"
+    },
+    {
+      "path": "controller/collisionAvoidanceController.m",
+      "sha256": "c2ec3c75e88504ab7746c105d6a5e069b2eb590b3e2212207515b9456a13b5d4"
+    },
+    {
+      "path": "controller/predictiveSafetyGeometry.m",
+      "sha256": "9f3d6fe28a1e6f007e8b83c69b099bd9658b8a1ef3a54f40e85189e2c9e5f7de"
+    },
+    {
+      "path": "controller/readControllerInputs.m",
+      "sha256": "bdb168febfc0fb0140e6a194a52ffa69ff7dffcb7fa008566c35ecc154aeb35e"
+    },
+    {
+      "path": "controller/solvePredictiveControl.m",
+      "sha256": "256ce2d216748955c598165d2e685d8b49373e43912464f0415df8f107b87f61"
+    },
+    {
+      "path": "estimator/nrmmControllerErrorBounds.m",
+      "sha256": "12c36834aa6bfd05311ac3e8b9e86d25e69d19429891d261e8198b22a4d0016f"
+    },
+    {
+      "path": "estimator/nrmmTargetParameterErrorBounds.m",
+      "sha256": "acf4f47348b1828b9b9d3c3e2ba4f017b68667cecdf6b45082d38f9f20798c0b"
+    },
+    {
+      "path": "tests/nrmmControllerErrorBoundsTest.m",
+      "sha256": "76181fb23d02a79c3b20b478282b2f866dbfaab31b6fa26c2703c4484b68563b"
+    },
+    {
+      "path": "tests/observerPredictiveControlTest.m",
+      "sha256": "3680195a7f23e7ea80d57f0cdc1d5815268d40c50ec4501b0aa495cbb07e4859"
+    },
+    {
+      "path": "scripts/verifyObserverControllerIntegration.m",
+      "sha256": "034459b6f4c491e2669fe4a1eb9bf7b46f5c94409b169087947e982f7f16de11"
+    },
+    {
+      "path": "report/OBSERVER_CONTROLLER_INTEGRATION_20261003.tex",
+      "sha256": "40444eb2ff9eb62ad0cf9da4f396a8778c85eb87232d753a58be8fd8ec472d6d"
+    },
+    {
+      "path": "report/OBSERVER_CONTROLLER_INTEGRATION_20261003/code-analysis.json",
+      "sha256": "c7b5e184143d1fbf64b40ec04d5804b9636dab1032989c5fc964f5e15e38e03d"
+    },
+    {
+      "path": "report/OBSERVER_CONTROLLER_INTEGRATION_20261003/final-focused-tests.json",
+      "sha256": "dee9ce933d1682846c750622bfde994123731dcfdca6fc16b93b798d1a19c4e5"
+    },
+    {
+      "path": "report/OBSERVER_CONTROLLER_INTEGRATION_20261003/integration.json",
+      "sha256": "0415273c818d763878114dc5f2e8e3d1eaaddf8c184514103d22285bb1771fdc"
+    },
+    {
+      "path": "report/OBSERVER_CONTROLLER_INTEGRATION_20261003/nominal-regression.json",
+      "sha256": "0af8240ea01b444a76dda2857ece12be01b8563a82fd57d6fc1a991d1f7a1a27"
+    },
+    {
+      "path": "report/OBSERVER_CONTROLLER_INTEGRATION_20261003/tests.json",
+      "sha256": "aa8327151d0ec597b9f01406d8fcb99421cc711a863479bcb685079c24c76edc"
+    }
+  ],
+  "rawEvidenceLocation": "/home/zai/.cache/collisionAvoidance/observer-integration-20261003",
+  "rawScenarioFiles": [
+    {
+      "file": "nominal-campaign/recovery-summary.json",
+      "sha256": "34b887c70f832957b85eef472a87046691fab6fdc4d5aca9ab6e3813be797437"
+    },
+    {
+      "file": "nominal-campaign/speed15-acceleratingHeadOn.json",
+      "sha256": "c4b73cf1af3d1835492e0b6c8948f13da2958fda8cf562c17667436fea4539b9"
+    },
+    {
+      "file": "nominal-campaign/speed15-acceleratingHeadOn.mat",
+      "sha256": "2308a9a3e7600d6931191b4ef0a2b1426333adf4194e36d5f1e02fac80bbe7dd"
+    },
+    {
+      "file": "nominal-campaign/speed15-brakingLead.json",
+      "sha256": "4caf425941009e9567434bf62505449d479dcfcdd2c7887fee34f1b5219eecdc"
+    },
+    {
+      "file": "nominal-campaign/speed15-brakingLead.mat",
+      "sha256": "a421eed607884a0ce3eb06f83d9716a22edac4a9a1cc8feaa0c0fcafb8328019"
+    },
+    {
+      "file": "nominal-campaign/speed15-crossing.json",
+      "sha256": "d155a0bb5bc8be4e981d7cea41a8ec3c0802f70ea9c9c437f341066973da0c40"
+    },
+    {
+      "file": "nominal-campaign/speed15-crossing.mat",
+      "sha256": "bc7abf3d3369133fc6c49abfef02c65cd89ed4fe8852bce08fec0b1587c7a845"
+    },
+    {
+      "file": "nominal-campaign/speed15-curvedCrossing.json",
+      "sha256": "7912c6f929bed7f6b9ece7c2c0f92db8c05424d4bf4ff904352aa55d4f071436"
+    },
+    {
+      "file": "nominal-campaign/speed15-curvedCrossing.mat",
+      "sha256": "db11b572aaa59bb85779eed1d75040f53f1f52e8f346cfa7753b8620554fe472"
+    },
+    {
+      "file": "nominal-campaign/speed15-curvedHeadOn-recovery.json",
+      "sha256": "3212d4c81df2211aa1133aa132f088865033183ea5cb71122edff86ae1be19d4"
+    },
+    {
+      "file": "nominal-campaign/speed15-curvedHeadOn-recovery.mat",
+      "sha256": "10fb9f192e88125fcf16dd0a4f92dff2e451049762b38551c2f2c3eef8833180"
+    },
+    {
+      "file": "nominal-campaign/speed15-curvedHeadOn.json",
+      "sha256": "55ae67fd969a207ee6a4a7adf8a74738d677f8db6166e6b011bd733ba7b19241"
+    },
+    {
+      "file": "nominal-campaign/speed15-curvedHeadOn.mat",
+      "sha256": "ea05b3f5d17d41e049d196ca3af6d1f969eb3bf2921479c3a19e4962dbbbf138"
+    },
+    {
+      "file": "nominal-campaign/speed15-headOn.json",
+      "sha256": "efd413777c0e1351da21aaa15c1f340b670e19b37b8a71ff18ae0f90a1afc648"
+    },
+    {
+      "file": "nominal-campaign/speed15-headOn.mat",
+      "sha256": "635d003f8ee40f7e7af2b6f4c5cda332f884428a36cd9f3ad644ede4889110d7"
+    },
+    {
+      "file": "nominal-campaign/speed15-turningCrossing.json",
+      "sha256": "4fc4f204b238720943aff3bff67f0805af1c5152ed6a84dbcf4b84f39418c715"
+    },
+    {
+      "file": "nominal-campaign/speed15-turningCrossing.mat",
+      "sha256": "f49396d824e3fbad0583636f631a11ab60dadccd59ed9ede7c846dcdf869e250"
+    },
+    {
+      "file": "nominal-campaign/speed8-acceleratingHeadOn.json",
+      "sha256": "4f6f070086085fa59c096f8555ea0edef1a4ddbab664d0ede687433196407ecb"
+    },
+    {
+      "file": "nominal-campaign/speed8-acceleratingHeadOn.mat",
+      "sha256": "648c65f932af891709dbbdee74a144076c26100aea5e58b9147641ee493af15b"
+    },
+    {
+      "file": "nominal-campaign/speed8-brakingLead.json",
+      "sha256": "97854db6f24f27d510681c10ec3bfd5d41eb96b788d90eb88a0c4d456b529544"
+    },
+    {
+      "file": "nominal-campaign/speed8-brakingLead.mat",
+      "sha256": "b77fc228ec3bade1ec71cdbb8bf254caa5080036fd14ab2cc7d4947436b78b48"
+    },
+    {
+      "file": "nominal-campaign/speed8-crossing.json",
+      "sha256": "1186623f42d8a22a354520bc97169d5702f2ef06e8e736ca175006a738a765eb"
+    },
+    {
+      "file": "nominal-campaign/speed8-crossing.mat",
+      "sha256": "a2866281a4384afc545395c9bffcaf4a202b5a6c0b7fae4945c2a7944a228517"
+    },
+    {
+      "file": "nominal-campaign/speed8-curvedCrossing.json",
+      "sha256": "9ee8e57e893d14121c68ef8ebd2aec0a9cad9ef06a6fd5b89f2ce7f6d382bdf0"
+    },
+    {
+      "file": "nominal-campaign/speed8-curvedCrossing.mat",
+      "sha256": "88ad37676c3293d63bb1f090c5ee492cf24abd92f890ced79c2f4f173a6974e1"
+    },
+    {
+      "file": "nominal-campaign/speed8-curvedHeadOn.json",
+      "sha256": "6713b2c4846f6f390c27790d3ab9f5195f6e2f2cc5da82f5793aaa870b42ce8b"
+    },
+    {
+      "file": "nominal-campaign/speed8-curvedHeadOn.mat",
+      "sha256": "75589438c00ab840186e0d93f952430f390fca78c00540a0999d551f5bf241a3"
+    },
+    {
+      "file": "nominal-campaign/speed8-headOn.json",
+      "sha256": "f27073564b6e3cd235a2a639d444350364aa1174fbdcfa275f251e1f1c3738f7"
+    },
+    {
+      "file": "nominal-campaign/speed8-headOn.mat",
+      "sha256": "191aa6c0e029bbc29d11b4b1b98cc17ef1e00d950aa564cff6d908da98474ac0"
+    },
+    {
+      "file": "nominal-campaign/speed8-turningCrossing.json",
+      "sha256": "5e06e64191b6f5c3ba0f0834cd9b21881022dee9cd78517db887a1a9a463e43d"
+    },
+    {
+      "file": "nominal-campaign/speed8-turningCrossing.mat",
+      "sha256": "71d99d509f84320da3f395e4a6b56e9e88b683f7d63a0fdd6366db0916418d0a"
+    },
+    {
+      "file": "nominal-campaign/summary.json",
+      "sha256": "6da62a08352d082e281e482766f41bfe83690a459f40ee094b520cf7e8d2ec2e"
+    }
+  ]
+}

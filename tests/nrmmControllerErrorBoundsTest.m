@@ -59,20 +59,20 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
             testCase.verifyEqual(motion.curvatureMaximum, ...
                 sin(domain.sideslipMaximum)/domain.rearAxleDistance);
             testCase.verifyEqual(motion.speedRateMaximum, domain.scalarAccelerationMaximum);
-            % The controller caps the acceleration magnitude, hypot(A, V*omega).
+            % This domain field bounds acceleration magnitude, hypot(A, V*omega).
             testCase.verifyEqual(motion.scalarAccelerationMaximum, domain.accelerationNormBound);
             testCase.verifyGreaterThan(motion.scalarAccelerationMaximum, domain.scalarAccelerationMaximum);
         end
         function thePublishedParameterBoundsContainTheTruthAndBeatTheBox(testCase, geometry)
             [published, ~, truth] = localReconstruction(testCase.Design, geometry);
             estimate = published.targetEstimate;
-            velocity = estimate.targetVelocityInertial;acceleration = estimate.targetAccelerationInertial;
+            velocity = estimate.targetVelocityInertial;
             speed = norm(velocity);
             courseError = atan2(sin(truth.course-atan2(velocity(2), velocity(1))), ...
                 cos(truth.course-atan2(velocity(2), velocity(1))));
             testCase.verifyLessThanOrEqual(abs(truth.speed-speed), estimate.targetSpeedErrorBound+1e-12);
             testCase.verifyLessThanOrEqual(abs(courseError), estimate.targetCourseErrorBound+1e-12);
-            testCase.verifyLessThanOrEqual(abs(truth.scalarAcceleration-dot(velocity, acceleration)/speed), ...
+            testCase.verifyLessThanOrEqual(abs(truth.scalarAcceleration-estimate.targetScalarAcceleration), ...
                 estimate.targetSpeedRateErrorBound+1e-12);
             curvature = truth.yawRate/truth.speed;
             testCase.verifyGreaterThanOrEqual(curvature, estimate.targetCurvatureInterval(1)-1e-12);
@@ -84,9 +84,19 @@ classdef nrmmControllerErrorBoundsTest < matlab.unittest.TestCase
                 testCase.verifyLessThan(estimate.targetSpeedErrorBound, norm(values(3:4)));
             end
         end
+        function parameterSetContainsConstantParametersAfterSaturatedReconstruction(testCase, geometry)
+            [published,~,truth]=localReconstruction(testCase.Design,geometry);
+            set=published.targetEstimate.predictionErrorSet;
+            actual=[truth.speed,truth.scalarAcceleration,truth.yawRate/truth.speed];
+            intervals=[set.speedInterval,set.accelerationInterval,set.curvatureInterval];
+            testCase.verifyTrue(set.available);
+            testCase.verifyLessThanOrEqual(intervals(1,:),actual+1e-12);
+            testCase.verifyGreaterThanOrEqual(intervals(2,:),actual-1e-12);
+            testCase.verifyFalse(set.futureMeasurementsAssumed);
+        end
         function aModelErrorPublishesNoMotionContract(testCase)
-            % A nonzero model jerk admits motion outside every NRMM path, which
-            % no contract describes; the controller then refuses the target.
+            % Preserve the observer API for previously declared model errors;
+            % the current controller study uses the exact NRMM contract only.
             design = testCase.Design;
             design.target.modelJerkMaximum = 0.5;
             published = localReconstruction(design, [1.2; 0.03; 0]);
@@ -155,7 +165,7 @@ function [published, actualError, truth] = localReconstruction(design, geometry)
     target.targetVelocityInertial = estimatedRotation*estimated(3:4);
     target.targetAccelerationInertial = estimatedRotation*estimated(5:6);
     target.targetHeadingInertial = estimatedYaw+target.targetCourseAngleEgoFrame-target.targetSideslip;
-    output = struct("stateTime", 0, "egoPositionInertial", estimatedPosition, ...
+    output = struct("stateTime", 0, "egoPositionInertial", estimatedPosition, "egoYaw",estimatedYaw, ...
         "targetEstimate", target);
     components = vecnorm(reshape(actual-estimated, 2, 3)).';
     bound = struct("yaw", abs(geometry(2)), "bodyVelocity", norm(egoVelocity-estimatedEgoVelocity), ...
