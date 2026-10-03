@@ -1,0 +1,16 @@
+{
+  "dev": {
+    "frames": 300,
+    "maximumPreviousPositionReproductionDifferenceM": 1.7763568394002505e-15,
+    "newRawAllFramesRmseM": 0.10810750491969462,
+    "newRawPost2sRmseM": 0.12463319431526342,
+    "scope": "Geometry-only control using exactly the previous closed-loop priors; independent of the new feedback trajectory."
+  },
+  "conf": {
+    "frames": 300,
+    "maximumPreviousPositionReproductionDifferenceM": 1.7763568394002505e-15,
+    "newRawAllFramesRmseM": 0.04713531525118796,
+    "newRawPost2sRmseM": 0.043283775774039975,
+    "scope": "Geometry-only control using exactly the previous closed-loop priors; independent of the new feedback trajectory."
+  }
+}

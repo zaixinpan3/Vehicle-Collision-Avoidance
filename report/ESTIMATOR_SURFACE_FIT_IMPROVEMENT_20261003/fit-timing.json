@@ -1,0 +1,18 @@
+{
+  "scope": "Single-process matched-input two-stage Python geometry only; no detector, data loading or MATLAB time. First five fits per recording excluded from each timing summary. Not a real-time scheduling guarantee.",
+  "fittedFramesPerMethod": 600,
+  "timingFramesPerMethod": 590,
+  "runtimeMs": {
+    "previous": {
+      "median": 11.161464004544541,
+      "p95": 31.853372973273505,
+      "maximum": 53.35068400017917
+    },
+    "surface": {
+      "median": 7.841828977689147,
+      "p95": 18.855525972321626,
+      "maximum": 37.51323703909293
+    }
+  },
+  "previousPositionReproductionsWithin1eMinus9M": 600
+}

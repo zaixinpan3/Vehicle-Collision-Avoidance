@@ -1,0 +1,651 @@
+{
+  "predictionsFrozenBeforeTruthRead": true,
+  "recordings": {
+    "dev": {
+      "default": {
+        "maximumEstimatedFrame": 109,
+        "maximumEstimatedErrorM": 0.5578203163507955,
+        "maximumEstimatedTimeS": 2.18,
+        "post2sMaximumEstimatedFrame": 109,
+        "post2sMaximumEstimatedErrorM": 0.5578203163507955,
+        "maximumRawFrame": 275,
+        "maximumRawErrorM": 0.5115427538862666
+      },
+      "surface": {
+        "maximumEstimatedFrame": 9,
+        "maximumEstimatedErrorM": 0.33439398450102825,
+        "maximumEstimatedTimeS": 0.18,
+        "post2sMaximumEstimatedFrame": 121,
+        "post2sMaximumEstimatedErrorM": 0.237184702760649,
+        "maximumRawFrame": 271,
+        "maximumRawErrorM": 0.13757550868996968
+      }
+    },
+    "conf": {
+      "default": {
+        "maximumEstimatedFrame": 11,
+        "maximumEstimatedErrorM": 0.3580076404587692,
+        "maximumEstimatedTimeS": 0.22,
+        "post2sMaximumEstimatedFrame": 269,
+        "post2sMaximumEstimatedErrorM": 0.3041086965386274,
+        "maximumRawFrame": 297,
+        "maximumRawErrorM": 0.3977766212266095
+      },
+      "surface": {
+        "maximumEstimatedFrame": 9,
+        "maximumEstimatedErrorM": 0.33315130980978236,
+        "maximumEstimatedTimeS": 0.18,
+        "post2sMaximumEstimatedFrame": 100,
+        "post2sMaximumEstimatedErrorM": 0.09252190362296488,
+        "maximumRawFrame": 78,
+        "maximumRawErrorM": 0.13682790712342077
+      }
+    }
+  },
+  "frames": [
+    {
+      "kind": "dev",
+      "frame": 9,
+      "timeS": 0.18,
+      "simulatorFrame": 1274,
+      "truePose": [
+        10.126918287736464,
+        0.0034197562189773045,
+        0.0001017327536410269
+      ],
+      "previousPose": [
+        10.15351736517563,
+        -0.12583159796174345,
+        -0.07636304231057893
+      ],
+      "newPose": [
+        10.153083128275805,
+        -0.08676227210407643,
+        -0.05836012148927002
+      ],
+      "previousRawErrorM": 0.13195993133585981,
+      "newRawErrorM": 0.09390099633608368,
+      "previousEstimatedErrorM": 0.3506331772871864,
+      "newEstimatedErrorM": 0.33439398450102825,
+      "previousRawErrorXYM": [
+        0.02659907743916534,
+        -0.12925135418072076
+      ],
+      "newRawErrorXYM": [
+        0.026164840539340872,
+        -0.09018202832305373
+      ],
+      "previousEstimatedErrorXYM": [
+        0.33512338650863605,
+        -0.1031306978037617
+      ],
+      "newEstimatedErrorXYM": [
+        0.33438201743923557,
+        -0.0028290075540158043
+      ],
+      "previousHeadingErrorDeg": -4.381108892596982,
+      "newHeadingErrorDeg": -3.3496175106277875,
+      "pointCount": 162,
+      "boundaryPointCount": 76,
+      "containmentPointCount": 162,
+      "boundaryHeightLimitM": 0.5068405687808991,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.00705072538152979,
+          "containment": 0.0019457083079889963,
+          "midpoint": 7.266251263747076e-08,
+          "total": 0.008996506352031424
+        },
+        "newFit": {
+          "boundary": 0.00721046649614121,
+          "containment": 0.0015386248593500288,
+          "midpoint": 6.447546835614874e-05,
+          "total": 0.008813566823847388
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.010769453608988101,
+          "containment": 8.45475871902934e-05,
+          "midpoint": 6.990898155019529e-06,
+          "total": 0.010860992094333414
+        }
+      }
+    },
+    {
+      "kind": "dev",
+      "frame": 109,
+      "timeS": 2.18,
+      "simulatorFrame": 1374,
+      "truePose": [
+        4.7988593361772995,
+        -0.014944576700701484,
+        -2.503371424674484e-05
+      ],
+      "previousPose": [
+        4.870987748433303,
+        -0.43499890323176194,
+        -0.10713855394744098
+      ],
+      "newPose": [
+        4.911306560717254,
+        -0.016051534255505685,
+        0.019354001994382003
+      ],
+      "previousRawErrorM": 0.4262020003379088,
+      "newRawErrorM": 0.11245267298631458,
+      "previousEstimatedErrorM": 0.5578203163507955,
+      "newEstimatedErrorM": 0.19513375728460078,
+      "previousRawErrorXYM": [
+        0.07212841225600375,
+        -0.42005432653106045
+      ],
+      "newRawErrorXYM": [
+        0.11244722453995415,
+        -0.0011069575548042013
+      ],
+      "previousEstimatedErrorXYM": [
+        0.13668056569774034,
+        -0.5408159837636525
+      ],
+      "newEstimatedErrorXYM": [
+        0.19504099555791043,
+        -0.006016085420325414
+      ],
+      "previousHeadingErrorDeg": -6.137152638151179,
+      "newHeadingErrorDeg": 1.110336957137742,
+      "pointCount": 999,
+      "boundaryPointCount": 511,
+      "containmentPointCount": 999,
+      "boundaryHeightLimitM": 0.7454335361719132,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.014842363746099763,
+          "containment": 0.0020781761735915974,
+          "midpoint": 0.0036235519468788935,
+          "total": 0.020544091866570253
+        },
+        "newFit": {
+          "boundary": 0.00967432682629917,
+          "containment": 0.0012990506601659375,
+          "midpoint": 5.197222652479636e-05,
+          "total": 0.011025349712989903
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.029456230820933002,
+          "containment": 0.0,
+          "midpoint": 0.00016749887167147944,
+          "total": 0.029623729692604482
+        }
+      }
+    },
+    {
+      "kind": "dev",
+      "frame": 121,
+      "timeS": 2.42,
+      "simulatorFrame": 1386,
+      "truePose": [
+        4.736426828583806,
+        -0.013562404528142558,
+        0.0001174454040724944
+      ],
+      "previousPose": [
+        4.798700610668422,
+        -0.48774141932285453,
+        -0.1367481786913183
+      ],
+      "newPose": [
+        4.861922146750666,
+        -0.012744751149706602,
+        -0.002414569258436632
+      ],
+      "previousRawErrorM": 0.47825073131863155,
+      "newRawErrorM": 0.12549798181185487,
+      "previousEstimatedErrorM": 0.5235642114759708,
+      "newEstimatedErrorM": 0.237184702760649,
+      "previousRawErrorXYM": [
+        0.06227378208461598,
+        -0.474179014794712
+      ],
+      "newRawErrorXYM": [
+        0.12549531816685988,
+        0.000817653378435956
+      ],
+      "previousEstimatedErrorXYM": [
+        0.18418671223723404,
+        -0.4900966624796514
+      ],
+      "newEstimatedErrorXYM": [
+        0.23702483597078405,
+        -0.008706914303031544
+      ],
+      "previousHeadingErrorDeg": -7.841822621089919,
+      "newHeadingErrorDeg": -0.14507375382701446,
+      "pointCount": 980,
+      "boundaryPointCount": 552,
+      "containmentPointCount": 980,
+      "boundaryHeightLimitM": 0.7796913728117945,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.028407018536446144,
+          "containment": 0.0023758400411110106,
+          "midpoint": 0.007087288406131644,
+          "total": 0.0378701469836888
+        },
+        "newFit": {
+          "boundary": 0.02062119357705573,
+          "containment": 0.0023447484149204394,
+          "midpoint": 6.725850247306921e-05,
+          "total": 0.02303320049444924
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.04800474125253519,
+          "containment": 0.0,
+          "midpoint": 0.00012392946751773625,
+          "total": 0.048128670720052925
+        }
+      }
+    },
+    {
+      "kind": "dev",
+      "frame": 275,
+      "timeS": 5.5,
+      "simulatorFrame": 1540,
+      "truePose": [
+        4.738733219033389,
+        -0.012992307768749253,
+        -0.0014152038032681073
+      ],
+      "previousPose": [
+        4.793287224481371,
+        -0.5216177589045796,
+        -0.15973519252527354
+      ],
+      "newPose": [
+        4.8703324616260755,
+        -0.027546567953606684,
+        -0.04052723068940565
+      ],
+      "previousRawErrorM": 0.5115427538862666,
+      "newRawErrorM": 0.13240161305851744,
+      "previousEstimatedErrorM": 0.4201504009212894,
+      "newEstimatedErrorM": 0.13425349506049572,
+      "previousRawErrorXYM": [
+        0.05455400544798206,
+        -0.5086254511358304
+      ],
+      "newRawErrorXYM": [
+        0.13159924259268685,
+        -0.01455426018485743
+      ],
+      "previousEstimatedErrorXYM": [
+        0.08343017540518094,
+        -0.4117836388519837
+      ],
+      "newEstimatedErrorXYM": [
+        0.13423563290460105,
+        -0.0021899302865020474
+      ],
+      "previousHeadingErrorDeg": -9.071067166329705,
+      "newHeadingErrorDeg": -2.240954068777884,
+      "pointCount": 939,
+      "boundaryPointCount": 529,
+      "containmentPointCount": 939,
+      "boundaryHeightLimitM": 0.7389934629201891,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.035936705557488645,
+          "containment": 0.0022829637343169187,
+          "midpoint": 0.004864178681769997,
+          "total": 0.04308384797357556
+        },
+        "newFit": {
+          "boundary": 0.02438623414937923,
+          "containment": 0.0027266459666194197,
+          "midpoint": 0.0005544046480310641,
+          "total": 0.027667284764029715
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.056020462719573574,
+          "containment": 0.0,
+          "midpoint": 7.71524979302211e-05,
+          "total": 0.056097615217503796
+        }
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 9,
+      "timeS": 0.18,
+      "simulatorFrame": 1672,
+      "truePose": [
+        15.129220615991176,
+        0.0062327366368005455,
+        0.00020026971397395872
+      ],
+      "previousPose": [
+        15.145010207550824,
+        -0.15529900836973284,
+        -0.04262669268728203
+      ],
+      "newPose": [
+        15.152374622603439,
+        0.010521011594572983,
+        0.005160442187395121
+      ],
+      "previousRawErrorM": 0.162301619974898,
+      "newRawErrorM": 0.023547766864699553,
+      "previousEstimatedErrorM": 0.3541398568696155,
+      "newEstimatedErrorM": 0.33315130980978236,
+      "previousRawErrorXYM": [
+        0.01578959155964732,
+        -0.1615317450065334
+      ],
+      "newRawErrorXYM": [
+        0.02315400661226441,
+        0.004288274957772438
+      ],
+      "previousEstimatedErrorXYM": [
+        0.3250608358440239,
+        -0.14053644091130355
+      ],
+      "newEstimatedErrorXYM": [
+        0.3330207343605238,
+        -0.009326613209039856
+      ],
+      "previousHeadingErrorDeg": -2.45380419495743,
+      "newHeadingErrorDeg": 0.2841969483839991,
+      "pointCount": 62,
+      "boundaryPointCount": 36,
+      "containmentPointCount": 62,
+      "boundaryHeightLimitM": 0.504737862944603,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.010598946732844512,
+          "containment": 0.0012688246343573336,
+          "midpoint": 0.00040188563901833813,
+          "total": 0.012269657006220184
+        },
+        "newFit": {
+          "boundary": 0.009085299599221625,
+          "containment": 0.001319998463371816,
+          "midpoint": 2.016873768882525e-08,
+          "total": 0.01040531823133113
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.011664400389123057,
+          "containment": 8.615748878993693e-05,
+          "midpoint": 5.7001191471745e-06,
+          "total": 0.011756257997060168
+        }
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 11,
+      "timeS": 0.22,
+      "simulatorFrame": 1674,
+      "truePose": [
+        14.97613960472334,
+        0.00618938187807111,
+        0.00011025486912928046
+      ],
+      "previousPose": [
+        14.993623668819895,
+        -0.15729221798297363,
+        -0.039793340132794834
+      ],
+      "newPose": [
+        15.001132232520394,
+        -0.0032227771769978556,
+        -0.0011532881517072916
+      ],
+      "previousRawErrorM": 0.1644138862458373,
+      "newRawErrorM": 0.026706182472978356,
+      "previousEstimatedErrorM": 0.3580076404587692,
+      "newEstimatedErrorM": 0.32701327776706335,
+      "previousRawErrorXYM": [
+        0.017484064096553453,
+        -0.16348159986104474
+      ],
+      "newRawErrorXYM": [
+        0.024992627797054467,
+        -0.009412159055068965
+      ],
+      "previousEstimatedErrorXYM": [
+        0.31814330440825955,
+        -0.16417767353403712
+      ],
+      "newEstimatedErrorXYM": [
+        0.32695250662546016,
+        -0.006304145246340333
+      ],
+      "previousHeadingErrorDeg": -2.2863075810095776,
+      "newHeadingErrorDeg": -0.07239568232714622,
+      "pointCount": 63,
+      "boundaryPointCount": 36,
+      "containmentPointCount": 63,
+      "boundaryHeightLimitM": 0.5214994132518767,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.010731425629199383,
+          "containment": 0.0011830333005597386,
+          "midpoint": 0.00037353091341452567,
+          "total": 0.012287989843173646
+        },
+        "newFit": {
+          "boundary": 0.00932930359149707,
+          "containment": 0.0010836880867900044,
+          "midpoint": 3.0615602497750005e-10,
+          "total": 0.0104129919844431
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.012000983230553732,
+          "containment": 7.588294573655836e-05,
+          "midpoint": 3.5133487873437043e-06,
+          "total": 0.012080379525077635
+        }
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 100,
+      "timeS": 2.0,
+      "simulatorFrame": 1763,
+      "truePose": [
+        9.04829217044682,
+        -0.0035116590890758026,
+        -0.00020719393280816474
+      ],
+      "previousPose": [
+        9.088636789654466,
+        0.06455092730482717,
+        0.03953698740977097
+      ],
+      "newPose": [
+        9.085869651665984,
+        0.0187089262406272,
+        0.011054567663925298
+      ],
+      "previousRawErrorM": 0.07912145073011162,
+      "newRawErrorM": 0.04365571563004424,
+      "previousEstimatedErrorM": 0.09406936486715435,
+      "newEstimatedErrorM": 0.09252190362296488,
+      "previousRawErrorXYM": [
+        0.040344619207646204,
+        0.06806258639390297
+      ],
+      "newRawErrorXYM": [
+        0.03757748121916471,
+        0.022220585329703002
+      ],
+      "previousEstimatedErrorXYM": [
+        0.09400669185027155,
+        0.0034332628617544923
+      ],
+      "newEstimatedErrorXYM": [
+        0.09117555186770154,
+        -0.015726455151663
+      ],
+      "previousHeadingErrorDeg": 2.2771738511323742,
+      "newHeadingErrorDeg": 0.6452514093753384,
+      "pointCount": 240,
+      "boundaryPointCount": 120,
+      "containmentPointCount": 240,
+      "boundaryHeightLimitM": 0.6064740672707556,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.007567478932484882,
+          "containment": 0.001896274949239464,
+          "midpoint": 2.7125803031925568e-05,
+          "total": 0.009490879684756271
+        },
+        "newFit": {
+          "boundary": 0.008007783397693475,
+          "containment": 0.0014524032295070177,
+          "midpoint": 9.690065851565038e-07,
+          "total": 0.00946115563378565
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.01254779410180118,
+          "containment": 1.9892898969300136e-05,
+          "midpoint": 1.120211940119064e-05,
+          "total": 0.01257888912017167
+        }
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 269,
+      "timeS": 5.38,
+      "simulatorFrame": 1932,
+      "truePose": [
+        5.199101521211787,
+        -0.013066495604990652,
+        -0.001241299384085933
+      ],
+      "previousPose": [
+        5.247093597526172,
+        -0.06364137796412335,
+        -0.0034988925712551733
+      ],
+      "newPose": [
+        5.242964569922738,
+        -0.011226306080366986,
+        0.012132537916910572
+      ],
+      "previousRawErrorM": 0.06972128881916807,
+      "newRawErrorM": 0.04390163254032652,
+      "previousEstimatedErrorM": 0.3041086965386274,
+      "newEstimatedErrorM": 0.04575837177589168,
+      "previousRawErrorXYM": [
+        0.047992076314384846,
+        -0.0505748823591327
+      ],
+      "newRawErrorXYM": [
+        0.0438630487109517,
+        0.0018401895246236664
+      ],
+      "previousEstimatedErrorXYM": [
+        0.03116147008357295,
+        0.30250795376758866
+      ],
+      "newEstimatedErrorXYM": [
+        0.04510680977914294,
+        0.007694432995935122
+      ],
+      "previousHeadingErrorDeg": -0.1293505614822856,
+      "newHeadingErrorDeg": 0.7662644332417318,
+      "pointCount": 979,
+      "boundaryPointCount": 454,
+      "containmentPointCount": 979,
+      "boundaryHeightLimitM": 0.5958242893218995,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.007563101730103863,
+          "containment": 0.0025560232656802015,
+          "midpoint": 0.0001886531409393578,
+          "total": 0.010307778136723423
+        },
+        "newFit": {
+          "boundary": 0.00801628615734391,
+          "containment": 0.0020371130560761456,
+          "midpoint": 1.9645315322667207e-05,
+          "total": 0.010073044528742723
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.014273005515136055,
+          "containment": 5.606226684442101e-05,
+          "midpoint": 8.418448564786255e-05,
+          "total": 0.01441325226762834
+        }
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 297,
+      "timeS": 5.94,
+      "simulatorFrame": 1960,
+      "truePose": [
+        4.945771378603028,
+        -0.01650607895782716,
+        -0.0009488842963952326
+      ],
+      "previousPose": [
+        4.985000681046974,
+        -0.41234354841242415,
+        -0.09861552059246383
+      ],
+      "newPose": [
+        5.014588338950675,
+        -0.03513401968553152,
+        0.006274087683001526
+      ],
+      "previousRawErrorM": 0.3977766212266095,
+      "newRawErrorM": 0.07129357760166459,
+      "previousEstimatedErrorM": 0.12027125050592134,
+      "newEstimatedErrorM": 0.05696520873457508,
+      "previousRawErrorXYM": [
+        0.03922930244394607,
+        -0.39583746945459697
+      ],
+      "newRawErrorXYM": [
+        0.06881696034764762,
+        -0.018627940727704365
+      ],
+      "previousEstimatedErrorXYM": [
+        0.04319120606153248,
+        -0.11224835596661684
+      ],
+      "newEstimatedErrorXYM": [
+        0.0565953861912023,
+        -0.006480529919873541
+      ],
+      "previousHeadingErrorDeg": -5.5958860590039485,
+      "newHeadingErrorDeg": 0.4138458099606885,
+      "pointCount": 1030,
+      "boundaryPointCount": 468,
+      "containmentPointCount": 1030,
+      "boundaryHeightLimitM": 0.688353396952152,
+      "costsUnderNewObjective": {
+        "previousFit": {
+          "boundary": 0.010305993409793412,
+          "containment": 0.00338146825086962,
+          "midpoint": 0.003315326626879148,
+          "total": 0.01700278828754218
+        },
+        "newFit": {
+          "boundary": 0.007012562407803815,
+          "containment": 0.002327082961513151,
+          "midpoint": 1.9569856550346617e-05,
+          "total": 0.009359215225867313
+        },
+        "truePoseDeclaredDimensions": {
+          "boundary": 0.01739278280964563,
+          "containment": 2.183089726679041e-05,
+          "midpoint": 9.231202171382007e-05,
+          "total": 0.017506925728626242
+        }
+      }
+    }
+  ],
+  "limitations": "Both straight-follow recordings and the target vehicle were previously examined. This is a development comparison, not independent scene validation. No target velocity initialization change."
+}

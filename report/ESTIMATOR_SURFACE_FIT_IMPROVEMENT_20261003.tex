@@ -1,0 +1,228 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\graphicspath{{simulation_output/estimator_visible_surface_20261003/}}
+\title{Lower-Body Surface Support for Pose-Initialized LiDAR Rectangle Fitting}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\section{Implemented improvement and outcome}
+The default rectangle fitter now separates edge support from containment.
+Returns in the lower part of the measured body supply edge-distance and
+support-midpoint residuals. Higher returns, including projected roof and trunk
+surfaces, still constrain containment but are no longer forced toward footprint
+edges. Position and yaw remain free variables. The NRMM prediction supplies
+only their numerical initial values, with no pose penalty or locked heading.
+There is one production fitting method and no new method-selection flag.
+
+Four complete causal perception--NRMM replays were executed on two existing
+300-frame recordings and their camera-blackout variants. The detector outputs
+and associated native LiDAR clusters were cached results of actual YOLO26x
+processing; geometry, estimator feedback and the actual MATLAB observer were
+executed again. No new capture, detector inference or connection to the shared
+CARLA server was made.
+
+\begin{center}\small
+\begin{tabular}{@{}llrrr@{}}\toprule
+Initial gap & Metric after 2 s & Previous & Improved & Reduction \\\midrule
+15 m & Raw position RMSE (m) & 0.45718 & 0.12458 & 72.75\% \\
+15 m & Estimated position RMSE (m) & 0.46819 & 0.15212 & 67.51\% \\
+15 m & Estimated velocity RMSE (m/s) & 0.35612 & 0.28702 & 19.40\% \\
+20 m & Raw position RMSE (m) & 0.20377 & 0.04324 & 78.78\% \\
+20 m & Estimated position RMSE (m) & 0.13940 & 0.05221 & 62.55\% \\
+20 m & Estimated velocity RMSE (m/s) & 0.33746 & 0.11129 & 67.02\% \\
+\bottomrule\end{tabular}
+\end{center}
+These are development-fixture results: both recordings and the same target
+vehicle had already been studied. They are not an independent generalization
+test. All-frame estimated position RMSE, including startup, changes from
+0.40577 to 0.15444 m at 15 m and from 0.15782 to 0.10197 m at 20 m.
+
+\section{Point selection and geometric objective}
+For the current XYZ cluster $P$, define the height split
+\[
+ z_* = \tfrac12\{Q_5(z)+Q_{95}(z)\},\qquad
+ B=\{i:z_i\leq z_*\}.
+\]
+If fewer than three points are selected, the threshold admits the three lowest
+returns, including ties. A constant-height cluster retains every point.
+This is the lower half of a robust observed \emph{height interval}, not the
+lower half of the point count and not semantic surface segmentation. Its
+selection uses current measurements only and is independent of the seed pose.
+The percentiles and the halfway split were fixed before the first new replay;
+no parameter sweep was performed.
+
+Let $u_i=(p_{i,xy}-c)^T R(\psi)$, $h=(L/2,W/2)$ and
+$e_i=|u_i|-h$. The objective is
+\[
+ J(c,\psi)=\frac{1}{|B|}\sum_{i\in B}
+       \min\!\left(\min_j|e_{ij}|,0.5\right)^2
+ +\frac{20}{|P|}\sum_{i\in P}\|\max(e_i,0)\|^2
+ +\|w\odot m\|^2.
+\]
+The support bounds $\ell,u$ are coordinate-wise quantiles over $B$ in the
+\emph{current candidate} axes, with
+\[
+ m=\tfrac12(\ell+u),\quad
+ s=(u-\ell)\oslash(L,W),\quad
+ w=\operatorname{clip}\big((s-0.8)/0.2,0,1\big).
+\]
+The existing continuous coverage weighting is retained. Neither the selected
+support axis nor the nearest rectangle face is frozen from the prediction.
+The damped finite-difference Gauss--Newton solver still optimizes all three
+coordinates. Its individual step limit is a numerical safeguard, not a bound
+on the final correction from the prior.
+
+The first stage uses 2nd/98th support percentiles. The existing 0.15 m
+containment-outlier rule then removes gross outliers before refinement with
+minimum/maximum support. Every retained point, including upper returns,
+contributes containment. Published spans and the acceptance gate now describe
+the lower-body support, so roof extent does not manufacture face coverage.
+The fitter records the height interval, threshold and separate boundary and
+containment counts. It now requires finite XYZ input; the production pipeline
+already supplies XYZ.
+
+\begin{figure}[p]
+\centering\includegraphics[width=\textwidth]{error_comparison.pdf}
+\caption{Complete normal-recording error traces. The dotted line marks the
+2 s reporting boundary. Startup is included in the plots and all-frame metrics.
+The remaining early estimated-error peaks are distinct from the removed large
+lateral geometry bias.}
+\end{figure}
+
+\section{Original maximum-error frame and remaining peaks}
+At the former 15 m maximum, frame 109, time 2.18 s, simulator frame 1374:
+\begin{center}\small
+\begin{tabular}{@{}lrr@{}}\toprule
+Quantity & Previous & Improved \\\midrule
+Raw position error (m) & 0.42620 & 0.11245 \\
+Raw longitudinal error (m) & 0.07213 & 0.11245 \\
+Raw lateral error (m) & -0.42005 & -0.00111 \\
+Fitted heading error (degrees) & -6.13715 & 1.11034 \\
+Estimated position error (m) & 0.55782 & 0.19513 \\
+Estimated lateral error (m) & -0.54082 & -0.00602 \\
+\bottomrule\end{tabular}
+\end{center}
+All 999 points constrain containment; 511 also supply edge support below
+$z_*=0.74543$ m. Under the new objective, the previous biased rectangle has
+cost 0.02054 m$^2$, while the new fit has 0.01103 m$^2$.
+The true pose with declared dimensions still has a larger cost, 0.02962 m$^2$:
+the new heuristic removes the large lateral failure but does not make the
+physical collision-center pose the exact minimum of this approximate model.
+The remaining 0.11245 m longitudinal error is visible in the table.
+
+At the previous raw-error maximum, frame 275, raw error falls from 0.51154
+to 0.13240 m. The 20 m late estimated peak at frame 269 falls from 0.30411
+to 0.04576 m. The new maxima are:
+\begin{center}\small
+\begin{tabular}{@{}llrrr@{}}\toprule
+Gap & Window & Previous maximum (m) & New maximum (m) & New frame \\\midrule
+15 m & All frames & 0.55782 & 0.33439 & 9 \\
+15 m & After 2 s & 0.55782 & 0.23718 & 121 \\
+20 m & All frames & 0.35801 & 0.33315 & 9 \\
+20 m & After 2 s & 0.30411 & 0.09252 & 100 \\
+\bottomrule\end{tabular}
+\end{center}
+Both all-frame maxima now occur at 0.18 s. The co-moving target-velocity
+initialization remains in place, as do the original observer gains and
+publication timing. At 20 m frame 9, raw error is only 0.02355 m while the
+published estimate has 0.33315 m error. The preceding diagnostic investigation
+isolated a 3.30156 m/s initial target-velocity mismatch in this recording;
+this implementation does not correct that separate startup mechanism.
+
+The 15 m post-2-s raw mean longitudinal error is 0.12378 m, versus lateral
+mean -0.00127 m. At frame 121, raw and estimated errors are 0.12550 and
+0.23718 m. Approximate vehicle dimensions and lower-body surface shape remain
+plausible contributors to the longitudinal measurement bias; this experiment
+does not independently identify their shares. The estimator's dynamic response
+adds a transient after the raw bias changes near 1.6 s. No truth-derived
+center offset or velocity has been inserted to hide either effect.
+
+\begin{figure}[p]
+\centering\includegraphics[width=\textwidth]{frame109_surface_fit.pdf}
+\caption{Original worst frame: measured height separates support from
+containment. Gray interior returns remain available to the containment loss.
+The green reference uses the true pose and the same declared 5.0 by 1.9 m
+dimensions, not a separately fitted true collision extent. The lower-body
+selector greatly reduces false yaw and lateral displacement.}
+\end{figure}
+
+\section{Validation, dropout behavior and fitting cost}
+All 38 Python tests pass, including six added behaviors: asymmetric dense
+upper-interior returns cannot pull a fully observed footprint away from its
+lower faces; upper returns still affect containment; planar rigid transforms
+and height-datum shifts preserve the solution; a fully observed side can
+recover pose; an unobserved face tangent remains ambiguous; invalid or absent
+height is rejected. Existing tests cover free position/yaw corrections,
+initial acquisition, missing observations, prefix invariance and prior timing.
+
+The four actual MATLAB replays publish 1200 finite states. Both normal runs
+have 300 valid fits. Each blackout run has 285 valid fits, with exactly frames
+150--164 missing and reacquisition at 165. The normal and blackout prefixes
+match exactly before interruption, ego outputs remain identical, and no
+predicted pose is injected as a missing measurement. All 1170 final fit
+refinements converge; 26 first-stage fits do not meet the local convergence
+test before refinement. There is no claim of global optimality.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrr@{}}\toprule
+Gap & \multicolumn{2}{c}{Blackout-run position RMSE after 2 s (m)}
+    & \multicolumn{2}{c}{Maximum during blackout (m)} \\
+ & Previous & Improved & Previous & Improved \\\midrule
+15 m & 0.46580 & 0.15791 & 0.45313 & 0.22670 \\
+20 m & 0.14046 & 0.05534 & 0.15531 & 0.09163 \\
+\bottomrule\end{tabular}
+\end{center}
+
+An additional geometry-only comparison fits all 600 point clouds with exactly
+the saved previous priors. The previous outputs reproduce within
+$1.8\times10^{-15}$ m. The new fit gives post-2-s raw RMSE 0.12463 m and
+0.04328 m, close to the new closed-loop values. This isolates the geometry
+improvement from changes in the feedback trajectory.
+
+That comparison alternates implementation order and times only two-stage
+Python geometry. Excluding the first five calls per recording, median time
+falls from 11.16 to 7.84 ms and the 95th percentile from 31.85 to 18.86 ms
+over 590 timings per method. Maximum new time is 37.51 ms. Detector work,
+loading and MATLAB are excluded; shared-machine timing is not an end-to-end
+50 Hz guarantee. Nine selected-frame objective decompositions reproduce the
+saved costs. No MATLAB unit suite was rerun because its source was unchanged;
+the four actual runtime replays are the estimator integration validation.
+
+\section{Scope, reproduction and remaining work}
+The lower-body heuristic assumes observable lower surfaces and an ego
+$z$ axis approximately aligned with vertical. Severe occlusion, sloped roads,
+underbody contamination, different vehicle shape, density dominated by roof
+returns and sparse LiDAR can violate that assumption. The synthetic rotated
+side case is useful algorithm coverage, not recorded multi-view validation.
+A measured boundary/shape model and causal velocity acquisition are the next
+distinct improvements suggested by the remaining errors.
+
+The native recordings retain the parked-free Town10HD\_Opt straight-follow
+scenario, 143 hidden parked meshes, 0.02 s period, declared target dimensions
+5.0 by 1.9 m and original LiDAR/ego-sensor seed pairs
+20261002/20261003 and 20261003/20261004. Native GNSS/IMU inputs retain the
+prior ideal-compass limitation. Prediction orchestration blocks opening
+scoring truth; outputs are frozen before scoring. The runtime snapshot is
+\path{26cd6f3998d17fd49f1cd9254245805d17f4d3ae}; the previous perception
+baseline is \path{4851f4bdc3f7047cec7ad8664d3c98e8a753d0e5}.
+
+The implementation is \path{perception/rectangle_pose_fit.py}; added tests are
+\path{tests/yoloLidarSurfaceFitTest.py}. Seven compact result, audit and
+provenance files accompany this report under
+\path{report/ESTIMATOR_SURFACE_FIT_IMPROVEMENT_20261003/}.
+Exact commands, source hashes and frozen prediction hashes are in
+\path{provenance.json}. Local replay adapters, traces, test logs and figures
+remain under \path{simulation_output/estimator_visible_surface_20261003/}.
+They are preserved as identified external archive exports, outside the
+project commit. Raw data, dependencies, generated binaries and concurrent
+theory/report changes are deliberately excluded.
+\end{document}

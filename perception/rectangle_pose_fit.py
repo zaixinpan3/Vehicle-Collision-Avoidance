@@ -18,27 +18,41 @@ def fit_rectangle_pose(
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Refine x, y and yaw using geometry, with the prior used only as a seed.
 
-    The objective retains capped face distance and weight-20 containment.
-    Observed-support midpoint residuals are weighted by coverage at the current
-    candidate pose. All residuals depend only on the point cloud and candidate;
+    Only the lower half of the observed height range supplies face-distance
+    and support-midpoint residuals. Higher returns (including roof and trunk
+    surfaces) constrain containment without being pulled onto footprint edges.
+    The height interval uses the 5th and 95th percentiles to reject isolated
+    height extremes; it is a measured lower-body heuristic, not segmentation.
+    All residuals depend only on the point cloud and candidate;
     the initial pose selects neither a fixed face nor an objective term.
     Neither position nor heading is penalized against the initial pose.
     A partially visible face can leave tangential translation unobservable;
     local initialization chooses a solution but does not resolve that ambiguity.
     """
     pose = np.asarray(initial_pose, dtype=float).copy()
-    points = np.asarray(points_ego, dtype=float)[:, :2]
+    cloud = np.asarray(points_ego, dtype=float)
     half_size = 0.5 * np.asarray([vehicle_length, vehicle_width], dtype=float)
     if pose.shape != (3,) or not np.all(np.isfinite(pose)):
         raise ValueError("Rectangle initial pose must contain finite x, y and heading.")
-    if points.shape[0] < 3 or not np.all(np.isfinite(points)):
-        raise ValueError("Rectangle fitting requires at least three finite points.")
+    if (cloud.ndim != 2 or cloud.shape[0] < 3 or cloud.shape[1] < 3
+            or not np.all(np.isfinite(cloud[:, :3]))):
+        raise ValueError("Rectangle fitting requires at least three finite XYZ points.")
     if not np.all(np.isfinite(half_size)) or np.any(half_size <= 0.0):
         raise ValueError("Rectangle dimensions must be finite and positive.")
     if not 0.0 < symmetry_minimum_support <= 1.0:
         raise ValueError("Rectangle symmetry minimum support must be in (0, 1].")
     quantile = min(max(float(support_quantile), 0.0), 25.0)
     initial = pose.copy()
+    points = cloud[:, :2]
+    height_low, height_high = np.percentile(cloud[:, 2], [5.0, 95.0])
+    height_limit = 0.5 * (height_low + height_high)
+    boundary_mask = cloud[:, 2] <= height_limit
+    # A very sparse height slice cannot establish a surface. Admit the lowest
+    # three returns (including ties), without using any predicted pose.
+    if np.count_nonzero(boundary_mask) < 3:
+        height_limit = float(np.partition(cloud[:, 2], 2)[2])
+        boundary_mask = cloud[:, 2] <= height_limit
+    boundary_points = points[boundary_mask]
 
     def axes(heading: float) -> np.ndarray:
         c, s = math.cos(heading), math.sin(heading)
@@ -58,10 +72,13 @@ def fit_rectangle_pose(
         basis = axes(candidate[2])
         local = (points - candidate[:2]) @ basis
         excess = np.abs(local) - half_size
-        boundary = np.minimum(np.min(np.abs(excess), axis=1), 0.5)
-        pieces = [boundary, math.sqrt(20.0) * np.maximum(excess, 0.0).ravel()]
-        midpoint, weights = support(local)
-        return np.concatenate([np.concatenate(pieces) / math.sqrt(len(points)), weights * midpoint])
+        boundary = np.minimum(np.min(np.abs(excess[boundary_mask]), axis=1), 0.5)
+        midpoint, weights = support(local[boundary_mask])
+        return np.concatenate([
+            boundary / math.sqrt(len(boundary_points)),
+            math.sqrt(20.0 / len(points)) * np.maximum(excess, 0.0).ravel(),
+            weights * midpoint,
+        ])
 
     value = residual(pose)
     cost = float(value @ value)
@@ -103,11 +120,11 @@ def fit_rectangle_pose(
 
     pose[2] = math.atan2(math.sin(pose[2]), math.cos(pose[2]))
     basis = axes(pose[2])
-    projections = points @ basis
+    projections = boundary_points @ basis
     low, high = np.percentile(projections, [quantile, 100.0 - quantile], axis=0)
     local = (points - pose[:2]) @ basis
     excess = np.abs(local) - half_size
-    _, symmetry_weights = support(local)
+    _, symmetry_weights = support(local[boundary_mask])
     center_projection = pose[:2] @ basis
     corners = np.asarray([[-1, -1], [1, -1], [1, 1], [-1, 1]]) * half_size
     correction = pose - initial
@@ -129,7 +146,12 @@ def fit_rectangle_pose(
         "symmetry_minimum_support": symmetry_minimum_support,
         "symmetry_weights": symmetry_weights.tolist(),
         "symmetry_selection": "recomputed from current candidate and point cloud",
-        "mean_boundary_distance_m": float(np.mean(np.min(np.abs(excess), axis=1))),
+        "boundary_selection": "lower half of current 5th-to-95th percentile height range",
+        "boundary_point_count": int(np.count_nonzero(boundary_mask)),
+        "containment_point_count": int(len(points)),
+        "observed_height_interval_m": [float(height_low), float(height_high)],
+        "boundary_height_limit_m": float(height_limit),
+        "mean_boundary_distance_m": float(np.mean(np.min(np.abs(excess[boundary_mask]), axis=1))),
         "maximum_containment_violation_m": float(np.max(np.maximum(excess, 0.0))),
         "objective": cost,
         "seed_objective": initial_cost,

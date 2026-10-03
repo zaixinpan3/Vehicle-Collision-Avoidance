@@ -1,0 +1,147 @@
+{
+  "scope": "The surface selector and objective were fixed before the first new replay; no parameter sweep. Both recordings had been examined in preceding diagnostic work and are development fixtures.",
+  "previousPerceptionCommit": "4851f4bdc3f7047cec7ad8664d3c98e8a753d0e5",
+  "previousDiagnosisCommit": "a9b56c61d55e1ad6a513b8623c2139f40637ff82",
+  "runtimeSnapshotCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "sourceHashes": {
+    "perception/rectangle_pose_fit.py": "ee38cadc915ec2cdf5425916e315570065c966dc1cde22e5bbf7fa9cc43d58a0",
+    "perception/yolo_lidar_target_position.py": "6b54cf1db0db16cde629243a443e4432ac26a156cbf3f568ffefb2befca582bb",
+    "tests/yoloLidarSurfaceFitTest.py": "9e9ebbf65c108231f4fc0af6fc3c3784bd37e6b7613beaf85050b446ee1c932d",
+    "simulation_output/estimator_visible_surface_20261003/runDefault.py": "df77e8cec3478c089a3505675598cd61c15c3d94b787c356ff97612ed3a5e873",
+    "simulation_output/estimator_visible_surface_20261003/nrmmPoseReplayStep.m": "38074a5503dd869d22808e6da445afc06355e4facf78a6e68cf8e317dc9d4c56",
+    "simulation_output/estimator_visible_surface_20261003/scoreFeedback.py": "4df52bd535f643f336b7479e98799dca477efda3a834be0d2475eba77fe2afd7",
+    "simulation_output/estimator_visible_surface_20261003/auditDefault.py": "e76afdeeb6f18981e056c39df0af023ad6cdbb8fa90f5e46fe526af11f0bea79",
+    "simulation_output/estimator_visible_surface_20261003/analyzeImprovement.py": "478d5dfd2a806143e7729de2da6a43fd0201c2aa808782d23917ff1061e6dc0d",
+    "simulation_output/estimator_visible_surface_20261003/benchmarkFit.py": "06805188b23573ac1eb6ca4990e3045d3f3d3b206ec074d1bc172baf062f8ec7",
+    "simulation_output/estimator_visible_surface_20261003/prepareReport.py": "951d6952776b94d2c645033d68af474a99cfcb1e4e54299d7497b23c2eaf879d"
+  },
+  "predictions": {
+    "simulation_output/estimator_pose_default_20261003/perception_dev_default/target_measurements.jsonl": "d52a489a45fad23147449d9712572507214064e2423033367318c509dc78147b",
+    "simulation_output/estimator_pose_default_20261003/estimator_dev_default/predictions.csv": "b126d8ffc4b237be5c83c6dc026b5d11889a06bce4dc3bb864f7005fad642255",
+    "simulation_output/estimator_pose_default_20261003/perception_dev_default_blackout/target_measurements.jsonl": "57df111d6381ccff98f8ffdab8ad1117032a837a4c2d94a15297607ae25aa854",
+    "simulation_output/estimator_pose_default_20261003/estimator_dev_default_blackout/predictions.csv": "edb80f0d684becc70cef186ef6b2fe3770a3d1a82a5fc8743765a8e9896a48ff",
+    "simulation_output/estimator_visible_surface_20261003/perception_dev_surface/target_measurements.jsonl": "1c8318de7f7e319b7d4b2de1a8ce3e4a509147b7344aa54bbcc7de076c745473",
+    "simulation_output/estimator_visible_surface_20261003/estimator_dev_surface/predictions.csv": "f4e95611baab6a01dd50dd027e12b6fe4bdcd0f0673b29bca5c35da01758cffb",
+    "simulation_output/estimator_visible_surface_20261003/perception_dev_surface_blackout/target_measurements.jsonl": "bdc903061a46d5f0ea0d481c004604c877f201925f4bd1d77dc15ea8a692dcff",
+    "simulation_output/estimator_visible_surface_20261003/estimator_dev_surface_blackout/predictions.csv": "167b2b9e9b4e6ed614e5df6eee06973f8490e818f5150a0f0e35eac03ac30beb",
+    "simulation_output/estimator_pose_default_20261003/perception_conf_default/target_measurements.jsonl": "b033f5d520698638e8af36af9bd8a478e9e640b0659c3e0e5cb6c46b6f690295",
+    "simulation_output/estimator_pose_default_20261003/estimator_conf_default/predictions.csv": "5f6cbd5b14b1b52d364d61f264125afa05876296404637d797e39f1900b9a9cc",
+    "simulation_output/estimator_pose_default_20261003/perception_conf_default_blackout/target_measurements.jsonl": "c23a1a791150e54aba9f42ad46114c4878a2fd74f686f9ac59354d0cff43afb3",
+    "simulation_output/estimator_pose_default_20261003/estimator_conf_default_blackout/predictions.csv": "d69bc2bedb70f9c785cae651a1aa84419bfbf86be5a11fefea764772ac5f5545",
+    "simulation_output/estimator_visible_surface_20261003/perception_conf_surface/target_measurements.jsonl": "b0ce5dfef59a0d4e69221f1a5f58ea0e0770e627899c12ff3451979883b52393",
+    "simulation_output/estimator_visible_surface_20261003/estimator_conf_surface/predictions.csv": "825f54b0977c75a96b25c7fe5a131b93e50bec98390367d4b9a58ebbd13a0095",
+    "simulation_output/estimator_visible_surface_20261003/perception_conf_surface_blackout/target_measurements.jsonl": "412bfc1478c7368698941236c068adb8eb956201b69cd7cd2392aeb8df8a558c",
+    "simulation_output/estimator_visible_surface_20261003/estimator_conf_surface_blackout/predictions.csv": "978918ebe0c8366e545c658730681e9a4d3f96c17000dde7b36404ba3a471453"
+  },
+  "replayRuns": [
+    {
+      "case": "dev_surface",
+      "device": "0",
+      "frontend": "Frozen actual selected detections and native LiDAR clusters",
+      "placement": "current point support",
+      "initialHeadingOffsetDeg": 0.0,
+      "holdInitialHeading": false,
+      "completed": true,
+      "validFrames": 300,
+      "wallSeconds": 11.427910095022526
+    },
+    {
+      "case": "conf_surface",
+      "device": "0",
+      "frontend": "Frozen actual selected detections and native LiDAR clusters",
+      "placement": "current point support",
+      "initialHeadingOffsetDeg": 0.0,
+      "holdInitialHeading": false,
+      "completed": true,
+      "validFrames": 300,
+      "wallSeconds": 9.847498639021069
+    },
+    {
+      "case": "dev_surface_blackout",
+      "device": "0",
+      "frontend": "Frozen actual selected detections and native LiDAR clusters",
+      "placement": "current point support",
+      "initialHeadingOffsetDeg": 0.0,
+      "holdInitialHeading": false,
+      "completed": true,
+      "validFrames": 285,
+      "wallSeconds": 12.018629418045748
+    },
+    {
+      "case": "conf_surface_blackout",
+      "device": "0",
+      "frontend": "Frozen actual selected detections and native LiDAR clusters",
+      "placement": "current point support",
+      "initialHeadingOffsetDeg": 0.0,
+      "holdInitialHeading": false,
+      "completed": true,
+      "validFrames": 285,
+      "wallSeconds": 10.722145434003323
+    }
+  ],
+  "platform": "Linux-7.2.8-1-cachyos-x86_64-with-glibc2.44",
+  "processor": "",
+  "runtimeVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "inputs": {
+    "recordings": [
+      "simulation_output/parked_free_perception_20261002",
+      "simulation_output/perception_geometry_confirmation_20261003"
+    ],
+    "detectorClusters": "simulation_output/estimator_heading_feedback_20261003/clusters_{dev,conf}",
+    "initialGapM": [
+      15,
+      20
+    ],
+    "evaluationFramesEach": 300,
+    "samplePeriodS": 0.02,
+    "declaredTargetDimensionsM": [
+      5,
+      1.9
+    ],
+    "nativeLidarEgoSensorSeedPairs": [
+      [
+        20261002,
+        20261003
+      ],
+      [
+        20261003,
+        20261004
+      ]
+    ],
+    "parkedMeshesHidden": 143,
+    "detector": "YOLO26x frozen actual detections",
+    "sensors": "Native LiDAR/GNSS/IMU; inherited ideal-compass limitation",
+    "blackoutFrames": [
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164
+    ]
+  },
+  "commands": [
+    "/home/zai/.cache/carla-yolo-range-venv/bin/python -m unittest discover -s tests -p 'yoloLidar*Test.py' -v",
+    "OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python simulation_output/estimator_visible_surface_20261003/runDefault.py dev_surface conf_surface",
+    "OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python simulation_output/estimator_visible_surface_20261003/runDefault.py dev_surface_blackout conf_surface_blackout",
+    "python3 simulation_output/estimator_visible_surface_20261003/scoreFeedback.py dev_surface dev_surface_blackout",
+    "python3 simulation_output/estimator_visible_surface_20261003/scoreFeedback.py conf_surface conf_surface_blackout",
+    "python3 simulation_output/estimator_visible_surface_20261003/auditDefault.py",
+    "OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python simulation_output/estimator_visible_surface_20261003/benchmarkFit.py",
+    "python3 simulation_output/estimator_visible_surface_20261003/analyzeImprovement.py",
+    "python3 simulation_output/estimator_visible_surface_20261003/prepareReport.py",
+    "pdflatex -interaction=nonstopmode -halt-on-error -output-directory simulation_output/estimator_visible_surface_20261003 report/ESTIMATOR_SURFACE_FIT_IMPROVEMENT_20261003.tex (two passes)",
+    "pdftoppm -scale-to 850 -png simulation_output/estimator_visible_surface_20261003/ESTIMATOR_SURFACE_FIT_IMPROVEMENT_20261003.pdf simulation_output/estimator_visible_surface_20261003/report-page",
+    "git diff --check -- perception/rectangle_pose_fit.py tests/yoloLidarSurfaceFitTest.py report/ESTIMATOR_SURFACE_FIT_IMPROVEMENT_20261003.tex report/ESTIMATOR_SURFACE_FIT_IMPROVEMENT_20261003"
+  ],
+  "exclusions": "Concurrent theory/report changes, local replay scripts, raw recordings, model weights, runtime snapshots, solver dependencies, generated figures/PDFs and unrelated untracked files are excluded from the project commit."
+}
