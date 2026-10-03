@@ -1,0 +1,271 @@
+{
+  "selectedFrames": [
+    {
+      "kind": "dev",
+      "frame": 109,
+      "populations": {
+        "footprint_interior": {
+          "pointCount": 721,
+          "fraction": 0.7217217217217218,
+          "truthLossContributionM2": 0.11305680875740161,
+          "fittedLossContributionM2": 0.09167425540546043,
+          "lossChangeContributionM2": -0.021382553351941183,
+          "medianHeightM": 0.7872081100940704
+        },
+        "near_footprint_boundary": {
+          "pointCount": 278,
+          "fraction": 0.2782782782782783,
+          "truthLossContributionM2": 0.003787048838849068,
+          "fittedLossContributionM2": 0.0029354188900667564,
+          "lossChangeContributionM2": -0.0008516299487823114,
+          "medianHeightM": 0.5368447601795199
+        },
+        "upper_height_half": {
+          "pointCount": 499,
+          "fraction": 0.4994994994994995,
+          "truthLossContributionM2": 0.10252767931169564,
+          "fittedLossContributionM2": 0.08551189540929661,
+          "lossChangeContributionM2": -0.017015783902399034,
+          "medianHeightM": 0.8723413050174714
+        },
+        "lower_height_half": {
+          "pointCount": 500,
+          "fraction": 0.5005005005005005,
+          "truthLossContributionM2": 0.014316178284555047,
+          "fittedLossContributionM2": 0.009097778886230586,
+          "lossChangeContributionM2": -0.005218399398324461,
+          "medianHeightM": 0.5780706703662873
+        }
+      },
+      "pointLossReductionFromInteriorFraction": 0.9616972686937146,
+      "allLidarDeclaredFootprintControl": {
+        "diagnosticOracle": true,
+        "description": "All native LiDAR returns within the true-pose declared footprint plus 0.15 m and above ego z=0; no image box. This is not semantic instance truth.",
+        "pointCount": 1076,
+        "positionErrorM": 0.3944454464369386,
+        "pose": [
+          4.861664792305852,
+          -0.4043578339163749,
+          -0.09657776213771346
+        ]
+      }
+    },
+    {
+      "kind": "dev",
+      "frame": 275,
+      "populations": {
+        "footprint_interior": {
+          "pointCount": 751,
+          "fraction": 0.7997870074547391,
+          "truthLossContributionM2": 0.12524967864264622,
+          "fittedLossContributionM2": 0.10122029958604115,
+          "lossChangeContributionM2": -0.024029379056605064,
+          "medianHeightM": 0.7508999407291416
+        },
+        "near_footprint_boundary": {
+          "pointCount": 188,
+          "fraction": 0.20021299254526093,
+          "truthLossContributionM2": 0.002790110291663824,
+          "fittedLossContributionM2": 0.0032053522523236917,
+          "lossChangeContributionM2": 0.00041524196065986796,
+          "medianHeightM": 0.5627740919590001
+        },
+        "upper_height_half": {
+          "pointCount": 469,
+          "fraction": 0.4994675186368477,
+          "truthLossContributionM2": 0.1072355835237022,
+          "fittedLossContributionM2": 0.08962634657995346,
+          "lossChangeContributionM2": -0.01760923694374876,
+          "medianHeightM": 0.8478579819202429
+        },
+        "lower_height_half": {
+          "pointCount": 470,
+          "fraction": 0.5005324813631523,
+          "truthLossContributionM2": 0.020804205410607835,
+          "fittedLossContributionM2": 0.0147993052584114,
+          "lossChangeContributionM2": -0.006004900152196435,
+          "medianHeightM": 0.6121648848056795
+        }
+      },
+      "pointLossReductionFromInteriorFraction": 1.017584464720126,
+      "allLidarDeclaredFootprintControl": {
+        "diagnosticOracle": true,
+        "description": "All native LiDAR returns within the true-pose declared footprint plus 0.15 m and above ego z=0; no image box. This is not semantic instance truth.",
+        "pointCount": 1045,
+        "positionErrorM": 0.41040660839704846,
+        "pose": [
+          4.807511719447384,
+          -0.4175947077823556,
+          -0.12214174256756963
+        ]
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 11,
+      "populations": {
+        "footprint_interior": {
+          "pointCount": 26,
+          "fraction": 0.4126984126984127,
+          "truthLossContributionM2": 0.06928019767188513,
+          "fittedLossContributionM2": 0.06555854540986393,
+          "lossChangeContributionM2": -0.0037216522620212205,
+          "medianHeightM": 0.7299578487873076
+        },
+        "near_footprint_boundary": {
+          "pointCount": 37,
+          "fraction": 0.5873015873015873,
+          "truthLossContributionM2": 0.00616488975319793,
+          "fittedLossContributionM2": 0.006385829025327302,
+          "lossChangeContributionM2": 0.00022093927212937157,
+          "medianHeightM": 0.31955495476722706
+        },
+        "upper_height_half": {
+          "pointCount": 31,
+          "fraction": 0.49206349206349204,
+          "truthLossContributionM2": 0.06937753749522392,
+          "fittedLossContributionM2": 0.06514680678205924,
+          "lossChangeContributionM2": -0.004230730713164711,
+          "medianHeightM": 0.7284863293170928
+        },
+        "lower_height_half": {
+          "pointCount": 32,
+          "fraction": 0.5079365079365079,
+          "truthLossContributionM2": 0.0060675499298591395,
+          "fittedLossContributionM2": 0.006797567653132001,
+          "lossChangeContributionM2": 0.000730017723272862,
+          "medianHeightM": 0.21687439084053028
+        }
+      },
+      "pointLossReductionFromInteriorFraction": 1.0631126495566257,
+      "allLidarDeclaredFootprintControl": {
+        "diagnosticOracle": true,
+        "description": "All native LiDAR returns within the true-pose declared footprint plus 0.15 m and above ego z=0; no image box. This is not semantic instance truth.",
+        "pointCount": 63,
+        "positionErrorM": 0.16441388622651204,
+        "pose": [
+          14.99362366882206,
+          -0.15729221796330636,
+          -0.039793340122594424
+        ]
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 269,
+      "populations": {
+        "footprint_interior": {
+          "pointCount": 575,
+          "fraction": 0.5873340143003064,
+          "truthLossContributionM2": 0.08942808928023027,
+          "fittedLossContributionM2": 0.08466545207807609,
+          "lossChangeContributionM2": -0.004762637202154179,
+          "medianHeightM": 0.7466118633747103
+        },
+        "near_footprint_boundary": {
+          "pointCount": 404,
+          "fraction": 0.41266598569969354,
+          "truthLossContributionM2": 0.003893417502227109,
+          "fittedLossContributionM2": 0.004043429514186999,
+          "lossChangeContributionM2": 0.00015001201195988907,
+          "medianHeightM": 0.33942857384681696
+        },
+        "upper_height_half": {
+          "pointCount": 489,
+          "fraction": 0.49948927477017363,
+          "truthLossContributionM2": 0.08569276565952016,
+          "fittedLossContributionM2": 0.08209527299078437,
+          "lossChangeContributionM2": -0.003597492668735785,
+          "medianHeightM": 0.7790829241275787
+        },
+        "lower_height_half": {
+          "pointCount": 490,
+          "fraction": 0.5005107252298263,
+          "truthLossContributionM2": 0.007628741122937226,
+          "fittedLossContributionM2": 0.00661360860147872,
+          "lossChangeContributionM2": -0.0010151325214585061,
+          "medianHeightM": 0.36092296242713934
+        }
+      },
+      "pointLossReductionFromInteriorFraction": 1.0325220467248866,
+      "allLidarDeclaredFootprintControl": {
+        "diagnosticOracle": true,
+        "description": "All native LiDAR returns within the true-pose declared footprint plus 0.15 m and above ego z=0; no image box. This is not semantic instance truth.",
+        "pointCount": 979,
+        "positionErrorM": 0.06972128882161704,
+        "pose": [
+          5.2470935975260975,
+          -0.06364137796757025,
+          -0.0034988925730550144
+        ]
+      }
+    },
+    {
+      "kind": "conf",
+      "frame": 297,
+      "populations": {
+        "footprint_interior": {
+          "pointCount": 649,
+          "fraction": 0.6300970873786408,
+          "truthLossContributionM2": 0.09652011142123183,
+          "fittedLossContributionM2": 0.08163491731497478,
+          "lossChangeContributionM2": -0.014885194106257056,
+          "medianHeightM": 0.7945326864719388
+        },
+        "near_footprint_boundary": {
+          "pointCount": 381,
+          "fraction": 0.3699029126213592,
+          "truthLossContributionM2": 0.0041094290562031215,
+          "fittedLossContributionM2": 0.005422934893429744,
+          "lossChangeContributionM2": 0.0013135058372266218,
+          "medianHeightM": 0.4375943243503567
+        },
+        "upper_height_half": {
+          "pointCount": 515,
+          "fraction": 0.5,
+          "truthLossContributionM2": 0.09123578226110596,
+          "fittedLossContributionM2": 0.07811332533282922,
+          "lossChangeContributionM2": -0.013122456928276746,
+          "medianHeightM": 0.8416787683963773
+        },
+        "lower_height_half": {
+          "pointCount": 515,
+          "fraction": 0.5,
+          "truthLossContributionM2": 0.009393758216329007,
+          "fittedLossContributionM2": 0.008944526875575318,
+          "lossChangeContributionM2": -0.000449231340753689,
+          "medianHeightM": 0.4710331261157986
+        }
+      },
+      "pointLossReductionFromInteriorFraction": 1.0967827886397852,
+      "allLidarDeclaredFootprintControl": {
+        "diagnosticOracle": true,
+        "description": "All native LiDAR returns within the true-pose declared footprint plus 0.15 m and above ego z=0; no image box. This is not semantic instance truth.",
+        "pointCount": 1049,
+        "positionErrorM": 0.3986487591133832,
+        "pose": [
+          4.9755374176591065,
+          -0.41404200948682,
+          -0.10070351952534903
+        ]
+      }
+    }
+  ],
+  "fullSequenceLowerHalfControl": {
+    "dev": {
+      "validFrames": 300,
+      "allFramesRmseM": 0.09687344354433002,
+      "after2sRmseM": 0.1114252871336601,
+      "maximumErrorM": 0.12168607806597036,
+      "maximumFrame": 277
+    },
+    "conf": {
+      "validFrames": 300,
+      "allFramesRmseM": 0.050390494407663064,
+      "after2sRmseM": 0.03459911419257888,
+      "maximumErrorM": 0.1850423045905086,
+      "maximumFrame": 28
+    }
+  },
+  "scope": "Point selection ablation with every recorded production prior held fixed. Neither a closed-loop replacement nor independently validated tuning. The median split was declared before evaluating this control."
+}

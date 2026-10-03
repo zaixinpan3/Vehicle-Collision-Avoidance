@@ -1,0 +1,52 @@
+{
+  "recordedAt": "2026-10-03T16:40:40.034203-05:00",
+  "sourceHashTiming": "Recorded after diagnostic execution for reproducibility; original baseline result hashes are in its committed audit.",
+  "implementationCommit": "4851f4bdc3f7047cec7ad8664d3c98e8a753d0e5",
+  "runtimeCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "hashes": {
+    "diagnoseGeometry.py": "8c0ed0a7c961b5071dec2b71759bd527e3a3ba5e3a72a1d92a8824a3c49d67a0",
+    "prepareEstimatorControls.py": "a673b74326a5c860c2962eb41f0835b500705cf82a49cfb7ae5b3881fa12d4a5",
+    "runEstimatorControls.py": "8bab659d63fe2555b1c2830f8690c31bbb2a4ab82ebc541764c25c1c4373801c",
+    "diagnosePointSupport.py": "1ef53356d38c70c31ea8977d2493e286ae34d98638095e8513d8e6c8ca455e50",
+    "scoreEstimatorControls.py": "d489347bd9de77d9a158efc026320e02de07392e3ec438725baa838ca54b0f13",
+    "plotDiagnosis.py": "b9320e63f66887f05103d0884734086c9bf3c9624a9fa3118116508412cfe131",
+    "compareObjectives.py": "e2500d3d825e1c1c92b28b5af09679b9d01447acbd59603e99a99b8969bed660",
+    "replayEstimatorControls.m": "021b55a4c2ac1a5136ea7c9b8135a4448a8b7047edb9cbae0dd2a674eb1bd2b3",
+    "source_snapshot/perception/yolo_lidar_target_position.py": "6b54cf1db0db16cde629243a443e4432ac26a156cbf3f568ffefb2befca582bb",
+    "source_snapshot/perception/rectangle_pose_fit.py": "b15c8213bb919a6a1a817393e9013753bc1ed31dcefadb8f95bf3dbe77b52b1f",
+    "comparison_snapshot/previous_pose_objective.py": "336e8702534fe301c68c4a4adda952724e4d6af98fe4f720271c21c62989cfd1"
+  },
+  "predictionHashes": {
+    "estimator_dev_baseline.csv": "9cacdcaa2083dbb8f5b5fb4759b43610dde55081f6dbf2417824abd781f9a266",
+    "estimator_dev_true_position.csv": "2d55dd4edc2ea4bcb128760726e4a0d46602856b981585c15fb07355a18388e3",
+    "estimator_dev_true_ego.csv": "f09a7f2697887cbea7f086cc9fd3a37819a4ad85f9326bd211d70eee5fdd18c4",
+    "estimator_dev_true_initial_velocity.csv": "048cb8a9020738c39e46608d1ef761ed1b911f167594cd756c678b0683086184",
+    "estimator_dev_true_lateral.csv": "520e1882290ca2713fae4030d2e16a6c2898ee27d2e0eed41b0fff7fd3fc6977",
+    "estimator_dev_true_longitudinal.csv": "4ac13114873b895b7660854291d5c6f89902ee836d802021170fc8bf68f588a6",
+    "estimator_dev_true_position_and_ego.csv": "2cb64dc498aa66417ead383a6d8ccaad5005b71556ce0e82d692edab0b01f05c",
+    "estimator_dev_only_frame109_true_lateral.csv": "a337623e9788546ddbd23b3366ae2421ff099b15017071ebe2a63ed3f38869c0",
+    "estimator_dev_only_frame108_true_lateral.csv": "6db52cf91d2162dff2f6703e0a7309d1e7767a048bab8ea6aaf41d44935a9597",
+    "estimator_conf_baseline.csv": "0f0340c506aa8c3304502ff3d5dcc798804dbe40fe91e86c5aea917eee7189e2",
+    "estimator_conf_true_position.csv": "67f5ac0c3edeb30087c4a5f590805c0b99316e522699660efa432973c35831a8",
+    "estimator_conf_true_ego.csv": "c670fc552f52e949a2030cfaf8ba73027b8c272f37656532444c3fa9f1d60b32",
+    "estimator_conf_true_initial_velocity.csv": "7cc185535dc3e8478b57060f2b32f0d53ba0af60f07fa358de593308cb1ee3b8",
+    "estimator_conf_true_position_and_initial_velocity.csv": "d774070181d3640a405f15045f9e46d9045139edd34be67f2dbd7954189deab3",
+    "estimator_conf_true_lateral.csv": "42782a9c4a159cb03da10e3e4f7c8853902d81b85855e748ed0f47814bc1da2b"
+  },
+  "commands": [
+    "env OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 nice -n 10 python3 -u simulation_output/estimator_max_error_20261003/diagnoseGeometry.py",
+    "python3 simulation_output/estimator_max_error_20261003/prepareEstimatorControls.py",
+    "env OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 nice -n 10 /home/zai/.cache/carla-yolo-range-venv/bin/python -u simulation_output/estimator_max_error_20261003/runEstimatorControls.py",
+    "python3 simulation_output/estimator_max_error_20261003/scoreEstimatorControls.py",
+    "env OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 nice -n 10 python3 -u simulation_output/estimator_max_error_20261003/diagnosePointSupport.py",
+    "python3 simulation_output/estimator_max_error_20261003/compareObjectives.py",
+    "python3 simulation_output/estimator_max_error_20261003/plotDiagnosis.py",
+    "pdflatex -interaction=nonstopmode -halt-on-error -output-directory simulation_output/estimator_max_error_20261003 report/ESTIMATOR_MAX_ERROR_DIAGNOSIS_20261003.tex (two passes); pdftotext and pdftoppm for text and all-page visual inspection"
+  ],
+  "limitations": "Truth substitutions and truth-seeded/filtered geometry controls are deliberate diagnostic oracles. Point-population controls hold original predicted seeds fixed; estimator controls hold target measurement streams fixed. No end-to-end replacement accuracy is claimed.",
+  "figureHashes": {
+    "maximum_frame_geometry.pdf": "b63a3289087b84c0171f056e6095a9399cc2ae4b353f3fd3f7ff6b24a956c4c9",
+    "error_sources_trace.pdf": "00a9877746f4e4ec9c0538d720708d79df2659048ccca936a77c461ca449a6b4",
+    "estimator_controls.pdf": "29ddc013f72e06aa0fd5d694e7e09e0e4826f9d578c3fe073880a952176fc240"
+  }
+}

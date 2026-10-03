@@ -1,0 +1,311 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\graphicspath{{simulation_output/estimator_max_error_20261003/}}
+\title{Maximum-Error Diagnosis of Pose-Initialized LiDAR Perception and NRMM Estimation}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+
+\section{Finding and frame identification}
+The largest position error is driven primarily by biased target-position
+measurements. The geometric loss pulls three-dimensional body returns toward
+the edges of a two-dimensional footprint, rewarding a translated and rotated
+rectangle even when initialized at the true pose. The recent coverage weighting
+also weakened the lateral support residual and increased that bias. The NRMM
+observer then inherits the bias and develops a transient velocity error.
+The separate 20 m recording has an additional, dominant startup velocity error.
+
+The labels 15 m and 20 m refer to the initial scene gap, not the distance at
+each evaluation frame. Frame indices below are zero based. Both blackout
+versions have the same all-record maxima as their normal counterparts; the
+maxima precede the camera interruption at 3.0--3.3 s.
+
+\begin{center}\small
+\begin{tabular}{@{}llrrrr@{}}\toprule
+Recording & Maximum type & Frame & Time (s) & Sim. frame & Error (m) \\\midrule
+15 m & Estimated position & 109 & 2.18 & 1374 & 0.55782 \\
+15 m & Raw fitted position & 275 & 5.50 & 1540 & 0.51154 \\
+20 m & Estimated position & 11 & 0.22 & 1674 & 0.35801 \\
+20 m & Estimated position after 2 s & 269 & 5.38 & 1932 & 0.30411 \\
+20 m & Raw fitted position & 297 & 5.94 & 1960 & 0.39778 \\
+\bottomrule\end{tabular}
+\end{center}
+
+For the 15 m recording after 2 s, lateral error accounts for 97.83 percent
+of raw position squared error and 95.86 percent of estimated position squared
+error. The corresponding fractions at 20 m are 96.90 and 88.07 percent.
+This directs the geometry investigation toward lateral center and yaw, rather
+than a scalar range offset.
+
+\section{Largest estimated-error frame: exact decomposition}
+At frame 109, the actual relative center is about 4.80 m ahead. In the same
+CARLA ego axes, the saved positions and their errors are
+\begin{center}\small
+\begin{tabular}{@{}lrrrr@{}}\toprule
+ & $x$ (m) & $y$ (m) & $e_x$ (m) & $e_y$ (m) \\\midrule
+True target center & 4.79886 & -0.01494 & 0 & 0 \\
+Fitted observation & 4.87099 & -0.43500 & 0.07213 & -0.42005 \\
+Published estimate & 4.93554 & -0.55576 & 0.13668 & -0.54082 \\
+\bottomrule\end{tabular}
+\end{center}
+The vector identity is
+\[
+ \underbrace{\begin{bmatrix}0.13668\\-0.54082\end{bmatrix}}_{\text{estimated error}}
+ =\underbrace{\begin{bmatrix}0.07213\\-0.42005\end{bmatrix}}_{\text{current fitted error}}
+ +\underbrace{\begin{bmatrix}0.06455\\-0.12076\end{bmatrix}}_{\text{estimate minus current fit}}.
+\]
+These vectors are an accounting identity, not additive causal percentages.
+The fitted observation has 0.42620 m error. Its heading error is
+$-6.1372^\circ$, while the predicted heading error is only about
+$-3.23^\circ$. With the declared 5 m length, the fitted rear-face midpoint
+error and the yaw lever arm explain its lateral center error exactly:
+\[
+ \Delta c_y=\Delta r_{\mathrm{rear},y}
+ +\frac L2\{\sin\psi_{\rm fit}-\sin\psi_{\rm true}\}
+ =-0.15278-0.26727=-0.42005\ \mathrm{m}.
+\]
+Thus a modest false yaw creates a large center displacement. This identity
+does not independently assign a physical cause to each term.
+
+\section{Why the point-cloud objective prefers an inaccurate pose}
+The frame contains 999 accepted target points; all are retained by the
+two-stage fit. At the true pose, all lie inside the declared rectangular
+footprint, and 721 points (72.17 percent) are more than 0.15 m from its edges.
+The image and the $x$--$z$ distribution show substantial elevated body-surface
+returns, consistent with trunk, window and roof surfaces. Their projection
+inside a footprint is physically expected; it is not evidence that the
+rectangle should move until they touch an edge.
+
+The present nearest-face term nevertheless penalizes every projected point
+according to its distance to the closest of the four footprint edges, capped
+at 0.5 m. The separate containment and support-midpoint terms are too weak to
+counter the reduction obtained by rotating and shifting the rectangle.
+Using exactly the same 999 refinement points gives:
+\begin{center}\small
+\begin{tabular}{@{}lrr@{}}\toprule
+Cost component (m$^2$) & True pose & Saved fitted pose \\\midrule
+Capped boundary closeness & 0.116844 & 0.092531 \\
+Weight-20 containment & 0 & 0.002078 \\
+Coverage-weighted support midpoint & 0.000167 & 0.003624 \\
+Total & 0.117011 & 0.098233 \\
+\bottomrule\end{tabular}
+\end{center}
+The inaccurate pose improves the stated objective by about 16 percent.
+Footprint-interior points contribute 0.02138 m$^2$ of the 0.02223 m$^2$
+point-loss reduction before the support penalty. Increasing numerical effort
+cannot repair a loss whose lower values reward this geometric bias.
+
+\begin{figure}[p]
+\centering\includegraphics[width=\textwidth]{maximum_frame_geometry.pdf}
+\caption{Frame 109: recorded image, selected box, point cloud and fitted
+rectangles. The green rectangle uses the true pose and declared dimensions;
+it is not a separately measured true collision extent. The objective assigns
+a lower cost to the inaccurate fit. Height is relative to the declared ego
+origin. All plotted data come from the saved frame.}
+\end{figure}
+
+\subsection{Initial pose, local convergence and support weighting}
+Several controlled changes separate the possible causes:
+\begin{center}\small
+\begin{tabular}{@{}lr@{}}\toprule
+Frame 109 geometry control & Position error (m) \\\midrule
+Current point cloud, saved predicted seed & 0.42620 \\
+Same method initialized at the true pose & 0.42620 \\
+Independent derivative-free minimization of the same refinement cost & 0.42479 \\
+Previous objective, identical current point cloud and predicted seed & 0.20278 \\
+Unit lateral support residual, independent minimization & 0.18755 \\
+Lower half of points by measured height, saved predicted seed & 0.10275 \\
+Points within 0.15 m of true footprint edges, diagnostic oracle & 0.09523 \\
+\bottomrule\end{tabular}
+\end{center}
+The saved refinement reports nonconvergence after 27 iterations, but an
+independent converged solve changes its position error by only 1.4 mm.
+Starting at the true pose returns essentially the same biased solution.
+Neither iteration count nor the extrapolated seed is the principal cause
+at this frame. Other seeds can enter an opposite-yaw solution with a similar
+large error; global uniqueness is not claimed.
+
+The preceding implementation's selected lateral support residual had unit
+weight. In the new method, observed lateral coverage at this fit is 0.87792,
+so the residual weight is
+$w=(0.87792-0.8)/0.2=0.38962$. Its squared-cost coefficient is only
+$w^2=0.1518$ of the earlier unit coefficient. Correcting seed-dependent
+support selection therefore also changed the objective strength. This
+weakening is a concrete contributor to the recent regression, not a necessary
+consequence of using the predicted pose only for initialization. Restoring
+unit lateral support in a diagnostic control reduces the bias, but does not
+remove the underlying body-surface/footprint mismatch.
+
+The frame with the largest raw error, 275, has the same failure mechanism:
+0.51154 m position error, $-9.0711^\circ$ yaw error, and 79.98 percent of
+points farther than 0.15 m inside the true-pose footprint. A true-pose seed
+still yields 0.45307 m error. The lower-height-half control gives 0.11751 m.
+
+\subsection{Association, coordinates and timing checks}
+The selected image box reaches pixel 639.36 in a 640-pixel-high image, so
+the close target is clipped at the image boundary. However, a diagnostic
+association using all native returns inside the true-pose declared footprint
+plus 0.15 m, above ego height zero, adds 77 points and still gives 0.39445 m
+error. This control uses actor truth and is not semantic instance labeling.
+It shows that enlarging the image selection alone does not remove the bias.
+The data provide no evidence of substitution by a parked vehicle at this frame.
+
+Every selected frame's cached cloud agrees with the raw cloud transformed
+through the fixed LiDAR-to-ego extrinsic to within $1.5\times10^{-14}$ m.
+The common estimated world pose cancels from this relative-coordinate
+transformation. All 300 frame identities match across native sensors,
+scoring truth and prediction records in both recordings. The large error is
+not explained by a frame-index shift or a world-to-ego translation mistake.
+Declared dimensions remain approximate; their separate contribution to the
+remaining longitudinal bias has not been isolated.
+
+\section{How the estimator adds a transient to the measurement bias}
+Fifteen actual MATLAB replays hold the saved target measurement streams
+fixed, changing one input source or initialization assumption at a time.
+Both baseline replays reproduce all common saved output fields exactly over
+600 frames. All 4500 counterfactual publications are finite. These controls
+isolate observer response; they do not rerun the changed observer state
+through the perception feedback loop.
+
+At the baseline maximum frame 109:
+\begin{center}\small
+\begin{tabular}{@{}lrr@{}}\toprule
+Diagnostic input control & Frame 109 error (m) & Position RMSE after 2 s (m) \\\midrule
+Original measurements & 0.55782 & 0.46819 \\
+True target lateral position only & 0.13703 & 0.09568 \\
+True target longitudinal position only & 0.54421 & 0.45998 \\
+True target position, both coordinates & 0.06101 & 0.03890 \\
+True ego inputs & 0.55309 & 0.46809 \\
+True initial target velocity & 0.55446 & 0.46779 \\
+True target position and true ego inputs & 0.03920 & 0.03877 \\
+\bottomrule\end{tabular}
+\end{center}
+The dominant removable source is target lateral-position bias. Correcting
+ego inputs or the initial target velocity alone has little effect at this
+later peak. The remaining few centimetres under oracle inputs are not fully
+separated into model, initialization, sampled propagation and planar-model
+effects in this study.
+
+Around frames 80--100, the fitted lateral position moves persistently away
+from truth. The observer initially lags and then overshoots. Its target
+velocity state acquires a false lateral component: at frame 109, target
+inertial lateral velocity error is about $-0.644$ m/s. The position innovation
+gain is 7.29765 s$^{-1}$, so the current 0.12076 m difference between fitted
+and estimated lateral position contributes $+0.88128$ m/s to the instantaneous
+position correction. Relative velocity and ego-rotation terms contribute
+$-0.64469$ and $+0.00287$ m/s. This predicts recovery after the peak; these
+instantaneous terms are not an exact integrated decomposition of the past.
+
+The runtime publishes the current predicted state before integrating the
+current observation over the next sample interval. Replacing only frame
+109's lateral observation with truth therefore leaves frame 109's published
+error unchanged at 0.55782 m. Replacing only frame 108's observation reduces
+it to 0.49667 m. The extra 0.12076 m lateral displacement relative to the
+current fit reflects prior history and observer dynamics, rather than an
+additional error introduced by the frame 109 optimizer.
+
+\begin{figure}[p]
+\centering\includegraphics[width=\textwidth]{error_sources_trace.pdf}
+\caption{Complete recorded traces. At 15 m the lateral fit bias persists
+even after the predicted heading returns near truth. At 20 m, changes
+between geometric fitting solutions produce lateral oscillations and delayed
+observer extrema. True ego-input replays nearly overlap the original result;
+true target-position inputs remove most later error. All oracle curves are
+diagnostic, not deployable measurements.}
+\end{figure}
+
+\section{The 20 m recording has two different peak mechanisms}
+Its all-record maximum occurs at frame 11, 0.22 s: the position error vector
+is $(0.31814,-0.16418)$ m. The current fitted observation has only 0.01748 m
+longitudinal error but 0.16348 m lateral error. The observer's initial
+co-moving target velocity is approximately 8.0687 m/s forward, while actual
+target forward velocity is 4.7674 m/s. The full initial velocity error is
+3.3016 m/s. This creates a longitudinal startup transient that is distinct
+from the later lateral fitting problem.
+
+\begin{center}\small
+\begin{tabular}{@{}lr@{}}\toprule
+20 m diagnostic control & Error at original frame 11 (m) \\\midrule
+Original measurements and initialization & 0.35801 \\
+True target position inputs & 0.29427 \\
+True initial target velocity & 0.16052 \\
+True target positions and true initial target velocity & 0.02072 \\
+True ego inputs & 0.36001 \\
+\bottomrule\end{tabular}
+\end{center}
+Later, the estimated maximum after 2 s is frame 269, 5.38 s. Its 0.30411 m
+estimate error occurs when the current raw fit error is only 0.06972 m,
+following earlier positive lateral fits. This is another history-dependent
+observer extremum. The largest raw fit error instead occurs at frame 297:
+0.39778 m and $-5.5959^\circ$ yaw error. Initializing that frame at truth
+still gives 0.39778 m. The lower-height-half control reduces its raw error
+to 0.06120 m. After 2 s over the entire recording, true position inputs
+reduce estimated position RMSE from 0.13940 to 0.01729 m.
+
+\section{Supported next change and limits of the current evidence}
+The first priority is a visibility-aware geometric objective: retain
+containment information from all valid target returns, but apply proximity
+residuals to points supporting observed footprint faces or silhouette edges.
+Three-dimensional surface orientation or height structure can help separate
+elevated body returns from footprint-boundary support. All three pose
+variables should remain free, with extrapolation supplying only the initial
+value. The lateral support term also needs deliberate strength and visibility
+semantics, rather than weakening merely because candidate orientation changes.
+
+As a whole-record diagnostic, selecting the lower half of points by measured
+height while holding every original predicted seed fixed produces 300 valid
+fits per recording. Raw position RMSE after 2 s changes from 0.45718 to
+0.11143 m at 15 m and from 0.20377 to 0.03460 m at 20 m. This independently
+supports the point-population diagnosis beyond the single worst frame.
+It is not a validated deployment rule: the split retains a longitudinal
+bias, and arbitrary viewing directions, occlusions and body shapes have not
+been evaluated. These are fixed-seed point ablations, not new closed-loop
+perception/estimator results.
+
+The second priority is target velocity initialization from time-aligned
+early observations and ego motion, rather than assuming the target initially
+shares ego velocity. Observer gain changes or more geometry iterations are
+lower priorities: the current observer cannot identify a persistent lateral
+measurement offset solely from that same biased measurement stream, and
+independent geometric optimization preserves the bias.
+
+This study changes no production algorithm or gain. It uses the same two
+previously seen straight-route recordings, native LiDAR, frozen actual
+detector selections and the original native ego preprocessing, including
+its ideal-compass limitation. No CARLA connection or detector inference
+was performed. Truth is deliberately used in labeled diagnostic controls;
+those controls are not claims of measured-input performance. No global
+optimality, generalization or new observer error certificate is established.
+
+\section{Reproduction and artifacts}
+The analyzed perception version is
+\path{4851f4bdc3f7047cec7ad8664d3c98e8a753d0e5}; the actual MATLAB runtime is
+the isolated existing snapshot
+\path{26cd6f3998d17fd49f1cd9254245805d17f4d3ae}. The matched previous-objective
+comparison uses only the geometric function from
+\path{447056c8f2092e0691a27da15525436342e409b2}, without restoring any old
+production path. Original LiDAR/ego-sensor seed pairs remain
+20261002/20261003 and 20261003/20261004; the interval is 0.02 s.
+
+Five saved point fits were reproduced to $10^{-10}$ tolerance, with 50
+selected-frame geometry controls, five matched previous-objective controls,
+600 whole-record point-selection fits and 15 MATLAB replays. The independent
+derivative-free optimizer passed a known-quadratic minimum check. Existing
+production unit suites were not rerun for this report-only change.
+
+Compact measurements, provenance and validation are in
+\path{report/ESTIMATOR_MAX_ERROR_DIAGNOSIS_20261003/}. Local diagnostic
+scripts, input substitutions, raw traces, figure sources and the derived PDF
+are in \path{simulation_output/estimator_max_error_20261003/}. Recorded
+datasets, runtime copies, historical comparison code, dependencies and
+generated figures/binaries remain outside Git. Identified archive exports
+preserve the supporting study artifacts and original evidence references.
+\end{document}

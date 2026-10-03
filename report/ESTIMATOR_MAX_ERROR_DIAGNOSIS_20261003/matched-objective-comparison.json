@@ -1,0 +1,82 @@
+[
+  {
+    "kind": "dev",
+    "frame": 109,
+    "matchedRecordedInitialPose": true,
+    "previousObjectiveCommit": "447056c8f2092e0691a27da15525436342e409b2",
+    "positionErrorM": 0.20277700059612044,
+    "pose": [
+      4.90419892420362,
+      -0.18821339433735543,
+      -0.05874577742554153
+    ],
+    "selectedRefinementAxis": "lateral",
+    "previousRefinementCost": 0.10126310371703702,
+    "currentPosePositionErrorM": 0.4262020003379088,
+    "note": "Isolated previous-objective comparison on identical points and current saved priors; no old runtime path restored."
+  },
+  {
+    "kind": "dev",
+    "frame": 275,
+    "matchedRecordedInitialPose": true,
+    "previousObjectiveCommit": "447056c8f2092e0691a27da15525436342e409b2",
+    "positionErrorM": 0.3270550137637175,
+    "pose": [
+      4.826177976656642,
+      -0.32814052114175235,
+      -0.14493177494176795
+    ],
+    "selectedRefinementAxis": "lateral",
+    "previousRefinementCost": 0.11164279637373373,
+    "currentPosePositionErrorM": 0.5115427538862666,
+    "note": "Isolated previous-objective comparison on identical points and current saved priors; no old runtime path restored."
+  },
+  {
+    "kind": "conf",
+    "frame": 11,
+    "matchedRecordedInitialPose": true,
+    "previousObjectiveCommit": "447056c8f2092e0691a27da15525436342e409b2",
+    "positionErrorM": 0.137084410337863,
+    "pose": [
+      14.993534988454728,
+      -0.12978685201049248,
+      -0.05139479307159203
+    ],
+    "selectedRefinementAxis": "lateral",
+    "previousRefinementCost": 0.07361474364708874,
+    "currentPosePositionErrorM": 0.1644138862458373,
+    "note": "Isolated previous-objective comparison on identical points and current saved priors; no old runtime path restored."
+  },
+  {
+    "kind": "conf",
+    "frame": 269,
+    "matchedRecordedInitialPose": true,
+    "previousObjectiveCommit": "447056c8f2092e0691a27da15525436342e409b2",
+    "positionErrorM": 0.048316260052571856,
+    "pose": [
+      5.2473136856301466,
+      -0.009896607978458613,
+      0.008945031323280892
+    ],
+    "selectedRefinementAxis": "lateral",
+    "previousRefinementCost": 0.08909473899311683,
+    "currentPosePositionErrorM": 0.06972128881916807,
+    "note": "Isolated previous-objective comparison on identical points and current saved priors; no old runtime path restored."
+  },
+  {
+    "kind": "conf",
+    "frame": 297,
+    "matchedRecordedInitialPose": true,
+    "previousObjectiveCommit": "447056c8f2092e0691a27da15525436342e409b2",
+    "positionErrorM": 0.1167538156675553,
+    "pose": [
+      5.018432303355052,
+      -0.1078944999263183,
+      -0.02860175658795155
+    ],
+    "selectedRefinementAxis": "lateral",
+    "previousRefinementCost": 0.09246039916831958,
+    "currentPosePositionErrorM": 0.3977766212266095,
+    "note": "Isolated previous-objective comparison on identical points and current saved priors; no old runtime path restored."
+  }
+]

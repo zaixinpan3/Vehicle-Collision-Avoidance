@@ -1,0 +1,564 @@
+{
+  "cases": {
+    "dev_baseline": {
+      "allFramesPositionRmseM": 0.40577254761082265,
+      "after2sPositionRmseM": 0.4681935249923009,
+      "allFramesMaximumErrorM": 0.5578203163507955,
+      "maximumFrame": 109,
+      "after2sMaximumErrorM": 0.5578203163507955,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.5578203163507955,
+      "errorXYAtBaselineMaximumM": [
+        0.13668056569774034,
+        -0.5408159837636525
+      ],
+      "after2sVelocityRmseMps": 0.3561179615506509,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_true_position": {
+      "allFramesPositionRmseM": 0.10109467191689923,
+      "after2sPositionRmseM": 0.03889974631433907,
+      "allFramesMaximumErrorM": 0.30169660306706964,
+      "maximumFrame": 9,
+      "after2sMaximumErrorM": 0.11136788691933351,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.061006612207126644,
+      "errorXYAtBaselineMaximumM": [
+        0.06095827459211023,
+        -0.002428063373065517
+      ],
+      "after2sVelocityRmseMps": 0.26670735912718935,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_true_ego": {
+      "allFramesPositionRmseM": 0.4058885002438132,
+      "after2sPositionRmseM": 0.4680949855973399,
+      "allFramesMaximumErrorM": 0.5530892552671655,
+      "maximumFrame": 109,
+      "after2sMaximumErrorM": 0.5530892552671655,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.5530892552671655,
+      "errorXYAtBaselineMaximumM": [
+        0.11483561174268075,
+        -0.5410365113073905
+      ],
+      "after2sVelocityRmseMps": 0.3633978160873815,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_true_initial_velocity": {
+      "allFramesPositionRmseM": 0.3953069279532543,
+      "after2sPositionRmseM": 0.4677902619809825,
+      "allFramesMaximumErrorM": 0.5544608994285506,
+      "maximumFrame": 109,
+      "after2sMaximumErrorM": 0.5544608994285506,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.5544608994285506,
+      "errorXYAtBaselineMaximumM": [
+        0.12248043592860025,
+        -0.5407637486091845
+      ],
+      "after2sVelocityRmseMps": 0.3446857267563486,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_true_lateral": {
+      "allFramesPositionRmseM": 0.12114827068251872,
+      "after2sPositionRmseM": 0.09568291783496438,
+      "allFramesMaximumErrorM": 0.3351281120771881,
+      "maximumFrame": 9,
+      "after2sMaximumErrorM": 0.18653193543169325,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.13703479632486634,
+      "errorXYAtBaselineMaximumM": [
+        0.1370137568674208,
+        -0.002401214874371317
+      ],
+      "after2sVelocityRmseMps": 0.2690975421055285,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_true_longitudinal": {
+      "allFramesPositionRmseM": 0.40026032886852403,
+      "after2sPositionRmseM": 0.4599819061287499,
+      "allFramesMaximumErrorM": 0.5442134197984816,
+      "maximumFrame": 109,
+      "after2sMaximumErrorM": 0.5442134197984816,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.5442134197984816,
+      "errorXYAtBaselineMaximumM": [
+        0.060625371899380553,
+        -0.5408260446491275
+      ],
+      "after2sVelocityRmseMps": 0.354377028987376,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_true_position_and_ego": {
+      "allFramesPositionRmseM": 0.10126479374196737,
+      "after2sPositionRmseM": 0.038772974634866626,
+      "allFramesMaximumErrorM": 0.3036722734431524,
+      "maximumFrame": 10,
+      "after2sMaximumErrorM": 0.10725261079419901,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.03920446846591734,
+      "errorXYAtBaselineMaximumM": [
+        0.039113394999270135,
+        -0.002670707645208815
+      ],
+      "after2sVelocityRmseMps": 0.278026455979478,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_only_frame109_true_lateral": {
+      "allFramesPositionRmseM": 0.4040198141352438,
+      "after2sPositionRmseM": 0.4659143178457447,
+      "allFramesMaximumErrorM": 0.5578203163507955,
+      "maximumFrame": 109,
+      "after2sMaximumErrorM": 0.5578203163507955,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.5578203163507955,
+      "errorXYAtBaselineMaximumM": [
+        0.13668056569774034,
+        -0.5408159837636525
+      ],
+      "after2sVelocityRmseMps": 0.3475303584399397,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "dev_only_frame108_true_lateral": {
+      "allFramesPositionRmseM": 0.40388982992857336,
+      "after2sPositionRmseM": 0.465745239731388,
+      "allFramesMaximumErrorM": 0.5551510341793768,
+      "maximumFrame": 108,
+      "after2sMaximumErrorM": 0.5551510341793768,
+      "baselineMaximumFrame": 109,
+      "errorAtBaselineMaximumM": 0.4966692703170453,
+      "errorXYAtBaselineMaximumM": [
+        0.13667899830904062,
+        -0.4774926339730315
+      ],
+      "after2sVelocityRmseMps": 0.3463338155840337,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "conf_baseline": {
+      "allFramesPositionRmseM": 0.15782178815030976,
+      "after2sPositionRmseM": 0.13939770934165616,
+      "allFramesMaximumErrorM": 0.3580076404587692,
+      "maximumFrame": 11,
+      "after2sMaximumErrorM": 0.3041086965386274,
+      "baselineMaximumFrame": 11,
+      "errorAtBaselineMaximumM": 0.3580076404587692,
+      "errorXYAtBaselineMaximumM": [
+        0.31814330440825955,
+        -0.16417767353403712
+      ],
+      "after2sVelocityRmseMps": 0.3374614929792156,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "conf_true_position": {
+      "allFramesPositionRmseM": 0.09473577916706834,
+      "after2sPositionRmseM": 0.017285098301899567,
+      "allFramesMaximumErrorM": 0.2997786855683695,
+      "maximumFrame": 9,
+      "after2sMaximumErrorM": 0.05634750364366691,
+      "baselineMaximumFrame": 11,
+      "errorAtBaselineMaximumM": 0.2942650127625325,
+      "errorXYAtBaselineMaximumM": [
+        0.2942530558094596,
+        -0.0026527123719814797
+      ],
+      "after2sVelocityRmseMps": 0.1077589263987775,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "conf_true_ego": {
+      "allFramesPositionRmseM": 0.15825958366392684,
+      "after2sPositionRmseM": 0.13946983163329432,
+      "allFramesMaximumErrorM": 0.36001091345309405,
+      "maximumFrame": 11,
+      "after2sMaximumErrorM": 0.3039231962321217,
+      "baselineMaximumFrame": 11,
+      "errorAtBaselineMaximumM": 0.36001091345309405,
+      "errorXYAtBaselineMaximumM": [
+        0.3210667296657608,
+        -0.1628619443180771
+      ],
+      "after2sVelocityRmseMps": 0.3391229851737917,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "conf_true_initial_velocity": {
+      "allFramesPositionRmseM": 0.13108060804820798,
+      "after2sPositionRmseM": 0.1386616504426315,
+      "allFramesMaximumErrorM": 0.30411106064384275,
+      "maximumFrame": 269,
+      "after2sMaximumErrorM": 0.30411106064384275,
+      "baselineMaximumFrame": 11,
+      "errorAtBaselineMaximumM": 0.16052304643453005,
+      "errorXYAtBaselineMaximumM": [
+        0.0032003534569611247,
+        -0.1604911404856131
+      ],
+      "after2sVelocityRmseMps": 0.3324640501102442,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "conf_true_position_and_initial_velocity": {
+      "allFramesPositionRmseM": 0.030933936944120565,
+      "after2sPositionRmseM": 0.014174418964857083,
+      "allFramesMaximumErrorM": 0.0907391232939034,
+      "maximumFrame": 31,
+      "after2sMaximumErrorM": 0.04271312406508875,
+      "baselineMaximumFrame": 11,
+      "errorAtBaselineMaximumM": 0.020718209007214508,
+      "errorXYAtBaselineMaximumM": [
+        -0.02069170283883892,
+        0.0010476727045264202
+      ],
+      "after2sVelocityRmseMps": 0.09237223601852018,
+      "allStatesFinite": true,
+      "frames": 300
+    },
+    "conf_true_lateral": {
+      "allFramesPositionRmseM": 0.09876636373834327,
+      "after2sPositionRmseM": 0.048472269771930636,
+      "allFramesMaximumErrorM": 0.3250807870890465,
+      "maximumFrame": 9,
+      "after2sMaximumErrorM": 0.09417372143834332,
+      "baselineMaximumFrame": 11,
+      "errorAtBaselineMaximumM": 0.3181597087890637,
+      "errorXYAtBaselineMaximumM": [
+        0.3181486463125598,
+        -0.0026531389386042596
+      ],
+      "after2sVelocityRmseMps": 0.1094533029343918,
+      "allStatesFinite": true,
+      "frames": 300
+    }
+  },
+  "baselineReproduction": {
+    "dev": {
+      "maximumAbsoluteDifference": 0.0,
+      "fields": [
+        "frame",
+        "time",
+        "egoX",
+        "egoY",
+        "egoVx",
+        "egoVy",
+        "egoBodyVx",
+        "egoBodyVy",
+        "egoYaw",
+        "targetRx",
+        "targetRy",
+        "targetVx",
+        "targetVy",
+        "targetRelativeHeading",
+        "targetSideslip",
+        "targetYawRate",
+        "finiteStates",
+        "sim_frame"
+      ]
+    },
+    "conf": {
+      "maximumAbsoluteDifference": 0.0,
+      "fields": [
+        "frame",
+        "time",
+        "egoX",
+        "egoY",
+        "egoVx",
+        "egoVy",
+        "egoBodyVx",
+        "egoBodyVy",
+        "egoYaw",
+        "targetRx",
+        "targetRy",
+        "targetVx",
+        "targetVy",
+        "targetRelativeHeading",
+        "targetSideslip",
+        "targetYawRate",
+        "finiteStates",
+        "sim_frame"
+      ]
+    }
+  },
+  "localDynamics": {
+    "dev": {
+      "innovationGains": [
+        7.297652196479163,
+        26.254049826269743,
+        40.942346479191514
+      ],
+      "samples": [
+        {
+          "frame": 107,
+          "time": 2.14,
+          "errorXYM": [
+            0.1218917704540603,
+            -0.5376327582456049
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            0.6723249996956007,
+            -0.7122132478752988
+          ],
+          "egoRotationTermCarlaXYMps": [
+            -0.0002115384319816376,
+            -0.0018846538512267324
+          ],
+          "innovationTermCarlaXYMps": [
+            -0.4321315803942581,
+            0.6420162214138195
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            0.23998188086936095,
+            -0.07208168031270601
+          ],
+          "targetVelocityWorldErrorMps": [
+            -0.631459888971099,
+            -0.7112667520273803
+          ]
+        },
+        {
+          "frame": 108,
+          "time": 2.16,
+          "errorXYM": [
+            0.12972029386165485,
+            -0.5397826563635382
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            0.6744921417417995,
+            -0.6795533454984238
+          ],
+          "egoRotationTermCarlaXYMps": [
+            0.0006898885688121078,
+            0.006130986780772823
+          ],
+          "innovationTermCarlaXYMps": [
+            -0.5003711649203976,
+            0.6584744711035221
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            0.17481086539021407,
+            -0.014947887614128907
+          ],
+          "targetVelocityWorldErrorMps": [
+            -0.6614516511111272,
+            -0.6798741290483293
+          ]
+        },
+        {
+          "frame": 109,
+          "time": 2.18,
+          "errorXYM": [
+            0.13668056569774034,
+            -0.5408159837636525
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            0.6724335134363013,
+            -0.6446894919416414
+          ],
+          "egoRotationTermCarlaXYMps": [
+            0.0003231584597905636,
+            0.0028698716432705683
+          ],
+          "innovationTermCarlaXYMps": [
+            -0.471079164351549,
+            0.881276573153889
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            0.2016775075445429,
+            0.23945695285551816
+          ],
+          "targetVelocityWorldErrorMps": [
+            -0.6862156638954495,
+            -0.6438568608008726
+          ]
+        },
+        {
+          "frame": 110,
+          "time": 2.2,
+          "errorXYM": [
+            0.1445201679681105,
+            -0.536885593777062
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            0.6717266930397994,
+            -0.5929714705690282
+          ],
+          "egoRotationTermCarlaXYMps": [
+            0.000517023322924137,
+            0.004629961223274468
+          ],
+          "innovationTermCarlaXYMps": [
+            -0.5930626789916371,
+            0.6326314848641008
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            0.0791810373710864,
+            0.04428997551834701
+          ],
+          "targetVelocityWorldErrorMps": [
+            -0.7119027870115247,
+            -0.5924353163550421
+          ]
+        }
+      ],
+      "note": "Instantaneous derivative terms at sample arrival, not an exact integrated attribution of the preceding interval."
+    },
+    "conf": {
+      "innovationGains": [
+        7.297652196479163,
+        26.254049826269743,
+        40.942346479191514
+      ],
+      "samples": [
+        {
+          "frame": 9,
+          "time": 0.18,
+          "errorXYM": [
+            0.3250608358440239,
+            -0.14053644091130355
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            -1.6718095625774803,
+            -0.3951507779276068
+          ],
+          "egoRotationTermCarlaXYMps": [
+            0.00013706117340489156,
+            0.015771582484341882
+          ],
+          "innovationTermCarlaXYMps": [
+            -2.2569539751597247,
+            -0.15321642704630203
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            -3.9286264765638004,
+            -0.5325956224895669
+          ],
+          "targetVelocityWorldErrorMps": [
+            -2.0075635239943725,
+            -0.4127387118245765
+          ]
+        },
+        {
+          "frame": 10,
+          "time": 0.2,
+          "errorXYM": [
+            0.3232052963120484,
+            -0.15130614062560233
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            -1.9361187568669909,
+            -0.417404595775483
+          ],
+          "egoRotationTermCarlaXYMps": [
+            -0.0001210184131564995,
+            -0.012835900456516097
+          ],
+          "innovationTermCarlaXYMps": [
+            -2.1769834567087485,
+            -0.222773561797429
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            -4.113223231988896,
+            -0.6530140580294281
+          ],
+          "targetVelocityWorldErrorMps": [
+            -1.7871813869970605,
+            -0.4309315584008168
+          ]
+        },
+        {
+          "frame": 11,
+          "time": 0.22,
+          "errorXYM": [
+            0.31814330440825955,
+            -0.16417767353403712
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            -2.1977232065276002,
+            -0.4441578801747052
+          ],
+          "egoRotationTermCarlaXYMps": [
+            -0.00011839629958923998,
+            -0.011461523397286245
+          ],
+          "innovationTermCarlaXYMps": [
+            -2.1941065654524787,
+            0.005079703568624128
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            -4.391948168279669,
+            -0.4505397000033673
+          ],
+          "targetVelocityWorldErrorMps": [
+            -1.567369291728549,
+            -0.45468424458713047
+          ]
+        },
+        {
+          "frame": 12,
+          "time": 0.24,
+          "errorXYM": [
+            0.3080336288270047,
+            -0.17295855413370567
+          ],
+          "relativeVelocityTermCarlaXYMps": [
+            -2.460253526072541,
+            -0.45602714067599864
+          ],
+          "egoRotationTermCarlaXYMps": [
+            -7.710817728834454e-05,
+            -0.007016176336036911
+          ],
+          "innovationTermCarlaXYMps": [
+            -2.181749595758877,
+            0.13449661500473903
+          ],
+          "instantaneousRhoDerivativeCarlaXYMps": [
+            -4.642080230008706,
+            -0.3285467020072965
+          ],
+          "targetVelocityWorldErrorMps": [
+            -1.3413727243692248,
+            -0.46737891242585056
+          ]
+        }
+      ],
+      "note": "Instantaneous derivative terms at sample arrival, not an exact integrated attribution of the preceding interval."
+    }
+  },
+  "initialization": {
+    "dev": {
+      "initialTargetVelocityBodyMps": [
+        8.141780274727209,
+        0.060033940753937816
+      ],
+      "actualTargetVelocityBodyMps": [
+        4.757367773882696,
+        -0.0009961825182622595
+      ],
+      "initialVelocityErrorNormMps": 3.384962725321983
+    },
+    "conf": {
+      "initialTargetVelocityBodyMps": [
+        8.068690310684195,
+        0.03663676992872136
+      ],
+      "actualTargetVelocityBodyMps": [
+        4.767362580948865,
+        -0.0021338348247471103
+      ],
+      "initialVelocityErrorNormMps": 3.3015553817727143
+    }
+  },
+  "finitePublications": 4500,
+  "scope": "Frozen measured target streams; changing estimator inputs does not rerun the point-cloud feedback loop. Oracle truth controls are diagnostic only."
+}

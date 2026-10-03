@@ -1,0 +1,295 @@
+{
+  "cases": [
+    {
+      "name": "dev_baseline",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.823712213142359,
+        0.088566242195696449,
+        8.1417802747272088,
+        0.060033940753937816,
+        0,
+        0
+      ],
+      "wallSeconds": 1.552973
+    },
+    {
+      "name": "dev_true_position",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.78173882960399,
+        -0.0033850914851343422,
+        8.1417802747272088,
+        0.060033940753937816,
+        0,
+        0
+      ],
+      "wallSeconds": 3.401985
+    },
+    {
+      "name": "dev_true_ego",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.823712213142359,
+        0.088566242195696449,
+        8.1932359325372524,
+        0.000631173662941856,
+        0,
+        0
+      ],
+      "wallSeconds": 2.835054
+    },
+    {
+      "name": "dev_true_initial_velocity",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.823712213142359,
+        0.088566242195696449,
+        4.757367773882696,
+        -0.00099618251826225947,
+        0,
+        0
+      ],
+      "wallSeconds": 3.638432
+    },
+    {
+      "name": "dev_true_lateral",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.823712213142359,
+        -0.0033850914851343422,
+        8.1417802747272088,
+        0.060033940753937816,
+        0,
+        0
+      ],
+      "wallSeconds": 3.576654
+    },
+    {
+      "name": "dev_true_longitudinal",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.78173882960399,
+        0.088566242195696449,
+        8.1417802747272088,
+        0.060033940753937816,
+        0,
+        0
+      ],
+      "wallSeconds": 2.79485
+    },
+    {
+      "name": "dev_true_position_and_ego",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.78173882960399,
+        -0.0033850914851343422,
+        8.1932359325372524,
+        0.000631173662941856,
+        0,
+        0
+      ],
+      "wallSeconds": 3.802624
+    },
+    {
+      "name": "dev_only_frame109_true_lateral",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.823712213142359,
+        0.088566242195696449,
+        8.1417802747272088,
+        0.060033940753937816,
+        0,
+        0
+      ],
+      "wallSeconds": 3.87441
+    },
+    {
+      "name": "dev_only_frame108_true_lateral",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        10.823712213142359,
+        0.088566242195696449,
+        8.1417802747272088,
+        0.060033940753937816,
+        0,
+        0
+      ],
+      "wallSeconds": 3.743642
+    },
+    {
+      "name": "conf_baseline",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        15.806575503318793,
+        0.0071716344282041228,
+        8.068690310684195,
+        0.036636769928721363,
+        0,
+        0
+      ],
+      "wallSeconds": 3.809657
+    },
+    {
+      "name": "conf_true_position",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        15.781122506381021,
+        -0.0034313504905781889,
+        8.068690310684195,
+        0.036636769928721363,
+        0,
+        0
+      ],
+      "wallSeconds": 3.738292
+    },
+    {
+      "name": "conf_true_ego",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        15.806575503318793,
+        0.0071716344282041228,
+        8.1932359325372524,
+        0.000631173662941856,
+        0,
+        0
+      ],
+      "wallSeconds": 3.61826
+    },
+    {
+      "name": "conf_true_initial_velocity",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        15.806575503318793,
+        0.0071716344282041228,
+        4.7673625809488653,
+        -0.0021338348247471103,
+        0,
+        0
+      ],
+      "wallSeconds": 3.001001
+    },
+    {
+      "name": "conf_true_position_and_initial_velocity",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        15.781122506381021,
+        -0.0034313504905781889,
+        4.7673625809488653,
+        -0.0021338348247471103,
+        0,
+        0
+      ],
+      "wallSeconds": 3.372509
+    },
+    {
+      "name": "conf_true_lateral",
+      "completed": true,
+      "frames": 300,
+      "finite": true,
+      "initialState": [
+        15.806575503318793,
+        -0.0034313504905781889,
+        8.068690310684195,
+        0.036636769928721363,
+        0,
+        0
+      ],
+      "wallSeconds": 2.840446
+    }
+  ],
+  "runtimeSnapshotCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "innovationGains": [
+    7.297652196479163,
+    26.254049826269743,
+    40.942346479191514
+  ],
+  "configuration": {
+    "runtime": {
+      "samplePeriod": 0.02,
+      "integrationStepMaximum": 0.005,
+      "targetHistoryDuration": 2
+    },
+    "target": {
+      "model": {
+        "scalarAccelerationRateMaximum": 0,
+        "curvatureRateMaximum": 0
+      },
+      "domain": {
+        "speedMinimum": 10,
+        "speedMaximum": 20,
+        "scalarAccelerationMaximum": 2,
+        "sideslipMaximum": 0.015,
+        "rearAxleDistance": 1.6,
+        "relativePositionMaximum": 50
+      }
+    },
+    "ego": {
+      "domain": {
+        "speedMinimum": 5,
+        "speedMaximum": 20,
+        "yawRateMaximum": 0.3,
+        "accelerationNormMaximum": null,
+        "bodyAccelerationRateMaximum": null,
+        "yawAccelerationMaximum": null
+      },
+      "yaw": {
+        "rearAxleDistance": 1.714395,
+        "sideslipDomainMaximum": 0.05,
+        "singleTrackYawRateMismatchMaximum": 0.02
+      }
+    },
+    "measurement": {
+      "gps": {
+        "positionNoiseMaximum": 0.12,
+        "velocityNoiseMaximum": 0.02
+      },
+      "imu": {
+        "noiseMaximum": 0.05
+      },
+      "gyroscope": {
+        "noiseMaximum": 0.002
+      },
+      "radar": {
+        "noiseMaximum": 0.12
+      }
+    }
+  },
+  "integration": {
+    "requestedStepMaximum": 0.005,
+    "rateLimitedStepMaximum": 0.053387489499990358,
+    "substepCount": 4,
+    "nominalSampledSpectralRadius": 0.9602748641813873,
+    "scope": "Necessary nominal sampling check and gain-aware RK4 resolution; no nonlinear digital certificate"
+  },
+  "matlabVersion": "26.1.0.3276743 (R2026a) Update 3",
+  "scope": "Frozen target measurement streams; explicit diagnostic truth substitutions. No perception feedback changes."
+}

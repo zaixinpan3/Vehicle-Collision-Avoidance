@@ -1,0 +1,24 @@
+{
+  "recordedAt": "2026-10-03T16:30:42.947941-05:00",
+  "implementationCommit": "4851f4bdc3f7047cec7ad8664d3c98e8a753d0e5",
+  "workspaceHead": "4851f4bdc3f7047cec7ad8664d3c98e8a753d0e5",
+  "runtimeSnapshotCommit": "26cd6f3998d17fd49f1cd9254245805d17f4d3ae",
+  "task": "Diagnose all-frame maximum position error and its perception/estimator causes without changing production algorithms.",
+  "selectedFrames": {
+    "dev_estimator_max": 109,
+    "dev_raw_max": 275,
+    "conf_estimator_max": 11,
+    "conf_raw_max": 297
+  },
+  "methods": [
+    "Exact saved-data reproduction and timestamp/frame audit",
+    "Vector error decomposition, point-cloud and objective-component inspection",
+    "Geometry initial-pose and objective counterfactuals; truth controls labeled diagnostic only",
+    "Actual MATLAB estimator replays with frozen target measurements and individually changed inputs or initialization"
+  ],
+  "limitations": "Previously seen two straight-route recordings. No CARLA or detector inference. Actor truth is intentionally used for diagnostic attribution, never represented as deployable measured input.",
+  "sourceHashes": {
+    "source_snapshot/perception/yolo_lidar_target_position.py": "6b54cf1db0db16cde629243a443e4432ac26a156cbf3f568ffefb2befca582bb",
+    "source_snapshot/perception/rectangle_pose_fit.py": "b15c8213bb919a6a1a817393e9013753bc1ed31dcefadb8f95bf3dbe77b52b1f"
+  }
+}

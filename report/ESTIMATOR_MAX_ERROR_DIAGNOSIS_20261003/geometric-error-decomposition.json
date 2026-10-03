@@ -1,0 +1,92 @@
+[
+  {
+    "kind": "dev",
+    "frame": 109,
+    "headingErrorDegrees": -6.137152638151179,
+    "centerErrorXYM": [
+      0.07212841225600375,
+      -0.42005432653106045
+    ],
+    "rearFaceMidpointErrorXYM": [
+      0.08646302891517332,
+      -0.1527826519656631
+    ],
+    "headingLeverArmContributionXYM": [
+      -0.014334616659169575,
+      -0.26727167456539735
+    ],
+    "interpretation": "Exact geometric identity with the declared 5 m length, not an additive causal allocation."
+  },
+  {
+    "kind": "dev",
+    "frame": 275,
+    "headingErrorDegrees": -9.071067166329705,
+    "centerErrorXYM": [
+      0.05455400544798206,
+      -0.5086254511358304
+    ],
+    "rearFaceMidpointErrorXYM": [
+      0.0863779084125521,
+      -0.11452151979432623
+    ],
+    "headingLeverArmContributionXYM": [
+      -0.03182390296457005,
+      -0.3941039313415041
+    ],
+    "interpretation": "Exact geometric identity with the declared 5 m length, not an additive causal allocation."
+  },
+  {
+    "kind": "conf",
+    "frame": 11,
+    "headingErrorDegrees": -2.286307581009577,
+    "centerErrorXYM": [
+      0.01748406409655523,
+      -0.16348159986104474
+    ],
+    "rearFaceMidpointErrorXYM": [
+      0.019463175115528697,
+      -0.06374886575675048
+    ],
+    "headingLeverArmContributionXYM": [
+      -0.0019791110189734673,
+      -0.09973273410429426
+    ],
+    "interpretation": "Exact geometric identity with the declared 5 m length, not an additive causal allocation."
+  },
+  {
+    "kind": "conf",
+    "frame": 269,
+    "headingErrorDegrees": -0.1293505614822856,
+    "centerErrorXYM": [
+      0.047992076314384846,
+      -0.0505748823591327
+    ],
+    "rearFaceMidpointErrorXYM": [
+      0.04800545308035087,
+      -0.04493091644190323
+    ],
+    "headingLeverArmContributionXYM": [
+      -1.337676596602222e-05,
+      -0.0056439659172294685
+    ],
+    "interpretation": "Exact geometric identity with the declared 5 m length, not an additive causal allocation."
+  },
+  {
+    "kind": "conf",
+    "frame": 297,
+    "headingErrorDegrees": -5.5958860590039485,
+    "centerErrorXYM": [
+      0.03922930244394607,
+      -0.39583746945459697
+    ],
+    "rearFaceMidpointErrorXYM": [
+      0.05137460461750731,
+      -0.15207028326416422
+    ],
+    "headingLeverArmContributionXYM": [
+      -0.012145302173561245,
+      -0.24376718619043275
+    ],
+    "interpretation": "Exact geometric identity with the declared 5 m length, not an additive causal allocation."
+  }
+]

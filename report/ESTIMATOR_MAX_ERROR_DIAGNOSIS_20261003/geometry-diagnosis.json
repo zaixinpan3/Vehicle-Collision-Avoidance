@@ -1,0 +1,2255 @@
+{
+  "scope": "Post-run diagnosis; truth-seeded/filtered controls are diagnostic oracles, not deployed measurements.",
+  "captures": {
+    "dev": {
+      "maximumEstimatorFrame": 109,
+      "maximumEstimatorTimeS": 2.18,
+      "maximumEstimatorErrorM": 0.5578203163507955,
+      "maximumRawFrame": 275,
+      "maximumRawErrorM": 0.5115427538862666,
+      "post2sMaximumEstimatorFrame": 109,
+      "post2sMaximumEstimatorErrorM": 0.5578203163507955,
+      "post2sRawRmseM": 0.4571754590130919,
+      "post2sEstimatorRmseM": 0.4681935249923009,
+      "post2sRawLateralSquaredErrorFraction": 0.9782747866528748,
+      "post2sEstimatorLateralSquaredErrorFraction": 0.9585529219219815,
+      "allSensorsSynchronized": true,
+      "allSimulatorFrameIdsMatch": true
+    },
+    "conf": {
+      "maximumEstimatorFrame": 11,
+      "maximumEstimatorTimeS": 0.22,
+      "maximumEstimatorErrorM": 0.3580076404587692,
+      "maximumRawFrame": 297,
+      "maximumRawErrorM": 0.3977766212266095,
+      "post2sMaximumEstimatorFrame": 269,
+      "post2sMaximumEstimatorErrorM": 0.3041086965386274,
+      "post2sRawRmseM": 0.20377125805456334,
+      "post2sEstimatorRmseM": 0.13939770934165616,
+      "post2sRawLateralSquaredErrorFraction": 0.9690077776539237,
+      "post2sEstimatorLateralSquaredErrorFraction": 0.8806704080129308,
+      "allSensorsSynchronized": true,
+      "allSimulatorFrameIdsMatch": true
+    }
+  },
+  "frameDiagnostics": [
+    {
+      "kind": "dev",
+      "frame": 109,
+      "timeS": 2.18,
+      "simFrame": 1374,
+      "pointCount": 999,
+      "retainedPointCount": 999,
+      "positionErrorM": 0.5578203163507955,
+      "rawPositionErrorM": 0.4262020003379088,
+      "estimatorErrorXYM": [
+        0.13668056569774034,
+        -0.5408159837636525
+      ],
+      "rawErrorXYM": [
+        0.07212841225600375,
+        -0.42005432653106045
+      ],
+      "estimatorMinusRawXYM": [
+        0.06455215344173659,
+        -0.12076165723259202
+      ],
+      "truePose": [
+        4.7988593361772995,
+        -0.014944576700701484,
+        -2.503371424674484e-05
+      ],
+      "predictedPose": [
+        4.9355399018750425,
+        -0.5557605604643541,
+        -0.0564003030227639
+      ],
+      "fittedPose": [
+        4.870987748433303,
+        -0.43499890323176194,
+        -0.10713855394744098
+      ],
+      "bbox": [
+        95.96995544433594,
+        339.19268798828125,
+        535.3246459960938,
+        639.364501953125
+      ],
+      "detectorConfidence": 0.9618834853172302,
+      "imageHeight": 640,
+      "pointQuantiles": [
+        [
+          2.3517671674489833,
+          -0.88935339450836,
+          0.19392970204353344
+        ],
+        [
+          2.3810099881887434,
+          -0.7679999613761902,
+          0.35294705510139485
+        ],
+        [
+          2.446227177977562,
+          -0.3664383143186569,
+          0.5780706703662873
+        ],
+        [
+          2.650080785155289,
+          2.0692585422921184e-09,
+          0.7435566484928133
+        ],
+        [
+          3.2429376691579783,
+          0.3436370640993127,
+          0.872140109539032
+        ],
+        [
+          4.316473893523216,
+          0.7407752871513368,
+          1.12323624253273
+        ],
+        [
+          5.085086926817894,
+          0.8022516369819659,
+          1.1630814969539645
+        ]
+      ],
+      "fixedExtrinsicNearestPointMaximumDifferenceM": 1.4323167916492475e-14,
+      "costs": {
+        "truth": {
+          "firstStage": {
+            "total": 0.11684385759625067,
+            "boundary": 0.11684385759625067,
+            "containment": 0.0,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.3870926911041498,
+              0.7940927898023914
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.4501189491240383,
+              0.0012756117578121007
+            ],
+            "interiorBeyond15cmFraction": 0.7217217217217218,
+            "outsideFootprintFraction": 0.0,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0
+          },
+          "refinement": {
+            "total": 0.11701135646792214,
+            "boundary": 0.11684385759625067,
+            "containment": 0.0,
+            "symmetry": 0.00016749887167147944,
+            "supportCoverage": [
+              0.5466624994350634,
+              0.8903167308615262
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4515836543076307
+            ],
+            "supportMidpointM": [
+              -1.080437277333204,
+              -0.02865944192373515
+            ],
+            "interiorBeyond15cmFraction": 0.7217217217217218,
+            "outsideFootprintFraction": 0.0,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0
+          }
+        },
+        "prior": {
+          "firstStage": {
+            "total": 0.15253300166284006,
+            "boundary": 0.0723993307659189,
+            "containment": 0.08013367089692115,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.38562718540456126,
+              0.7934416561447482
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.620028485275907,
+              0.4112221857460417
+            ],
+            "interiorBeyond15cmFraction": 0.4034034034034034,
+            "outsideFootprintFraction": 0.4034034034034034,
+            "outsideFootprint15cmFraction": 0.056056056056056056,
+            "maximumOverflowM": 0.2748383436861961
+          },
+          "refinement": {
+            "total": 0.17920927679034176,
+            "boundary": 0.0723993307659189,
+            "containment": 0.08013367089692115,
+            "symmetry": 0.026676275127501717,
+            "supportCoverage": [
+              0.5432556410320176,
+              0.8850601337947186
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.42530066897359275
+            ],
+            "supportMidpointM": [
+              -1.2587246410756325,
+              0.38403121658121336
+            ],
+            "interiorBeyond15cmFraction": 0.4034034034034034,
+            "outsideFootprintFraction": 0.4034034034034034,
+            "outsideFootprint15cmFraction": 0.056056056056056056,
+            "maximumOverflowM": 0.2748383436861961
+          }
+        },
+        "first": {
+          "firstStage": {
+            "total": 0.09340240740434747,
+            "boundary": 0.08952143872657303,
+            "containment": 0.0038808318926685267,
+            "symmetry": 1.3678510590193296e-07,
+            "supportCoverage": [
+              0.38570613114360647,
+              0.800319107027767
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0015955351388347028
+            ],
+            "supportMidpointM": [
+              -1.5712025301202766,
+              0.23179978686371272
+            ],
+            "interiorBeyond15cmFraction": 0.5065065065065065,
+            "outsideFootprintFraction": 0.17117117117117117,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.08800661259484088
+          },
+          "refinement": {
+            "total": 0.10012764358569093,
+            "boundary": 0.08952143872657303,
+            "containment": 0.0038808318926685267,
+            "symmetry": 0.006725372966449365,
+            "supportCoverage": [
+              0.5413314735505942,
+              0.8819421897568583
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4097109487842915
+            ],
+            "supportMidpointM": [
+              -1.2114492428601342,
+              0.20016153232582545
+            ],
+            "interiorBeyond15cmFraction": 0.5065065065065065,
+            "outsideFootprintFraction": 0.17117117117117117,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.08800661259484088
+          }
+        },
+        "final": {
+          "firstStage": {
+            "total": 0.09466552981265466,
+            "boundary": 0.09253149812193559,
+            "containment": 0.002078176173591597,
+            "symmetry": 5.5855517127479855e-05,
+            "supportCoverage": [
+              0.386333008839026,
+              0.8078924599133085
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.039462299566542236
+            ],
+            "supportMidpointM": [
+              -1.5695451011245134,
+              0.18938721141108755
+            ],
+            "interiorBeyond15cmFraction": 0.5325325325325325,
+            "outsideFootprintFraction": 0.15115115115115116,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.07116560623069645
+          },
+          "refinement": {
+            "total": 0.09823322624240609,
+            "boundary": 0.09253149812193559,
+            "containment": 0.002078176173591597,
+            "symmetry": 0.0036235519468788935,
+            "supportCoverage": [
+              0.5404602255900738,
+              0.8779240835548962
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.38962041777448053
+            ],
+            "supportMidpointM": [
+              -1.220015042255512,
+              0.1544989521083221
+            ],
+            "interiorBeyond15cmFraction": 0.5325325325325325,
+            "outsideFootprintFraction": 0.15115115115115116,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.07116560623069645
+          }
+        }
+      },
+      "controls": [
+        {
+          "name": "truth_seed",
+          "pointCount": 999,
+          "pose": [
+            4.870987754089958,
+            -0.4349988825425676,
+            -0.10713854456857774
+          ],
+          "errorXYM": [
+            0.07212841791265845,
+            -0.4200543058418661
+          ],
+          "positionErrorM": 0.42620198090444755,
+          "costOnOriginalRefinementPoints": 0.09823322632671182
+        },
+        {
+          "name": "production_seed",
+          "pointCount": 999,
+          "pose": [
+            4.870987748432625,
+            -0.43499890323424856,
+            -0.10713855394864093
+          ],
+          "errorXYM": [
+            0.07212841225532518,
+            -0.4200543265335471
+          ],
+          "positionErrorM": 0.4262020003402447,
+          "costOnOriginalRefinementPoints": 0.09823322624239515
+        },
+        {
+          "name": "truth_plus5deg",
+          "pointCount": 999,
+          "pose": [
+            4.870987754038172,
+            -0.4349988827317124,
+            -0.10713854465436412
+          ],
+          "errorXYM": [
+            0.07212841786087232,
+            -0.4200543060310109
+          ],
+          "positionErrorM": 0.42620198108210006,
+          "costOnOriginalRefinementPoints": 0.09823322632594046
+        },
+        {
+          "name": "truth_minus5deg",
+          "pointCount": 999,
+          "pose": [
+            4.86986731607065,
+            0.39710233307627446,
+            0.11336662957824699
+          ],
+          "errorXYM": [
+            0.07100797989335028,
+            0.41204690977697594
+          ],
+          "positionErrorM": 0.418120543701562,
+          "costOnOriginalRefinementPoints": 0.1044000075730062
+        },
+        {
+          "name": "true_footprint_boundary15cm",
+          "pointCount": 278,
+          "accepted": true,
+          "pose": [
+            4.8848762331470645,
+            -0.05579959899193174,
+            -0.0038206046441692405
+          ],
+          "errorXYM": [
+            0.086016896969765,
+            -0.04085502229123025
+          ],
+          "positionErrorM": 0.09522625378919454,
+          "costOnOriginalRefinementPoints": 0.10340645754058563
+        },
+        {
+          "name": "measured_rear_depth15cm",
+          "pointCount": 391,
+          "accepted": true,
+          "pose": [
+            4.896570905347547,
+            -0.20360893419469533,
+            0.015243313360407833
+          ],
+          "errorXYM": [
+            0.09771156917024726,
+            -0.18866435749399385
+          ],
+          "positionErrorM": 0.212465975013256,
+          "costOnOriginalRefinementPoints": 0.10438095163290825
+        },
+        {
+          "name": "measured_lower_half",
+          "pointCount": 500,
+          "accepted": true,
+          "pose": [
+            4.901608145175555,
+            -0.014656755637158595,
+            0.021362480316455237
+          ],
+          "errorXYM": [
+            0.10274880899825511,
+            0.00028782106354288857
+          ],
+          "positionErrorM": 0.10274921212118626,
+          "costOnOriginalRefinementPoints": 0.10183983784638966
+        },
+        {
+          "name": "independent_same_cost",
+          "pointCount": 999,
+          "pose": [
+            4.870853140517907,
+            -0.43359132249387294,
+            -0.10713973762838636
+          ],
+          "errorXYM": [
+            0.07199380434060743,
+            -0.41864674579317146
+          ],
+          "positionErrorM": 0.4247919556990763,
+          "costOnOriginalRefinementPoints": 0.09823150069895892,
+          "optimizer": {
+            "iterations": 234,
+            "objective": 0.09823150069895892,
+            "converged": true
+          }
+        },
+        {
+          "name": "unit_lateral_support",
+          "pointCount": 999,
+          "pose": [
+            4.9070958625332946,
+            -0.16811092535526656,
+            -0.04993914464566827
+          ],
+          "errorXYM": [
+            0.10823652635599501,
+            -0.15316634865456508
+          ],
+          "positionErrorM": 0.1875501959417366,
+          "costOnOriginalRefinementPoints": 0.10112009097558072,
+          "optimizer": {
+            "iterations": 135,
+            "objective": 0.10125879962484136,
+            "converged": true
+          }
+        },
+        {
+          "name": "no_boundary_residual",
+          "pointCount": 999,
+          "pose": [
+            4.792634285443947,
+            -0.29196718900604546,
+            -0.12038574947180196
+          ],
+          "errorXYM": [
+            -0.006225050733352333,
+            -0.277022612305344
+          ],
+          "positionErrorM": 0.27709254588514237,
+          "costOnOriginalRefinementPoints": 0.1130866004924116,
+          "optimizer": {
+            "iterations": 76,
+            "objective": 2.877570766990378e-19,
+            "converged": true
+          }
+        }
+      ],
+      "firstStageConverged": true,
+      "refinementConverged": false,
+      "refinementIterations": 27
+    },
+    {
+      "kind": "dev",
+      "frame": 275,
+      "timeS": 5.5,
+      "simFrame": 1540,
+      "pointCount": 939,
+      "retainedPointCount": 939,
+      "positionErrorM": 0.4201504009212894,
+      "rawPositionErrorM": 0.5115427538862666,
+      "estimatorErrorXYM": [
+        0.08343017540518094,
+        -0.4117836388519837
+      ],
+      "rawErrorXYM": [
+        0.05455400544798206,
+        -0.5086254511358304
+      ],
+      "estimatorMinusRawXYM": [
+        0.028876169957198883,
+        0.09684181228384664
+      ],
+      "truePose": [
+        4.738733219033389,
+        -0.012992307768749253,
+        -0.0014152038032681073
+      ],
+      "predictedPose": [
+        4.822163394438567,
+        -0.4247759466207335,
+        -0.002750384022471289
+      ],
+      "fittedPose": [
+        4.793287224481371,
+        -0.5216177589045796,
+        -0.15973519252527354
+      ],
+      "bbox": [
+        83.599365234375,
+        344.33197021484375,
+        549.7978515625,
+        639.2694091796875
+      ],
+      "detectorConfidence": 0.9474313259124756,
+      "imageHeight": 640,
+      "pointQuantiles": [
+        [
+          2.302091225981714,
+          -0.8307902812957764,
+          0.20522478222847026
+        ],
+        [
+          2.324101905226708,
+          -0.7627293825149536,
+          0.3971875679492954
+        ],
+        [
+          2.4176045507192603,
+          -0.3627978265285501,
+          0.6121648848056795
+        ],
+        [
+          2.6980069726705587,
+          4.256968111349124e-10,
+          0.7218437492847446
+        ],
+        [
+          3.2470778077840814,
+          0.34914520382881253,
+          0.847777664661408
+        ],
+        [
+          4.31176617562771,
+          0.7280101943016071,
+          1.0710433661937715
+        ],
+        [
+          5.054494962096214,
+          0.8519083261489868,
+          1.0971663296222691
+        ]
+      ],
+      "fixedExtrinsicNearestPointMaximumDifferenceM": 4.010656666373001e-15,
+      "costs": {
+        "truth": {
+          "firstStage": {
+            "total": 0.12803978893431003,
+            "boundary": 0.12803978893431003,
+            "containment": 0.0,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.3975761794206284,
+              0.7846569619820434
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.4207508491490066,
+              -0.007515382828440331
+            ],
+            "interiorBeyond15cmFraction": 0.7997870074547391,
+            "outsideFootprintFraction": 0.0,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0
+          },
+          "refinement": {
+            "total": 0.12811694143224026,
+            "boundary": 0.12803978893431003,
+            "containment": 0.0,
+            "symmetry": 7.71524979302211e-05,
+            "supportCoverage": [
+              0.550421629986768,
+              0.8856810912677769
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4284054563388845
+            ],
+            "supportMidpointM": [
+              -1.0606583787947597,
+              0.02050312230011897
+            ],
+            "interiorBeyond15cmFraction": 0.7997870074547391,
+            "outsideFootprintFraction": 0.0,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0
+          }
+        },
+        "prior": {
+          "firstStage": {
+            "total": 0.1403743762556352,
+            "boundary": 0.089850054194265,
+            "containment": 0.050524322061370204,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.3976163249029683,
+              0.7847094724176576
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.505265065387851,
+              0.4010671620851066
+            ],
+            "interiorBeyond15cmFraction": 0.5122470713525027,
+            "outsideFootprintFraction": 0.14376996805111822,
+            "outsideFootprint15cmFraction": 0.039403620873269436,
+            "maximumOverflowM": 0.3206203817870301
+          },
+          "refinement": {
+            "total": 0.1742161092248255,
+            "boundary": 0.089850054194265,
+            "containment": 0.050524322061370204,
+            "symmetry": 0.03384173296919029,
+            "supportCoverage": [
+              0.5503648449246061,
+              0.8857268691403161
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4286343457015801
+            ],
+            "supportMidpointM": [
+              -1.1454247653595298,
+              0.42917985610372994
+            ],
+            "interiorBeyond15cmFraction": 0.5122470713525027,
+            "outsideFootprintFraction": 0.14376996805111822,
+            "outsideFootprint15cmFraction": 0.039403620873269436,
+            "maximumOverflowM": 0.3206203817870301
+          }
+        },
+        "first": {
+          "firstStage": {
+            "total": 0.10116596282258876,
+            "boundary": 0.09645866979154812,
+            "containment": 0.004704404971008831,
+            "symmetry": 2.888060031800363e-06,
+            "supportCoverage": [
+              0.3936630589284512,
+              0.8014404940473964
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.007202470236981617
+            ],
+            "supportMidpointM": [
+              -1.5552034885020745,
+              0.235950898707882
+            ],
+            "interiorBeyond15cmFraction": 0.5527156549520766,
+            "outsideFootprintFraction": 0.1757188498402556,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.14380522167218324
+          },
+          "refinement": {
+            "total": 0.11263145314392803,
+            "boundary": 0.09645866979154812,
+            "containment": 0.004704404971008831,
+            "symmetry": 0.011468378381371082,
+            "supportCoverage": [
+              0.5443803110505765,
+              0.8844699870764248
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4223499353821236
+            ],
+            "supportMidpointM": [
+              -1.2041320787154064,
+              0.25355873394957973
+            ],
+            "interiorBeyond15cmFraction": 0.5527156549520766,
+            "outsideFootprintFraction": 0.1757188498402556,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.14380522167218324
+          }
+        },
+        "final": {
+          "firstStage": {
+            "total": 0.10446134736005311,
+            "boundary": 0.10214268810404793,
+            "containment": 0.0022829637343169183,
+            "symmetry": 3.569552168826588e-05,
+            "supportCoverage": [
+              0.3929565259099693,
+              0.8072800273586409
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.03640013679320431
+            ],
+            "supportMidpointM": [
+              -1.5568903427824075,
+              0.16413600210638418
+            ],
+            "interiorBeyond15cmFraction": 0.5931842385516507,
+            "outsideFootprintFraction": 0.14589989350372737,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.06594020389689037
+          },
+          "refinement": {
+            "total": 0.10928983052013484,
+            "boundary": 0.10214268810404793,
+            "containment": 0.0022829637343169183,
+            "symmetry": 0.004864178681769997,
+            "supportCoverage": [
+              0.5403634575903153,
+              0.8801030804988287
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4005154024941432
+            ],
+            "supportMidpointM": [
+              -1.2150315599211021,
+              0.17413478648601965
+            ],
+            "interiorBeyond15cmFraction": 0.5931842385516507,
+            "outsideFootprintFraction": 0.14589989350372737,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.06594020389689037
+          }
+        }
+      },
+      "controls": [
+        {
+          "name": "truth_seed",
+          "pointCount": 939,
+          "pose": [
+            4.817226458211987,
+            0.4332242739533939,
+            0.11331294857276211
+          ],
+          "errorXYM": [
+            0.07849323917859863,
+            0.4462165817221432
+          ],
+          "positionErrorM": 0.45306779448614837,
+          "costOnOriginalRefinementPoints": 0.10671777953983656
+        },
+        {
+          "name": "production_seed",
+          "pointCount": 939,
+          "pose": [
+            4.7932872244813005,
+            -0.5216177589039882,
+            -0.15973519252526003
+          ],
+          "errorXYM": [
+            0.05455400544791189,
+            -0.5086254511352389
+          ],
+          "positionErrorM": 0.5115427538856709,
+          "costOnOriginalRefinementPoints": 0.10928983052013355
+        },
+        {
+          "name": "truth_plus5deg",
+          "pointCount": 939,
+          "pose": [
+            4.793279873725762,
+            -0.5215696141604641,
+            -0.1597365987690112
+          ],
+          "errorXYM": [
+            0.05454665469237341,
+            -0.5085773063917148
+          ],
+          "positionErrorM": 0.5114940997849156,
+          "costOnOriginalRefinementPoints": 0.10928970972564166
+        },
+        {
+          "name": "truth_minus5deg",
+          "pointCount": 939,
+          "pose": [
+            4.817226451373868,
+            0.4332242970286072,
+            0.1133129450664877
+          ],
+          "errorXYM": [
+            0.07849323234047922,
+            0.4462166047973565
+          ],
+          "positionErrorM": 0.4530678160277296,
+          "costOnOriginalRefinementPoints": 0.10671777977620071
+        },
+        {
+          "name": "true_footprint_boundary15cm",
+          "pointCount": 188,
+          "accepted": true,
+          "pose": [
+            4.825028011945954,
+            0.05697299981226697,
+            0.013117060413442922
+          ],
+          "errorXYM": [
+            0.08629479291256548,
+            0.06996530758101623
+          ],
+          "positionErrorM": 0.11109426424765938,
+          "costOnOriginalRefinementPoints": 0.11423606520093768
+        },
+        {
+          "name": "measured_rear_depth15cm",
+          "pointCount": 313,
+          "accepted": true,
+          "pose": [
+            4.840938723264183,
+            -0.1653198519234569,
+            0.021299177847140006
+          ],
+          "errorXYM": [
+            0.10220550423079455,
+            -0.15232754415470767
+          ],
+          "positionErrorM": 0.18343839784318708,
+          "costOnOriginalRefinementPoints": 0.11596751108577646
+        },
+        {
+          "name": "measured_lower_half",
+          "pointCount": 470,
+          "accepted": true,
+          "pose": [
+            4.851770231045038,
+            -0.045122835329695264,
+            -0.046265509417143566
+          ],
+          "errorXYM": [
+            0.11303701201164973,
+            -0.03213052756094601
+          ],
+          "positionErrorM": 0.11751483687546248,
+          "costOnOriginalRefinementPoints": 0.11183296700768985
+        },
+        {
+          "name": "independent_same_cost",
+          "pointCount": 939,
+          "pose": [
+            4.793524254751337,
+            -0.5168635089398276,
+            -0.1597383169413619
+          ],
+          "errorXYM": [
+            0.05479103571794841,
+            -0.5038712011710783
+          ],
+          "positionErrorM": 0.5068414396679013,
+          "costOnOriginalRefinementPoints": 0.10928116295559227,
+          "optimizer": {
+            "iterations": 181,
+            "objective": 0.10928116295559227,
+            "converged": true
+          }
+        },
+        {
+          "name": "unit_lateral_support",
+          "pointCount": 939,
+          "pose": [
+            4.82617807530081,
+            -0.32814010399856175,
+            -0.14493157969613474
+          ],
+          "errorXYM": [
+            0.08744485626742105,
+            -0.3151477962298125
+          ],
+          "positionErrorM": 0.32705463818166125,
+          "costOnOriginalRefinementPoints": 0.1115335981351964,
+          "optimizer": {
+            "iterations": 135,
+            "objective": 0.11164279637371996,
+            "converged": true
+          }
+        },
+        {
+          "name": "no_boundary_residual",
+          "pointCount": 939,
+          "pose": [
+            4.739741624253403,
+            -0.35392283514522527,
+            -0.1709023484032754
+          ],
+          "errorXYM": [
+            0.0010084052200145521,
+            -0.340930527376476
+          ],
+          "positionErrorM": 0.3409320187050342,
+          "costOnOriginalRefinementPoints": 0.12061088376854918,
+          "optimizer": {
+            "iterations": 76,
+            "objective": 2.7574922930105385e-19,
+            "converged": true
+          }
+        }
+      ],
+      "firstStageConverged": true,
+      "refinementConverged": false,
+      "refinementIterations": 30
+    },
+    {
+      "kind": "conf",
+      "frame": 11,
+      "timeS": 0.22,
+      "simFrame": 1674,
+      "pointCount": 63,
+      "retainedPointCount": 63,
+      "positionErrorM": 0.3580076404587692,
+      "rawPositionErrorM": 0.1644138862458373,
+      "estimatorErrorXYM": [
+        0.31814330440825955,
+        -0.16417767353403712
+      ],
+      "rawErrorXYM": [
+        0.017484064096553453,
+        -0.16348159986104474
+      ],
+      "estimatorMinusRawXYM": [
+        0.3006592403117061,
+        -0.0006960736729923755
+      ],
+      "truePose": [
+        14.97613960472334,
+        0.00618938187807111,
+        0.00011025486912928046
+      ],
+      "predictedPose": [
+        15.294282909131576,
+        -0.15798829165596606,
+        -0.06085752981667865
+      ],
+      "fittedPose": [
+        14.993623668819895,
+        -0.15729221798297363,
+        -0.039793340132794834
+      ],
+      "bbox": [
+        298.6001281738281,
+        326.7535095214844,
+        341.70880126953125,
+        361.2374267578125
+      ],
+      "detectorConfidence": 0.7563356161117554,
+      "imageHeight": 640,
+      "pointQuantiles": [
+        [
+          12.46067963540554,
+          -0.8148789405822754,
+          0.03804424405097939
+        ],
+        [
+          12.477481355071067,
+          -0.8124395751953125,
+          0.04587396740913369
+        ],
+        [
+          12.568975552916523,
+          -0.4008625149726859,
+          0.21687439084053028
+        ],
+        [
+          12.664517030119889,
+          9.882192841814685e-10,
+          0.48511961102485646
+        ],
+        [
+          13.151517495512962,
+          0.4019366204738617,
+          0.7266529500484465
+        ],
+        [
+          13.943626336455344,
+          0.8129413032531725,
+          0.9814509832859039
+        ],
+        [
+          14.012994393706329,
+          0.8167856931686401,
+          0.9857628643512725
+        ]
+      ],
+      "fixedExtrinsicNearestPointMaximumDifferenceM": 7.324948293788351e-15,
+      "costs": {
+        "truth": {
+          "firstStage": {
+            "total": 0.07544758164492255,
+            "boundary": 0.07536920447934649,
+            "containment": 7.588294573655836e-05,
+            "symmetry": 2.4942198395024314e-06,
+            "supportCoverage": [
+              0.29321713396314875,
+              0.8554631490593434
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.27731574529671676
+            ],
+            "supportMidpointM": [
+              -1.7655880826749857,
+              -0.005694988300807946
+            ],
+            "interiorBeyond15cmFraction": 0.4126984126984127,
+            "outsideFootprintFraction": 0.015873015873015872,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.015460636438069386
+          },
+          "refinement": {
+            "total": 0.07544724431192508,
+            "boundary": 0.07536920447934649,
+            "containment": 7.588294573655836e-05,
+            "symmetry": 2.1568868420301594e-06,
+            "supportCoverage": [
+              0.31047276437392424,
+              0.858769092768932
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.2938454638446597
+            ],
+            "supportMidpointM": [
+              -1.739278725503259,
+              -0.004997982023303427
+            ],
+            "interiorBeyond15cmFraction": 0.4126984126984127,
+            "outsideFootprintFraction": 0.015873015873015872,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.015460636438069386
+          }
+        },
+        "prior": {
+          "firstStage": {
+            "total": 0.7264278474107733,
+            "boundary": 0.08640722666689861,
+            "containment": 0.6400192920660938,
+            "symmetry": 1.3286777809561672e-06,
+            "supportCoverage": [
+              0.3001631755111449,
+              0.8541369922163955
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.27068496108197726
+            ],
+            "supportMidpointM": [
+              -2.0852054303488723,
+              0.00425839269997158
+            ],
+            "interiorBeyond15cmFraction": 0.30158730158730157,
+            "outsideFootprintFraction": 0.6666666666666666,
+            "outsideFootprint15cmFraction": 0.47619047619047616,
+            "maximumOverflowM": 0.3462402171926908
+          },
+          "refinement": {
+            "total": 0.726431925333035,
+            "boundary": 0.08640722666689861,
+            "containment": 0.6400192920660938,
+            "symmetry": 5.406600042713264e-06,
+            "supportCoverage": [
+              0.30612893309221406,
+              0.8581529693065012
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.2907648465325058
+            ],
+            "supportMidpointM": [
+              -2.0809178844621554,
+              0.007996873435284158
+            ],
+            "interiorBeyond15cmFraction": 0.30158730158730157,
+            "outsideFootprintFraction": 0.6666666666666666,
+            "outsideFootprint15cmFraction": 0.47619047619047616,
+            "maximumOverflowM": 0.3462402171926908
+          }
+        },
+        "first": {
+          "firstStage": {
+            "total": 0.07229935567598489,
+            "boundary": 0.07072419522104204,
+            "containment": 0.0011874061357226794,
+            "symmetry": 0.0003877543192201745,
+            "supportCoverage": [
+              0.29867188034793224,
+              0.8549400344844812
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.27470017242240574
+            ],
+            "supportMidpointM": [
+              -1.787141294527713,
+              0.07168353105312125
+            ],
+            "interiorBeyond15cmFraction": 0.4444444444444444,
+            "outsideFootprintFraction": 0.09523809523809523,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0372596041065405
+          },
+          "refinement": {
+            "total": 0.07238867208264536,
+            "boundary": 0.07072419522104204,
+            "containment": 0.0011874061357226794,
+            "symmetry": 0.00047707072588063887,
+            "supportCoverage": [
+              0.3066470840125328,
+              0.8587178588718454
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.29358929435922665
+            ],
+            "supportMidpointM": [
+              -1.7706418940752084,
+              0.07439627120364345
+            ],
+            "interiorBeyond15cmFraction": 0.4444444444444444,
+            "outsideFootprintFraction": 0.09523809523809523,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0372596041065405
+          }
+        },
+        "final": {
+          "firstStage": {
+            "total": 0.07230227903492605,
+            "boundary": 0.07076134113463148,
+            "containment": 0.0011830333005597386,
+            "symmetry": 0.0003579045997348183,
+            "supportCoverage": [
+              0.2986215934517328,
+              0.8549545287766807
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.27477264388340306
+            ],
+            "supportMidpointM": [
+              -1.7872129315257559,
+              0.06885098335384066
+            ],
+            "interiorBeyond15cmFraction": 0.4444444444444444,
+            "outsideFootprintFraction": 0.09523809523809523,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0371963580173964
+          },
+          "refinement": {
+            "total": 0.07238564545564757,
+            "boundary": 0.07076134113463148,
+            "containment": 0.0011830333005597386,
+            "symmetry": 0.00044127102045634704,
+            "supportCoverage": [
+              0.3066758089972196,
+              0.858726745969681
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.29363372984840486
+            ],
+            "supportMidpointM": [
+              -1.7705068355243474,
+              0.07153964187881634
+            ],
+            "interiorBeyond15cmFraction": 0.4444444444444444,
+            "outsideFootprintFraction": 0.09523809523809523,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.0371963580173964
+          }
+        }
+      },
+      "controls": [
+        {
+          "name": "truth_seed",
+          "pointCount": 63,
+          "pose": [
+            14.993623668820062,
+            -0.1572922179804726,
+            -0.039793340131724086
+          ],
+          "errorXYM": [
+            0.017484064096722207,
+            -0.1634815998585437
+          ],
+          "positionErrorM": 0.16441388624336842,
+          "costOnOriginalRefinementPoints": 0.07238564545564759
+        },
+        {
+          "name": "production_seed",
+          "pointCount": 63,
+          "pose": [
+            14.993623668821673,
+            -0.15729221796676246,
+            -0.03979334012450024
+          ],
+          "errorXYM": [
+            0.017484064098333363,
+            -0.16348159984483357
+          ],
+          "positionErrorM": 0.16441388622990735,
+          "costOnOriginalRefinementPoints": 0.07238564545564757
+        },
+        {
+          "name": "truth_plus5deg",
+          "pointCount": 63,
+          "pose": [
+            14.993623668831143,
+            -0.15729221788145278,
+            -0.03979334007909515
+          ],
+          "errorXYM": [
+            0.01748406410780312,
+            -0.1634815997595239
+          ],
+          "positionErrorM": 0.16441388614608846,
+          "costOnOriginalRefinementPoints": 0.07238564545564755
+        },
+        {
+          "name": "truth_minus5deg",
+          "pointCount": 63,
+          "pose": [
+            14.994570077069035,
+            0.15324000279664524,
+            0.04349341541611779
+          ],
+          "errorXYM": [
+            0.018430472345695392,
+            0.14705062091857413
+          ],
+          "positionErrorM": 0.14820110466330416,
+          "costOnOriginalRefinementPoints": 0.07298616942004994
+        },
+        {
+          "name": "true_footprint_boundary15cm",
+          "pointCount": 37,
+          "accepted": true,
+          "pose": [
+            14.992513846258836,
+            -0.018354198001044382,
+            -0.0032710426637315277
+          ],
+          "errorXYM": [
+            0.01637424153549638,
+            -0.02454357987911549
+          ],
+          "positionErrorM": 0.0295042895041602,
+          "costOnOriginalRefinementPoints": 0.07408698592472922
+        },
+        {
+          "name": "measured_rear_depth15cm",
+          "pointCount": 29,
+          "accepted": true,
+          "pose": [
+            14.995371524278008,
+            0.3267507349203736,
+            -0.009530154078069996
+          ],
+          "errorXYM": [
+            0.01923191955466841,
+            0.3205613530423025
+          ],
+          "positionErrorM": 0.3211377395979316,
+          "costOnOriginalRefinementPoints": 0.13279090417246414
+        },
+        {
+          "name": "measured_lower_half",
+          "pointCount": 32,
+          "accepted": true,
+          "pose": [
+            14.991124577042587,
+            0.010421667018380794,
+            0.004953424106522972
+          ],
+          "errorXYM": [
+            0.014984972319247447,
+            0.004232285140309685
+          ],
+          "positionErrorM": 0.015571179560890639,
+          "costOnOriginalRefinementPoints": 0.0743120592608156
+        },
+        {
+          "name": "independent_same_cost",
+          "pointCount": 63,
+          "pose": [
+            14.993623865907978,
+            -0.15729043415847102,
+            -0.03979240546232286
+          ],
+          "errorXYM": [
+            0.017484261184637973,
+            -0.16347981603654213
+          ],
+          "positionErrorM": 0.1644121334954154,
+          "costOnOriginalRefinementPoints": 0.07238564545539372,
+          "optimizer": {
+            "iterations": 105,
+            "objective": 0.07238564545539372,
+            "converged": true
+          }
+        },
+        {
+          "name": "unit_lateral_support",
+          "pointCount": 63,
+          "pose": [
+            14.993535062571715,
+            -0.12978618077345758,
+            -0.05139447431361093
+          ],
+          "errorXYM": [
+            0.017395457848374818,
+            -0.1359755626515287
+          ],
+          "positionErrorM": 0.13708375393223804,
+          "costOnOriginalRefinementPoints": 0.07329255534466556,
+          "optimizer": {
+            "iterations": 116,
+            "objective": 0.07361474364706051,
+            "converged": true
+          }
+        },
+        {
+          "name": "no_boundary_residual",
+          "pointCount": 63,
+          "pose": [
+            14.910941855956786,
+            -0.07073436343777041,
+            -0.03422717605871471
+          ],
+          "errorXYM": [
+            -0.06519774876655404,
+            -0.07692374531584152
+          ],
+          "positionErrorM": 0.10083654614098575,
+          "costOnOriginalRefinementPoints": 0.08386368450780916,
+          "optimizer": {
+            "iterations": 82,
+            "objective": 2.1531294209308604e-20,
+            "converged": true
+          }
+        }
+      ],
+      "firstStageConverged": true,
+      "refinementConverged": true,
+      "refinementIterations": 2
+    },
+    {
+      "kind": "conf",
+      "frame": 269,
+      "timeS": 5.38,
+      "simFrame": 1932,
+      "pointCount": 979,
+      "retainedPointCount": 978,
+      "positionErrorM": 0.3041086965386274,
+      "rawPositionErrorM": 0.06972128881916807,
+      "estimatorErrorXYM": [
+        0.03116147008357295,
+        0.30250795376758866
+      ],
+      "rawErrorXYM": [
+        0.047992076314384846,
+        -0.0505748823591327
+      ],
+      "estimatorMinusRawXYM": [
+        -0.016830606230811895,
+        0.3530828361267213
+      ],
+      "truePose": [
+        5.199101521211787,
+        -0.013066495604990652,
+        -0.001241299384085933
+      ],
+      "predictedPose": [
+        5.23026299129536,
+        0.2894414581625979,
+        0.09673253598387312
+      ],
+      "fittedPose": [
+        5.247093597526172,
+        -0.06364137796412335,
+        -0.0034988925712551733
+      ],
+      "bbox": [
+        158.30380249023438,
+        341.4577331542969,
+        477.43328857421875,
+        639.118408203125
+      ],
+      "detectorConfidence": 0.9439079165458679,
+      "imageHeight": 640,
+      "pointQuantiles": [
+        [
+          2.6676176637411118,
+          -0.8841466307640076,
+          0.023885518312454362
+        ],
+        [
+          2.6999775308370593,
+          -0.7585319137573252,
+          0.10584211945533764
+        ],
+        [
+          2.807708963751792,
+          -0.36963240802288144,
+          0.36092296242713934
+        ],
+        [
+          2.9111229032278043,
+          -5.939870817428528e-10,
+          0.6403211653232574
+        ],
+        [
+          3.495409354567526,
+          0.36165712773799985,
+          0.7789308130741119
+        ],
+        [
+          4.683053044676779,
+          0.7476736187934875,
+          1.0696369206905363
+        ],
+        [
+          5.605698212981224,
+          0.8267537355422956,
+          1.1098646819591522
+        ]
+      ],
+      "fixedExtrinsicNearestPointMaximumDifferenceM": 3.978256139440565e-15,
+      "costs": {
+        "truth": {
+          "firstStage": {
+            "total": 0.09332150678245739,
+            "boundary": 0.09326544451561297,
+            "containment": 5.6062266844421e-05,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.39674305108313423,
+              0.7927457557674552
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5074297563259962,
+              0.005201701721289309
+            ],
+            "interiorBeyond15cmFraction": 0.5873340143003064,
+            "outsideFootprintFraction": 0.01940755873340143,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.03144318283893455
+          },
+          "refinement": {
+            "total": 0.09347301126857752,
+            "boundary": 0.09335485648553662,
+            "containment": 5.611959022565252e-05,
+            "symmetry": 6.203519281523911e-05,
+            "supportCoverage": [
+              0.5875147693118631,
+              0.8981352941769775
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4906764708848871
+            ],
+            "supportMidpointM": [
+              -1.0626562595592768,
+              -0.01605180352091301
+            ],
+            "interiorBeyond15cmFraction": 0.5879345603271984,
+            "outsideFootprintFraction": 0.019427402862985686,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.03144318283893455
+          }
+        },
+        "prior": {
+          "firstStage": {
+            "total": 0.08820609997814186,
+            "boundary": 0.08412176524447243,
+            "containment": 0.004084334733669421,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.39422763559195334,
+              0.7986915735199421
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5686834164624197,
+              -0.08471987722997781
+            ],
+            "interiorBeyond15cmFraction": 0.4964249233912155,
+            "outsideFootprintFraction": 0.1205311542390194,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.09951667563473388
+          },
+          "refinement": {
+            "total": 0.09074146727463218,
+            "boundary": 0.08420766424675204,
+            "containment": 0.004086209492803443,
+            "symmetry": 0.0024475935350767005,
+            "supportCoverage": [
+              0.5960431760032079,
+              0.8937129590839485
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4685647954197425
+            ],
+            "supportMidpointM": [
+              -1.1094087356267142,
+              -0.10558445753462459
+            ],
+            "interiorBeyond15cmFraction": 0.49693251533742333,
+            "outsideFootprintFraction": 0.1196319018404908,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.09951667563473388
+          }
+        },
+        "first": {
+          "firstStage": {
+            "total": 0.08324693369581118,
+            "boundary": 0.07857280002359879,
+            "containment": 0.0046741336722124,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.3936841083855915,
+              0.7986287706149839
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5600508821342673,
+              -0.22486504179493555
+            ],
+            "interiorBeyond15cmFraction": 0.4525025536261491,
+            "outsideFootprintFraction": 0.13687436159346272,
+            "outsideFootprint15cmFraction": 0.0010214504596527069,
+            "maximumOverflowM": 0.1519447850696578
+          },
+          "refinement": {
+            "total": 0.09677383341802563,
+            "boundary": 0.07862953374784597,
+            "containment": 0.0042067817084853265,
+            "symmetry": 0.013937517961694328,
+            "supportCoverage": [
+              0.5917561611160794,
+              0.8963870523852376
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.48193526192618796
+            ],
+            "supportMidpointM": [
+              -1.0991870369718608,
+              -0.2449649878934118
+            ],
+            "interiorBeyond15cmFraction": 0.45296523517382414,
+            "outsideFootprintFraction": 0.1359918200408998,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.14653268765938754
+          }
+        },
+        "final": {
+          "firstStage": {
+            "total": 0.0887088815922631,
+            "boundary": 0.0861528583265829,
+            "containment": 0.002556023265680201,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.39697418792404815,
+              0.7924499475405317
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5553079508665848,
+              0.05089013203101728
+            ],
+            "interiorBeyond15cmFraction": 0.4933605720122574,
+            "outsideFootprintFraction": 0.10520939734422881,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.07952794679640895
+          },
+          "refinement": {
+            "total": 0.0889945284647472,
+            "boundary": 0.08622574932775037,
+            "containment": 0.0025586367864017558,
+            "symmetry": 0.00021014235059507543,
+            "supportCoverage": [
+              0.5873281375486045,
+              0.8981356650839364
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.4906783254196817
+            ],
+            "supportMidpointM": [
+              -1.1112076029248978,
+              0.02954336216886172
+            ],
+            "interiorBeyond15cmFraction": 0.4938650306748466,
+            "outsideFootprintFraction": 0.10531697341513292,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.07952794679640895
+          }
+        }
+      },
+      "controls": [
+        {
+          "name": "truth_seed",
+          "pointCount": 979,
+          "pose": [
+            5.239201843568365,
+            -0.19426921963119775,
+            -0.047351754025913274
+          ],
+          "errorXYM": [
+            0.04010032235657768,
+            -0.1812027240262071
+          ],
+          "positionErrorM": 0.1855868073102698,
+          "costOnOriginalRefinementPoints": 0.08902710374235634
+        },
+        {
+          "name": "production_seed",
+          "pointCount": 979,
+          "pose": [
+            5.2470935975261215,
+            -0.06364137796718689,
+            -0.003498892572667054
+          ],
+          "errorXYM": [
+            0.04799207631433422,
+            -0.05057488236219623
+          ],
+          "positionErrorM": 0.06972128882135546,
+          "costOnOriginalRefinementPoints": 0.08899452846474719
+        },
+        {
+          "name": "truth_plus5deg",
+          "pointCount": 979,
+          "pose": [
+            5.2392018435677,
+            -0.1942692196365689,
+            -0.04735175402860458
+          ],
+          "errorXYM": [
+            0.04010032235591243,
+            -0.18120272403157825
+          ],
+          "positionErrorM": 0.18558680731537033,
+          "costOnOriginalRefinementPoints": 0.0890271037423563
+        },
+        {
+          "name": "truth_minus5deg",
+          "pointCount": 979,
+          "pose": [
+            5.247093597526144,
+            -0.06364137796451395,
+            -0.003498892571544791
+          ],
+          "errorXYM": [
+            0.047992076314356424,
+            -0.0505748823595233
+          ],
+          "positionErrorM": 0.06972128881943185,
+          "costOnOriginalRefinementPoints": 0.0889945284647472
+        },
+        {
+          "name": "true_footprint_boundary15cm",
+          "pointCount": 404,
+          "accepted": true,
+          "pose": [
+            5.223601134300702,
+            -0.031753339966638226,
+            0.0031201542808947554
+          ],
+          "errorXYM": [
+            0.02449961308891435,
+            -0.018686844361647574
+          ],
+          "positionErrorM": 0.03081280892263708,
+          "costOnOriginalRefinementPoints": 0.09024270843319711
+        },
+        {
+          "name": "measured_rear_depth15cm",
+          "pointCount": 390,
+          "accepted": true,
+          "pose": [
+            5.223931941409031,
+            0.23414293810945008,
+            -0.004134103676085261
+          ],
+          "errorXYM": [
+            0.024830420197243797,
+            0.24720943371444073
+          ],
+          "positionErrorM": 0.24845332335186454,
+          "costOnOriginalRefinementPoints": 0.10256033409677046
+        },
+        {
+          "name": "measured_lower_half",
+          "pointCount": 490,
+          "accepted": true,
+          "pose": [
+            5.231005822846485,
+            -0.00501673904129838,
+            0.0159386609970694
+          ],
+          "errorXYM": [
+            0.031904301634697596,
+            0.008049756563692272
+          ],
+          "positionErrorM": 0.03290414933610159,
+          "costOnOriginalRefinementPoints": 0.08967282716960884
+        },
+        {
+          "name": "independent_same_cost",
+          "pointCount": 978,
+          "pose": [
+            5.247093599223231,
+            -0.06364131621356015,
+            -0.0034988607235686394
+          ],
+          "errorXYM": [
+            0.04799207801144334,
+            -0.05057482060856949
+          ],
+          "positionErrorM": 0.06972124519431253,
+          "costOnOriginalRefinementPoints": 0.08899452846474683,
+          "optimizer": {
+            "iterations": 103,
+            "objective": 0.08899452846474683,
+            "converged": true
+          }
+        },
+        {
+          "name": "unit_lateral_support",
+          "pointCount": 978,
+          "pose": [
+            5.247361885665975,
+            -0.034622905169247174,
+            -0.001905889857816009
+          ],
+          "errorXYM": [
+            0.04826036445418769,
+            -0.021556409564256522
+          ],
+          "positionErrorM": 0.052855856539772324,
+          "costOnOriginalRefinementPoints": 0.08907520539332166,
+          "optimizer": {
+            "iterations": 123,
+            "objective": 0.08908732989384231,
+            "converged": true
+          }
+        },
+        {
+          "name": "no_boundary_residual",
+          "pointCount": 978,
+          "pose": [
+            5.154730835857932,
+            0.044597822873734455,
+            0.034042180143402684
+          ],
+          "errorXYM": [
+            -0.044370685353855244,
+            0.05766431847872511
+          ],
+          "positionErrorM": 0.07275940725697717,
+          "costOnOriginalRefinementPoints": 0.1010344139708422,
+          "optimizer": {
+            "iterations": 82,
+            "objective": 8.136608944656887e-21,
+            "converged": true
+          }
+        }
+      ],
+      "firstStageConverged": true,
+      "refinementConverged": true,
+      "refinementIterations": 30
+    },
+    {
+      "kind": "conf",
+      "frame": 297,
+      "timeS": 5.94,
+      "simFrame": 1960,
+      "pointCount": 1030,
+      "retainedPointCount": 1030,
+      "positionErrorM": 0.12027125050592134,
+      "rawPositionErrorM": 0.3977766212266095,
+      "estimatorErrorXYM": [
+        0.04319120606153248,
+        -0.11224835596661684
+      ],
+      "rawErrorXYM": [
+        0.03922930244394607,
+        -0.39583746945459697
+      ],
+      "estimatorMinusRawXYM": [
+        0.003961903617586415,
+        0.28358911348798016
+      ],
+      "truePose": [
+        4.945771378603028,
+        -0.01650607895782716,
+        -0.0009488842963952326
+      ],
+      "predictedPose": [
+        4.988962584664556,
+        -0.1287544349244438,
+        -0.046187310618533726
+      ],
+      "fittedPose": [
+        4.985000681046974,
+        -0.41234354841242415,
+        -0.09861552059246383
+      ],
+      "bbox": [
+        122.24162292480469,
+        339.43359375,
+        511.1072082519531,
+        639.3020629882812
+      ],
+      "detectorConfidence": 0.9453292489051819,
+      "imageHeight": 640,
+      "pointQuantiles": [
+        [
+          2.422459229826929,
+          -0.8754670619964582,
+          0.05905750393867465
+        ],
+        [
+          2.470003389716149,
+          -0.7699891173839569,
+          0.24672166466712925
+        ],
+        [
+          2.5685528367757797,
+          -0.37983845919370696,
+          0.4724739789962765
+        ],
+        [
+          2.6951643079519267,
+          -5.007104952881036e-09,
+          0.724107354879379
+        ],
+        [
+          3.2810993045568475,
+          0.3445239737629904,
+          0.8416747003793714
+        ],
+        [
+          4.4054905313253405,
+          0.7390385603904734,
+          1.1082310259342192
+        ],
+        [
+          4.912996873259544,
+          0.7992803454399127,
+          1.150433510541916
+        ]
+      ],
+      "fixedExtrinsicNearestPointMaximumDifferenceM": 2.5510982866352577e-15,
+      "costs": {
+        "truth": {
+          "firstStage": {
+            "total": 0.10062954047743497,
+            "boundary": 0.10060770958016818,
+            "containment": 2.183089726679041e-05,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.387098703254924,
+              0.7941043524354041
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5080106822582147,
+              -0.0009588949403168123
+            ],
+            "interiorBeyond15cmFraction": 0.6300970873786408,
+            "outsideFootprintFraction": 0.007766990291262136,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.023211561659585378
+          },
+          "refinement": {
+            "total": 0.10072185249914879,
+            "boundary": 0.10060770958016818,
+            "containment": 2.183089726679041e-05,
+            "symmetry": 9.231202171382007e-05,
+            "supportCoverage": [
+              0.49802383101033315,
+              0.8813998117443654
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.40699905872182696
+            ],
+            "supportMidpointM": [
+              -1.2781519841337525,
+              -0.02360672421522364
+            ],
+            "interiorBeyond15cmFraction": 0.6300970873786408,
+            "outsideFootprintFraction": 0.007766990291262136,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.023211561659585378
+          }
+        },
+        "prior": {
+          "firstStage": {
+            "total": 0.09409363237362445,
+            "boundary": 0.09323239220779293,
+            "containment": 0.0008612401658315079,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.3885354694395603,
+              0.7916407880971477
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5522773958692477,
+              0.01153936832674135
+            ],
+            "interiorBeyond15cmFraction": 0.5466019417475728,
+            "outsideFootprintFraction": 0.04563106796116505,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.06801466747047868
+          },
+          "refinement": {
+            "total": 0.09410802352351393,
+            "boundary": 0.09323239220779293,
+            "containment": 0.0008612401658315079,
+            "symmetry": 1.4391149889483976e-05,
+            "supportCoverage": [
+              0.4942956352710901,
+              0.8782776766062047
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.3913883830310233
+            ],
+            "supportMidpointM": [
+              -1.3322755792927534,
+              -0.009692589440571109
+            ],
+            "interiorBeyond15cmFraction": 0.5466019417475728,
+            "outsideFootprintFraction": 0.04563106796116505,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.06801466747047868
+          }
+        },
+        "first": {
+          "firstStage": {
+            "total": 0.08577103728295522,
+            "boundary": 0.08098721523475721,
+            "containment": 0.004783822048198014,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.3896694209235921,
+              0.7954158460898932
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5805790450644444,
+              0.22779102718083766
+            ],
+            "interiorBeyond15cmFraction": 0.46601941747572817,
+            "outsideFootprintFraction": 0.1262135922330097,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.09504866504817944
+          },
+          "refinement": {
+            "total": 0.09188840027869515,
+            "boundary": 0.08098721523475721,
+            "containment": 0.004783822048198014,
+            "symmetry": 0.006117362995739918,
+            "supportCoverage": [
+              0.49280921968743857,
+              0.8763510054187269
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.3817550270936343
+            ],
+            "supportMidpointM": [
+              -1.363025615829583,
+              0.20487896009936363
+            ],
+            "interiorBeyond15cmFraction": 0.46601941747572817,
+            "outsideFootprintFraction": 0.1262135922330097,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.09504866504817944
+          }
+        },
+        "final": {
+          "firstStage": {
+            "total": 0.08705785220840452,
+            "boundary": 0.0836763839575349,
+            "containment": 0.00338146825086962,
+            "symmetry": 0.0,
+            "supportCoverage": [
+              0.3893663588084374,
+              0.7978524016162835
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.0
+            ],
+            "supportMidpointM": [
+              -1.5831719845344976,
+              0.1800136627729928
+            ],
+            "interiorBeyond15cmFraction": 0.487378640776699,
+            "outsideFootprintFraction": 0.10679611650485436,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.09324880238449129
+          },
+          "refinement": {
+            "total": 0.09037317883528367,
+            "boundary": 0.0836763839575349,
+            "containment": 0.00338146825086962,
+            "symmetry": 0.003315326626879148,
+            "supportCoverage": [
+              0.4899271080457138,
+              0.8724117325328029
+            ],
+            "symmetryWeights": [
+              0.0,
+              0.3620586626640143
+            ],
+            "supportMidpointM": [
+              -1.3684310322702067,
+              0.15903188911775107
+            ],
+            "interiorBeyond15cmFraction": 0.487378640776699,
+            "outsideFootprintFraction": 0.10679611650485436,
+            "outsideFootprint15cmFraction": 0.0,
+            "maximumOverflowM": 0.09324880238449129
+          }
+        }
+      },
+      "controls": [
+        {
+          "name": "truth_seed",
+          "pointCount": 1030,
+          "pose": [
+            4.985000681045826,
+            -0.41234354841708637,
+            -0.09861552059431856
+          ],
+          "errorXYM": [
+            0.03922930244279854,
+            -0.39583746945925924
+          ],
+          "positionErrorM": 0.3977766212311359,
+          "costOnOriginalRefinementPoints": 0.09037317883528367
+        },
+        {
+          "name": "production_seed",
+          "pointCount": 1030,
+          "pose": [
+            4.985000681046596,
+            -0.4123435484144373,
+            -0.09861552059319122
+          ],
+          "errorXYM": [
+            0.03922930244356859,
+            -0.39583746945661014
+          ],
+          "positionErrorM": 0.39777662122857566,
+          "costOnOriginalRefinementPoints": 0.09037317883528365
+        },
+        {
+          "name": "truth_plus5deg",
+          "pointCount": 1030,
+          "pose": [
+            4.985000681046657,
+            -0.41234354841353926,
+            -0.09861552059304733
+          ],
+          "errorXYM": [
+            0.03922930244362899,
+            -0.3958374694557121
+          ],
+          "positionErrorM": 0.3977766212276879,
+          "costOnOriginalRefinementPoints": 0.09037317883528367
+        },
+        {
+          "name": "truth_minus5deg",
+          "pointCount": 1030,
+          "pose": [
+            4.986764984306002,
+            -0.4042682820411021,
+            -0.0954269658148942
+          ],
+          "errorXYM": [
+            0.04099360570297428,
+            -0.3877622030832749
+          ],
+          "positionErrorM": 0.3899230717058505,
+          "costOnOriginalRefinementPoints": 0.09037471232768943
+        },
+        {
+          "name": "true_footprint_boundary15cm",
+          "pointCount": 381,
+          "accepted": true,
+          "pose": [
+            4.988470218214501,
+            -0.04899762795101401,
+            -0.010428191415364331
+          ],
+          "errorXYM": [
+            0.04269883961147336,
+            -0.032491548993186854
+          ],
+          "positionErrorM": 0.05365530411937843,
+          "costOnOriginalRefinementPoints": 0.0944981733893964
+        },
+        {
+          "name": "measured_rear_depth15cm",
+          "pointCount": 412,
+          "accepted": true,
+          "pose": [
+            4.992306205447566,
+            -0.2477698613210102,
+            0.001228597469619481
+          ],
+          "errorXYM": [
+            0.046534826844538024,
+            -0.23126378236318304
+          ],
+          "positionErrorM": 0.23589918851572345,
+          "costOnOriginalRefinementPoints": 0.09576975874319195
+        },
+        {
+          "name": "measured_lower_half",
+          "pointCount": 515,
+          "accepted": true,
+          "pose": [
+            5.001315151199163,
+            -0.04220736275619285,
+            0.007848781390766215
+          ],
+          "errorXYM": [
+            0.05554377259613563,
+            -0.02570128379836569
+          ],
+          "positionErrorM": 0.06120185179465865,
+          "costOnOriginalRefinementPoints": 0.09316832746140286
+        },
+        {
+          "name": "independent_same_cost",
+          "pointCount": 1030,
+          "pose": [
+            4.984442325222345,
+            -0.4134869181557007,
+            -0.09945792597979819
+          ],
+          "errorXYM": [
+            0.038670946619316915,
+            -0.3969808391978735
+          ],
+          "positionErrorM": 0.39885991125040626,
+          "costOnOriginalRefinementPoints": 0.09037286142845792,
+          "optimizer": {
+            "iterations": 100,
+            "objective": 0.09037286142845792,
+            "converged": true
+          }
+        },
+        {
+          "name": "unit_lateral_support",
+          "pointCount": 1030,
+          "pose": [
+            5.018432254400871,
+            -0.10789538995806251,
+            -0.028602174624936694
+          ],
+          "errorXYM": [
+            0.07266087579784308,
+            -0.09138931100023535
+          ],
+          "positionErrorM": 0.11675448187032186,
+          "costOnOriginalRefinementPoints": 0.09242114229188811,
+          "optimizer": {
+            "iterations": 111,
+            "objective": 0.09246039916825638,
+            "converged": true
+          }
+        },
+        {
+          "name": "no_boundary_residual",
+          "pointCount": 1030,
+          "pose": [
+            4.876669356650018,
+            -0.27182070027739336,
+            -0.1138306062243851
+          ],
+          "errorXYM": [
+            -0.06910202195301007,
+            -0.25531462131956617
+          ],
+          "positionErrorM": 0.26450074725328804,
+          "costOnOriginalRefinementPoints": 0.10974040629175742,
+          "optimizer": {
+            "iterations": 82,
+            "objective": 3.822485873513985e-20,
+            "converged": true
+          }
+        }
+      ],
+      "firstStageConverged": true,
+      "refinementConverged": true,
+      "refinementIterations": 7
+    }
+  ],
+  "frozenInputHashes": {
+    "clusters_dev/000109.npz": "b6a08b3da5abef2e6a6ec4f8f34002bcb86e5b06609c74921ee7282571235d80",
+    "clusters_dev/000275.npz": "d3a61ef7d7f4b7789a6c6a5168f274c849bfdd7c94920781a88d5fda99b0a615",
+    "clusters_conf/000011.npz": "c9dc54201c92133b749557acbd34635bf6337c1d91d347efc491e6cea51b91e1",
+    "clusters_conf/000269.npz": "9bacc904a77969b57cf87fc326b3eff08334a2fb23e1a3bb6729786fab50868d",
+    "clusters_conf/000297.npz": "bdb59d607446a6b576d843da1d39ed4e4af6bc84f2321101f6875bd9aaa77b08"
+  },
+  "independentOptimizerQuadraticCheck": true
+}

@@ -1,0 +1,41 @@
+{
+  "exactPointFitReproductions": 5,
+  "pointFitReproductionTolerance": 1e-10,
+  "selectedFrameGeometryControls": 50,
+  "matchedPreviousObjectiveControls": 5,
+  "fullSequencePointSelectionFits": 600,
+  "allPointSelectionFitsAccepted": true,
+  "actualMatlabReplays": 15,
+  "finiteEstimatorPublications": 4500,
+  "exactBaselineEstimatorFrames": 600,
+  "maximumBaselineReproductionDifference": 0.0,
+  "independentDerivativeFreeOptimizerQuadraticCheckPassed": true,
+  "normalAndBlackoutMaximaIdenticalBeforeDropout": {
+    "dev": {
+      "frame": 109,
+      "maximumM": 0.5578203163507955,
+      "time": 2.18
+    },
+    "conf": {
+      "frame": 11,
+      "maximumM": 0.3580076404587692,
+      "time": 0.22
+    }
+  },
+  "liveCarlaConnections": 0,
+  "newDetectorInferenceRuns": 0,
+  "productionAlgorithmChanges": false,
+  "matlabUnitTestsRun": 0,
+  "pythonProductionUnitTestsRun": 0,
+  "reason": "Research-only diagnostic scripts and reports; exact saved-output reproduction, mathematical identities, baseline parity and finite-state replay checks validate the analysis.",
+  "technicalReportPdf": {
+    "path": "simulation_output/estimator_max_error_20261003/ESTIMATOR_MAX_ERROR_DIAGNOSIS_20261003.pdf",
+    "pages": 8,
+    "twoPassBuildPassed": true,
+    "overfullBoxes": 0,
+    "textExtractionChecked": true,
+    "allEightPagesVisuallyInspected": true
+  },
+  "allLidarFootprintControls": 5,
+  "scientificPlotsVisuallyInspected": 3
+}
