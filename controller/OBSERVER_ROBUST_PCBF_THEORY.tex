@@ -1,0 +1,902 @@
+\documentclass[10pt,letterpaper]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm,booktabs,longtable,enumitem}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
+\newtheorem{assumption}{Assumption}
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+\newtheorem{remark}{Remark}
+\newcommand{\R}{\mathbb R}
+\newcommand{\B}{\mathbb B}
+\newcommand{\E}{\mathcal E}
+\newcommand{\Z}{\mathcal Z}
+\newcommand{\I}{\mathcal I}
+\newcommand{\U}{\mathcal U}
+\newcommand{\W}{\mathcal W}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\supp}[2]{\sigma_{#1}(#2)}
+\newcommand{\Reach}{\operatorname{Reach}}
+\newcommand{\dist}{\operatorname{dist}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\He}{\operatorname{He}}
+\newcommand{\cl}{\operatorname{cl}}
+\title{From a Multistage Vehicle Observer to an Output-Feedback\protect\\
+Robust Predictive Barrier and One Nominal CLF}
+\author{Pan Dynamics Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+We derive an information-state predictive safety controller from the existing
+covariant NRMM observer certificate. Its links are explicit: a positive
+comparison system bounds estimation error; an intersection update defines the
+current possible true states; a causal output-feedback prediction propagates
+these sets; support functions and interval reserves certify rectangle clearance;
+a shift-closed terminal continuation gives recursive feasibility; and the same
+path-following CLF provides disturbance-dependent recovery. An inherited
+zero safety-slack budget eliminates repeated primary minimization. One
+linearization is compatible with the theorem if its remainder bounds hold over
+the entire decision and uncertainty domain and its inner approximation retains
+the shifted certificate. We also derive a vanishing proximal weight that
+preserves CLF dissipation in one convex optimization. These are mathematical
+design results, with finite numerical checks, not a claim that the present
+certainty-equivalent controller already implements or certifies them.
+\end{abstract}
+
+\section{Claim, scope, and the single-controller design}
+Let $t_k=kh$ and let $u_k$ be held on $[t_k,t_{k+1})$. We seek
+\begin{equation}\label{eq:goal}
+\dist\bigl(\mathcal V_E(t),\mathcal V_C(t)\bigr)\ge d_0,
+\qquad t\ge t_0,
+\end{equation}
+for every admitted initial error, sensor error, plant disturbance and target
+motion. Here $\mathcal V_E,\mathcal V_C$ are the full vehicle rectangles and
+$d_0=0.20\,\mathrm m$ is the present design clearance, not an uncertainty bound.
+The nominal behavior is the given path at its desired cruise speed, with free
+longitudinal phase. There is one controller and one nominal CLF throughout the
+encounter and recovery. A terminal policy is a continuation used in the
+feasibility proof and prediction policy class; it is not a second command mode.
+
+The general use of online observer bounds in robust output-feedback MPC is
+established prior work \cite{Kohler}. The present connection specializes that
+foundation to the Sharma/NRMM vehicle model, its covariant cascade, relative
+rectangle geometry, a predictive slack budget, and the existing one-CLF
+architecture. The generic observer--tube--MPC chain itself is not a novelty claim.
+Sharma et al.\ \cite{Sharma} supply the original vehicle/observer framework;
+the repository uses a modified cascade, whose certificate must be verified on
+its own equations. Huang et al.\ \cite{Huang} supply the predictive-slack
+construction. Their exact optimal-value results are not silently transferred to
+a retained suboptimal budget or an approximate nonlinear program.
+
+\begin{assumption}[Declared model and information contract]\label{ass:contract}
+The well-posed continuous plant and sensor maps, the sampled observer, and their
+disturbance sets are specified. Initial errors have finite certified bounds.
+Truth remains in the declared model domain, and each observer, geometry or
+integration certificate is used only on its valid domain. Sensor timing, maximum admitted outages,
+noise and hold errors satisfy their declared bounds. The target has constant
+tangential acceleration $A_C$ and sideslip $\beta_C$, or an explicitly enclosed
+model defect. No unknown future measurement is replaced by its nominal value.
+\end{assumption}
+For deterministic guarantees, Gaussian noise simulations alone are insufficient:
+an untruncated Gaussian has no finite all-realization amplitude bound. A
+probabilistic noise contract leads to a probabilistic safety claim with an
+explicit time-uniform failure budget, not \eqref{eq:goal} for all realizations.
+The positive-speed NRMM inverse is not valid through a stop. Constant negative
+acceleration cannot be extrapolated through zero speed under this contract.
+Likewise, finite-domain observer constants do not establish an infinite-time
+claim after truth leaves that domain. The theorem below includes these premises;
+they must be enforced or replaced by a valid extended model.
+
+\section{Observer stability produces current state sets}
+\subsection{Positive comparison, including the transient}
+In the existing cascade let $e_v$ be the body-velocity error and
+$e_T=[e_\rho^\top,e_q^\top,e_s^\top]^\top$. For an observer frequency $\omega_o>0$
+and $P_o\succ0$, set
+\begin{equation}
+D_o=\diag(1,\omega_o^{-1},\omega_o^{-2}),\quad
+Q_o=(D_oP_oD_o)\otimes I_2,\quad W_T=\sqrt{e_T^\top Q_o e_T}.
+\end{equation}
+The existing continuous-core derivation has the form
+\begin{equation}\label{eq:comparison}
+D^+\chi\le H\chi+d(t),\qquad
+\chi=\begin{bmatrix}\norm{e_v}\\ W_T\end{bmatrix},\quad
+H=\begin{bmatrix}-k_v&0\\c_{Tv}&-\lambda_T\end{bmatrix},
+\quad k_v,\lambda_T>0,\ c_{Tv}\ge0,\ d(t)\ge0.
+\end{equation}
+All constants include the declared true-domain and disturbance terms. Define
+\begin{equation}\label{eq:envelope}
+b(t)=e^{H(t-t_0)}b_0+
+\int_{t_0}^{t}e^{H(t-s)}\bar d(s)\,ds,
+\qquad b_0\ge\chi(t_0),\quad \bar d\ge d.
+\end{equation}
+\begin{proposition}[Current error containment]\label{prop:observer}
+Under \eqref{eq:comparison}, $\chi(t)\le b(t)$ componentwise. Consequently
+\begin{equation}\label{eq:observerSet}
+e_v\in b_v(t)\B_2,\qquad e_T\in\E_T(t):=
+\{e:e^\top Q_o e\le b_T(t)^2\}.
+\end{equation}
+\end{proposition}
+\begin{proof}
+$H$ is Metzler, so $e^{H\tau}$ is entrywise nonnegative for $\tau\ge0$.
+The comparison principle, followed by variation of constants, gives
+\eqref{eq:envelope}. The two sets are the definitions of the bounded norms.
+\end{proof}
+For constant $\bar d$, $b(t)=e^{H\tau}b_0+H^{-1}(e^{H\tau}-I)\bar d$.
+The lower-left entry of $e^{H\tau}$ is
+\begin{equation}
+c_{Tv}\frac{e^{-k_v\tau}-e^{-\lambda_T\tau}}{\lambda_T-k_v},
+\quad\text{or }c_{Tv}\tau e^{-k_v\tau}\text{ if }\lambda_T=k_v.
+\end{equation}
+The steady-state bound $-H^{-1}\bar d$ cannot replace the transient unless it
+also contains the initial error. The copositive weights
+$w=-H^{-\top}{\bf1}>0$ give $w^\top H=-{\bf1}^\top$, providing an independent
+certificate for the comparison system.
+
+For any vector $a$, the exact ellipsoid support is
+\begin{equation}\label{eq:support}
+\supp{\E_T(t)}{a}=b_T(t)\sqrt{a^\top Q_o^{-1}a}.
+\end{equation}
+In particular the Euclidean component radii are
+\begin{equation}\label{eq:components}
+b_\rho=\sqrt{(P_o^{-1})_{11}}b_T,\quad
+b_q=\omega_o\sqrt{(P_o^{-1})_{22}}b_T,\quad
+b_s=\omega_o^2\sqrt{(P_o^{-1})_{33}}b_T.
+\end{equation}
+These follow by maximizing each directional projection; the maximizing error
+is $b_TQ_o^{-1}a/\sqrt{a^\top Q_o^{-1}a}$. Keeping the joint ellipsoid preserves
+correlation that separate component boxes discard.
+
+\subsection{Sampled realization and the remaining ego channels}
+The production observer is sampled and numerically integrated. A continuous
+stability theorem alone is insufficient for its timestamped error. Use its
+validated finite-time enclosure, or prove a sampled comparison update of the form
+\begin{equation}\label{eq:sampled}
+b_{k+1}\le \bar b_{1|k}:=M_kb_k+d_k^{\rm obs},\qquad M_k\ge0,
+\end{equation}
+where $d_k^{\rm obs}$ encloses sensor noise, held-signal errors, numerical defects
+and the permitted measurement schedule. The matrix need not be $e^{Hh}$ unless
+the sampled-to-continuous defect has also been bounded. A valid finite-time
+enclosure is useful even without a sampled exponential-stability theorem.
+Forecast bounds $\bar b_{i|k}$ require a comparison valid for \emph{every}
+permitted future measurement/update history. Without that future timing
+contract, propagate the true reachable set without prospective measurement
+shrinkage.
+
+Append independently valid yaw, body-velocity, gyro and absolute-position
+enclosures when building the ego state set. For example, a GNSS position ball
+of radius $r_p$ measured $a$ seconds ago gives radius $r_p+v_{\max}a$ about its
+old measurement, not about an unrelated current estimate. Recentring requires
+the displacement between those centers. The repository already publishes
+current error bounds with \texttt{futurePredictionIncluded=false}. Publication
+is not horizon propagation.
+
+Sharma's exponential theorem supplies a route to \eqref{eq:comparison} only
+under its assumptions and coordinate transformations. Its yaw $H_\infty$
+input--output energy statement, by itself, is not a pointwise state enclosure.
+A storage inequality plus an initial storage bound and a specified disturbance
+energy bound could supply one; this must be derived rather than inferred from
+the gain alone.
+
+\section{Use the relative NRMM geometry, without double counting}
+Let $J=\left[\begin{smallmatrix}0&-1\\1&0\end{smallmatrix}\right]$ and define
+\begin{equation}
+\rho=R_E^\top(p_C-p_E),\quad q=R_E^\top v_C,\quad s=R_E^\top a_C.
+\end{equation}
+Writing the ego body velocity as $v_E$ and yaw rate as $r_E$, the exact target
+equations in the rotating ego frame are
+\begin{equation}\label{eq:nrmm}
+\dot\rho=q-v_E-r_EJ\rho,\qquad
+\dot q=s-r_EJq,\qquad \dot s=\Phi(q,s)-r_EJs,
+\end{equation}
+\begin{equation}\label{eq:phi}
+V_C=\norm q,\quad A_C=\frac{q^\top s}{V_C},\quad
+\Omega_C=\frac{(Jq)^\top s}{V_C^2},\qquad
+\Phi=-\Omega_C^2q+\frac{3A_C\Omega_C}{V_C}Jq.
+\end{equation}
+Here $\Omega_C$ denotes the target yaw/course rate, \emph{not} a sideslip-rate
+state; $\dot\beta_C=0$. The factor three follows by differentiating
+$a_C=A_Ct+\kappa_CV_C^2Jt$ with constant
+$\kappa_C=\sin\beta_C/l_{rC}$. The rotating-frame terms are transport, not
+independent target maneuvers.
+
+On the positive-speed, $|\beta_C|<\pi/2$ physical domain,
+\begin{equation}\label{eq:relativeYaw}
+\beta_C=\arcsin\!\left(\frac{l_{rC}(Jq)^\top s}{\norm q^3}\right),\qquad
+\psi_R=\arg(q)-\beta_C.
+\end{equation}
+The image of the joint $(q,s)$ set under \eqref{eq:relativeYaw} gives a relative
+body-yaw set; interval/Lipschitz evaluation must enclose this entire image. If
+$b_q<\norm{\hat q}$, the course error is at most
+$\arcsin(b_q/\norm{\hat q})$; add a valid sideslip reconstruction error, with
+angle wrapping. If speed can reach zero, this inverse supplies no body-heading
+certificate. A saturated estimate does not establish a saturated true angle.
+
+A fully explicit enclosure is available without a new observer state. Suppose
+$\nu:=\norm{\hat q}-b_q>0$, $S_*:=\norm{\hat s}+b_s$, and truth satisfies
+$|\beta_C|\le\beta_{\max}<\pi/2$. Reconstruct the center using
+\begin{equation}
+\hat\beta_C=\arcsin\!\left(\operatorname{clip}_{[-\sin\beta_{\max},\sin\beta_{\max}]}
+\frac{l_{rC}(J\hat q)^\top\hat s}{\norm{\hat q}^3}\right).
+\end{equation}
+On the convex velocity ball, the unclipped argument has derivative bounds
+$4l_{rC}S_*/\nu^3$ in $q$ and $l_{rC}/\nu^2$ in $s$. Clipping is
+nonexpansive and the clipped arcsine has Lipschitz constant
+$1/\cos\beta_{\max}$. Hence one sound bound is
+\begin{equation}\label{eq:explicitYawBound}
+b_\beta=\frac{l_{rC}}{\cos\beta_{\max}}
+\left(\frac{4S_*b_q}{\nu^3}+\frac{b_s}{\nu^2}\right),\qquad
+b_{\psi_R}=\min\!\left\{\pi,\arcsin\frac{b_q}{\norm{\hat q}}+b_\beta\right\}.
+\end{equation}
+The ball avoids zero throughout every connecting segment, so this argument
+does not presume convexity of a positive-speed annulus. Evaluating the joint
+ellipsoid image can improve this conservative component bound. An invalid
+true sideslip premise cannot be made valid by clipping the estimate.
+
+Let $B_E,B_C$ be body rectangles, including any reference-point offsets. Rigid
+motion invariance gives the exact identity
+\begin{equation}\label{eq:relativeDistance}
+\dist(\mathcal V_E,\mathcal V_C)
+=\dist\bigl(B_E,\rho+R(\psi_R)B_C\bigr).
+\end{equation}
+Thus the observer's relative-position and relative-yaw uncertainty can be used
+directly. Common absolute translation and yaw do not enter this instantaneous
+collision expression. Adding separate inertial ego and target position balls
+can count this common uncertainty twice. Absolute pose uncertainty still enters
+path tracking and any global-coordinate constraint; ego velocity/rate errors
+still enter future \eqref{eq:nrmm}. This cancellation does not discard those
+effects or assert independence of the relative errors.
+
+\section{Information update and prediction are different operations}
+\subsection{The information state and a monotone update}
+Let $z$ contain the physical ego and target variables, and any constant unknown
+parameters retained in prediction. Let
+\begin{equation}
+I_k=(\eta_k,b_k,\Z_k,u_{k-1},t_k)
+\end{equation}
+contain the available observer memory $\eta_k$, certificate data, a nonempty
+set of possible true states, previous input and time. At initialization,
+intersect the observer sets with the physical model/domain and any other
+independently certified information. The essential property is
+\begin{equation}\label{eq:truth}
+z_k\in\Z_k.
+\end{equation}
+Let $\mathcal P_h(\Z,u)$ be a sound outer reachable set for the exact held-input
+plant, including disturbances and numerical enclosure errors. Use
+\begin{equation}\label{eq:intersection}
+\Z_{k+1}=\mathcal P_h(\Z_k,u_k)\cap
+\mathcal O(\eta_{k+1},b_{k+1})\cap\mathcal D_{k+1}.
+\end{equation}
+$\mathcal O$ is the new current observer enclosure and $\mathcal D$ contains
+other valid information. An unavailable channel contributes the whole space,
+not an invented finite radius; a predicted loss of target observability may
+therefore leave only its propagated motion set. Each set contains truth,
+hence their intersection does.
+In particular
+\begin{equation}\label{eq:nesting}
+z_{k+1}\in\Z_{k+1}\subseteq\mathcal P_h(\Z_k,u_k).
+\end{equation}
+The estimate may move in either direction; the physical successor inclusion is
+what matters. An empty intersection contradicts at least one premise and is
+not repaired mathematically by silently increasing a safety budget.
+
+An outer box of the intersection need not remain inside the old prediction.
+For two unit disks centered at $(0,0)$ and $(1,0)$, the lens has bounding box
+$[0,1]\times[-\sqrt3/2,\sqrt3/2]$; a corner of that box lies outside the first
+disk. Preserve the intersection as constraints, or separately certify inclusion
+of a reduced representation in the already certified tube. Simple recentering
+of an unchanged physical set is harmless; unjustified enlargement is not.
+Use an inclusion-preserving reach operator, or retain the old tube constraints
+when a new approximation is not monotone.
+
+\subsection{Why an observer decay rate is not a prediction decay rate}
+At time $k$, the future position set of a target with uncertain constant speed
+can grow even if a continuously observed estimator is exponentially stable.
+For $p(0)\in[-r_p,r_p]$, $v\in[-r_v,r_v]$, the exact current-conditioned
+position radius is $r_p+tr_v$, not $r_pe^{-\lambda t}$.
+Future measurements can reduce \emph{future posterior} error, but their centers
+and values are unknown now. There are two sound operations:
+\begin{enumerate}[nosep]
+\item Propagate the current true-state set under the plant with common
+open-loop inputs. No future observer contraction shrinks that reachable set.
+\item Predict causal output feedback and all possible measurement outcomes.
+Bounds such as \eqref{eq:sampled} may bound error about each future estimate;
+the family of possible estimates must also be covered.
+\end{enumerate}
+The second permits less conservative controlled ego tubes. It does not turn
+an uncontrolled target into a contracting system. Constant $A_C,\beta_C$ are
+retained along each possible target path; they are not reselected at every
+prediction step. A model with bounded nonzero defect must propagate that defect
+instead of claiming exact constant-parameter paths.
+
+\subsection{A causal tube that exposes the observer contribution}
+Use a policy class closed under shifting and terminal append. A useful
+finite-dimensional member is
+\begin{equation}\label{eq:policy}
+u_i=v_i+K_i(\hat x_{E,i}-c_{E,i}),
+\end{equation}
+with preselected gains, nominal centers $c_i$ and decision variables $v_i$.
+Only estimates, never unknown true states, enter this policy. These gains
+describe the future response of the same controller; they are not a separate
+executable backup. At the first node $c_{E,0}=\hat x_{E,k}$ is convenient, so
+the feedback term is zero, but forcing this recentering is not required and
+must not discard a previously feasible policy.
+
+Linearize the joint hold map once at $(\bar z_i,\bar u_i)$, obtaining $A_i,B_i$.
+With $C_Ez=x_E$, $d_i=z_i-c_i$, and estimation error
+$\epsilon_{E,i}=x_{E,i}-\hat x_{E,i}$, set
+\begin{align}
+c_{i+1}&=f_h(\bar z_i,\bar u_i)+A_i(c_i-\bar z_i)+B_i(v_i-\bar u_i),\\
+d_{i+1}&=(A_i+B_iK_iC_E)d_i-B_iK_i\epsilon_{E,i}+w_i+r_i.
+\label{eq:tubeDynamics}
+\end{align}
+The minus sign multiplying observer error follows directly from
+$\hat x_E-c_E=C_Ed-\epsilon_E$. It is not a freely chosen disturbance channel.
+If $d_i\in\E_i$, $\epsilon_{E,i}\in\E^o_{E,i}$, $w_i\in\W_i$ and
+$r_i\in\mathcal R_i$, a sound recursion is
+\begin{equation}\label{eq:tube}
+\E_{i+1}\supseteq(A_i+B_iK_iC_E)\E_i\oplus
+(-B_iK_i)\E^o_{E,i}\oplus\W_i\oplus\mathcal R_i.
+\end{equation}
+Dropping dependence between terms is conservative, not unsound. For component
+boxes with radii $r^z_i,b^E_i$, it suffices that
+\begin{equation}\label{eq:boxTube}
+r^z_{i+1}\ge |A_i+B_iK_iC_E|r^z_i+|B_iK_i|b^E_i+
+\bar w_i+\bar r_i.
+\end{equation}
+Absolute value is entrywise. The current observer enclosure initializes the
+tube, and future worst-case observer bounds enter its disturbance term. For
+$K_i=0$, this reduces to ordinary reachable-set propagation. The closed-loop
+plant tube may contract if its controlled dynamics do; the observer decay
+constant is not substituted for $A_i$.
+
+Pure input vectors with $K_i=0$ at every possible future step are not generally
+closed under appending an output-feedback terminal policy. Either use a
+shift-closed policy class as above, or prove existence of a common open-loop
+terminal action for every terminal information set. The invalid quantifier
+exchange $\forall z\,\exists u(z)$ to $\exists u\,\forall z$ cannot supply
+output-feedback recursive feasibility.
+
+\section{Certified one-linearization collision constraints}
+\subsection{Remainders over the complete decision domain}
+Suppose the Jacobian of scalar map $f_{h,j}$ has Lipschitz constant $L_j$ on
+the relevant convex neighborhood of the anchor. Then
+\begin{equation}\label{eq:taylor}
+|r_{i,j}|\le\tfrac12L_j
+\norm{(z_i-\bar z_i,u_i-\bar u_i)}^2.
+\end{equation}
+The neighborhood covers nominal decision corrections, propagated true-state
+uncertainty, output-feedback deviations and the entire connecting segment.
+A bound covering only the estimation error at the anchor is insufficient.
+Integration error between RK4 and the physical hold map is additional unless
+RK4 itself is explicitly the entire claimed plant. A nonsmooth tire regime
+requires a valid piecewise/interval enclosure, not an unjustified global
+Hessian. A measured 10-mm mismatch on one rollout is not \eqref{eq:taylor}.
+
+Freeze valid $\mathcal R_i$, tube supports and collision normals before the
+convex solve, or use sound convex upper bounds depending on its variables.
+This can give one conservative conic program without within-frame SCP.
+Repeated linearization is not required by the safety proof; valid setwise
+remainders and feasibility are. Whether sufficiently tight bounds fit a
+100-ms budget is an experimental question, not a consequence of this theorem.
+
+\subsection{A complete relative-rectangle row}
+For a fixed unit normal $n$, separation in the ego frame is certified by
+\begin{equation}\label{eq:plane}
+\min_j n^\top\bigl(\rho+R(\psi_R)v_{C,j}\bigr)-h_{B_E}(n)\ge d_0,
+\qquad h_{B_E}(n)=\max_{v\in B_E}n^\top v.
+\end{equation}
+Every ego point then has projection at most $h_{B_E}(n)$, and every target
+point at least $d_0$ beyond it; Cauchy--Schwarz proves Euclidean distance at
+least $d_0$. Normals can vary across times but are fixed during one solve.
+This is a sufficient separating-plane condition, not an equivalence for an
+arbitrarily selected normal. A zero multiplier from an overlapping ordinary
+distance dual proves no positive clearance.
+
+Let $p_r=(\rho,\psi_R)$, with anchor $\bar p_r$, affine center correction
+$\Delta p_r$, and certified pose-error set $E_r$. For vertex $j$, define
+\begin{equation}
+g_j^0=n^\top(\bar\rho+R(\bar\psi_R)v_{C,j})-h_{B_E}(n),\quad
+a_j^\top=[\,n^\top,\ n^\top R(\bar\psi_R)Jv_{C,j}\,].
+\end{equation}
+If $|\Delta\psi_R|\le t_\psi$ and $|e_{\psi_R}|\le b_\psi$, a sufficient row is
+\begin{equation}\label{eq:robustRow}
+\boxed{
+g_j^0+a_j^\top\Delta p_r-\supp{E_r}{-a_j}
+-\tfrac12\norm{v_{C,j}}(t_\psi+b_\psi)^2
+-\varepsilon_i^{\rm hold}-\varepsilon_i^{\rm num}
+\ \ge\ d_0-\xi_i.}
+\end{equation}
+The orientation remainder follows from
+$|n^\top R(\psi)J^2v|\le\norm v$. Any nonlinear reconstruction of $p_r$ from
+the joint state needs its own enclosure before $E_r$ is used. Pose-model errors
+from \eqref{eq:tube} are already in $E_r$; do not add the same error twice.
+$\varepsilon^{\rm num}$ bounds admitted numerical residuals. For ellipsoids,
+\eqref{eq:support} computes the directional tightening analytically; for boxes
+it is $|a_j|^\top r$. Exact maximization of rectangle supports over an angular
+interval is another valid, possibly tighter, certificate.
+
+\subsection{Whole-hold safety, not just node safety}
+Let $d(t)$ be the actual rectangle distance on a hold. If the reference-point
+speeds and body yaw rates are bounded throughout it, then
+\begin{equation}\label{eq:holdLipschitz}
+|d(t)-d(s)|\le L_d|t-s|,\quad
+L_d=\bar v_E+\bar v_C+R_E\bar r_E+R_C\bar r_C,
+\end{equation}
+where $R_E,R_C$ bound vertex distance from the corresponding reference point.
+This follows from Hausdorff motion bounds for each body and the triangle
+inequality for set distance. For nodes at start, midpoint and end, every time
+is within $h/4$ of a node. Thus take
+\begin{equation}\label{eq:holdReserve}
+\varepsilon_i^{\rm hold}=L_dh/4.
+\end{equation}
+More nodes or a direct interval reachable-body enclosure can reduce this
+conservative reserve. The midpoint must be an enclosed physical midpoint, not
+an endpoint interpolant with unbounded interpolation error. Node certificates
+with $\xi_i=0$ and \eqref{eq:holdReserve} prove \eqref{eq:goal} throughout the
+hold. If different slacks meet at a boundary, each adjacent hold must have its
+own valid node inequalities. A positive slack permits clearance below $d_0$;
+it is not a certificate of the requested margin.
+
+\section{The terminal object is an information set, with free path phase}
+Let $T(I,u,y)$ denote the information update, including all admitted plant and
+sensor outcomes represented by $y$. A terminal family $\mathfrak B_f$ has a
+causal policy $\kappa_f$ such that
+\begin{equation}\label{eq:terminal}
+I\in\mathfrak B_f\Longrightarrow
+\begin{cases}
+\kappa_f(I)\text{ is admissible for every state in }\Z,\\
+\text{the entire next hold satisfies \eqref{eq:goal} and all hard constraints},\\
+T(I,\kappa_f(I),y)\in\mathfrak B_f\quad\text{for every admitted }y.
+\end{cases}
+\end{equation}
+The state includes time, observer/certificate memory and previous input if
+slew constraints are present. Free path phase is retained. There is no
+requirement to reach a prescribed longitudinal position at a prescribed time.
+
+This is a precise construction target rather than a cruise-orbit geometry
+surrogate. Define the robust predecessor of a family $\mathfrak A$ by
+\begin{equation}\label{eq:predecessor}
+\operatorname{Pre}(\mathfrak A)=
+\{I:\exists u\ \text{with safe admissible whole hold, }\
+T(I,u,y)\in\mathfrak A\ \forall y\}.
+\end{equation}
+The greatest controlled-invariant subfamily of the admissible safe information
+states is the union of all families satisfying \eqref{eq:terminal} with a
+suitable selector. This definition does not assume the kernel is nonempty or
+numerically computable. A certified, finitely represented invariant inner family is sufficient. Repeated
+predecessors approximate it, but identifying an infinite intersection of
+predecessors with the kernel additionally needs the usual compactness/closedness
+and action-selection conditions; no such identity is presumed here.
+
+\subsection{A constructive local ego core}
+Use transverse ego error $e$ and $q_E=\sqrt{e^\top P e}$. Suppose the same
+nominal feedback applied to estimates admits the verified local bound
+\begin{equation}\label{eq:coreBound}
+q_E^+\le a q_E+Cq_E^2+d_f,\qquad 0\le a<1,\ C\ge0,
+\end{equation}
+for every observer error in an invariant certificate envelope and every plant
+disturbance. Here $d_f$ includes feedback sensitivity to observer error; the
+sampling/trim defect is included too. An envelope $\bar b$ is invariant if
+$M\bar b+d^{\rm obs}\le\bar b$ uniformly for the terminal sensor contract.
+Then the ego sublevel $q_E\le r_f$ is invariant when it lies inside the verified
+model/input domain and
+\begin{equation}\label{eq:coreRadius}
+Cr_f^2-(1-a)r_f+d_f\le0.
+\end{equation}
+For $C>0$ this is possible only if $(1-a)^2\ge4Cd_f$, with
+\begin{equation}
+\frac{(1-a)-\sqrt{(1-a)^2-4Cd_f}}{2C}\le r_f\le
+\frac{(1-a)+\sqrt{(1-a)^2-4Cd_f}}{2C}.
+\end{equation}
+For $C=0$, require $r_f\ge d_f/(1-a)$. This explicitly explains why shrinking
+a nominal ellipsoid indefinitely cannot repair a robust core with nonzero
+disturbance: the lower admissible radius is positive. If required, input
+memory is included in $q_E$ and the same argument applies to the augmented map.
+Input and whole-hold domain constraints need separate uniform verification.
+
+An ego core alone is not a collision-safe joint core. Intersect it with a
+target-relative family whose whole-hold safety and successor inclusion under
+this same policy are verified. For example, a truly departing target can use a
+fixed inertial unit $n$ with
+\begin{equation}\label{eq:departing}
+n^\top(p_C-p_E)\ge R_E+R_C+d_0,\qquad
+n^\top(v_C-v_E)\ge0
+\end{equation}
+throughout its admitted future and the ego core. The first inequality then
+never decreases and circumdisks establish separation. The second must itself
+be invariant under the declared dynamics; checking its current value is not
+enough. A nonzero-curvature target may eventually return, so range exceeding
+30 m, one nominal pass, or a small curvature estimate does not establish
+\eqref{eq:departing}. If this sufficient departure test is unavailable, retain
+target timing in the joint invariant family \eqref{eq:terminal}. A finite
+simulation horizon cannot prove that an uncertain circular target never
+returns. No all-future spatial-sweep separation is imposed as a necessary
+condition.
+
+An $M-N$ step hard continuation into $\mathfrak B_f$ implicitly defines the
+terminal admissible family at the end of the main $N$-step prefix. This is
+finite backward reachability to a robust core, without a fixed terminal pose.
+The continuation length affects feasibility, but does not create a new
+tracking objective or force return to the path within that length.
+
+\section{Robust PCBF, inherited budget, and the safety theorem}
+\subsection{The robust finite-horizon problem}
+A prediction policy $\Pi=(\pi_0,\ldots,\pi_{M-1})$ is causal: $\pi_i$ uses
+information available at that future node. Let $\mathfrak I_i^\Pi(I)$ be all
+possible future information states generated from $I$. Use common nonnegative
+prefix slacks $\xi_0,\ldots,\xi_{N-1}$; extend $\xi_i=0$ for $N\le i<M$.
+The feasible witness set $\mathcal F_M(I)$ consists of policies and slacks
+satisfying, for every information branch and every state/disturbance in it,
+\begin{align}\label{eq:robustProblem}
+&\text{dynamics, observer/update contract, and hard physical constraints},\nonumber\\
+&\dist(\mathcal V_E(t),\mathcal V_C(t))\ge d_0-\xi_i
+\quad(t\in[t_{k+i},t_{k+i+1}]),\\
+&\mathfrak I_M^\Pi(I)\subseteq\mathfrak B_f.\nonumber
+\end{align}
+Any additional softened constraints use specified scales and the same stage
+slacks; this document uses distance units for collision slack. Softening a
+model-evaluability domain is not allowed.
+Define
+\begin{equation}\label{eq:pcbf}
+V_B^*(I)=\inf_{(\Pi,\Xi)\in\mathcal F_M(I)}\sum_{i=0}^{N-1}\xi_i,
+\quad S(\Xi)=\sum_{i=0}^{N-1}\xi_i,\quad
+\mathfrak K_M=\{I:\exists(\Pi,0)\in\mathcal F_M(I)\}.
+\end{equation}
+Where an optimum is attained, $V_B^*=0$ exactly on $\mathfrak K_M$.
+Without attainment, a zero infimum need not supply a zero-slack witness; the
+controller retains an actual witness. $V_B^*$ is defined on information,
+not just the estimated vehicle state. The quantity retained online is $S$,
+with $V_B^*(I)\le S$; it need not be the optimal value.
+
+\begin{assumption}[Shift closure and sound numerical realization]\label{ass:shift}
+The admitted policy/certificate class is closed under conditioning on the
+realized next information, discarding its first hold, and appending
+$\kappa_f$. The uncertainty update is the update represented in prediction,
+or a certified refinement of it. Every numerical constraint certificate is
+sound, with residuals enclosed. If a convex inner approximation is used, it
+retains this shifted witness or independently certifies a replacement under
+the inherited budget. Future domain, noise and target contracts do not expand
+beyond the predicted contract.
+\end{assumption}
+
+\subsection{A constructive way to retain convex feasibility}
+Assumption~\ref{ass:shift} need not be implemented as a search for a second
+control mode. Along with an accepted policy, retain each affine dynamics
+enclosure, its anchor and validity domain, the tube, fixed collision rows,
+absolute times and terminal certificate. At the next sample:
+\begin{enumerate}[nosep]
+\item Shift the first $M-1$ affine enclosure/constraint blocks unchanged.
+The old accepted centers $c^*_{1|k},\ldots,c^*_{M|k}$ and remaining policy
+coefficients still satisfy those same affine equations.
+\item Retain $c_{0|k+1}=c^*_{1|k}$ as the warm candidate center. Require
+$\Z_{k+1}-c^*_{1|k}\subseteq\E^*_{1|k}$, which follows from the certified
+update. Do not add an equality forcing that center to be the new estimate.
+The first input is $v_{0|k+1}+K_{0|k+1}(\hat x_{E,k+1}-c_{E,0|k+1})$.
+\item Append the terminal certificate's affine policy/enclosure block. For
+an affine estimate-feedback local core, its preverified uniform bounds supply
+this block. A general nonlinear terminal selector requires a policy class
+that can represent it and is not automatically a small SOCP.
+\end{enumerate}
+No smaller observer radius or newer derivative is needed to make this warm
+point feasible. The new optimization can improve its centers/inputs inside
+the retained certified domains. An optional fresh linearization or tighter
+set representation is admitted only if it also retains the shifted
+certificate, or has another proved replacement within the inherited budget.
+Otherwise the cached valid blocks remain the model for that solve. This is
+at most one new local approximation per sample, with substantial reuse; it
+does not require within-hold SCP. Certificate reuse is mathematical memory
+inside the single optimization, not permission to issue an unchecked old
+open-loop command. In particular, always forcing both a fresh rollout anchor
+and an estimate-centered initial equality is an additional restriction that
+does not inherit this feasibility proof.
+
+\begin{theorem}[Inherited-budget feasibility and robust safety]\label{thm:safety}
+Under Assumptions~\ref{ass:contract}--\ref{ass:shift}, suppose a feasible
+witness $(\Pi_k,\Xi_k)$ exists and its first input is applied. At the next
+sample a feasible witness exists with slacks
+\begin{equation}\label{eq:shift}
+\widetilde\Xi_{k+1}=(\xi_{1|k},\ldots,\xi_{N-1|k},0),\qquad
+\bar S_{k+1}=S_k-\xi_{0|k}.
+\end{equation}
+Consequently secondary CLF optimization subject to
+\begin{equation}\label{eq:budget}
+S_{k+1}\le\bar S_{k+1},\qquad
+\xi_{0|k+1}\le\widetilde\xi_{0|k+1}
+\end{equation}
+is safety-feasible without resolving the primary minimum. A nonnegative
+unbounded CLF slack makes the CLF row feasible whenever its values are finite.
+If the initial witness has $S_0=0$, every applied hold satisfies
+\eqref{eq:goal}, and $I_k\in\mathfrak K_M$ for all $k$.
+\end{theorem}
+\begin{proof}
+Truth containment follows first from Proposition~\ref{prop:observer} and
+\eqref{eq:intersection}, then by induction from sound reachable-set propagation.
+The realized successor is an admitted branch of $\mathfrak I_1^{\Pi_k}$.
+Restrict the old policy to this branch and shift its suffix. Its first $N-1$
+slacks are the old last $N-1$ prefix slacks. The newly entering last prefix
+stage is an old hard-tail stage, hence has zero slack (if $M=N$, it is the
+appended safe terminal hold). The remaining tail is hard, and
+\eqref{eq:terminal} supplies an admissible zero-slack appended hold and new
+terminal membership. This constructs \eqref{eq:shift}; it also satisfies the
+first-stage cap in \eqref{eq:budget}. Assumption~\ref{ass:shift} preserves its
+availability in the chosen numerical representation. If $S_k=0$, nonnegative
+slacks and the budget force all new slacks to zero. The whole-hold robust
+constraints then imply \eqref{eq:goal} for the actual state. Induct on $k$.
+\end{proof}
+
+With an attained optimum, applying its policy gives
+\begin{equation}\label{eq:valueDecrease}
+V_B^*(I_{k+1})\le V_B^*(I_k)-\xi^*_{0|k}.
+\end{equation}
+This is the information-state predictive barrier decrease. Calling it a
+classical smooth CBF would require extra regularity, not supplied here.
+For the inherited feasible upper bound,
+\begin{equation}\label{eq:sum}
+S_{k+1}\le S_k-\xi_{0|k}\quad\Longrightarrow\quad
+\sum_{k=0}^{\infty}\xi_{0|k}\le S_0,\quad\xi_{0|k}\to0.
+\end{equation}
+This alone does not imply $S_k\to0$: $(\xi_0,\xi_1)=(0,c)$ can keep postponing
+the same future violation. Huang's further convergence statements have their
+own optimality, continuity and invariance premises. No such stronger result
+is claimed for the suboptimal budget here. A positive slack witness is a
+restoration object, not a proof of clearance $d_0$; its first hold only has
+the certified lower bound $d_0-\xi_0$.
+
+\begin{remark}[A retained witness is not an executable backup mode]
+The next command can still come from the same CLF optimization on every
+sample. Retaining a feasible policy and certificate is the induction argument
+and a feasible initialization for that optimization. If a numerical solver
+fails to return a command within a deadline and the design refuses any
+previously certified command, mathematical problem feasibility alone cannot
+guarantee closed-loop operation through that computational failure. A runtime
+completion premise must be stated; a new controller mode need not be invented.
+\end{remark}
+
+Recomputing collision normals, shrinking decision domains, resetting a tube
+center to the new estimate, or enlarging a target estimate independently of
+\eqref{eq:intersection} can remove the shifted feasible point from a new inner
+approximation. It is not a proof to say that the old nonlinear witness exists
+while the new convex program excludes it. Retain compatible old certificate
+rows/domains when necessary, or prove a new inner certificate contains that
+witness. This is a constraint on the mathematical one-RTI realization, not a
+request to add repeated SCP rounds. A restoration that increases the inherited
+budget starts a new chain and does not preserve \eqref{eq:sum} across the reset.
+
+\section{One CLF: nominal dissipation with an explicit uncertainty supply}
+\subsection{The same function during avoidance and recovery}
+Let
+\begin{equation}\label{eq:clf}
+e(x_E)=\begin{bmatrix}e_y&e_\psi&v_x-v_{x,\rm ref}&
+v_y-v_{y,\rm ref}&r-r_{\rm ref}\end{bmatrix}^{\!\top},\quad
+V=e^\top P e,\quad\ell=e^\top Qe,\quad P,Q\succ0.
+\end{equation}
+This is the existing transverse function, independent of the target. A smooth
+path chart and a verified recovery domain are required. Positive definiteness
+of an LQR matrix at one trim does not prove a global nonlinear CLF. If $P$
+depends on path phase, all successor expressions include the successor $P$;
+freezing it without a bound is invalid. Below $P$ is fixed on the verified domain.
+
+The desired robust first-hold row is
+\begin{equation}\label{eq:robustClf}
+\sup_{z\in\Z_k,\,w\in\W_k}
+\{V(x_E^+)-V(x_E)+\eta\ell(x_E)\}
+\le\delta_k+\sigma_k,\qquad \delta_k\ge0,\quad\eta>0.
+\end{equation}
+Here $\sigma_k$ is a \emph{derived} disturbance supply, not an optimized slack,
+and $\delta_k$ is the single CLF slack. The supremum preserves the dependence
+between a true current state and its successor. Safety constraints keep
+priority through \eqref{eq:budget}. No target-range switch changes $V$.
+
+\subsection{Deriving the supply, rather than choosing a convenient tolerance}
+Suppose a common estimate-feedback action on the recovery domain has
+\begin{equation}\label{eq:nominalContraction}
+\sqrt{V(F_E(x_E,\kappa(x_E)))}\le a\sqrt{V(x_E)},\qquad 0\le a<1,
+\end{equation}
+and the effect of using $\kappa(\hat x_E)$, plant disturbance and hold-model
+defect is bounded by $D_k$ in the successor $P$ norm. For example a valid
+uniform bound is $D_k=L_{F,u}L_\kappa b_{E,k}+d_{E,k}$, in consistent norms.
+For any $a^2<\lambda<1$,
+\begin{equation}\label{eq:young}
+(a\sqrt V+D_k)^2\le\lambda V+
+\frac{\lambda}{\lambda-a^2}D_k^2.
+\end{equation}
+Indeed the difference is
+$(\lambda-a^2)(\sqrt V-aD_k/(\lambda-a^2))^2$.
+Choose $\eta$ so that $\eta Q\preceq(1-\lambda)P$ and set
+\begin{equation}\label{eq:supply}
+\sigma_k=\frac{\lambda}{\lambda-a^2}D_k^2.
+\end{equation}
+Then the common action satisfies \eqref{eq:robustClf} with $\delta_k=0$.
+This does not show it is collision-safe, terminal-feasible or inside a
+particular RTI decision domain. Zero CLF slack is guaranteed admissible only
+where those requirements are jointly compatible.
+
+\subsection{A tractable conservative SOC row}
+Let $P_-=P-\eta Q\succeq0$. Precompute a sound lower bound
+\begin{equation}\label{eq:clfLower}
+0\le\underline W_k\le\inf_{z\in\Z_k}e(x_E)^\top P_-e(x_E).
+\end{equation}
+For an enclosed current error $e=\hat e+d_e$,
+one choice is $(\max\{0,\norm{P_-^{1/2}\hat e}-r_{-,k}\})^2$ with
+$r_{-,k}\ge\sup\norm{P_-^{1/2}d_e}$. Include nonlinear path-projection
+remainders in $d_e$. Let $e_1^c$ be the affine next-error center and
+$r_{P,1}$ a valid bound on $\norm{P^{1/2}(e_1-e_1^c)}$ over the whole
+uncertainty and decision domain. Introduce $t\ge0$ and impose
+\begin{equation}\label{eq:clfSoc}
+\norm{P^{1/2}e_1^c}\le t,\qquad
+(t+r_{P,1})^2\le\underline W_k+\sigma_k+\delta_k.
+\end{equation}
+These are ordinary/rotated SOC constraints when the radii are fixed. The
+triangle inequality and \eqref{eq:clfLower} imply \eqref{eq:robustClf}.
+This sufficient bound can be more conservative than the joint supremum;
+therefore physical feasibility of zero slack does not ensure its feasibility
+in \eqref{eq:clfSoc}. A joint quadratic robust bound can be tighter but may
+require an SDP or a different certified approximation. The computation is not
+automatically a QP with only affine constraints.
+
+\subsection{A proximal tie that does not create a nonzero recovery floor}
+The current controller adds a bounded input-increment term relative to the
+linearization input, not zero. A fixed additive weight can buy positive CLF
+slack even when zero is feasible. To retain one solve and remove that
+mathematical obstruction, let $0\le R(\Delta U)\le1$ on the decision domain,
+and compute
+\begin{equation}\label{eq:ellLower}
+0\le\underline\ell_k\le\inf_{z\in\Z_k}\ell(x_E).
+\end{equation}
+Use the single secondary objective
+\begin{equation}\label{eq:objective}
+\boxed{\min\ \delta_k+\epsilon\,\underline\ell_k R(\Delta U),
+\qquad 0\le\epsilon<\eta,}
+\end{equation}
+under the robust safety budget and all constraints above. Scaling this entire
+objective by a positive known constant is harmless. Scaling just one term
+changes the argument.
+
+\begin{proposition}[One-solve CLF recovery with a vanishing tie]\label{prop:clf}
+Suppose from some sample onward a zero-CLF-slack feasible candidate exists in
+the actual optimization, its optimum is attained, and its objective is solved
+with gap at most $\tau_k\ge0$. An issued optimizer satisfying
+\eqref{eq:robustClf} and \eqref{eq:objective} obeys
+\begin{equation}\label{eq:recovery}
+V_{k+1}-V_k\le-(\eta-\epsilon)\ell_k+\sigma_k+\tau_k.
+\end{equation}
+If $\ell\ge\mu V$ on a forward invariant bounded recovery domain, with
+$0<c:=(\eta-\epsilon)\mu\le1$, then
+\begin{equation}\label{eq:iss}
+V_{k+j}\le(1-c)^jV_k+
+\sum_{s=0}^{j-1}(1-c)^{j-1-s}(\sigma_{k+s}+\tau_{k+s}).
+\end{equation}
+In particular $\limsup V_k\le(\bar\sigma+\bar\tau)/c$ for uniformly bounded
+supplies, and $V_k\to0$ if the supplies tend to zero.
+\end{proposition}
+\begin{proof}
+A zero-slack feasible point has objective at most
+$\epsilon\underline\ell_k$. Nonnegativity of $R$ gives
+$\delta_k\le\epsilon\underline\ell_k+\tau_k\le\epsilon\ell_k+\tau_k$
+for the actual state. Insert this in \eqref{eq:robustClf} and iterate the scalar
+contraction inequality. A stable scalar convolution of a bounded sequence
+tending to zero also tends to zero, proving the last claim.
+\end{proof}
+The objective minimizes CLF relaxation under the safety budget. It is not
+an assertion of minimum Euclidean distance to a nominal input. The proximal
+term remains centered on the linearization input, not on zero, and introduces
+neither a second CLF nor a separate path-deviation penalty.
+Thus exact zero numerical slack is not necessary for genuine dissipation:
+the allowable optimization tie vanishes with the available tracking error.
+For an exact lexicographic minimum of $\delta$, simply set $\epsilon=0$ or
+use a solver that enforces that hierarchy. A fixed positive solver tolerance,
+persistent model/noise bounds, or an unvanishing proximal tie generally yields
+a practical neighborhood rather than exact nominal convergence.
+
+The nominal manifold has arbitrary longitudinal phase, so $V\to0$ means
+return to path-following cruise, not arrival at a scheduled position. Nothing
+in the proof imposes a fixed recovery duration. Conversely, collision threat
+disappearing alone does not prove membership in a global recovery domain or
+zero slack in a conservative convex inner problem. Those conditions must be
+certified or assessed separately. Feasible damping of a CLF optimizer preserves
+safety only; it preserves \eqref{eq:recovery} only if its \emph{issued} slack
+also satisfies the bound used in that proof.
+
+\section{The resulting online problem and the precise implementation boundary}
+At each sample perform the following operations, all within the same controller:
+\begin{enumerate}[leftmargin=*,itemsep=3pt]
+\item Obtain timestamped observer sets and intersect them with the certified
+previous successor set using \eqref{eq:intersection}.
+\item Condition and shift the previous causal witness and its certificate;
+inherit \eqref{eq:shift}. Without a witness, generate an APF search seed.
+The seed has no independent safety permission.
+\item Construct one affine center model and valid setwise remainders/tube
+supports, preserving an inherited feasible certificate when it exists.
+\item At initialization/restoration minimize prefix safety slack. During
+ordinary zero-budget continuation, impose the inherited budget directly.
+In either case solve the \emph{same} CLF secondary problem; zero PCBF slack
+does not skip CLF optimization.
+\item Solve \eqref{eq:objective} subject to affine center dynamics,
+\eqref{eq:tube} or \eqref{eq:boxTube}, \eqref{eq:robustRow}, hard tail and
+robust terminal membership, and \eqref{eq:clfSoc}. Apply its first
+estimate-based input and retain the complete policy/certificate/slacks.
+\end{enumerate}
+With fixed gains, directions, remainder radii and an SOC-representable
+terminal inner set, the center problem is a convex conic QP/SOCP. General
+information-state reachability and the maximal invariant kernel are not
+claimed to be SOCPs. Robust overapproximation quality, certificate closure and
+first feasibility remain substantive design requirements. A trusted reference
+seed can improve conditioning and direction choice, but does not replace any
+uncertainty or remainder term.
+
+\begin{center}
+\fbox{\begin{minipage}{0.94\linewidth}
+\textbf{Completed mathematical connection.}
+Observer comparison $\Rightarrow$ current truth-containing sets
+$\Rightarrow$ causal reachable tubes and nested information updates
+$\Rightarrow$ whole-hold robust rectangle constraints
+$\Rightarrow$ a shift-closed robust predictive safety witness.
+An initial zero-slack witness gives recursive feasibility and $d_0$ clearance.
+The one CLF and its disturbance supply give practical recovery under persistent
+uncertainty, and asymptotic nominal recovery when uncertainty/numerical supply
+vanishes and zero CLF slack remains feasible in the recovery domain.
+\end{minipage}}
+\end{center}
+
+\begin{longtable}{p{0.31\linewidth}p{0.62\linewidth}}
+\toprule
+Existing artifact & What is and is not supplied today \\\midrule
+\endhead
+\texttt{nrmmObserverCertificate.m}, \texttt{nrmmPositionErrorBound.m}
+& Comparison/certificate and sampled current enclosures under their declared
+premises. A continuous-core certificate is not automatically a sampled
+exponential certificate or a prediction tube. \\
+\texttt{nrmmControllerErrorBounds.m}
+& Current state/parameter radii. Relative joint sets should be preserved rather
+than unnecessarily converted to two independent inertial boxes. \\
+Current MPC state and target parsing
+& Does not implement \eqref{eq:intersection}; exact-epoch target reset behavior
+must be replaced by a compatible information update for observer integration. \\
+Current RTI and distance rows
+& Nominal affine rows and point-rollout disagreement thresholds. Need validated
+\eqref{eq:tube}, \eqref{eq:taylor}, \eqref{eq:robustRow} and whole-hold coverage. \\
+Current terminal core and inherited slack
+& Nominal numerical continuation, not yet \eqref{eq:terminal} or the inner
+approximation closure in Assumption~\ref{ass:shift}. \\
+Current one quadratic CLF
+& Correct function structure. Need the robust row/supply and a vanishing tie
+or exact slack priority for the recovery result proved here. \\
+\bottomrule
+\end{longtable}
+
+The accompanying \texttt{scripts/verifyObserverRobustConnection.m} checks
+the derived identities and decisive counterexamples on finite numerical
+instances. It does not certify Lipschitz/remainder constants for every Fiala
+trajectory, a robust terminal set for the fourteen scenarios, deterministic
+sensor amplitude bounds, or a runtime deadline. Those are numerical/model
+certification and controller-integration tasks. No existing collision or
+recovery simulation result is relabelled as an output-feedback robust result.
+
+\begin{thebibliography}{9}
+\bibitem{Sharma} G. Sharma, H. Alai, and R. Rajamani,
+``Simultaneous ego-vehicle state estimation and vehicle trajectory tracking
+using a multistage high gain observer,'' \emph{Transportation Research Part C},
+vol. 182, 105411, 2026.
+\href{https://doi.org/10.1016/j.trc.2025.105411}{doi:10.1016/j.trc.2025.105411}.
+Local reference PDF, Assumption 1 and Theorems 1--2, PDF pp. 6--8.
+\bibitem{Huang} J. Huang, H. Wang, K. Margellos, and P. Goulart,
+``Predictive Control Barrier Functions: Bridging model predictive control
+and control barrier functions,'' \emph{European Control Conference},
+pp. 2623--2629, 2025.
+\href{https://doi.org/10.23919/ECC65951.2025.11187291}{doi:10.23919/ECC65951.2025.11187291};
+\href{https://arxiv.org/abs/2502.08400}{arXiv:2502.08400}, Sec. III, Eq. (8).
+\bibitem{Kohler} J. K\"ohler, M. A. M\"uller, and F. Allg\"ower,
+``Robust output feedback model predictive control using online estimation
+bounds,'' 2021 preprint.
+\href{https://arxiv.org/abs/2105.03427}{arXiv:2105.03427}, Secs. III--IV.
+\bibitem{Local} Collision Avoidance repository,
+\emph{Observer ISS Theory}, \texttt{estimator/OBSERVER\_ISS\_THEORY.md};
+\emph{One Analytic Nominal CLF}, \texttt{controller/NOMINAL\_CLF.md}; and
+\emph{Observer-to-Robust-PCBF Gap},
+\texttt{report/OBSERVER\_ROBUST\_PCBF\_GAP\_20261003.tex}.
+Working-source hashes and finite-check provenance accompany this derivation.
+\end{thebibliography}
+\end{document}

@@ -14,6 +14,16 @@ missing guarantee. The source and runtime audit, and the mathematical
 integration requirements, are recorded in
 [the observer-to-PCBF gap analysis](../report/OBSERVER_ROBUST_PCBF_GAP_20261003.tex).
 
+The completed mathematical design is in
+[Observer-to-robust-PCBF theory](OBSERVER_ROBUST_PCBF_THEORY.tex). It derives
+current joint uncertainty sets, causal prediction tubes, whole-hold robust
+rectangle constraints, an information-state terminal/shift theorem, and
+disturbance-dependent recovery with this same CLF. A vanishing proximal
+weight preserves dissipation in one convex solve. These are conditional
+theoretical results, with finite checks in
+`scripts/verifyObserverRobustConnection.m`; the production controller has not
+yet been changed to realize their set propagation or certification premises.
+
 ## Prediction and initialization
 
 The Fiala bicycle state is `x = [px; py; yaw; vx; vy; yawRate]` and its input is

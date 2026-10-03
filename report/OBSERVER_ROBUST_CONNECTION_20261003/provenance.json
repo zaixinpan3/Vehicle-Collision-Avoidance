@@ -1,0 +1,109 @@
+{
+  "preparationDate": "2026-10-03",
+  "scope": "Mathematical design and finite verification only; production controller unchanged",
+  "baseCommit": "56f1964f1b0bd2d6c73678f6a8ca8836af0872fb",
+  "sourceHashes": [
+    {
+      "path": "estimator/OBSERVER_ISS_THEORY.md",
+      "sha256": "5ba71904b3f5d460ca48dc8afb1e535f1fa08c031ee9bc56f773f7152266aff7"
+    },
+    {
+      "path": "estimator/nrmmObserverCertificate.m",
+      "sha256": "d99f102292a50a0f18db65ca67b93ffc1b77a850ecfa6f63b33dd504a2381308"
+    },
+    {
+      "path": "estimator/nrmmPositionErrorBound.m",
+      "sha256": "5b6fe45f7924c611c6af948038bf16b059fbb76ece1aba571f7d6f420ffbebb5"
+    },
+    {
+      "path": "estimator/nrmmControllerErrorBounds.m",
+      "sha256": "48bfd1208c4ecc5a1dd20b74364895da9b9d71a9ad66e060fdd35ef80f8280cc"
+    },
+    {
+      "path": "controller/NOMINAL_CLF.md",
+      "sha256": "fe087c48cd49a40876445a84f4d19105709671d62160705deb64545510c44554"
+    },
+    {
+      "path": "controller/terminalContinuation.m",
+      "sha256": "350c98b9cb5475ddc883c6d90b4aab060d742a0c353f64f366b60bf48de8fb7a"
+    },
+    {
+      "path": "report/OBSERVER_ROBUST_PCBF_GAP_20261003.tex",
+      "sha256": "672bb196aedab92e59f6df17b65ef04c8d32e62d52936f7af2c80e505065bfb1"
+    },
+    {
+      "path": "controller/OBSERVER_ROBUST_PCBF_THEORY.tex",
+      "sha256": "8fccac4b7455f4149a7460a2857b5cc19a9cf4de652e664be180bf3ab7ff4c1a"
+    },
+    {
+      "path": "controller/PCBF_CLF_ARCHITECTURE.md",
+      "sha256": "9cb20c8a62870328b88f50eba25dd498d52f776a6b4c76ffc76272eca6db0259"
+    },
+    {
+      "path": "scripts/verifyObserverRobustConnection.m",
+      "sha256": "863ca2b1a6a7520e3c1fd89cd575ba33be32dc922c852582e4c08091731138a5"
+    },
+    {
+      "path": "report/OBSERVER_ROBUST_CONNECTION_20261003/math-checks.json",
+      "sha256": "b6218e2d83fddc31d77c4587eba551d20e4aba056d3e69958f5d4dac46bdba04"
+    },
+    {
+      "path": "reference/Sharma et al. - 2026 - Simultaneous ego-vehicle state estimation and vehicle trajectory tracking using a multistage high ga.pdf",
+      "sha256": "f8414de25dd6bfa1d65ed4c4681d57b692bf5837622a5e2fbee7bafff4f03621"
+    },
+    {
+      "path": "reference/Huang et al. - 2025 - Predictive Control Barrier Functions Bridging model predictive control and control barrier function.pdf",
+      "sha256": "aabbce274eeb616a8f583daf05a53417fb17fea7ca2801d6469ccacc8e3ad7b3"
+    }
+  ],
+  "sources": [
+    {
+      "title": "Robust output feedback model predictive control using online estimation bounds",
+      "authors": "Johannes Koehler; Matthias A. Mueller; Frank Allgoewer",
+      "url": "https://arxiv.org/abs/2105.03427",
+      "sections": "III-IV",
+      "accessed": "2026-10-03",
+      "role": "Prior foundation; not a claim of novelty for the generic observer-bound-to-robust-MPC chain"
+    },
+    {
+      "title": "Sharma, Alai and Rajamani (2026)",
+      "doi": "10.1016/j.trc.2025.105411",
+      "sections": "Assumption 1 and Theorems 1-2, PDF pages 6-8",
+      "access": "Local reference PDF"
+    },
+    {
+      "title": "Huang, Wang, Margellos and Goulart (2025)",
+      "doi": "10.23919/ECC65951.2025.11187291",
+      "sections": "Section III, predictive slack problem and shift argument",
+      "access": "Local reference PDF and primary arXiv/Oxford metadata"
+    }
+  ],
+  "verification": {
+    "command": "matlab -singleCompThread -batch \"addpath('scripts'); verifyObserverRobustConnection('report/OBSERVER_ROBUST_CONNECTION_20261003/math-checks.json'); issues = checkcode('scripts/verifyObserverRobustConnection.m', '-id'); disp(issues);\"",
+    "exitCode": 0,
+    "finiteChecksPassed": 17,
+    "finiteChecksTotal": 17,
+    "randomSeed": 20261003,
+    "matlabRelease": "2026a",
+    "codeAnalyzer": "No source diagnostics. CFERR at line 0: missing legacy R2025b settings file; default analyzer settings used.",
+    "latex": "pdflatex twice; exit 0, 12 pages, no undefined references or overfull boxes; extracted text and rendered pages inspected",
+    "limitations": "Finite examples, analytic extremizers and counterexamples; not exhaustive nonlinear vehicle validation, interval arithmetic, a closed-loop scenario run, or a runtime benchmark."
+  },
+  "designResults": [
+    "Positive comparison and transient-to-ellipsoid mapping, including exact directional supports",
+    "Explicit relative NRMM yaw enclosure and common-pose cancellation in rectangle separation",
+    "Nested posterior update, causal output-feedback tube, and separation of future estimation error from reachable-state spread",
+    "Certified affine rectangle rows, whole-domain Taylor remainders, and intersample clearance reserve",
+    "Information-state robust terminal family, disturbance-dependent ego core radius, and cached-certificate shift closure",
+    "Inherited-budget robust feasibility and zero-slack continuous-hold safety theorem",
+    "Single robust CLF, explicit disturbance supply, and vanishing proximal weight preserving dissipation in one solve"
+  ],
+  "remainingVehicleCertification": [
+    "True initial/noise/domain and future sensor contracts",
+    "Sampled observer forecast and Fiala/hold setwise remainder constants",
+    "Nonempty robust joint terminal inner family and sound conic certificate reuse",
+    "Robust recovery-domain and conservative CLF-row feasibility",
+    "Production observer/controller integration and timed noisy closed-loop experiments"
+  ],
+  "exclusions": "Pre-existing observer theory/report, manuscript, perception, reference PDFs and solver/dependency work are not staged; their read-only content is identified where used. No weekly/monthly document hash is recorded."
+}
