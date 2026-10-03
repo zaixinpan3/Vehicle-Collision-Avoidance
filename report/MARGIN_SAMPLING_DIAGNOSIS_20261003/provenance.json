@@ -1,0 +1,47 @@
+{
+  "sourceCommit": "de0767ce8d3bae397c6f2c25d7a32a1a683eaf9e",
+  "simulationCommit": "8347c2aac7952ae8065f9c571e3c46cdca77e049",
+  "commands": [
+    "matlab -singleCompThread -batch \"addpath('scripts'); auditCollisionMarginSampling('/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign','/home/zai/.cache/collisionAvoidance/margin-sampling-20261003');\""
+  ],
+  "inputs": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed15-acceleratingHeadOn.json",
+      "sha256": "a7a65784670fc2ec966f7cc2799004eb6ae7f24faa719553b32aeccaafc41ba8"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed15-acceleratingHeadOn.mat",
+      "sha256": "f71b515c65019ba728d67fe3404ca4ded327b079cdd3521e0f64c62f835aed71"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed8-crossing.json",
+      "sha256": "590c8d5c02f513b9b9ec8c690bddc2897c987905f5016cb3887804022123c271"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed8-crossing.mat",
+      "sha256": "32beb27d73442fcf34203c4d2d4dee7a37cfc6b245226a048970be7d30379e6d"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed8-curvedCrossing.json",
+      "sha256": "16399b5a926f64ec52457434f7a3fbcb7884287b592505305dd4fd0cd81de7ec"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed8-curvedCrossing.mat",
+      "sha256": "fa0f5a259227903bab9aa10b864c581de03d51ff3ba267fa09781d1a74d15049"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed8-turningCrossing.json",
+      "sha256": "422320664d4e87467bd2df2b0ae6bfbee0eef60370403429d202499ccf1ae45a"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/path-bound-20261003/validated-campaign/speed8-turningCrossing.mat",
+      "sha256": "46822f2000937c804d36f29da30df880197da20889d4d053c63800383ef3cdde"
+    }
+  ],
+  "captures": {
+    "path": "/home/zai/.cache/collisionAvoidance/margin-sampling-20261003/margin-captures.mat",
+    "sha256": "ae4e83ef5e167eebbf30e9f1c6784f0b6302dc6e62073482ce814449f4efe0ba"
+  },
+  "validation": "All four recorded minima match to 1e-9 m and all 110 replayed commands match exactly; subsequent dense ODE sampling and scalar minimum refinement are offline diagnostics.",
+  "initialAttempt": "Loading configuration from JSON failed because Inf limits were serialized as null. The diagnostic now reads the paired MAT configuration; the failed-attempt log is retained. No controller issue was inferred from that serialization failure."
+}
