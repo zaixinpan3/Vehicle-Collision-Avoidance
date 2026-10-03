@@ -1,0 +1,618 @@
+{
+  "speed": 15,
+  "scenario": "brakingLead",
+  "frame": 2,
+  "trace": {
+    "time": 0.05,
+    "controllerSeconds": 0.093064,
+    "horizonSteps": 96,
+    "source": "twoStageRealTimeIteration",
+    "solverCalls": 2,
+    "initialization": "movingTargetPotentialField",
+    "potentialFieldRestarted": true,
+    "initializationFailure": "shiftedModelDisagreement",
+    "linearizationCount": 2,
+    "attempts": [
+      {
+        "initialization": "shiftedInputRollout",
+        "terminationReason": "twoStagesReturned",
+        "solverCalls": 1,
+        "stages": [
+          {
+            "objective": "inheritedSafetyBudget",
+            "exitFlag": null,
+            "seconds": 0,
+            "value": 8.881311797860031e-07,
+            "numericalSolve": false,
+            "solverInfo": {}
+          },
+          {
+            "objective": "clfSlack",
+            "exitFlag": 1,
+            "seconds": 0.015275,
+            "value": 3.66151344708634,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 1,
+              "iterations": 18,
+              "solveSeconds": 0.015079933,
+              "primalResidual": 6.3541252533613175e-09,
+              "dualResidual": 2.199594445890862e-13,
+              "objective": 2.6160450682985816
+            }
+          }
+        ],
+        "primaryOptimum": null,
+        "primaryLowerBound": 0,
+        "inputTrustScale": 0.125,
+        "budgetSource": "shiftedTrajectory",
+        "slackCap": 8.881311797860031e-07,
+        "firstSlackCap": 5.8662428173043865e-08,
+        "budgetAnchorResidual": 0.007938345643244412,
+        "initializationSeconds": 0.000887,
+        "formulationSeconds": 0.026274,
+        "clfConstructionSeconds": 0.000135,
+        "modelBuilt": true
+      },
+      {
+        "initialization": "movingTargetPotentialField",
+        "terminationReason": "twoStagesReturned",
+        "solverCalls": 1,
+        "stages": [
+          {
+            "objective": "pcbfSlack",
+            "exitFlag": 1,
+            "seconds": 2.3e-05,
+            "value": 0,
+            "numericalSolve": false,
+            "solverInfo": {}
+          },
+          {
+            "objective": "clfSlack",
+            "exitFlag": 1,
+            "seconds": 0.015228,
+            "value": 3.663833106085031,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 1,
+              "iterations": 16,
+              "solveSeconds": 0.015048373,
+              "primalResidual": 1.134510960406122e-09,
+              "dualResidual": 5.475750348703426e-14,
+              "objective": 2.6177023950721203
+            }
+          }
+        ],
+        "primaryOptimum": 0,
+        "primaryLowerBound": 0,
+        "inputTrustScale": 0.125,
+        "budgetSource": "primaryOptimum",
+        "slackCap": 1e-06,
+        "firstSlackCap": null,
+        "budgetAnchorResidual": null,
+        "initializationSeconds": 0.004235,
+        "formulationSeconds": 0.023740999999999998,
+        "clfConstructionSeconds": 0.000117,
+        "modelBuilt": true
+      }
+    ],
+    "refinementCount": 2,
+    "predictionAgreement": {
+      "poseErrorMeters": 0.0013618531921150974,
+      "fullPoseErrorMeters": 0.0013618531921150974,
+      "poseConstraintNodeCount": 97,
+      "scaledStateError": 0.00010251776915326527,
+      "scaledClfError": 0.0026053897298311474,
+      "ratio": 0.26053897298311474,
+      "inputTrustScale": 0.125,
+      "actualClfSlack": 3.806580841551525,
+      "maximumLateralDeviationMeters": 9.798034426595208,
+      "lateralDeviationRatio": 0,
+      "firstInputTrustActivity": 0.49999999999932765,
+      "seconds": 0.001063,
+      "stepFraction": 0.5,
+      "predictedClfReduction": 0.1491545125688658,
+      "actualClfReduction": 0.15280111386510598,
+      "clfReductionResolved": true,
+      "trustBoundaryRefinement": false
+    },
+    "modelAgreementHistory": [
+      {
+        "poseErrorMeters": 0.0054481320575848645,
+        "fullPoseErrorMeters": 0.0054481320575848645,
+        "poseConstraintNodeCount": 97,
+        "scaledStateError": 0.00041050377450587333,
+        "scaledClfError": 0.010243178746365385,
+        "ratio": 1.0243178746365385,
+        "inputTrustScale": 0.125,
+        "actualClfSlack": 3.647176709489417,
+        "maximumLateralDeviationMeters": 9.737172884787567,
+        "lateralDeviationRatio": 0,
+        "firstInputTrustActivity": 1.0000000000010223,
+        "seconds": 0.000925,
+        "stepFraction": 1,
+        "predictedClfReduction": 0.29566396251626204,
+        "actualClfReduction": 0.31000070011318526,
+        "clfReductionResolved": true,
+        "trustBoundaryRefinement": false
+      },
+      {
+        "poseErrorMeters": 0.005445738657435808,
+        "fullPoseErrorMeters": 0.005445738657435808,
+        "poseConstraintNodeCount": 97,
+        "scaledStateError": 0.0004104987375836607,
+        "scaledClfError": 0.010245981254974017,
+        "ratio": 1.0245981254974017,
+        "inputTrustScale": 0.125,
+        "actualClfSlack": 3.649492445991705,
+        "maximumLateralDeviationMeters": 9.73541470146981,
+        "lateralDeviationRatio": 0,
+        "firstInputTrustActivity": 0.9999999999986553,
+        "seconds": 0.000919,
+        "stepFraction": 1,
+        "predictedClfReduction": 0.2955488493316003,
+        "actualClfReduction": 0.3098895094249263,
+        "clfReductionResolved": true,
+        "trustBoundaryRefinement": false
+      }
+    ],
+    "modelAgreementSatisfied": true,
+    "lineSearchHistory": [
+      {
+        "reason": "infeasibleBase",
+        "baseResidual": 0.007938345643244412,
+        "baseClfSlack": 3.9571774096026027,
+        "fullClfSlack": 3.66151344708634,
+        "accepted": false,
+        "seconds": 5.1e-05,
+        "trials": [],
+        "round": 1
+      },
+      {
+        "reason": "accepted",
+        "baseResidual": 0,
+        "baseClfSlack": 3.959381955416631,
+        "fullClfSlack": 3.663833106085031,
+        "accepted": true,
+        "seconds": 0.00261,
+        "trials": {
+          "fraction": 0.5,
+          "clfSlack": 3.8102274428477654,
+          "safety": 4.7096995692095043e-07,
+          "agreement": {
+            "poseErrorMeters": 0.0013618531921150974,
+            "fullPoseErrorMeters": 0.0013618531921150974,
+            "poseConstraintNodeCount": 97,
+            "scaledStateError": 0.00010251776915326527,
+            "scaledClfError": 0.0026053897298311474,
+            "ratio": 0.26053897298311474,
+            "inputTrustScale": 0.125,
+            "actualClfSlack": 3.806580841551525,
+            "maximumLateralDeviationMeters": 9.798034426595208,
+            "lateralDeviationRatio": 0,
+            "firstInputTrustActivity": 0.49999999999932765,
+            "seconds": 0.001063,
+            "stepFraction": 0.5,
+            "predictedClfReduction": 0.1491545125688658,
+            "actualClfReduction": 0.15280111386510598,
+            "clfReductionResolved": true,
+            "trustBoundaryRefinement": false
+          }
+        },
+        "round": 2
+      }
+    ],
+    "lineSearchSeconds": 0.0026609999999999997,
+    "lineSearchTrials": 1,
+    "acceptedStepFraction": 0.5,
+    "slackCap": 1e-06,
+    "primaryOptimum": 0,
+    "budgetSource": "primaryOptimum",
+    "firstSlackCap": null,
+    "budgetAnchorResidual": null,
+    "stageSlacks": [
+      2.939356193424484e-08,
+      2.9395029972472163e-08,
+      2.9399639397870605e-08,
+      2.941041547899429e-08,
+      2.9424728371573174e-08,
+      2.9437357303046527e-08,
+      2.9446451849505647e-08,
+      2.9451765522635196e-08,
+      2.9453876584086677e-08,
+      2.945364873487695e-08,
+      2.9451923163165482e-08,
+      2.9449391598629643e-08,
+      2.9446575087008216e-08,
+      2.944881533423664e-08,
+      2.9452389838473034e-08,
+      2.9454386750131363e-08
+    ],
+    "primaryLowerBound": 0,
+    "selectedAttempt": 2,
+    "inputTrustScale": 0.125,
+    "absoluteSampleIndex": 1,
+    "endpointIndex": 97,
+    "terminalPhaseMeters": 0,
+    "terminalSeparationMargin": null,
+    "completionSteps": 80,
+    "optimizationReturned": true,
+    "optimizationConverged": true,
+    "terminationReason": "twoStagesModelAgreement",
+    "solverStages": [
+      {
+        "objective": "inheritedSafetyBudget",
+        "exitFlag": null,
+        "seconds": 0,
+        "value": 8.881311797860031e-07,
+        "numericalSolve": false,
+        "solverInfo": {}
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.015275,
+        "value": 3.66151344708634,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 18,
+          "solveSeconds": 0.015079933,
+          "primalResidual": 6.3541252533613175e-09,
+          "dualResidual": 2.199594445890862e-13,
+          "objective": 2.6160450682985816
+        }
+      },
+      {
+        "objective": "pcbfSlack",
+        "exitFlag": 1,
+        "seconds": 2.3e-05,
+        "value": 0,
+        "numericalSolve": false,
+        "solverInfo": {}
+      },
+      {
+        "objective": "clfSlack",
+        "exitFlag": 1,
+        "seconds": 0.015228,
+        "value": 3.663833106085031,
+        "numericalSolve": true,
+        "solverInfo": {
+          "nativeStatus": 1,
+          "iterations": 16,
+          "solveSeconds": 0.015048373,
+          "primalResidual": 1.134510960406122e-09,
+          "dualResidual": 5.475750348703426e-14,
+          "objective": 2.6177023950721203
+        }
+      }
+    ],
+    "affineFeasibilityTolerance": 1e-05,
+    "affineValidationPerformed": false,
+    "nonlinearValidationPerformed": false,
+    "predictiveBarrierValue": 4.7096995692095043e-07,
+    "hardResidual": null,
+    "clfSlack": 3.8102274428477654,
+    "clfInitialValue": 1.3996375492262738,
+    "clfNextValue": 4.635385021968946,
+    "clfFunction": "quadraticTransverseError",
+    "clfRequiredDecrease": 0.5744799701050928,
+    "clfTieBound": 0.0001399637549226274,
+    "clfLocalModel": "quadraticOnAffineFirstSuccessor",
+    "clfStageAttempted": true,
+    "clfStageCompleted": true,
+    "clfLowerBound": false,
+    "clfInitialSlack": 3.959381955416631,
+    "state": [
+      0.7494165646973071,
+      0.0049404234586235005,
+      0.005633542520986525,
+      14.977858249896192,
+      0.1155463046089603,
+      0.20827296716982824
+    ],
+    "nextState": [
+      1.497911848167018,
+      0.02024382296056585,
+      0.01942503932209887,
+      14.967836125098511,
+      0.12390074308258868,
+      0.3318483742922437
+    ],
+    "input": [
+      0.11123863015032197,
+      0.03234340433405795
+    ],
+    "transverseError": [
+      0.02024382296056585,
+      0.01942503932209887,
+      -0.032163874901488754,
+      0.12390074308258868,
+      0.3318483742922437
+    ],
+    "auditTimes": [
+      0,
+      0.0016666666666666668,
+      0.0033333333333333335,
+      0.005000000000000001,
+      0.006666666666666667,
+      0.008333333333333333,
+      0.010000000000000002,
+      0.011666666666666667,
+      0.013333333333333334,
+      0.015000000000000001,
+      0.016666666666666666,
+      0.018333333333333333,
+      0.020000000000000004,
+      0.021666666666666667,
+      0.023333333333333334,
+      0.025,
+      0.02666666666666667,
+      0.028333333333333335,
+      0.030000000000000002,
+      0.03166666666666667,
+      0.03333333333333333,
+      0.035,
+      0.03666666666666667,
+      0.03833333333333334,
+      0.04000000000000001,
+      0.041666666666666664,
+      0.043333333333333335,
+      0.045000000000000005,
+      0.04666666666666667,
+      0.04833333333333334,
+      0.05
+    ],
+    "auditStates": [
+      [
+        0.7494165646973071,
+        0.0049404234586235005,
+        0.005633542520986525,
+        14.977858249896192,
+        0.1155463046089603,
+        0.20827296716982824
+      ],
+      [
+        0.7743777940594015,
+        0.0052794007053705615,
+        0.005985110447111548,
+        14.977475408467289,
+        0.11721353790551771,
+        0.21359263855982502
+      ],
+      [
+        0.7993382501574512,
+        0.005629940889979925,
+        0.006345465328279548,
+        14.977096841515355,
+        0.11876433910439622,
+        0.21881753176468802
+      ],
+      [
+        0.8242979330751445,
+        0.005992068867432219,
+        0.006714450293835852,
+        14.976722463369095,
+        0.1202011144603998,
+        0.2239489584969568
+      ],
+      [
+        0.8492568426892286,
+        0.0063658095781456234,
+        0.00709191065966326,
+        14.976352185472248,
+        0.1215262431492479,
+        0.22898823071668573
+      ],
+      [
+        0.8742149786699397,
+        0.006751188057474208,
+        0.007477693927746243,
+        14.975985916637361,
+        0.1227420768377213,
+        0.23393665962134874
+      ],
+      [
+        0.8991723404815165,
+        0.007148229444459788,
+        0.007871649784090084,
+        14.97562356328959,
+        0.12385093928892828,
+        0.23879555468153152
+      ],
+      [
+        0.9241289273827928,
+        0.007556958989855658,
+        0.00827363009507044,
+        14.975265029700669,
+        0.12485512600208415,
+        0.2435662227216339
+      ],
+      [
+        0.9490847384278671,
+        0.007977402063441686,
+        0.008683488902287716,
+        14.974910218213232,
+        0.1257569038861387,
+        0.24824996704476235
+      ],
+      [
+        0.9740397724668431,
+        0.008409584160650989,
+        0.00910108241599913,
+        14.974559029455662,
+        0.12655851096653756,
+        0.25284808660094427
+      ],
+      [
+        0.9989940281466418,
+        0.008853530908529016,
+        0.009526269007199948,
+        14.974211362547651,
+        0.12726215612435993,
+        0.2573618751977545
+      ],
+      [
+        1.023947503911878,
+        0.009309268071046303,
+        0.00995890919842379,
+        14.97386711529665,
+        0.12787001886703742,
+        0.2617926207524092
+      ],
+      [
+        1.0489001980058008,
+        0.00977682155378655,
+        0.010398865653330308,
+        14.973526184385452,
+        0.12838424912982502,
+        0.2661416045843488
+      ],
+      [
+        1.0738521084712935,
+        0.010256217408031988,
+        0.010846003165146853,
+        14.973188465551058,
+        0.1288069671071665,
+        0.2704101007473061
+      ],
+      [
+        1.0988032331519326,
+        0.010747481834268182,
+        0.011300188644029159,
+        14.972853853755081,
+        0.1291402631130724,
+        0.27459937539983265
+      ],
+      [
+        1.123753569693097,
+        0.011250641185130455,
+        0.011761291103404188,
+        14.972522243345905,
+        0.12938619746960853,
+        0.2787106862132376
+      ],
+      [
+        1.1487031155431318,
+        0.011765721967814289,
+        0.012229181645356663,
+        14.972193528212772,
+        0.1295468004225767,
+        0.28274528181587877
+      ],
+      [
+        1.173651867954561,
+        0.01229275084597192,
+        0.012703733445118975,
+        14.971867601932074,
+        0.12962407208345686,
+        0.2867044012727348
+      ],
+      [
+        1.1985998239853433,
+        0.012831754641117262,
+        0.013184821734722345,
+        14.971544357906044,
+        0.12961998239667075,
+        0.2905892735991791
+      ],
+      [
+        1.2235469805001757,
+        0.013382760333561172,
+        0.013672323785865378,
+        14.971223689494076,
+        0.12953647113122183,
+        0.2944011173078744
+      ],
+      [
+        1.2484933341718327,
+        0.013945795062898824,
+        0.014166118892054269,
+        14.970905490136904,
+        0.12937544789576302,
+        0.2981411399877005
+      ],
+      [
+        1.27343888148255,
+        0.014520886128070742,
+        0.014666088350067188,
+        14.970589653473853,
+        0.1291387921761442,
+        0.30181053791363627
+      ],
+      [
+        1.2983836187254396,
+        0.01510806098701862,
+        0.015172115440793485,
+        14.970276073453405,
+        0.12882835339449464,
+        0.305410495686514
+      ],
+      [
+        1.3233275420059427,
+        0.015707347255956922,
+        0.015684085409496663,
+        14.969964644437283,
+        0.1284459509888998,
+        0.30894218590157707
+      ],
+      [
+        1.348270647243312,
+        0.016318772708280666,
+        0.016201885445548177,
+        14.969655261298294,
+        0.1279933745127403,
+        0.3124067688447753
+      ],
+      [
+        1.3732129301721243,
+        0.016942365273129478,
+        0.016725404661677486,
+        14.96934781951214,
+        0.12747238375276992,
+        0.31580539221574794
+      ],
+      [
+        1.3981543863438228,
+        0.01757815303362766,
+        0.017254534072781894,
+        14.969042215243407,
+        0.12688470886502065,
+        0.31913919087645326
+      ],
+      [
+        1.4230950111282825,
+        0.018226164224819316,
+        0.017789166574338093,
+        14.968738345425969,
+        0.1262320505276366,
+        0.32240928662442014
+      ],
+      [
+        1.448034799715401,
+        0.018886427231317348,
+        0.01832919692045564,
+        14.968436107837984,
+        0.12551608010975232,
+        0.32561678798961213
+      ],
+      [
+        1.4729737471167124,
+        0.019558970584684532,
+        0.018874521701610854,
+        14.968135401171743,
+        0.12473843985554743,
+        0.3287627900539125
+      ],
+      [
+        1.497911848167018,
+        0.02024382296056585,
+        0.01942503932209887,
+        14.967836125098511,
+        0.12390074308258868,
+        0.3318483742922437
+      ]
+    ],
+    "predictionCollisionMargin": null
+  }
+}

@@ -207,7 +207,7 @@ monotonicity claim; closed-loop recovery and collisions are audited separately.
 
 One nonnegative collision slack is assigned to each primary-horizon stage;
 it relaxes the start and midpoint separation rows. Completion-tail rows are
-hard. The node buffer is 0.10 m, whereas the experiment's physical pass criterion
+hard. The node buffer is 0.20 m, whereas the experiment's physical pass criterion
 is positive rectangle clearance. No road-boundary constraint is imposed.
 The independent given-path center-deviation bound is described in
 [PATH_DEVIATION_BOUND.md](PATH_DEVIATION_BOUND.md); it defaults to 10 m and is

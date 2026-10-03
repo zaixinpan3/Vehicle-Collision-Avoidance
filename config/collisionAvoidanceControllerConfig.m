@@ -37,7 +37,7 @@ function cfg=localDefaults()
     % only until a prediction first exceeds that range. Inf never ends it.
     % safetyMarginMeters is the clearance required at the sampled collision
     % rows (hold start and midpoint), not a continuous-time clearance bound.
-    cfg.collision=struct('safetyMarginMeters',0.10,'encounterRangeMeters',30);
+    cfg.collision=struct('safetyMarginMeters',0.20,'encounterRangeMeters',30);
     cfg.vehicle=struct('m',1650,'Iz',1700,'lf',1.4,'lr',1.65, ...
         'wheelbase',3.05,'length',4.8,'width',1.9,'rectangleOffset',[0;0],'gravity',9.81);
     cfg.tire=struct('corneringStiffness',[96000;96000],'frictionCoefficient',[.85;.85]);

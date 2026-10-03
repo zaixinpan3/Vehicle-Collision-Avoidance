@@ -42,7 +42,7 @@ def main():
                              eightSeconds=eight, final=final, source=str(source),
                              sourceSha256=hashlib.sha256(source.read_bytes()).hexdigest()))
     output = dict(scope='Independent sampled geometry and nominal-recovery audit; no nonlinear feasibility certification',
-                  physicalCriterion='Strictly positive rectangle distance; the 0.10 m buffer is an affine-node requirement',
+                  physicalCriterion='Strictly positive rectangle distance; the configured buffer is an affine-node requirement',
                   results=rows)
     (args.experiment / 'comparison.json').write_text(json.dumps(output, indent=2) + '\n')
     for version in ('baseline', 'current'):

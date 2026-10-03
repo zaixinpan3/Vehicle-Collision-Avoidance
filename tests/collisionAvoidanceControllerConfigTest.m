@@ -63,7 +63,7 @@ classdef collisionAvoidanceControllerConfigTest < matlab.unittest.TestCase
         end
         function defaultCollisionBufferCanBeExplicitlyDisabled(testCase)
             cfg = collisionAvoidanceControllerConfig();
-            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0.10);
+            testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0.20);
             cfg = collisionAvoidanceControllerConfig( ...
                 struct('collision', struct('safetyMarginMeters', 0)));
             testCase.verifyEqual(cfg.collision.safetyMarginMeters, 0);

@@ -1,0 +1,13 @@
+{
+  "controller/laneGeometry.m": "8ace6aee83efe3d1473a866bf1f658bc5f9117fcc177b387e29a399714c878bf",
+  "controller/modifiedFialaTire.m": "3b9d09f2d0850d460dcc1209eebd511579b49011f259999255ab4c92ee9013c0",
+  "controller/collisionAvoidanceController.m": "fa27cb862347686aaecf800af51a20930d0ed550cc18d1d851a093b4d35a5242",
+  "controller/predictiveSafetyGeometry.m": "e8c6c858d7bc20cc25b3761366ec4dee1e125b07d10fa1c360101bf011561a18",
+  "controller/readControllerInputs.m": "6385088c3c47f8f5f1ed99cd62dcdb087c3c4b2b9e0712c5c7478f8817fdc55a",
+  "controller/terminalContinuation.m": "350c98b9cb5475ddc883c6d90b4aab060d742a0c353f64f366b60bf48de8fb7a",
+  "controller/nonlinearBicycleModel.m": "280c5de71dfe3b27eace06095db1a36932f1a11d5bc538f5b103a092c8ecca33",
+  "controller/solvePredictiveControl.m": "8344c276c71be91044030e346dea29c98a2dfe2888507bb9cbfc56c31966edc5",
+  "config/collisionAvoidanceControllerConfig.m": "be1cd65b58d017cb01346b9fbf1206e7b4128e9fa64db5efd9f53297dc25640d",
+  "scripts/runPotentialFieldCampaign.m": "95d72e67868a7ccd7b646660803e4a2a20e73b5ded1708d08fc5f8b040b85181",
+  "scripts/runNonlinearPredictiveSafetyValidation.m": "6f8b961a2e8eb8fcf81340a4a4c3f99e5e87e57df7853814f4a3266550b879cc"
+}

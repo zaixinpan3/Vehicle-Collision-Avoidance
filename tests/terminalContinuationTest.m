@@ -73,8 +73,10 @@ classdef terminalContinuationTest < matlab.unittest.TestCase
             blocking=predictiveSafetyGeometry.predictTarget([origin+20*t;.2;0;0;0;1.6;2.4;.95;0;0],-time);
             alongside=predictiveSafetyGeometry.predictTarget([origin+5*n;.2;8;0;0;1.6;2.4;.95;0;0],-time);
             [margin,value]=terminalContinuation.departure(seed,receding,index,cfg);
-            testCase.verifyGreaterThan(margin,10);
-            testCase.verifyLessThan(margin,15-4.8);
+            geometricMargin=15-(cfg.vehicle.length/2+2.4)-cfg.collision.safetyMarginMeters;
+            % The invariant tube adds a small reserve to the requested buffer.
+            testCase.verifyGreaterThan(margin,geometricMargin-.01);
+            testCase.verifyLessThan(margin,geometricMargin);
             testCase.verifyEqual(min(value),margin,AbsTol=1e-12);
             testCase.verifyLessThan(terminalContinuation.departure(seed,blocking,index,cfg),0);
             testCase.verifyEqual(terminalContinuation.departure(seed,alongside,index,cfg),-Inf);
