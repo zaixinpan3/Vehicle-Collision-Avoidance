@@ -1,0 +1,118 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,booktabs,hyperref,xurl}
+\usepackage[T1]{fontenc}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\title{Why the 20-cm-margin frame fails model agreement}
+\author{Collision Avoidance Research}
+\date{October 3, 2026}
+\begin{document}
+\maketitle
+\textbf{Finding.} The initialization is dynamically consistent, but is not
+sufficiently compatible with the tightened constraints to support the current
+single-linearization correction and damping rule. The fresh potential-field
+seed misses the new sampled clearance requirement by 2.464 cm. Restoring its
+convex feasibility already produces more nonlinear prediction error than the
+10-mm acceptance threshold. This is a local numerical-design limitation, not
+proof that avoiding the target is physically impossible.
+
+\textbf{Scope and reproduction.} The 15-m/s accelerating head-on case stops
+at $t=0.25$ s before its sixth control. The frozen continuation from
+\path{/home/zai/.cache/collisionAvoidance/margin-20cm-20261003/validated-campaign/speed15-acceleratingHeadOn.mat}
+was replayed through a temporary diagnostic copy of
+\path{controller/solvePredictiveControl.m}. Only the copied function name,
+output-directory argument and passive candidate saves changed. The online
+controller and all parameters remain unchanged. The captures reproduce both
+original disagreement values to $10^{-10}$ m. Results are offline numerical
+model comparisons, not an additional closed-loop experiment or timing test.
+
+\textbf{What the error measures.} For the optimized affine state and a nonlinear
+RK4 rollout of exactly the same input sequence, the controller evaluates
+\[
+ E_i=\|p_i^{\rm aff}-p_i^{\rm nl}\|_2+
+ R\,|\psi_i^{\rm aff}-\psi_i^{\rm nl}|,
+ \qquad R=\sqrt{(4.8/2)^2+(1.9/2)^2}.
+\]
+The maximum over collision-relevant prediction nodes must not exceed 0.01 m;
+state and CLF errors have separate gates. This is not the discrepancy at the
+currently measured state. Both anchors are nonlinear bicycle rollouts and have
+exactly zero discrepancy before input correction.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Point & Node gap (cm) & First-step error (mm) & Maximum error (mm) \\
+\midrule
+Shifted anchor & 19.8814 & 0 & 0 \\
+Shifted CLF solution & 19.8841 & 0.107674 & 10.534877 \\
+Fresh potential-field anchor & 17.5362 & 0 & 0 \\
+Fresh PCBF solution & 19.8340 & 0.066526 & 17.439265 \\
+Fresh CLF solution & 19.7737 & 0.000970 & 26.946763 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Node gaps above use nonlinear RK4 states at starts and their interpolated
+midpoints, matching the controller's numerical geometry. They are not refined
+continuous-time clearances. The 0.20-m inequalities hold for the optimized
+\emph{affine} models; nonlinear rollout can have a smaller gap.
+
+\textbf{Shifted trajectory.} The old inputs, rerolled from the current measured
+state, miss the 20-cm collision row by 1.186 mm and also violate the terminal
+membership cone by 0.041818 in that cone's units (not meters). Therefore the
+zero-correction shifted anchor is not a feasible base for convex interpolation.
+The CLF solution is convex-feasible but has 10.535-mm maximum disagreement,
+only 0.535 mm beyond the gate. Its largest steering correction is 0.662 degrees.
+Ordinary damping toward the anchor reduces error: half the correction has
+2.611-mm disagreement. However it leaves terminal-cone residual 0.020728,
+so it does not solve the constrained problem. The inherited slack budget
+alone cannot certify that this shifted base is feasible.
+
+\textbf{Fresh trajectory.} The Zhai-inspired potential guidance predicts the
+moving target and produces an executable-model rollout, but its nearest node
+at absolute $t=1.075$ s has 17.536-cm gap. Its terminal cone is feasible.
+The maximum constraint violation is consequently the 2.464-cm gap shortage in
+a hard completion-stage collision row. Guidance uses its own 0.7-m influence
+padding; it does not read \texttt{collision.safetyMarginMeters}. Increasing
+the optimization threshold therefore does not directly widen the freshly
+generated path at a fixed initial state. The influence padding is not a promised
+rectangle clearance after tracking the desired heading with vehicle dynamics.
+
+The PCBF primary solve finds zero prefix slack and a convex-feasible point,
+but this point already has 17.439-mm nonlinear disagreement. The largest
+steering correction is only 0.536 degrees. A small input correction over many
+stages is not by itself a bound on accumulated position error.
+The CLF step increases the maximum to 26.947 mm. The current line search is
+\[
+ z(\alpha)=z^{P}+\alpha(z^{C}-z^{P}),
+\]
+so $\alpha\to0$ approaches the \emph{PCBF point}, not the original nonlinear
+anchor. Its three actual trials yield 19.701, 18.003 and 17.579 mm; the limiting
+primary point remains above 10 mm. Conversely, halfway from the original
+anchor to the primary point gives 4.288-mm disagreement but leaves a
+1.121-cm affine-constraint deficit. Accuracy and feasibility must both hold.
+
+\textbf{Error accumulation.} All three nontrivial maxima in the table occur
+2.45 s into the prediction, at absolute $t=2.70$ s. At the near-encounter
+node $t=1.10$ s, shifted CLF, fresh PCBF and fresh CLF errors are respectively
+3.086, 5.158 and 6.880 mm. The maximum is an accumulated future-model discrepancy,
+not a centimeter-scale immediate actuation error. At the maximum, translation
+contributes 9.520/15.887/24.295 mm and the heading term contributes
+1.015/1.552/2.652 mm. This diagnostic does not justify dropping the future
+accuracy requirement or relaxing a physical margin.
+
+\textbf{Design implication.} Improving initialization remains useful: it should
+respond to the requested margin and reduce the repair needed at the predicted
+encounter while retaining its role as a search seed. It need not be a safety
+certificate. The associated PCBF repair should also favor a small displacement
+from that seed; minimizing safety slack alone does not select the smallest
+nonlinear-model perturbation among equally feasible results. Such changes could
+help provide a convex-feasible, model-accurate damping base, but no proposed
+change is implemented or validated by this diagnostic. The measured failure
+cannot be assigned entirely to a bad avoidance side, an infeasible physical
+maneuver, or an overly large first steering jump.
+
+\textbf{Artifacts.} Captured primary/secondary points and complete assembled
+problems reside in the diagnostic cache. Compact results and source/input
+provenance are in \path{report/INITIALIZATION_ERROR_DIAGNOSIS_20261003/}.
+\end{document}

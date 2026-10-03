@@ -1,0 +1,54 @@
+{
+  "recordedAt": "2026-10-03T14:23:10.280668-05:00",
+  "projectHead": "91a35f6d54e9027a7276191230b4e2fcbf21e90e",
+  "probe": {
+    "source": "/home/zai/Downloads/ResearchProjects/collisionAvoidance/controller/solvePredictiveControl.m",
+    "sourceSha256": "8344c276c71be91044030e346dea29c98a2dfe2888507bb9cbfc56c31966edc5",
+    "probeSha256": "be906f599bf729c5a3089cfed60c3378ba7309bbe4a739b2b88c60246aa55616",
+    "changes": [
+      "Rename the temporary orchestration entry and add an audit output-directory argument.",
+      "Save the already-computed candidate, complete convex segment and trial model before model agreement. No numerical expression or control branch is changed."
+    ],
+    "scope": "Diagnostic copy outside repository; production controller unchanged; no timing claims from capture run."
+  },
+  "methods": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/initialization-error-20261003/buildProbe.py",
+      "sha256": "1ad5c4bca76f63fa71332b9b5988ec60aae8ad2c4b48bc1e7a9c3b77b9c616c8"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/initialization-error-20261003/runAudit.m",
+      "sha256": "308fffadc25f97f8c38e3464619db5ac47629836787128885b637a7ca1788afc"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/initialization-error-20261003/writeReport.py",
+      "sha256": "35f7cde245b0c9ca180c32e35ed1e6f81a506401ba9db199a874da2ced1b9c5e"
+    }
+  ],
+  "captures": [
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/margin-20cm-20261003/validated-campaign/speed15-acceleratingHeadOn.mat",
+      "sha256": "c642ad6333c791ae7c0b6789435596e9413a8f5e67e6367a00486e7ad6ac6d53"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/initialization-error-20261003/round-1.mat",
+      "sha256": "23e24ec278f8c24c8fd992ed711667442b68d90215058d111dafc9e6f4f1b83c"
+    },
+    {
+      "path": "/home/zai/.cache/collisionAvoidance/initialization-error-20261003/round-2.mat",
+      "sha256": "2337d22e61413f789fad19fd2516b5e810d0dbce5b3831d3ddd6296cc5ddd186"
+    }
+  ],
+  "commands": [
+    "python3 /home/zai/.cache/collisionAvoidance/initialization-error-20261003/buildProbe.py",
+    "matlab -singleCompThread -batch \"run('/home/zai/.cache/collisionAvoidance/initialization-error-20261003/runAudit.m');\"",
+    "python3 /home/zai/.cache/collisionAvoidance/initialization-error-20261003/writeReport.py"
+  ],
+  "validation": [
+    "Frozen failure and both original model-error values reproduced to 1e-10 m.",
+    "Independent rollout of each anchor exactly matches the stored states.",
+    "Recomputed full-step errors match controller diagnostics to 1e-12 m.",
+    "Controller source hash unchanged after capture."
+  ],
+  "scope": "Offline frozen-frame diagnosis only. No controller change, new closed-loop campaign, or runtime benchmark; midpoint gaps use the same numerical start/endpoint interpolation as this one-step RK4 controller."
+}
