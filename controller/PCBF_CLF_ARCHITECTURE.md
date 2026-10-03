@@ -1,6 +1,6 @@
 # Inherited PCBF slack budgets and one-step CLF optimization
 
-Every frame uses the same target-independent nominal cost-to-go CLF, defined in
+Every frame uses the same target-independent analytic quadratic CLF, defined in
 [NOMINAL_CLF.md](NOMINAL_CLF.md). Initialization and restoration minimize PCBF slack before CLF slack.
 A continuation frame first attempts CLF optimization under an inherited slack
 budget. A bounded input-increment tie term regularizes the future plan. There is no third optimization stage, target-range
@@ -49,7 +49,7 @@ the moving field and the target at the same absolute time, but need not follow
 the Gaussian exactly. Neither the geometric envelope nor its curved-road
 Frenet approximation certifies this bicycle rollout. A failed seed remains a
 possible search object. The flow constructor supplies only the initial
-trajectory; the following within-hold iteration controls prediction accuracy.
+trajectory; the bounded RTI correction and optional second model control prediction accuracy.
 The derivation, paired experiments, and remaining failures are recorded in
 [the timed-flow study](../report/SHARMA_TIMED_FLOW_20261002.tex).
 
@@ -58,7 +58,7 @@ For an anchor `(xbar_i, ubar_i)` the shared model is
     x_(i+1) = f_h(xbar_i,ubar_i) + A_i (x_i-xbar_i) + B_i (u_i-ubar_i).
 
 The same anchor supplies dynamics, tire derivatives, collision directions,
-terminal geometry and the first-input CLF approximation. Input/state correction
+terminal geometry and the analytic first-successor CLF approximation. Input/state correction
 boxes are numerical iteration bounds. At unit trust scale, the steering
 correction is +/-0.075 rad and the braking-ratio correction +/-0.125. The
 input scale adapts from measured prediction disagreement and transfers to
@@ -200,23 +200,24 @@ this lower bound, one fresh flow model is tried. Primary values are compared onl
 array from a failed primary solve is not a valid PCBF optimum. The smaller
 primary value is retained, with ties favoring the shifted model. A fresh or relinearized problem that reports infeasibility or numerical
 stalling permits one bounded enlargement to twice the nominal input box; its better primary result is retained. State boxes, physical bounds,
-collision rows and terminal conditions remain. The CLF is evaluated only after
-this primary-model selection. At most one fresh-flow retry is used across
+collision rows and terminal conditions remain. The CLF is constructed only once for each model and reused if the inherited budget needs primary restoration. At most one fresh-flow retry is used across
 the complete within-frame refinement, rather than resetting that allowance
 each time the dynamics are rebuilt.
 
 On the selected model the single CLF requirement is
 
-    V_K(F_h(z,u_0)) - V_K(z) <= -eta * ell(z) + rho,    rho >= 0.
+    V(x_next) - V(x) <= -eta * e(x)' Q e(x) + rho,    rho >= 0,
+    V(x) = e(x)' P e(x).
 
-Only two first-input variables enter the successor value. A centered stencil
-forms a nonnegative Gauss-Newton residual model, augmented by the positive
-part of the omitted residual curvature. It is a convex quadratic represented
-as a second-order cone, not a certified global upper bound. The secondary
-problem minimizes
+P is the local discrete LQR matrix for the given-path cruise trim. The analytic
+error Jacobian applied to the affine first successor gives a convex quadratic
+with Hessian J' P J. One second-order cone represents its epigraph. There are
+no cost-to-go rollouts or finite-difference curvature calculations. This
+quadratic is locally justified, not a global nonlinear CLF; positive slack can
+remain necessary away from cruise even without a target. The secondary minimizes
 
-    rho / max(V_K(z),1) + epsilon * R(dU),
-    sum(xi) <= achievedPrimary + lexicographicTieTolerance.
+    rho / max(V(x),1) + epsilon * R(dU),
+    sum(xi) <= inheritedBudget or achievedPrimary + lexicographicTieTolerance.
 
 `R` is the normalized squared input increment about the linearization inputs.
 At an exact optimum its effect on minimum scaled CLF slack is bounded by
@@ -269,30 +270,82 @@ If `r <= 1`, the completed CLF candidate becomes an eligible optimization
 iterate. A zero primary value never skips the CLF stage. Positive PCBF slack
 remains a relaxed result and is not interpreted as collision freedom.
 
-The first completed CLF solution satisfying model agreement ends the frame.
+The first completed CLF step satisfying model agreement ends the frame.
 Positive CLF slack at a local input boundary does not trigger optional extra
 rounds. Further rounds repair model disagreement only. This is a computational
 stopping rule, not a proof that a local step preserves global nominal recovery;
 the closed-loop campaign must test that property. The complete CLF objective
-has been solved before this stopping rule is considered.
+has been solved before this stopping rule is considered. A damped step need
+not attain the optimum of that solved CLF problem.
 
-The full nonlinear propagation of the optimized inputs becomes the next
-anchor when evaluable. Damping every inaccurate candidate can leave its
+Before rebuilding an inaccurate model, retain the primary point `zP` and the
+secondary point `zS` of the same assembled conic problem. In an inherited-budget
+attempt, `zP` is the zero correction with the shifted slacks; it is not presumed
+feasible. Give `zP` the minimum nonnegative CLF epigraph height for its first
+input. Damping is available only when its equality, inequality, box and cone
+residuals are within `constraintTolerance` in this exact assembled problem.
+This is a condition on the segment construction, not a new nonlinear safety
+admission layer.
+
+For two feasible endpoints, convexity gives
+
+    z(alpha) = zP + alpha * (zS-zP),  0 <= alpha <= 1,
+
+in the same feasible set. States, controls and stage slacks are interpolated
+together. The safety budget, first-stage cap, affine dynamics, collision rows,
+physical bounds and terminal cone are preserved up to endpoint solver tolerances.
+The CLF epigraph variable is then tightened to the exact value of the existing
+convex quadratic at the interpolated input. This does not rebuild or differentiate
+the CLF, and cannot invalidate its epigraph inequality. The successor CLF value
+must be evaluated quadratically, not interpolated between endpoint values.
+
+Try at most three fractions starting at `min(0.5,0.8/sqrt(r))` and halving after
+an inaccurate trial. Each trial uses the existing nonlinear prediction-agreement
+evaluation, with no new conic solve. The first accurate trial ends the frame.
+When the full secondary solution has zero CLF slack within tolerance, a damped
+trial must retain zero slack. If it loses zero, smaller fractions are skipped:
+the convex zero-slack sublevel set on the segment is an interval containing
+alpha=1. This prevents a runtime shortcut from deliberately giving up a
+modeled zero-slack dissipation step. Positive optimal slack may increase after
+damping; global recovery and collision performance must still be measured.
+
+The approximate quadratic scaling of linearization error applies when the
+segment starts at the nonlinear linearization anchor. A nonzero primary
+correction can retain model error even as alpha tends to zero. Neither a small
+fraction nor conic feasibility proves nonlinear collision freedom. An infeasible
+base or unsuccessful bounded line search therefore returns to relinearization.
+
+After unsuccessful damping, the full nonlinear propagation of the optimized
+inputs becomes the next anchor when evaluable. Rebasing to every damped trial can leave its
 endpoint far from the small terminal core; shrinking the next correction
 box then creates artificial infeasibility and repeated expansion. Rebasing
 the complete trajectory avoids that particular obstruction. Only an invalid
 nonlinear rollout uses up to nine halved input steps to recover an evaluable
 anchor; otherwise the old anchor remains. These search controls are never
 directly issued. When `r > 1`, the next input trust scale contracts by
-`max(0.1,min(0.8,0.8/sqrt(r)))`, with a floor of 1/1024. Dynamics, tire
+`max(0.1,min(0.5,0.8/sqrt(r)))`, with a floor of 1/1024. Dynamics, tire
 derivatives, collision duals, terminal fit and CLF approximation are rebuilt.
 
-There are at most eight refinement rounds and a shared soft time budget.
-A usable inherited cap normally needs one CLF solve. Initialization or
-budget restoration can also require primary solves. A returned scale can grow by at most 1.5 for the next
-frame when agreement is good, up to its nominal value of one. This does not
-impose a physical steering magnitude or slew bound. It also does not prove
-SQP convergence: no global merit-function descent theorem is asserted.
+There are at most **two actual trajectory model builds** per frame. The normal
+path is one model and one inherited-budget CLF solve. The second build is shared
+by a fresh-flow retry or a correction after model disagreement; neither can
+silently reset the allowance. No third build is permitted. The optional second
+correction uses at most half the previous input radius. This avoids spending
+multiple rounds making only small radius reductions for ratios just above one.
+
+A failed inherited-budget attempt restores PCBF on the existing matrices and
+reuses the analytic CLF cone. One bounded input-box enlargement also reuses those
+matrices, changing only input bounds and the normalized proximal objective.
+Initialization and these restoration solves can require more than one numerical
+solve; one model does not imply one solve in every exceptional frame.
+`linearizationCount` counts actual builds, while attempt logs retain reused-model
+solves with `modelBuilt=false`.
+
+A returned scale grows by at most 1.5 for the next frame when agreement is good,
+up to its nominal value of one. A damped result also multiplies that scale by the
+accepted fraction, with a 1/1024 floor. These are numerical correction limits,
+not physical steering limits. No global SQP convergence theorem or hard execution
+deadline follows from this finite work budget.
 
 The first accurate result from the current frame is issued. A frame without
 an accurate completed CLF result reports
@@ -313,8 +366,8 @@ invariance argument nor the affine tail certifies the realized nonlinear plant.
 
 ## Issued commands, diagnostics and limits
 
-Only the selected CLF optimizer result supplies the applied input.
-Its applied input is not clipped or replaced. A nonpositive solver flag cannot supply an input. Positive numerical
+The selected CLF optimizer result, or its accepted feasible-segment step,
+supplies the applied input. Its applied input is not clipped. A nonpositive solver flag cannot supply an input. Positive numerical
 termination and nonlinear prediction agreement are required; neither is a
 continuous-time safety certificate. If no sufficiently
 accurate completed CLF result exists,
@@ -325,7 +378,9 @@ No previous trajectory or primary-only point is issued instead.
 termination it is not a certified optimum. Attempt logs retain all primary
 models and timings; `selectedAttempt` identifies the model supplying the
 command. `optimizationConverged` describes the numerical stages of the selected
-problem, not discarded restoration attempts or optimality of an inherited cap. Continuation state version 67 stores the per-stage slacks and their total
+problem, not discarded restoration attempts, optimality of an inherited cap,
+or optimality of an issued damped point. `secondaryOptimumApplied` distinguishes
+a full solution from a damped step. Continuation state version 67 stores the per-stage slacks and their total
 alongside the existing single-CLF trajectory state. The optional stored
 `linearizationTrustScale` carries the learned step size, not an executable
 backup policy.
@@ -338,16 +393,15 @@ Metadata retains the explicit scope:
 - `nonlinearValidationPerformed = false` (no complete nonlinear-constraint certificate);
 - `nonlinearPredictionEvaluated = true`, with `predictionAgreement`;
 - `modelAgreementHistory`, `refinementCount`, and `modelAgreementSatisfied`;
+- `lineSearchHistory`, `lineSearchSeconds`, `lineSearchTrials`, and `acceptedStepFraction`;
 - `recursiveFeasibilityScope = notCertifiedForNonlinearPlant`;
 - unmeasured constraint residuals and margins are NaN;
-- `clfFunction = nominalCostToGo`, with no tertiary objective;
-- required decrease, modeled successor value, rollout length, tail diagnostic
-  and bounded CLF tie allowance are recorded.
+- `clfFunction = quadraticTransverseError`, with no tertiary objective;
+- required decrease, modeled successor value and bounded CLF tie allowance are recorded.
 
 Positive PCBF slack is relaxation, not collision freedom. Zero modeled CLF
 slack alone is not a nonlinear decrease theorem: the local RTI value model is
-an approximation. The mathematical regional CLF construction, its local tail
-condition and the remaining proof obligations are stated in NOMINAL_CLF.md.
+an approximation. The local quadratic construction and its remaining proof obligations are stated in NOMINAL_CLF.md.
 Independent ODE45 replay measures actual clearance and recovery offline;
 these dense ODE45 safety/recovery measurements remain offline. Online
 nonlinear RK4 expansion evaluates approximation accuracy, not a full

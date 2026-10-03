@@ -55,17 +55,6 @@ classdef controllerKernelTest < matlab.unittest.TestCase
             testCase.verifyError(@()nonlinearBicycleModel.sample([0;0;0;8;0;0],[0;1.5],cfg), ...
                 'collisionAvoidanceController:nonlinearDomain');
         end
-        function nominalValueKernelMatchesTheInterpretedPolicyEvaluation(testCase)
-            cfg=collisionAvoidanceControllerConfig(struct('referenceSpeed',8));
-            reference=nonlinearBicycleModel.cruise(cfg,.005);terminal=nonlinearBicycleModel.nominalTail(cfg,.005);
-            native=fullfile(fileparts(fileparts(mfilename('fullpath'))),'solver','controller');
-            testCase.assumeTrue(isfile(fullfile(native,"nominalClfKernelMex."+mexext)));
-            e=[-20;.3;-1;.2;-.1];steps=60;
-            [expected,tail]=nonlinearBicycleModel.nominalResidual(e,reference.input,reference,terminal,cfg,steps);
-            [actual,nativeTail]=nominalClfKernelMex(e,reference.input,reference,terminal,cfg,steps);
-            testCase.verifyEqual(actual,expected,AbsTol=1e-9);
-            testCase.verifyEqual(nativeTail,tail);
-        end
     end
 end
 

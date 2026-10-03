@@ -24,7 +24,7 @@ function cfg=localDefaults()
     cfg.controller=struct('sampleTime',.05,'horizonSteps',16,'maximumHorizonSteps',512);
     % trustRadius scales RTI state/input corrections about each fresh rollout.
     cfg.nonlinear=struct('integrationStep',.05,'terminalRadius',.25, ...
-        'trustRadius',.5,'maximumLinearizations',8,'predictionToleranceMeters',.01, ...
+        'trustRadius',.5,'maximumLinearizations',2,'predictionToleranceMeters',.01, ...
         'statePredictionTolerance',.01,'clfPredictionTolerance',.01, ...
         'recoveryHorizonSeconds',3);
     % A target farther than encounterRangeMeters (body to body) carries no
@@ -45,16 +45,11 @@ function cfg=localDefaults()
     cfg.clf=struct('lateralPositionErrorScale',.5,'headingErrorScale',.1, ...
         'speedErrorScale',.25,'lateralVelocityErrorScale',.5,'yawRateErrorScale',.2, ...
         'frontWheelSteeringAngleWeight',1,'brakingRatioWeight',1);
-    % One nominal cost-to-go throughout the encounter and return to cruise.
-    % The feedback below defines the value function; it never supplies a
-    % fallback command. evaluationSeconds is a policy-evaluation horizon,
-    % not an arrival deadline or an additional optimization horizon.
-    % The tail solves A' P A - P = -2 Q, leaving a nonlinear decrease reserve.
-    % tailLevel reports whether a rollout ended near the local trim.
+    % One analytic quadratic CLF; decreaseFraction multiplies e' Q e.
+    % The remaining nominalClf parameters guide initialization only.
     cfg.nominalClf=struct('lookaheadSeconds',1.5,'minimumLookaheadMeters',8,'courseGain',1.5, ...
         'yawRateGain',10,'lateralAccelerationFraction',.75,'frontForceFraction',.9, ...
-        'speedGain',.5,'brakingRatioLimit',.35,'decreaseFraction',.5,'tailLevel',1e-3, ...
-        'evaluationSeconds',120);
+        'speedGain',.5,'brakingRatioLimit',.35,'decreaseFraction',.5);
     % The two convex solves share the remaining controller-call budget.
     % An in-flight factorization can overrun this soft wall-clock limit.
     cfg.solver=struct('maxIterations',400,'timeLimitSeconds',5, ...
@@ -91,7 +86,7 @@ function localValidate(cfg)
             "statePredictionTolerance","clfPredictionTolerance"]
         validateattributes(cfg.nonlinear.(name),{'double'},{'scalar','real','finite','positive'});
     end
-    validateattributes(cfg.nonlinear.maximumLinearizations,{'double'},{'scalar','real','finite','integer','positive'});
+    validateattributes(cfg.nonlinear.maximumLinearizations,{'double'},{'scalar','real','finite','integer','>=',1,'<=',2});
     validateattributes(cfg.collision.safetyMarginMeters,{'double'},{'scalar','real','finite','nonnegative'});
     validateattributes(cfg.collision.encounterRangeMeters,{'double'},{'scalar','real','nonnan','positive'});
     if cfg.collision.encounterRangeMeters<=cfg.collision.safetyMarginMeters

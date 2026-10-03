@@ -1,0 +1,1416 @@
+{
+  "scope": "Exact-state ODE45 closed-loop audit; latency is measured but not applied to the plant.",
+  "collisionFreeAndRecovered": 14,
+  "recovered": 14,
+  "interrupted": 0,
+  "frames": 5755,
+  "medianSeconds": 0.012788,
+  "p95Seconds": 0.025525500000000003,
+  "maximumSeconds": 0.231377,
+  "framesOver100ms": 2,
+  "analyticPrimaryStages": 12,
+  "numericalSolves": 5994,
+  "reducedAccuracySolves": 885,
+  "allFramesCompletedClf": true,
+  "maximumAcceptedPredictionRatio": 0.9957742640365382,
+  "worstFrame": {
+    "speed": 8,
+    "scenario": "headOn",
+    "time": 0,
+    "controllerSeconds": 0.231377,
+    "refinementCount": 1,
+    "solverCalls": 1,
+    "primaryOptimum": 0,
+    "clfSlack": 0.6808812306837625,
+    "clfInitialValue": 0,
+    "predictionAgreement": {
+      "poseErrorMeters": 0.0015806361331733606,
+      "fullPoseErrorMeters": 0.0015806361331733606,
+      "poseConstraintNodeCount": 69,
+      "scaledStateError": 0.0002746996550902862,
+      "scaledClfError": 0.003889928109443219,
+      "ratio": 0.3889928109443219,
+      "inputTrustScale": 1,
+      "actualClfSlack": 0.6769913025743193,
+      "firstInputTrustActivity": 0.1260351092793995,
+      "seconds": 0.000678,
+      "stepFraction": 0.12603510927961115,
+      "predictedClfReduction": 0.11690964875329923,
+      "actualClfReduction": 0.12079957686274245,
+      "clfReductionResolved": true,
+      "trustBoundaryRefinement": false
+    },
+    "budgetSource": "primaryOptimum",
+    "slackCap": 1e-06,
+    "firstSlackCap": null,
+    "budgetAnchorResidual": null
+  },
+  "worstComponents": {
+    "pcbfSeconds": 8.5e-05,
+    "clfSolveSeconds": 0.010463,
+    "formulationSeconds": 0.024722,
+    "clfConstructionSeconds": 0.001584,
+    "initializationSeconds": 0.017679,
+    "predictionAgreementSeconds": 0.002182,
+    "lineSearchSeconds": 0.002832,
+    "otherSeconds": 0.17182999999999998
+  },
+  "worstExcludingProcessFirstFrame": {
+    "speed": 15,
+    "scenario": "headOn",
+    "time": 0,
+    "controllerSeconds": 0.1222,
+    "refinementCount": 1,
+    "solverCalls": 1,
+    "primaryOptimum": 0,
+    "clfSlack": 1.0689254082812982,
+    "clfInitialValue": 0,
+    "predictionAgreement": {
+      "poseErrorMeters": 0.0015866385751320388,
+      "fullPoseErrorMeters": 0.0023403301208365216,
+      "poseConstraintNodeCount": 53,
+      "scaledStateError": 0.00022263384877006334,
+      "scaledClfError": 0.0038995366777609952,
+      "ratio": 0.3899536677760995,
+      "inputTrustScale": 1,
+      "actualClfSlack": 1.0650258716035372,
+      "firstInputTrustActivity": 0.09163780658964431,
+      "seconds": 0.000682,
+      "stepFraction": 0.09163780658979861,
+      "predictedClfReduction": 0.10690162158695471,
+      "actualClfReduction": 0.1108011582647157,
+      "clfReductionResolved": true,
+      "trustBoundaryRefinement": false
+    },
+    "budgetSource": "primaryOptimum",
+    "slackCap": 1e-06,
+    "firstSlackCap": null,
+    "budgetAnchorResidual": null
+  },
+  "runningWorstComponents": {
+    "pcbfSeconds": 2.2e-05,
+    "clfSolveSeconds": 0.010896,
+    "formulationSeconds": 0.009758,
+    "clfConstructionSeconds": 0.000198,
+    "initializationSeconds": 0.003643,
+    "predictionAgreementSeconds": 0.00072,
+    "lineSearchSeconds": 0.001523,
+    "otherSeconds": 0.09544
+  },
+  "negativeGrowthFrames": [],
+  "results": [
+    {
+      "executedFrames": 415,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 1.9246840625964603,
+      "maximumFrameSeconds": 0.231377,
+      "finalTransverseError": [
+        0.0581188886042118,
+        -0.005111281603078806,
+        0.00024403135669182063,
+        -0.00012489878955172535,
+        -0.00010745925817948947
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.7983333333333333,
+        "entryTimeSeconds": 19.750000000000146,
+        "confirmationTimeSeconds": 20.75000000000016
+      },
+      "speed": 8,
+      "scenario": "headOn",
+      "geometryAudit": {
+        "scenario": "headOn",
+        "passed": false,
+        "samples": 12865,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 1.9246840625964574,
+        "minimumRoadMarginMeters": -12.414924925813139,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.0581188886042118
+      },
+      "medianSeconds": 0.010938,
+      "maximumRunningSeconds": 0.060287,
+      "maximumTime": 0
+    },
+    {
+      "executedFrames": 431,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 1.5190615090875388,
+      "maximumFrameSeconds": 0.057303,
+      "finalTransverseError": [
+        0.05319431894365177,
+        -0.005644379986535329,
+        0.0002939870020401969,
+        -0.00015577804430728107,
+        -0.00014930021225706237
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.7083333333333335,
+        "entryTimeSeconds": 20.550000000000157,
+        "confirmationTimeSeconds": 21.55000000000017
+      },
+      "speed": 8,
+      "scenario": "acceleratingHeadOn",
+      "geometryAudit": {
+        "scenario": "acceleratingHeadOn",
+        "passed": false,
+        "samples": 13361,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 1.5190615090875355,
+        "minimumRoadMarginMeters": -13.522278791768123,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.05319431894365177
+      },
+      "medianSeconds": 0.011015,
+      "maximumRunningSeconds": 0.057303,
+      "maximumTime": 0.05
+    },
+    {
+      "executedFrames": 291,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 0.09952887747772489,
+      "maximumFrameSeconds": 0.094748,
+      "finalTransverseError": [
+        -0.06231067262943211,
+        0.0047538381098635694,
+        5.973750313614801e-05,
+        0.00018182924866975544,
+        0.0001620043970885858
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 6.646666666666667,
+        "entryTimeSeconds": 13.550000000000058,
+        "confirmationTimeSeconds": 14.550000000000072
+      },
+      "speed": 8,
+      "scenario": "brakingLead",
+      "geometryAudit": {
+        "scenario": "brakingLead",
+        "passed": false,
+        "samples": 9021,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.09952887747772542,
+        "minimumRoadMarginMeters": -0.6639415060445915,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": false,
+        "finalLateralErrorMeters": -0.06231067262943211
+      },
+      "medianSeconds": 0.021639,
+      "maximumRunningSeconds": 0.087949,
+      "maximumTime": 0
+    },
+    {
+      "executedFrames": 333,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 0.6592074817660246,
+      "maximumFrameSeconds": 0.046682,
+      "finalTransverseError": [
+        0.044900696285463323,
+        -0.002023027788114259,
+        -8.368215793641554e-05,
+        -0.0017092121154613207,
+        -0.0014194990795885249
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 2.0183333333333335,
+        "entryTimeSeconds": 15.650000000000087,
+        "confirmationTimeSeconds": 16.6500000000001
+      },
+      "speed": 8,
+      "scenario": "crossing",
+      "geometryAudit": {
+        "scenario": "crossing",
+        "passed": false,
+        "samples": 10323,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.6592074817660255,
+        "minimumRoadMarginMeters": -6.980938853900049,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.044900696285463323
+      },
+      "medianSeconds": 0.010969,
+      "maximumRunningSeconds": 0.046682,
+      "maximumTime": 0.05
+    },
+    {
+      "executedFrames": 358,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 0.7259793264368558,
+      "maximumFrameSeconds": 0.062783,
+      "finalTransverseError": [
+        0.06601580628481195,
+        -0.004269825051901086,
+        0.00015222864533903646,
+        -0.0002992206111385857,
+        -0.00025143149938066305
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.935,
+        "entryTimeSeconds": 16.900000000000105,
+        "confirmationTimeSeconds": 17.90000000000012
+      },
+      "speed": 8,
+      "scenario": "turningCrossing",
+      "geometryAudit": {
+        "scenario": "turningCrossing",
+        "passed": false,
+        "samples": 11098,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.7259793264368625,
+        "minimumRoadMarginMeters": -6.323177468618825,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.06601580628481195
+      },
+      "medianSeconds": 0.011022,
+      "maximumRunningSeconds": 0.048805,
+      "maximumTime": 0
+    },
+    {
+      "executedFrames": 493,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 2.373036837574545,
+      "maximumFrameSeconds": 0.046617,
+      "finalTransverseError": [
+        -0.07023900493886817,
+        0.003297204760122191,
+        -0.0006488462623144287,
+        -0.001217657153215923,
+        -0.0010727540606759733
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.9000000000000001,
+        "entryTimeSeconds": 23.6500000000002,
+        "confirmationTimeSeconds": 24.650000000000215
+      },
+      "speed": 8,
+      "scenario": "curvedHeadOn",
+      "geometryAudit": {
+        "scenario": "curvedHeadOn",
+        "passed": false,
+        "samples": 15283,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 2.373036837574542,
+        "minimumRoadMarginMeters": -9.889828588310394,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.07023900493886817
+      },
+      "medianSeconds": 0.010588,
+      "maximumRunningSeconds": 0.046617,
+      "maximumTime": 0.05
+    },
+    {
+      "executedFrames": 406,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 0.4352981326311821,
+      "maximumFrameSeconds": 0.047669,
+      "finalTransverseError": [
+        -0.06988188452158718,
+        0.003282654385392552,
+        -0.0006383728451577753,
+        -0.0012144260308474125,
+        -0.0010701430604933074
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.9366666666666668,
+        "entryTimeSeconds": 19.30000000000014,
+        "confirmationTimeSeconds": 20.300000000000153
+      },
+      "speed": 8,
+      "scenario": "curvedCrossing",
+      "geometryAudit": {
+        "scenario": "curvedCrossing",
+        "passed": false,
+        "samples": 12586,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.4352981326311842,
+        "minimumRoadMarginMeters": -5.920336845743236,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.06988188452158718
+      },
+      "medianSeconds": 0.011195,
+      "maximumRunningSeconds": 0.047669,
+      "maximumTime": 0.05
+    },
+    {
+      "executedFrames": 232,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 0.21444214853906696,
+      "maximumFrameSeconds": 0.1222,
+      "finalTransverseError": [
+        0.026350230311072798,
+        -0.001453241511063646,
+        0.0008743828502968398,
+        0.00025775053353091666,
+        -0.0013032383816352555
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.2516666666666667,
+        "entryTimeSeconds": 10.600000000000016,
+        "confirmationTimeSeconds": 11.60000000000003
+      },
+      "speed": 15,
+      "scenario": "headOn",
+      "geometryAudit": {
+        "scenario": "headOn",
+        "passed": false,
+        "samples": 7192,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.21444214853906524,
+        "minimumRoadMarginMeters": -4.5205517519623015,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.026350230311072798
+      },
+      "medianSeconds": 0.012522499999999999,
+      "maximumRunningSeconds": 0.041374,
+      "maximumTime": 0
+    },
+    {
+      "executedFrames": 224,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 0.0788409115727259,
+      "maximumFrameSeconds": 0.046404,
+      "finalTransverseError": [
+        0.02613768742359333,
+        -0.001436038022520956,
+        0.001037642717596654,
+        0.0002577169122412179,
+        -0.001282153101562904
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.2183333333333335,
+        "entryTimeSeconds": 10.20000000000001,
+        "confirmationTimeSeconds": 11.200000000000024
+      },
+      "speed": 15,
+      "scenario": "acceleratingHeadOn",
+      "geometryAudit": {
+        "scenario": "acceleratingHeadOn",
+        "passed": false,
+        "samples": 6944,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.07884091157272419,
+        "minimumRoadMarginMeters": -3.7579625349278487,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": false,
+        "finalLateralErrorMeters": 0.02613768742359333
+      },
+      "medianSeconds": 0.012858000000000001,
+      "maximumRunningSeconds": 0.046404,
+      "maximumTime": 0.05
+    },
+    {
+      "executedFrames": 318,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 0.09927081723477338,
+      "maximumFrameSeconds": 0.079276,
+      "finalTransverseError": [
+        0.0013979867096996748,
+        -0.004823171538142026,
+        -0.0005540213116344006,
+        0.00012038996726719,
+        0.00912951113368227
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 6.646666666666667,
+        "entryTimeSeconds": 14.900000000000077,
+        "confirmationTimeSeconds": 15.900000000000091
+      },
+      "speed": 15,
+      "scenario": "brakingLead",
+      "geometryAudit": {
+        "scenario": "brakingLead",
+        "passed": false,
+        "samples": 9858,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 0.09927081723477338,
+        "minimumRoadMarginMeters": -0.7794676617458789,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": false,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": false,
+        "finalLateralErrorMeters": 0.0013979867096996748
+      },
+      "medianSeconds": 0.024644,
+      "maximumRunningSeconds": 0.079276,
+      "maximumTime": 6.399999999999985
+    },
+    {
+      "executedFrames": 261,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 2.687656130916824,
+      "maximumFrameSeconds": 0.045463,
+      "finalTransverseError": [
+        0.04612099458327319,
+        -0.00238329939721366,
+        0.00019606840251640278,
+        0.0001562958227506106,
+        -0.0011156207144170569
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.8216666666666668,
+        "entryTimeSeconds": 12.050000000000036,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "speed": 15,
+      "scenario": "crossing",
+      "geometryAudit": {
+        "scenario": "crossing",
+        "passed": false,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 2.687656130916829,
+        "minimumRoadMarginMeters": -10.119955180504185,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.04612099458327319
+      },
+      "medianSeconds": 0.012584,
+      "maximumRunningSeconds": 0.045463,
+      "maximumTime": 7.549999999999981
+    },
+    {
+      "executedFrames": 261,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 2.6876167683647774,
+      "maximumFrameSeconds": 0.040253,
+      "finalTransverseError": [
+        0.049094462419481094,
+        -0.002868857448802745,
+        0.00040772787745169126,
+        0.00017469297574015976,
+        -0.0014355511480494132
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.8266666666666669,
+        "entryTimeSeconds": 12.050000000000036,
+        "confirmationTimeSeconds": 13.05000000000005
+      },
+      "speed": 15,
+      "scenario": "turningCrossing",
+      "geometryAudit": {
+        "scenario": "turningCrossing",
+        "passed": false,
+        "samples": 8091,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 2.687616768364775,
+        "minimumRoadMarginMeters": -10.730264910463202,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": 0.049094462419481094
+      },
+      "medianSeconds": 0.012421,
+      "maximumRunningSeconds": 0.040253,
+      "maximumTime": 0.05
+    },
+    {
+      "executedFrames": 1402,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 2.059736944670161,
+      "maximumFrameSeconds": 0.059904,
+      "finalTransverseError": [
+        -0.06196894731083074,
+        0.0018985403544655494,
+        -0.004887724393391579,
+        0.0004294420064606449,
+        -0.0009329176283872642
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 56.445,
+        "entryTimeSeconds": 69.09999999999822,
+        "confirmationTimeSeconds": 70.09999999999816
+      },
+      "speed": 15,
+      "scenario": "curvedHeadOn",
+      "geometryAudit": {
+        "scenario": "curvedHeadOn",
+        "passed": false,
+        "samples": 43462,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 2.059736944672451,
+        "minimumRoadMarginMeters": -7.228353096698669,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.06196894731083074
+      },
+      "medianSeconds": 0.013449,
+      "maximumRunningSeconds": 0.059904,
+      "maximumTime": 54.84999999999902
+    },
+    {
+      "executedFrames": 330,
+      "failure": "",
+      "failureTime": null,
+      "failedFrameSeconds": null,
+      "minimumReplayClearanceMeters": 1.8252285302980236,
+      "maximumFrameSeconds": 0.0463,
+      "finalTransverseError": [
+        -0.06245886245908792,
+        0.0018995401097836534,
+        -0.004994816344000341,
+        0.00043204961735727673,
+        -0.0009297319846071489
+      ],
+      "recovery": {
+        "enabled": true,
+        "recovered": true,
+        "tolerances": [
+          0.1,
+          0.017453292519943295,
+          0.1,
+          0.05,
+          0.01
+        ],
+        "errorOrder": [
+          "lateralMeters",
+          "headingRadians",
+          "speedMetersPerSecond",
+          "lateralVelocityMetersPerSecond",
+          "yawRateRadiansPerSecond"
+        ],
+        "dwellSeconds": 1,
+        "minimumTimeSeconds": 1.8250000000000002,
+        "entryTimeSeconds": 15.500000000000085,
+        "confirmationTimeSeconds": 16.5000000000001
+      },
+      "speed": 15,
+      "scenario": "curvedCrossing",
+      "geometryAudit": {
+        "scenario": "curvedCrossing",
+        "passed": false,
+        "samples": 10230,
+        "sampledRecoveryConfirmed": true,
+        "minimumClearanceMeters": 1.825228530298029,
+        "minimumRoadMarginMeters": -7.40907358986172,
+        "roadConstraintsEnforced": false,
+        "roadBoundarySatisfied": false,
+        "agreesWithMatlabGeometry": true,
+        "allPredictionsZeroSlack": true,
+        "everyHoldFeasible": false,
+        "everyHoldInvokedOptimizer": true,
+        "everyHoldConverged": true,
+        "strictlyCollisionFree": true,
+        "configuredClearanceSatisfied": true,
+        "finalLateralErrorMeters": -0.06245886245908792
+      },
+      "medianSeconds": 0.012792000000000001,
+      "maximumRunningSeconds": 0.0463,
+      "maximumTime": 0.05
+    }
+  ],
+  "sourceHashes": {
+    "campaign/speed8-headOn.json": "a938358d8c39e836f8a43b902c96c658e83796276faa5e9e8e6dde352352301c",
+    "campaign/speed8-acceleratingHeadOn.json": "85082db3097aaf99b23f6ebeaa3d4c0724c7cbfc5c3e5d8e9079f859bfdbdf62",
+    "campaign/speed8-brakingLead.json": "173f1758307ab7654c6902f623767d1653e5605b8cefe4cd2553d0b4f2f5d357",
+    "campaign/speed8-crossing.json": "52b2d51f1b5bed3779cf1913eec10a7d01fb580ed527d7426895ad2914d75635",
+    "campaign/speed8-turningCrossing.json": "8db050e28ea3c4848cb6919c4bcdd17f2a66035ede66c0d5dc6e8308c1c3ec77",
+    "campaign/speed8-curvedHeadOn.json": "e585833b0ef71c15408b36a94bfc98c1afdfab3ec81293c9cba75d437e5e81fa",
+    "campaign/speed8-curvedCrossing.json": "8edab3a249ef977c431e15939d527eb9d23e077fd8075960a12e053ca0216dce",
+    "campaign/speed15-headOn.json": "75f7ce0e338e7259d9022308a3faa9ae0d2216579e0e8f71ef1debb75ff511ad",
+    "campaign/speed15-acceleratingHeadOn.json": "8d3752517d6e78c91f74e0f700b5d160f891c353a39e0e65523b3cabefa75f78",
+    "campaign/speed15-brakingLead.json": "092d2e4790ed298433134bb7784fa0fbbfed2cb1885147a1c4c8dea14b17a1b5",
+    "campaign/speed15-crossing.json": "0e520650c22a5bf3e6b5a2672547d351f16e68b1f7f9e8b68c8b6a0a9e77782e",
+    "campaign/speed15-turningCrossing.json": "c68ee527257bc952b0c51a5cbf91641964c6420687d1812a01a124a55f269625",
+    "campaign/speed15-curvedHeadOn.json": "8fea5bcc267378261d76e6ce67c08226a9c9ee71ffcb9dfa40d2af6184543e43",
+    "campaign/speed15-curvedCrossing.json": "8d9f553c657fb5529f3235766247de485dbe1291d8aaf6a6c9c15b5e5e335137"
+  },
+  "inheritedBudgetFrames": 5668,
+  "budgetRestoredFrames": 73,
+  "oneSolveFrames": 5604,
+  "oneRoundFrames": 5672,
+  "budgetAttempts": 5820,
+  "maximumBudgetExcess": 7.541882473764901e-10,
+  "maximumFirstSlackExcess": 3.4993747179648137e-12,
+  "numericallyFeasibleBudgetAnchors": 1570,
+  "timingScope": "Campaign follows unit tests in the same MATLAB process; separate fresh-process initialization is measured independently.",
+  "dampedFrames": 20,
+  "lineSearchReasons": {
+    "accepted": 20,
+    "infeasibleBase": 75,
+    "modelDisagreement": 4,
+    "zeroClfSlackWouldBeLost": 4
+  },
+  "lineSearchTrials": 43,
+  "totalLineSearchSeconds": 0.04539,
+  "maximumLineSearchSeconds": 0.004757,
+  "acceptedFractions": [
+    0.12603510927961115,
+    0.12599430828592464,
+    0.3790364227610211,
+    0.1273095859531602,
+    0.5,
+    0.12639964570266518,
+    0.12785747955486335,
+    0.5,
+    0.09163780658979861,
+    0.5,
+    0.09191490088828277,
+    0.5,
+    0.5,
+    0.10144585734683373,
+    0.16141851187824313,
+    0.07711032770803916,
+    0.07835722226048193,
+    0.11803936208941584,
+    0.08543994978865437,
+    0.1552967629642756
+  ],
+  "roundHistogram": {
+    "1": 5672,
+    "2": 83
+  },
+  "dampedBudgetAndClfAssertionsPassed": true,
+  "modelBuildHistogram": {
+    "1": 5670,
+    "2": 85
+  },
+  "solveHistogram": {
+    "1": 5604,
+    "2": 75,
+    "3": 67,
+    "6": 1,
+    "4": 7,
+    "5": 1
+  },
+  "allModelBudgetsRespected": true,
+  "maximumContinuationSeconds": 0.087949,
+  "worstContinuationFrame": {
+    "file": "speed8-brakingLead.json",
+    "time": 5.349999999999989,
+    "controllerSeconds": 0.087949,
+    "linearizationCount": 2,
+    "refinementCount": 2,
+    "solverCalls": 5,
+    "clfSlack": 7.34453449659195,
+    "lineSearchHistory": {
+      "reason": "modelDisagreement",
+      "baseResidual": 3.2714041193203266e-13,
+      "baseClfSlack": 14.262031366665964,
+      "fullClfSlack": 7.761034955271283,
+      "accepted": false,
+      "seconds": 0.002084,
+      "trials": [
+        {
+          "fraction": 0.4902801058791543,
+          "clfSlack": 10.928239915100235,
+          "safety": 0.00010194280377890484,
+          "agreement": {
+            "poseErrorMeters": 0.022342462390990123,
+            "fullPoseErrorMeters": 0.022342462390990123,
+            "poseConstraintNodeCount": 69,
+            "scaledStateError": 0.0010954068192711094,
+            "scaledClfError": 3.2521386896250466e-08,
+            "ratio": 2.2342462390990123,
+            "inputTrustScale": 0.5625,
+            "actualClfSlack": 10.928229962946672,
+            "firstInputTrustActivity": 0.13572118414310852,
+            "seconds": 0.000622,
+            "stepFraction": 0.4902801058791543,
+            "predictedClfReduction": 3.3337914515657285,
+            "actualClfReduction": 3.333801403719292,
+            "clfReductionResolved": true,
+            "trustBoundaryRefinement": false
+          }
+        },
+        {
+          "fraction": 0.24514005293957716,
+          "clfSlack": 12.559911721760853,
+          "safety": 0.00010169766436784893,
+          "agreement": {
+            "poseErrorMeters": 0.030965595923475017,
+            "fullPoseErrorMeters": 0.030965595923475017,
+            "poseConstraintNodeCount": 69,
+            "scaledStateError": 0.0017369773374015334,
+            "scaledClfError": 0.0002956339666051467,
+            "ratio": 3.0965595923475018,
+            "inputTrustScale": 0.5625,
+            "actualClfSlack": 12.46944219033851,
+            "firstInputTrustActivity": 0.45420283916534104,
+            "seconds": 0.00062,
+            "stepFraction": 0.24514005293957716,
+            "predictedClfReduction": 1.7021196449051104,
+            "actualClfReduction": 1.7925891763274535,
+            "clfReductionResolved": true,
+            "trustBoundaryRefinement": false
+          }
+        },
+        {
+          "fraction": 0.12257002646978858,
+          "clfSlack": 13.402165564432675,
+          "safety": 0.00010157509466232098,
+          "agreement": {
+            "poseErrorMeters": 0.038831961433444695,
+            "fullPoseErrorMeters": 0.038831961433444695,
+            "poseConstraintNodeCount": 69,
+            "scaledStateError": 0.0021099134172578027,
+            "scaledClfError": 0.0006806934396502258,
+            "ratio": 3.8831961433444695,
+            "inputTrustScale": 0.5625,
+            "actualClfSlack": 13.193860621551506,
+            "firstInputTrustActivity": 0.6842550170110255,
+            "seconds": 0.000613,
+            "stepFraction": 0.12257002646978858,
+            "predictedClfReduction": 0.8598658022332888,
+            "actualClfReduction": 1.0681707451144575,
+            "clfReductionResolved": true,
+            "trustBoundaryRefinement": false
+          }
+        }
+      ],
+      "round": 1
+    },
+    "attempts": [
+      {
+        "initialization": "shiftedInputRollout",
+        "terminationReason": "clfNoNumericalResult",
+        "solverCalls": 1,
+        "stages": [
+          {
+            "objective": "inheritedSafetyBudget",
+            "exitFlag": null,
+            "seconds": 0,
+            "value": 4.1439584610183404e-05,
+            "numericalSolve": false,
+            "solverInfo": {}
+          },
+          {
+            "objective": "clfSlack",
+            "exitFlag": -2,
+            "seconds": 0.012278,
+            "value": null,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 2,
+              "iterations": 22,
+              "solveSeconds": 0.012133713,
+              "primalResidual": 1.908421335587061e-10,
+              "dualResidual": 3.0549644606443304e-17,
+              "objective": null
+            }
+          }
+        ],
+        "primaryOptimum": null,
+        "primaryLowerBound": 0.00010145221232496504,
+        "inputTrustScale": 0.5625,
+        "budgetSource": "shiftedTrajectory",
+        "slackCap": 4.1439584610183404e-05,
+        "firstSlackCap": 4.1439581169255354e-05,
+        "budgetAnchorResidual": 0.0016553010248004406,
+        "initializationSeconds": 0.000606,
+        "formulationSeconds": 0.010469,
+        "clfConstructionSeconds": 0.000123,
+        "modelBuilt": true
+      },
+      {
+        "initialization": "shiftedInputRollout",
+        "terminationReason": "twoStagesReturned",
+        "solverCalls": 2,
+        "stages": [
+          {
+            "objective": "pcbfSlack",
+            "exitFlag": 1,
+            "seconds": 0.006951,
+            "value": 0.00010145252495679305,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 1,
+              "iterations": 13,
+              "solveSeconds": 0.006804468,
+              "primalResidual": 8.249591527526699e-12,
+              "dualResidual": 7.634470888160602e-11,
+              "objective": 0.00010145252495679306
+            }
+          },
+          {
+            "objective": "clfSlack",
+            "exitFlag": 1,
+            "seconds": 0.016601,
+            "value": 7.761034955271283,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 1,
+              "iterations": 26,
+              "solveSeconds": 0.016466432,
+              "primalResidual": 2.994875413123905e-09,
+              "dualResidual": 1.4290190160543706e-11,
+              "objective": 0.02536291637616726
+            }
+          }
+        ],
+        "primaryOptimum": 0.00010145252495679305,
+        "primaryLowerBound": 0.00010145221232496504,
+        "inputTrustScale": 0.5625,
+        "budgetSource": "primaryOptimum",
+        "slackCap": 0.00010245252495679304,
+        "firstSlackCap": null,
+        "budgetAnchorResidual": null,
+        "initializationSeconds": 0,
+        "formulationSeconds": 0,
+        "clfConstructionSeconds": 0,
+        "modelBuilt": false
+      },
+      {
+        "initialization": "sameFrameRollout",
+        "terminationReason": "twoStagesReturned",
+        "solverCalls": 2,
+        "stages": [
+          {
+            "objective": "pcbfSlack",
+            "exitFlag": 1,
+            "seconds": 0.008461,
+            "value": 0.00010145222105310065,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 1,
+              "iterations": 16,
+              "solveSeconds": 0.008268161,
+              "primalResidual": 2.484142285062409e-13,
+              "dualResidual": 2.9989083822965045e-12,
+              "objective": 0.00010145222088342932
+            }
+          },
+          {
+            "objective": "clfSlack",
+            "exitFlag": 1,
+            "seconds": 0.015635,
+            "value": 7.34453449659195,
+            "numericalSolve": true,
+            "solverInfo": {
+              "nativeStatus": 1,
+              "iterations": 26,
+              "solveSeconds": 0.015489218,
+              "primalResidual": 1.8945514704564096e-10,
+              "dualResidual": 7.591714309901147e-12,
+              "objective": 0.024000663884563962
+            }
+          }
+        ],
+        "primaryOptimum": 0.00010145222105310065,
+        "primaryLowerBound": 0.00010145221232496504,
+        "inputTrustScale": 0.2757825595570243,
+        "budgetSource": "primaryOptimum",
+        "slackCap": 0.00010245222105310064,
+        "firstSlackCap": null,
+        "budgetAnchorResidual": null,
+        "initializationSeconds": 3e-06,
+        "formulationSeconds": 0.010267,
+        "clfConstructionSeconds": 0.000154,
+        "modelBuilt": true
+      }
+    ],
+    "modelAgreementHistory": [
+      {
+        "poseErrorMeters": 0.02662511127786043,
+        "fullPoseErrorMeters": 0.02662511127786043,
+        "poseConstraintNodeCount": 69,
+        "scaledStateError": 0.002142859647070607,
+        "scaledClfError": 0.0011559365161880068,
+        "ratio": 2.662511127786043,
+        "inputTrustScale": 0.5625,
+        "actualClfSlack": 7.407296728405312,
+        "firstInputTrustActivity": 0.9625968449934267,
+        "seconds": 0.000643,
+        "stepFraction": 1,
+        "predictedClfReduction": 3.1914513293263056,
+        "actualClfReduction": 3.545189556192277,
+        "clfReductionResolved": true,
+        "trustBoundaryRefinement": false
+      },
+      {
+        "poseErrorMeters": 0.0014474672371969537,
+        "fullPoseErrorMeters": 0.0014474672371969537,
+        "poseConstraintNodeCount": 69,
+        "scaledStateError": 0.000188423410812442,
+        "scaledClfError": 3.037406676574937e-07,
+        "ratio": 0.14474672371969538,
+        "inputTrustScale": 0.2757825595570243,
+        "actualClfSlack": 7.344441545966744,
+        "firstInputTrustActivity": 0.1528406653502541,
+        "seconds": 0.000641,
+        "stepFraction": 1,
+        "predictedClfReduction": 0.06276223181327545,
+        "actualClfReduction": 0.06285518243848198,
+        "clfReductionResolved": true,
+        "trustBoundaryRefinement": false
+      }
+    ],
+    "predictionAgreement": {
+      "poseErrorMeters": 0.0014474672371969537,
+      "fullPoseErrorMeters": 0.0014474672371969537,
+      "poseConstraintNodeCount": 69,
+      "scaledStateError": 0.000188423410812442,
+      "scaledClfError": 3.037406676574937e-07,
+      "ratio": 0.14474672371969538,
+      "inputTrustScale": 0.2757825595570243,
+      "actualClfSlack": 7.344441545966744,
+      "firstInputTrustActivity": 0.1528406653502541,
+      "seconds": 0.000641,
+      "stepFraction": 1,
+      "predictedClfReduction": 0.06276223181327545,
+      "actualClfReduction": 0.06285518243848198,
+      "clfReductionResolved": true,
+      "trustBoundaryRefinement": false
+    }
+  },
+  "continuationWorstComponentsSeconds": {
+    "initialization": 0.000609,
+    "formulationExcludingClf": 0.020458999999999998,
+    "clfConstruction": 0.000277,
+    "pcbf": 0.015411999999999999,
+    "clfSolve": 0.044514,
+    "predictionAgreement": 0.001284,
+    "lineSearch": 0.002084,
+    "other": 0.0033100000000000074
+  },
+  "startupFrames": [
+    {
+      "file": "speed8-headOn.json",
+      "time": 0,
+      "controllerSeconds": 0.231377,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed8-acceleratingHeadOn.json",
+      "time": 0,
+      "controllerSeconds": 0.029616,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed8-brakingLead.json",
+      "time": 0,
+      "controllerSeconds": 0.094748,
+      "linearizationCount": 2,
+      "solverCalls": 6
+    },
+    {
+      "file": "speed8-crossing.json",
+      "time": 0,
+      "controllerSeconds": 0.026823,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed8-turningCrossing.json",
+      "time": 0,
+      "controllerSeconds": 0.062783,
+      "linearizationCount": 2,
+      "solverCalls": 4
+    },
+    {
+      "file": "speed8-curvedHeadOn.json",
+      "time": 0,
+      "controllerSeconds": 0.039093,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed8-curvedCrossing.json",
+      "time": 0,
+      "controllerSeconds": 0.026076,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed15-headOn.json",
+      "time": 0,
+      "controllerSeconds": 0.1222,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed15-acceleratingHeadOn.json",
+      "time": 0,
+      "controllerSeconds": 0.027108,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed15-brakingLead.json",
+      "time": 0,
+      "controllerSeconds": 0.072858,
+      "linearizationCount": 2,
+      "solverCalls": 4
+    },
+    {
+      "file": "speed15-crossing.json",
+      "time": 0,
+      "controllerSeconds": 0.031736,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed15-turningCrossing.json",
+      "time": 0,
+      "controllerSeconds": 0.027637,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed15-curvedHeadOn.json",
+      "time": 0,
+      "controllerSeconds": 0.019368,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    },
+    {
+      "file": "speed15-curvedCrossing.json",
+      "time": 0,
+      "controllerSeconds": 0.02831,
+      "linearizationCount": 1,
+      "solverCalls": 1
+    }
+  ],
+  "zeroPcbfFrames": 5743,
+  "oneModelFraction": 0.9852302345786272,
+  "oneSolveFraction": 0.9737619461337967,
+  "refinedMinimumClearanceMeters": 0.07879758437100103,
+  "coldFirstCallSeconds": 1.409726,
+  "cachedFreshProblemMedianSeconds": 0.0377145,
+  "framesOver50ms": 35,
+  "matlabTestsPassed": 393,
+  "localQuadraticSamplesPassed": 120
+}

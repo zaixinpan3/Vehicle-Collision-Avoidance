@@ -1,0 +1,61 @@
+{
+  "baseCommit": "56743d0557443c2a07d553a70a43986584c90290",
+  "matlab": "R2026a Update 3, -singleCompThread",
+  "rawCache": "/home/zai/.cache/collisionAvoidance/damped-rti-20261002",
+  "rawCampaignSha256": {
+    "campaign/speed8-headOn.json": "a938358d8c39e836f8a43b902c96c658e83796276faa5e9e8e6dde352352301c",
+    "campaign/speed8-acceleratingHeadOn.json": "85082db3097aaf99b23f6ebeaa3d4c0724c7cbfc5c3e5d8e9079f859bfdbdf62",
+    "campaign/speed8-brakingLead.json": "173f1758307ab7654c6902f623767d1653e5605b8cefe4cd2553d0b4f2f5d357",
+    "campaign/speed8-crossing.json": "52b2d51f1b5bed3779cf1913eec10a7d01fb580ed527d7426895ad2914d75635",
+    "campaign/speed8-turningCrossing.json": "8db050e28ea3c4848cb6919c4bcdd17f2a66035ede66c0d5dc6e8308c1c3ec77",
+    "campaign/speed8-curvedHeadOn.json": "e585833b0ef71c15408b36a94bfc98c1afdfab3ec81293c9cba75d437e5e81fa",
+    "campaign/speed8-curvedCrossing.json": "8edab3a249ef977c431e15939d527eb9d23e077fd8075960a12e053ca0216dce",
+    "campaign/speed15-headOn.json": "75f7ce0e338e7259d9022308a3faa9ae0d2216579e0e8f71ef1debb75ff511ad",
+    "campaign/speed15-acceleratingHeadOn.json": "8d3752517d6e78c91f74e0f700b5d160f891c353a39e0e65523b3cabefa75f78",
+    "campaign/speed15-brakingLead.json": "092d2e4790ed298433134bb7784fa0fbbfed2cb1885147a1c4c8dea14b17a1b5",
+    "campaign/speed15-crossing.json": "0e520650c22a5bf3e6b5a2672547d351f16e68b1f7f9e8b68c8b6a0a9e77782e",
+    "campaign/speed15-turningCrossing.json": "c68ee527257bc952b0c51a5cbf91641964c6420687d1812a01a124a55f269625",
+    "campaign/speed15-curvedHeadOn.json": "8fea5bcc267378261d76e6ce67c08226a9c9ee71ffcb9dfa40d2af6184543e43",
+    "campaign/speed15-curvedCrossing.json": "8d9f553c657fb5529f3235766247de485dbe1291d8aaf6a6c9c15b5e5e335137"
+  },
+  "checks": {
+    "matlabTests": 393,
+    "localQuadraticSamples": 120,
+    "independentGeometryAndRecovery": 14,
+    "budgetTransferHolds": 5668,
+    "denseRefinementSamplesPerCase": 3003
+  },
+  "pairedStudyScope": "Same-process six alternating pairs, three warmups, terminal preparation outside timer. Recorded immediately before removal of inactive cost-to-go utilities; active quadratic CLF, damping, bounds and solver are identical. Old and new models use eight and two model budgets, respectively. The frozen measured sources are in the external diagnostic export.",
+  "timingScope": "Full controller call, including online formulation and postprocessing. Campaign follows 311 related tests. Fresh-process cold first call measured separately. Computation delay is not applied to the simulated plant.",
+  "physicalScope": "Exact measured states, deterministic fixed target A and beta, no road constraints; ODE45 plant replay; 0.10 m affine node buffer, observed positive physical clearance criterion. No hard nonlinear recursive-feasibility certificate.",
+  "excluded": "Unrelated estimator/report-index/perception/manuscript/administrative/reference changes and nested solver binaries/dependencies.",
+  "campaignSourceSha256": {
+    "config/collisionAvoidanceControllerConfig.m": "fec71b3649c9bd941df7c374095aa6b13b548a0dfd93039eb76ccba9160bf60f",
+    "controller/collisionAvoidanceController.m": "95f10b3be98bc300c4278beabc76287da28b9b030da99d9938f09533f3eb5dfd",
+    "controller/nonlinearBicycleModel.m": "c55943a9df940c134c291da86353486a68ebad7d06aa5eefab09dd17a5d6071c",
+    "controller/solvePredictiveControl.m": "b2ea1ab8de21886ee57d121c0c206d678fca4a060d57371933ad277e0dfa095d",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "33403893736382ef7aecf57a8df9968993a8c7b1bef93eae89dcf27e6b8ef776",
+    "scripts/runTimedFlowCampaign.m": "265f33b7dd33bd054e8d42677bf5fced253e53e999acd1597d50a7db4dd6d8b5",
+    "scripts/buildControllerKernels.m": "1422fb4766ae474df082cd0ccb1cf7a3913829f1e35c76a61fcaad7a98da1ff5",
+    "scripts/validateNominalClf.m": "0076fe29d3cf9f4b51747cd6e161ebb32101d769b77d341cd8b4cad38bc4d4bd",
+    "tests/twoStagePredictiveControlTest.m": "3d88e5e0f232bb8a754a70a696f667f5085ff1c6e9602d3de01d6369dd231de7",
+    "tests/nominalClfTest.m": "3eb99f2fda1b3db5a4a9b13b3e3d6f52dbd3fad6be8b96110dd4d3bfd05ff245",
+    "tests/clfNominalRecoveryTest.m": "f4bdd6db707d36029142ca2b976bb8feef1ff536e924d620b65e154369fffdbd",
+    "tests/controllerKernelTest.m": "9106e5a255918c0aa489a3eb8dc031951905bf8d56740f6156835ddbeb194988"
+  },
+  "sourceSha256": {
+    "config/collisionAvoidanceControllerConfig.m": "fec71b3649c9bd941df7c374095aa6b13b548a0dfd93039eb76ccba9160bf60f",
+    "controller/collisionAvoidanceController.m": "95f10b3be98bc300c4278beabc76287da28b9b030da99d9938f09533f3eb5dfd",
+    "controller/nonlinearBicycleModel.m": "c55943a9df940c134c291da86353486a68ebad7d06aa5eefab09dd17a5d6071c",
+    "controller/solvePredictiveControl.m": "bfc5c23de5dc7caf8309d1f6a0434c70f72e2c0d8ba8349ebd659e2a896a2c77",
+    "scripts/runNonlinearPredictiveSafetyValidation.m": "33403893736382ef7aecf57a8df9968993a8c7b1bef93eae89dcf27e6b8ef776",
+    "scripts/runTimedFlowCampaign.m": "265f33b7dd33bd054e8d42677bf5fced253e53e999acd1597d50a7db4dd6d8b5",
+    "scripts/buildControllerKernels.m": "1422fb4766ae474df082cd0ccb1cf7a3913829f1e35c76a61fcaad7a98da1ff5",
+    "scripts/validateNominalClf.m": "0076fe29d3cf9f4b51747cd6e161ebb32101d769b77d341cd8b4cad38bc4d4bd",
+    "tests/twoStagePredictiveControlTest.m": "3d88e5e0f232bb8a754a70a696f667f5085ff1c6e9602d3de01d6369dd231de7",
+    "tests/nominalClfTest.m": "3eb99f2fda1b3db5a4a9b13b3e3d6f52dbd3fad6be8b96110dd4d3bfd05ff245",
+    "tests/clfNominalRecoveryTest.m": "2f480d8c40b858e07c970b20cb2b0414d4f7af0ee88b2333d9228d018b757a75",
+    "tests/controllerKernelTest.m": "9106e5a255918c0aa489a3eb8dc031951905bf8d56740f6156835ddbeb194988"
+  },
+  "postCampaignEdits": "Trailing whitespace cleanup, removal of an unused local reference assignment and stale analyzer suppression; no numerical algorithm changes. Final Code Analyzer uses factory configuration: eight sparse-indexing performance advisories in existing formulation rows, zero messages elsewhere. The recovery-test help comment was corrected to distinguish local decrease from displaced recovery."
+}
